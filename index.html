@@ -326,49 +326,49 @@
                         
                         <div class="form-group">
                             <label for="labor-income" class="label">
-                                劳务报酬所得 (元/月)
+                                劳务报酬所得 (元/年)
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
                                     <span class="tooltip-text">劳务报酬所得，按80%折算计入综合所得收入额</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="labor-income" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="labor-income" class="input-field" value="0" min="0" step="1000">
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
-                                月计入综合所得收入额：<span id="labor-income-calculated">0</span> 元
+                                年计入综合所得收入额：<span id="labor-income-calculated">0</span> 元
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="author-income" class="label">
-                                稿酬所得 (元/月)
+                                稿酬所得 (元/年)
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
                                     <span class="tooltip-text">稿酬所得，按80%×70%折算计入综合所得收入额</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="author-income" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="author-income" class="input-field" value="0" min="0" step="1000">
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
-                                月计入综合所得收入额：<span id="author-income-calculated">0</span> 元
+                                年计入综合所得收入额：<span id="author-income-calculated">0</span> 元
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="royalty-income" class="label">
-                                特许权使用费所得 (元/月)
+                                特许权使用费所得 (元/年)
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
                                     <span class="tooltip-text">特许权使用费所得，按80%折算计入综合所得收入额</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="royalty-income" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="royalty-income" class="input-field" value="0" min="0" step="1000">
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
-                                月计入综合所得收入额：<span id="royalty-income-calculated">0</span> 元
+                                年计入综合所得收入额：<span id="royalty-income-calculated">0</span> 元
                             </div>
                         </div>
                         
@@ -436,150 +436,214 @@
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="insurance-deduction" class="label">
-                                专项扣除 - 三险一金 (元/月)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">个人承担的养老保险、医疗保险、失业保险和住房公积金总额</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="insurance-deduction" class="input-field" value="2000" min="0" step="100">
-                            </div>
-                        </div>
-                        
                         <div class="mt-4">
-                            <h4 class="font-medium text-gray-700 mb-3">专项附加扣除</h4>
-                            
-                            <div class="form-group">
-                                <label for="elderly-deduction" class="label">
-                                    赡养老人 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">独生子女每月2000元，非独生子女分摊每月2000元，最高3000元/月</span>
-                                    </span>
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="special-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">专项扣除</span>
                                 </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="elderly-deduction" class="input-field" value="0" min="0" max="3000" step="100">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：每月最高3000元
-                                </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="children-deduction" class="label">
-                                    子女教育+婴幼儿照护 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">每个子女每月2000元的专项附加扣除</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="children-deduction" class="input-field" value="0" min="0" step="2000">
+                            <div id="special-deduction-content" class="mb-6">
+                                <div class="form-group">
+                                    <label for="pension-insurance" class="label">
+                                        养老保险金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的养老保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="pension-insurance" class="input-field" value="0" min="0" step="100">
+                                    </div>
                                 </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：每个子女每月2000元，请输入子女数量×2000
+                                <div class="form-group">
+                                    <label for="medical-insurance" class="label">
+                                        医疗保险金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的医疗保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="medical-insurance" class="input-field" value="0" min="0" step="100">
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="rent-deduction" class="label">
-                                    住房租金 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">根据城市类型不同，每月1500元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="rent-deduction" class="input-field" value="0" min="0" max="3000" step="100">
+                                <div class="form-group">
+                                    <label for="unemployment-insurance" class="label">
+                                        失业保险金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的失业保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="unemployment-insurance" class="input-field" value="0" min="0" step="100">
+                                    </div>
                                 </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：默认1500元/月，可根据实际情况调整
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="housing-loan-deduction" class="label">
-                                    住房贷款利息 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">首套住房贷款利息支出，每月1000元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="housing-loan-deduction" class="input-field" value="0" min="0" max="1000" step="100">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：每月最高1000元
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="education-deduction" class="label">
-                                    继续教育 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">学历继续教育每月400元，职业资格教育每月300元</span>
-                                    </span>
-                                </label>
-                                <select id="education-deduction" class="input-field">
-                                    <option value="0">无</option>
-                                    <option value="300">职业资格教育 (300元/月)</option>
-                                    <option value="400">学历继续教育 (400元/月)</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="medical-deduction" class="label">
-                                    大病医疗 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">医保目录范围内自付部分超过15000元的部分，限额80000元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="medical-deduction" class="input-field" value="0" min="0" max="80000" step="1000">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：实际可扣除额为超过15000元的部分，系统将自动计算
+                                <div class="form-group">
+                                    <label for="housing-fund" class="label">
+                                        住房公积金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的住房公积金部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="housing-fund" class="input-field" value="0" min="0" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：根据实际个人承担部分填写
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="mt-4">
-                            <h4 class="font-medium text-gray-700 mb-3">其他扣除</h4>
-                            
-                            <div class="form-group">
-                                <label for="pension-deduction" class="label">
-                                    个人养老金 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
-                                    </span>
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="special-additional-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">专项附加扣除</span>
                                 </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：月度最高扣除1000元（年度12000元）
-                                </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="insurance-other-deduction" class="label">
-                                    商业健康保险 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                            <div id="special-additional-deduction-content" class="mb-6">
+                                <div class="form-group">
+                                    <label for="elderly-deduction" class="label">
+                                        赡养老人 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">独生子女每月2000元，非独生子女分摊每月2000元，最高3000元/月</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="elderly-deduction" class="input-field" value="0" min="0" max="3000" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：每月最高3000元
+                                    </div>
                                 </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：月度最高扣除200元（年度2400元）
+                                
+                                <div class="form-group">
+                                    <label for="children-deduction" class="label">
+                                        子女教育+婴幼儿照护 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">每个子女每月2000元的专项附加扣除</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="children-deduction" class="input-field" value="0" min="0" step="2000">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：每个子女每月2000元，请输入子女数量×2000
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="rent-deduction" class="label">
+                                        住房租金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">根据城市类型不同，每月1500元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="rent-deduction" class="input-field" value="0" min="0" max="3000" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：默认1500元/月，可根据实际情况调整
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="housing-loan-deduction" class="label">
+                                        住房贷款利息 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">首套住房贷款利息支出，每月1000元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="housing-loan-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：每月最高1000元
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="education-deduction" class="label">
+                                        继续教育 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">学历继续教育每月400元，职业资格教育每月300元</span>
+                                        </span>
+                                    </label>
+                                    <select id="education-deduction" class="input-field">
+                                        <option value="0">无</option>
+                                        <option value="300">职业资格教育 (300元/月)</option>
+                                        <option value="400">学历继续教育 (400元/月)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="medical-deduction" class="label">
+                                        大病医疗 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">医保目录范围内自付部分超过15000元的部分，限额80000元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="medical-deduction" class="input-field" value="0" min="0" max="80000" step="1000">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：实际可扣除额为超过15000元的部分，系统将自动计算
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="other-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">其他扣除</span>
+                                </label>
+                            </div>
+                            
+                            <div id="other-deduction-content" class="mb-6">
+                                <div class="form-group">
+                                    <label for="pension-deduction" class="label">
+                                        个人养老金 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：月度最高扣除1000元（年度12000元）
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="insurance-other-deduction" class="label">
+                                        商业健康保险 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：月度最高扣除200元（年度2400元）
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -588,6 +652,10 @@
                         
                         <div class="mt-6 p-4 bg-blue-50 rounded-lg">
                             <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">月度专项扣除合计</span>
+                                    <span id="monthly-special-deduction-total">0</span> 元
+                                </div>
                                 <div class="flex justify-between items-center">
                                     <span class="text-gray-700">月度专项附加扣除合计</span>
                                     <span id="monthly-special-additional-total">0</span> 元
@@ -623,7 +691,7 @@
                 <div id="step-parameters" class="step-pane hidden">
                     <div class="card">
                         <h3 class="text-lg font-bold text-primary mb-4">其他计算参数</h3>
-                        <p class="text-sm text-gray-600 mb-4">请设置其他计算参数</p>
+            
                         
                         <div class="form-group">
                             <label for="prepaid-tax" class="label">
@@ -638,14 +706,7 @@
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label class="label">收入增长预期</label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="income-growth" class="input-field" value="5" min="0" max="30" step="1">
-                                <span class="text-gray-500">%</span>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1">预计下一年度收入增长率，用于预算参考</p>
-                        </div>
+
                         
 
                         
@@ -827,20 +888,6 @@
                 <p class="text-sm text-gray-600 mb-4">请输入税额信息和扣除项，系统将自动反推税前收入</p>
                 
                 <div class="form-group">
-                    <label class="label">倒算方式</label>
-                    <div class="flex space-x-4">
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="reverse-method" value="total-tax" class="form-radio text-primary" checked>
-                            <span class="ml-2">全年应缴税额</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="reverse-method" value="refund-tax" class="form-radio text-primary">
-                            <span class="ml-2">年度应退/应补税额</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div id="total-tax-input" class="form-group">
                     <label for="reverse-total-tax" class="label">
                         全年应缴税额 (元)
                         <span class="tooltip ml-1">
@@ -853,50 +900,31 @@
                     </div>
                 </div>
                 
-                <div id="refund-tax-input" class="form-group hidden">
-                    <label for="reverse-refund-tax" class="label">
-                        年度应退/应补税额 (元)
-                        <span class="tooltip ml-1">
-                            <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">年度汇算清缴时应退或应补的税额，正数为应补税额，负数为应退税额</span>
-                        </span>
-                    </label>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" id="reverse-refund-tax" class="input-field" value="1000" min="-100000" max="100000" step="100">
-                    </div>
-                </div>
-                
-                <div id="prepaid-tax-input" class="form-group hidden">
-                    <label for="reverse-prepaid-tax" class="label">
-                        全年累计已预缴税额 (元)
-                        <span class="tooltip ml-1">
-                            <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">个人全年已预缴的个税总额</span>
-                        </span>
-                    </label>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" id="reverse-prepaid-tax" class="input-field" value="4000" min="0" step="100">
-                    </div>
-                </div>
-                
                 <div class="form-group">
-                    <label for="tax-level" class="label">
-                        预计适用税率级数
+                    <label for="work-months" class="label">
+                        年工作总月数
                         <span class="tooltip ml-1">
                             <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">根据应纳税所得额预计适用的税率级数</span>
+                            <span class="tooltip-text">一年中实际工作的月数，不满12个月时需要调整计算</span>
                         </span>
                     </label>
-                    <select id="tax-level" class="input-field">
-                        <option value="1">级数1（≤36000元）- 3%</option>
-                        <option value="2">级数2（36000-144000元）- 10%</option>
-                        <option value="3" selected>级数3（144000-300000元）- 20%</option>
-                        <option value="4">级数4（300000-420000元）- 25%</option>
-                        <option value="5">级数5（420000-660000元）- 30%</option>
-                        <option value="6">级数6（660000-960000元）- 35%</option>
-                        <option value="7">级数7（＞960000元）- 45%</option>
+                    <select id="work-months" class="input-field">
+                        <option value="12">12个月</option>
+                        <option value="11">11个月</option>
+                        <option value="10">10个月</option>
+                        <option value="9">9个月</option>
+                        <option value="8">8个月</option>
+                        <option value="7">7个月</option>
+                        <option value="6">6个月</option>
+                        <option value="5">5个月</option>
+                        <option value="4">4个月</option>
+                        <option value="3">3个月</option>
+                        <option value="2">2个月</option>
+                        <option value="1">1个月</option>
                     </select>
                 </div>
+                
+
                 
                 <div class="mt-6">
                     <h4 class="font-medium text-gray-700 mb-3">年度各项扣除总额</h4>
@@ -1302,20 +1330,7 @@
                 document.getElementById('reverse-result').classList.add('hidden');
             });
             
-            // 反向倒算方式切换
-            document.querySelectorAll('input[name="reverse-method"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    if (this.value === 'total-tax') {
-                        document.getElementById('total-tax-input').classList.remove('hidden');
-                        document.getElementById('refund-tax-input').classList.add('hidden');
-                        document.getElementById('prepaid-tax-input').classList.add('hidden');
-                    } else {
-                        document.getElementById('total-tax-input').classList.add('hidden');
-                        document.getElementById('refund-tax-input').classList.remove('hidden');
-                        document.getElementById('prepaid-tax-input').classList.remove('hidden');
-                    }
-                });
-            });
+
             
             // 保存计算结果
             document.getElementById('save-calculation-btn').addEventListener('click', function() {
@@ -1357,7 +1372,10 @@
             
             // 扣除项实时计算
             document.getElementById('basic-deduction').addEventListener('input', updateDeductionCalculation);
-            document.getElementById('insurance-deduction').addEventListener('input', updateDeductionCalculation);
+            document.getElementById('pension-insurance').addEventListener('input', updateDeductionCalculation);
+            document.getElementById('medical-insurance').addEventListener('input', updateDeductionCalculation);
+            document.getElementById('unemployment-insurance').addEventListener('input', updateDeductionCalculation);
+            document.getElementById('housing-fund').addEventListener('input', updateDeductionCalculation);
             document.getElementById('elderly-deduction').addEventListener('input', updateDeductionCalculation);
             document.getElementById('children-deduction').addEventListener('input', updateDeductionCalculation);
             document.getElementById('rent-deduction').addEventListener('input', updateDeductionCalculation);
@@ -1382,6 +1400,37 @@
             const dateString = today.getFullYear() + '年' + (today.getMonth() + 1) + '月' + today.getDate() + '日';
             document.getElementById('budget-table-date').textContent = dateString;
             document.getElementById('reverse-budget-table-date').textContent = dateString;
+            
+            // 扣除项显示/隐藏控制
+            document.getElementById('special-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('special-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                updateDeductionCalculation();
+            });
+            
+            document.getElementById('special-additional-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('special-additional-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                updateDeductionCalculation();
+            });
+            
+            document.getElementById('other-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('other-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                updateDeductionCalculation();
+            });
         });
         
         // 页面切换
@@ -1458,30 +1507,34 @@
         // 更新收入计算
         function updateIncomeCalculation() {
             const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-            const monthlyLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
-            const monthlyAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
-            const monthlyRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
+            const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
+            const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
+            const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
             const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
             const bonusInclude = document.getElementById('bonus-include').checked;
             
-            // 计算各项收入计入综合所得的金额（月度）
-            const monthlyLaborIncomeCalculated = monthlyLaborIncome * 0.8;
-            const monthlyAuthorIncomeCalculated = monthlyAuthorIncome * 0.8 * 0.7;
-            const monthlyRoyaltyIncomeCalculated = monthlyRoyaltyIncome * 0.8;
+            // 计算各项收入计入综合所得的金额（年度）
+            const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
+            const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
+            const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
             
-            // 计算月度综合所得收入额合计
-            const monthlyIncomeAmount = monthlySalaryIncome + monthlyLaborIncomeCalculated + monthlyAuthorIncomeCalculated + monthlyRoyaltyIncomeCalculated;
+            // 计算月度综合所得收入额合计（用于显示）
+            const monthlySalaryIncomeCalculated = monthlySalaryIncome;
+            const monthlyLaborIncomeCalculated = annualLaborIncomeCalculated / 12;
+            const monthlyAuthorIncomeCalculated = annualAuthorIncomeCalculated / 12;
+            const monthlyRoyaltyIncomeCalculated = annualRoyaltyIncomeCalculated / 12;
+            const monthlyIncomeAmount = monthlySalaryIncomeCalculated + monthlyLaborIncomeCalculated + monthlyAuthorIncomeCalculated + monthlyRoyaltyIncomeCalculated;
             
             // 计算年度综合所得收入额合计
-            let totalIncomeAmount = monthlyIncomeAmount * 12;
+            let totalIncomeAmount = monthlySalaryIncome * 12 + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
             if (bonusInclude) {
                 totalIncomeAmount += bonusIncome;
             }
             
             // 更新显示
-            document.getElementById('labor-income-calculated').textContent = monthlyLaborIncomeCalculated.toFixed(2);
-            document.getElementById('author-income-calculated').textContent = monthlyAuthorIncomeCalculated.toFixed(2);
-            document.getElementById('royalty-income-calculated').textContent = monthlyRoyaltyIncomeCalculated.toFixed(2);
+            document.getElementById('labor-income-calculated').textContent = annualLaborIncomeCalculated.toFixed(2);
+            document.getElementById('author-income-calculated').textContent = annualAuthorIncomeCalculated.toFixed(2);
+            document.getElementById('royalty-income-calculated').textContent = annualRoyaltyIncomeCalculated.toFixed(2);
             document.getElementById('monthly-income-amount').textContent = monthlyIncomeAmount.toFixed(2);
             document.getElementById('total-income-amount').textContent = totalIncomeAmount.toFixed(2);
             
@@ -1492,15 +1545,26 @@
         // 更新扣除项计算
         function updateDeductionCalculation() {
             const basicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 0;
-            const insuranceDeduction = parseFloat(document.getElementById('insurance-deduction').value) || 0;
-            const elderlyDeduction = parseFloat(document.getElementById('elderly-deduction').value) || 0;
-            const childrenDeduction = parseFloat(document.getElementById('children-deduction').value) || 0;
-            const rentDeduction = parseFloat(document.getElementById('rent-deduction').value) || 0;
-            const housingLoanDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
-            const educationDeduction = parseFloat(document.getElementById('education-deduction').value) || 0;
-            const medicalDeduction = parseFloat(document.getElementById('medical-deduction').value) || 0;
-            const pensionDeduction = parseFloat(document.getElementById('pension-deduction').value) || 0;
-            const insuranceOtherDeduction = parseFloat(document.getElementById('insurance-other-deduction').value) || 0;
+            
+            // 检查各扣除项是否显示
+            const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
+            const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
+            const isOtherDeductionVisible = !document.getElementById('other-deduction-content').classList.contains('hidden');
+            
+            // 获取各扣除项值，只有当对应的部分显示时才计算
+            const pensionInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('pension-insurance').value) || 0) : 0;
+            const medicalInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('medical-insurance').value) || 0) : 0;
+            const unemploymentInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('unemployment-insurance').value) || 0) : 0;
+            const housingFund = isSpecialDeductionVisible ? (parseFloat(document.getElementById('housing-fund').value) || 0) : 0;
+            const insuranceDeduction = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
+            const elderlyDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('elderly-deduction').value) || 0) : 0;
+            const childrenDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('children-deduction').value) || 0) : 0;
+            const rentDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('rent-deduction').value) || 0) : 0;
+            const housingLoanDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('housing-loan-deduction').value) || 0) : 0;
+            const educationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
+            const medicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
+            const pensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+            const insuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
             
             // 计算月度专项附加扣除合计（大病医疗除外）
             const monthlySpecialAdditionalTotal = elderlyDeduction + childrenDeduction + rentDeduction + 
@@ -1525,6 +1589,7 @@
             const annualDeductionTotal = basicDeduction * 12 + insuranceDeduction * 12 + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
             
             // 更新显示
+            document.getElementById('monthly-special-deduction-total').textContent = insuranceDeduction.toFixed(2);
             document.getElementById('monthly-special-additional-total').textContent = monthlySpecialAdditionalTotal.toFixed(2);
             document.getElementById('monthly-other-deduction-total').textContent = monthlyOtherDeductionTotal.toFixed(2);
             document.getElementById('monthly-deduction-amount').textContent = monthlyDeductionTotal.toFixed(2);
@@ -1560,39 +1625,48 @@
         
         // 计算个人所得税
         function calculateTax() {
-            // 获取收入数据（月度）
+            // 获取收入数据
             const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-            const monthlyLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
-            const monthlyAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
-            const monthlyRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
+            const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
+            const monthlyLaborIncome = annualLaborIncome / 12;
+            const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
+            const monthlyAuthorIncome = annualAuthorIncome / 12;
+            const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
+            const monthlyRoyaltyIncome = annualRoyaltyIncome / 12;
             const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
             const bonusInclude = document.getElementById('bonus-include').checked;
             
-            // 计算各项收入计入综合所得的金额（月度）
-            const monthlyLaborIncomeCalculated = monthlyLaborIncome * 0.8;
-            const monthlyAuthorIncomeCalculated = monthlyAuthorIncome * 0.8 * 0.7;
-            const monthlyRoyaltyIncomeCalculated = monthlyRoyaltyIncome * 0.8;
-            
-            // 计算月度综合所得收入额合计
-            const monthlyIncomeAmount = monthlySalaryIncome + monthlyLaborIncomeCalculated + monthlyAuthorIncomeCalculated + monthlyRoyaltyIncomeCalculated;
+            // 计算各项收入计入综合所得的金额（年度）
+            const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
+            const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
+            const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
             
             // 计算年度综合所得收入额合计
-            let totalIncome = monthlyIncomeAmount * 12;
+            let totalIncome = monthlySalaryIncome * 12 + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
             if (bonusInclude) {
                 totalIncome += bonusIncome;
             }
             
+            // 检查各扣除项是否显示
+            const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
+            const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
+            const isOtherDeductionVisible = !document.getElementById('other-deduction-content').classList.contains('hidden');
+            
             // 获取扣除项数据（月度）
             const monthlyBasicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 0;
-            const monthlyInsuranceDeduction = parseFloat(document.getElementById('insurance-deduction').value) || 0;
-            const monthlyElderlyDeduction = parseFloat(document.getElementById('elderly-deduction').value) || 0;
-            const monthlyChildrenDeduction = parseFloat(document.getElementById('children-deduction').value) || 0;
-            const monthlyRentDeduction = parseFloat(document.getElementById('rent-deduction').value) || 0;
-            const monthlyHousingLoanDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
-            const monthlyEducationDeduction = parseFloat(document.getElementById('education-deduction').value) || 0;
-            const annualMedicalDeduction = parseFloat(document.getElementById('medical-deduction').value) || 0;
-            const monthlyPensionDeduction = parseFloat(document.getElementById('pension-deduction').value) || 0;
-            const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('insurance-other-deduction').value) || 0;
+            const monthlyPensionInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('pension-insurance').value) || 0) : 0;
+            const monthlyMedicalInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('medical-insurance').value) || 0) : 0;
+            const monthlyUnemploymentInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('unemployment-insurance').value) || 0) : 0;
+            const monthlyHousingFund = isSpecialDeductionVisible ? (parseFloat(document.getElementById('housing-fund').value) || 0) : 0;
+            const monthlyInsuranceDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
+            const monthlyElderlyDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('elderly-deduction').value) || 0) : 0;
+            const monthlyChildrenDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('children-deduction').value) || 0) : 0;
+            const monthlyRentDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('rent-deduction').value) || 0) : 0;
+            const monthlyHousingLoanDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('housing-loan-deduction').value) || 0) : 0;
+            const monthlyEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
+            const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
+            const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+            const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
             
             // 计算年度大病医疗实际可扣除额
             const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
@@ -1652,12 +1726,12 @@
             calculationResults = {
                 incomeDetails: {
                     salary: monthlySalaryIncome,
-                    labor: monthlyLaborIncome,
-                    laborCalculated: monthlyLaborIncomeCalculated,
-                    author: monthlyAuthorIncome,
-                    authorCalculated: monthlyAuthorIncomeCalculated,
-                    royalty: monthlyRoyaltyIncome,
-                    royaltyCalculated: monthlyRoyaltyIncomeCalculated,
+                    labor: annualLaborIncome,
+                    laborCalculated: annualLaborIncomeCalculated,
+                    author: annualAuthorIncome,
+                    authorCalculated: annualAuthorIncomeCalculated,
+                    royalty: annualRoyaltyIncome,
+                    royaltyCalculated: annualRoyaltyIncomeCalculated,
                     bonus: bonusIncome,
                     bonusInclude: bonusInclude,
                     bonusTax: bonusTax,
@@ -1665,7 +1739,10 @@
                 },
                 deductionDetails: {
                     basic: monthlyBasicDeduction,
-                    insurance: monthlyInsuranceDeduction,
+                    pensionInsurance: monthlyPensionInsurance,
+                    medicalInsurance: monthlyMedicalInsurance,
+                    unemploymentInsurance: monthlyUnemploymentInsurance,
+                    housingFund: monthlyHousingFund,
                     elderly: monthlyElderlyDeduction,
                     children: monthlyChildrenDeduction,
                     rent: monthlyRentDeduction,
@@ -1704,9 +1781,15 @@
                 const bonusDisplay = document.getElementById('bonus-tax-display');
                 if (bonusDisplay) {
                     bonusDisplay.style.display = 'block';
-                    document.getElementById('bonus-amount').textContent = '¥' + bonusIncome.toFixed(2);
-                    document.getElementById('bonus-tax-amount').textContent = '¥' + bonusTax.toFixed(2);
-                    document.getElementById('bonus-method').textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
+                    // 检查元素是否存在
+                    const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
+                    const bonusMethodElement = document.getElementById('bonus-method');
+                    if (bonusTaxAmountElement) {
+                        bonusTaxAmountElement.textContent = '¥' + bonusTax.toFixed(2);
+                    }
+                    if (bonusMethodElement) {
+                        bonusMethodElement.textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
+                    }
                 }
             } else {
                 const bonusDisplay = document.getElementById('bonus-tax-display');
@@ -1714,85 +1797,81 @@
                     bonusDisplay.style.display = 'none';
                 }
             }
-            document.getElementById('result-prepaid-tax').textContent = '¥' + prepaidTax.toFixed(2);
+            // 检查元素是否存在
+            const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
+            if (resultPrepaidTaxElement) {
+                resultPrepaidTaxElement.textContent = '¥' + prepaidTax.toFixed(2);
+            }
             
             const refundTaxElement = document.getElementById('result-refund-tax');
-            refundTaxElement.textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
-            refundTaxElement.className = refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success';
+            if (refundTaxElement) {
+                refundTaxElement.textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
+                refundTaxElement.className = refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success';
+            }
             
-            document.getElementById('result-net-income').textContent = '¥' + netIncome.toFixed(2);
+            const resultNetIncomeElement = document.getElementById('result-net-income');
+            if (resultNetIncomeElement) {
+                resultNetIncomeElement.textContent = '¥' + netIncome.toFixed(2);
+            }
         }
         
         // 计算反向个人所得税
         function calculateReverseTax() {
-            // 获取倒算方式
-            const reverseMethod = document.querySelector('input[name="reverse-method"]:checked').value;
-            
             // 获取税额数据
-            let totalTax = 0;
+            const totalTax = parseFloat(document.getElementById('reverse-total-tax').value) || 0;
             
-            if (reverseMethod === 'total-tax') {
-                totalTax = parseFloat(document.getElementById('reverse-total-tax').value) || 0;
-            } else {
-                const refundTax = parseFloat(document.getElementById('reverse-refund-tax').value) || 0;
-                const prepaidTax = parseFloat(document.getElementById('reverse-prepaid-tax').value) || 0;
-                totalTax = refundTax + prepaidTax;
-            }
+            // 获取年工作总月数
+            const workMonths = parseInt(document.getElementById('work-months').value) || 12;
             
-            // 获取税率级数
-            const taxLevel = parseInt(document.getElementById('tax-level').value);
+            // 获取扣除项数据（年度）
+            const annualBasicDeduction = parseFloat(document.getElementById('reverse-basic-deduction').value) || 0;
+            const annualSpecialDeduction = parseFloat(document.getElementById('reverse-special-deduction').value) || 0;
+            const annualSpecialAdditionalDeduction = parseFloat(document.getElementById('reverse-special-additional-deduction').value) || 0;
+            const annualOtherDeduction = parseFloat(document.getElementById('reverse-other-deduction').value) || 0;
             
-            // 获取扣除项数据
-            const basicDeduction = parseFloat(document.getElementById('reverse-basic-deduction').value) || 0;
-            const specialDeduction = parseFloat(document.getElementById('reverse-special-deduction').value) || 0;
-            const specialAdditionalDeduction = parseFloat(document.getElementById('reverse-special-additional-deduction').value) || 0;
-            const otherDeduction = parseFloat(document.getElementById('reverse-other-deduction').value) || 0;
+            // 根据工作月数调整扣除额
+            const basicDeduction = (annualBasicDeduction / 12) * workMonths;
+            const specialDeduction = (annualSpecialDeduction / 12) * workMonths;
+            const specialAdditionalDeduction = (annualSpecialAdditionalDeduction / 12) * workMonths;
+            const otherDeduction = (annualOtherDeduction / 12) * workMonths;
             
             // 计算总扣除额
             const totalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
             
-            // 根据税率级数反算应纳税所得额
+            // 根据税额自动计算应纳税所得额和税率
             let taxableIncome = 0;
             let applicableRate = 0;
             let applicableDeduction = 0;
             
-            // 根据手册4.2节的综合所得分档倒算公式
-            switch(taxLevel) {
-                case 1: // ≤36000元
-                    taxableIncome = totalTax / 0.03;
-                    applicableRate = 0.03;
-                    applicableDeduction = 0;
-                    break;
-                case 2: // 36000-144000元
-                    taxableIncome = (totalTax + 2520) / 0.1;
-                    applicableRate = 0.1;
-                    applicableDeduction = 2520;
-                    break;
-                case 3: // 144000-300000元
-                    taxableIncome = (totalTax + 16920) / 0.2;
-                    applicableRate = 0.2;
-                    applicableDeduction = 16920;
-                    break;
-                case 4: // 300000-420000元
-                    taxableIncome = (totalTax + 31920) / 0.25;
-                    applicableRate = 0.25;
-                    applicableDeduction = 31920;
-                    break;
-                case 5: // 420000-660000元
-                    taxableIncome = (totalTax + 52920) / 0.3;
-                    applicableRate = 0.3;
-                    applicableDeduction = 52920;
-                    break;
-                case 6: // 660000-960000元
-                    taxableIncome = (totalTax + 85920) / 0.35;
-                    applicableRate = 0.35;
-                    applicableDeduction = 85920;
-                    break;
-                case 7: // ＞960000元
-                    taxableIncome = (totalTax + 181920) / 0.45;
-                    applicableRate = 0.45;
-                    applicableDeduction = 181920;
-                    break;
+            // 自动判断税率级别并计算
+            if (totalTax <= 1080) { // 36000 * 0.03
+                taxableIncome = totalTax / 0.03;
+                applicableRate = 0.03;
+                applicableDeduction = 0;
+            } else if (totalTax <= 14100) { // 144000 * 0.1 - 2520
+                taxableIncome = (totalTax + 2520) / 0.1;
+                applicableRate = 0.1;
+                applicableDeduction = 2520;
+            } else if (totalTax <= 30180) { // 300000 * 0.2 - 16920
+                taxableIncome = (totalTax + 16920) / 0.2;
+                applicableRate = 0.2;
+                applicableDeduction = 16920;
+            } else if (totalTax <= 55080) { // 420000 * 0.25 - 31920
+                taxableIncome = (totalTax + 31920) / 0.25;
+                applicableRate = 0.25;
+                applicableDeduction = 31920;
+            } else if (totalTax <= 96080) { // 660000 * 0.3 - 52920
+                taxableIncome = (totalTax + 52920) / 0.3;
+                applicableRate = 0.3;
+                applicableDeduction = 52920;
+            } else if (totalTax <= 142880) { // 960000 * 0.35 - 85920
+                taxableIncome = (totalTax + 85920) / 0.35;
+                applicableRate = 0.35;
+                applicableDeduction = 85920;
+            } else { // ＞960000元
+                taxableIncome = (totalTax + 181920) / 0.45;
+                applicableRate = 0.45;
+                applicableDeduction = 181920;
             }
             
             // 计算税前收入总额
@@ -1802,7 +1881,6 @@
             reverseCalculationResults = {
                 taxDetails: {
                     totalTax: totalTax,
-                    taxLevel: taxLevel,
                     applicableRate: applicableRate,
                     applicableDeduction: applicableDeduction,
                     taxableIncome: taxableIncome
@@ -1817,17 +1895,45 @@
                 incomeDetails: {
                     total: totalIncome
                 },
+                workMonths: workMonths,
                 calculationDate: new Date().toISOString()
             };
             
             // 更新结果显示
-            document.getElementById('reverse-result-total-tax').textContent = '¥' + totalTax.toFixed(2);
-            document.getElementById('reverse-result-tax-level').textContent = '级数' + taxLevel;
-            document.getElementById('reverse-result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
-            document.getElementById('reverse-result-deduction').textContent = '¥' + applicableDeduction.toFixed(2);
-            document.getElementById('reverse-result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
-            document.getElementById('reverse-result-total-deduction').textContent = '¥' + totalDeduction.toFixed(2);
-            document.getElementById('reverse-result-total-income').textContent = '¥' + totalIncome.toFixed(2);
+            const reverseResultTotalTaxElement = document.getElementById('reverse-result-total-tax');
+            if (reverseResultTotalTaxElement) {
+                reverseResultTotalTaxElement.textContent = '¥' + totalTax.toFixed(2);
+            }
+            
+            const reverseResultTaxLevelElement = document.getElementById('reverse-result-tax-level');
+            if (reverseResultTaxLevelElement) {
+                reverseResultTaxLevelElement.textContent = '';
+            }
+            
+            const reverseResultTaxRateElement = document.getElementById('reverse-result-tax-rate');
+            if (reverseResultTaxRateElement) {
+                reverseResultTaxRateElement.textContent = (applicableRate * 100).toFixed(0) + '%';
+            }
+            
+            const reverseResultDeductionElement = document.getElementById('reverse-result-deduction');
+            if (reverseResultDeductionElement) {
+                reverseResultDeductionElement.textContent = '¥' + applicableDeduction.toFixed(2);
+            }
+            
+            const reverseResultTaxableIncomeElement = document.getElementById('reverse-result-taxable-income');
+            if (reverseResultTaxableIncomeElement) {
+                reverseResultTaxableIncomeElement.textContent = '¥' + taxableIncome.toFixed(2);
+            }
+            
+            const reverseResultTotalDeductionElement = document.getElementById('reverse-result-total-deduction');
+            if (reverseResultTotalDeductionElement) {
+                reverseResultTotalDeductionElement.textContent = '¥' + totalDeduction.toFixed(2);
+            }
+            
+            const reverseResultTotalIncomeElement = document.getElementById('reverse-result-total-income');
+            if (reverseResultTotalIncomeElement) {
+                reverseResultTotalIncomeElement.textContent = '¥' + totalIncome.toFixed(2);
+            }
         }
         
         // 更新预算表
@@ -1873,13 +1979,14 @@
         // 计算月度数据（通用函数）
         function calculateMonthlyData(results) {
             const monthlyData = [];
-            const monthlyIncome = results.incomeDetails.total / 12;
-            const monthlyDeductions = results.deductionDetails.total / 12;
+            const workMonths = results.workMonths || 12;
+            const monthlyIncome = results.incomeDetails.total / workMonths;
+            const monthlyDeductions = results.deductionDetails.total / workMonths;
             
             let cumulativeTaxableIncome = 0;
             let cumulativeTax = 0;
             
-            for (let i = 1; i <= 12; i++) {
+            for (let i = 1; i <= workMonths; i++) {
                 // 计算本月应纳税所得额
                 const monthlyTaxableIncome = monthlyIncome - monthlyDeductions;
                 cumulativeTaxableIncome += monthlyTaxableIncome;
@@ -2137,7 +2244,7 @@
             
             // 创建新图表
             window.monthlyTaxChart = new Chart(ctx, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: Array.from({length: 12}, (_, i) => (i + 1) + '月'),
                     datasets: [
@@ -2611,7 +2718,7 @@
             goToStep(1);
             
             // 重置收入数据
-            document.getElementById('salary-income').value = 120000;
+            document.getElementById('salary-income').value = 10000;
             document.getElementById('labor-income').value = 0;
             document.getElementById('author-income').value = 0;
             document.getElementById('royalty-income').value = 0;
@@ -2619,7 +2726,10 @@
             document.getElementById('bonus-include').checked = false;
             
             // 重置扣除项数据
-            document.getElementById('insurance-deduction').value = 24000;
+            document.getElementById('pension-insurance').value = 0;
+            document.getElementById('medical-insurance').value = 0;
+            document.getElementById('unemployment-insurance').value = 0;
+            document.getElementById('housing-fund').value = 0;
             document.getElementById('elderly-deduction').value = 0;
             document.getElementById('children-deduction').value = 0;
             document.getElementById('rent-deduction').value = 0;
@@ -2631,7 +2741,6 @@
             
             // 重置其他参数
             document.getElementById('prepaid-tax').value = 0;
-            document.getElementById('income-growth').value = 5;
             
             // 重新计算
             updateIncomeCalculation();
@@ -2643,7 +2752,7 @@
         
         // 重置收入数据
         function resetIncomeData() {
-            document.getElementById('salary-income').value = 120000;
+            document.getElementById('salary-income').value = 10000;
             document.getElementById('labor-income').value = 0;
             document.getElementById('author-income').value = 0;
             document.getElementById('royalty-income').value = 0;
@@ -2653,24 +2762,16 @@
         
         // 重置反向倒算
         function resetReverseCalculation() {
-            // 重置倒算方式
-            document.querySelector('input[name="reverse-method"][value="total-tax"]').checked = true;
-            document.getElementById('total-tax-input').classList.remove('hidden');
-            document.getElementById('refund-tax-input').classList.add('hidden');
-            document.getElementById('prepaid-tax-input').classList.add('hidden');
-            
             // 重置税额数据
             document.getElementById('reverse-total-tax').value = 5000;
-            document.getElementById('reverse-refund-tax').value = 1000;
-            document.getElementById('reverse-prepaid-tax').value = 4000;
-            
-            // 重置税率级数
-            document.getElementById('tax-level').value = 3;
             
             // 重置扣除项数据
             document.getElementById('reverse-special-deduction').value = 24000;
             document.getElementById('reverse-special-additional-deduction').value = 24000;
             document.getElementById('reverse-other-deduction').value = 0;
+            
+            // 重置工作月数
+            document.getElementById('work-months').value = 12;
             
             // 重新计算
             updateReverseDeductionCalculation();
