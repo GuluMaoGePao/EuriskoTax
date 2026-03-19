@@ -717,9 +717,10 @@
                                     <div class="flex items-center space-x-2">
                                         <label for="elderly-type" class="label">类型：</label>
                                         <select id="elderly-type" class="input-field w-32">
-                                            <option value="non-only">非独生子女</option>
-                                            <option value="only">独生子女</option>
-                                        </select>
+                                        <option value="none">无</option>
+                                        <option value="non-only">非独生子女</option>
+                                        <option value="only">独生子女</option>
+                                    </select>
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <input type="number" id="elderly-deduction" class="input-field" value="0" min="0" max="2000" step="100">
@@ -1080,14 +1081,14 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="work-months" class="label">
+                    <label for="reverse-work-months" class="label">
                         年工作总月数
                         <span class="tooltip ml-1">
                             <i class="fa fa-info-circle text-gray-400"></i>
                             <span class="tooltip-text">一年中实际工作的月数，不满12个月时需要调整计算</span>
                         </span>
                     </label>
-                    <select id="work-months" class="input-field">
+                    <select id="reverse-work-months" class="input-field">
                         <option value="12">12个月</option>
                         <option value="11">11个月</option>
                         <option value="10">10个月</option>
@@ -1106,41 +1107,325 @@
 
                 
                 <div class="mt-6">
-                    <h4 class="font-medium text-gray-700 mb-3">年度各项扣除总额</h4>
+                    <h4 class="font-medium text-gray-700 mb-3">年度各项扣除明细</h4>
                     
                     <div class="form-group">
                         <label for="reverse-basic-deduction" class="label">
                             基本减除费用 (元/年)
+                            <span class="tooltip ml-1">
+                                <i class="fa fa-info-circle text-gray-400"></i>
+                                <span class="tooltip-text">每年固定60000元，不可修改</span>
+                            </span>
                         </label>
                         <div class="flex items-center space-x-2">
                             <input type="number" id="reverse-basic-deduction" class="input-field" value="60000" min="60000" max="60000" disabled>
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="reverse-special-deduction" class="label">
-                            专项扣除 - 三险一金 (元/年)
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="reverse-special-deduction" class="input-field" value="0" min="0" step="1000">
+                    <div class="mt-4">
+                        <div class="flex items-center mb-4">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="reverse-special-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                <span class="ml-2 font-medium text-gray-700">专项扣除 - 三险一金</span>
+                            </label>
+                        </div>
+                        
+                        <div id="reverse-special-deduction-content" class="mb-6 hidden">
+                            <div class="form-group">
+                                <label for="reverse-social-security-base" class="label">
+                                    社保缴费基数 (元/月)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">社会保险缴费的基数，一般为本人上年度月平均工资</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-social-security-base" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-pension-insurance" class="label">
+                                    养老保险金 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">个人承担的养老保险部分</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-pension-insurance" class="input-field" value="0" min="0" step="1000">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <label for="reverse-pension-rate" class="label">缴费比例：</label>
+                                    <input type="number" id="reverse-pension-rate" class="input-field w-24" value="8" min="0" max="100" step="0.1">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-medical-insurance" class="label">
+                                    医疗保险金 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">个人承担的医疗保险部分</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-medical-insurance" class="input-field" value="0" min="0" step="1000">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <label for="reverse-medical-rate" class="label">缴费比例：</label>
+                                    <input type="number" id="reverse-medical-rate" class="input-field w-24" value="2" min="0" max="100" step="0.1">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-unemployment-insurance" class="label">
+                                    失业保险金 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">个人承担的失业保险部分</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-unemployment-insurance" class="input-field" value="0" min="0" step="1000">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <label for="reverse-unemployment-rate" class="label">缴费比例：</label>
+                                    <input type="number" id="reverse-unemployment-rate" class="input-field w-24" value="0.5" min="0" max="100" step="0.1">
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-housing-fund" class="label">
+                                    住房公积金 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">个人承担的住房公积金部分</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-housing-fund" class="input-field" value="0" min="0" step="1000">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
+                                    <select id="reverse-housing-fund-rate" class="input-field w-24">
+                                        <option value="5">5%</option>
+                                        <option value="7">7%</option>
+                                    </select>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    提示：根据实际个人承担部分填写
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="reverse-special-additional-deduction" class="label">
-                            专项附加扣除合计 (元/年)
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="reverse-special-additional-deduction" class="input-field" value="0" min="0" step="1000">
+                    <div class="mt-4">
+                        <div class="flex items-center mb-4">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="reverse-special-additional-deduction-checkbox" class="form-checkbox text-primary">
+                                <span class="ml-2 font-medium text-gray-700">专项附加扣除</span>
+                            </label>
+                        </div>
+                        
+                        <div id="reverse-special-additional-deduction-content" class="mb-6 hidden">
+                            <!-- 子女教育 -->
+                            <div class="form-group mb-5">
+                                <label class="label">
+                                    子女教育 (1000元/月/孩)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">每个子女每月1000元的专项附加扣除</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="reverse-children-count" class="label">子女数量：</label>
+                                    <input type="number" id="reverse-children-count" class="input-field w-32" value="0" min="0" step="1">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <input type="number" id="reverse-children-deduction" class="input-field" value="0" min="0" step="1000">
+                                    <span class="text-gray-500">元/年</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 3岁以下婴幼儿照护 -->
+                            <div class="form-group mb-5">
+                                <label class="label">
+                                    3岁以下婴幼儿照护 (1000元/月/孩)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">每个婴幼儿每月1000元的专项附加扣除</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="reverse-infant-count" class="label">婴幼儿数量：</label>
+                                    <input type="number" id="reverse-infant-count" class="input-field w-32" value="0" min="0" step="1">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <input type="number" id="reverse-infant-deduction" class="input-field" value="0" min="0" step="1000">
+                                    <span class="text-gray-500">元/年</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 赡养老人 -->
+                            <div class="form-group mb-5">
+                                <label class="label">
+                                    赡养老人
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">独生子女每月2000元，非独生子女分摊每月2000元，最高1500元/月</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="reverse-elderly-type" class="label">类型：</label>
+                                    <select id="reverse-elderly-type" class="input-field w-32">
+                                        <option value="none">无</option>
+                                        <option value="non-only">非独生子女</option>
+                                        <option value="only">独生子女</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <input type="number" id="reverse-elderly-deduction" class="input-field" value="0" min="0" max="24000" step="1000">
+                                    <span class="text-gray-500">元/年</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    提示：独生子女每年最高24000元，非独生子女每年最高18000元
+                                </div>
+                            </div>
+                            
+                            <!-- 住房（二选一） -->
+                            <div class="form-group mb-5">
+                                <label class="label">
+                                    住房（二选一）
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">住房租金或住房贷款利息，二选一</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="reverse-housing-type" class="label">类型：</label>
+                                    <select id="reverse-housing-type" class="input-field w-32">
+                                        <option value="none">无</option>
+                                        <option value="rent">住房租金</option>
+                                        <option value="loan">住房贷款利息</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- 住房租金 -->
+                                <div id="reverse-rent-fields" class="mt-2">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-rent-deduction" class="input-field" value="18000" min="9600" max="18000" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：默认上海18000元/年，可根据实际情况调整（9600-18000元）
+                                    </div>
+                                </div>
+                                
+                                <!-- 住房贷款利息 -->
+                                <div id="reverse-loan-fields" class="mt-2 hidden">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-housing-loan-deduction" class="input-field" value="12000" min="0" max="12000" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：首套住房贷款利息，每年最高12000元
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 继续教育 -->
+                            <div class="form-group mb-5">
+                                <label class="label">
+                                    继续教育
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">学历教育12000元/年，职业资格3600元/年</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="reverse-education-type" class="label">类型：</label>
+                                    <select id="reverse-education-type" class="input-field w-32">
+                                        <option value="none">无</option>
+                                        <option value="degree">学历教育</option>
+                                        <option value="professional">职业资格</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <input type="number" id="reverse-education-deduction" class="input-field" value="0" min="0" step="1000">
+                                    <span class="text-gray-500">元/年</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1" id="reverse-education-hint">
+                                    提示：选择类型后系统会自动计算扣除金额
+                                </div>
+                            </div>
+                            
+                            <!-- 大病医疗 -->
+                            <div class="form-group">
+                                <label for="reverse-medical-deduction" class="label">
+                                    大病医疗 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">医保目录范围内自付部分超过15000元的部分，限额80000元</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-medical-deduction" class="input-field" value="0" min="0" step="1000">
+                                    <span class="text-gray-500">元/年</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    提示：实际可扣除额为超过15000元的部分，系统将自动计算，最高80000元
+                                </div>
+                                <div class="text-xs text-primary mt-1" id="reverse-actual-medical-deduction-display">
+                                    实际可扣除额：0 元
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="reverse-other-deduction" class="label">
-                            其他扣除合计 (元/年)
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="reverse-other-deduction" class="input-field" value="0" min="0" step="1000">
+                    <div class="mt-4">
+                        <div class="flex items-center mb-4">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="reverse-other-deduction-checkbox" class="form-checkbox text-primary">
+                                <span class="ml-2 font-medium text-gray-700">其他扣除</span>
+                            </label>
+                        </div>
+                        
+                        <div id="reverse-other-deduction-content" class="mb-6 hidden">
+                            <div class="form-group">
+                                <label for="reverse-pension-deduction" class="label">
+                                    个人养老金 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">个人养老金年度扣除限额12000元</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="12000" step="1000">
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    提示：年度最高扣除12000元
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-insurance-other-deduction" class="label">
+                                    商业健康保险 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">商业健康保险年度扣除限额2400元</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="2400" step="100">
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    提示：年度最高扣除2400元
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1903,6 +2188,154 @@
             
             document.getElementById('reverse-mode-btn').addEventListener('click', function() {
                 showPage('reverse-calculation-page');
+                // 重新初始化反向倒算扣除项显示状态
+                setupReverseDeductionToggle('reverse-special-deduction-checkbox', 'reverse-special-deduction-content');
+                setupReverseDeductionToggle('reverse-special-additional-deduction-checkbox', 'reverse-special-additional-deduction-content');
+                setupReverseDeductionToggle('reverse-other-deduction-checkbox', 'reverse-other-deduction-content');
+                
+                // 绑定反向倒算页面的社保缴费计算事件监听器
+                document.getElementById('reverse-social-security-base').addEventListener('input', calculateReverseSocialSecurity);
+                document.getElementById('reverse-pension-rate').addEventListener('input', calculateReverseSocialSecurity);
+                document.getElementById('reverse-medical-rate').addEventListener('input', calculateReverseSocialSecurity);
+                document.getElementById('reverse-unemployment-rate').addEventListener('input', calculateReverseSocialSecurity);
+                document.getElementById('reverse-housing-fund-rate').addEventListener('change', calculateReverseSocialSecurity);
+                
+                // 专项扣除 - 保险金额计算比例
+                document.getElementById('reverse-pension-insurance').addEventListener('input', function() {
+                    calculateReverseSocialSecurityRate('pension');
+                });
+                document.getElementById('reverse-medical-insurance').addEventListener('input', function() {
+                    calculateReverseSocialSecurityRate('medical');
+                });
+                document.getElementById('reverse-unemployment-insurance').addEventListener('input', function() {
+                    calculateReverseSocialSecurityRate('unemployment');
+                });
+                document.getElementById('reverse-housing-fund').addEventListener('input', function() {
+                    calculateReverseSocialSecurityRate('housing');
+                });
+                
+                // 专项附加扣除事件监听器
+                // 子女教育数量输入
+                document.getElementById('reverse-children-count').addEventListener('input', function() {
+                    const count = parseInt(this.value) || 0;
+                    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                    const amount = count * 1000 * workMonths; // 每个子女每月1000元，根据工作月数调整
+                    document.getElementById('reverse-children-deduction').value = amount;
+                    updateReverseDeductionCalculation();
+                });
+                
+                // 婴幼儿照护数量输入
+                document.getElementById('reverse-infant-count').addEventListener('input', function() {
+                    const count = parseInt(this.value) || 0;
+                    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                    const amount = count * 1000 * workMonths; // 每个婴幼儿每月1000元，根据工作月数调整
+                    document.getElementById('reverse-infant-deduction').value = amount;
+                    updateReverseDeductionCalculation();
+                });
+                
+                // 赡养老人类型选择
+                document.getElementById('reverse-elderly-type').addEventListener('change', function() {
+                    const type = this.value;
+                    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                    const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
+                    if (type === 'only') {
+                        elderlyDeduction.max = 2000 * workMonths;
+                        elderlyDeduction.value = 2000 * workMonths;
+                    } else if (type === 'non-only') {
+                        elderlyDeduction.max = 1500 * workMonths;
+                        elderlyDeduction.value = 1500 * workMonths;
+                    } else {
+                        elderlyDeduction.max = 0;
+                        elderlyDeduction.value = 0;
+                    }
+                    updateReverseDeductionCalculation();
+                });
+                
+                // 继续教育类型选择
+                document.getElementById('reverse-education-type').addEventListener('change', function() {
+                    const type = this.value;
+                    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                    let amount = 0;
+                    if (type === 'degree') {
+                        amount = 1000 * workMonths; // 学历教育1000元/月，根据工作月数调整
+                    } else if (type === 'professional') {
+                        amount = 3600; // 职业资格3600元/年（一次性扣除，不需要根据工作月数调整）
+                    }
+                    document.getElementById('reverse-education-deduction').value = amount;
+                    updateReverseDeductionCalculation();
+                });
+                
+                // 住房类型选择
+                document.getElementById('reverse-housing-type').addEventListener('change', function() {
+                    const type = this.value;
+                    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                    document.getElementById('reverse-rent-fields').classList.add('hidden');
+                    document.getElementById('reverse-loan-fields').classList.add('hidden');
+                    
+                    if (type === 'rent') {
+                        document.getElementById('reverse-rent-fields').classList.remove('hidden');
+                        // 根据工作月数调整住房租金扣除金额（默认上海1500元/月）
+                        document.getElementById('reverse-rent-deduction').value = 1500 * workMonths;
+                    } else if (type === 'loan') {
+                        document.getElementById('reverse-loan-fields').classList.remove('hidden');
+                        // 根据工作月数调整住房贷款利息扣除金额（1000元/月）
+                        document.getElementById('reverse-housing-loan-deduction').value = 1000 * workMonths;
+                    }
+                    updateReverseDeductionCalculation();
+                });
+                
+                // 绑定工作月数变化事件监听器
+                document.getElementById('reverse-work-months').addEventListener('change', function() {
+                    const workMonths = parseInt(this.value) || 12;
+                    
+                    // 更新反向倒算页面的专项附加扣除字段
+                    // 子女教育
+                    const childrenCount = parseInt(document.getElementById('reverse-children-count').value) || 0;
+                    document.getElementById('reverse-children-deduction').value = childrenCount * 1000 * workMonths;
+                    
+                    // 婴幼儿照护
+                    const infantCount = parseInt(document.getElementById('reverse-infant-count').value) || 0;
+                    document.getElementById('reverse-infant-deduction').value = infantCount * 1000 * workMonths;
+                    
+                    // 赡养老人
+                    const elderlyType = document.getElementById('reverse-elderly-type').value;
+                    const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
+                    if (elderlyType === 'only') {
+                        elderlyDeduction.max = 2000 * workMonths;
+                        elderlyDeduction.value = 2000 * workMonths;
+                    } else if (elderlyType === 'non-only') {
+                        elderlyDeduction.max = 1500 * workMonths;
+                        elderlyDeduction.value = 1500 * workMonths;
+                    } else {
+                        elderlyDeduction.max = 0;
+                        elderlyDeduction.value = 0;
+                    }
+                    
+                    // 继续教育
+                    const educationType = document.getElementById('reverse-education-type').value;
+                    if (educationType === 'degree') {
+                        document.getElementById('reverse-education-deduction').value = 1000 * workMonths;
+                    } else if (educationType === 'professional') {
+                        document.getElementById('reverse-education-deduction').value = 3600; // 职业资格3600元/年（一次性扣除）
+                    }
+                    
+                    // 住房
+                    const housingType = document.getElementById('reverse-housing-type').value;
+                    if (housingType === 'rent') {
+                        document.getElementById('reverse-rent-deduction').value = 1500 * workMonths;
+                    } else if (housingType === 'loan') {
+                        document.getElementById('reverse-housing-loan-deduction').value = 1000 * workMonths;
+                    }
+                    
+                    // 社保缴费
+                    calculateReverseSocialSecurity();
+                    
+                    // 更新其他计算
+                    updateIncomeCalculation();
+                    updateDeductionCalculation();
+                    updatePreviewData();
+                    updateReverseDeductionCalculation();
+                });
             });
             
             document.getElementById('back-to-mode-selection').addEventListener('click', function() {
@@ -2138,16 +2571,184 @@
             document.getElementById('pension-deduction').addEventListener('input', updateDeductionCalculation);
             document.getElementById('insurance-other-deduction').addEventListener('input', updateDeductionCalculation);
             
-            // 反向倒算扣除项实时计算
-            document.getElementById('reverse-special-deduction').addEventListener('input', updateReverseDeductionCalculation);
-            document.getElementById('reverse-special-additional-deduction').addEventListener('input', updateReverseDeductionCalculation);
-            document.getElementById('reverse-other-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            // 反向倒算税额输入实时计算
+            document.getElementById('reverse-total-tax').addEventListener('input', updateReverseDeductionCalculation);
             
-            // 工作月数变化时更新预览数据
-            document.getElementById('work-months').addEventListener('change', function() {
+            // 反向倒算扣除项实时计算
+            // 专项扣除 - 社保缴费基数和比例计算
+            document.getElementById('reverse-social-security-base').addEventListener('input', calculateReverseSocialSecurity);
+            document.getElementById('reverse-pension-rate').addEventListener('input', calculateReverseSocialSecurity);
+            document.getElementById('reverse-medical-rate').addEventListener('input', calculateReverseSocialSecurity);
+            document.getElementById('reverse-unemployment-rate').addEventListener('input', calculateReverseSocialSecurity);
+            document.getElementById('reverse-housing-fund-rate').addEventListener('change', calculateReverseSocialSecurity);
+            
+            // 专项扣除 - 保险金额计算比例
+            document.getElementById('reverse-pension-insurance').addEventListener('input', function() {
+                calculateReverseSocialSecurityRate('pension');
+            });
+            document.getElementById('reverse-medical-insurance').addEventListener('input', function() {
+                calculateReverseSocialSecurityRate('medical');
+            });
+            document.getElementById('reverse-unemployment-insurance').addEventListener('input', function() {
+                calculateReverseSocialSecurityRate('unemployment');
+            });
+            document.getElementById('reverse-housing-fund').addEventListener('input', function() {
+                calculateReverseSocialSecurityRate('housing');
+            });
+            
+            // 专项附加扣除
+            document.getElementById('reverse-children-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-infant-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-elderly-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-rent-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-housing-loan-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-education-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-medical-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            
+            // 其他扣除
+            document.getElementById('reverse-pension-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-insurance-other-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            
+            // 住房类型选择
+            document.getElementById('reverse-housing-type').addEventListener('change', function() {
+                const type = this.value;
+                document.getElementById('reverse-rent-fields').classList.add('hidden');
+                document.getElementById('reverse-loan-fields').classList.add('hidden');
+                
+                if (type === 'rent') {
+                    document.getElementById('reverse-rent-fields').classList.remove('hidden');
+                } else if (type === 'loan') {
+                    document.getElementById('reverse-loan-fields').classList.remove('hidden');
+                }
+                updateReverseDeductionCalculation();
+            });
+            
+            // 子女教育数量输入
+            document.getElementById('reverse-children-count').addEventListener('input', function() {
+                const count = parseInt(this.value) || 0;
+                const amount = count * 12000; // 每个子女每年12000元
+                document.getElementById('reverse-children-deduction').value = amount;
+                updateReverseDeductionCalculation();
+            });
+            
+            // 婴幼儿照护数量输入
+            document.getElementById('reverse-infant-count').addEventListener('input', function() {
+                const count = parseInt(this.value) || 0;
+                const amount = count * 12000; // 每个婴幼儿每年12000元
+                document.getElementById('reverse-infant-deduction').value = amount;
+                updateReverseDeductionCalculation();
+            });
+            
+            // 赡养老人类型选择
+            document.getElementById('reverse-elderly-type').addEventListener('change', function() {
+                const type = this.value;
+                const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+                const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
+                if (type === 'only') {
+                    elderlyDeduction.max = 2000 * workMonths;
+                    elderlyDeduction.value = 2000 * workMonths;
+                } else if (type === 'non-only') {
+                    elderlyDeduction.max = 1500 * workMonths;
+                    elderlyDeduction.value = 1500 * workMonths;
+                } else {
+                    elderlyDeduction.max = 0;
+                    elderlyDeduction.value = 0;
+                }
+                updateReverseDeductionCalculation();
+            });
+            
+            // 继续教育类型选择
+            document.getElementById('reverse-education-type').addEventListener('change', function() {
+                const type = this.value;
+                let amount = 0;
+                if (type === 'degree') {
+                    amount = 12000; // 学历教育12000元/年
+                } else if (type === 'professional') {
+                    amount = 3600; // 职业资格3600元/年
+                }
+                document.getElementById('reverse-education-deduction').value = amount;
+                updateReverseDeductionCalculation();
+            });
+            
+            // 反向倒算扣除项显示/隐藏控制
+            function setupReverseDeductionToggle(checkboxId, contentId) {
+                const checkbox = document.getElementById(checkboxId);
+                const content = document.getElementById(contentId);
+                
+                // 初始状态
+                if (checkbox.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                
+                // 绑定事件
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                    updateReverseDeductionCalculation();
+                });
+            }
+            
+            // 设置三个扣除项的显示/隐藏控制
+            setupReverseDeductionToggle('reverse-special-deduction-checkbox', 'reverse-special-deduction-content');
+            setupReverseDeductionToggle('reverse-special-additional-deduction-checkbox', 'reverse-special-additional-deduction-content');
+            setupReverseDeductionToggle('reverse-other-deduction-checkbox', 'reverse-other-deduction-content');
+            
+            // 工作月数变化时更新数据
+            document.getElementById('reverse-work-months').addEventListener('change', function() {
+                const workMonths = parseInt(this.value) || 12;
+                
+                // 更新反向倒算页面的专项附加扣除字段
+                // 子女教育
+                const childrenCount = parseInt(document.getElementById('reverse-children-count').value) || 0;
+                document.getElementById('reverse-children-deduction').value = childrenCount * 1000 * workMonths;
+                
+                // 婴幼儿照护
+                const infantCount = parseInt(document.getElementById('reverse-infant-count').value) || 0;
+                document.getElementById('reverse-infant-deduction').value = infantCount * 1000 * workMonths;
+                
+                // 赡养老人
+                const elderlyType = document.getElementById('reverse-elderly-type').value;
+                const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
+                if (elderlyType === 'only') {
+                    elderlyDeduction.max = 2000 * workMonths;
+                    elderlyDeduction.value = 2000 * workMonths;
+                } else if (elderlyType === 'non-only') {
+                    elderlyDeduction.max = 1500 * workMonths;
+                    elderlyDeduction.value = 1500 * workMonths;
+                } else {
+                    elderlyDeduction.max = 0;
+                    elderlyDeduction.value = 0;
+                }
+                
+                // 继续教育
+                const educationType = document.getElementById('reverse-education-type').value;
+                if (educationType === 'degree') {
+                    document.getElementById('reverse-education-deduction').value = 1000 * workMonths;
+                } else if (educationType === 'professional') {
+                    document.getElementById('reverse-education-deduction').value = 3600; // 职业资格3600元/年（一次性扣除）
+                }
+                
+                // 住房
+                const housingType = document.getElementById('reverse-housing-type').value;
+                if (housingType === 'rent') {
+                    document.getElementById('reverse-rent-deduction').value = 1500 * workMonths;
+                } else if (housingType === 'loan') {
+                    document.getElementById('reverse-housing-loan-deduction').value = 1000 * workMonths;
+                }
+                
+                // 社保缴费
+                calculateReverseSocialSecurity();
+                
+                // 更新其他计算
                 updateIncomeCalculation();
                 updateDeductionCalculation();
                 updatePreviewData();
+                updateReverseDeductionCalculation();
             });
             
             // 初始化数据
@@ -2336,9 +2937,12 @@
                     if (type === 'only') {
                         elderlyDeduction.max = 2000;
                         elderlyDeduction.value = 2000;
-                    } else {
+                    } else if (type === 'non-only') {
                         elderlyDeduction.max = 1500;
                         elderlyDeduction.value = 1500;
+                    } else {
+                        elderlyDeduction.max = 0;
+                        elderlyDeduction.value = 0;
                     }
                     updateDeductionCalculation();
                 });
@@ -2486,6 +3090,81 @@
             } else {
                 document.getElementById(rateField).value = rate.toFixed(1);
             }
+        }
+        
+        // 反向倒算页面的社保缴费计算
+        function calculateReverseSocialSecurity() {
+            const base = parseFloat(document.getElementById('reverse-social-security-base').value) || 0;
+            const pensionRate = parseFloat(document.getElementById('reverse-pension-rate').value) || 0;
+            const medicalRate = parseFloat(document.getElementById('reverse-medical-rate').value) || 0;
+            const unemploymentRate = parseFloat(document.getElementById('reverse-unemployment-rate').value) || 0;
+            const housingFundRate = parseFloat(document.getElementById('reverse-housing-fund-rate').value) || 0;
+            const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+            
+            // 计算各项保险费用（根据工作月数调整）
+            const pensionAmount = base * (pensionRate / 100) * workMonths;
+            const medicalAmount = base * (medicalRate / 100) * workMonths;
+            const unemploymentAmount = base * (unemploymentRate / 100) * workMonths;
+            const housingFundAmount = base * (housingFundRate / 100) * workMonths;
+            
+            // 更新输入字段
+            document.getElementById('reverse-pension-insurance').value = pensionAmount.toFixed(2);
+            document.getElementById('reverse-medical-insurance').value = medicalAmount.toFixed(2);
+            document.getElementById('reverse-unemployment-insurance').value = unemploymentAmount.toFixed(2);
+            document.getElementById('reverse-housing-fund').value = housingFundAmount.toFixed(2);
+            
+            // 更新反向倒算扣除项计算
+            updateReverseDeductionCalculation();
+        }
+        
+        // 反向倒算页面根据社保基数和保险金额计算缴费比例
+        function calculateReverseSocialSecurityRate(type) {
+            const base = parseFloat(document.getElementById('reverse-social-security-base').value) || 0;
+            if (base === 0) return;
+            
+            const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+            
+            let amount, rateField;
+            
+            switch (type) {
+                case 'pension':
+                    amount = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
+                    rateField = 'reverse-pension-rate';
+                    break;
+                case 'medical':
+                    amount = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
+                    rateField = 'reverse-medical-rate';
+                    break;
+                case 'unemployment':
+                    amount = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
+                    rateField = 'reverse-unemployment-rate';
+                    break;
+                case 'housing':
+                    amount = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
+                    rateField = 'reverse-housing-fund-rate';
+                    break;
+                default:
+                    return;
+            }
+            
+            // 计算月度金额
+            const monthlyAmount = amount / workMonths;
+            const rate = (monthlyAmount / base) * 100;
+            
+            // 对于住房公积金，只允许5%或7%
+            if (type === 'housing') {
+                if (rate < 6) {
+                    document.getElementById(rateField).value = 5;
+                } else {
+                    document.getElementById(rateField).value = 7;
+                }
+            } else {
+                document.getElementById(rateField).value = rate.toFixed(1);
+            }
+            
+            // 注意：这里不调用calculateReverseSocialSecurity，避免循环计算
+            // 更新反向倒算扣除项计算
+            updateReverseDeductionCalculation();
         }
         
         // 更新收入计算
@@ -2639,10 +3318,68 @@
         
         // 更新反向倒算扣除项计算
         function updateReverseDeductionCalculation() {
-            const basicDeduction = parseFloat(document.getElementById('reverse-basic-deduction').value) || 0;
-            const specialDeduction = parseFloat(document.getElementById('reverse-special-deduction').value) || 0;
-            const specialAdditionalDeduction = parseFloat(document.getElementById('reverse-special-additional-deduction').value) || 0;
-            const otherDeduction = parseFloat(document.getElementById('reverse-other-deduction').value) || 0;
+            // 获取工作月数
+            const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+            
+            // 基本减除费用（每年60000元，根据工作月数调整）
+            const basicDeduction = (60000 / 12) * workMonths;
+            
+            // 检查各扣除项是否显示
+            const isSpecialDeductionVisible = document.getElementById('reverse-special-deduction-checkbox').checked;
+            const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox').checked;
+            const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox').checked;
+            
+            // 计算专项扣除（根据工作月数调整）
+            let specialDeduction = 0;
+            if (isSpecialDeductionVisible) {
+                const annualPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
+                const annualMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
+                const annualUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
+                const annualHousingFund = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
+                const annualSpecialDeduction = annualPensionInsurance + annualMedicalInsurance + annualUnemploymentInsurance + annualHousingFund;
+                specialDeduction = (annualSpecialDeduction / 12) * workMonths;
+            }
+            
+            // 计算专项附加扣除（根据工作月数调整）
+            let specialAdditionalDeduction = 0;
+            if (isSpecialAdditionalDeductionVisible) {
+                const annualChildrenDeduction = parseFloat(document.getElementById('reverse-children-deduction').value) || 0;
+                const annualInfantDeduction = parseFloat(document.getElementById('reverse-infant-deduction').value) || 0;
+                const annualElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
+                
+                // 住房扣除（二选一）
+                let annualHousingDeduction = 0;
+                const housingType = document.getElementById('reverse-housing-type').value;
+                if (housingType === 'rent') {
+                    annualHousingDeduction = parseFloat(document.getElementById('reverse-rent-deduction').value) || 0;
+                } else if (housingType === 'loan') {
+                    annualHousingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction').value) || 0;
+                }
+                
+                const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
+                
+                // 计算大病医疗实际可扣除额（大病医疗是年度金额，不需要根据工作月数调整）
+                const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
+                const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+                
+                // 更新大病医疗实际可扣除额显示
+                document.getElementById('reverse-actual-medical-deduction-display').textContent = `实际可扣除额：${actualMedicalDeduction.toFixed(2)} 元`;
+                
+                // 计算年度专项附加扣除合计（根据工作月数调整）
+                const annualSpecialAdditionalTotal = annualChildrenDeduction + annualInfantDeduction + annualElderlyDeduction + annualHousingDeduction + annualEducationDeduction;
+                specialAdditionalDeduction = (annualSpecialAdditionalTotal / 12) * workMonths + actualMedicalDeduction;
+            } else {
+                document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
+            }
+            
+            // 计算其他扣除（根据工作月数调整）
+            let otherDeduction = 0;
+            if (isOtherDeductionVisible) {
+                const annualPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
+                const annualInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
+                const annualOtherDeductionTotal = annualPensionDeduction + annualInsuranceOtherDeduction;
+                otherDeduction = (annualOtherDeductionTotal / 12) * workMonths;
+            }
             
             const totalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
             
@@ -2945,9 +3682,54 @@
             
             // 获取扣除项数据（年度）
             const annualBasicDeduction = parseFloat(document.getElementById('reverse-basic-deduction').value) || 0;
-            const annualSpecialDeduction = parseFloat(document.getElementById('reverse-special-deduction').value) || 0;
-            const annualSpecialAdditionalDeduction = parseFloat(document.getElementById('reverse-special-additional-deduction').value) || 0;
-            const annualOtherDeduction = parseFloat(document.getElementById('reverse-other-deduction').value) || 0;
+            
+            // 检查各扣除项是否显示
+            const isSpecialDeductionVisible = document.getElementById('reverse-special-deduction-checkbox').checked;
+            const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox').checked;
+            const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox').checked;
+            
+            // 计算专项扣除
+            let annualSpecialDeduction = 0;
+            if (isSpecialDeductionVisible) {
+                const pensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
+                const medicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
+                const unemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
+                const housingFund = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
+                annualSpecialDeduction = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
+            }
+            
+            // 计算专项附加扣除
+            let annualSpecialAdditionalDeduction = 0;
+            if (isSpecialAdditionalDeductionVisible) {
+                const childrenDeduction = parseFloat(document.getElementById('reverse-children-deduction').value) || 0;
+                const infantDeduction = parseFloat(document.getElementById('reverse-infant-deduction').value) || 0;
+                const elderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
+                
+                // 住房扣除（二选一）
+                let housingDeduction = 0;
+                const housingType = document.getElementById('reverse-housing-type').value;
+                if (housingType === 'rent') {
+                    housingDeduction = parseFloat(document.getElementById('reverse-rent-deduction').value) || 0;
+                } else if (housingType === 'loan') {
+                    housingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction').value) || 0;
+                }
+                
+                const educationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
+                
+                // 计算大病医疗实际可扣除额
+                const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
+                const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+                
+                annualSpecialAdditionalDeduction = childrenDeduction + infantDeduction + elderlyDeduction + housingDeduction + educationDeduction + actualMedicalDeduction;
+            }
+            
+            // 计算其他扣除
+            let annualOtherDeduction = 0;
+            if (isOtherDeductionVisible) {
+                const pensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
+                const insuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
+                annualOtherDeduction = pensionDeduction + insuranceOtherDeduction;
+            }
             
             // 根据工作月数调整扣除额
             const basicDeduction = (annualBasicDeduction / 12) * workMonths;
@@ -3882,6 +4664,7 @@
             document.getElementById('medical-insurance').value = 0;
             document.getElementById('unemployment-insurance').value = 0;
             document.getElementById('housing-fund').value = 0;
+            document.getElementById('elderly-type').value = 'none';
             document.getElementById('elderly-deduction').value = 0;
             document.getElementById('children-deduction').value = 0;
             document.getElementById('rent-deduction').value = 0;
@@ -3914,13 +4697,41 @@
             // 重置税额数据
             document.getElementById('reverse-total-tax').value = 5000;
             
-            // 重置扣除项数据
-            document.getElementById('reverse-special-deduction').value = 24000;
-            document.getElementById('reverse-special-additional-deduction').value = 24000;
-            document.getElementById('reverse-other-deduction').value = 0;
+            // 重置专项扣除数据
+            document.getElementById('reverse-social-security-base').value = 0;
+            document.getElementById('reverse-pension-insurance').value = 0;
+            document.getElementById('reverse-medical-insurance').value = 0;
+            document.getElementById('reverse-unemployment-insurance').value = 0;
+            document.getElementById('reverse-housing-fund').value = 0;
+            document.getElementById('reverse-pension-rate').value = 8;
+            document.getElementById('reverse-medical-rate').value = 2;
+            document.getElementById('reverse-unemployment-rate').value = 0.5;
+            document.getElementById('reverse-housing-fund-rate').value = 5;
+            
+            // 重置专项附加扣除数据
+            document.getElementById('reverse-children-count').value = 0;
+            document.getElementById('reverse-children-deduction').value = 0;
+            document.getElementById('reverse-infant-count').value = 0;
+            document.getElementById('reverse-infant-deduction').value = 0;
+            document.getElementById('reverse-elderly-type').value = 'none';
+            document.getElementById('reverse-elderly-deduction').value = 0;
+            document.getElementById('reverse-housing-type').value = 'none';
+            document.getElementById('reverse-rent-deduction').value = 18000;
+            document.getElementById('reverse-housing-loan-deduction').value = 12000;
+            document.getElementById('reverse-education-type').value = 'none';
+            document.getElementById('reverse-education-deduction').value = 0;
+            document.getElementById('reverse-medical-deduction').value = 0;
+            
+            // 重置其他扣除数据
+            document.getElementById('reverse-pension-deduction').value = 0;
+            document.getElementById('reverse-insurance-other-deduction').value = 0;
             
             // 重置工作月数
-            document.getElementById('work-months').value = 12;
+            document.getElementById('reverse-work-months').value = 12;
+            
+            // 重置显示状态
+            document.getElementById('reverse-rent-fields').classList.add('hidden');
+            document.getElementById('reverse-loan-fields').classList.add('hidden');
             
             // 重新计算
             updateReverseDeductionCalculation();
