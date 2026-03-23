@@ -1056,420 +1056,456 @@
                 
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">反向倒算</h2>
                 <p class="text-gray-600 mb-6">输入税额信息，反推税前收入</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="text-lg font-bold text-primary mb-4">反向倒算参数设置</h3>
-                <p class="text-sm text-gray-600 mb-4">请输入税额信息和扣除项，系统将自动反推税前收入</p>
                 
-                <div class="form-group">
-                    <label for="reverse-income-type" class="label">
-                        所得类型
-                        <span class="tooltip ml-1">
-                            <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">选择需要反向倒算的所得类型</span>
-                        </span>
-                    </label>
-                    <select id="reverse-income-type" class="input-field">
-                        <option value="comprehensive">综合所得</option>
-                        <option value="business">经营所得</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="reverse-total-tax" class="label">
-                        全年应缴税额 (元)
-                        <span class="tooltip ml-1">
-                            <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">个人全年应缴纳的个人所得税总额</span>
-                        </span>
-                    </label>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" id="reverse-total-tax" class="input-field" value="0" min="0" step="100">
+                <!-- 步骤指示器 -->
+                <div class="step-indicator">
+                    <div class="step">
+                        <div class="step-number active">1</div>
+                        <div class="step-title active">基本参数</div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="reverse-work-months" class="label">
-                        年工作总月数
-                        <span class="tooltip ml-1">
-                            <i class="fa fa-info-circle text-gray-400"></i>
-                            <span class="tooltip-text">一年中实际工作的月数，不满12个月时需要调整计算</span>
-                        </span>
-                    </label>
-                    <select id="reverse-work-months" class="input-field">
-                        <option value="12">12个月</option>
-                        <option value="11">11个月</option>
-                        <option value="10">10个月</option>
-                        <option value="9">9个月</option>
-                        <option value="8">8个月</option>
-                        <option value="7">7个月</option>
-                        <option value="6">6个月</option>
-                        <option value="5">5个月</option>
-                        <option value="4">4个月</option>
-                        <option value="3">3个月</option>
-                        <option value="2">2个月</option>
-                        <option value="1">1个月</option>
-                    </select>
-                </div>
-                
-
-                
-                <div class="mt-6">
-                    <h4 class="font-medium text-gray-700 mb-3">年度各项扣除明细</h4>
-                    
-                    <div class="form-group">
-                        <label for="reverse-basic-deduction" class="label">
-                            基本减除费用 (元/年)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">每月5000元，根据年工作总月数自动计算</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="reverse-basic-deduction" class="input-field" value="60000" min="0" step="1000">
-                        </div>
+                    <div class="step-line"></div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">扣除项明细</div>
                     </div>
-                    
-                    <div class="mt-4">
-                        <div class="flex items-center mb-4">
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" id="reverse-special-deduction-checkbox" class="form-checkbox text-primary" checked>
-                                <span class="ml-2 font-medium text-gray-700">专项扣除 - 三险一金</span>
-                            </label>
-                        </div>
-                        
-                        <div id="reverse-special-deduction-content" class="mb-6 hidden">
-                            <div class="form-group">
-                                <label for="reverse-social-security-base" class="label">
-                                    社保缴费基数 (元/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">社会保险缴费的基数，一般为本人上年度月平均工资</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-social-security-base" class="input-field" value="0" min="0" step="100">
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="reverse-pension-insurance" class="label">
-                                    养老保险金 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人承担的养老保险部分</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-pension-insurance" class="input-field" value="0" min="0" step="1000">
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-pension-rate" class="label">缴费比例：</label>
-                                    <input type="number" id="reverse-pension-rate" class="input-field w-24" value="8" min="0" max="100" step="0.1">
-                                    <span>%</span>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="reverse-medical-insurance" class="label">
-                                    医疗保险金 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人承担的医疗保险部分</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-medical-insurance" class="input-field" value="0" min="0" step="1000">
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-medical-rate" class="label">缴费比例：</label>
-                                    <input type="number" id="reverse-medical-rate" class="input-field w-24" value="2" min="0" max="100" step="0.1">
-                                    <span>%</span>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="reverse-unemployment-insurance" class="label">
-                                    失业保险金 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人承担的失业保险部分</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-unemployment-insurance" class="input-field" value="0" min="0" step="1000">
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-unemployment-rate" class="label">缴费比例：</label>
-                                    <input type="number" id="reverse-unemployment-rate" class="input-field w-24" value="0.5" min="0" max="100" step="0.1">
-                                    <span>%</span>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-housing-fund-base" class="label">住房公积金基数：</label>
-                                    <input type="number" id="reverse-housing-fund-base" class="input-field" value="0" min="0" step="1000">
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
-                                    <select id="reverse-housing-fund-rate" class="input-field w-24">
-                                        <option value="5">5%</option>
-                                        <option value="7">7%</option>
-                                    </select>
-                                </div>
-                                <label for="reverse-housing-fund" class="label mt-2">
-                                    住房公积金 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人承担的住房公积金部分</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-housing-fund" class="input-field" value="0" min="0" step="1000">
-                                </div>
-
-                            </div>
-                        </div>
+                    <div class="step-line"></div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">计算结果</div>
                     </div>
-                    
-                    <div class="mt-4">
-                        <div class="flex items-center mb-4">
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" id="reverse-special-additional-deduction-checkbox" class="form-checkbox text-primary">
-                                <span class="ml-2 font-medium text-gray-700">专项附加扣除</span>
-                            </label>
-                        </div>
-                        
-                        <div id="reverse-special-additional-deduction-content" class="mb-6 hidden">
-                            <!-- 子女教育 + 3岁以下婴幼儿照护 -->
-                            <div class="form-group mb-5">
-                                <label class="label">
-                                    子女教育 + 3岁以下婴幼儿照护 (2000元/人/月)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">每个子女/婴幼儿每月2000元的专项附加扣除</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <label for="reverse-children-infant-count" class="label">子女/婴幼儿数量：</label>
-                                    <input type="number" id="reverse-children-infant-count" class="input-field w-32" value="0" min="0" step="1">
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <label for="reverse-children-infant-deduction-rate" class="label">扣除比例：</label>
-                                    <select id="reverse-children-infant-deduction-rate" class="input-field w-32">
-                                        <option value="100">100%</option>
-                                        <option value="50">50%</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <input type="number" id="reverse-children-infant-deduction" class="input-field" value="0" min="0" step="1000">
-                                    <span class="text-gray-500">元/年</span>
-                                </div>
-                            </div>
-                            
-                            <!-- 赡养老人 -->
-                            <div class="form-group mb-5">
-                                <label class="label">
-                                    赡养老人
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">独生子女每月3000元，非独生子女分摊每月3000元，最高1500元/月</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <label for="reverse-elderly-type" class="label">类型：</label>
-                                    <select id="reverse-elderly-type" class="input-field w-32">
-                                        <option value="none">无</option>
-                                        <option value="non-only">非独生子女</option>
-                                        <option value="only">独生子女</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <input type="number" id="reverse-elderly-deduction" class="input-field" value="0" min="0" max="36000" step="1000">
-                                    <span class="text-gray-500">元/年</span>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：独生子女每年最高36000元，非独生子女每年最高18000元
-                                </div>
-                            </div>
-                            
-                            <!-- 住房（二选一） -->
-                            <div class="form-group mb-5">
-                                <label class="label">
-                                    住房（二选一）
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">住房租金或住房贷款利息，二选一</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <label for="reverse-housing-type" class="label">类型：</label>
-                                    <select id="reverse-housing-type" class="input-field w-32">
-                                        <option value="none">无</option>
-                                        <option value="rent">住房租金</option>
-                                        <option value="loan">住房贷款利息</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- 住房租金 -->
-                                <div id="reverse-rent-fields" class="mt-2">
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-rent-deduction" class="input-field" value="18000" min="9600" max="18000" step="1000">
-                                        <span class="text-gray-500">元/年</span>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：默认上海18000元/年，可根据实际情况调整（9600-18000元）
-                                    </div>
-                                </div>
-                                
-                                <!-- 住房贷款利息 -->
-                                <div id="reverse-loan-fields" class="mt-2 hidden">
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-housing-loan-deduction" class="input-field" value="12000" min="0" max="12000" step="1000">
-                                        <span class="text-gray-500">元/年</span>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：首套住房贷款利息，每年最高12000元
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 继续教育 -->
-                            <div class="form-group mb-5">
-                                <label class="label">
-                                    继续教育
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">学历教育400元/月，职业资格300元/月，可叠加享受</span>
-                                    </span>
-                                </label>
-                                <div class="space-y-2 mt-2">
-                                    <div class="flex items-center space-x-2">
-                                        <label class="inline-flex items-center">
-                                            <input type="checkbox" id="reverse-education-degree-checkbox" class="form-checkbox text-primary">
-                                            <span class="ml-2 text-sm text-gray-700">学历教育（400元/月）</span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <label class="inline-flex items-center">
-                                            <input type="checkbox" id="reverse-education-professional-checkbox" class="form-checkbox text-primary">
-                                            <span class="ml-2 text-sm text-gray-700">职业资格（300元/月）</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <input type="number" id="reverse-education-deduction" class="input-field" value="0" min="0" step="1000">
-                                    <span class="text-gray-500">元/年</span>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1" id="reverse-education-hint">
-                                    提示：勾选后系统会自动计算扣除金额，可叠加享受
-                                </div>
-                            </div>
-                            
-                            <!-- 大病医疗 -->
-                            <div class="form-group">
-                                <label for="reverse-medical-deduction" class="label">
-                                    大病医疗 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">医保目录范围内自付部分超过15000元的部分，限额80000元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-medical-deduction" class="input-field" value="0" min="0" step="1000">
-                                    <span class="text-gray-500">元/年</span>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：实际可扣除额为超过15000元的部分，系统将自动计算，最高80000元
-                                </div>
-                                <div class="text-xs text-primary mt-1" id="reverse-actual-medical-deduction-display">
-                                    实际可扣除额：0 元
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <div class="flex items-center mb-4">
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" id="reverse-other-deduction-checkbox" class="form-checkbox text-primary">
-                                <span class="ml-2 font-medium text-gray-700">其他扣除</span>
-                            </label>
-                        </div>
-                        
-                        <div id="reverse-other-deduction-content" class="mb-6 hidden">
-                            <div class="form-group">
-                                <label for="reverse-pension-deduction" class="label">
-                                    个人养老金 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">个人养老金年度扣除限额12000元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="12000" step="1000">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：年度最高扣除12000元
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="reverse-insurance-other-deduction" class="label">
-                                    商业健康保险 (元/年)
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">商业健康保险年度扣除限额2400元</span>
-                                    </span>
-                                </label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="2400" step="100">
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    提示：年度最高扣除2400元
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-6 p-4 bg-blue-50 rounded-lg">
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-700">年度专项扣除合计</span>
-                            <span id="reverse-annual-special-deduction-total">0</span> 元
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-700">年度专项附加扣除合计</span>
-                            <span id="reverse-annual-special-additional-total">0</span> 元
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-700">年度其他扣除合计</span>
-                            <span id="reverse-annual-other-deduction-total">0</span> 元
-                        </div>
-                        <div class="border-t border-blue-200 my-2"></div>
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium text-gray-700">年度扣除总额合计</span>
-                            <span class="font-bold text-primary text-lg" id="reverse-total-deduction">0</span> 元
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-6 flex justify-between">
-                    <button id="reset-reverse-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                        <i class="fa fa-refresh mr-2"></i>重置
-                    </button>
-                    <button id="calculate-reverse-btn" class="btn btn-primary">
-                        计算并生成预算表 <i class="fa fa-calculator ml-2"></i>
-                    </button>
                 </div>
             </div>
             
-            <!-- 反向倒算结果 -->
-            <div id="reverse-result" class="hidden mt-6">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 步骤内容 -->
+            <div class="step-content">
+                <!-- 步骤1：基本参数 -->
+                <div id="reverse-step-parameters" class="step-pane active">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-primary mb-4">基本计算参数</h3>
+                        <p class="text-sm text-gray-600 mb-4">请输入基本计算参数，这些参数将影响所有后续计算</p>
+                        
+                        <div class="form-group">
+                            <label for="reverse-income-type" class="label">
+                                所得类型
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">选择需要反向倒算的所得类型</span>
+                                </span>
+                            </label>
+                            <select id="reverse-income-type" class="input-field">
+                                <option value="comprehensive">综合所得</option>
+                                <option value="business">经营所得</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reverse-total-tax" class="label">
+                                全年应缴税额 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">个人全年应缴纳的个人所得税总额</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="reverse-total-tax" class="input-field" value="0" min="0" step="100">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reverse-work-months" class="label">
+                                年工作总月数
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">一年中实际工作的月数，不满12个月时需要调整计算</span>
+                                </span>
+                            </label>
+                            <select id="reverse-work-months" class="input-field">
+                                <option value="12">12个月</option>
+                                <option value="11">11个月</option>
+                                <option value="10">10个月</option>
+                                <option value="9">9个月</option>
+                                <option value="8">8个月</option>
+                                <option value="7">7个月</option>
+                                <option value="6">6个月</option>
+                                <option value="5">5个月</option>
+                                <option value="4">4个月</option>
+                                <option value="3">3个月</option>
+                                <option value="2">2个月</option>
+                                <option value="1">1个月</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mt-6 flex justify-between">
+                            <button id="reset-reverse-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                <i class="fa fa-refresh mr-2"></i>重置
+                            </button>
+                            <button id="reverse-next-to-deductions-btn" class="btn btn-primary">
+                                下一步：扣除项明细 <i class="fa fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 步骤2：扣除项明细 -->
+                <div id="reverse-step-deductions" class="step-pane hidden">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-primary mb-4">年度各项扣除明细</h3>
+                        <p class="text-sm text-gray-600 mb-4">请输入您的扣除项信息，系统将自动计算年度扣除总额</p>
+                        
+                        <div class="form-group">
+                            <label for="reverse-basic-deduction" class="label">
+                                基本减除费用 (元/年)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">每月5000元，根据年工作总月数自动计算</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="reverse-basic-deduction" class="input-field" value="60000" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-special-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">专项扣除 - 三险一金</span>
+                                </label>
+                            </div>
+                            
+                            <div id="reverse-special-deduction-content" class="mb-6">
+                                <div class="form-group">
+                                    <label for="reverse-social-security-base" class="label">
+                                        社保缴费基数 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">社会保险缴费的基数，一般为本人上年度月平均工资</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-social-security-base" class="input-field" value="0" min="0" step="100">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-pension-insurance" class="label">
+                                        养老保险金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的养老保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-pension-insurance" class="input-field" value="0" min="0" step="1000">
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-pension-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="reverse-pension-rate" class="input-field w-24" value="8" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-medical-insurance" class="label">
+                                        医疗保险金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的医疗保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-medical-insurance" class="input-field" value="0" min="0" step="1000">
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-medical-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="reverse-medical-rate" class="input-field w-24" value="2" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-unemployment-insurance" class="label">
+                                        失业保险金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的失业保险部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-unemployment-insurance" class="input-field" value="0" min="0" step="1000">
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-unemployment-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="reverse-unemployment-rate" class="input-field w-24" value="0.5" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-housing-fund-base" class="label">住房公积金基数：</label>
+                                        <input type="number" id="reverse-housing-fund-base" class="input-field" value="0" min="0" step="1000">
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
+                                        <select id="reverse-housing-fund-rate" class="input-field w-24">
+                                            <option value="5">5%</option>
+                                            <option value="7">7%</option>
+                                        </select>
+                                    </div>
+                                    <label for="reverse-housing-fund" class="label mt-2">
+                                        住房公积金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人承担的住房公积金部分</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-housing-fund" class="input-field" value="0" min="0" step="1000">
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-special-additional-deduction-checkbox" class="form-checkbox text-primary">
+                                    <span class="ml-2 font-medium text-gray-700">专项附加扣除</span>
+                                </label>
+                            </div>
+                            
+                            <div id="reverse-special-additional-deduction-content" class="mb-6 hidden">
+                                <!-- 子女教育 + 3岁以下婴幼儿照护 -->
+                                <div class="form-group mb-5">
+                                    <label class="label">
+                                        子女教育 + 3岁以下婴幼儿照护 (2000元/人/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">每个子女/婴幼儿每月2000元的专项附加扣除</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <label for="reverse-children-infant-count" class="label">子女/婴幼儿数量：</label>
+                                        <input type="number" id="reverse-children-infant-count" class="input-field w-32" value="0" min="0" step="1">
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="reverse-children-infant-deduction-rate" class="label">扣除比例：</label>
+                                        <select id="reverse-children-infant-deduction-rate" class="input-field w-32">
+                                            <option value="100">100%</option>
+                                            <option value="50">50%</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <input type="number" id="reverse-children-infant-deduction" class="input-field" value="0" min="0" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 赡养老人 -->
+                                <div class="form-group mb-5">
+                                    <label class="label">
+                                        赡养老人
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">独生子女每月3000元，非独生子女分摊每月3000元，最高1500元/月</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <label for="reverse-elderly-type" class="label">类型：</label>
+                                        <select id="reverse-elderly-type" class="input-field w-32">
+                                            <option value="none">无</option>
+                                            <option value="non-only">非独生子女</option>
+                                            <option value="only">独生子女</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <input type="number" id="reverse-elderly-deduction" class="input-field" value="0" min="0" max="36000" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：独生子女每年最高36000元，非独生子女每年最高18000元
+                                    </div>
+                                </div>
+                                
+                                <!-- 住房（二选一） -->
+                                <div class="form-group mb-5">
+                                    <label class="label">
+                                        住房（二选一）
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">住房租金或住房贷款利息，二选一</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <label for="reverse-housing-type" class="label">类型：</label>
+                                        <select id="reverse-housing-type" class="input-field w-32">
+                                            <option value="none">无</option>
+                                            <option value="rent">住房租金</option>
+                                            <option value="loan">住房贷款利息</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- 住房租金 -->
+                                    <div id="reverse-rent-fields" class="mt-2">
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-rent-deduction" class="input-field" value="18000" min="9600" max="18000" step="1000">
+                                            <span class="text-gray-500">元/年</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：默认上海18000元/年，可根据实际情况调整（9600-18000元）
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 住房贷款利息 -->
+                                    <div id="reverse-loan-fields" class="mt-2 hidden">
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-housing-loan-deduction" class="input-field" value="12000" min="0" max="12000" step="1000">
+                                            <span class="text-gray-500">元/年</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：首套住房贷款利息，每年最高12000元
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 继续教育 -->
+                                <div class="form-group mb-5">
+                                    <label class="label">
+                                        继续教育
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">学历教育400元/月，职业资格300元/月，可叠加享受</span>
+                                        </span>
+                                    </label>
+                                    <div class="space-y-2 mt-2">
+                                        <div class="flex items-center space-x-2">
+                                            <label class="inline-flex items-center">
+                                                <input type="checkbox" id="reverse-education-degree-checkbox" class="form-checkbox text-primary">
+                                                <span class="ml-2 text-sm text-gray-700">学历教育（400元/月）</span>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <label class="inline-flex items-center">
+                                                <input type="checkbox" id="reverse-education-professional-checkbox" class="form-checkbox text-primary">
+                                                <span class="ml-2 text-sm text-gray-700">职业资格（300元/月）</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <input type="number" id="reverse-education-deduction" class="input-field" value="0" min="0" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1" id="reverse-education-hint">
+                                        提示：勾选后系统会自动计算扣除金额，可叠加享受
+                                    </div>
+                                </div>
+                                
+                                <!-- 大病医疗 -->
+                                <div class="form-group">
+                                    <label for="reverse-medical-deduction" class="label">
+                                        大病医疗 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">医保目录范围内自付部分超过15000元的部分，限额80000元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-medical-deduction" class="input-field" value="0" min="0" step="1000">
+                                        <span class="text-gray-500">元/年</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：实际可扣除额为超过15000元的部分，系统将自动计算，最高80000元
+                                    </div>
+                                    <div class="text-xs text-primary mt-1" id="reverse-actual-medical-deduction-display">
+                                        实际可扣除额：0 元
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="flex items-center mb-4">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-other-deduction-checkbox" class="form-checkbox text-primary">
+                                    <span class="ml-2 font-medium text-gray-700">其他扣除</span>
+                                </label>
+                            </div>
+                            
+                            <div id="reverse-other-deduction-content" class="mb-6 hidden">
+                                <div class="form-group">
+                                    <label for="reverse-pension-deduction" class="label">
+                                        个人养老金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">个人养老金年度扣除限额12000元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="12000" step="1000">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：年度最高扣除12000元
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-insurance-other-deduction" class="label">
+                                        商业健康保险 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">商业健康保险年度扣除限额2400元</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="2400" step="100">
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        提示：年度最高扣除2400元
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">年度专项扣除合计</span>
+                                    <span id="reverse-annual-special-deduction-total">0</span> 元
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">年度专项附加扣除合计</span>
+                                    <span id="reverse-annual-special-additional-total">0</span> 元
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">年度其他扣除合计</span>
+                                    <span id="reverse-annual-other-deduction-total">0</span> 元
+                                </div>
+                                <div class="border-t border-blue-200 my-2"></div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-medium text-gray-700">年度扣除总额合计</span>
+                                    <span class="font-bold text-primary text-lg" id="reverse-total-deduction">0</span> 元
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 flex justify-between">
+                            <button id="reverse-back-to-parameters-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                <i class="fa fa-arrow-left mr-2"></i>上一步：基本参数
+                            </button>
+                            <button id="calculate-reverse-btn" class="btn btn-primary">
+                                下一步：计算结果 <i class="fa fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 步骤3：计算结果 -->
+                <div id="reverse-step-result" class="step-pane hidden">
+                    <!-- 反向倒算结果 -->
+                    <div id="reverse-result" class="mt-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- 倒算结果卡片 -->
                     <div class="card lg:col-span-1">
                         <h3 class="text-lg font-bold text-primary mb-4">倒算结果</h3>
@@ -1562,6 +1598,8 @@
                             <i class="fa fa-plus mr-2"></i>开始新的倒算
                         </button>
                     </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1575,106 +1613,141 @@
                 
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">经营所得计税</h2>
                 <p class="text-gray-600 mb-6">适用于个体工商户、个人独资企业等经营所得</p>
+                
+                <!-- 步骤指示器 -->
+                <div class="step-indicator">
+                    <div class="step">
+                        <div class="step-number active">1</div>
+                        <div class="step-title active">经营收入与成本</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">扣除项明细</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">计算结果</div>
+                    </div>
+                </div>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- 经营所得表单卡片 -->
-                <div class="card lg:col-span-1">
-                    <h3 class="text-lg font-bold text-primary mb-4">经营所得信息</h3>
-                    
-                    <div class="form-group">
-                        <label for="business-income" class="label">
-                            年度经营收入总额 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">包括主营业务收入和其他业务收入</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-income" class="input-field" value="0" min="0" step="1000">
+            <!-- 步骤内容 -->
+            <div class="step-content">
+                <!-- 步骤1：经营收入与成本 -->
+                <div id="business-step-income-cost" class="step-pane active">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-primary mb-4">经营所得信息</h3>
+                        <p class="text-sm text-gray-600 mb-4">请输入经营收入和成本费用信息</p>
+                        
+                        <div class="form-group">
+                            <label for="business-income" class="label">
+                                年度经营收入总额 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">包括主营业务收入和其他业务收入</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-income" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-cost" class="label">
+                                年度成本 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">包括原材料、商品采购等直接成本</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-cost" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-expenses" class="label">
+                                年度费用 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">包括房租、水电费、办公费等间接费用</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-expenses" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-taxes" class="label">
+                                年度税金 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">包括增值税、城建税、教育费附加等</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-taxes" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-losses" class="label">
+                                年度损失 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">包括资产损失、坏账损失等</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-losses" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-other-expenses" class="label">
+                                其他支出 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">其他与经营活动相关的支出</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-other-expenses" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-previous-losses" class="label">
+                                以前年度亏损弥补 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">允许弥补的以前年度亏损</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-previous-losses" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 flex justify-between">
+                            <button id="reset-business-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                <i class="fa fa-refresh mr-2"></i>重置
+                            </button>
+                            <button id="business-next-to-deductions-btn" class="btn bg-accent text-white hover:bg-accent/90">
+                                下一步：扣除项明细 <i class="fa fa-arrow-right ml-2"></i>
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="business-cost" class="label">
-                            年度成本 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">包括原材料、商品采购等直接成本</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-cost" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-expenses" class="label">
-                            年度费用 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">包括房租、水电费、办公费等间接费用</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-expenses" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-taxes" class="label">
-                            年度税金 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">包括增值税、城建税、教育费附加等</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-taxes" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-losses" class="label">
-                            年度损失 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">包括资产损失、坏账损失等</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-losses" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-other-expenses" class="label">
-                            其他支出 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">其他与经营活动相关的支出</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-other-expenses" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-previous-losses" class="label">
-                            以前年度亏损弥补 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">允许弥补的以前年度亏损</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-previous-losses" class="input-field" value="0" min="0" step="1000">
-                        </div>
-                    </div>
-                    
-                    <div class="mt-6">
-                        <h4 class="font-medium text-gray-700 mb-3">扣除项</h4>
+                </div>
+                
+                <!-- 步骤2：扣除项明细 -->
+                <div id="business-step-deductions" class="step-pane hidden">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-primary mb-4">扣除项明细</h3>
+                        <p class="text-sm text-gray-600 mb-4">请输入各项扣除信息</p>
                         
                         <div class="form-group">
                             <label for="business-investor-deduction" class="label">
@@ -1689,31 +1762,7 @@
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="business-special-deduction" class="label">
-                                专项扣除 (元/年)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">个人承担的三险一金部分</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="business-special-deduction" class="input-field" value="0" min="0" step="1000">
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="business-special-additional-deduction" class="label">
-                                专项附加扣除 (元/年)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">赡养老人、子女教育等专项附加扣除</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="business-special-additional-deduction" class="input-field" value="0" min="0" step="1000">
-                            </div>
-                        </div>
+
                         
                         <div class="form-group">
                             <label for="business-other-deduction" class="label">
@@ -1727,126 +1776,131 @@
                                 <input type="number" id="business-other-deduction" class="input-field" value="0" min="0" step="1000">
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="business-prepaid-tax" class="label">
-                            全年累计已预缴税额 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">年度内已预缴的经营所得税额</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="business-prepaid-tax" class="input-field" value="0" min="0" step="100">
+                        
+                        <div class="form-group">
+                            <label for="business-prepaid-tax" class="label">
+                                全年累计已预缴税额 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">年度内已预缴的经营所得税额</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-prepaid-tax" class="input-field" value="0" min="0" step="100">
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="mt-6 flex justify-between">
-                        <button id="reset-business-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                            <i class="fa fa-refresh mr-2"></i>重置
-                        </button>
-                        <button id="calculate-business-btn" class="btn bg-accent text-white hover:bg-accent/90">
-                            计算税额 <i class="fa fa-calculator ml-2"></i>
-                        </button>
+                        
+                        <div class="mt-6 flex justify-between">
+                            <button id="business-back-to-income-cost-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                <i class="fa fa-arrow-left mr-2"></i>上一步：经营收入与成本
+                            </button>
+                            <button id="calculate-business-btn" class="btn bg-accent text-white hover:bg-accent/90">
+                                下一步：计算结果 <i class="fa fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- 经营所得结果卡片 -->
-                <div class="card lg:col-span-2">
-                    <div id="business-result" class="hidden">
-                        <h3 class="text-lg font-bold text-primary mb-4">计算结果</h3>
+                <!-- 步骤3：计算结果 -->
+                <div id="business-step-result" class="step-pane hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- 经营所得结果卡片 -->
+                        <div class="card lg:col-span-1">
+                            <div id="business-result">
+                                <h3 class="text-lg font-bold text-primary mb-4">计算结果</h3>
+                                
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度经营收入总额</span>
+                                        <span class="font-medium" id="business-result-income">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度成本费用总额</span>
+                                        <span class="font-medium text-success" id="business-result-costs">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度经营利润</span>
+                                        <span class="font-medium" id="business-result-profit">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度应纳税所得额</span>
+                                        <span class="font-medium" id="business-result-taxable-income">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">适用税率</span>
+                                        <span class="font-medium" id="business-result-tax-rate">0%</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">速算扣除数</span>
+                                        <span class="font-medium" id="business-result-deduction">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度应纳税额</span>
+                                        <span class="font-medium text-danger" id="business-result-total-tax">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">全年累计已预缴税额</span>
+                                        <span class="font-medium" id="business-result-prepaid-tax">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度应退/应补税额</span>
+                                        <span class="font-medium text-lg" id="business-result-refund-tax">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-600">税后经营所得</span>
+                                        <span class="font-medium text-primary text-lg" id="business-result-net-income">¥0</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <button id="export-business-pdf-btn" class="btn btn-secondary w-full mb-3">
+                                        <i class="fa fa-download mr-2"></i>导出PDF报告
+                                    </button>
+                                    <button id="print-business-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
+                                        <i class="fa fa-print mr-2"></i>打印报告
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度经营收入总额</span>
-                                <span class="font-medium" id="business-result-income">¥0</span>
+                        <!-- 经营所得预算表卡片 -->
+                        <div class="card lg:col-span-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold text-primary">经营所得年度预算表</h3>
+                                <div class="text-sm text-gray-500">
+                                    生成日期：<span id="business-budget-table-date"></span>
+                                </div>
                             </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度成本费用总额</span>
-                                <span class="font-medium text-success" id="business-result-costs">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度经营利润</span>
-                                <span class="font-medium" id="business-result-profit">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度应纳税所得额</span>
-                                <span class="font-medium" id="business-result-taxable-income">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">适用税率</span>
-                                <span class="font-medium" id="business-result-tax-rate">0%</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">速算扣除数</span>
-                                <span class="font-medium" id="business-result-deduction">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度应纳税额</span>
-                                <span class="font-medium text-danger" id="business-result-total-tax">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">全年累计已预缴税额</span>
-                                <span class="font-medium" id="business-result-prepaid-tax">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度应退/应补税额</span>
-                                <span class="font-medium text-lg" id="business-result-refund-tax">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600">税后经营所得</span>
-                                <span class="font-medium text-primary text-lg" id="business-result-net-income">¥0</span>
+                            <div class="overflow-x-auto">
+                                <table class="tax-budget-table" id="business-tax-budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>项目</th>
+                                            <th>金额 (元)</th>
+                                            <th>说明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="business-budget-table-body">
+                                        <!-- 表格内容将由JavaScript动态生成 -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                         
-                        <div class="mt-6">
-                            <button id="export-business-pdf-btn" class="btn btn-secondary w-full mb-3">
-                                <i class="fa fa-download mr-2"></i>导出PDF报告
-                            </button>
-                            <button id="print-business-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
-                                <i class="fa fa-print mr-2"></i>打印报告
+                        <div class="lg:col-span-3 flex justify-center mt-4">
+                            <button id="new-business-calculation-btn" class="btn bg-accent text-white hover:bg-accent/90">
+                                <i class="fa fa-plus mr-2"></i>开始新的计算
                             </button>
                         </div>
-                    </div>
-                    
-                    <!-- 经营所得预算表卡片 -->
-                    <div class="card lg:col-span-2">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-primary">经营所得年度预算表</h3>
-                            <div class="text-sm text-gray-500">
-                                生成日期：<span id="business-budget-table-date"></span>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="tax-budget-table" id="business-tax-budget-table">
-                                <thead>
-                                    <tr>
-                                        <th>项目</th>
-                                        <th>金额 (元)</th>
-                                        <th>说明</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="business-budget-table-body">
-                                    <!-- 表格内容将由JavaScript动态生成 -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div class="lg:col-span-2 flex justify-center mt-4">
-                        <button id="new-business-calculation-btn" class="btn bg-accent text-white hover:bg-accent/90">
-                            <i class="fa fa-plus mr-2"></i>开始新的计算
-                        </button>
                     </div>
                 </div>
             </div>
@@ -1861,185 +1915,218 @@
                 
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">分类所得计税</h2>
                 <p class="text-gray-600 mb-6">适用于利息、股息、红利等分类所得</p>
+                
+                <!-- 步骤指示器 -->
+                <div class="step-indicator">
+                    <div class="step">
+                        <div class="step-number active">1</div>
+                        <div class="step-title active">所得信息</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">计算结果</div>
+                    </div>
+                </div>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- 分类所得表单卡片 -->
-                <div class="card lg:col-span-1">
-                    <h3 class="text-lg font-bold text-primary mb-4">分类所得信息</h3>
-                    
-                    <div class="form-group">
-                        <label for="classification-type" class="label">
-                            所得类型
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">选择分类所得的具体类型</span>
-                            </span>
-                        </label>
-                        <select id="classification-type" class="input-field">
-                            <option value="interest">利息、股息、红利所得</option>
-                            <option value="rent">财产租赁所得</option>
-                            <option value="transfer">财产转让所得</option>
-                            <option value="accidental">偶然所得</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="classification-income" class="label">
-                            收入金额 (元)
-                            <span class="tooltip ml-1">
-                                <i class="fa fa-info-circle text-gray-400"></i>
-                                <span class="tooltip-text">每次收入的金额</span>
-                            </span>
-                        </label>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="classification-income" class="input-field" value="0" min="0" step="100">
-                        </div>
-                    </div>
-                    
-                    <!-- 财产租赁所得特有字段 -->
-                    <div id="rent-fields" class="hidden">
+            <!-- 步骤内容 -->
+            <div class="step-content">
+                <!-- 步骤1：所得信息 -->
+                <div id="classification-step-info" class="step-pane active">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-primary mb-4">分类所得信息</h3>
+                        <p class="text-sm text-gray-600 mb-4">请输入分类所得的相关信息</p>
+                        
                         <div class="form-group">
-                            <label for="rent-deductions" class="label">
-                                准予扣除项目 (元)
+                            <label for="classification-type" class="label">
+                                所得类型
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">包括相关税费等</span>
+                                    <span class="tooltip-text">选择分类所得的具体类型</span>
                                 </span>
                             </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="rent-deductions" class="input-field" value="0" min="0" step="100">
-                            </div>
+                            <select id="classification-type" class="input-field">
+                                <option value="interest">利息、股息、红利所得</option>
+                                <option value="rent">财产租赁所得</option>
+                                <option value="transfer">财产转让所得</option>
+                                <option value="accidental">偶然所得</option>
+                            </select>
                         </div>
                         
                         <div class="form-group">
-                            <label for="rent-repair" class="label">
-                                修缮费用 (元)
+                            <label for="classification-income" class="label">
+                                收入金额 (元)
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">每月最高扣除800元</span>
+                                    <span class="tooltip-text">每次收入的金额</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="rent-repair" class="input-field" value="0" min="0" max="800" step="100">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 财产转让所得特有字段 -->
-                    <div id="transfer-fields" class="hidden">
-                        <div class="form-group">
-                            <label for="transfer-original" class="label">
-                                财产原值 (元)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">取得财产时的实际支出</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="transfer-original" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="classification-income" class="input-field" value="0" min="0" step="100">
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="transfer-expenses" class="label">
-                                合理费用 (元)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">转让过程中发生的相关费用</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="transfer-expenses" class="input-field" value="0" min="0" step="100">
+                        <!-- 偶然所得提示 -->
+                        <div id="accidental-hint" class="hidden mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div class="flex items-start">
+                                <i class="fa fa-info-circle text-primary mt-0.5 mr-2"></i>
+                                <div>
+                                    <h4 class="font-medium text-primary mb-1">偶然所得计税提示</h4>
+                                    <p class="text-sm text-gray-600">单张有奖发票奖金800元以上，单笔奖金10000元以上需要缴纳个人所得税。</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="mt-6 flex justify-between">
-                        <button id="reset-classification-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                            <i class="fa fa-refresh mr-2"></i>重置
-                        </button>
-                        <button id="calculate-classification-btn" class="btn bg-success text-white hover:bg-success/90">
-                            计算税额 <i class="fa fa-calculator ml-2"></i>
-                        </button>
+                        
+                        <!-- 财产租赁所得特有字段 -->
+                        <div id="rent-fields" class="hidden">
+                            <div class="form-group">
+                                <label for="rent-deductions" class="label">
+                                    准予扣除项目 (元)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">包括相关税费等</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="rent-deductions" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="rent-repair" class="label">
+                                    修缮费用 (元)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">每月最高扣除800元</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="rent-repair" class="input-field" value="0" min="0" max="800" step="100">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 财产转让所得特有字段 -->
+                        <div id="transfer-fields" class="hidden">
+                            <div class="form-group">
+                                <label for="transfer-original" class="label">
+                                    财产原值 (元)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">取得财产时的实际支出</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="transfer-original" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="transfer-expenses" class="label">
+                                    合理费用 (元)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">转让过程中发生的相关费用</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="transfer-expenses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 flex justify-between">
+                            <button id="reset-classification-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                <i class="fa fa-refresh mr-2"></i>重置
+                            </button>
+                            <button id="calculate-classification-btn" class="btn bg-success text-white hover:bg-success/90">
+                                下一步：计算结果 <i class="fa fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- 分类所得结果卡片 -->
-                <div class="card lg:col-span-2">
-                    <div id="classification-result" class="hidden">
-                        <h3 class="text-lg font-bold text-primary mb-4">计算结果</h3>
+                <!-- 步骤2：计算结果 -->
+                <div id="classification-step-result" class="step-pane hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- 分类所得结果卡片 -->
+                        <div class="card lg:col-span-1">
+                            <div id="classification-result">
+                                <h3 class="text-lg font-bold text-primary mb-4">计算结果</h3>
+                                
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">所得类型</span>
+                                        <span class="font-medium" id="classification-result-type">利息、股息、红利所得</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">收入金额</span>
+                                        <span class="font-medium">¥0</span>
+                                    </div>
+                                    
+                                    <div id="classification-result-deductions" class="flex justify-between items-center pb-2 border-b border-gray-100 hidden">
+                                        <span class="text-gray-600">扣除项目</span>
+                                        <span class="font-medium text-success">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">应纳税所得额</span>
+                                        <span class="font-medium">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">适用税率</span>
+                                        <span class="font-medium">20%</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">应纳税额</span>
+                                        <span class="font-medium text-danger">¥0</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <button id="export-classification-pdf-btn" class="btn btn-secondary w-full mb-3">
+                                        <i class="fa fa-download mr-2"></i>导出PDF报告
+                                    </button>
+                                    <button id="print-classification-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
+                                        <i class="fa fa-print mr-2"></i>打印报告
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">所得类型</span>
-                                <span class="font-medium" id="classification-result-type">利息、股息、红利所得</span>
+                        <!-- 分类所得预算表卡片 -->
+                        <div class="card lg:col-span-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold text-primary">分类所得计税表</h3>
+                                <div class="text-sm text-gray-500">
+                                    生成日期：<span id="classification-budget-table-date"></span>
+                                </div>
                             </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">收入金额</span>
-                                <span class="font-medium">¥0</span>
-                            </div>
-                            
-                            <div id="classification-result-deductions" class="flex justify-between items-center pb-2 border-b border-gray-100 hidden">
-                                <span class="text-gray-600">扣除项目</span>
-                                <span class="font-medium text-success">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">应纳税所得额</span>
-                                <span class="font-medium">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">适用税率</span>
-                                <span class="font-medium">20%</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">应纳税额</span>
-                                <span class="font-medium text-danger">¥0</span>
+                            <div class="overflow-x-auto">
+                                <table class="tax-budget-table" id="classification-tax-budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>项目</th>
+                                            <th>金额 (元)</th>
+                                            <th>说明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="classification-budget-table-body">
+                                        <!-- 表格内容将由JavaScript动态生成 -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                         
-                        <div class="mt-6">
-                            <button id="export-classification-pdf-btn" class="btn btn-secondary w-full mb-3">
-                                <i class="fa fa-download mr-2"></i>导出PDF报告
-                            </button>
-                            <button id="print-classification-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
-                                <i class="fa fa-print mr-2"></i>打印报告
+                        <div class="lg:col-span-3 flex justify-center mt-4">
+                            <button id="new-classification-calculation-btn" class="btn bg-success text-white hover:bg-success/90">
+                                <i class="fa fa-plus mr-2"></i>开始新的计算
                             </button>
                         </div>
-                    </div>
-                    
-                    <!-- 分类所得预算表卡片 -->
-                    <div class="card lg:col-span-2">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-primary">分类所得计税表</h3>
-                            <div class="text-sm text-gray-500">
-                                生成日期：<span id="classification-budget-table-date"></span>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="tax-budget-table" id="classification-tax-budget-table">
-                                <thead>
-                                    <tr>
-                                        <th>项目</th>
-                                        <th>金额 (元)</th>
-                                        <th>说明</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="classification-budget-table-body">
-                                    <!-- 表格内容将由JavaScript动态生成 -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div class="lg:col-span-2 flex justify-center mt-4">
-                        <button id="new-classification-calculation-btn" class="btn bg-success text-white hover:bg-success/90">
-                            <i class="fa fa-plus mr-2"></i>开始新的计算
-                        </button>
                     </div>
                 </div>
             </div>
@@ -2170,6 +2257,7 @@
     </div>
 
     <script>
+        
         // 全局变量
         let currentStep = 1;
         let calculationResults = {};
@@ -2190,6 +2278,82 @@
                 document.getElementById('reverse-education-deduction').value = amount;
                 updateReverseDeductionCalculation();
             }
+        }
+        
+        // 重置反向倒算
+        function resetReverseCalculation() {
+            // 1. 重置税额数据
+            document.getElementById('reverse-total-tax').value = 0;
+            
+            // 2. 重置工作月数
+            document.getElementById('reverse-work-months').value = 12;
+            
+            // 3. 重置基本减除费用
+            document.getElementById('reverse-basic-deduction').value = 60000;
+            
+            // 4. 重置扣除项复选框状态
+            document.getElementById('reverse-special-deduction-checkbox').checked = true;
+            document.getElementById('reverse-special-additional-deduction-checkbox').checked = false;
+            document.getElementById('reverse-other-deduction-checkbox').checked = false;
+            
+            // 5. 重置专项扣除数据
+            document.getElementById('reverse-social-security-base').value = 0;
+            document.getElementById('reverse-housing-fund-base').value = 0;
+            document.getElementById('reverse-pension-insurance').value = 0;
+            document.getElementById('reverse-medical-insurance').value = 0;
+            document.getElementById('reverse-unemployment-insurance').value = 0;
+            document.getElementById('reverse-housing-fund').value = 0;
+            document.getElementById('reverse-pension-rate').value = 8;
+            document.getElementById('reverse-medical-rate').value = 2;
+            document.getElementById('reverse-unemployment-rate').value = 0.5;
+            document.getElementById('reverse-housing-fund-rate').value = 5;
+            
+            // 6. 重置专项附加扣除数据
+            document.getElementById('reverse-children-infant-count').value = 0;
+            document.getElementById('reverse-children-infant-deduction').value = 0;
+            document.getElementById('reverse-elderly-type').value = 'none';
+            document.getElementById('reverse-elderly-deduction').value = 0;
+            document.getElementById('reverse-housing-type').value = 'none';
+            document.getElementById('reverse-rent-deduction').value = 18000;
+            document.getElementById('reverse-housing-loan-deduction').value = 12000;
+            
+            // 7. 重置继续教育复选框
+            document.getElementById('reverse-education-degree-checkbox').checked = false;
+            document.getElementById('reverse-education-professional-checkbox').checked = false;
+            document.getElementById('reverse-education-deduction').value = 0;
+            
+            // 8. 重置大病医疗数据
+            document.getElementById('reverse-medical-deduction').value = 0;
+            
+            // 9. 重置其他扣除数据
+            document.getElementById('reverse-pension-deduction').value = 0;
+            document.getElementById('reverse-insurance-other-deduction').value = 0;
+            
+            // 10. 重置显示状态
+            document.getElementById('reverse-special-deduction-content').classList.remove('hidden');
+            document.getElementById('reverse-special-additional-deduction-content').classList.add('hidden');
+            document.getElementById('reverse-other-deduction-content').classList.add('hidden');
+            document.getElementById('reverse-rent-fields').classList.add('hidden');
+            document.getElementById('reverse-loan-fields').classList.add('hidden');
+            
+            // 11. 重置大病医疗实际可扣除额显示
+            document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
+            
+            // 12. 清空计算结果
+            reverseCalculationResults = {};
+            
+            // 13. 重新计算并更新显示
+            updateReverseDeductionCalculation();
+            
+            // 14. 再次确保所有显示状态正确
+            setTimeout(() => {
+                document.getElementById('reverse-special-deduction-content').classList.remove('hidden');
+                document.getElementById('reverse-special-additional-deduction-content').classList.add('hidden');
+                document.getElementById('reverse-other-deduction-content').classList.add('hidden');
+                document.getElementById('reverse-rent-fields').classList.add('hidden');
+                document.getElementById('reverse-loan-fields').classList.add('hidden');
+                document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
+            }, 100);
         }
         
         // 综合所得税率表
@@ -2228,6 +2392,11 @@
                 setupReverseDeductionToggle('reverse-special-deduction-checkbox', 'reverse-special-deduction-content');
                 setupReverseDeductionToggle('reverse-special-additional-deduction-checkbox', 'reverse-special-additional-deduction-content');
                 setupReverseDeductionToggle('reverse-other-deduction-checkbox', 'reverse-other-deduction-content');
+                
+                // 重新绑定重置按钮事件监听器
+                document.getElementById('reset-reverse-btn').addEventListener('click', function() {
+                    resetReverseCalculation();
+                });
                 
                 // 绑定反向倒算页面的社保缴费计算事件监听器
                 document.getElementById('reverse-social-security-base').addEventListener('input', calculateReverseSocialSecurity);
@@ -2272,6 +2441,25 @@
                     updateReverseDeductionCalculation();
                 });
                 
+                // 反向倒算页面步骤导航
+                document.getElementById('reverse-next-to-deductions-btn').addEventListener('click', function() {
+                    showReverseStep(2);
+                });
+                
+                document.getElementById('reverse-back-to-parameters-btn').addEventListener('click', function() {
+                    showReverseStep(1);
+                });
+                
+                document.getElementById('calculate-reverse-btn').addEventListener('click', function() {
+                    updateReverseDeductionCalculation();
+                    showReverseStep(3);
+                });
+                
+                document.getElementById('new-reverse-calculation-btn').addEventListener('click', function() {
+                    showReverseStep(1);
+                    resetReverseCalculation();
+                });
+                
                 // 赡养老人类型选择
                 document.getElementById('reverse-elderly-type').addEventListener('change', function() {
                     const type = this.value;
@@ -2312,12 +2500,19 @@
                 });
                 
                 // 绑定继续教育复选框事件监听器
-                if (document.getElementById('reverse-education-degree-checkbox')) {
-                    document.getElementById('reverse-education-degree-checkbox').addEventListener('change', updateReverseEducationDeduction);
-                }
-                if (document.getElementById('reverse-education-professional-checkbox')) {
-                    document.getElementById('reverse-education-professional-checkbox').addEventListener('change', updateReverseEducationDeduction);
-                }
+    if (document.getElementById('reverse-education-degree-checkbox')) {
+        document.getElementById('reverse-education-degree-checkbox').addEventListener('change', updateReverseEducationDeduction);
+    }
+    if (document.getElementById('reverse-education-professional-checkbox')) {
+        document.getElementById('reverse-education-professional-checkbox').addEventListener('change', updateReverseEducationDeduction);
+    }
+    
+    // 绑定大病医疗输入框事件监听器
+    document.getElementById('reverse-medical-deduction').addEventListener('input', updateReverseDeductionCalculation);
+    
+    // 绑定其他扣除输入框事件监听器
+    document.getElementById('reverse-pension-deduction').addEventListener('input', updateReverseDeductionCalculation);
+    document.getElementById('reverse-insurance-other-deduction').addEventListener('input', updateReverseDeductionCalculation);
                 
                 // 绑定工作月数变化事件监听器
                 document.getElementById('reverse-work-months').addEventListener('change', function() {
@@ -2470,6 +2665,35 @@
             // 经营所得计税
             document.getElementById('business-mode-btn').addEventListener('click', function() {
                 showPage('business-calculation-page');
+                
+                // 经营所得计税页面步骤导航
+                document.getElementById('business-next-to-deductions-btn').addEventListener('click', function() {
+                    showBusinessStep(2);
+                });
+                
+                document.getElementById('business-back-to-income-cost-btn').addEventListener('click', function() {
+                    showBusinessStep(1);
+                });
+                
+                document.getElementById('calculate-business-btn').addEventListener('click', function() {
+                    try {
+                        calculateBusinessTax();
+                        showBusinessStep(3);
+                        updateBusinessBudgetTable();
+                    } catch (error) {
+                        console.error('计算过程中出现错误:', error);
+                        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+                    }
+                });
+                
+                document.getElementById('new-business-calculation-btn').addEventListener('click', function() {
+                    showBusinessStep(1);
+                    resetBusinessCalculation();
+                });
+                
+                document.getElementById('reset-business-btn').addEventListener('click', function() {
+                    resetBusinessCalculation();
+                });
             });
             
             document.getElementById('back-to-mode-selection-business').addEventListener('click', function() {
@@ -2477,65 +2701,49 @@
                 resetBusinessCalculation();
             });
             
-            document.getElementById('calculate-business-btn').addEventListener('click', function() {
-                try {
-                    calculateBusinessTax();
-                    document.getElementById('business-result').classList.remove('hidden');
-                    updateBusinessBudgetTable();
-                } catch (error) {
-                    console.error('计算过程中出现错误:', error);
-                    alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
-                }
-            });
-            
-            document.getElementById('new-business-calculation-btn').addEventListener('click', function() {
-                resetBusinessCalculation();
-                document.getElementById('business-result').classList.add('hidden');
-            });
-            
-            document.getElementById('reset-business-btn').addEventListener('click', function() {
-                resetBusinessCalculation();
-            });
-            
             // 分类所得计税
             document.getElementById('classification-mode-btn').addEventListener('click', function() {
                 showPage('classification-calculation-page');
+                
+                // 分类所得计税页面步骤导航
+                document.getElementById('calculate-classification-btn').addEventListener('click', function() {
+                    try {
+                        calculateClassificationTax();
+                        showClassificationStep(2);
+                        updateClassificationBudgetTable();
+                    } catch (error) {
+                        console.error('计算过程中出现错误:', error);
+                        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+                    }
+                });
+                
+                document.getElementById('new-classification-calculation-btn').addEventListener('click', function() {
+                    showClassificationStep(1);
+                    resetClassificationCalculation();
+                });
+                
+                document.getElementById('reset-classification-btn').addEventListener('click', function() {
+                    resetClassificationCalculation();
+                });
+                
+                document.getElementById('classification-type').addEventListener('change', function() {
+                    const type = this.value;
+                    document.getElementById('rent-fields').classList.add('hidden');
+                    document.getElementById('transfer-fields').classList.add('hidden');
+                    document.getElementById('accidental-hint').classList.add('hidden');
+                    
+                    if (type === 'rent') {
+                        document.getElementById('rent-fields').classList.remove('hidden');
+                    } else if (type === 'transfer') {
+                        document.getElementById('transfer-fields').classList.remove('hidden');
+                    } else if (type === 'accidental') {
+                        document.getElementById('accidental-hint').classList.remove('hidden');
+                    }
+                });
             });
             
             document.getElementById('back-to-mode-selection-classification').addEventListener('click', function() {
                 showPage('mode-selection-page');
-                resetClassificationCalculation();
-            });
-            
-            document.getElementById('classification-type').addEventListener('change', function() {
-                const type = this.value;
-                document.getElementById('rent-fields').classList.add('hidden');
-                document.getElementById('transfer-fields').classList.add('hidden');
-                
-                if (type === 'rent') {
-                    document.getElementById('rent-fields').classList.remove('hidden');
-                } else if (type === 'transfer') {
-                    document.getElementById('transfer-fields').classList.remove('hidden');
-                }
-            });
-            
-            document.getElementById('calculate-classification-btn').addEventListener('click', function() {
-                try {
-                    calculateClassificationTax();
-                    document.getElementById('classification-result').classList.remove('hidden');
-                    updateClassificationBudgetTable();
-                } catch (error) {
-                    console.error('计算过程中出现错误:', error);
-                    alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
-                }
-            });
-            
-            document.getElementById('new-classification-calculation-btn').addEventListener('click', function() {
-                resetClassificationCalculation();
-                document.getElementById('classification-result').classList.add('hidden');
-            });
-            
-            document.getElementById('reset-classification-btn').addEventListener('click', function() {
                 resetClassificationCalculation();
             });
             
@@ -2637,8 +2845,7 @@
             });
             
             // 专项附加扣除
-            document.getElementById('reverse-children-deduction').addEventListener('input', updateReverseDeductionCalculation);
-            document.getElementById('reverse-infant-deduction').addEventListener('input', updateReverseDeductionCalculation);
+            document.getElementById('reverse-children-infant-deduction').addEventListener('input', updateReverseDeductionCalculation);
             document.getElementById('reverse-elderly-deduction').addEventListener('input', updateReverseDeductionCalculation);
             document.getElementById('reverse-rent-deduction').addEventListener('input', updateReverseDeductionCalculation);
             document.getElementById('reverse-housing-loan-deduction').addEventListener('input', updateReverseDeductionCalculation);
@@ -2654,11 +2861,43 @@
                 const type = this.value;
                 document.getElementById('reverse-rent-fields').classList.add('hidden');
                 document.getElementById('reverse-loan-fields').classList.add('hidden');
-                
                 if (type === 'rent') {
                     document.getElementById('reverse-rent-fields').classList.remove('hidden');
                 } else if (type === 'loan') {
                     document.getElementById('reverse-loan-fields').classList.remove('hidden');
+                }
+                updateReverseDeductionCalculation();
+            });
+            
+            // 其他扣除复选框
+            document.getElementById('reverse-other-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('reverse-other-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                updateReverseDeductionCalculation();
+            });
+            
+            // 专项扣除复选框
+            document.getElementById('reverse-special-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('reverse-special-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+                updateReverseDeductionCalculation();
+            });
+            
+            // 专项附加扣除复选框
+            document.getElementById('reverse-special-additional-deduction-checkbox').addEventListener('change', function() {
+                const content = document.getElementById('reverse-special-additional-deduction-content');
+                if (this.checked) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
                 }
                 updateReverseDeductionCalculation();
             });
@@ -2725,6 +2964,199 @@
             }
             if (document.getElementById('reverse-education-professional-checkbox')) {
                 document.getElementById('reverse-education-professional-checkbox').addEventListener('change', updateReverseEducationDeduction);
+            }
+            
+            // 步骤导航辅助函数
+            function showReverseStep(step) {
+                currentStep = step;
+                
+                // 隐藏所有步骤
+                document.getElementById('reverse-step-parameters').classList.add('hidden');
+                document.getElementById('reverse-step-deductions').classList.add('hidden');
+                document.getElementById('reverse-step-result').classList.add('hidden');
+                
+                // 显示当前步骤
+                if (step === 1) {
+                    document.getElementById('reverse-step-parameters').classList.remove('hidden');
+                } else if (step === 2) {
+                    document.getElementById('reverse-step-deductions').classList.remove('hidden');
+                } else if (step === 3) {
+                    document.getElementById('reverse-step-result').classList.remove('hidden');
+                }
+                
+                // 更新步骤指示器
+                const steps = document.querySelectorAll('#reverse-calculation-page .step-number');
+                const stepTitles = document.querySelectorAll('#reverse-calculation-page .step-title');
+                const stepLines = document.querySelectorAll('#reverse-calculation-page .step-line');
+                
+                steps.forEach((stepEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        stepEl.classList.remove('active');
+                        stepEl.classList.add('completed');
+                        stepEl.textContent = '✓';
+                    } else if (stepNum === step) {
+                        stepEl.classList.add('active');
+                        stepEl.classList.remove('completed');
+                        stepEl.textContent = stepNum;
+                    } else {
+                        stepEl.classList.remove('active', 'completed');
+                        stepEl.textContent = stepNum;
+                    }
+                });
+                
+                stepTitles.forEach((titleEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        titleEl.classList.remove('active');
+                        titleEl.classList.add('completed');
+                    } else if (stepNum === step) {
+                        titleEl.classList.add('active');
+                        titleEl.classList.remove('completed');
+                    } else {
+                        titleEl.classList.remove('active', 'completed');
+                    }
+                });
+                
+                stepLines.forEach((lineEl, index) => {
+                    const lineNum = index + 1;
+                    if (lineNum < step) {
+                        lineEl.classList.add('completed');
+                        lineEl.classList.remove('active');
+                    } else if (lineNum === step) {
+                        lineEl.classList.add('active');
+                        lineEl.classList.remove('completed');
+                    } else {
+                        lineEl.classList.remove('active', 'completed');
+                    }
+                });
+            }
+            
+            function showBusinessStep(step) {
+                currentStep = step;
+                
+                // 隐藏所有步骤
+                document.getElementById('business-step-income-cost').classList.add('hidden');
+                document.getElementById('business-step-deductions').classList.add('hidden');
+                document.getElementById('business-step-result').classList.add('hidden');
+                
+                // 显示当前步骤
+                if (step === 1) {
+                    document.getElementById('business-step-income-cost').classList.remove('hidden');
+                } else if (step === 2) {
+                    document.getElementById('business-step-deductions').classList.remove('hidden');
+                } else if (step === 3) {
+                    document.getElementById('business-step-result').classList.remove('hidden');
+                }
+                
+                // 更新步骤指示器
+                const steps = document.querySelectorAll('#business-calculation-page .step-number');
+                const stepTitles = document.querySelectorAll('#business-calculation-page .step-title');
+                const stepLines = document.querySelectorAll('#business-calculation-page .step-line');
+                
+                steps.forEach((stepEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        stepEl.classList.remove('active');
+                        stepEl.classList.add('completed');
+                        stepEl.textContent = '✓';
+                    } else if (stepNum === step) {
+                        stepEl.classList.add('active');
+                        stepEl.classList.remove('completed');
+                        stepEl.textContent = stepNum;
+                    } else {
+                        stepEl.classList.remove('active', 'completed');
+                        stepEl.textContent = stepNum;
+                    }
+                });
+                
+                stepTitles.forEach((titleEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        titleEl.classList.remove('active');
+                        titleEl.classList.add('completed');
+                    } else if (stepNum === step) {
+                        titleEl.classList.add('active');
+                        titleEl.classList.remove('completed');
+                    } else {
+                        titleEl.classList.remove('active', 'completed');
+                    }
+                });
+                
+                stepLines.forEach((lineEl, index) => {
+                    const lineNum = index + 1;
+                    if (lineNum < step) {
+                        lineEl.classList.add('completed');
+                        lineEl.classList.remove('active');
+                    } else if (lineNum === step) {
+                        lineEl.classList.add('active');
+                        lineEl.classList.remove('completed');
+                    } else {
+                        lineEl.classList.remove('active', 'completed');
+                    }
+                });
+            }
+            
+            function showClassificationStep(step) {
+                currentStep = step;
+                
+                // 隐藏所有步骤
+                document.getElementById('classification-step-info').classList.add('hidden');
+                document.getElementById('classification-step-result').classList.add('hidden');
+                
+                // 显示当前步骤
+                if (step === 1) {
+                    document.getElementById('classification-step-info').classList.remove('hidden');
+                } else if (step === 2) {
+                    document.getElementById('classification-step-result').classList.remove('hidden');
+                }
+                
+                // 更新步骤指示器
+                const steps = document.querySelectorAll('#classification-calculation-page .step-number');
+                const stepTitles = document.querySelectorAll('#classification-calculation-page .step-title');
+                const stepLines = document.querySelectorAll('#classification-calculation-page .step-line');
+                
+                steps.forEach((stepEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        stepEl.classList.remove('active');
+                        stepEl.classList.add('completed');
+                        stepEl.textContent = '✓';
+                    } else if (stepNum === step) {
+                        stepEl.classList.add('active');
+                        stepEl.classList.remove('completed');
+                        stepEl.textContent = stepNum;
+                    } else {
+                        stepEl.classList.remove('active', 'completed');
+                        stepEl.textContent = stepNum;
+                    }
+                });
+                
+                stepTitles.forEach((titleEl, index) => {
+                    const stepNum = index + 1;
+                    if (stepNum < step) {
+                        titleEl.classList.remove('active');
+                        titleEl.classList.add('completed');
+                    } else if (stepNum === step) {
+                        titleEl.classList.add('active');
+                        titleEl.classList.remove('completed');
+                    } else {
+                        titleEl.classList.remove('active', 'completed');
+                    }
+                });
+                
+                stepLines.forEach((lineEl, index) => {
+                    const lineNum = index + 1;
+                    if (lineNum < step) {
+                        lineEl.classList.add('completed');
+                        lineEl.classList.remove('active');
+                    } else if (lineNum === step) {
+                        lineEl.classList.add('active');
+                        lineEl.classList.remove('completed');
+                    } else {
+                        lineEl.classList.remove('active', 'completed');
+                    }
+                });
             }
             
             // 工作月数变化时更新数据
@@ -2827,7 +3259,7 @@
             currentStep = step;
             
             // 更新步骤指示器
-            document.querySelectorAll('.step-number').forEach((el, index) => {
+            document.querySelectorAll('#forward-calculation-page .step-number').forEach((el, index) => {
                 const stepNum = index + 1;
                 if (stepNum < step) {
                     el.classList.remove('active');
@@ -2843,7 +3275,7 @@
                 }
             });
             
-            document.querySelectorAll('.step-title').forEach((el, index) => {
+            document.querySelectorAll('#forward-calculation-page .step-title').forEach((el, index) => {
                 const stepNum = index + 1;
                 if (stepNum < step) {
                     el.classList.remove('active');
@@ -2856,7 +3288,7 @@
                 }
             });
             
-            document.querySelectorAll('.step-line').forEach((el, index) => {
+            document.querySelectorAll('#forward-calculation-page .step-line').forEach((el, index) => {
                 const lineNum = index + 1;
                 if (lineNum < step) {
                     el.classList.add('completed');
@@ -2870,7 +3302,7 @@
             });
             
             // 显示对应步骤内容
-            document.querySelectorAll('.step-pane').forEach(pane => {
+            document.querySelectorAll('#forward-calculation-page .step-pane').forEach(pane => {
                 pane.classList.add('hidden');
             });
             
@@ -4895,52 +5327,7 @@
             updateIncomeCalculation();
         }
         
-        // 重置反向倒算
-        function resetReverseCalculation() {
-            // 重置税额数据
-            document.getElementById('reverse-total-tax').value = 5000;
-            
-            // 重置专项扣除数据
-            document.getElementById('reverse-social-security-base').value = 0;
-            document.getElementById('reverse-housing-fund-base').value = 0;
-            document.getElementById('reverse-pension-insurance').value = 0;
-            document.getElementById('reverse-medical-insurance').value = 0;
-            document.getElementById('reverse-unemployment-insurance').value = 0;
-            document.getElementById('reverse-housing-fund').value = 0;
-            document.getElementById('reverse-pension-rate').value = 8;
-            document.getElementById('reverse-medical-rate').value = 2;
-            document.getElementById('reverse-unemployment-rate').value = 0.5;
-            document.getElementById('reverse-housing-fund-rate').value = 5;
-            
-            // 重置专项附加扣除数据
-            document.getElementById('reverse-children-infant-count').value = 0;
-            document.getElementById('reverse-children-infant-deduction').value = 0;
-            document.getElementById('reverse-elderly-type').value = 'none';
-            document.getElementById('reverse-elderly-deduction').value = 0;
-            document.getElementById('reverse-housing-type').value = 'none';
-            document.getElementById('reverse-rent-deduction').value = 18000;
-            document.getElementById('reverse-housing-loan-deduction').value = 12000;
-            document.getElementById('reverse-education-type').value = 'none';
-            document.getElementById('reverse-education-deduction').value = 0;
-            document.getElementById('reverse-medical-deduction').value = 0;
-            
-            // 重置其他扣除数据
-            document.getElementById('reverse-pension-deduction').value = 0;
-            document.getElementById('reverse-insurance-other-deduction').value = 0;
-            
-            // 重置工作月数
-            document.getElementById('reverse-work-months').value = 12;
-            
-            // 重置显示状态
-            document.getElementById('reverse-rent-fields').classList.add('hidden');
-            document.getElementById('reverse-loan-fields').classList.add('hidden');
-            
-            // 重新计算
-            updateReverseDeductionCalculation();
-            
-            // 清空计算结果
-            reverseCalculationResults = {};
-        }
+
         
         // 计算经营所得税
         function calculateBusinessTax() {
@@ -4955,8 +5342,6 @@
             
             // 获取扣除项数据
             const businessInvestorDeduction = parseFloat(document.getElementById('business-investor-deduction').value) || 0;
-            const businessSpecialDeduction = parseFloat(document.getElementById('business-special-deduction').value) || 0;
-            const businessSpecialAdditionalDeduction = parseFloat(document.getElementById('business-special-additional-deduction').value) || 0;
             const businessOtherDeduction = parseFloat(document.getElementById('business-other-deduction').value) || 0;
             
             // 获取已预缴税额
@@ -4969,7 +5354,7 @@
             const businessProfit = businessIncome - totalCosts;
             
             // 计算应纳税所得额
-            const taxableIncome = Math.max(0, businessProfit - businessPreviousLosses - businessInvestorDeduction - businessSpecialDeduction - businessSpecialAdditionalDeduction - businessOtherDeduction);
+            const taxableIncome = Math.max(0, businessProfit - businessPreviousLosses - businessInvestorDeduction - businessOtherDeduction);
             
             // 计算应纳税额
             let totalTax = 0;
@@ -5000,11 +5385,9 @@
                 },
                 deductionDetails: {
                     investor: businessInvestorDeduction,
-                    special: businessSpecialDeduction,
-                    specialAdditional: businessSpecialAdditionalDeduction,
                     other: businessOtherDeduction,
                     previousLosses: businessPreviousLosses,
-                    total: businessInvestorDeduction + businessSpecialDeduction + businessSpecialAdditionalDeduction + businessOtherDeduction
+                    total: businessInvestorDeduction + businessOtherDeduction
                 },
                 taxDetails: {
                     taxableIncome: taxableIncome,
@@ -5067,8 +5450,6 @@
             // 添加扣除项行
             addTableRow(tableBody, '四、扣除项目', '¥' + results.deductionDetails.total.toFixed(2), '可在税前扣除的项目');
             addTableRow(tableBody, '其中：投资者减除费用', '¥' + results.deductionDetails.investor.toFixed(2), '固定60000元/年');
-            addTableRow(tableBody, '专项扣除', '¥' + results.deductionDetails.special.toFixed(2), '三险一金');
-            addTableRow(tableBody, '专项附加扣除', '¥' + results.deductionDetails.specialAdditional.toFixed(2), '赡养老人、子女教育等');
             addTableRow(tableBody, '其他扣除', '¥' + results.deductionDetails.other.toFixed(2), '个人养老金、商业健康保险等');
             addTableRow(tableBody, '以前年度亏损弥补', '¥' + results.deductionDetails.previousLosses.toFixed(2), '允许弥补的以前年度亏损');
             
@@ -5104,8 +5485,6 @@
             document.getElementById('business-previous-losses').value = 0;
             
             // 重置扣除项数据
-            document.getElementById('business-special-deduction').value = 24000;
-            document.getElementById('business-special-additional-deduction').value = 24000;
             document.getElementById('business-other-deduction').value = 0;
             
             // 重置已预缴税额
@@ -5268,6 +5647,7 @@
             // 隐藏特有字段
             document.getElementById('rent-fields').classList.add('hidden');
             document.getElementById('transfer-fields').classList.add('hidden');
+            document.getElementById('accidental-hint').classList.add('hidden');
             
             // 清空计算结果
             classificationCalculationResults = {};
