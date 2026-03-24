@@ -252,6 +252,13 @@ function calculateReverseTax() {
             return;
         }
         
+        // 获取年终奖数据
+        const bonusIncome = parseFloat(document.getElementById('reverse-bonus-income').value) || 0;
+        const bonusInclude = document.getElementById('reverse-bonus-include').checked;
+        
+        // 获取税率选择
+        const taxRateChoice = document.getElementById('reverse-tax-rate').value;
+        
         // 获取扣除项数据（年度）
         const annualBasicDeduction = parseFloat(document.getElementById('reverse-basic-deduction').value) || 0;
         
@@ -310,42 +317,100 @@ function calculateReverseTax() {
         // 计算总扣除额
         const totalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
         
-        // 根据税额自动计算应纳税所得额和税率
+        // 计算年终奖税额
+        let bonusTax = 0;
+        if (bonusIncome > 0 && !bonusInclude) {
+            // 年终奖单独计税
+            if (bonusIncome <= 36000) {
+                bonusTax = bonusIncome * 0.03;
+            } else if (bonusIncome <= 144000) {
+                bonusTax = bonusIncome * 0.1 - 2520;
+            } else if (bonusIncome <= 300000) {
+                bonusTax = bonusIncome * 0.2 - 16920;
+            } else if (bonusIncome <= 420000) {
+                bonusTax = bonusIncome * 0.25 - 31920;
+            } else if (bonusIncome <= 660000) {
+                bonusTax = bonusIncome * 0.3 - 52920;
+            } else if (bonusIncome <= 960000) {
+                bonusTax = bonusIncome * 0.35 - 85920;
+            } else {
+                bonusTax = bonusIncome * 0.45 - 181920;
+            }
+        }
+        
+        // 调整综合所得税额
+        const comprehensiveTax = totalTax - bonusTax;
+        
+        // 根据税额计算应纳税所得额和税率
         let taxableIncome = 0;
         let applicableRate = 0;
         let applicableDeduction = 0;
         
         if (incomeType === 'comprehensive') {
             // 综合所得反向倒算
-            // 自动判断税率级别并计算
-            if (totalTax <= 1080) { // 36000 * 0.03
-                taxableIncome = totalTax / 0.03;
-                applicableRate = 0.03;
-                applicableDeduction = 0;
-            } else if (totalTax <= 14100) { // 144000 * 0.1 - 2520
-                taxableIncome = (totalTax + 2520) / 0.1;
-                applicableRate = 0.1;
-                applicableDeduction = 2520;
-            } else if (totalTax <= 30180) { // 300000 * 0.2 - 16920
-                taxableIncome = (totalTax + 16920) / 0.2;
-                applicableRate = 0.2;
-                applicableDeduction = 16920;
-            } else if (totalTax <= 55080) { // 420000 * 0.25 - 31920
-                taxableIncome = (totalTax + 31920) / 0.25;
-                applicableRate = 0.25;
-                applicableDeduction = 31920;
-            } else if (totalTax <= 96080) { // 660000 * 0.3 - 52920
-                taxableIncome = (totalTax + 52920) / 0.3;
-                applicableRate = 0.3;
-                applicableDeduction = 52920;
-            } else if (totalTax <= 142880) { // 960000 * 0.35 - 85920
-                taxableIncome = (totalTax + 85920) / 0.35;
-                applicableRate = 0.35;
-                applicableDeduction = 85920;
-            } else { // ＞960000元
-                taxableIncome = (totalTax + 181920) / 0.45;
-                applicableRate = 0.45;
-                applicableDeduction = 181920;
+            if (taxRateChoice === 'auto') {
+                // 自动判断税率级别
+                if (comprehensiveTax <= 1080) { // 36000 * 0.03
+                    taxableIncome = comprehensiveTax / 0.03;
+                    applicableRate = 0.03;
+                    applicableDeduction = 0;
+                } else if (comprehensiveTax <= 14100) { // 144000 * 0.1 - 2520
+                    taxableIncome = (comprehensiveTax + 2520) / 0.1;
+                    applicableRate = 0.1;
+                    applicableDeduction = 2520;
+                } else if (comprehensiveTax <= 30180) { // 300000 * 0.2 - 16920
+                    taxableIncome = (comprehensiveTax + 16920) / 0.2;
+                    applicableRate = 0.2;
+                    applicableDeduction = 16920;
+                } else if (comprehensiveTax <= 55080) { // 420000 * 0.25 - 31920
+                    taxableIncome = (comprehensiveTax + 31920) / 0.25;
+                    applicableRate = 0.25;
+                    applicableDeduction = 31920;
+                } else if (comprehensiveTax <= 96080) { // 660000 * 0.3 - 52920
+                    taxableIncome = (comprehensiveTax + 52920) / 0.3;
+                    applicableRate = 0.3;
+                    applicableDeduction = 52920;
+                } else if (comprehensiveTax <= 142880) { // 960000 * 0.35 - 85920
+                    taxableIncome = (comprehensiveTax + 85920) / 0.35;
+                    applicableRate = 0.35;
+                    applicableDeduction = 85920;
+                } else { // ＞960000元
+                    taxableIncome = (comprehensiveTax + 181920) / 0.45;
+                    applicableRate = 0.45;
+                    applicableDeduction = 181920;
+                }
+            } else {
+                // 根据选择的税率计算
+                const rate = parseFloat(taxRateChoice) / 100;
+                let deduction = 0;
+                
+                switch (taxRateChoice) {
+                    case '3':
+                        deduction = 0;
+                        break;
+                    case '10':
+                        deduction = 2520;
+                        break;
+                    case '20':
+                        deduction = 16920;
+                        break;
+                    case '25':
+                        deduction = 31920;
+                        break;
+                    case '30':
+                        deduction = 52920;
+                        break;
+                    case '35':
+                        deduction = 85920;
+                        break;
+                    case '45':
+                        deduction = 181920;
+                        break;
+                }
+                
+                taxableIncome = (comprehensiveTax + deduction) / rate;
+                applicableRate = rate;
+                applicableDeduction = deduction;
             }
         } else if (incomeType === 'business') {
             // 经营所得反向倒算
@@ -373,32 +438,32 @@ function calculateReverseTax() {
             }
         } else {
             // 默认使用综合所得税率表
-            if (totalTax <= 1080) { // 36000 * 0.03
-                taxableIncome = totalTax / 0.03;
+            if (comprehensiveTax <= 1080) { // 36000 * 0.03
+                taxableIncome = comprehensiveTax / 0.03;
                 applicableRate = 0.03;
                 applicableDeduction = 0;
-            } else if (totalTax <= 14100) { // 144000 * 0.1 - 2520
-                taxableIncome = (totalTax + 2520) / 0.1;
+            } else if (comprehensiveTax <= 14100) { // 144000 * 0.1 - 2520
+                taxableIncome = (comprehensiveTax + 2520) / 0.1;
                 applicableRate = 0.1;
                 applicableDeduction = 2520;
-            } else if (totalTax <= 30180) { // 300000 * 0.2 - 16920
-                taxableIncome = (totalTax + 16920) / 0.2;
+            } else if (comprehensiveTax <= 30180) { // 300000 * 0.2 - 16920
+                taxableIncome = (comprehensiveTax + 16920) / 0.2;
                 applicableRate = 0.2;
                 applicableDeduction = 16920;
-            } else if (totalTax <= 55080) { // 420000 * 0.25 - 31920
-                taxableIncome = (totalTax + 31920) / 0.25;
+            } else if (comprehensiveTax <= 55080) { // 420000 * 0.25 - 31920
+                taxableIncome = (comprehensiveTax + 31920) / 0.25;
                 applicableRate = 0.25;
                 applicableDeduction = 31920;
-            } else if (totalTax <= 96080) { // 660000 * 0.3 - 52920
-                taxableIncome = (totalTax + 52920) / 0.3;
+            } else if (comprehensiveTax <= 96080) { // 660000 * 0.3 - 52920
+                taxableIncome = (comprehensiveTax + 52920) / 0.3;
                 applicableRate = 0.3;
                 applicableDeduction = 52920;
-            } else if (totalTax <= 142880) { // 960000 * 0.35 - 85920
-                taxableIncome = (totalTax + 85920) / 0.35;
+            } else if (comprehensiveTax <= 142880) { // 960000 * 0.35 - 85920
+                taxableIncome = (comprehensiveTax + 85920) / 0.35;
                 applicableRate = 0.35;
                 applicableDeduction = 85920;
             } else { // ＞960000元
-                taxableIncome = (totalTax + 181920) / 0.45;
+                taxableIncome = (comprehensiveTax + 181920) / 0.45;
                 applicableRate = 0.45;
                 applicableDeduction = 181920;
             }
@@ -422,6 +487,8 @@ function calculateReverseTax() {
         
         // 更新结果显示
         document.getElementById('reverse-result-total-tax').textContent = '¥' + totalTax.toFixed(2);
+        document.getElementById('reverse-result-bonus').textContent = '¥' + bonusIncome.toFixed(2);
+        document.getElementById('reverse-result-bonus-tax').textContent = '¥' + bonusTax.toFixed(2);
         document.getElementById('reverse-result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
         document.getElementById('reverse-result-total-deduction').textContent = '¥' + totalDeduction.toFixed(2);
         document.getElementById('reverse-result-total-income').textContent = '¥' + totalIncome.toFixed(2);
