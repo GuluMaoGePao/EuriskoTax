@@ -36,7 +36,7 @@ window.addEventListener('DOMContentLoaded', function() {
         
         if (type === 'rent') {
             document.getElementById('reverse-rent-fields').classList.remove('hidden');
-        } else if (type === 'housing-loan') {
+        } else if (type === 'loan') {
             document.getElementById('reverse-loan-fields').classList.remove('hidden');
         }
         updateReverseDeductionCalculation();

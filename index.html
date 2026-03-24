@@ -1145,6 +1145,45 @@
                             </select>
                         </div>
                         
+                        <div class="form-group">
+                            <label for="reverse-bonus-income" class="label">
+                                年终奖 (元/年)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">全年一次性奖金收入</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="reverse-bonus-income" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                            <div class="mt-2">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-bonus-include" class="form-checkbox text-primary">
+                                    <span class="ml-2 text-sm text-gray-700">并入综合所得计税（不勾选则单独计税）</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reverse-tax-rate" class="label">
+                                适用税率
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">选择适用的税率级别，系统将按照该税率进行反向倒算</span>
+                                </span>
+                            </label>
+                            <select id="reverse-tax-rate" class="input-field">
+                                <option value="auto">自动判断</option>
+                                <option value="3">3%</option>
+                                <option value="10">10%</option>
+                                <option value="20">20%</option>
+                                <option value="25">25%</option>
+                                <option value="30">30%</option>
+                                <option value="35">35%</option>
+                                <option value="45">45%</option>
+                            </select>
+                        </div>
+                        
                         <div class="mt-6 flex justify-between">
                             <button id="reset-reverse-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
                                 <i class="fa fa-refresh mr-2"></i>重置
@@ -1529,6 +1568,16 @@
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">全年应缴税额</span>
                                 <span class="font-medium" id="reverse-result-total-tax">¥0</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <span class="text-gray-600">年终奖</span>
+                                <span class="font-medium" id="reverse-result-bonus">¥0</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <span class="text-gray-600">年终奖税额</span>
+                                <span class="font-medium text-danger" id="reverse-result-bonus-tax">¥0</span>
                             </div>
                             
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
