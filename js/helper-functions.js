@@ -1,11 +1,17 @@
 // 计算社保费用
 function calculateSocialSecurity() {
-    const base = parseFloat(document.getElementById('social-security-base').value) || 0;
-    const housingFundBase = parseFloat(document.getElementById('housing-fund-base').value) || 0;
+    let base = parseFloat(document.getElementById('social-security-base').value) || 0;
+    let housingFundBase = parseFloat(document.getElementById('housing-fund-base').value) || 0;
     const pensionRate = parseFloat(document.getElementById('pension-rate').value) || 0;
     const medicalRate = parseFloat(document.getElementById('medical-rate').value) || 0;
     const unemploymentRate = parseFloat(document.getElementById('unemployment-rate').value) || 0;
     const housingFundRate = parseFloat(document.getElementById('housing-fund-rate').value) || 0;
+    
+    // 社保基数限制：最低7460，最高37302
+    const minBase = 7460;
+    const maxBase = 37302;
+    base = Math.max(minBase, Math.min(maxBase, base));
+    housingFundBase = Math.max(minBase, Math.min(maxBase, housingFundBase));
     
     // 计算各项保险费用
     const pensionAmount = base * (pensionRate / 100);
@@ -75,13 +81,19 @@ function calculateSocialSecurityRate(type) {
 
 // 反向倒算页面的社保缴费计算
 function calculateReverseSocialSecurity() {
-    const base = parseFloat(document.getElementById('reverse-social-security-base').value) || 0;
-    const housingFundBase = parseFloat(document.getElementById('reverse-housing-fund-base').value) || 0;
+    let base = parseFloat(document.getElementById('reverse-social-security-base').value) || 0;
+    let housingFundBase = parseFloat(document.getElementById('reverse-housing-fund-base').value) || 0;
     const pensionRate = parseFloat(document.getElementById('reverse-pension-rate').value) || 0;
     const medicalRate = parseFloat(document.getElementById('reverse-medical-rate').value) || 0;
     const unemploymentRate = parseFloat(document.getElementById('reverse-unemployment-rate').value) || 0;
     const housingFundRate = parseFloat(document.getElementById('reverse-housing-fund-rate').value) || 0;
     const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+    
+    // 社保基数限制：最低7460，最高37302
+    const minBase = 7460;
+    const maxBase = 37302;
+    base = Math.max(minBase, Math.min(maxBase, base));
+    housingFundBase = Math.max(minBase, Math.min(maxBase, housingFundBase));
     
     // 计算各项保险费用（根据工作月数调整）
     const pensionAmount = base * (pensionRate / 100) * workMonths;
@@ -185,9 +197,33 @@ function updateIncomeCalculation() {
     });
     
     // 计算各项收入计入综合所得的金额（年度）
-    const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
-    const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
-    const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
+        // 劳务报酬所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const laborTaxableIncome = Math.max(0, annualLaborIncome <= 4000 ? (annualLaborIncome - 800) : (annualLaborIncome * 0.8));
+        // 稿酬所得：不超过4000元的减除800元，超过4000元的减除20%，再减按70%，但不低于0
+        const authorTaxableIncome = Math.max(0, annualAuthorIncome <= 4000 ? ((annualAuthorIncome - 800) * 0.7) : (annualAuthorIncome * 0.8 * 0.7));
+        // 特许权使用费所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const royaltyTaxableIncome = Math.max(0, annualRoyaltyIncome <= 4000 ? (annualRoyaltyIncome - 800) : (annualRoyaltyIncome * 0.8));
+        
+        // 计算劳务报酬所得的预扣税额（根据应纳税所得额的不同档次）
+        let laborTax = 0;
+        if (laborTaxableIncome <= 20000) {
+            laborTax = laborTaxableIncome * 0.2;
+        } else if (laborTaxableIncome <= 50000) {
+            laborTax = laborTaxableIncome * 0.3 - 2000;
+        } else {
+            laborTax = laborTaxableIncome * 0.4 - 7000;
+        }
+        
+        // 计算稿酬所得的预扣税额
+        const authorTax = authorTaxableIncome * 0.2;
+        
+        // 计算特许权使用费所得的预扣税额
+        const royaltyTax = royaltyTaxableIncome * 0.2;
+        
+        // 计算计入综合所得的金额（年度）
+        const annualLaborIncomeCalculated = laborTaxableIncome;
+        const annualAuthorIncomeCalculated = authorTaxableIncome;
+        const annualRoyaltyIncomeCalculated = royaltyTaxableIncome;
     
     // 计算月度综合所得收入额合计（用于显示）
     const monthlySalaryIncomeCalculated = monthlySalaryIncome;
@@ -271,7 +307,10 @@ function updateDeductionCalculation() {
     
     // 其他扣除
     const pensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+    const enterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
     const insuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+    const taxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
+    const charitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
     
     // 计算年度大病医疗实际可扣除额
     const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
@@ -290,7 +329,10 @@ function updateDeductionCalculation() {
         housingLoanDeduction + (educationDegreeDeduction / workMonths);
     
     // 计算月度其他扣除合计
-    const monthlyOtherDeductionTotal = pensionDeduction + insuranceOtherDeduction;
+    const monthlyOtherDeductionTotal = pensionDeduction + enterpriseAnnuity + insuranceOtherDeduction + taxDeferredPension;
+    
+    // 计算年度其他扣除合计（根据工作月数调整）
+    const annualOtherDeductionTotal = monthlyOtherDeductionTotal * workMonths + charitableDonation;
     
     // 计算月度扣除总额合计
     const monthlyDeductionTotal = basicDeduction + insuranceDeduction + monthlySpecialAdditionalTotal + monthlyOtherDeductionTotal;
@@ -298,8 +340,7 @@ function updateDeductionCalculation() {
     // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
     const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     
-    // 计算年度其他扣除合计（根据工作月数调整）
-    const annualOtherDeductionTotal = monthlyOtherDeductionTotal * workMonths;
+    // 年度其他扣除合计已经在前面计算过，包含了公益捐赠支出
     
     // 计算年度专项扣除合计（根据工作月数调整）
     const annualSpecialDeductionTotal = insuranceDeduction * workMonths;
@@ -391,8 +432,11 @@ function updateReverseDeductionCalculation() {
     let annualOtherDeductionTotal = 0;
     // 无论复选框是否勾选，都计算其他扣除，因为用户可能已经输入了金额
     const annualPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
+    const annualEnterpriseAnnuity = parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0;
     const annualInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
-    annualOtherDeductionTotal = annualPensionDeduction + annualInsuranceOtherDeduction;
+    const annualTaxDeferredPension = parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0;
+    const annualCharitableDonation = parseFloat(document.getElementById('reverse-charitable-donation').value) || 0;
+    annualOtherDeductionTotal = annualPensionDeduction + annualEnterpriseAnnuity + annualInsuranceOtherDeduction + annualTaxDeferredPension + annualCharitableDonation;
     otherDeduction = (annualOtherDeductionTotal / 12) * workMonths;
     
     // 计算年度专项扣除合计
@@ -460,9 +504,33 @@ function updatePreviewData() {
     const bonusInclude = document.getElementById('bonus-include').checked;
     
     // 计算各项收入计入综合所得的金额（年度）
-    const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
-    const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
-    const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
+        // 劳务报酬所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const laborTaxableIncome = Math.max(0, annualLaborIncome <= 4000 ? (annualLaborIncome - 800) : (annualLaborIncome * 0.8));
+        // 稿酬所得：不超过4000元的减除800元，超过4000元的减除20%，再减按70%，但不低于0
+        const authorTaxableIncome = Math.max(0, annualAuthorIncome <= 4000 ? ((annualAuthorIncome - 800) * 0.7) : (annualAuthorIncome * 0.8 * 0.7));
+        // 特许权使用费所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const royaltyTaxableIncome = Math.max(0, annualRoyaltyIncome <= 4000 ? (annualRoyaltyIncome - 800) : (annualRoyaltyIncome * 0.8));
+        
+        // 计算劳务报酬所得的预扣税额（根据应纳税所得额的不同档次）
+        let laborTax = 0;
+        if (laborTaxableIncome <= 20000) {
+            laborTax = laborTaxableIncome * 0.2;
+        } else if (laborTaxableIncome <= 50000) {
+            laborTax = laborTaxableIncome * 0.3 - 2000;
+        } else {
+            laborTax = laborTaxableIncome * 0.4 - 7000;
+        }
+        
+        // 计算稿酬所得的预扣税额
+        const authorTax = authorTaxableIncome * 0.2;
+        
+        // 计算特许权使用费所得的预扣税额
+        const royaltyTax = royaltyTaxableIncome * 0.2;
+        
+        // 计算计入综合所得的金额（年度）
+        const annualLaborIncomeCalculated = laborTaxableIncome;
+        const annualAuthorIncomeCalculated = authorTaxableIncome;
+        const annualRoyaltyIncomeCalculated = royaltyTaxableIncome;
     
     // 计算年度综合所得收入额合计（根据工作月数调整）
     let totalIncome = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
@@ -499,7 +567,10 @@ function updatePreviewData() {
     const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
     const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
     const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+    const monthlyEnterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
     const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+    const monthlyTaxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
+    const annualCharitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
     
     // 检查职业资格扣除
     let annualProfessionalDeduction = 0;
@@ -519,7 +590,7 @@ function updatePreviewData() {
     const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     
     // 计算年度其他扣除合计（根据工作月数调整）
-    const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyInsuranceOtherDeduction) * workMonths;
+    const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension) * workMonths + annualCharitableDonation;
     
     // 计算年度总扣除额（根据工作月数调整）
     const totalDeduction = monthlyBasicDeduction * workMonths + monthlyInsuranceDeduction * workMonths + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
@@ -602,7 +673,10 @@ function resetDeductionData() {
     
     // 其他扣除
     document.getElementById('pension-deduction').value = 0;
-    document.getElementById('insurance-other-deduction').value = 0;
+    document.getElementById('enterprise-annuity').value = 0;
+    document.getElementById('insurance-other-deduction').value = 200;
+    document.getElementById('tax-deferred-pension').value = 0;
+    document.getElementById('charitable-donation').value = 0;
     
     // 重置复选框状态
     document.getElementById('special-deduction-checkbox').checked = false;
@@ -702,8 +776,11 @@ function resetReverseCalculation() {
     document.getElementById('reverse-medical-deduction').value = 0;
     
     // 9. 重置其他扣除数据
-    document.getElementById('reverse-pension-deduction').value = 0;
-    document.getElementById('reverse-insurance-other-deduction').value = 0;
+        document.getElementById('reverse-pension-deduction').value = 0;
+        document.getElementById('reverse-enterprise-annuity').value = 0;
+        document.getElementById('reverse-insurance-other-deduction').value = 2400;
+        document.getElementById('reverse-tax-deferred-pension').value = 0;
+        document.getElementById('reverse-charitable-donation').value = 0;
     
     // 10. 重置显示状态
     document.getElementById('reverse-special-deduction-content').classList.remove('hidden');

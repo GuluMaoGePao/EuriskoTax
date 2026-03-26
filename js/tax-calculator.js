@@ -51,9 +51,33 @@ function calculateTax() {
         }
         
         // 计算各项收入计入综合所得的金额（年度）
-        const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
-        const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
-        const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
+        // 劳务报酬所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const laborTaxableIncome = Math.max(0, annualLaborIncome <= 4000 ? (annualLaborIncome - 800) : (annualLaborIncome * 0.8));
+        // 稿酬所得：不超过4000元的减除800元，超过4000元的减除20%，再减按70%，但不低于0
+        const authorTaxableIncome = Math.max(0, annualAuthorIncome <= 4000 ? ((annualAuthorIncome - 800) * 0.7) : (annualAuthorIncome * 0.8 * 0.7));
+        // 特许权使用费所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
+        const royaltyTaxableIncome = Math.max(0, annualRoyaltyIncome <= 4000 ? (annualRoyaltyIncome - 800) : (annualRoyaltyIncome * 0.8));
+        
+        // 计算劳务报酬所得的预扣税额（根据应纳税所得额的不同档次）
+        let laborTax = 0;
+        if (laborTaxableIncome <= 20000) {
+            laborTax = laborTaxableIncome * 0.2;
+        } else if (laborTaxableIncome <= 50000) {
+            laborTax = laborTaxableIncome * 0.3 - 2000;
+        } else {
+            laborTax = laborTaxableIncome * 0.4 - 7000;
+        }
+        
+        // 计算稿酬所得的预扣税额
+        const authorTax = authorTaxableIncome * 0.2;
+        
+        // 计算特许权使用费所得的预扣税额
+        const royaltyTax = royaltyTaxableIncome * 0.2;
+        
+        // 计算计入综合所得的金额（年度）
+        const annualLaborIncomeCalculated = laborTaxableIncome;
+        const annualAuthorIncomeCalculated = authorTaxableIncome;
+        const annualRoyaltyIncomeCalculated = royaltyTaxableIncome;
         
         // 计算年度综合所得收入额合计
         let totalIncome = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
@@ -97,7 +121,10 @@ function calculateTax() {
         const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
         const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
         const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+        const monthlyEnterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
         const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+        const monthlyTaxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
+        const annualCharitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
         
         // 检查职业资格扣除
         let annualProfessionalDeduction = 0;
@@ -122,7 +149,7 @@ function calculateTax() {
         const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
         
         // 计算年度其他扣除合计（根据工作月数调整）
-        const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyInsuranceOtherDeduction) * workMonths;
+        const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension) * workMonths + annualCharitableDonation;
         
         // 计算年度总扣除额（根据工作月数调整）
         const totalDeduction = monthlyBasicDeduction * workMonths + monthlyInsuranceDeduction * workMonths + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
@@ -180,10 +207,13 @@ function calculateTax() {
                 salary: monthlySalaryIncome,
                 labor: annualLaborIncome,
                 laborCalculated: annualLaborIncomeCalculated,
+                laborTax: laborTax,
                 author: annualAuthorIncome,
                 authorCalculated: annualAuthorIncomeCalculated,
+                authorTax: authorTax,
                 royalty: annualRoyaltyIncome,
                 royaltyCalculated: annualRoyaltyIncomeCalculated,
+                royaltyTax: royaltyTax,
                 bonus: bonusIncome,
                 bonusInclude: bonusInclude,
                 bonusTax: bonusTax,
@@ -202,7 +232,10 @@ function calculateTax() {
                 medical: annualMedicalDeduction,
                 actualMedical: actualMedicalDeduction,
                 pension: monthlyPensionDeduction,
+                enterpriseAnnuity: monthlyEnterpriseAnnuity,
                 insuranceOther: monthlyInsuranceOtherDeduction,
+                taxDeferredPension: monthlyTaxDeferredPension,
+                charitableDonation: annualCharitableDonation,
                 specialAdditionalTotal: annualSpecialAdditionalTotal,
                 otherTotal: annualOtherDeductionTotal,
                 total: totalDeduction
