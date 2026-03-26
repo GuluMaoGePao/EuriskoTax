@@ -9,9 +9,10 @@ function updateBudgetTable() {
     tbody.innerHTML = '';
     
     const monthlySalary = calculationResults.incomeDetails.salary;
-    const monthlyLabor = calculationResults.incomeDetails.labor / 12;
-    const monthlyAuthor = calculationResults.incomeDetails.author / 12;
-    const monthlyRoyalty = calculationResults.incomeDetails.royalty / 12;
+    // laborCalculated、authorCalculated 和 royaltyCalculated 已经是年度计算后的值，需要除以12得到月度值
+    const monthlyLabor = calculationResults.incomeDetails.laborCalculated / 12;
+    const monthlyAuthor = calculationResults.incomeDetails.authorCalculated / 12;
+    const monthlyRoyalty = calculationResults.incomeDetails.royaltyCalculated / 12;
     const monthlyBonus = calculationResults.incomeDetails.bonusInclude ? calculationResults.incomeDetails.bonus / workMonths : 0;
     
     const monthlyBasicDeduction = calculationResults.deductionDetails.basic;
@@ -20,26 +21,37 @@ function updateBudgetTable() {
                                      calculationResults.deductionDetails.unemploymentInsurance + 
                                      calculationResults.deductionDetails.housingFund;
     const monthlySpecialAdditional = (calculationResults.deductionDetails.specialAdditionalTotal - calculationResults.deductionDetails.actualMedical) / workMonths;
-    const monthlyMedicalDeduction = calculationResults.deductionDetails.actualMedical / workMonths;
     const monthlyOtherDeduction = calculationResults.deductionDetails.otherTotal / workMonths;
     
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
+    // 大病医疗按年计算，不平均到工作月
+    const annualMedicalDeduction = calculationResults.deductionDetails.actualMedical;
+    // 年终奖税额
+    const bonusTax = calculationResults.incomeDetails.bonusTax || 0;
+    // 总应纳税额（来自计算结果）
+    const totalTax = calculationResults.taxDetails.totalTax - bonusTax;
+    
     for (let month = 1; month <= workMonths; month++) {
         const monthlyIncome = monthlySalary + monthlyLabor + monthlyAuthor + monthlyRoyalty + monthlyBonus;
-        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyMedicalDeduction + monthlyOtherDeduction;
+        // 月度扣除不包含大病医疗
+        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
         const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
         
         cumulativeTaxableIncome += monthlyTaxableIncome;
         
-        // 计算累计应纳税额
+        // 最后一个月减去年度大病医疗扣除，并加上年终奖税额
+        let adjustedTaxableIncome = cumulativeTaxableIncome;
         let monthTax = 0;
-        for (const bracket of comprehensiveTaxRates) {
-            if (cumulativeTaxableIncome <= bracket.max) {
-                monthTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction - cumulativeTax;
-                break;
-            }
+        
+        if (month === workMonths) {
+            adjustedTaxableIncome = Math.max(0, cumulativeTaxableIncome - annualMedicalDeduction);
+            // 最后一个月的税额 = 总应纳税额 - 之前累计的税额 + 年终奖税额
+            monthTax = totalTax - cumulativeTax + bonusTax;
+        } else {
+            // 前11个月的税额 = 总应纳税额 / 12
+            monthTax = totalTax / workMonths;
         }
         
         cumulativeTax += monthTax;
@@ -50,7 +62,7 @@ function updateBudgetTable() {
             <td>¥${monthlyIncome.toFixed(2)}</td>
             <td>¥${monthlyDeduction.toFixed(2)}</td>
             <td>¥${monthlyTaxableIncome.toFixed(2)}</td>
-            <td>${getTaxRate(cumulativeTaxableIncome)}%</td>
+            <td>${getTaxRate(adjustedTaxableIncome)}%</td>
             <td>¥${monthTax.toFixed(2)}</td>
             <td>¥${cumulativeTax.toFixed(2)}</td>
         `;
@@ -70,15 +82,26 @@ function updateReverseBudgetTable() {
     tbody.innerHTML = '';
     
     const monthlyIncome = reverseCalculationResults.totalIncome / workMonths;
-    const monthlyDeduction = reverseCalculationResults.totalDeduction / workMonths;
+    // 月度扣除不包含大病医疗
+    const monthlyDeduction = (reverseCalculationResults.totalDeduction - reverseCalculationResults.deductionDetails.actualMedical) / workMonths;
     const monthlyTaxableIncome = monthlyIncome - monthlyDeduction;
     const monthlyTax = reverseCalculationResults.totalTax / workMonths;
     
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
+    // 大病医疗按年计算，不平均到工作月
+    const annualMedicalDeduction = reverseCalculationResults.deductionDetails.actualMedical || 0;
+    
     for (let month = 1; month <= workMonths; month++) {
         cumulativeTaxableIncome += monthlyTaxableIncome;
+        
+        // 最后一个月减去年度大病医疗扣除
+        let adjustedTaxableIncome = cumulativeTaxableIncome;
+        if (month === workMonths) {
+            adjustedTaxableIncome = Math.max(0, cumulativeTaxableIncome - annualMedicalDeduction);
+        }
+        
         cumulativeTax += monthlyTax;
         
         const row = document.createElement('tr');
@@ -87,7 +110,7 @@ function updateReverseBudgetTable() {
             <td>¥${monthlyIncome.toFixed(2)}</td>
             <td>¥${monthlyDeduction.toFixed(2)}</td>
             <td>¥${monthlyTaxableIncome.toFixed(2)}</td>
-            <td>${getTaxRate(cumulativeTaxableIncome)}%</td>
+            <td>${getTaxRate(adjustedTaxableIncome)}%</td>
             <td>¥${monthlyTax.toFixed(2)}</td>
             <td>¥${cumulativeTax.toFixed(2)}</td>
         `;
@@ -487,13 +510,29 @@ function generateOptimizationTips() {
         tips.push('您未填写社保缴费信息，建议根据实际情况填写，这部分支出可以在计算个税时扣除。');
     }
     
+    // 检查工作月数
+    if (calculationResults.workMonths < 12) {
+        tips.push(`您填写的工作月数为${calculationResults.workMonths}个月，系统已根据实际工作月数调整了扣除额计算。`);
+    }
+    
+    // 检查应纳税所得额
+    if (calculationResults.taxDetails.taxableIncome === 0) {
+        tips.push('您的应纳税所得额为0，无需缴纳个人所得税。');
+    }
+    
+    // 检查税率级别
+    const taxRate = calculationResults.taxDetails.applicableRate * 100;
+    if (taxRate > 20) {
+        tips.push(`您的适用税率为${taxRate}%，属于较高税率级别，建议合理规划税务，利用各项扣除政策降低税负。`);
+    }
+    
     if (tips.length === 0) {
         tips.push('您的税务规划较为合理，建议继续保持。');
     }
     
     tips.forEach((tip, index) => {
         const tipElement = document.createElement('div');
-        tipElement.className = 'flex items-start p-3 bg-blue-50 rounded-lg';
+        tipElement.className = 'flex items-start p-3 bg-blue-50 rounded-lg mb-3';
         tipElement.innerHTML = `
             <i class="fa fa-lightbulb-o text-primary mt-0.5 mr-3"></i>
             <div>

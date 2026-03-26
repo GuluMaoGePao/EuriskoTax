@@ -28,203 +28,243 @@ const classificationTaxRate = 0.2;
 
 // 计算个人所得税
 function calculateTax() {
-    // 获取工作月数
-    const workMonths = parseInt(document.getElementById('work-months').value) || 12;
-    
-    // 获取收入数据
-    const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-    const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
-    const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
-    const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
-    const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
-    const bonusInclude = document.getElementById('bonus-include').checked;
-    
-    // 计算各项收入计入综合所得的金额（年度）
-    const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
-    const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
-    const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
-    
-    // 计算年度综合所得收入额合计
-    let totalIncome = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
-    if (bonusInclude) {
-        totalIncome += bonusIncome;
-    }
-    
-    // 检查各扣除项是否显示
-    const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
-    const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
-    const isOtherDeductionVisible = !document.getElementById('other-deduction-content').classList.contains('hidden');
-    
-    // 获取扣除项数据（月度）
-    const monthlyBasicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 0;
-    const monthlyPensionInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('pension-insurance').value) || 0) : 0;
-    const monthlyMedicalInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('medical-insurance').value) || 0) : 0;
-    const monthlyUnemploymentInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('unemployment-insurance').value) || 0) : 0;
-    const monthlyHousingFund = isSpecialDeductionVisible ? (parseFloat(document.getElementById('housing-fund').value) || 0) : 0;
-    const monthlyInsuranceDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
-    const monthlyElderlyDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('elderly-deduction').value) || 0) : 0;
-    const monthlyChildrenInfantDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('children-infant-deduction').value) || 0) : 0;
-    
-    // 住房扣除（二选一）
-    let monthlyHousingDeduction = 0;
-    if (isSpecialAdditionalDeductionVisible) {
-        const housingType = document.getElementById('housing-type').value;
-        if (housingType === 'rent') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('rent-deduction').value) || 0;
-        } else if (housingType === 'loan') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
+    try {
+        // 获取工作月数
+        const workMonths = parseInt(document.getElementById('work-months').value) || 12;
+        
+        // 验证工作月数
+        if (workMonths < 1 || workMonths > 12) {
+            throw new Error('工作月数必须在1-12之间');
         }
-    }
-    
-    const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
-    const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
-    const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
-    const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
-    
-    // 计算年度大病医疗实际可扣除额
-    const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
-    
-    // 计算年度专项附加扣除合计（根据工作月数调整）
-    const annualSpecialAdditionalTotal = (monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction) * workMonths + 
-                                         annualEducationDeduction + actualMedicalDeduction;
-    
-    // 计算年度其他扣除合计（根据工作月数调整）
-    const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyInsuranceOtherDeduction) * workMonths;
-    
-    // 计算年度总扣除额（根据工作月数调整）
-    const totalDeduction = monthlyBasicDeduction * workMonths + monthlyInsuranceDeduction * workMonths + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
-    
-    // 计算应纳税所得额
-    const taxableIncome = Math.max(0, totalIncome - totalDeduction);
-    
-    // 计算应纳税额
-    let totalTax = 0;
-    let applicableRate = 0;
-    let applicableDeduction = 0;
-    
-    for (const bracket of comprehensiveTaxRates) {
-        if (taxableIncome <= bracket.max) {
-            totalTax = taxableIncome * bracket.rate - bracket.deduction;
-            applicableRate = bracket.rate;
-            applicableDeduction = bracket.deduction;
-            break;
+        
+        // 获取收入数据
+        const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
+        const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
+        const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
+        const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
+        const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
+        const bonusInclude = document.getElementById('bonus-include').checked;
+        
+        // 验证收入数据
+        if (monthlySalaryIncome < 0 || annualLaborIncome < 0 || annualAuthorIncome < 0 || annualRoyaltyIncome < 0 || bonusIncome < 0) {
+            throw new Error('收入数据不能为负数');
         }
-    }
-    
-    // 计算年终奖单独计税税额
-    let bonusTax = 0;
-    if (bonusIncome > 0 && !bonusInclude) {
-        const bonusTaxableIncome = bonusIncome;
+        
+        // 计算各项收入计入综合所得的金额（年度）
+        const annualLaborIncomeCalculated = annualLaborIncome * 0.8;
+        const annualAuthorIncomeCalculated = annualAuthorIncome * 0.8 * 0.7;
+        const annualRoyaltyIncomeCalculated = annualRoyaltyIncome * 0.8;
+        
+        // 计算年度综合所得收入额合计
+        let totalIncome = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
+        if (bonusInclude) {
+            totalIncome += bonusIncome;
+        }
+        
+        // 检查各扣除项是否显示
+        const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
+        const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
+        const isOtherDeductionVisible = !document.getElementById('other-deduction-content').classList.contains('hidden');
+        
+        // 获取扣除项数据（月度）
+        const monthlyBasicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 0;
+        const monthlyPensionInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('pension-insurance').value) || 0) : 0;
+        const monthlyMedicalInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('medical-insurance').value) || 0) : 0;
+        const monthlyUnemploymentInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('unemployment-insurance').value) || 0) : 0;
+        const monthlyHousingFund = isSpecialDeductionVisible ? (parseFloat(document.getElementById('housing-fund').value) || 0) : 0;
+        const monthlyInsuranceDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
+        const monthlyElderlyDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('elderly-deduction').value) || 0) : 0;
+        const monthlyChildrenInfantDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('children-infant-deduction').value) || 0) : 0;
+        
+        // 验证扣除项数据
+        if (monthlyBasicDeduction < 0 || monthlyPensionInsurance < 0 || monthlyMedicalInsurance < 0 || 
+            monthlyUnemploymentInsurance < 0 || monthlyHousingFund < 0 || monthlyElderlyDeduction < 0 || 
+            monthlyChildrenInfantDeduction < 0) {
+            throw new Error('扣除项数据不能为负数');
+        }
+        
+        // 住房扣除（二选一）
+        let monthlyHousingDeduction = 0;
+        if (isSpecialAdditionalDeductionVisible) {
+            const housingType = document.getElementById('housing-type').value;
+            if (housingType === 'rent') {
+                monthlyHousingDeduction = parseFloat(document.getElementById('rent-deduction').value) || 0;
+            } else if (housingType === 'loan') {
+                monthlyHousingDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
+            }
+        }
+        
+        const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
+        const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
+        const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+        const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+        
+        // 检查职业资格扣除
+        let annualProfessionalDeduction = 0;
+        if (isSpecialAdditionalDeductionVisible && document.getElementById('education-professional-checkbox') && document.getElementById('education-professional-checkbox').checked) {
+            annualProfessionalDeduction = 3600; // 职业资格3600元/年
+        }
+        
+        // 验证其他扣除项数据
+        if (annualEducationDeduction < 0 || annualMedicalDeduction < 0 || monthlyPensionDeduction < 0 || monthlyInsuranceOtherDeduction < 0) {
+            throw new Error('扣除项数据不能为负数');
+        }
+        
+        // 计算年度大病医疗实际可扣除额
+        const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
+        
+        // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
+        const monthlySpecialAdditionalTotal = (monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction) + (annualEducationDeduction / workMonths);
+        
+        // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
+        const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
+        
+        // 计算年度其他扣除合计（根据工作月数调整）
+        const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyInsuranceOtherDeduction) * workMonths;
+        
+        // 计算年度总扣除额（根据工作月数调整）
+        const totalDeduction = monthlyBasicDeduction * workMonths + monthlyInsuranceDeduction * workMonths + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
+        
+        // 计算应纳税所得额
+        const taxableIncome = Math.max(0, totalIncome - totalDeduction);
+        
+        // 计算应纳税额
+        let totalTax = 0;
+        let applicableRate = 0;
+        let applicableDeduction = 0;
+        
         for (const bracket of comprehensiveTaxRates) {
-            if (bonusTaxableIncome <= bracket.max) {
-                bonusTax = bonusTaxableIncome * bracket.rate - bracket.deduction;
+            if (taxableIncome <= bracket.max) {
+                totalTax = taxableIncome * bracket.rate - bracket.deduction;
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
                 break;
             }
         }
-    }
-    
-    // 计算总应纳税额
-    const finalTotalTax = totalTax + bonusTax;
-    
-    // 获取已预缴税额
-    const prepaidTax = parseFloat(document.getElementById('prepaid-tax').value) || 0;
-    
-    // 计算应退/应补税额
-    const refundTax = finalTotalTax - prepaidTax;
-    
-    // 计算税后收入（考虑已预缴税额）
-    const netIncome = totalIncome - (finalTotalTax - prepaidTax);
-    
-    // 保存计算结果
-    calculationResults = {
-        workMonths: workMonths,
-        incomeDetails: {
-            salary: monthlySalaryIncome,
-            labor: annualLaborIncome,
-            laborCalculated: annualLaborIncomeCalculated,
-            author: annualAuthorIncome,
-            authorCalculated: annualAuthorIncomeCalculated,
-            royalty: annualRoyaltyIncome,
-            royaltyCalculated: annualRoyaltyIncomeCalculated,
-            bonus: bonusIncome,
-            bonusInclude: bonusInclude,
-            bonusTax: bonusTax,
-            total: totalIncome
-        },
-        deductionDetails: {
-            basic: monthlyBasicDeduction,
-            pensionInsurance: monthlyPensionInsurance,
-            medicalInsurance: monthlyMedicalInsurance,
-            unemploymentInsurance: monthlyUnemploymentInsurance,
-            housingFund: monthlyHousingFund,
-            elderly: monthlyElderlyDeduction,
-            childrenInfant: monthlyChildrenInfantDeduction,
-            housing: monthlyHousingDeduction,
-            education: annualEducationDeduction,
-            medical: annualMedicalDeduction,
-            actualMedical: actualMedicalDeduction,
-            pension: monthlyPensionDeduction,
-            insuranceOther: monthlyInsuranceOtherDeduction,
-            specialAdditionalTotal: annualSpecialAdditionalTotal,
-            otherTotal: annualOtherDeductionTotal,
-            total: totalDeduction
-        },
-        taxDetails: {
-            taxableIncome: taxableIncome,
-            totalTax: finalTotalTax,
-            applicableRate: applicableRate,
-            applicableDeduction: applicableDeduction,
-            prepaidTax: prepaidTax,
-            refundTax: refundTax,
-            netIncome: netIncome
-        },
-        calculationDate: new Date().toISOString()
-    };
-    
-    // 更新结果显示
-    document.getElementById('result-total-income').textContent = '¥' + totalIncome.toFixed(2);
-    document.getElementById('result-total-deduction').textContent = '¥' + totalDeduction.toFixed(2);
-    document.getElementById('result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
-    document.getElementById('result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
-    document.getElementById('result-deduction-amount').textContent = '¥' + applicableDeduction.toFixed(2);
-    document.getElementById('result-total-tax').textContent = '¥' + finalTotalTax.toFixed(2);
-    
-    // 更新年终奖相关显示
-    if (bonusIncome > 0) {
-        const bonusDisplay = document.getElementById('bonus-tax-display');
-        if (bonusDisplay) {
-            bonusDisplay.style.display = 'block';
-            // 检查元素是否存在
-            const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
-            const bonusMethodElement = document.getElementById('bonus-method');
-            if (bonusTaxAmountElement) {
-                bonusTaxAmountElement.textContent = '¥' + bonusTax.toFixed(2);
-            }
-            if (bonusMethodElement) {
-                bonusMethodElement.textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
+        
+        // 计算年终奖单独计税税额
+        let bonusTax = 0;
+        if (bonusIncome > 0 && !bonusInclude) {
+            const bonusTaxableIncome = bonusIncome;
+            for (const bracket of comprehensiveTaxRates) {
+                if (bonusTaxableIncome <= bracket.max) {
+                    bonusTax = bonusTaxableIncome * bracket.rate - bracket.deduction;
+                    break;
+                }
             }
         }
-    } else {
-        const bonusDisplay = document.getElementById('bonus-tax-display');
-        if (bonusDisplay) {
-            bonusDisplay.style.display = 'none';
+        
+        // 计算总应纳税额
+        const finalTotalTax = totalTax + bonusTax;
+        
+        // 获取已预缴税额
+        const prepaidTax = parseFloat(document.getElementById('prepaid-tax').value) || 0;
+        
+        // 验证已预缴税额
+        if (prepaidTax < 0) {
+            throw new Error('已预缴税额不能为负数');
         }
-    }
-    // 检查元素是否存在
-    const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
-    if (resultPrepaidTaxElement) {
-        resultPrepaidTaxElement.textContent = '¥' + prepaidTax.toFixed(2);
-    }
-    
-    const refundTaxElement = document.getElementById('result-refund-tax');
-    if (refundTaxElement) {
-        refundTaxElement.textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
-        refundTaxElement.className = refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success';
-    }
-    
-    const resultNetIncomeElement = document.getElementById('result-net-income');
-    if (resultNetIncomeElement) {
-        resultNetIncomeElement.textContent = '¥' + netIncome.toFixed(2);
+        
+        // 计算应退/应补税额
+        const refundTax = finalTotalTax - prepaidTax;
+        
+        // 计算税后收入（考虑已预缴税额）
+        const netIncome = totalIncome - (finalTotalTax - prepaidTax);
+        
+        // 保存计算结果
+        calculationResults = {
+            workMonths: workMonths,
+            incomeDetails: {
+                salary: monthlySalaryIncome,
+                labor: annualLaborIncome,
+                laborCalculated: annualLaborIncomeCalculated,
+                author: annualAuthorIncome,
+                authorCalculated: annualAuthorIncomeCalculated,
+                royalty: annualRoyaltyIncome,
+                royaltyCalculated: annualRoyaltyIncomeCalculated,
+                bonus: bonusIncome,
+                bonusInclude: bonusInclude,
+                bonusTax: bonusTax,
+                total: totalIncome
+            },
+            deductionDetails: {
+                basic: monthlyBasicDeduction,
+                pensionInsurance: monthlyPensionInsurance,
+                medicalInsurance: monthlyMedicalInsurance,
+                unemploymentInsurance: monthlyUnemploymentInsurance,
+                housingFund: monthlyHousingFund,
+                elderly: monthlyElderlyDeduction,
+                childrenInfant: monthlyChildrenInfantDeduction,
+                housing: monthlyHousingDeduction,
+                education: annualEducationDeduction,
+                medical: annualMedicalDeduction,
+                actualMedical: actualMedicalDeduction,
+                pension: monthlyPensionDeduction,
+                insuranceOther: monthlyInsuranceOtherDeduction,
+                specialAdditionalTotal: annualSpecialAdditionalTotal,
+                otherTotal: annualOtherDeductionTotal,
+                total: totalDeduction
+            },
+            taxDetails: {
+                taxableIncome: taxableIncome,
+                totalTax: finalTotalTax,
+                applicableRate: applicableRate,
+                applicableDeduction: applicableDeduction,
+                prepaidTax: prepaidTax,
+                refundTax: refundTax,
+                netIncome: netIncome
+            },
+            calculationDate: new Date().toISOString()
+        };
+        
+        // 更新结果显示
+        document.getElementById('result-total-income').textContent = '¥' + totalIncome.toFixed(2);
+        document.getElementById('result-total-deduction').textContent = '¥' + totalDeduction.toFixed(2);
+        document.getElementById('result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
+        document.getElementById('result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
+        document.getElementById('result-deduction-amount').textContent = '¥' + applicableDeduction.toFixed(2);
+        document.getElementById('result-total-tax').textContent = '¥' + finalTotalTax.toFixed(2);
+        
+        // 更新年终奖相关显示
+        if (bonusIncome > 0) {
+            const bonusDisplay = document.getElementById('bonus-tax-display');
+            if (bonusDisplay) {
+                bonusDisplay.style.display = 'block';
+                // 检查元素是否存在
+                const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
+                const bonusMethodElement = document.getElementById('bonus-method');
+                if (bonusTaxAmountElement) {
+                    bonusTaxAmountElement.textContent = '¥' + bonusTax.toFixed(2);
+                }
+                if (bonusMethodElement) {
+                    bonusMethodElement.textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
+                }
+            }
+        } else {
+            const bonusDisplay = document.getElementById('bonus-tax-display');
+            if (bonusDisplay) {
+                bonusDisplay.style.display = 'none';
+            }
+        }
+        // 检查元素是否存在
+        const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
+        if (resultPrepaidTaxElement) {
+            resultPrepaidTaxElement.textContent = '¥' + prepaidTax.toFixed(2);
+        }
+        
+        const refundTaxElement = document.getElementById('result-refund-tax');
+        if (refundTaxElement) {
+            refundTaxElement.textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
+            refundTaxElement.className = refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success';
+        }
+        
+        const resultNetIncomeElement = document.getElementById('result-net-income');
+        if (resultNetIncomeElement) {
+            resultNetIncomeElement.textContent = '¥' + netIncome.toFixed(2);
+        }
+    } catch (error) {
+        console.error('计算过程中出现错误:', error);
+        alert('计算过程中出现错误：' + error.message);
     }
 }
 
@@ -279,6 +319,7 @@ function calculateReverseTax() {
         
         // 计算专项附加扣除
         let annualSpecialAdditionalDeduction = 0;
+        let actualMedicalDeduction = 0;
         if (isSpecialAdditionalDeductionVisible) {
             const annualChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction').value) || 0;
             const annualElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
@@ -296,9 +337,10 @@ function calculateReverseTax() {
             
             // 计算大病医疗实际可扣除额
             const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
-            const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+            actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
             
-            annualSpecialAdditionalDeduction = annualChildrenInfantDeduction + annualElderlyDeduction + annualHousingDeduction + annualEducationDeduction + actualMedicalDeduction;
+            // 不包含大病医疗的专项附加扣除
+            annualSpecialAdditionalDeduction = annualChildrenInfantDeduction + annualElderlyDeduction + annualHousingDeduction + annualEducationDeduction;
         }
         
         // 计算其他扣除
@@ -311,7 +353,8 @@ function calculateReverseTax() {
         // 根据工作月数调整扣除额
         const basicDeduction = (annualBasicDeduction / 12) * workMonths;
         const specialDeduction = (annualSpecialDeduction / 12) * workMonths;
-        const specialAdditionalDeduction = (annualSpecialAdditionalDeduction / 12) * workMonths;
+        // 不包含大病医疗的专项附加扣除按工作月数调整
+        const specialAdditionalDeduction = (annualSpecialAdditionalDeduction / 12) * workMonths + actualMedicalDeduction;
         const otherDeduction = (annualOtherDeduction / 12) * workMonths;
         
         // 计算总扣除额
@@ -482,6 +525,9 @@ function calculateReverseTax() {
             applicableRate: applicableRate,
             applicableDeduction: applicableDeduction,
             totalIncome: totalIncome,
+            deductionDetails: {
+                actualMedical: actualMedicalDeduction
+            },
             calculationDate: new Date().toISOString()
         };
         
