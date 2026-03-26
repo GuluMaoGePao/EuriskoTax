@@ -191,9 +191,9 @@ function updateIncomeCalculation() {
     
     // 计算月度综合所得收入额合计（用于显示）
     const monthlySalaryIncomeCalculated = monthlySalaryIncome;
-    const monthlyLaborIncomeCalculated = annualLaborIncomeCalculated / 12;
-    const monthlyAuthorIncomeCalculated = annualAuthorIncomeCalculated / 12;
-    const monthlyRoyaltyIncomeCalculated = annualRoyaltyIncomeCalculated / 12;
+    const monthlyLaborIncomeCalculated = annualLaborIncomeCalculated / workMonths;
+    const monthlyAuthorIncomeCalculated = annualAuthorIncomeCalculated / workMonths;
+    const monthlyRoyaltyIncomeCalculated = annualRoyaltyIncomeCalculated / workMonths;
     const monthlyIncomeAmount = monthlySalaryIncomeCalculated + monthlyLaborIncomeCalculated + monthlyAuthorIncomeCalculated + monthlyRoyaltyIncomeCalculated;
     
     // 计算年度综合所得收入额合计（根据工作月数调整）
@@ -246,6 +246,7 @@ function updateDeductionCalculation() {
     let rentDeduction = 0;
     let housingLoanDeduction = 0;
     let annualEducationDeduction = 0;
+    let annualProfessionalDeduction = 0;
     let medicalDeduction = 0;
     
     if (isSpecialAdditionalDeductionVisible) {
@@ -261,6 +262,10 @@ function updateDeductionCalculation() {
         }
         
         annualEducationDeduction = parseFloat(document.getElementById('education-deduction').value) || 0;
+        // 检查职业资格扣除
+        if (document.getElementById('education-professional-checkbox') && document.getElementById('education-professional-checkbox').checked) {
+            annualProfessionalDeduction = 3600; // 职业资格3600元/年
+        }
         medicalDeduction = parseFloat(document.getElementById('medical-deduction').value) || 0;
     }
     
@@ -270,8 +275,6 @@ function updateDeductionCalculation() {
     
     // 计算年度大病医疗实际可扣除额
     const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
-    // 计算月度大病医疗实际可扣除额
-    const monthlyMedicalDeduction = actualMedicalDeduction / workMonths;
     
     // 更新大病医疗实际可扣除额显示
     if (isSpecialAdditionalDeductionVisible) {
@@ -280,9 +283,9 @@ function updateDeductionCalculation() {
         document.getElementById('actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
     }
     
-    // 计算月度专项附加扣除合计（包含大病医疗）
+    // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
     const monthlySpecialAdditionalTotal = elderlyDeduction + childrenInfantDeduction + rentDeduction + 
-        housingLoanDeduction + (annualEducationDeduction / workMonths) + monthlyMedicalDeduction;
+        housingLoanDeduction + (annualEducationDeduction / workMonths);
     
     // 计算月度其他扣除合计
     const monthlyOtherDeductionTotal = pensionDeduction + insuranceOtherDeduction;
@@ -290,8 +293,8 @@ function updateDeductionCalculation() {
     // 计算月度扣除总额合计
     const monthlyDeductionTotal = basicDeduction + insuranceDeduction + monthlySpecialAdditionalTotal + monthlyOtherDeductionTotal;
     
-    // 计算年度专项附加扣除合计（根据工作月数调整）
-    const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths;
+    // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
+    const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     
     // 计算年度其他扣除合计（根据工作月数调整）
     const annualOtherDeductionTotal = monthlyOtherDeductionTotal * workMonths;
@@ -362,17 +365,21 @@ function updateReverseDeductionCalculation() {
         // 计算大病医疗实际可扣除额（大病医疗是年度金额，不需要根据工作月数调整）
         const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
         const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
-        // 计算月度大病医疗实际可扣除额
-        const monthlyMedicalDeduction = actualMedicalDeduction / workMonths;
+        
+        // 检查职业资格扣除
+        let annualProfessionalDeduction = 0;
+        if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
+            annualProfessionalDeduction = 3600; // 职业资格3600元/年
+        }
         
         // 更新大病医疗实际可扣除额显示
         document.getElementById('reverse-actual-medical-deduction-display').textContent = `实际可扣除额：${actualMedicalDeduction.toFixed(2)} 元`;
         
-        // 计算年度专项附加扣除合计（根据工作月数调整）
-        const annualSpecialAdditionalTotal = annualChildrenInfantDeduction + annualElderlyDeduction + annualHousingDeduction + annualEducationDeduction;
-        // 计算月度专项附加扣除合计（包含大病医疗）
-        const monthlySpecialAdditionalTotal = (annualSpecialAdditionalTotal / 12) + monthlyMedicalDeduction;
-        specialAdditionalDeduction = monthlySpecialAdditionalTotal * workMonths;
+        // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
+        const monthlySpecialAdditionalTotal = (annualChildrenInfantDeduction / 12) + (annualElderlyDeduction / 12) + (annualHousingDeduction / 12) + (annualEducationDeduction / 12);
+        
+        // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
+        specialAdditionalDeduction = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     } else {
         document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
     }
@@ -411,7 +418,18 @@ function updateReverseDeductionCalculation() {
         const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
         const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
         const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
-        annualSpecialAdditionalDeductionTotal = annualChildrenInfantDeduction + annualElderlyDeduction + annualHousingDeduction + annualEducationDeduction + actualMedicalDeduction;
+        
+        // 检查职业资格扣除
+        let annualProfessionalDeduction = 0;
+        if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
+            annualProfessionalDeduction = 3600; // 职业资格3600元/年
+        }
+        
+        // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
+        const monthlySpecialAdditionalTotal = (annualChildrenInfantDeduction / 12) + (annualElderlyDeduction / 12) + (annualHousingDeduction / 12) + (annualEducationDeduction / 12);
+        
+        // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
+        annualSpecialAdditionalDeductionTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     }
     
     const totalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
@@ -481,12 +499,20 @@ function updatePreviewData() {
     const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
     const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
     
+    // 检查职业资格扣除
+    let annualProfessionalDeduction = 0;
+    if (isSpecialAdditionalDeductionVisible && document.getElementById('education-professional-checkbox') && document.getElementById('education-professional-checkbox').checked) {
+        annualProfessionalDeduction = 3600; // 职业资格3600元/年
+    }
+    
     // 计算年度大病医疗实际可扣除额
     const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
     
-    // 计算年度专项附加扣除合计（根据工作月数调整）
-    const annualSpecialAdditionalTotal = (monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction) * workMonths + 
-                                         annualEducationDeduction + actualMedicalDeduction;
+    // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
+    const monthlySpecialAdditionalTotal = (monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction) + (annualEducationDeduction / workMonths);
+    
+    // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
+    const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     
     // 计算年度其他扣除合计（根据工作月数调整）
     const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyInsuranceOtherDeduction) * workMonths;

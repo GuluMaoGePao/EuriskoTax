@@ -6,8 +6,6 @@ window.addEventListener('DOMContentLoaded', function() {
         goToStep(1);
     });
     
-
-    
     document.getElementById('business-mode-btn').addEventListener('click', function() {
         showPage('business-calculation-page');
         showBusinessStep(1);
@@ -480,29 +478,21 @@ window.addEventListener('DOMContentLoaded', function() {
     });
     
     // 继续教育复选框
-    document.getElementById('education-degree-checkbox').addEventListener('change', function() {
+    function updateEducationDeduction() {
+        const workMonths = parseInt(document.getElementById('work-months').value) || 12;
         let amount = 0;
+        
         if (document.getElementById('education-degree-checkbox').checked) {
-            amount += 400; // 学历教育400元/月
+            amount += 400 * workMonths; // 学历教育400元/月，按年计算
         }
-        if (document.getElementById('education-professional-checkbox').checked) {
-            amount += 300; // 职业资格300元/月
-        }
+        
         document.getElementById('education-deduction').value = amount;
         updateDeductionCalculation();
-    });
+    }
     
-    document.getElementById('education-professional-checkbox').addEventListener('change', function() {
-        let amount = 0;
-        if (document.getElementById('education-degree-checkbox').checked) {
-            amount += 400; // 学历教育400元/月
-        }
-        if (document.getElementById('education-professional-checkbox').checked) {
-            amount += 300; // 职业资格300元/月
-        }
-        document.getElementById('education-deduction').value = amount;
-        updateDeductionCalculation();
-    });
+    document.getElementById('education-degree-checkbox').addEventListener('change', updateEducationDeduction);
+    document.getElementById('education-professional-checkbox').addEventListener('change', updateEducationDeduction);
+    document.getElementById('work-months').addEventListener('change', updateEducationDeduction);
     
     // 子女教育 + 婴幼儿照护数量输入
     document.getElementById('children-infant-count').addEventListener('input', function() {
@@ -551,6 +541,63 @@ window.addEventListener('DOMContentLoaded', function() {
         updateIncomeCalculation();
         updateDeductionCalculation();
     });
+    
+    // 收入明细相关事件监听器
+    document.getElementById('labor-income').addEventListener('input', updateIncomeCalculation);
+    document.getElementById('author-income').addEventListener('input', updateIncomeCalculation);
+    document.getElementById('royalty-income').addEventListener('input', updateIncomeCalculation);
+    document.getElementById('salary-income').addEventListener('input', updateIncomeCalculation);
+    document.getElementById('bonus-income').addEventListener('input', updateIncomeCalculation);
+    document.getElementById('bonus-include').addEventListener('change', updateIncomeCalculation);
+    
+    // 扣除项明细相关事件监听器
+    document.getElementById('basic-deduction').addEventListener('input', updateDeductionCalculation);
+    // 社保缴费相关事件监听器
+    document.getElementById('social-security-base').addEventListener('input', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('pension-insurance').addEventListener('input', function() {
+        calculateSocialSecurityRate('pension');
+        updateDeductionCalculation();
+    });
+    document.getElementById('pension-rate').addEventListener('input', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('medical-insurance').addEventListener('input', function() {
+        calculateSocialSecurityRate('medical');
+        updateDeductionCalculation();
+    });
+    document.getElementById('medical-rate').addEventListener('input', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('unemployment-insurance').addEventListener('input', function() {
+        calculateSocialSecurityRate('unemployment');
+        updateDeductionCalculation();
+    });
+    document.getElementById('unemployment-rate').addEventListener('input', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('housing-fund').addEventListener('input', function() {
+        calculateSocialSecurityRate('housing');
+        updateDeductionCalculation();
+    });
+    document.getElementById('housing-fund-base').addEventListener('input', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('housing-fund-rate').addEventListener('change', function() {
+        calculateSocialSecurity();
+        updateDeductionCalculation();
+    });
+    document.getElementById('elderly-deduction').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('children-infant-deduction').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('rent-deduction').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('housing-loan-deduction').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('education-deduction').addEventListener('input', updateDeductionCalculation);
     
     // 初始化
     loadHistoryRecords();
