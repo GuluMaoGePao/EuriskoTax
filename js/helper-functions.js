@@ -604,6 +604,11 @@ function resetDeductionData() {
     document.getElementById('pension-deduction').value = 0;
     document.getElementById('insurance-other-deduction').value = 0;
     
+    // 重置复选框状态
+    document.getElementById('special-deduction-checkbox').checked = false;
+    document.getElementById('special-additional-deduction-checkbox').checked = false;
+    document.getElementById('other-deduction-checkbox').checked = false;
+    
     // 重置显示状态
     document.getElementById('special-deduction-content').classList.add('hidden');
     document.getElementById('special-additional-deduction-content').classList.add('hidden');
