@@ -696,7 +696,7 @@
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <input type="number" id="children-infant-deduction" class="input-field" value="0" min="0" step="100">
-                                        <span class="text-gray-500">元/年</span>
+                                        <span class="text-gray-500">元/月</span>
                                     </div>
                                 </div>
                                 
@@ -719,7 +719,7 @@
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <input type="number" id="elderly-deduction" class="input-field" value="0" min="0" max="3000" step="100">
-                                        <span class="text-gray-500">元/年</span>
+                                        <span class="text-gray-500">元/月</span>
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
                                         提示：独生子女每月最高3000元，非独生子女每月最高1500元
@@ -748,7 +748,7 @@
                                     <div id="rent-fields" class="mt-2 hidden">
                                         <div class="flex items-center space-x-2">
                                             <input type="number" id="rent-deduction" class="input-field" value="1500" min="800" max="1500" step="100">
-                                            <span class="text-gray-500">元/年</span>
+                                            <span class="text-gray-500">元/月</span>
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">
                                             提示：默认上海1500元/月，可根据实际情况调整（800-1500元）
@@ -759,7 +759,7 @@
                                     <div id="loan-fields" class="mt-2 hidden">
                                         <div class="flex items-center space-x-2">
                                             <input type="number" id="housing-loan-deduction" class="input-field" value="1000" min="0" max="1000" step="100">
-                                            <span class="text-gray-500">元/年</span>
+                                            <span class="text-gray-500">元/月</span>
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">
                                             提示：首套住房贷款利息，每月最高1000元
@@ -1277,14 +1277,14 @@
                                 
                                 <div class="form-group">
                                     <label for="reverse-pension-insurance" class="label">
-                                        养老保险金 (元/年)
+                                        养老保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的养老保险部分</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-pension-insurance" class="input-field" value="0" min="0" step="1000">
+                                        <input type="number" id="reverse-pension-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-pension-rate" class="label">缴费比例：</label>
@@ -1295,14 +1295,14 @@
                                 
                                 <div class="form-group">
                                     <label for="reverse-medical-insurance" class="label">
-                                        医疗保险金 (元/年)
+                                        医疗保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的医疗保险部分</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-medical-insurance" class="input-field" value="0" min="0" step="1000">
+                                        <input type="number" id="reverse-medical-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-medical-rate" class="label">缴费比例：</label>
@@ -1313,14 +1313,14 @@
                                 
                                 <div class="form-group">
                                     <label for="reverse-unemployment-insurance" class="label">
-                                        失业保险金 (元/年)
+                                        失业保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的失业保险部分</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-unemployment-insurance" class="input-field" value="0" min="0" step="1000">
+                                        <input type="number" id="reverse-unemployment-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-unemployment-rate" class="label">缴费比例：</label>
@@ -1332,7 +1332,7 @@
                                 <div class="form-group">
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-housing-fund-base" class="label">住房公积金基数：</label>
-                                        <input type="number" id="reverse-housing-fund-base" class="input-field" value="0" min="0" step="1000">
+                                        <input type="number" id="reverse-housing-fund-base" class="input-field" value="0" min="0" step="100">
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
@@ -1342,14 +1342,14 @@
                                         </select>
                                     </div>
                                     <label for="reverse-housing-fund" class="label mt-2">
-                                        住房公积金 (元/年)
+                                        住房公积金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的住房公积金部分</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-housing-fund" class="input-field" value="0" min="0" step="1000">
+                                        <input type="number" id="reverse-housing-fund" class="input-field" value="0" min="0" step="100">
                                     </div>
 
                                 </div>
@@ -1386,8 +1386,8 @@
                                         </select>
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
-                                        <input type="number" id="reverse-children-infant-deduction" class="input-field" value="0" min="0" step="1000">
-                                        <span class="text-gray-500">元/年</span>
+                                        <input type="number" id="reverse-children-infant-deduction" class="input-field" value="0" min="0" step="100">
+                                        <span class="text-gray-500">元/月</span>
                                     </div>
                                 </div>
                                 
@@ -1409,11 +1409,11 @@
                                         </select>
                                     </div>
                                     <div class="flex items-center space-x-2 mt-2">
-                                        <input type="number" id="reverse-elderly-deduction" class="input-field" value="0" min="0" max="36000" step="1000">
-                                        <span class="text-gray-500">元/年</span>
+                                        <input type="number" id="reverse-elderly-deduction" class="input-field" value="0" min="0" max="3000" step="100">
+                                        <span class="text-gray-500">元/月</span>
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
-                                        提示：独生子女每年最高36000元，非独生子女每年最高18000元
+                                        提示：独生子女每月最高3000元，非独生子女每月最高1500元
                                     </div>
                                 </div>
                                 
@@ -1436,24 +1436,24 @@
                                     </div>
                                     
                                     <!-- 住房租金 -->
-                                    <div id="reverse-rent-fields" class="mt-2">
+                                    <div id="reverse-rent-fields" class="mt-2 hidden">
                                         <div class="flex items-center space-x-2">
-                                            <input type="number" id="reverse-rent-deduction" class="input-field" value="18000" min="9600" max="18000" step="1000">
-                                            <span class="text-gray-500">元/年</span>
+                                            <input type="number" id="reverse-rent-deduction" class="input-field" value="1500" min="800" max="1500" step="100">
+                                            <span class="text-gray-500">元/月</span>
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">
-                                            提示：默认上海18000元/年，可根据实际情况调整（9600-18000元）
+                                            提示：默认上海1500元/月，可根据实际情况调整（800-1500元）
                                         </div>
                                     </div>
                                     
                                     <!-- 住房贷款利息 -->
                                     <div id="reverse-loan-fields" class="mt-2 hidden">
                                         <div class="flex items-center space-x-2">
-                                            <input type="number" id="reverse-housing-loan-deduction" class="input-field" value="12000" min="0" max="12000" step="1000">
-                                            <span class="text-gray-500">元/年</span>
+                                            <input type="number" id="reverse-housing-loan-deduction" class="input-field" value="1000" min="0" max="1000" step="100">
+                                            <span class="text-gray-500">元/月</span>
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">
-                                            提示：首套住房贷款利息，每年最高12000元
+                                            提示：首套住房贷款利息，每月最高1000元
                                         </div>
                                     </div>
                                 </div>
@@ -1524,59 +1524,59 @@
                             <div id="reverse-other-deduction-content" class="mb-6 hidden">
                                 <div class="form-group">
                                     <label for="reverse-pension-deduction" class="label">
-                                        个人养老金 (元/年)
+                                        个人养老金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">个人养老金年度扣除限额12000元</span>
+                                            <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="12000" step="1000">
+                                        <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
-                                        提示：年度最高扣除12000元
+                                        提示：月度最高扣除1000元（年度12000元）
                                     </div>
                                 </div>
                                 
                                 <div class="form-group">
                                     <label for="reverse-enterprise-annuity" class="label">
-                                        企业年金/单位年金 (元/年)
+                                        企业年金/单位年金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人工资基数的4%</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-enterprise-annuity" class="input-field" value="0" min="0" step="100">
+                                        <input type="number" id="reverse-enterprise-annuity" class="input-field" value="0" min="0" step="50">
                                     </div>
                                 </div>
                                 
                                 <div class="form-group">
                                     <label for="reverse-insurance-other-deduction" class="label">
-                                        商业健康保险 (元/年)
+                                        商业健康保险 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">商业健康保险年度扣除限额2400元</span>
+                                            <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="2400" min="0" max="2400" step="100">
+                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="200" min="0" max="200" step="10">
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
-                                        提示：年度最高扣除2400元
+                                        提示：月度最高扣除200元（年度2400元）
                                     </div>
                                 </div>
                                 
                                 <div class="form-group">
                                     <label for="reverse-tax-deferred-pension" class="label">
-                                        税收递延型养老保险 (元/年)
+                                        税收递延型养老保险 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">当月收入的6%与1000元中的较低者</span>
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-tax-deferred-pension" class="input-field" value="0" min="0" max="12000" step="100">
+                                        <input type="number" id="reverse-tax-deferred-pension" class="input-field" value="0" min="0" max="1000" step="50">
                                     </div>
                                 </div>
                                 
@@ -1598,6 +1598,19 @@
                         <div class="mt-6 p-4 bg-blue-50 rounded-lg">
                             <div class="space-y-2">
                                 <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">月度专项扣除合计</span>
+                                    <span id="reverse-monthly-special-deduction-total">0</span> 元
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">月度专项附加扣除合计</span>
+                                    <span id="reverse-monthly-special-additional-total">0</span> 元
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">月度其他扣除合计</span>
+                                    <span id="reverse-monthly-other-deduction-total">0</span> 元
+                                </div>
+                                <div class="border-t border-blue-200 my-2"></div>
+                                <div class="flex justify-between items-center">
                                     <span class="text-gray-700">年度专项扣除合计</span>
                                     <span id="reverse-annual-special-deduction-total">0</span> 元
                                 </div>
@@ -1610,6 +1623,10 @@
                                     <span id="reverse-annual-other-deduction-total">0</span> 元
                                 </div>
                                 <div class="border-t border-blue-200 my-2"></div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-700">月度扣除总额合计</span>
+                                    <span id="reverse-monthly-deduction-amount">0</span> 元
+                                </div>
                                 <div class="flex justify-between items-center">
                                     <span class="font-medium text-gray-700">年度扣除总额合计</span>
                                     <span class="font-bold text-primary text-lg" id="reverse-total-deduction">0</span> 元
