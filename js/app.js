@@ -177,6 +177,11 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 反向倒算扣除项明细页面重置按钮
     document.getElementById('reset-reverse-deduction-btn').addEventListener('click', function() {
+        // 重置扣除项复选框状态
+        document.getElementById('reverse-special-deduction-checkbox').checked = true;
+        document.getElementById('reverse-special-additional-deduction-checkbox').checked = false;
+        document.getElementById('reverse-other-deduction-checkbox').checked = false;
+        
         // 重置专项扣除数据
         document.getElementById('reverse-social-security-base').value = 0;
         document.getElementById('reverse-housing-fund-base').value = 0;
@@ -208,7 +213,10 @@ window.addEventListener('DOMContentLoaded', function() {
         
         // 重置其他扣除数据
         document.getElementById('reverse-pension-deduction').value = 0;
-        document.getElementById('reverse-insurance-other-deduction').value = 0;
+        document.getElementById('reverse-enterprise-annuity').value = 0;
+        document.getElementById('reverse-insurance-other-deduction').value = 2400;
+        document.getElementById('reverse-tax-deferred-pension').value = 0;
+        document.getElementById('reverse-charitable-donation').value = 0;
         
         // 重置显示状态
         document.getElementById('reverse-special-deduction-content').classList.remove('hidden');
