@@ -486,6 +486,10 @@ window.addEventListener('DOMContentLoaded', function() {
             amount += 400 * workMonths; // 学历教育400元/月，按年计算
         }
         
+        if (document.getElementById('education-professional-checkbox').checked) {
+            amount += 3600; // 职业资格3600元/年
+        }
+        
         document.getElementById('education-deduction').value = amount;
         updateDeductionCalculation();
     }

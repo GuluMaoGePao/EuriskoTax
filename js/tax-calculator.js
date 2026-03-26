@@ -114,7 +114,9 @@ function calculateTax() {
         const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
         
         // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
-        const monthlySpecialAdditionalTotal = (monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction) + (annualEducationDeduction / workMonths);
+        // 从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
+        const educationDegreeDeduction = parseFloat(document.getElementById('education-degree-checkbox').checked ? (400 * workMonths) : 0);
+        const monthlySpecialAdditionalTotal = monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction + (educationDegreeDeduction / workMonths);
         
         // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
         const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
