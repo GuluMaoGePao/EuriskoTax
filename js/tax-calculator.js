@@ -397,7 +397,8 @@ function calculateReverseTax() {
         // 无论复选框是否勾选，都计算其他扣除，因为用户可能已经输入了金额
         const monthlyPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
         // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
-        const monthlyEnterpriseAnnuity = parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0;
+        const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
+        const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0) : 0;
         const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
         const monthlyTaxDeferredPension = parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0;
         otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;

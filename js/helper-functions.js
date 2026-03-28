@@ -314,9 +314,10 @@ function updateDeductionCalculation() {
     const pensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
     // 企业年金：个人月工资的5%
     const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-    const enterpriseAnnuity = isOtherDeductionVisible ? (monthlySalaryIncome * 0.05) : 0;
+    const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('enterprise-annuity-checkbox').checked;
+    const enterpriseAnnuity = isEnterpriseAnnuityChecked ? (monthlySalaryIncome * 0.05) : 0;
     // 更新企业年金输入字段
-    if (isOtherDeductionVisible) {
+    if (isEnterpriseAnnuityChecked) {
         document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
     }
     const insuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
@@ -444,7 +445,8 @@ function updateReverseDeductionCalculation() {
     const monthlyPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
     // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
     let monthlyEnterpriseAnnuity = 0;
-    if (isOtherDeductionVisible && reverseCalculationResults && reverseCalculationResults.totalIncome) {
+    const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
+    if (isEnterpriseAnnuityChecked && reverseCalculationResults && reverseCalculationResults.totalIncome) {
         const monthlyIncome = reverseCalculationResults.totalIncome / workMonths;
         monthlyEnterpriseAnnuity = monthlyIncome * 0.05;
         // 更新企业年金输入字段
@@ -704,7 +706,9 @@ function resetDeductionData() {
     
     // 其他扣除
     document.getElementById('pension-deduction').value = 0;
+    document.getElementById('enterprise-annuity-checkbox').checked = false;
     document.getElementById('enterprise-annuity').value = 0;
+    document.getElementById('enterprise-annuity-fields').classList.add('hidden');
     document.getElementById('insurance-other-deduction').value = 0;
     document.getElementById('tax-deferred-pension').value = 0;
     document.getElementById('charitable-donation').value = 0;
@@ -808,7 +812,9 @@ function resetReverseCalculation() {
     
     // 9. 重置其他扣除数据
     document.getElementById('reverse-pension-deduction').value = 0;
+    document.getElementById('reverse-enterprise-annuity-checkbox').checked = false;
     document.getElementById('reverse-enterprise-annuity').value = 0;
+    document.getElementById('reverse-enterprise-annuity-fields').classList.add('hidden');
     document.getElementById('reverse-insurance-other-deduction').value = 0;
     document.getElementById('reverse-charitable-donation').value = 0;
     
