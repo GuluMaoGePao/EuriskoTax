@@ -1,3 +1,5 @@
+
+
 // 计算社保费用
 function calculateSocialSecurity() {
     let base = parseFloat(document.getElementById('social-security-base').value) || 0;
@@ -310,7 +312,13 @@ function updateDeductionCalculation() {
     
     // 其他扣除
     const pensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
-    const enterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
+    // 企业年金：个人月工资的5%
+    const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
+    const enterpriseAnnuity = isOtherDeductionVisible ? (monthlySalaryIncome * 0.05) : 0;
+    // 更新企业年金输入字段
+    if (isOtherDeductionVisible) {
+        document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
+    }
     const insuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
     const taxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
     const charitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
@@ -381,18 +389,17 @@ function updateReverseDeductionCalculation() {
     const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox').checked;
     const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox').checked;
     
-    // 计算专项扣除（根据工作月数调整）
+    // 计算专项扣除（与综合所得计税逻辑一致）
     let specialDeduction = 0;
     if (isSpecialDeductionVisible) {
         const monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
         const monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
         const monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
         const monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
-        const monthlySpecialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
-        specialDeduction = monthlySpecialDeduction * workMonths;
+        specialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
     }
     
-    // 计算专项附加扣除（根据工作月数调整）
+    // 计算专项附加扣除（与综合所得计税逻辑一致）
     let specialAdditionalDeduction = 0;
     if (isSpecialAdditionalDeductionVisible) {
         const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction').value) || 0;
@@ -409,7 +416,7 @@ function updateReverseDeductionCalculation() {
         
         const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
         
-        // 计算大病医疗实际可扣除额（大病医疗是年度金额，不需要根据工作月数调整）
+        // 计算大病医疗实际可扣除额（大病医疗是年度金额）
         const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
         const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
         
@@ -425,33 +432,38 @@ function updateReverseDeductionCalculation() {
         // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
         // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
         const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-        const monthlyEducationDeduction = educationDegreeAmount / workMonths;
-        const monthlySpecialAdditionalTotal = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
-        
-        // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
-        specialAdditionalDeduction = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
+        const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
+        specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
     } else {
         document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
     }
     
-    // 计算其他扣除（根据工作月数调整）
+    // 计算其他扣除（与综合所得计税逻辑一致）
     let otherDeduction = 0;
-    let annualOtherDeductionTotal = 0;
     // 无论复选框是否勾选，都计算其他扣除，因为用户可能已经输入了金额
     const monthlyPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
-    const monthlyEnterpriseAnnuity = parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0;
+    // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
+    let monthlyEnterpriseAnnuity = 0;
+    if (isOtherDeductionVisible && reverseCalculationResults && reverseCalculationResults.totalIncome) {
+        const monthlyIncome = reverseCalculationResults.totalIncome / workMonths;
+        monthlyEnterpriseAnnuity = monthlyIncome * 0.05;
+        // 更新企业年金输入字段
+        document.getElementById('reverse-enterprise-annuity').value = monthlyEnterpriseAnnuity.toFixed(2);
+    }
     const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
     const monthlyTaxDeferredPension = parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0;
-    const annualCharitableDonation = parseFloat(document.getElementById('reverse-charitable-donation').value) || 0;
-    const monthlyOtherDeductionTotal = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
-    annualOtherDeductionTotal = monthlyOtherDeductionTotal * workMonths + annualCharitableDonation;
-    otherDeduction = annualOtherDeductionTotal;
+    // 与综合所得计税一致，计算月度其他扣除合计
+    otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
     
-    // 计算年度专项扣除合计
-    let annualSpecialDeductionTotal = specialDeduction;
+    // 计算年度扣除合计（与综合所得计税逻辑一致）
+    let annualSpecialDeductionTotal = specialDeduction * workMonths;
     
     // 计算年度专项附加扣除合计
-    let annualSpecialAdditionalDeductionTotal = specialAdditionalDeduction;
+    let annualSpecialAdditionalDeductionTotal = specialAdditionalDeduction * workMonths;
+    
+    // 计算年度其他扣除合计
+    const annualCharitableDonation = parseFloat(document.getElementById('reverse-charitable-donation').value) || 0;
+    let annualOtherDeductionTotal = otherDeduction * workMonths + annualCharitableDonation;
     
     // 计算月度合计（与综合所得计税逻辑一致）
     // 月度专项扣除合计 = 养老保险 + 医疗保险 + 失业保险 + 住房公积金
@@ -481,17 +493,18 @@ function updateReverseDeductionCalculation() {
         }
         // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
         const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-        const monthlyEducationDeduction = educationDegreeAmount / workMonths;
+        const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
         monthlySpecialAdditionalTotal = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
     }
     
     // 月度其他扣除合计 = 个人养老金 + 企业年金 + 商业健康保险 + 税收递延型养老保险
-    // 使用第444行已经计算的 monthlyOtherDeductionTotal
+    const monthlyOtherDeductionTotal = otherDeduction;
     
     // 月度扣除总额合计 = 基本减除费用 + 月度专项扣除 + 月度专项附加扣除 + 月度其他扣除
     const monthlyDeductionAmount = 5000 + monthlySpecialDeductionTotal + monthlySpecialAdditionalTotal + monthlyOtherDeductionTotal;
     
-    const totalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
+    // 年度扣除总额合计 = 基本减除费用 + 年度专项扣除 + 年度专项附加扣除 + 年度其他扣除
+    const totalDeduction = basicDeduction + annualSpecialDeductionTotal + annualSpecialAdditionalDeductionTotal + annualOtherDeductionTotal;
     
     // 更新显示
     document.getElementById('reverse-monthly-special-deduction-total').textContent = monthlySpecialDeductionTotal.toFixed(2);
@@ -782,8 +795,8 @@ function resetReverseCalculation() {
     document.getElementById('reverse-elderly-type').value = 'none';
     document.getElementById('reverse-elderly-deduction').value = 0;
     document.getElementById('reverse-housing-type').value = 'none';
-    document.getElementById('reverse-rent-deduction').value = 18000;
-    document.getElementById('reverse-housing-loan-deduction').value = 12000;
+    document.getElementById('reverse-rent-deduction').value = 1500; // 月度金额
+    document.getElementById('reverse-housing-loan-deduction').value = 1000; // 月度金额
     
     // 7. 重置继续教育复选框
     document.getElementById('reverse-education-degree-checkbox').checked = false;

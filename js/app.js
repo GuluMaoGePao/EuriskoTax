@@ -80,8 +80,7 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-children-infant-count').addEventListener('input', function() {
         const count = parseInt(this.value) || 0;
         const rate = parseInt(document.getElementById('reverse-children-infant-deduction-rate').value) || 100;
-        const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
-        const amount = count * 2000 * (rate / 100) * workMonths; // 每个子女/婴幼儿每月2000元，考虑扣除比例和工作月数
+        const amount = count * 2000 * (rate / 100); // 每个子女/婴幼儿每月2000元，考虑扣除比例（月度金额）
         document.getElementById('reverse-children-infant-deduction').value = amount;
         updateReverseDeductionCalculation();
     });
@@ -90,8 +89,7 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-children-infant-deduction-rate').addEventListener('change', function() {
         const count = parseInt(document.getElementById('reverse-children-infant-count').value) || 0;
         const rate = parseInt(this.value) || 100;
-        const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
-        const amount = count * 2000 * (rate / 100) * workMonths; // 每个子女/婴幼儿每月2000元，考虑扣除比例和工作月数
+        const amount = count * 2000 * (rate / 100); // 每个子女/婴幼儿每月2000元，考虑扣除比例（月度金额）
         document.getElementById('reverse-children-infant-deduction').value = amount;
         updateReverseDeductionCalculation();
     });
@@ -100,13 +98,12 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-elderly-type').addEventListener('change', function() {
         const type = this.value;
         const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
-        const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
         if (type === 'only') {
-            elderlyDeduction.max = 3000 * workMonths;
-            elderlyDeduction.value = 3000 * workMonths;
+            elderlyDeduction.max = 3000;
+            elderlyDeduction.value = 3000; // 独生子女每月3000元（月度金额）
         } else if (type === 'non-only') {
-            elderlyDeduction.max = 1500 * workMonths;
-            elderlyDeduction.value = 1500 * workMonths;
+            elderlyDeduction.max = 1500;
+            elderlyDeduction.value = 1500; // 非独生子女每月1500元（月度金额）
         } else {
             elderlyDeduction.max = 0;
             elderlyDeduction.value = 0;
@@ -124,22 +121,21 @@ window.addEventListener('DOMContentLoaded', function() {
     // 反向倒算页面工作月数变化
     document.getElementById('reverse-work-months').addEventListener('change', function() {
         updateReverseDeductionCalculation();
-        // 更新子女教育扣除
+        // 更新子女教育扣除（保持月度金额，不随工作月数变化）
         const count = parseInt(document.getElementById('reverse-children-infant-count').value) || 0;
         const rate = parseInt(document.getElementById('reverse-children-infant-deduction-rate').value) || 100;
-        const workMonths = parseInt(this.value) || 12;
-        const amount = count * 2000 * (rate / 100) * workMonths;
+        const amount = count * 2000 * (rate / 100); // 月度金额
         document.getElementById('reverse-children-infant-deduction').value = amount;
         
-        // 更新赡养老人扣除
+        // 更新赡养老人扣除（保持月度金额，不随工作月数变化）
         const elderlyType = document.getElementById('reverse-elderly-type').value;
         const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
         if (elderlyType === 'only') {
-            elderlyDeduction.max = 3000 * workMonths;
-            elderlyDeduction.value = 3000 * workMonths;
+            elderlyDeduction.max = 3000;
+            elderlyDeduction.value = 3000; // 月度金额
         } else if (elderlyType === 'non-only') {
-            elderlyDeduction.max = 1500 * workMonths;
-            elderlyDeduction.value = 1500 * workMonths;
+            elderlyDeduction.max = 1500;
+            elderlyDeduction.value = 1500; // 月度金额
         } else {
             elderlyDeduction.max = 0;
             elderlyDeduction.value = 0;
@@ -200,8 +196,8 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reverse-elderly-type').value = 'none';
         document.getElementById('reverse-elderly-deduction').value = 0;
         document.getElementById('reverse-housing-type').value = 'none';
-        document.getElementById('reverse-rent-deduction').value = 18000;
-        document.getElementById('reverse-housing-loan-deduction').value = 12000;
+        document.getElementById('reverse-rent-deduction').value = 1500; // 月度金额
+        document.getElementById('reverse-housing-loan-deduction').value = 1000; // 月度金额
         
         // 重置继续教育复选框
         document.getElementById('reverse-education-degree-checkbox').checked = false;
