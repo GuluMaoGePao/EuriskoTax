@@ -85,6 +85,9 @@ function calculateTax() {
             totalIncome += bonusIncome;
         }
         
+        // 计算税前收入合计（所有收入的总和）
+        const preTaxIncome = monthlySalaryIncome * workMonths + annualLaborIncome + annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
+        
         // 检查各扣除项是否显示
         const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
         const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
@@ -198,9 +201,9 @@ function calculateTax() {
         // 计算应退/应补税额
         const refundTax = finalTotalTax - prepaidTax;
         
-        // 计算税后收入（实际到手收入 = 总收入 - 最终应纳税额）
+        // 计算税后收入（实际到手收入 = 税前收入合计 - 最终应纳税额）
         // 注意：预缴税额只是已经缴纳的部分，不影响税后收入的计算
-        const netIncome = totalIncome - finalTotalTax;
+        const netIncome = preTaxIncome - finalTotalTax;
         
         // 保存计算结果
         calculationResults = {
