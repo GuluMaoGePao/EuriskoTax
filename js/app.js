@@ -214,8 +214,7 @@ window.addEventListener('DOMContentLoaded', function() {
         // 重置其他扣除数据
         document.getElementById('reverse-pension-deduction').value = 0;
         document.getElementById('reverse-enterprise-annuity').value = 0;
-        document.getElementById('reverse-insurance-other-deduction').value = 2400;
-        document.getElementById('reverse-tax-deferred-pension').value = 0;
+        document.getElementById('reverse-insurance-other-deduction').value = 0;
         document.getElementById('reverse-charitable-donation').value = 0;
         
         // 重置显示状态
@@ -257,6 +256,7 @@ window.addEventListener('DOMContentLoaded', function() {
         calculateBusinessTax();
         showBusinessStep(3);
         updateBusinessBudgetTable();
+        updateBusinessCharts();
     });
     
     // 经营所得页面重置按钮
@@ -267,6 +267,7 @@ window.addEventListener('DOMContentLoaded', function() {
         showClassificationStep(2);
         setTimeout(function() {
             calculateClassificationTax();
+            updateClassificationCharts();
         }, 100);
     });
     
@@ -381,11 +382,12 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 导出PDF按钮
     document.getElementById('export-pdf-btn').addEventListener('click', function() {
-        exportToPDF('tax-budget-table', '个人年度个税预算表');
+        exportToPDF('step-result', '个人年度个税预算表');
     });
     
-    document.getElementById('print-report-btn').addEventListener('click', function() {
-        printElement('step-result');
+    // 导出Word按钮
+    document.getElementById('export-word-btn').addEventListener('click', function() {
+        exportToWord('step-result', '个人年度个税预算表');
     });
     
     // 新计算按钮
@@ -410,29 +412,32 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 反向倒算页面导出PDF按钮
     document.getElementById('export-reverse-pdf-btn').addEventListener('click', function() {
-        exportToPDF('reverse-tax-budget-table', '个人年度个税预算表（反向倒算）');
+        exportToPDF('reverse-result', '个人年度个税预算表（反向倒算）');
     });
     
-    document.getElementById('print-reverse-report-btn').addEventListener('click', function() {
-        printElement('reverse-result');
+    // 反向倒算页面导出Word按钮
+    document.getElementById('export-reverse-word-btn').addEventListener('click', function() {
+        exportToWord('reverse-result', '个人年度个税预算表（反向倒算）');
     });
     
     // 经营所得页面导出PDF按钮
     document.getElementById('export-business-pdf-btn').addEventListener('click', function() {
-        exportToPDF('business-tax-budget-table', '经营所得年度预算表');
+        exportToPDF('business-result', '经营所得年度预算表');
     });
     
-    document.getElementById('print-business-report-btn').addEventListener('click', function() {
-        printElement('business-result');
+    // 经营所得页面导出Word按钮
+    document.getElementById('export-business-word-btn').addEventListener('click', function() {
+        exportToWord('business-result', '经营所得年度预算表');
     });
     
     // 分类所得页面导出PDF按钮
     document.getElementById('export-classification-pdf-btn').addEventListener('click', function() {
-        exportToPDF('classification-tax-budget-table', '分类所得计税表');
+        exportToPDF('classification-result', '分类所得计税表');
     });
     
-    document.getElementById('print-classification-report-btn').addEventListener('click', function() {
-        printElement('classification-result');
+    // 分类所得页面导出Word按钮
+    document.getElementById('export-classification-word-btn').addEventListener('click', function() {
+        exportToWord('classification-result', '分类所得计税表');
     });
     
     // 历史记录页面返回按钮

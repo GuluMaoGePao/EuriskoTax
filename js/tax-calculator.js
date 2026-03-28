@@ -141,9 +141,10 @@ function calculateTax() {
         const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
         
         // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
-        // 从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
-        const educationDegreeDeduction = parseFloat(document.getElementById('education-degree-checkbox').checked ? (400 * workMonths) : 0);
-        const monthlySpecialAdditionalTotal = monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction + (educationDegreeDeduction / workMonths);
+        // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
+        const educationDegreeAmount = annualEducationDeduction - annualProfessionalDeduction;
+        const monthlyEducationDeduction = educationDegreeAmount / workMonths;
+        const monthlySpecialAdditionalTotal = monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
         
         // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
         const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
@@ -197,8 +198,9 @@ function calculateTax() {
         // 计算应退/应补税额
         const refundTax = finalTotalTax - prepaidTax;
         
-        // 计算税后收入（考虑已预缴税额）
-        const netIncome = totalIncome - (finalTotalTax - prepaidTax);
+        // 计算税后收入（实际到手收入 = 总收入 - 最终应纳税额）
+        // 注意：预缴税额只是已经缴纳的部分，不影响税后收入的计算
+        const netIncome = totalIncome - finalTotalTax;
         
         // 保存计算结果
         calculationResults = {
@@ -231,6 +233,8 @@ function calculateTax() {
                 education: annualEducationDeduction,
                 medical: annualMedicalDeduction,
                 actualMedical: actualMedicalDeduction,
+                professional: annualProfessionalDeduction,
+                educationDegree: educationDegreeDeduction / workMonths,
                 pension: monthlyPensionDeduction,
                 enterpriseAnnuity: monthlyEnterpriseAnnuity,
                 insuranceOther: monthlyInsuranceOtherDeduction,
