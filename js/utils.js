@@ -40,7 +40,8 @@ function updateBudgetTable() {
     
     // 1. 生成月度数据表格
     for (let month = 1; month <= workMonths; month++) {
-        const monthlyIncome = monthlySalary + monthlyLabor + monthlyAuthor + monthlyRoyalty + monthlyBonus;
+        // 只计算月工资的收入
+        const monthlyIncome = monthlySalary;
         // 月度扣除不包含大病医疗
         const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
         const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
