@@ -240,12 +240,16 @@ function updateIncomeCalculation() {
         totalIncomeAmount += bonusIncome;
     }
     
+    // 计算税前收入合计（所有收入的总和）
+    const preTaxIncomeAmount = monthlySalaryIncome * workMonths + annualLaborIncome + annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
+    
     console.log('Calculations:', {
         annualLaborIncomeCalculated,
         annualAuthorIncomeCalculated,
         annualRoyaltyIncomeCalculated,
         monthlyIncomeAmount,
-        totalIncomeAmount
+        totalIncomeAmount,
+        preTaxIncomeAmount
     });
     
     // 更新显示
@@ -254,6 +258,7 @@ function updateIncomeCalculation() {
     document.getElementById('royalty-income-calculated').textContent = annualRoyaltyIncomeCalculated.toFixed(2);
     document.getElementById('monthly-income-amount').textContent = monthlyIncomeAmount.toFixed(2);
     document.getElementById('total-income-amount').textContent = totalIncomeAmount.toFixed(2);
+    document.getElementById('pre-tax-income-amount').textContent = preTaxIncomeAmount.toFixed(2);
     
     // 更新预览数据
     updatePreviewData();
