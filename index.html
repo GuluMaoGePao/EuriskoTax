@@ -852,15 +852,23 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="enterprise-annuity" class="label">
-                                        企业年金/单位年金 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">个人月工资的5%</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="enterprise-annuity" class="input-field" value="0" min="0" step="50">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="enterprise-annuity-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">企业年金/单位年金</span>
+                                        </label>
+                                    </div>
+                                    <div id="enterprise-annuity-fields" class="hidden">
+                                        <label for="enterprise-annuity" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">个人月工资的5%</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="enterprise-annuity" class="input-field" value="0" min="0" step="50">
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -976,7 +984,7 @@
                             
                             <div class="space-y-4">
                                 <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                    <span class="text-gray-600">年度综合所得收入额</span>
+                                    <span class="text-gray-600">年度应税综合所得</span>
                                     <span class="font-medium" id="result-total-income">¥0</span>
                                 </div>
                                 
@@ -1209,7 +1217,7 @@
                         
                         <div class="form-group">
                             <label for="reverse-tax-rate" class="label">
-                                适用税率
+                                按税率预算
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
                                     <span class="tooltip-text">选择适用的税率级别，系统将按照该税率进行反向倒算</span>
@@ -1543,15 +1551,23 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="reverse-enterprise-annuity" class="label">
-                                        企业年金/单位年金 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">个人月工资的5%</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-enterprise-annuity" class="input-field" value="0" min="0" step="50">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="reverse-enterprise-annuity-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">企业年金/单位年金</span>
+                                        </label>
+                                    </div>
+                                    <div id="reverse-enterprise-annuity-fields" class="hidden">
+                                        <label for="reverse-enterprise-annuity" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">个人月工资的5%</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-enterprise-annuity" class="input-field" value="0" min="0" step="50">
+                                        </div>
                                     </div>
                                 </div>
                                 
