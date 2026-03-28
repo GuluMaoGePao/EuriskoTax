@@ -262,7 +262,8 @@ function calculateTax() {
         document.getElementById('result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
         document.getElementById('result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
         document.getElementById('result-deduction-amount').textContent = '¥' + applicableDeduction.toFixed(2);
-        document.getElementById('result-total-tax').textContent = '¥' + finalTotalTax.toFixed(2);
+        // 年终奖单独计税时，年度应纳税额只显示综合所得税额
+        document.getElementById('result-total-tax').textContent = '¥' + totalTax.toFixed(2);
         
         // 更新年终奖相关显示
         if (bonusIncome > 0) {
