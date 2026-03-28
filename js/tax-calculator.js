@@ -234,7 +234,7 @@ function calculateTax() {
                 medical: annualMedicalDeduction,
                 actualMedical: actualMedicalDeduction,
                 professional: annualProfessionalDeduction,
-                educationDegree: educationDegreeDeduction / workMonths,
+                educationDegree: educationDegreeAmount / workMonths,
                 pension: monthlyPensionDeduction,
                 enterpriseAnnuity: monthlyEnterpriseAnnuity,
                 insuranceOther: monthlyInsuranceOtherDeduction,
