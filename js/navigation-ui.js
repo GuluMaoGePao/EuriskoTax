@@ -181,62 +181,256 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 }
 
 // 导出PDF
-function exportToPDF(tableId, title) {
+function exportToPDF(elementId, title) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
     
     // 添加标题
     doc.setFontSize(16);
     doc.text(title, 14, 20);
     
-    // 添加表格
-    const table = document.getElementById(tableId);
-    const tableData = [];
+    let currentY = 30;
+    const imgWidth = 210; // A4宽度，单位mm
+    const pageHeight = 297; // A4高度，单位mm
     
-    // 获取表头
-    const headers = [];
-    table.querySelectorAll('th').forEach(th => {
-        headers.push(th.textContent);
-    });
-    tableData.push(headers);
+    // 根据不同的页面定义不同的导出区域
+    let sections = [];
     
-    // 获取表格数据
-    table.querySelectorAll('tbody tr').forEach(tr => {
-        const rowData = [];
-        tr.querySelectorAll('td').forEach(td => {
-            rowData.push(td.textContent);
+    if (elementId === 'step-result') {
+        // 正向计税页面
+        sections = [
+            { title: '年度总览', selector: '#step-result > div > div:first-child' },
+            { title: '税率分布', selector: '#step-result > div > div:nth-child(2)' },
+            { title: '月度个税明细', selector: '#step-result > div > div:nth-child(3)' },
+            { title: '个人年度个税预算表', selector: '#step-result > div > div:nth-child(4)' }
+        ];
+    } else if (elementId === 'reverse-result') {
+        // 反向倒算页面
+        sections = [
+            { title: '反向倒算结果', selector: '#reverse-result > div > div:first-child' },
+            { title: '收入构成分析', selector: '#reverse-result > div > div:nth-child(2)' },
+            { title: '个人年度个税预算表', selector: '#reverse-result > div > div:nth-child(3)' }
+        ];
+    } else if (elementId === 'business-result') {
+        // 经营所得页面
+        sections = [
+            { title: '经营所得计算结果', selector: '#business-result > div > div:first-child' },
+            { title: '经营所得年度预算表', selector: '#business-result > div > div:nth-child(2)' }
+        ];
+    } else if (elementId === 'classification-result') {
+        // 分类所得页面
+        sections = [
+            { title: '分类所得计算结果', selector: '#classification-result > div > div:first-child' },
+            { title: '分类所得计税表', selector: '#classification-result > div > div:nth-child(2)' }
+        ];
+    } else {
+        // 默认情况，导出整个元素
+        sections = [
+            { title: title, selector: `#${elementId}` }
+        ];
+    }
+    
+    // 处理每个区域
+    let processedSections = 0;
+    
+    sections.forEach((section, index) => {
+        const element = document.querySelector(section.selector);
+        if (!element) {
+            console.error(`找不到区域: ${section.title}`);
+            processedSections++;
+            if (processedSections === sections.length) {
+                doc.save(`${title}.pdf`);
+            }
+            return;
+        }
+        
+        // 克隆元素以避免修改原始元素
+        const clonedElement = element.cloneNode(true);
+        
+        // 确保克隆元素有足够的宽度和高度
+        clonedElement.style.width = '1000px'; // 增加宽度以确保内容不被截断
+        clonedElement.style.maxWidth = '100%';
+        clonedElement.style.overflow = 'visible';
+        clonedElement.style.height = 'auto';
+        clonedElement.style.display = 'block';
+        
+        // 确保所有子元素也能正确显示
+        const children = clonedElement.querySelectorAll('*');
+        children.forEach(child => {
+            child.style.maxWidth = '100%';
+            child.style.overflow = 'visible';
         });
-        if (rowData.length > 0) {
-            tableData.push(rowData);
-        }
+        
+        // 特别处理表格，确保表格内容完整显示
+        const tables = clonedElement.querySelectorAll('table');
+        tables.forEach(table => {
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+        });
+        
+        // 特别处理图表容器，确保图表完整显示
+        const chartContainers = clonedElement.querySelectorAll('canvas');
+        chartContainers.forEach(canvas => {
+            const container = canvas.parentElement;
+            if (container) {
+                container.style.width = '100%';
+                container.style.height = 'auto';
+            }
+        });
+        
+        // 将克隆元素添加到页面临时容器
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '-9999px';
+        tempContainer.style.width = '1000px';
+        tempContainer.style.height = 'auto';
+        tempContainer.style.zIndex = '9999';
+        tempContainer.appendChild(clonedElement);
+        document.body.appendChild(tempContainer);
+        
+        // 强制计算元素尺寸
+        clonedElement.style.visibility = 'hidden';
+        clonedElement.offsetHeight; // 触发重排
+        clonedElement.style.visibility = 'visible';
+        
+        // 计算元素的实际高度
+        const elementHeight = clonedElement.scrollHeight;
+        console.log(`区域 ${section.title} 高度: ${elementHeight}`);
+        
+        // 特别处理图表，确保图表已渲染完成
+        chartContainers.forEach(canvas => {
+            // 尝试重新绘制图表
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                // 获取图表实例（如果存在）
+                const chart = Chart.getChart(canvas);
+                if (chart) {
+                    chart.resize();
+                    chart.update();
+                }
+            }
+        });
+        
+        // 延迟一下，确保图表渲染完成
+        setTimeout(() => {
+            // 使用html2canvas生成图片
+            html2canvas(clonedElement, {
+                scale: 2, // 提高清晰度
+                useCORS: true,
+                logging: true, // 启用日志以便调试
+                backgroundColor: '#ffffff',
+                width: 1000,
+                height: elementHeight,
+                windowWidth: 1000,
+                windowHeight: elementHeight + 100, // 增加额外空间
+                allowTaint: true,
+                removeContainer: true
+            }).then(canvas => {
+                // 移除临时容器
+                if (tempContainer && tempContainer.parentNode) {
+                    document.body.removeChild(tempContainer);
+                }
+                
+                console.log(`生成的图片尺寸: ${canvas.width} x ${canvas.height}`);
+                
+                // 计算图片尺寸
+                const imgHeight = (canvas.height * (imgWidth - 20)) / canvas.width;
+                console.log(`PDF中的图片高度: ${imgHeight}`);
+                
+                // 如果当前页面空间不足，添加新页面
+                if (currentY + imgHeight > pageHeight - 20) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+                
+                // 添加区域标题
+                doc.setFontSize(14);
+                doc.text(section.title, 14, currentY);
+                currentY += 15;
+                
+                // 添加图片
+                doc.addImage(canvas.toDataURL('image/png'), 'PNG', 10, currentY, imgWidth - 20, imgHeight);
+                currentY += imgHeight + 20;
+                
+                // 增加处理计数
+                processedSections++;
+                console.log(`已处理区域: ${processedSections}/${sections.length}`);
+                
+                // 所有区域处理完成后保存PDF
+                if (processedSections === sections.length) {
+                    console.log('所有区域处理完成，保存PDF');
+                    doc.save(`${title}.pdf`);
+                }
+            }).catch(error => {
+                console.error(`导出${section.title}失败:`, error);
+                
+                // 确保移除临时容器
+                if (tempContainer && tempContainer.parentNode) {
+                    document.body.removeChild(tempContainer);
+                }
+                
+                // 增加处理计数
+                processedSections++;
+                
+                // 所有区域处理完成后保存PDF
+                if (processedSections === sections.length) {
+                    doc.save(`${title}.pdf`);
+                }
+            });
+        }, 500); // 500ms延迟，确保图表渲染完成
     });
-    
-    // 生成表格
-    doc.autoTable({
-        head: [headers],
-        body: tableData.slice(1),
-        startY: 30,
-        margin: {
-            top: 30,
-            left: 14,
-            right: 14,
-            bottom: 14
-        }
-    });
-    
-    // 保存PDF
-    doc.save(`${title}.pdf`);
 }
 
-// 打印元素
-function printElement(elementId) {
+// 导出Word文档
+function exportToWord(elementId, title) {
     const element = document.getElementById(elementId);
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write('<html><head><title>打印</title>');
-    printWindow.document.write('<style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>');
-    printWindow.document.write('</head><body>');
-    printWindow.document.write(element.outerHTML);
-    printWindow.document.write('</body></html>');
-    printWindow.document.close();
-    printWindow.print();
+    
+    // 创建一个包含HTML内容的Blob
+    const htmlContent = `
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>${title}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #1e40af; text-align: center; margin-bottom: 30px; }
+                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+                .highlight { font-weight: bold; color: #1e40af; }
+                .negative { color: #ef4444; font-weight: medium; }
+                .positive { color: #10b981; font-weight: medium; }
+            </style>
+        </head>
+        <body>
+            <h1>${title}</h1>
+            ${element.innerHTML}
+        </body>
+        </html>
+    `;
+    
+    // 创建Blob对象
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    
+    // 创建下载链接
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title}.doc`;
+    
+    // 触发下载
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // 释放URL对象
+    URL.revokeObjectURL(url);
 }
+
+

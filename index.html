@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- 统一的 Tailwind 配置 -->
     <script>
@@ -147,28 +148,31 @@
                 @apply bg-success;
             }
             .tax-budget-table {
-                @apply w-full border-collapse;
+                @apply w-full border-collapse border border-gray-200 shadow-sm;
             }
             .tax-budget-table th {
-                @apply px-4 py-3 text-left bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider;
+                @apply px-4 py-3 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200;
             }
             .tax-budget-table td {
-                @apply px-4 py-3 text-sm text-gray-900;
+                @apply px-4 py-3 text-sm text-gray-900 text-center border border-gray-200 transition-colors hover:bg-blue-50/30;
             }
             .tax-budget-table tr:nth-child(even) {
-                @apply bg-gray-50;
+                @apply bg-gray-50/50;
             }
             .tax-budget-table .section-title {
-                @apply font-medium text-gray-700 bg-gray-100;
+                @apply font-semibold text-gray-800 bg-gray-100 py-2;
             }
             .tax-budget-table .highlight {
                 @apply font-bold text-primary;
             }
             .tax-budget-table .negative {
-                @apply text-danger;
+                @apply text-danger font-medium;
             }
             .tax-budget-table .positive {
-                @apply text-success;
+                @apply text-success font-medium;
+            }
+            .overflow-x-auto {
+                @apply rounded-lg overflow-hidden;
             }
         }
     </style>
@@ -869,7 +873,7 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="insurance-other-deduction" class="input-field" value="200" min="0" max="200" step="10">
+                                        <input type="number" id="insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
                                         提示：月度最高扣除200元（年度2400元）
@@ -1026,8 +1030,8 @@
                                 <button id="export-pdf-btn" class="btn btn-secondary w-full mb-3">
                                     <i class="fa fa-download mr-2"></i>导出PDF报告
                                 </button>
-                                <button id="print-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full mb-3">
-                                    <i class="fa fa-print mr-2"></i>打印报告
+                                <button id="export-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full mb-3">
+                                    <i class="fa fa-file-word-o mr-2"></i>导出Word报告
                                 </button>
                                 <button id="save-calculation-btn" class="btn btn-success w-full">
                                     <i class="fa fa-save mr-2"></i>保存计算结果
@@ -1560,7 +1564,7 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="200" min="0" max="200" step="10">
+                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
                                         提示：月度最高扣除200元（年度2400元）
@@ -1711,8 +1715,8 @@
                             <button id="export-reverse-pdf-btn" class="btn btn-secondary w-full mb-3">
                                 <i class="fa fa-download mr-2"></i>导出PDF报告
                             </button>
-                            <button id="print-reverse-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
-                                <i class="fa fa-print mr-2"></i>打印报告
+                            <button id="export-reverse-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
+                                <i class="fa fa-file-word-o mr-2"></i>导出Word报告
                             </button>
                         </div>
                     </div>
@@ -2030,8 +2034,8 @@
                                     <button id="export-business-pdf-btn" class="btn btn-secondary w-full mb-3">
                                         <i class="fa fa-download mr-2"></i>导出PDF报告
                                     </button>
-                                    <button id="print-business-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
-                                        <i class="fa fa-print mr-2"></i>打印报告
+                                    <button id="export-business-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
+                                        <i class="fa fa-file-word-o mr-2"></i>导出Word报告
                                     </button>
                                 </div>
                             </div>
@@ -2269,8 +2273,8 @@
                                     <button id="export-classification-pdf-btn" class="btn btn-secondary w-full mb-3">
                                         <i class="fa fa-download mr-2"></i>导出PDF报告
                                     </button>
-                                    <button id="print-classification-report-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full">
-                                        <i class="fa fa-print mr-2"></i>打印报告
+                                    <button id="export-classification-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
+                                        <i class="fa fa-file-word-o mr-2"></i>导出Word报告
                                     </button>
                                 </div>
                             </div>
