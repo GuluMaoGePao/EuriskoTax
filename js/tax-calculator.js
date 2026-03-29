@@ -190,13 +190,29 @@ function calculateTax() {
         // 计算总应纳税额
         const finalTotalTax = totalTax + bonusTax;
         
-        // 获取已预缴税额
-        const prepaidTax = parseFloat(document.getElementById('prepaid-tax').value) || 0;
-        
-        // 验证已预缴税额
-        if (prepaidTax < 0) {
-            throw new Error('已预缴税额不能为负数');
+        // 计算已预缴税额 = 工资薪金预扣预缴税额 + 劳务所得预扣税额 + 稿酬所得预扣税额 + 特许权使用费预扣税额 + 年终奖税额
+        // 工资薪金预扣预缴税额从月度计算中获取（累计）
+        let monthlyPrepaidTax = 0;
+        const monthlySalary = monthlySalaryIncome;
+        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditionalTotal + (monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension);
+        const monthlyTaxableIncome = Math.max(0, monthlySalary - monthlyDeduction);
+        let cumulativeTaxableIncome = 0;
+        let cumulativeTax = 0;
+        for (let month = 1; month <= workMonths; month++) {
+            cumulativeTaxableIncome += monthlyTaxableIncome;
+            let currentCumulativeTax = 0;
+            for (const bracket of comprehensiveTaxRates) {
+                if (cumulativeTaxableIncome <= bracket.max) {
+                    currentCumulativeTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            cumulativeTax = currentCumulativeTax;
         }
+        monthlyPrepaidTax = cumulativeTax;
+        
+        // 计算已预缴税额 = 工资薪金预扣预缴税额 + 劳务所得预扣税额 + 稿酬所得预扣税额 + 特许权使用费预扣税额 + 年终奖税额
+        const prepaidTax = monthlyPrepaidTax + laborTax + authorTax + royaltyTax + bonusTax;
         
         // 计算应退/应补税额
         const refundTax = finalTotalTax - prepaidTax;
