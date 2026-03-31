@@ -123,11 +123,16 @@ function calculateTax() {
         
         const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
         const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
-        const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
-        const monthlyEnterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
-        const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
-        const monthlyTaxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
-        const annualCharitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
+        const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('pension-deduction-checkbox').checked;
+        const monthlyPensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+        const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('enterprise-annuity-checkbox').checked;
+        const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
+        const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('insurance-other-deduction-checkbox').checked;
+        const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+        const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('tax-deferred-pension-checkbox').checked;
+        const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
+        const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('charitable-donation-checkbox').checked;
+        const annualCharitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
         
         // 检查职业资格扣除
         let annualProfessionalDeduction = 0;
@@ -414,20 +419,23 @@ function calculateReverseTax() {
         
         // 计算其他扣除（月度）
         let otherDeduction = 0;
-        // 无论复选框是否勾选，都计算其他扣除，因为用户可能已经输入了金额
-        const monthlyPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
+        const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-pension-deduction-checkbox').checked;
+        const monthlyPensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('reverse-pension-deduction').value) || 0) : 0;
         // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
         const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
         const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0) : 0;
-        const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
-        const monthlyTaxDeferredPension = parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0;
+        const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-insurance-other-deduction-checkbox').checked;
+        const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0) : 0;
+        const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('reverse-tax-deferred-pension-checkbox').checked;
+        const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0) : 0;
         otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
         
         // 计算月度总扣除额
         const monthlyTotalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
         
         // 计算年度总扣除额（与综合所得计税逻辑一致）
-        const annualCharitableDonation = parseFloat(document.getElementById('reverse-charitable-donation').value) || 0;
+        const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('reverse-charitable-donation-checkbox').checked;
+        const annualCharitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('reverse-charitable-donation').value) || 0) : 0;
         const totalDeduction = monthlyTotalDeduction * workMonths + actualMedicalDeduction + annualCharitableDonation;
         
         // 计算年终奖税额

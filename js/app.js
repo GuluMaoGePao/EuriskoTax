@@ -62,6 +62,53 @@ window.addEventListener('DOMContentLoaded', function() {
         updateReverseDeductionCalculation();
     });
     
+    // 反向倒算页面企业年金输入
+    document.getElementById('reverse-enterprise-annuity').addEventListener('input', updateReverseDeductionCalculation);
+    
+    // 反向倒算页面个人养老金复选框
+    document.getElementById('reverse-pension-deduction-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('reverse-pension-deduction-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateReverseDeductionCalculation();
+    });
+    
+    // 反向倒算页面商业健康保险复选框
+    document.getElementById('reverse-insurance-other-deduction-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('reverse-insurance-other-deduction-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateReverseDeductionCalculation();
+    });
+    
+    // 反向倒算页面税收递延型养老保险复选框
+    document.getElementById('reverse-tax-deferred-pension-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('reverse-tax-deferred-pension-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateReverseDeductionCalculation();
+    });
+    
+    // 反向倒算页面公益捐赠支出复选框
+    document.getElementById('reverse-charitable-donation-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('reverse-charitable-donation-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateReverseDeductionCalculation();
+    });
+    
     // 反向倒算页面社保缴费相关事件监听器
     document.getElementById('reverse-social-security-base').addEventListener('input', function() {
         calculateReverseSocialSecurity();
@@ -88,10 +135,10 @@ window.addEventListener('DOMContentLoaded', function() {
         calculateReverseSocialSecurityRate('housing');
     });
     document.getElementById('reverse-housing-fund-base').addEventListener('input', function() {
-        calculateReverseSocialSecurity();
+        calculateReverseHousingFund();
     });
     document.getElementById('reverse-housing-fund-rate').addEventListener('change', function() {
-        calculateReverseSocialSecurity();
+        calculateReverseHousingFund();
     });
     
     // 反向倒算页面子女教育 + 婴幼儿照护数量输入
@@ -135,6 +182,8 @@ window.addEventListener('DOMContentLoaded', function() {
     // 反向倒算页面其他扣除输入
     document.getElementById('reverse-pension-deduction').addEventListener('input', updateReverseDeductionCalculation);
     document.getElementById('reverse-insurance-other-deduction').addEventListener('input', updateReverseDeductionCalculation);
+    document.getElementById('reverse-tax-deferred-pension').addEventListener('input', updateReverseDeductionCalculation);
+    document.getElementById('reverse-charitable-donation').addEventListener('input', updateReverseDeductionCalculation);
     
     // 反向倒算页面工作月数变化
     document.getElementById('reverse-work-months').addEventListener('change', function() {
@@ -226,12 +275,21 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reverse-medical-deduction').value = 0;
         
         // 重置其他扣除数据
+        document.getElementById('reverse-pension-deduction-checkbox').checked = false;
         document.getElementById('reverse-pension-deduction').value = 0;
+        document.getElementById('reverse-pension-deduction-fields').classList.add('hidden');
         document.getElementById('reverse-enterprise-annuity-checkbox').checked = false;
         document.getElementById('reverse-enterprise-annuity').value = 0;
         document.getElementById('reverse-enterprise-annuity-fields').classList.add('hidden');
+        document.getElementById('reverse-insurance-other-deduction-checkbox').checked = false;
         document.getElementById('reverse-insurance-other-deduction').value = 0;
+        document.getElementById('reverse-insurance-other-deduction-fields').classList.add('hidden');
+        document.getElementById('reverse-tax-deferred-pension-checkbox').checked = false;
+        document.getElementById('reverse-tax-deferred-pension').value = 0;
+        document.getElementById('reverse-tax-deferred-pension-fields').classList.add('hidden');
+        document.getElementById('reverse-charitable-donation-checkbox').checked = false;
         document.getElementById('reverse-charitable-donation').value = 0;
+        document.getElementById('reverse-charitable-donation-fields').classList.add('hidden');
         
         // 重置显示状态
         document.getElementById('reverse-special-deduction-content').classList.remove('hidden');
@@ -542,6 +600,53 @@ window.addEventListener('DOMContentLoaded', function() {
         updateDeductionCalculation();
     });
     
+    // 企业年金输入
+    document.getElementById('enterprise-annuity').addEventListener('input', updateDeductionCalculation);
+    
+    // 个人养老金复选框
+    document.getElementById('pension-deduction-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('pension-deduction-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateDeductionCalculation();
+    });
+    
+    // 商业健康保险复选框
+    document.getElementById('insurance-other-deduction-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('insurance-other-deduction-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateDeductionCalculation();
+    });
+    
+    // 税收递延型养老保险复选框
+    document.getElementById('tax-deferred-pension-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('tax-deferred-pension-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateDeductionCalculation();
+    });
+    
+    // 公益捐赠支出复选框
+    document.getElementById('charitable-donation-checkbox').addEventListener('change', function() {
+        const content = document.getElementById('charitable-donation-fields');
+        if (this.checked) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+        updateDeductionCalculation();
+    });
+    
     // 子女教育 + 婴幼儿照护数量输入
     document.getElementById('children-infant-count').addEventListener('input', function() {
         const count = parseInt(this.value) || 0;
@@ -583,6 +688,8 @@ window.addEventListener('DOMContentLoaded', function() {
     // 其他扣除输入
     document.getElementById('pension-deduction').addEventListener('input', updateDeductionCalculation);
     document.getElementById('insurance-other-deduction').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('tax-deferred-pension').addEventListener('input', updateDeductionCalculation);
+    document.getElementById('charitable-donation').addEventListener('input', updateDeductionCalculation);
     
     // 工作月数变化
     document.getElementById('work-months').addEventListener('change', function() {
@@ -644,11 +751,11 @@ window.addEventListener('DOMContentLoaded', function() {
         updateDeductionCalculation();
     });
     document.getElementById('housing-fund-base').addEventListener('input', function() {
-        calculateSocialSecurity();
+        calculateHousingFund();
         updateDeductionCalculation();
     });
     document.getElementById('housing-fund-rate').addEventListener('change', function() {
-        calculateSocialSecurity();
+        calculateHousingFund();
         updateDeductionCalculation();
     });
     document.getElementById('elderly-deduction').addEventListener('input', updateDeductionCalculation);
