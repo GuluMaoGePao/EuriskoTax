@@ -193,19 +193,21 @@ function updateBudgetTable() {
         if (bonusIncome > 0 && !bonusInclude) {
             const bonusRow = document.createElement('tr');
             // 计算年终奖适用税率
+            // 计算方式：全年奖金/12，查月度税率表确定税率
             let bonusTaxRate = 0;
-            // 直接定义税率表，避免依赖外部变量
-            const taxBrackets = [
-                { max: 36000, rate: 0.03, deduction: 0 },
-                { max: 144000, rate: 0.1, deduction: 2520 },
-                { max: 300000, rate: 0.2, deduction: 16920 },
-                { max: 420000, rate: 0.25, deduction: 31920 },
-                { max: 660000, rate: 0.3, deduction: 52920 },
-                { max: 960000, rate: 0.35, deduction: 85920 },
-                { max: Infinity, rate: 0.45, deduction: 181920 }
+            const monthlyBonus = bonusIncome / 12;
+            // 年终奖月度税率表
+            const bonusMonthlyTaxBrackets = [
+                { max: 3000, rate: 0.03, deduction: 0 },
+                { max: 12000, rate: 0.1, deduction: 210 },
+                { max: 25000, rate: 0.2, deduction: 1410 },
+                { max: 35000, rate: 0.25, deduction: 2660 },
+                { max: 55000, rate: 0.3, deduction: 4410 },
+                { max: 80000, rate: 0.35, deduction: 7160 },
+                { max: Infinity, rate: 0.45, deduction: 15160 }
             ];
-            for (const bracket of taxBrackets) {
-                if (bonusIncome <= bracket.max) {
+            for (const bracket of bonusMonthlyTaxBrackets) {
+                if (monthlyBonus <= bracket.max) {
                     bonusTaxRate = bracket.rate;
                     break;
                 }
@@ -958,7 +960,7 @@ function generateOptimizationTips() {
         
         // 计算另一种计税方式的税额
         let alternativeTax = 0;
-        // 直接定义税率表，避免依赖外部变量
+        // 综合所得税率表
         const taxBrackets = [
             { max: 36000, rate: 0.03, deduction: 0 },
             { max: 144000, rate: 0.1, deduction: 2520 },
@@ -968,11 +970,22 @@ function generateOptimizationTips() {
             { max: 960000, rate: 0.35, deduction: 85920 },
             { max: Infinity, rate: 0.45, deduction: 181920 }
         ];
+        // 年终奖月度税率表（单独计税时使用）
+        const bonusMonthlyTaxBrackets = [
+            { max: 3000, rate: 0.03, deduction: 0 },
+            { max: 12000, rate: 0.1, deduction: 210 },
+            { max: 25000, rate: 0.2, deduction: 1410 },
+            { max: 35000, rate: 0.25, deduction: 2660 },
+            { max: 55000, rate: 0.3, deduction: 4410 },
+            { max: 80000, rate: 0.35, deduction: 7160 },
+            { max: Infinity, rate: 0.45, deduction: 15160 }
+        ];
         
         if (bonusInclude) {
-            // 计算单独计税的税额
-            for (const bracket of taxBrackets) {
-                if (bonusAmount <= bracket.max) {
+            // 计算单独计税的税额：全年奖金/12，查月度税率表
+            const monthlyBonus = bonusAmount / 12;
+            for (const bracket of bonusMonthlyTaxBrackets) {
+                if (monthlyBonus <= bracket.max) {
                     alternativeTax = bonusAmount * bracket.rate - bracket.deduction;
                     break;
                 }
