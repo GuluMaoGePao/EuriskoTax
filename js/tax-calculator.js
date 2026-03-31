@@ -26,6 +26,17 @@ const businessTaxRates = [
 
 const classificationTaxRate = 0.2;
 
+// 年终奖单独计税月度税率表（按全年奖金/12后的月均金额确定税率）
+const bonusMonthlyTaxRates = [
+    { max: 3000, rate: 0.03, deduction: 0 },
+    { max: 12000, rate: 0.1, deduction: 210 },
+    { max: 25000, rate: 0.2, deduction: 1410 },
+    { max: 35000, rate: 0.25, deduction: 2660 },
+    { max: 55000, rate: 0.3, deduction: 4410 },
+    { max: 80000, rate: 0.35, deduction: 7160 },
+    { max: Infinity, rate: 0.45, deduction: 15160 }
+];
+
 // 计算个人所得税
 function calculateTax() {
     try {
@@ -181,12 +192,13 @@ function calculateTax() {
         }
         
         // 计算年终奖单独计税税额
+        // 计算方式：全年奖金/12，查月度税率表确定税率和速算扣除数，然后全年奖金*税率-速算扣除数
         let bonusTax = 0;
         if (bonusIncome > 0 && !bonusInclude) {
-            const bonusTaxableIncome = bonusIncome;
-            for (const bracket of comprehensiveTaxRates) {
-                if (bonusTaxableIncome <= bracket.max) {
-                    bonusTax = bonusTaxableIncome * bracket.rate - bracket.deduction;
+            const monthlyBonus = bonusIncome / 12;
+            for (const bracket of bonusMonthlyTaxRates) {
+                if (monthlyBonus <= bracket.max) {
+                    bonusTax = bonusIncome * bracket.rate - bracket.deduction;
                     break;
                 }
             }
@@ -439,23 +451,15 @@ function calculateReverseTax() {
         const totalDeduction = monthlyTotalDeduction * workMonths + actualMedicalDeduction + annualCharitableDonation;
         
         // 计算年终奖税额
+        // 计算方式：全年奖金/12，查月度税率表确定税率和速算扣除数，然后全年奖金*税率-速算扣除数
         let bonusTax = 0;
         if (bonusIncome > 0 && !bonusInclude) {
-            // 年终奖单独计税
-            if (bonusIncome <= 36000) {
-                bonusTax = bonusIncome * 0.03;
-            } else if (bonusIncome <= 144000) {
-                bonusTax = bonusIncome * 0.1 - 2520;
-            } else if (bonusIncome <= 300000) {
-                bonusTax = bonusIncome * 0.2 - 16920;
-            } else if (bonusIncome <= 420000) {
-                bonusTax = bonusIncome * 0.25 - 31920;
-            } else if (bonusIncome <= 660000) {
-                bonusTax = bonusIncome * 0.3 - 52920;
-            } else if (bonusIncome <= 960000) {
-                bonusTax = bonusIncome * 0.35 - 85920;
-            } else {
-                bonusTax = bonusIncome * 0.45 - 181920;
+            const monthlyBonus = bonusIncome / 12;
+            for (const bracket of bonusMonthlyTaxRates) {
+                if (monthlyBonus <= bracket.max) {
+                    bonusTax = bonusIncome * bracket.rate - bracket.deduction;
+                    break;
+                }
             }
         }
         
