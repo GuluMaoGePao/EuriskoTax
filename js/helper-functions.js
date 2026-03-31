@@ -1,30 +1,32 @@
 
 
-// 计算社保费用
+// 计算社保费用（养老保险、医疗保险、失业保险）
 function calculateSocialSecurity() {
     let base = parseFloat(document.getElementById('social-security-base').value) || 0;
-    let housingFundBase = parseFloat(document.getElementById('housing-fund-base').value) || 0;
     const pensionRate = parseFloat(document.getElementById('pension-rate').value) || 0;
     const medicalRate = parseFloat(document.getElementById('medical-rate').value) || 0;
     const unemploymentRate = parseFloat(document.getElementById('unemployment-rate').value) || 0;
-    const housingFundRate = parseFloat(document.getElementById('housing-fund-rate').value) || 0;
-    
-    // 社保基数限制：最低7460，最高37302
-    const minBase = 7460;
-    const maxBase = 37302;
-    base = Math.max(minBase, Math.min(maxBase, base));
-    housingFundBase = Math.max(minBase, Math.min(maxBase, housingFundBase));
     
     // 计算各项保险费用
     const pensionAmount = base * (pensionRate / 100);
     const medicalAmount = base * (medicalRate / 100);
     const unemploymentAmount = base * (unemploymentRate / 100);
-    const housingFundAmount = housingFundBase * (housingFundRate / 100);
     
     // 更新输入字段
     document.getElementById('pension-insurance').value = pensionAmount.toFixed(2);
     document.getElementById('medical-insurance').value = medicalAmount.toFixed(2);
     document.getElementById('unemployment-insurance').value = unemploymentAmount.toFixed(2);
+}
+
+// 计算住房公积金
+function calculateHousingFund() {
+    let housingFundBase = parseFloat(document.getElementById('housing-fund-base').value) || 0;
+    const housingFundRate = parseFloat(document.getElementById('housing-fund-rate').value) || 0;
+    
+    // 计算住房公积金费用
+    const housingFundAmount = housingFundBase * (housingFundRate / 100);
+    
+    // 更新输入字段
     document.getElementById('housing-fund').value = housingFundAmount.toFixed(2);
 }
 
@@ -81,32 +83,38 @@ function calculateSocialSecurityRate(type) {
     }
 }
 
-// 反向倒算页面的社保缴费计算
+// 反向倒算页面的社保缴费计算（养老保险、医疗保险、失业保险）
 function calculateReverseSocialSecurity() {
     let base = parseFloat(document.getElementById('reverse-social-security-base').value) || 0;
-    let housingFundBase = parseFloat(document.getElementById('reverse-housing-fund-base').value) || 0;
     const pensionRate = parseFloat(document.getElementById('reverse-pension-rate').value) || 0;
     const medicalRate = parseFloat(document.getElementById('reverse-medical-rate').value) || 0;
     const unemploymentRate = parseFloat(document.getElementById('reverse-unemployment-rate').value) || 0;
-    const housingFundRate = parseFloat(document.getElementById('reverse-housing-fund-rate').value) || 0;
     const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
-    
-    // 社保基数限制：最低7460，最高37302
-    const minBase = 7460;
-    const maxBase = 37302;
-    base = Math.max(minBase, Math.min(maxBase, base));
-    housingFundBase = Math.max(minBase, Math.min(maxBase, housingFundBase));
     
     // 计算各项保险费用（根据工作月数调整）
     const pensionAmount = base * (pensionRate / 100) * workMonths;
     const medicalAmount = base * (medicalRate / 100) * workMonths;
     const unemploymentAmount = base * (unemploymentRate / 100) * workMonths;
-    const housingFundAmount = housingFundBase * (housingFundRate / 100) * workMonths;
     
     // 更新输入字段
     document.getElementById('reverse-pension-insurance').value = pensionAmount.toFixed(2);
     document.getElementById('reverse-medical-insurance').value = medicalAmount.toFixed(2);
     document.getElementById('reverse-unemployment-insurance').value = unemploymentAmount.toFixed(2);
+    
+    // 更新反向倒算扣除项计算
+    updateReverseDeductionCalculation();
+}
+
+// 反向倒算页面的住房公积金计算
+function calculateReverseHousingFund() {
+    let housingFundBase = parseFloat(document.getElementById('reverse-housing-fund-base').value) || 0;
+    const housingFundRate = parseFloat(document.getElementById('reverse-housing-fund-rate').value) || 0;
+    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+    
+    // 计算住房公积金费用（根据工作月数调整）
+    const housingFundAmount = housingFundBase * (housingFundRate / 100) * workMonths;
+    
+    // 更新输入字段
     document.getElementById('reverse-housing-fund').value = housingFundAmount.toFixed(2);
     
     // 更新反向倒算扣除项计算
@@ -316,7 +324,8 @@ function updateDeductionCalculation() {
     }
     
     // 其他扣除
-    const pensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
+    const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('pension-deduction-checkbox').checked;
+    const pensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
     // 企业年金：个人月工资的5%
     const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
     const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('enterprise-annuity-checkbox').checked;
@@ -325,9 +334,12 @@ function updateDeductionCalculation() {
     if (isEnterpriseAnnuityChecked) {
         document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
     }
-    const insuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
-    const taxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
-    const charitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
+    const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('insurance-other-deduction-checkbox').checked;
+    const insuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
+    const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('tax-deferred-pension-checkbox').checked;
+    const taxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
+    const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('charitable-donation-checkbox').checked;
+    const charitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
     
     // 计算年度大病医疗实际可扣除额
     const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
@@ -446,8 +458,8 @@ function updateReverseDeductionCalculation() {
     
     // 计算其他扣除（与综合所得计税逻辑一致）
     let otherDeduction = 0;
-    // 无论复选框是否勾选，都计算其他扣除，因为用户可能已经输入了金额
-    const monthlyPensionDeduction = parseFloat(document.getElementById('reverse-pension-deduction').value) || 0;
+    const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-pension-deduction-checkbox').checked;
+    const monthlyPensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('reverse-pension-deduction').value) || 0) : 0;
     // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
     let monthlyEnterpriseAnnuity = 0;
     const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
@@ -457,8 +469,10 @@ function updateReverseDeductionCalculation() {
         // 更新企业年金输入字段
         document.getElementById('reverse-enterprise-annuity').value = monthlyEnterpriseAnnuity.toFixed(2);
     }
-    const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0;
-    const monthlyTaxDeferredPension = parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0;
+    const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-insurance-other-deduction-checkbox').checked;
+    const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0) : 0;
+    const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('reverse-tax-deferred-pension-checkbox').checked;
+    const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0) : 0;
     // 与综合所得计税一致，计算月度其他扣除合计
     otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
     
@@ -469,7 +483,8 @@ function updateReverseDeductionCalculation() {
     let annualSpecialAdditionalDeductionTotal = specialAdditionalDeduction * workMonths;
     
     // 计算年度其他扣除合计
-    const annualCharitableDonation = parseFloat(document.getElementById('reverse-charitable-donation').value) || 0;
+    const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('reverse-charitable-donation-checkbox').checked;
+    const annualCharitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('reverse-charitable-donation').value) || 0) : 0;
     let annualOtherDeductionTotal = otherDeduction * workMonths + annualCharitableDonation;
     
     // 计算月度合计（与综合所得计税逻辑一致）
@@ -710,13 +725,21 @@ function resetDeductionData() {
     document.getElementById('medical-deduction').value = 0;
     
     // 其他扣除
+    document.getElementById('pension-deduction-checkbox').checked = false;
     document.getElementById('pension-deduction').value = 0;
+    document.getElementById('pension-deduction-fields').classList.add('hidden');
     document.getElementById('enterprise-annuity-checkbox').checked = false;
     document.getElementById('enterprise-annuity').value = 0;
     document.getElementById('enterprise-annuity-fields').classList.add('hidden');
+    document.getElementById('insurance-other-deduction-checkbox').checked = false;
     document.getElementById('insurance-other-deduction').value = 0;
+    document.getElementById('insurance-other-deduction-fields').classList.add('hidden');
+    document.getElementById('tax-deferred-pension-checkbox').checked = false;
     document.getElementById('tax-deferred-pension').value = 0;
+    document.getElementById('tax-deferred-pension-fields').classList.add('hidden');
+    document.getElementById('charitable-donation-checkbox').checked = false;
     document.getElementById('charitable-donation').value = 0;
+    document.getElementById('charitable-donation-fields').classList.add('hidden');
     
     // 重置复选框状态
     document.getElementById('special-deduction-checkbox').checked = false;

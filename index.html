@@ -840,18 +840,26 @@
                             
                             <div id="other-deduction-content" class="mb-6 hidden">
                                 <div class="form-group">
-                                    <label for="pension-deduction" class="label">
-                                        个人养老金 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="pension-deduction-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">个人养老金</span>
+                                        </label>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：月度最高扣除1000元（年度12000元）
+                                    <div id="pension-deduction-fields" class="hidden">
+                                        <label for="pension-deduction" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：月度最高扣除1000元（年度12000元）
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -877,44 +885,68 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="insurance-other-deduction" class="label">
-                                        商业健康保险 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="insurance-other-deduction-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">商业健康保险</span>
+                                        </label>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：月度最高扣除200元（年度2400元）
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="tax-deferred-pension" class="label">
-                                        税收递延型养老保险 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">当月收入的6%与1000元中的较低者</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="tax-deferred-pension" class="input-field" value="0" min="0" max="1000" step="50">
+                                    <div id="insurance-other-deduction-fields" class="hidden">
+                                        <label for="insurance-other-deduction" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：月度最高扣除200元（年度2400元）
+                                        </div>
                                     </div>
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="charitable-donation" class="label">
-                                        公益捐赠支出 (元/年)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">符合标准的一般捐赠30%，特殊捐赠100%</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="charitable-donation" class="input-field" value="0" min="0" step="100">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="tax-deferred-pension-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">税收递延型养老保险</span>
+                                        </label>
+                                    </div>
+                                    <div id="tax-deferred-pension-fields" class="hidden">
+                                        <label for="tax-deferred-pension" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">当月收入的6%与1000元中的较低者</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="tax-deferred-pension" class="input-field" value="0" min="0" max="1000" step="50">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="charitable-donation-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">公益捐赠支出</span>
+                                        </label>
+                                    </div>
+                                    <div id="charitable-donation-fields" class="hidden">
+                                        <label for="charitable-donation" class="label">
+                                            金额 (元/年)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">符合标准的一般捐赠30%，特殊捐赠100%</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="charitable-donation" class="input-field" value="0" min="0" step="100">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1539,18 +1571,26 @@
                             
                             <div id="reverse-other-deduction-content" class="mb-6 hidden">
                                 <div class="form-group">
-                                    <label for="reverse-pension-deduction" class="label">
-                                        个人养老金 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="reverse-pension-deduction-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">个人养老金</span>
+                                        </label>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：月度最高扣除1000元（年度12000元）
+                                    <div id="reverse-pension-deduction-fields" class="hidden">
+                                        <label for="reverse-pension-deduction" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">个人养老金月度扣除限额1000元</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-pension-deduction" class="input-field" value="0" min="0" max="1000" step="100">
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：月度最高扣除1000元（年度12000元）
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1576,44 +1616,68 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="reverse-insurance-other-deduction" class="label">
-                                        商业健康保险 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="reverse-insurance-other-deduction-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">商业健康保险</span>
+                                        </label>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        提示：月度最高扣除200元（年度2400元）
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="reverse-tax-deferred-pension" class="label">
-                                        税收递延型养老保险 (元/月)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">当月收入的6%与1000元中的较低者</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-tax-deferred-pension" class="input-field" value="0" min="0" max="1000" step="50">
+                                    <div id="reverse-insurance-other-deduction-fields" class="hidden">
+                                        <label for="reverse-insurance-other-deduction" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">商业健康保险月度扣除限额200元</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-insurance-other-deduction" class="input-field" value="0" min="0" max="200" step="10">
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            提示：月度最高扣除200元（年度2400元）
+                                        </div>
                                     </div>
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="reverse-charitable-donation" class="label">
-                                        公益捐赠支出 (元/年)
-                                        <span class="tooltip ml-1">
-                                            <i class="fa fa-info-circle text-gray-400"></i>
-                                            <span class="tooltip-text">符合标准的一般捐赠30%，特殊捐赠100%</span>
-                                        </span>
-                                    </label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-charitable-donation" class="input-field" value="0" min="0" step="100">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="reverse-tax-deferred-pension-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">税收递延型养老保险</span>
+                                        </label>
+                                    </div>
+                                    <div id="reverse-tax-deferred-pension-fields" class="hidden">
+                                        <label for="reverse-tax-deferred-pension" class="label">
+                                            金额 (元/月)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">当月收入的6%与1000元中的较低者</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-tax-deferred-pension" class="input-field" value="0" min="0" max="1000" step="50">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="flex items-center mb-2">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="reverse-charitable-donation-checkbox" class="form-checkbox text-primary">
+                                            <span class="ml-2 font-medium text-gray-700">公益捐赠支出</span>
+                                        </label>
+                                    </div>
+                                    <div id="reverse-charitable-donation-fields" class="hidden">
+                                        <label for="reverse-charitable-donation" class="label">
+                                            金额 (元/年)
+                                            <span class="tooltip ml-1">
+                                                <i class="fa fa-info-circle text-gray-400"></i>
+                                                <span class="tooltip-text">符合标准的一般捐赠30%，特殊捐赠100%</span>
+                                            </span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="reverse-charitable-donation" class="input-field" value="0" min="0" step="100">
+                                        </div>
                                     </div>
                                 </div>
                             </div>

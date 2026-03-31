@@ -605,10 +605,41 @@ function updateClassificationDistributionChart() {
 
 // 更新税率分布饼图
 function updateTaxRateDistributionChart() {
-    if (Object.keys(calculationResults).length === 0) return;
-    
     const ctx = document.getElementById('tax-rate-distribution-chart');
     if (!ctx) return;
+    
+    if (window.taxRateChart) {
+        window.taxRateChart.destroy();
+    }
+    
+    // 如果没有计算结果，显示默认图表
+    if (Object.keys(calculationResults).length === 0) {
+        window.taxRateChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['无应纳税所得额'],
+                datasets: [{
+                    data: [1],
+                    backgroundColor: ['#e5e7eb'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: '税率分布'
+                    }
+                }
+            }
+        });
+        return;
+    }
     
     const taxableIncome = calculationResults.taxDetails.taxableIncome;
     // 使用统一的税率表
@@ -636,10 +667,6 @@ function updateTaxRateDistributionChart() {
     
     const labels = taxBrackets.filter(bracket => bracket.amount > 0).map(bracket => `${bracket.rate}%`);
     const data = taxBrackets.filter(bracket => bracket.amount > 0).map(bracket => bracket.amount);
-    
-    if (window.taxRateChart) {
-        window.taxRateChart.destroy();
-    }
     
     // 如果没有数据，显示默认图表
     if (labels.length === 0) {
@@ -705,10 +732,49 @@ function updateTaxRateDistributionChart() {
 
 // 更新月度个税图表
 function updateMonthlyTaxChart() {
-    if (Object.keys(calculationResults).length === 0) return;
-    
     const ctx = document.getElementById('monthly-tax-chart');
     if (!ctx) return;
+    
+    if (window.monthlyTaxChart) {
+        window.monthlyTaxChart.destroy();
+    }
+    
+    // 如果没有计算结果，显示默认图表
+    if (Object.keys(calculationResults).length === 0) {
+        window.monthlyTaxChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                datasets: [{
+                    label: '月度个税',
+                    data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    backgroundColor: '#e5e7eb',
+                    borderColor: '#9ca3af',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '税额 (元)'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '月度个税明细'
+                    }
+                }
+            }
+        });
+        return;
+    }
     
     const workMonths = calculationResults.workMonths;
     const monthlySalary = calculationResults.incomeDetails.salary;
@@ -770,10 +836,6 @@ function updateMonthlyTaxChart() {
         cumulativeTax = currentCumulativeTax;
         
         taxData.push(monthTax);
-    }
-    
-    if (window.monthlyTaxChart) {
-        window.monthlyTaxChart.destroy();
     }
     
     window.monthlyTaxChart = new Chart(ctx, {
@@ -892,6 +954,7 @@ function generateOptimizationTips() {
     if (calculationResults.incomeDetails.bonus > 0) {
         const bonusTax = calculationResults.incomeDetails.bonusTax;
         const bonusInclude = calculationResults.incomeDetails.bonusInclude;
+        const bonusAmount = calculationResults.incomeDetails.bonus;
         
         // 计算另一种计税方式的税额
         let alternativeTax = 0;
@@ -905,26 +968,35 @@ function generateOptimizationTips() {
             { max: 960000, rate: 0.35, deduction: 85920 },
             { max: Infinity, rate: 0.45, deduction: 181920 }
         ];
+        
         if (bonusInclude) {
             // 计算单独计税的税额
-            const bonusTaxableIncome = calculationResults.incomeDetails.bonus;
             for (const bracket of taxBrackets) {
-                if (bonusTaxableIncome <= bracket.max) {
-                    alternativeTax = bonusTaxableIncome * bracket.rate - bracket.deduction;
+                if (bonusAmount <= bracket.max) {
+                    alternativeTax = bonusAmount * bracket.rate - bracket.deduction;
                     break;
                 }
             }
         } else {
             // 计算并入综合所得的税额
-            const totalIncome = calculationResults.incomeDetails.total - calculationResults.incomeDetails.bonus;
+            const currentTotalTax = calculationResults.taxDetails.totalTax;
+            const currentBonusTax = bonusTax;
+            
+            // 计算并入综合所得后的总应纳税额
+            const totalIncomeWithBonus = calculationResults.incomeDetails.total - calculationResults.incomeDetails.bonus + bonusAmount;
             const totalDeduction = calculationResults.deductionDetails.total;
-            const taxableIncome = Math.max(0, totalIncome + calculationResults.incomeDetails.bonus - totalDeduction);
+            const taxableIncomeWithBonus = Math.max(0, totalIncomeWithBonus - totalDeduction);
+            
+            let totalTaxWithBonus = 0;
             for (const bracket of taxBrackets) {
-                if (taxableIncome <= bracket.max) {
-                    alternativeTax = taxableIncome * bracket.rate - bracket.deduction - (calculationResults.taxDetails.totalTax - bonusTax);
+                if (taxableIncomeWithBonus <= bracket.max) {
+                    totalTaxWithBonus = taxableIncomeWithBonus * bracket.rate - bracket.deduction;
                     break;
                 }
             }
+            
+            // 计算并入综合所得后，年终奖部分的税额
+            alternativeTax = totalTaxWithBonus - (currentTotalTax - currentBonusTax);
         }
         
         // 只有当另一种方式确实更优时才给出建议
