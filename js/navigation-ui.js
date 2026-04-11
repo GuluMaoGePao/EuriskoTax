@@ -386,51 +386,6 @@ function exportToPDF(elementId, title) {
     });
 }
 
-// 导出Word文档
-function exportToWord(elementId, title) {
-    const element = document.getElementById(elementId);
-    
-    // 创建一个包含HTML内容的Blob
-    const htmlContent = `
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>${title}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #1e40af; text-align: center; margin-bottom: 30px; }
-                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                tr:nth-child(even) { background-color: #f9f9f9; }
-                .highlight { font-weight: bold; color: #1e40af; }
-                .negative { color: #ef4444; font-weight: medium; }
-                .positive { color: #10b981; font-weight: medium; }
-            </style>
-        </head>
-        <body>
-            <h1>${title}</h1>
-            ${element.innerHTML}
-        </body>
-        </html>
-    `;
-    
-    // 创建Blob对象
-    const blob = new Blob([htmlContent], { type: 'application/msword' });
-    
-    // 创建下载链接
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${title}.doc`;
-    
-    // 触发下载
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // 释放URL对象
-    URL.revokeObjectURL(url);
-}
+
 
 
