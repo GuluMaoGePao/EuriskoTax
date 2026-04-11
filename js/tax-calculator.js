@@ -471,38 +471,37 @@ function calculateReverseTax() {
         let applicableRate = 0;
         let applicableDeduction = 0;
         
+        // 综合所得税率表（官方2026年标准）
+        const comprehensiveTaxRates = [
+            { max: 36000, rate: 0.03, deduction: 0, maxTax: 36000 * 0.03 },
+            { max: 144000, rate: 0.1, deduction: 2520, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 },
+            { max: 300000, rate: 0.2, deduction: 16920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 },
+            { max: 420000, rate: 0.25, deduction: 31920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 },
+            { max: 660000, rate: 0.3, deduction: 52920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 },
+            { max: 960000, rate: 0.35, deduction: 85920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 + (960000 - 660000) * 0.35 },
+            { max: Infinity, rate: 0.45, deduction: 181920, maxTax: Infinity }
+        ];
+        
+        // 经营所得税率表
+        const businessTaxRates = [
+            { max: 30000, rate: 0.05, deduction: 0, maxTax: 30000 * 0.05 },
+            { max: 90000, rate: 0.1, deduction: 1500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 },
+            { max: 300000, rate: 0.2, deduction: 10500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 },
+            { max: 500000, rate: 0.3, deduction: 40500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 + (500000 - 300000) * 0.3 },
+            { max: Infinity, rate: 0.35, deduction: 65500, maxTax: Infinity }
+        ];
+        
         if (incomeType === 'comprehensive') {
             // 综合所得反向倒算
             if (taxRateChoice === 'auto') {
                 // 自动判断税率级别
-                if (comprehensiveTax <= 1080) { // 36000 * 0.03
-                    taxableIncome = comprehensiveTax / 0.03;
-                    applicableRate = 0.03;
-                    applicableDeduction = 0;
-                } else if (comprehensiveTax <= 14100) { // 144000 * 0.1 - 2520
-                    taxableIncome = (comprehensiveTax + 2520) / 0.1;
-                    applicableRate = 0.1;
-                    applicableDeduction = 2520;
-                } else if (comprehensiveTax <= 30180) { // 300000 * 0.2 - 16920
-                    taxableIncome = (comprehensiveTax + 16920) / 0.2;
-                    applicableRate = 0.2;
-                    applicableDeduction = 16920;
-                } else if (comprehensiveTax <= 55080) { // 420000 * 0.25 - 31920
-                    taxableIncome = (comprehensiveTax + 31920) / 0.25;
-                    applicableRate = 0.25;
-                    applicableDeduction = 31920;
-                } else if (comprehensiveTax <= 96080) { // 660000 * 0.3 - 52920
-                    taxableIncome = (comprehensiveTax + 52920) / 0.3;
-                    applicableRate = 0.3;
-                    applicableDeduction = 52920;
-                } else if (comprehensiveTax <= 142880) { // 960000 * 0.35 - 85920
-                    taxableIncome = (comprehensiveTax + 85920) / 0.35;
-                    applicableRate = 0.35;
-                    applicableDeduction = 85920;
-                } else { // ＞960000元
-                    taxableIncome = (comprehensiveTax + 181920) / 0.45;
-                    applicableRate = 0.45;
-                    applicableDeduction = 181920;
+                for (const bracket of comprehensiveTaxRates) {
+                    if (comprehensiveTax <= bracket.maxTax) {
+                        taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
+                        applicableRate = bracket.rate;
+                        applicableDeduction = bracket.deduction;
+                        break;
+                    }
                 }
             } else {
                 // 根据选择的税率计算
@@ -539,58 +538,23 @@ function calculateReverseTax() {
             }
         } else if (incomeType === 'business') {
             // 经营所得反向倒算
-            // 根据经营所得税率表倒算
-            if (totalTax <= 1500) { // 30000 * 0.05
-                taxableIncome = totalTax / 0.05;
-                applicableRate = 0.05;
-                applicableDeduction = 0;
-            } else if (totalTax <= 7500) { // 90000 * 0.1 - 1500
-                taxableIncome = (totalTax + 1500) / 0.1;
-                applicableRate = 0.1;
-                applicableDeduction = 1500;
-            } else if (totalTax <= 40500) { // 300000 * 0.2 - 10500
-                taxableIncome = (totalTax + 10500) / 0.2;
-                applicableRate = 0.2;
-                applicableDeduction = 10500;
-            } else if (totalTax <= 90500) { // 500000 * 0.3 - 40500
-                taxableIncome = (totalTax + 40500) / 0.3;
-                applicableRate = 0.3;
-                applicableDeduction = 40500;
-            } else { // ＞500000元
-                taxableIncome = (totalTax + 65500) / 0.35;
-                applicableRate = 0.35;
-                applicableDeduction = 65500;
+            for (const bracket of businessTaxRates) {
+                if (totalTax <= bracket.maxTax) {
+                    taxableIncome = (totalTax + bracket.deduction) / bracket.rate;
+                    applicableRate = bracket.rate;
+                    applicableDeduction = bracket.deduction;
+                    break;
+                }
             }
         } else {
             // 默认使用综合所得税率表
-            if (comprehensiveTax <= 1080) { // 36000 * 0.03
-                taxableIncome = comprehensiveTax / 0.03;
-                applicableRate = 0.03;
-                applicableDeduction = 0;
-            } else if (comprehensiveTax <= 14100) { // 144000 * 0.1 - 2520
-                taxableIncome = (comprehensiveTax + 2520) / 0.1;
-                applicableRate = 0.1;
-                applicableDeduction = 2520;
-            } else if (comprehensiveTax <= 30180) { // 300000 * 0.2 - 16920
-                taxableIncome = (comprehensiveTax + 16920) / 0.2;
-                applicableRate = 0.2;
-                applicableDeduction = 16920;
-            } else if (comprehensiveTax <= 55080) { // 420000 * 0.25 - 31920
-                taxableIncome = (comprehensiveTax + 31920) / 0.25;
-                applicableRate = 0.25;
-                applicableDeduction = 31920;
-            } else if (comprehensiveTax <= 96080) { // 660000 * 0.3 - 52920
-                taxableIncome = (comprehensiveTax + 52920) / 0.3;
-                applicableRate = 0.3;
-                applicableDeduction = 52920;
-            } else if (comprehensiveTax <= 142880) { // 960000 * 0.35 - 85920
-                taxableIncome = (comprehensiveTax + 85920) / 0.35;
-                applicableRate = 0.35;
-                applicableDeduction = 85920;
-            } else { // ＞960000元
-                taxableIncome = (comprehensiveTax + 181920) / 0.45;
-                applicableRate = 0.45;
-                applicableDeduction = 181920;
+            for (const bracket of comprehensiveTaxRates) {
+                if (comprehensiveTax <= bracket.maxTax) {
+                    taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
+                    applicableRate = bracket.rate;
+                    applicableDeduction = bracket.deduction;
+                    break;
+                }
             }
         }
         
