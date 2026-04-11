@@ -958,8 +958,9 @@ function generateOptimizationTips() {
         const bonusInclude = calculationResults.incomeDetails.bonusInclude;
         const bonusAmount = calculationResults.incomeDetails.bonus;
         
-        // 计算另一种计税方式的税额
-        let alternativeTax = 0;
+        // 计算另一种计税方式的总税额
+        let currentTotalTax = calculationResults.taxDetails.totalTax + bonusTax;
+        let alternativeTotalTax = 0;
         // 综合所得税率表
         const taxBrackets = [
             { max: 36000, rate: 0.03, deduction: 0 },
@@ -982,21 +983,21 @@ function generateOptimizationTips() {
         ];
         
         if (bonusInclude) {
+            // 计算单独计税的总税额
+            const currentTotalTaxWithoutBonus = calculationResults.taxDetails.totalTax - bonusTax;
             // 计算单独计税的税额：全年奖金/12，查月度税率表
+            let bonusTaxAlone = 0;
             const monthlyBonus = bonusAmount / 12;
             for (const bracket of bonusMonthlyTaxBrackets) {
                 if (monthlyBonus <= bracket.max) {
-                    alternativeTax = bonusAmount * bracket.rate - bracket.deduction;
+                    bonusTaxAlone = bonusAmount * bracket.rate - bracket.deduction;
                     break;
                 }
             }
+            alternativeTotalTax = currentTotalTaxWithoutBonus + bonusTaxAlone;
         } else {
-            // 计算并入综合所得的税额
-            const currentTotalTax = calculationResults.taxDetails.totalTax;
-            const currentBonusTax = bonusTax;
-            
-            // 计算并入综合所得后的总应纳税额
-            const totalIncomeWithBonus = calculationResults.incomeDetails.total - calculationResults.incomeDetails.bonus + bonusAmount;
+            // 计算并入综合所得的总税额
+            const totalIncomeWithBonus = calculationResults.incomeDetails.total + bonusAmount;
             const totalDeduction = calculationResults.deductionDetails.total;
             const taxableIncomeWithBonus = Math.max(0, totalIncomeWithBonus - totalDeduction);
             
@@ -1007,16 +1008,14 @@ function generateOptimizationTips() {
                     break;
                 }
             }
-            
-            // 计算并入综合所得后，年终奖部分的税额
-            alternativeTax = totalTaxWithBonus - (currentTotalTax - currentBonusTax);
+            alternativeTotalTax = totalTaxWithBonus;
         }
         
         // 只有当另一种方式确实更优时才给出建议
-        if (Math.abs(alternativeTax - bonusTax) > 100) {
-            if (alternativeTax < bonusTax) {
+        if (Math.abs(alternativeTotalTax - currentTotalTax) > 100) {
+            if (alternativeTotalTax < currentTotalTax) {
                 const betterMethod = bonusInclude ? '单独计税' : '并入综合所得计税';
-                const taxSaved = bonusTax - alternativeTax;
+                const taxSaved = currentTotalTax - alternativeTotalTax;
                 tips.push(`您的年终奖采用了${bonusInclude ? '并入综合所得计税' : '单独计税'}方式，建议考虑使用${betterMethod}方式，预计可节省税额约${taxSaved.toFixed(2)}元。`);
             }
         }
