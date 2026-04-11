@@ -326,14 +326,9 @@ function updateDeductionCalculation() {
     // 其他扣除
     const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('pension-deduction-checkbox').checked;
     const pensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
-    // 企业年金：个人月工资的5%
-    const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
+    // 企业年金：用户手动输入
     const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('enterprise-annuity-checkbox').checked;
-    const enterpriseAnnuity = isEnterpriseAnnuityChecked ? (monthlySalaryIncome * 0.05) : 0;
-    // 更新企业年金输入字段
-    if (isEnterpriseAnnuityChecked) {
-        document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
-    }
+    const enterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
     const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('insurance-other-deduction-checkbox').checked;
     const insuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
     const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('tax-deferred-pension-checkbox').checked;
@@ -463,11 +458,8 @@ function updateReverseDeductionCalculation() {
     // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
     let monthlyEnterpriseAnnuity = 0;
     const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
-    if (isEnterpriseAnnuityChecked && reverseCalculationResults && reverseCalculationResults.totalIncome) {
-        const monthlyIncome = reverseCalculationResults.totalIncome / workMonths;
-        monthlyEnterpriseAnnuity = monthlyIncome * 0.05;
-        // 更新企业年金输入字段
-        document.getElementById('reverse-enterprise-annuity').value = monthlyEnterpriseAnnuity.toFixed(2);
+    if (isEnterpriseAnnuityChecked) {
+        monthlyEnterpriseAnnuity = parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0;
     }
     const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-insurance-other-deduction-checkbox').checked;
     const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0) : 0;
