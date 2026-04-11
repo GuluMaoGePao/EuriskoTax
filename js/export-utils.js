@@ -1,0 +1,726 @@
+// 导出到Word文档
+function exportToWord(elementId, title) {
+    // 获取计算结果数据
+    if (Object.keys(calculationResults).length === 0) {
+        alert('请先进行计算，再导出文档');
+        return;
+    }
+    
+    // 构建Word文档内容
+    const docContent = generateWordDocumentContent(title);
+    
+    // 创建Blob对象
+    const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
+    
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${title}_${new Date().toISOString().split('T')[0]}.doc`;
+    link.click();
+}
+
+// 生成Word文档内容
+function generateWordDocumentContent(title) {
+    const results = calculationResults;
+    const workMonths = results.workMonths;
+    const incomeDetails = results.incomeDetails;
+    const deductionDetails = results.deductionDetails;
+    const taxDetails = results.taxDetails;
+    
+    // 生成月度数据
+    const monthlyData = generateMonthlyData(results);
+    
+    // 生成税收优化建议
+    const optimizationTips = generateOptimizationTipsForWord();
+    
+    // 构建完整的HTML内容
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+        * {
+            font-family: 'SimSun', '宋体', serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'SimSun', '宋体', serif;
+            margin: 2.5cm 2cm;
+            line-height: 1.5;
+            font-size: 14pt;
+            color: #000;
+        }
+        .cover {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 60px 0;
+            border-bottom: 2px solid #000;
+        }
+        .cover h1 {
+            font-size: 22pt;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #000;
+        }
+        .cover p {
+            font-size: 14pt;
+            color: #000;
+            margin-bottom: 10px;
+        }
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .section h2 {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 5px;
+            color: #000;
+        }
+        .section h3 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 12px;
+            margin-top: 20px;
+            color: #000;
+        }
+        .section p {
+            font-size: 14pt;
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12pt;
+        }
+        .info-table th,
+        .info-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            text-align: left;
+            font-size: 12pt;
+        }
+        .info-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            color: #000;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12pt;
+        }
+        .summary-table th,
+        .summary-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: right;
+            font-size: 12pt;
+        }
+        .summary-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            text-align: left;
+            color: #000;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #000;
+        }
+        .danger {
+            font-weight: bold;
+            color: #000;
+        }
+        .success {
+            font-weight: bold;
+            color: #000;
+        }
+        .tips {
+            background-color: #f9f9f9;
+            border-left: 3px solid #000;
+            padding: 10px;
+            margin: 12px 0;
+        }
+        .tips h4 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #000;
+        }
+        .tips p {
+            font-size: 14pt;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #000;
+            text-align: center;
+            font-size: 12pt;
+            color: #666;
+        }
+        .footer p {
+            font-size: 12pt;
+            margin-bottom: 4px;
+        }
+        .note {
+            font-size: 12pt;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        .cover-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding: 15px 0;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+        }
+        .cover-info span {
+            font-size: 14pt;
+        }
+        .footer-info {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 15px 0;
+            border-top: 2px solid #000;
+        }
+        .footer-info span {
+            font-size: 12pt;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- 封面 -->
+    <div class="cover">
+        <h1>${title}</h1>
+        <div class="cover-info">
+            <span>生成日期：${new Date().toLocaleDateString()}</span>
+            <span>计算类型：综合所得计税</span>
+            <span>工作月数：${workMonths}个月</span>
+        </div>
+    </div>
+    
+    <!-- 报告概述 -->
+    <div class="section">
+        <h2>1. 报告概述</h2>
+        <p>本报告根据《中华人民共和国个人所得税法》及其实施条例，结合您提供的个人收入和扣除信息，对2026年度综合所得进行了详细计算。</p>
+        <p>报告涵盖年度总览、收入明细、扣除项明细、月度个税明细、税率分布分析、税收优化建议及结论等内容，旨在为您提供清晰的税务状况分析和合规的税务规划建议。</p>
+        <p class="note">声明：本报告仅供参考，实际纳税情况以税务部门核算结果为准。</p>
+    </div>
+    
+    <!-- 年度总览 -->
+    <div class="section">
+        <h2>2. 年度总览</h2>
+        <table class="summary-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+            </tr>
+            <tr>
+                <td>年度应税综合所得</td>
+                <td>${incomeDetails.total.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>年度总扣除</td>
+                <td class="success">${deductionDetails.total.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>应纳税所得额</td>
+                <td>${taxDetails.taxableIncome.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>适用税率</td>
+                <td>${(taxDetails.applicableRate * 100).toFixed(0)}%</td>
+            </tr>
+            <tr>
+                <td>速算扣除数</td>
+                <td>${taxDetails.applicableDeduction.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>年度应纳税额</td>
+                <td class="danger">${(taxDetails.totalTax - (incomeDetails.bonusTax || 0)).toFixed(2)}</td>
+            </tr>
+            ${incomeDetails.bonus > 0 ? `
+            <tr>
+                <td>年终奖税额（${incomeDetails.bonusInclude ? '并入综合所得计税' : '单独计税'}）</td>
+                <td class="danger">${(incomeDetails.bonusTax || 0).toFixed(2)}</td>
+            </tr>
+            ` : ''}
+            <tr>
+                <td>全年累计已预缴税额</td>
+                <td>${taxDetails.prepaidTax.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>年度应退/应补税额</td>
+                <td class="${taxDetails.refundTax >= 0 ? 'danger' : 'success'}">${taxDetails.refundTax.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>税后年收入</td>
+                <td class="highlight">${taxDetails.netIncome.toFixed(2)}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- 收入明细 -->
+    <div class="section">
+        <h2>3. 收入明细</h2>
+        <table class="info-table">
+            <tr>
+                <th>收入类型</th>
+                <th>金额（元）</th>
+                <th>计入综合所得金额（元）</th>
+                <th>预扣税额（元）</th>
+            </tr>
+            <tr>
+                <td>工资薪金所得</td>
+                <td>${(incomeDetails.salary * workMonths).toFixed(2)}</td>
+                <td>${(incomeDetails.salary * workMonths).toFixed(2)}</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>劳务报酬所得</td>
+                <td>${incomeDetails.labor.toFixed(2)}</td>
+                <td>${incomeDetails.laborCalculated.toFixed(2)}</td>
+                <td>${incomeDetails.laborTax.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>稿酬所得</td>
+                <td>${incomeDetails.author.toFixed(2)}</td>
+                <td>${incomeDetails.authorCalculated.toFixed(2)}</td>
+                <td>${incomeDetails.authorTax.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>特许权使用费所得</td>
+                <td>${incomeDetails.royalty.toFixed(2)}</td>
+                <td>${incomeDetails.royaltyCalculated.toFixed(2)}</td>
+                <td>${incomeDetails.royaltyTax.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>年终奖</td>
+                <td>${incomeDetails.bonus.toFixed(2)}</td>
+                <td>${incomeDetails.bonusInclude ? incomeDetails.bonus.toFixed(2) : '0.00'}</td>
+                <td>${(incomeDetails.bonusTax || 0).toFixed(2)}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- 扣除项明细 -->
+    <div class="section">
+        <h2>4. 扣除项明细</h2>
+        
+        <h3>4.1 月度扣除明细</h3>
+        <table class="info-table">
+            <tr>
+                <th>扣除类型</th>
+                <th>月度金额（元）</th>
+                <th>年度金额（元）</th>
+            </tr>
+            <tr>
+                <td>基本减除费用</td>
+                <td>${deductionDetails.basic.toFixed(2)}</td>
+                <td>${(deductionDetails.basic * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>养老保险金</td>
+                <td>${deductionDetails.pensionInsurance.toFixed(2)}</td>
+                <td>${(deductionDetails.pensionInsurance * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>医疗保险金</td>
+                <td>${deductionDetails.medicalInsurance.toFixed(2)}</td>
+                <td>${(deductionDetails.medicalInsurance * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>失业保险金</td>
+                <td>${deductionDetails.unemploymentInsurance.toFixed(2)}</td>
+                <td>${(deductionDetails.unemploymentInsurance * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>住房公积金</td>
+                <td>${deductionDetails.housingFund.toFixed(2)}</td>
+                <td>${(deductionDetails.housingFund * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>赡养老人</td>
+                <td>${deductionDetails.elderly.toFixed(2)}</td>
+                <td>${(deductionDetails.elderly * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>子女教育 + 3岁以下婴幼儿照护</td>
+                <td>${deductionDetails.childrenInfant.toFixed(2)}</td>
+                <td>${(deductionDetails.childrenInfant * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>住房扣除（${deductionDetails.housing > 1200 ? '租金' : '贷款利息'}）</td>
+                <td>${deductionDetails.housing.toFixed(2)}</td>
+                <td>${(deductionDetails.housing * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>继续教育（学历）</td>
+                <td>${(deductionDetails.educationDegree || 0).toFixed(2)}</td>
+                <td>${((deductionDetails.educationDegree || 0) * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>个人养老金</td>
+                <td>${deductionDetails.pension.toFixed(2)}</td>
+                <td>${(deductionDetails.pension * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>企业年金</td>
+                <td>${deductionDetails.enterpriseAnnuity.toFixed(2)}</td>
+                <td>${(deductionDetails.enterpriseAnnuity * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>商业健康保险</td>
+                <td>${deductionDetails.insuranceOther.toFixed(2)}</td>
+                <td>${(deductionDetails.insuranceOther * workMonths).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>税收递延型养老保险</td>
+                <td>${deductionDetails.taxDeferredPension.toFixed(2)}</td>
+                <td>${(deductionDetails.taxDeferredPension * workMonths).toFixed(2)}</td>
+            </tr>
+        </table>
+        
+        <h3>4.2 年度一次性扣除</h3>
+        <table class="info-table">
+            <tr>
+                <th>扣除类型</th>
+                <th>金额（元）</th>
+            </tr>
+            <tr>
+                <td>继续教育（职业资格）</td>
+                <td>${deductionDetails.professional.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>大病医疗（实际可扣除）</td>
+                <td>${deductionDetails.actualMedical.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>公益捐赠支出</td>
+                <td>${deductionDetails.charitableDonation.toFixed(2)}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- 月度个税明细 -->
+    <div class="section">
+        <h2>5. 月度个税明细</h2>
+        <table class="info-table">
+            <tr>
+                <th>月份</th>
+                <th>月工资收入（元）</th>
+                <th>扣除（元）</th>
+                <th>应纳税所得额（元）</th>
+                <th>税率</th>
+                <th>月工资应纳税额（元）</th>
+                <th>累计已缴（元）</th>
+            </tr>
+            ${monthlyData.map((item, index) => `
+            <tr>
+                <td>${index + 1}月</td>
+                <td>${item.monthlyIncome.toFixed(2)}</td>
+                <td>${item.monthlyDeduction.toFixed(2)}</td>
+                <td>${item.monthlyTaxableIncome.toFixed(2)}</td>
+                <td>${item.applicableRate}%</td>
+                <td>${item.monthTax.toFixed(2)}</td>
+                <td>${item.cumulativeTax.toFixed(2)}</td>
+            </tr>
+            `).join('')}
+        </table>
+    </div>
+    
+    <!-- 税率分布分析 -->
+    <div class="section">
+        <h2>6. 税率分布分析</h2>
+        <p>根据计算结果，您的应纳税所得额为 ${taxDetails.taxableIncome.toFixed(2)} 元，适用税率为 ${(taxDetails.applicableRate * 100).toFixed(0)}%。</p>
+        <p>税率分布情况如下：</p>
+        ${generateTaxRateDistribution(taxDetails.taxableIncome)}
+    </div>
+    
+    <!-- 税收优化建议 -->
+    <div class="section">
+        <h2>7. 税收优化建议</h2>
+        ${optimizationTips}
+    </div>
+    
+    <!-- 结论 -->
+    <div class="section">
+        <h2>8. 结论</h2>
+        <p>经计算，2026年度您的综合所得应纳税额为 ${taxDetails.totalTax.toFixed(2)} 元，税后年收入为 ${taxDetails.netIncome.toFixed(2)} 元。</p>
+        <p>若全年累计已预缴税额为 ${taxDetails.prepaidTax.toFixed(2)} 元，则 ${taxDetails.refundTax >= 0 ? '应补税额' : '应退税额'} 为 ${Math.abs(taxDetails.refundTax).toFixed(2)} 元。</p>
+        <p>建议您依据本报告中的税收优化建议，合理规划个人税务，充分利用各项法定扣除政策，合规降低税负。同时，请妥善保存相关扣除凭证，以备税务部门核查。</p>
+        <p>本报告数据截至生成之日，如遇税收政策调整，以最新政策为准。</p>
+    </div>
+    
+    <!-- 页脚 -->
+    <div class="footer">
+        <div class="footer-info">
+            <span>本报告由个人所得税计算小程序生成</span>
+            <span>报告生成日期：${new Date().toLocaleDateString()}</span>
+            <span>版本：2026.04.11</span>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+}
+
+// 生成月度数据
+function generateMonthlyData(results) {
+    const workMonths = results.workMonths;
+    const monthlySalary = results.incomeDetails.salary;
+    const monthlyBasicDeduction = results.deductionDetails.basic;
+    const monthlyInsuranceDeduction = results.deductionDetails.pensionInsurance + 
+                                     results.deductionDetails.medicalInsurance + 
+                                     results.deductionDetails.unemploymentInsurance + 
+                                     results.deductionDetails.housingFund;
+    const monthlySpecialAdditional = results.deductionDetails.elderly + 
+                                     results.deductionDetails.childrenInfant + 
+                                     results.deductionDetails.housing + 
+                                     (results.deductionDetails.educationDegree || 0);
+    const monthlyOtherDeduction = results.deductionDetails.otherTotal / workMonths;
+    
+    const monthlyData = [];
+    let cumulativeTaxableIncome = 0;
+    let cumulativeTax = 0;
+    
+    for (let month = 1; month <= workMonths; month++) {
+        const monthlyIncome = monthlySalary;
+        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
+        const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
+        
+        cumulativeTaxableIncome += monthlyTaxableIncome;
+        
+        let currentCumulativeTax = 0;
+        let applicableRate = 0;
+        const taxBrackets = [
+            { max: 36000, rate: 0.03, deduction: 0 },
+            { max: 144000, rate: 0.1, deduction: 2520 },
+            { max: 300000, rate: 0.2, deduction: 16920 },
+            { max: 420000, rate: 0.25, deduction: 31920 },
+            { max: 660000, rate: 0.3, deduction: 52920 },
+            { max: 960000, rate: 0.35, deduction: 85920 },
+            { max: Infinity, rate: 0.45, deduction: 181920 }
+        ];
+        
+        for (const bracket of taxBrackets) {
+            if (cumulativeTaxableIncome <= bracket.max) {
+                currentCumulativeTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction;
+                applicableRate = bracket.rate * 100;
+                break;
+            }
+        }
+        
+        const monthTax = currentCumulativeTax - cumulativeTax;
+        cumulativeTax = currentCumulativeTax;
+        
+        monthlyData.push({
+            monthlyIncome,
+            monthlyDeduction,
+            monthlyTaxableIncome,
+            applicableRate: applicableRate.toFixed(0),
+            monthTax,
+            cumulativeTax
+        });
+    }
+    
+    return monthlyData;
+}
+
+// 生成税率分布
+function generateTaxRateDistribution(taxableIncome) {
+    const taxBrackets = [
+        { max: 36000, rate: 3, amount: 0 },
+        { max: 144000, rate: 10, amount: 0 },
+        { max: 300000, rate: 20, amount: 0 },
+        { max: 420000, rate: 25, amount: 0 },
+        { max: 660000, rate: 30, amount: 0 },
+        { max: 960000, rate: 35, amount: 0 },
+        { max: Infinity, rate: 45, amount: 0 }
+    ];
+    
+    let remainingIncome = taxableIncome;
+    for (let i = 0; i < taxBrackets.length; i++) {
+        const bracket = taxBrackets[i];
+        const prevMax = i > 0 ? taxBrackets[i - 1].max : 0;
+        const bracketIncome = Math.min(remainingIncome, bracket.max - prevMax);
+        if (bracketIncome > 0) {
+            taxBrackets[i].amount = bracketIncome;
+            remainingIncome -= bracketIncome;
+        }
+        if (remainingIncome <= 0) break;
+    }
+    
+    const distribution = taxBrackets.filter(bracket => bracket.amount > 0);
+    
+    if (distribution.length === 0) {
+        return '<p>无应纳税所得额</p>';
+    }
+    
+    return `
+    <table class="info-table">
+        <tr>
+            <th>税率</th>
+            <th>应纳税所得额（元）</th>
+            <th>占比</th>
+        </tr>
+        ${distribution.map(bracket => {
+            const percentage = ((bracket.amount / taxableIncome) * 100).toFixed(2);
+            return `
+            <tr>
+                <td>${bracket.rate}%</td>
+                <td>${bracket.amount.toFixed(2)}</td>
+                <td>${percentage}%</td>
+            </tr>
+            `;
+        }).join('')}
+    </table>
+    `;
+}
+
+// 生成税收优化建议
+function generateOptimizationTipsForWord() {
+    if (Object.keys(calculationResults).length === 0) {
+        return '<p>暂无优化建议</p>';
+    }
+    
+    const tips = [];
+    const results = calculationResults;
+    
+    // 检查专项附加扣除
+    if (results.deductionDetails.specialAdditionalTotal === 0) {
+        tips.push('您未填写任何专项附加扣除，建议检查是否有符合条件的扣除项目，如子女教育、赡养老人、住房贷款利息等。');
+    }
+    
+    // 检查个人养老金
+    if (results.deductionDetails.pension === 0) {
+        tips.push('您未填写个人养老金扣除，建议考虑缴纳个人养老金，每年最高可扣除12000元。');
+    }
+    
+    // 检查商业健康保险
+    if (results.deductionDetails.insuranceOther === 0) {
+        tips.push('您未填写商业健康保险扣除，建议考虑购买符合条件的商业健康保险，每年最高可扣除2400元。');
+    }
+    
+    // 检查年终奖计税方式
+    if (results.incomeDetails.bonus > 0) {
+        const bonusTax = results.incomeDetails.bonusTax;
+        const bonusInclude = results.incomeDetails.bonusInclude;
+        const bonusAmount = results.incomeDetails.bonus;
+        
+        // 计算另一种计税方式的税额
+        let alternativeTax = 0;
+        const taxBrackets = [
+            { max: 36000, rate: 0.03, deduction: 0 },
+            { max: 144000, rate: 0.1, deduction: 2520 },
+            { max: 300000, rate: 0.2, deduction: 16920 },
+            { max: 420000, rate: 0.25, deduction: 31920 },
+            { max: 660000, rate: 0.3, deduction: 52920 },
+            { max: 960000, rate: 0.35, deduction: 85920 },
+            { max: Infinity, rate: 0.45, deduction: 181920 }
+        ];
+        const bonusMonthlyTaxBrackets = [
+            { max: 3000, rate: 0.03, deduction: 0 },
+            { max: 12000, rate: 0.1, deduction: 210 },
+            { max: 25000, rate: 0.2, deduction: 1410 },
+            { max: 35000, rate: 0.25, deduction: 2660 },
+            { max: 55000, rate: 0.3, deduction: 4410 },
+            { max: 80000, rate: 0.35, deduction: 7160 },
+            { max: Infinity, rate: 0.45, deduction: 15160 }
+        ];
+        
+        if (bonusInclude) {
+            // 计算单独计税的税额：全年奖金/12，查月度税率表
+            const monthlyBonus = bonusAmount / 12;
+            for (const bracket of bonusMonthlyTaxBrackets) {
+                if (monthlyBonus <= bracket.max) {
+                    alternativeTax = bonusAmount * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+        } else {
+            // 计算并入综合所得的税额
+            const currentTotalTax = results.taxDetails.totalTax;
+            const currentBonusTax = bonusTax;
+            
+            // 计算并入综合所得后的总应纳税额
+            const totalIncomeWithBonus = results.incomeDetails.total - results.incomeDetails.bonus + bonusAmount;
+            const totalDeduction = results.deductionDetails.total;
+            const taxableIncomeWithBonus = Math.max(0, totalIncomeWithBonus - totalDeduction);
+            
+            let totalTaxWithBonus = 0;
+            for (const bracket of taxBrackets) {
+                if (taxableIncomeWithBonus <= bracket.max) {
+                    totalTaxWithBonus = taxableIncomeWithBonus * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            
+            // 计算并入综合所得后，年终奖部分的税额
+            alternativeTax = totalTaxWithBonus - (currentTotalTax - currentBonusTax);
+        }
+        
+        // 只有当另一种方式确实更优时才给出建议
+        if (Math.abs(alternativeTax - bonusTax) > 100) {
+            if (alternativeTax < bonusTax) {
+                const betterMethod = bonusInclude ? '单独计税' : '并入综合所得计税';
+                const taxSaved = bonusTax - alternativeTax;
+                tips.push(`您的年终奖采用了${bonusInclude ? '并入综合所得计税' : '单独计税'}方式，建议考虑使用${betterMethod}方式，预计可节省税额约${taxSaved.toFixed(2)}元。`);
+            }
+        }
+    }
+    
+    // 检查大病医疗
+    if (results.deductionDetails.medical > 0 && results.deductionDetails.actualMedical === 0) {
+        tips.push('您填写的大病医疗费用未达到扣除标准（超过15000元的部分），建议保留相关凭证，以备后续年度可能的扣除。');
+    }
+    
+    // 检查社保缴费
+    if (results.deductionDetails.pensionInsurance + 
+        results.deductionDetails.medicalInsurance + 
+        results.deductionDetails.unemploymentInsurance + 
+        results.deductionDetails.housingFund === 0) {
+        tips.push('您未填写社保缴费信息，建议根据实际情况填写，这部分支出可以在计算个税时扣除。');
+    }
+    
+    // 检查工作月数
+    if (results.workMonths < 12) {
+        tips.push(`您填写的工作月数为${results.workMonths}个月，系统已根据实际工作月数调整了扣除额计算。`);
+    }
+    
+    // 检查应纳税所得额
+    if (results.taxDetails.taxableIncome === 0) {
+        tips.push('您的应纳税所得额为0，无需缴纳个人所得税。');
+    }
+    
+    // 检查税率级别
+    const taxRate = results.taxDetails.applicableRate * 100;
+    if (taxRate > 20) {
+        tips.push(`您的适用税率为${taxRate}%，属于较高税率级别，建议合理规划税务，利用各项扣除政策降低税负。`);
+    }
+    
+    if (tips.length === 0) {
+        return '<p>您的税务规划较为合理，建议继续保持。</p>';
+    }
+    
+    return tips.map((tip, index) => `
+    <div class="tips">
+        <h4>优化建议 ${index + 1}</h4>
+        <p>${tip}</p>
+    </div>
+    `).join('');
+}

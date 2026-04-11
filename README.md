@@ -36,6 +36,7 @@
 
 ### 6. 导出功能
 - PDF导出
+- Word导出
 - 打印功能
 
 ## 技术栈
@@ -72,6 +73,7 @@
   - `utils.js`：工具函数（表格更新、图表更新等）
   - `app.js`：应用逻辑
   - `helper-functions.js`：辅助函数
+  - `export-utils.js`：导出功能（Word导出）
 - `css/`：样式文件
 
 ### 本地运行
