@@ -458,7 +458,7 @@ function generateWordDocumentContent(title) {
     <!-- 结论 -->
     <div class="section">
         <h2>8. 结论</h2>
-        <p>经计算，2026年度您的综合所得应纳税额为 ${taxDetails.totalTax.toFixed(2)} 元，税后年收入为 ${taxDetails.netIncome.toFixed(2)} 元。</p>
+        <p>经计算，2026年度您的应纳税额合计为 ${taxDetails.totalTax.toFixed(2)} 元，税后年收入为 ${taxDetails.netIncome.toFixed(2)} 元。</p>
         <p>若全年累计已预缴税额为 ${taxDetails.prepaidTax.toFixed(2)} 元，则 ${taxDetails.refundTax >= 0 ? '应补税额' : '应退税额'} 为 ${Math.abs(taxDetails.refundTax).toFixed(2)} 元。</p>
         <p>建议您依据本报告中的税收优化建议，合理规划个人税务，充分利用各项法定扣除政策，合规降低税负。同时，请妥善保存相关扣除凭证，以备税务部门核查。</p>
         <p>本报告数据截至生成之日，如遇税收政策调整，以最新政策为准。</p>
