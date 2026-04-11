@@ -182,208 +182,115 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 
 // 导出PDF
 function exportToPDF(elementId, title) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-    });
-    
-    // 添加标题
-    doc.setFontSize(16);
-    doc.text(title, 14, 20);
-    
-    let currentY = 30;
-    const imgWidth = 210; // A4宽度，单位mm
-    const pageHeight = 297; // A4高度，单位mm
-    
-    // 根据不同的页面定义不同的导出区域
-    let sections = [];
-    
-    if (elementId === 'step-result') {
-        // 正向计税页面
-        sections = [
-            { title: '年度总览', selector: '#step-result > div > div:first-child' },
-            { title: '税率分布', selector: '#step-result > div > div:nth-child(2)' },
-            { title: '月度个税明细', selector: '#step-result > div > div:nth-child(3)' },
-            { title: '个人年度个税预算表', selector: '#step-result > div > div:nth-child(4)' }
-        ];
-    } else if (elementId === 'reverse-result') {
-        // 反向倒算页面
-        sections = [
-            { title: '反向倒算结果', selector: '#reverse-result > div > div:first-child' },
-            { title: '收入构成分析', selector: '#reverse-result > div > div:nth-child(2)' },
-            { title: '个人年度个税预算表', selector: '#reverse-result > div > div:nth-child(3)' }
-        ];
-    } else if (elementId === 'business-result') {
-        // 经营所得页面
-        sections = [
-            { title: '经营所得计算结果', selector: '#business-result > div > div:first-child' },
-            { title: '经营所得年度预算表', selector: '#business-result > div > div:nth-child(2)' }
-        ];
-    } else if (elementId === 'classification-result') {
-        // 分类所得页面
-        sections = [
-            { title: '分类所得计算结果', selector: '#classification-result > div > div:first-child' },
-            { title: '分类所得计税表', selector: '#classification-result > div > div:nth-child(2)' }
-        ];
-    } else {
-        // 默认情况，导出整个元素
-        sections = [
-            { title: title, selector: `#${elementId}` }
-        ];
+    // 获取计算结果数据
+    if (Object.keys(calculationResults).length === 0) {
+        alert('请先进行计算，再导出文档');
+        return;
     }
     
-    // 处理每个区域
-    let processedSections = 0;
+    // 构建Word文档内容
+    const docContent = generateWordDocumentContent(title);
     
-    sections.forEach((section, index) => {
-        const element = document.querySelector(section.selector);
-        if (!element) {
-            console.error(`找不到区域: ${section.title}`);
-            processedSections++;
-            if (processedSections === sections.length) {
-                doc.save(`${title}.pdf`);
+    // 创建临时HTML文件
+    const tempContainer = document.createElement('div');
+    tempContainer.style.position = 'fixed';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '-9999px';
+    tempContainer.style.width = '800px'; // 调整宽度以适应纵向布局
+    tempContainer.style.height = 'auto';
+    tempContainer.style.zIndex = '9999';
+    tempContainer.innerHTML = docContent;
+    document.body.appendChild(tempContainer);
+    
+    // 等待内容加载完成
+    setTimeout(() => {
+        // 使用html2canvas生成图片
+        html2canvas(tempContainer, {
+            scale: 2, // 提高清晰度
+            useCORS: true,
+            logging: true,
+            backgroundColor: '#ffffff',
+            width: 800, // 调整宽度以适应纵向布局
+            height: tempContainer.scrollHeight,
+            windowWidth: 800,
+            windowHeight: tempContainer.scrollHeight + 100,
+            allowTaint: true,
+            removeContainer: true
+        }).then(canvas => {
+            // 清理临时容器
+            if (tempContainer.parentNode) {
+                tempContainer.parentNode.removeChild(tempContainer);
             }
-            return;
-        }
-        
-        // 克隆元素以避免修改原始元素
-        const clonedElement = element.cloneNode(true);
-        
-        // 确保克隆元素有足够的宽度和高度
-        clonedElement.style.width = '1000px'; // 增加宽度以确保内容不被截断
-        clonedElement.style.maxWidth = '100%';
-        clonedElement.style.overflow = 'visible';
-        clonedElement.style.height = 'auto';
-        clonedElement.style.display = 'block';
-        
-        // 确保所有子元素也能正确显示
-        const children = clonedElement.querySelectorAll('*');
-        children.forEach(child => {
-            child.style.maxWidth = '100%';
-            child.style.overflow = 'visible';
-        });
-        
-        // 特别处理表格，确保表格内容完整显示
-        const tables = clonedElement.querySelectorAll('table');
-        tables.forEach(table => {
-            table.style.width = '100%';
-            table.style.borderCollapse = 'collapse';
-        });
-        
-        // 特别处理图表容器，确保图表完整显示
-        const chartContainers = clonedElement.querySelectorAll('canvas');
-        chartContainers.forEach(canvas => {
-            const container = canvas.parentElement;
-            if (container) {
-                container.style.width = '100%';
-                container.style.height = 'auto';
-            }
-        });
-        
-        // 将克隆元素添加到页面临时容器
-        const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'fixed';
-        tempContainer.style.left = '-9999px';
-        tempContainer.style.top = '-9999px';
-        tempContainer.style.width = '1000px';
-        tempContainer.style.height = 'auto';
-        tempContainer.style.zIndex = '9999';
-        tempContainer.appendChild(clonedElement);
-        document.body.appendChild(tempContainer);
-        
-        // 强制计算元素尺寸
-        clonedElement.style.visibility = 'hidden';
-        clonedElement.offsetHeight; // 触发重排
-        clonedElement.style.visibility = 'visible';
-        
-        // 计算元素的实际高度
-        const elementHeight = clonedElement.scrollHeight;
-        console.log(`区域 ${section.title} 高度: ${elementHeight}`);
-        
-        // 特别处理图表，确保图表已渲染完成
-        chartContainers.forEach(canvas => {
-            // 尝试重新绘制图表
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                // 获取图表实例（如果存在）
-                const chart = Chart.getChart(canvas);
-                if (chart) {
-                    chart.resize();
-                    chart.update();
-                }
-            }
-        });
-        
-        // 延迟一下，确保图表渲染完成
-        setTimeout(() => {
-            // 使用html2canvas生成图片
-            html2canvas(clonedElement, {
-                scale: 2, // 提高清晰度
-                useCORS: true,
-                logging: true, // 启用日志以便调试
-                backgroundColor: '#ffffff',
-                width: 1000,
-                height: elementHeight,
-                windowWidth: 1000,
-                windowHeight: elementHeight + 100, // 增加额外空间
-                allowTaint: true,
-                removeContainer: true
-            }).then(canvas => {
-                // 移除临时容器
-                if (tempContainer && tempContainer.parentNode) {
-                    document.body.removeChild(tempContainer);
-                }
-                
-                console.log(`生成的图片尺寸: ${canvas.width} x ${canvas.height}`);
-                
-                // 计算图片尺寸
-                const imgHeight = (canvas.height * (imgWidth - 20)) / canvas.width;
-                console.log(`PDF中的图片高度: ${imgHeight}`);
-                
-                // 如果当前页面空间不足，添加新页面
-                if (currentY + imgHeight > pageHeight - 20) {
-                    doc.addPage();
-                    currentY = 20;
-                }
-                
-                // 添加区域标题
-                doc.setFontSize(14);
-                doc.text(section.title, 14, currentY);
-                currentY += 15;
-                
-                // 添加图片
-                doc.addImage(canvas.toDataURL('image/png'), 'PNG', 10, currentY, imgWidth - 20, imgHeight);
-                currentY += imgHeight + 20;
-                
-                // 增加处理计数
-                processedSections++;
-                console.log(`已处理区域: ${processedSections}/${sections.length}`);
-                
-                // 所有区域处理完成后保存PDF
-                if (processedSections === sections.length) {
-                    console.log('所有区域处理完成，保存PDF');
-                    doc.save(`${title}.pdf`);
-                }
-            }).catch(error => {
-                console.error(`导出${section.title}失败:`, error);
-                
-                // 确保移除临时容器
-                if (tempContainer && tempContainer.parentNode) {
-                    document.body.removeChild(tempContainer);
-                }
-                
-                // 增加处理计数
-                processedSections++;
-                
-                // 所有区域处理完成后保存PDF
-                if (processedSections === sections.length) {
-                    doc.save(`${title}.pdf`);
-                }
+            
+            // 创建PDF文档，使用标准A4尺寸
+            const { jsPDF } = window.jspdf;
+            
+            // 标准A4尺寸：210mm × 297mm
+            // 使用纵向布局
+            const doc = new jsPDF({
+                orientation: 'portrait', // 纵向布局
+                unit: 'mm',
+                format: 'a4', // 明确指定A4格式
+                margin: { top: 10, right: 10, bottom: 10, left: 10 } // 适当边距
             });
-        }, 500); // 500ms延迟，确保图表渲染完成
-    });
+            
+            // 标准A4纵向尺寸：210mm × 297mm
+            const A4_WIDTH = 210; // A4纵向宽度
+            const A4_HEIGHT = 297; // A4纵向高度
+            const MARGIN = 10; // 边距
+            
+            const imgWidth = A4_WIDTH - (MARGIN * 2); // 可用宽度
+            const pageHeight = A4_HEIGHT - (MARGIN * 2); // 可用高度
+            let currentY = MARGIN; // 起始位置
+            
+            // 计算图片在PDF中的高度，保持宽高比
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // 检查是否需要分页
+            if (imgHeight > pageHeight) {
+                // 计算需要的页数
+                const totalPages = Math.ceil(imgHeight / pageHeight);
+                const pageImageHeight = (canvas.height / totalPages) * (imgWidth / canvas.width);
+                
+                for (let i = 0; i < totalPages; i++) {
+                    if (i > 0) {
+                        // 添加新页面，保持A4纵向尺寸
+                        doc.addPage('a4', 'portrait');
+                        currentY = MARGIN;
+                    }
+                    
+                    // 计算当前页的图片区域
+                    const pageCanvas = document.createElement('canvas');
+                    pageCanvas.width = canvas.width;
+                    pageCanvas.height = canvas.height / totalPages;
+                    const ctx = pageCanvas.getContext('2d');
+                    ctx.drawImage(
+                        canvas,
+                        0, i * (canvas.height / totalPages),
+                        canvas.width, canvas.height / totalPages,
+                        0, 0,
+                        canvas.width, canvas.height / totalPages
+                    );
+                    
+                    // 添加图片到PDF，确保在A4页面内
+                    doc.addImage(pageCanvas, 'PNG', MARGIN, currentY, imgWidth, pageImageHeight);
+                }
+            } else {
+                // 单页显示
+                doc.addImage(canvas, 'PNG', MARGIN, currentY, imgWidth, imgHeight);
+            }
+            
+            // 保存PDF
+            doc.save(`${title}_${new Date().toISOString().split('T')[0]}.pdf`);
+        }).catch(error => {
+            console.error('生成PDF时出错:', error);
+            
+            // 清理临时容器
+            if (tempContainer.parentNode) {
+                tempContainer.parentNode.removeChild(tempContainer);
+            }
+        });
+    }, 500); // 500ms延迟，确保内容加载完成
 }
 
 

@@ -55,9 +55,8 @@ function generateWordDocumentContent(title) {
         }
         .cover {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 0px;
             padding: 60px 0;
-            border-bottom: 2px solid #000;
         }
         .cover h1 {
             font-size: 22pt;
@@ -181,10 +180,9 @@ function generateWordDocumentContent(title) {
         .cover-info {
             display: flex;
             justify-content: space-between;
-            margin-top: 40px;
+            margin-top: 10px;
             padding: 15px 0;
             border-top: 1px solid #000;
-            border-bottom: 1px solid #000;
         }
         .cover-info span {
             font-size: 14pt;
