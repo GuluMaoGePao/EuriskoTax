@@ -1182,6 +1182,20 @@
                         <p class="text-sm text-gray-600 mb-4">请输入基本计算参数，这些参数将影响所有后续计算</p>
                         
                         <div class="form-group">
+                            <label for="reverse-type" class="label">
+                                倒算方式
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">选择从税额倒算或从税后收入倒算</span>
+                                </span>
+                            </label>
+                            <select id="reverse-type" class="input-field">
+                                <option value="tax">从税额倒算</option>
+                                <option value="net">从税后收入倒算</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="reverse-income-type" class="label">
                                 所得类型
                                 <span class="tooltip ml-1">
@@ -1195,7 +1209,7 @@
                             </select>
                         </div>
                         
-                        <div class="form-group">
+                        <div id="reverse-tax-input" class="form-group">
                             <label for="reverse-total-tax" class="label">
                                 全年应缴税额 (元)
                                 <span class="tooltip ml-1">
@@ -1205,6 +1219,19 @@
                             </label>
                             <div class="flex items-center space-x-2">
                                 <input type="number" id="reverse-total-tax" class="input-field" value="0" min="0" step="100">
+                            </div>
+                        </div>
+                        
+                        <div id="reverse-net-input" class="form-group hidden">
+                            <label for="reverse-net-income" class="label">
+                                全年税后收入 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">个人全年实际到手的税后收入总额</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="reverse-net-income" class="input-field" value="0" min="0" step="1000">
                             </div>
                         </div>
                         
@@ -1792,6 +1819,11 @@
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">年度累计税前收入</span>
                                 <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">年度税后收入</span>
+                                <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
                             </div>
                         </div>
                         
@@ -2530,5 +2562,30 @@
     <script src="js/data-management.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/app.js"></script>
+    <script>
+        // 反向倒算方式切换
+        document.getElementById('reverse-type').addEventListener('change', function() {
+            const reverseType = this.value;
+            const taxInput = document.getElementById('reverse-tax-input');
+            const netInput = document.getElementById('reverse-net-input');
+            
+            if (reverseType === 'tax') {
+                taxInput.classList.remove('hidden');
+                netInput.classList.add('hidden');
+            } else {
+                taxInput.classList.add('hidden');
+                netInput.classList.remove('hidden');
+            }
+        });
+        
+        // 初始化反向倒算页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 触发一次倒算方式的切换，确保初始状态正确
+            const reverseTypeElement = document.getElementById('reverse-type');
+            if (reverseTypeElement) {
+                reverseTypeElement.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
 </body>
 </html>

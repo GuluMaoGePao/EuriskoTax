@@ -344,210 +344,235 @@ function calculateTax() {
     }
 }
 
-// 计算反向个人所得税
+// 反向倒算主函数
 function calculateReverseTax() {
     try {
-        // 获取所得类型
-        const incomeType = document.getElementById('reverse-income-type').value;
+        // 1. 输入数据收集与验证
+        const inputData = collectReverseInputData();
         
-        // 获取税额数据
-        const totalTax = parseFloat(document.getElementById('reverse-total-tax').value) || 0;
+        // 2. 计算扣除项
+        const deductionData = calculateReverseDeductions(inputData);
+        
+        // 3. 计算年终奖税额
+        const bonusTax = calculateReverseBonusTax(inputData);
+        
+        // 4. 根据倒算方式执行计算
+        let result;
+        if (inputData.reverseType === 'tax') {
+            // 从税额倒算
+            result = calculateFromTax(inputData, deductionData, bonusTax);
+        } else {
+            // 从税后收入倒算
+            result = calculateFromNetIncome(inputData, deductionData, bonusTax);
+        }
+        
+        // 5. 保存计算结果
+        saveReverseCalculationResult(result, inputData, deductionData, bonusTax);
+        
+        // 6. 更新结果显示
+        updateReverseResultDisplay(result);
+        
+        // 7. 显示计算详情
+        showReverseCalculationDetails();
+        
+    } catch (error) {
+        console.error('反向倒算计算过程中出现错误:', error);
+        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+    }
+}
+
+// 收集反向倒算输入数据
+function collectReverseInputData() {
+    // 获取倒算方式
+    const reverseType = document.getElementById('reverse-type')?.value || 'tax';
+    
+    // 获取所得类型
+    const incomeType = document.getElementById('reverse-income-type').value;
+    
+    // 获取输入数据
+    let totalTax = 0;
+    let netIncome = 0;
+    
+    if (reverseType === 'tax') {
+        // 从税额倒算
+        totalTax = parseFloat(document.getElementById('reverse-total-tax').value) || 0;
         
         // 验证税额必须是非负数
         if (totalTax < 0) {
-            alert('税额不能为负数');
-            return;
+            throw new Error('税额不能为负数');
+        }
+    } else {
+        // 从税后收入倒算
+        netIncome = parseFloat(document.getElementById('reverse-net-income').value) || 0;
+        
+        // 验证税后收入必须是非负数
+        if (netIncome < 0) {
+            throw new Error('税后收入不能为负数');
+        }
+    }
+    
+    // 获取年工作总月数
+    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+    
+    // 验证工作月数必须在合理范围内
+    if (workMonths < 1 || workMonths > 12) {
+        throw new Error('工作月数必须在1-12之间');
+    }
+    
+    // 获取年终奖数据
+    const bonusIncome = parseFloat(document.getElementById('reverse-bonus-income').value) || 0;
+    const bonusInclude = document.getElementById('reverse-bonus-include').checked;
+    
+    // 获取税率选择
+    const taxRateChoice = document.getElementById('reverse-tax-rate').value;
+    
+    return {
+        reverseType,
+        incomeType,
+        totalTax,
+        netIncome,
+        workMonths,
+        bonusIncome,
+        bonusInclude,
+        taxRateChoice
+    };
+}
+
+// 计算反向倒算扣除项
+function calculateReverseDeductions(inputData) {
+    // 基本减除费用每月5000元
+    const basicDeduction = 5000;
+    
+    // 检查各扣除项是否显示
+    const isSpecialDeductionVisible = document.getElementById('reverse-special-deduction-checkbox').checked;
+    const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox').checked;
+    const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox').checked;
+    
+    // 计算专项扣除（月度）
+    let specialDeduction = 0;
+    if (isSpecialDeductionVisible) {
+        const monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
+        const monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
+        const monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
+        const monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
+        specialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
+    }
+    
+    // 计算专项附加扣除（月度）
+    let specialAdditionalDeduction = 0;
+    let actualMedicalDeduction = 0;
+    if (isSpecialAdditionalDeductionVisible) {
+        const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction').value) || 0;
+        const monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
+        
+        // 住房扣除（二选一）
+        let monthlyHousingDeduction = 0;
+        const housingType = document.getElementById('reverse-housing-type').value;
+        if (housingType === 'rent') {
+            monthlyHousingDeduction = parseFloat(document.getElementById('reverse-rent-deduction').value) || 0;
+        } else if (housingType === 'loan') {
+            monthlyHousingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction').value) || 0;
         }
         
-        // 获取年工作总月数
-        const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+        const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
         
-        // 验证工作月数必须在合理范围内
-        if (workMonths < 1 || workMonths > 12) {
-            alert('工作月数必须在1-12之间');
-            return;
+        // 计算大病医疗实际可扣除额（年度）
+        const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
+        actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+        
+        // 检查职业资格扣除
+        let annualProfessionalDeduction = 0;
+        if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
+            annualProfessionalDeduction = 3600; // 职业资格3600元/年
         }
         
-        // 获取年终奖数据
-        const bonusIncome = parseFloat(document.getElementById('reverse-bonus-income').value) || 0;
-        const bonusInclude = document.getElementById('reverse-bonus-include').checked;
+        // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
+        const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
+        const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
         
-        // 获取税率选择
-        const taxRateChoice = document.getElementById('reverse-tax-rate').value;
-        
-        // 获取扣除项数据（与综合所得计税逻辑一致，使用月度数据）
-        const basicDeduction = 5000; // 基本减除费用每月5000元
-        
-        // 检查各扣除项是否显示
-        const isSpecialDeductionVisible = document.getElementById('reverse-special-deduction-checkbox').checked;
-        const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox').checked;
-        const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox').checked;
-        
-        // 计算专项扣除（月度）
-        let specialDeduction = 0;
-        if (isSpecialDeductionVisible) {
-            const monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
-            const monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance').value) || 0;
-            const monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance').value) || 0;
-            const monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund').value) || 0;
-            specialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
-        }
-        
-        // 计算专项附加扣除（月度）
-        let specialAdditionalDeduction = 0;
-        let actualMedicalDeduction = 0;
-        if (isSpecialAdditionalDeductionVisible) {
-            const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction').value) || 0;
-            const monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
-            
-            // 住房扣除（二选一）
-            let monthlyHousingDeduction = 0;
-            const housingType = document.getElementById('reverse-housing-type').value;
-            if (housingType === 'rent') {
-                monthlyHousingDeduction = parseFloat(document.getElementById('reverse-rent-deduction').value) || 0;
-            } else if (housingType === 'loan') {
-                monthlyHousingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction').value) || 0;
-            }
-            
-            const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
-            
-            // 计算大病医疗实际可扣除额（年度）
-            const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
-            actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
-            
-            // 检查职业资格扣除
-            let annualProfessionalDeduction = 0;
-            if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
-                annualProfessionalDeduction = 3600; // 职业资格3600元/年
-            }
-            
-            // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
-            const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-            const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
-            
-            // 月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
-            specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
-        }
-        
-        // 计算其他扣除（月度）
-        let otherDeduction = 0;
-        const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-pension-deduction-checkbox').checked;
-        const monthlyPensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('reverse-pension-deduction').value) || 0) : 0;
-        // 企业年金：个人月工资的5%（反向倒算时根据计算出的月度收入）
-        const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
-        const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0) : 0;
-        const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-insurance-other-deduction-checkbox').checked;
-        const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0) : 0;
-        const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('reverse-tax-deferred-pension-checkbox').checked;
-        const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0) : 0;
-        otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
-        
-        // 计算月度总扣除额
-        const monthlyTotalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
-        
-        // 计算年度总扣除额（与综合所得计税逻辑一致）
-        const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('reverse-charitable-donation-checkbox').checked;
-        const annualCharitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('reverse-charitable-donation').value) || 0) : 0;
-        const totalDeduction = monthlyTotalDeduction * workMonths + actualMedicalDeduction + annualCharitableDonation;
-        
-        // 计算年终奖税额
-        // 计算方式：全年奖金/12，查月度税率表确定税率和速算扣除数，然后全年奖金*税率-速算扣除数
-        let bonusTax = 0;
-        if (bonusIncome > 0 && !bonusInclude) {
-            const monthlyBonus = bonusIncome / 12;
-            for (const bracket of bonusMonthlyTaxRates) {
-                if (monthlyBonus <= bracket.max) {
-                    bonusTax = bonusIncome * bracket.rate - bracket.deduction;
-                    break;
-                }
+        // 月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
+        specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
+    }
+    
+    // 计算其他扣除（月度）
+    let otherDeduction = 0;
+    const isPensionDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-pension-deduction-checkbox').checked;
+    const monthlyPensionDeduction = isPensionDeductionChecked ? (parseFloat(document.getElementById('reverse-pension-deduction').value) || 0) : 0;
+    const isEnterpriseAnnuityChecked = isOtherDeductionVisible && document.getElementById('reverse-enterprise-annuity-checkbox').checked;
+    const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (parseFloat(document.getElementById('reverse-enterprise-annuity').value) || 0) : 0;
+    const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && document.getElementById('reverse-insurance-other-deduction-checkbox').checked;
+    const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (parseFloat(document.getElementById('reverse-insurance-other-deduction').value) || 0) : 0;
+    const isTaxDeferredPensionChecked = isOtherDeductionVisible && document.getElementById('reverse-tax-deferred-pension-checkbox').checked;
+    const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (parseFloat(document.getElementById('reverse-tax-deferred-pension').value) || 0) : 0;
+    otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
+    
+    // 计算月度总扣除额
+    const monthlyTotalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
+    
+    // 计算年度总扣除额（与综合所得计税逻辑一致）
+    const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('reverse-charitable-donation-checkbox').checked;
+    const annualCharitableDonation = isCharitableDonationChecked ? (parseFloat(document.getElementById('reverse-charitable-donation').value) || 0) : 0;
+    const totalDeduction = monthlyTotalDeduction * inputData.workMonths + actualMedicalDeduction + annualCharitableDonation;
+    
+    return {
+        basicDeduction,
+        specialDeduction,
+        specialAdditionalDeduction,
+        otherDeduction,
+        monthlyTotalDeduction,
+        totalDeduction,
+        actualMedicalDeduction
+    };
+}
+
+// 计算反向倒算年终奖税额
+function calculateReverseBonusTax(inputData) {
+    let bonusTax = 0;
+    if (inputData.bonusIncome > 0 && !inputData.bonusInclude) {
+        const monthlyBonus = inputData.bonusIncome / 12;
+        for (const bracket of bonusMonthlyTaxRates) {
+            if (monthlyBonus <= bracket.max) {
+                bonusTax = inputData.bonusIncome * bracket.rate - bracket.deduction;
+                break;
             }
         }
+    }
+    return bonusTax;
+}
+
+// 从税额倒算
+function calculateFromTax(inputData, deductionData, bonusTax) {
+    // 综合所得税率表
+    const comprehensiveTaxRates = [
+        { max: 36000, rate: 0.03, deduction: 0, maxTax: 36000 * 0.03 },
+        { max: 144000, rate: 0.1, deduction: 2520, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 },
+        { max: 300000, rate: 0.2, deduction: 16920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 },
+        { max: 420000, rate: 0.25, deduction: 31920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 },
+        { max: 660000, rate: 0.3, deduction: 52920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 },
+        { max: 960000, rate: 0.35, deduction: 85920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 + (960000 - 660000) * 0.35 },
+        { max: Infinity, rate: 0.45, deduction: 181920, maxTax: Infinity }
+    ];
+    
+    // 经营所得税率表
+    const businessTaxRates = [
+        { max: 30000, rate: 0.05, deduction: 0, maxTax: 30000 * 0.05 },
+        { max: 90000, rate: 0.1, deduction: 1500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 },
+        { max: 300000, rate: 0.2, deduction: 10500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 },
+        { max: 500000, rate: 0.3, deduction: 40500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 + (500000 - 300000) * 0.3 },
+        { max: Infinity, rate: 0.35, deduction: 65500, maxTax: Infinity }
+    ];
+    
+    let taxableIncome = 0;
+    let applicableRate = 0;
+    let applicableDeduction = 0;
+    let finalTotalTax = inputData.totalTax;
+    
+    if (inputData.incomeType === 'comprehensive') {
+        // 综合所得反向倒算
+        const comprehensiveTax = inputData.totalTax - bonusTax;
         
-        // 调整综合所得税额
-        const comprehensiveTax = totalTax - bonusTax;
-        
-        // 根据税额计算应纳税所得额和税率
-        let taxableIncome = 0;
-        let applicableRate = 0;
-        let applicableDeduction = 0;
-        
-        // 综合所得税率表（官方2026年标准）
-        const comprehensiveTaxRates = [
-            { max: 36000, rate: 0.03, deduction: 0, maxTax: 36000 * 0.03 },
-            { max: 144000, rate: 0.1, deduction: 2520, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 },
-            { max: 300000, rate: 0.2, deduction: 16920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 },
-            { max: 420000, rate: 0.25, deduction: 31920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 },
-            { max: 660000, rate: 0.3, deduction: 52920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 },
-            { max: 960000, rate: 0.35, deduction: 85920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 + (960000 - 660000) * 0.35 },
-            { max: Infinity, rate: 0.45, deduction: 181920, maxTax: Infinity }
-        ];
-        
-        // 经营所得税率表
-        const businessTaxRates = [
-            { max: 30000, rate: 0.05, deduction: 0, maxTax: 30000 * 0.05 },
-            { max: 90000, rate: 0.1, deduction: 1500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 },
-            { max: 300000, rate: 0.2, deduction: 10500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 },
-            { max: 500000, rate: 0.3, deduction: 40500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 + (500000 - 300000) * 0.3 },
-            { max: Infinity, rate: 0.35, deduction: 65500, maxTax: Infinity }
-        ];
-        
-        if (incomeType === 'comprehensive') {
-            // 综合所得反向倒算
-            if (taxRateChoice === 'auto') {
-                // 自动判断税率级别
-                for (const bracket of comprehensiveTaxRates) {
-                    if (comprehensiveTax <= bracket.maxTax) {
-                        taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
-                        applicableRate = bracket.rate;
-                        applicableDeduction = bracket.deduction;
-                        break;
-                    }
-                }
-            } else {
-                // 根据选择的税率计算
-                const rate = parseFloat(taxRateChoice) / 100;
-                let deduction = 0;
-                
-                switch (taxRateChoice) {
-                    case '3':
-                        deduction = 0;
-                        break;
-                    case '10':
-                        deduction = 2520;
-                        break;
-                    case '20':
-                        deduction = 16920;
-                        break;
-                    case '25':
-                        deduction = 31920;
-                        break;
-                    case '30':
-                        deduction = 52920;
-                        break;
-                    case '35':
-                        deduction = 85920;
-                        break;
-                    case '45':
-                        deduction = 181920;
-                        break;
-                }
-                
-                taxableIncome = (comprehensiveTax + deduction) / rate;
-                applicableRate = rate;
-                applicableDeduction = deduction;
-            }
-        } else if (incomeType === 'business') {
-            // 经营所得反向倒算
-            for (const bracket of businessTaxRates) {
-                if (totalTax <= bracket.maxTax) {
-                    taxableIncome = (totalTax + bracket.deduction) / bracket.rate;
-                    applicableRate = bracket.rate;
-                    applicableDeduction = bracket.deduction;
-                    break;
-                }
-            }
-        } else {
-            // 默认使用综合所得税率表
+        if (inputData.taxRateChoice === 'auto') {
+            // 自动判断税率级别
             for (const bracket of comprehensiveTaxRates) {
                 if (comprehensiveTax <= bracket.maxTax) {
                     taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
@@ -556,73 +581,356 @@ function calculateReverseTax() {
                     break;
                 }
             }
-        }
-        
-        // 计算税前收入
-        const totalIncome = taxableIncome + totalDeduction;
-        
-        // 保存计算结果
-        reverseCalculationResults = {
-            incomeType: incomeType,
-            workMonths: workMonths,
-            totalTax: totalTax,
-            totalDeduction: totalDeduction,
-            taxableIncome: taxableIncome,
-            applicableRate: applicableRate,
-            applicableDeduction: applicableDeduction,
-            totalIncome: totalIncome,
-            deductionDetails: {
-                actualMedical: actualMedicalDeduction
-            },
-            calculationDate: new Date().toISOString()
-        };
-        
-        // 更新结果显示
-        document.getElementById('reverse-result-total-tax').textContent = '¥' + totalTax.toFixed(2);
-        document.getElementById('reverse-result-bonus').textContent = '¥' + bonusIncome.toFixed(2);
-        document.getElementById('reverse-result-bonus-tax').textContent = '¥' + bonusTax.toFixed(2);
-        document.getElementById('reverse-result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
-        document.getElementById('reverse-result-total-deduction').textContent = '¥' + totalDeduction.toFixed(2);
-        document.getElementById('reverse-result-total-income').textContent = '¥' + totalIncome.toFixed(2);
-        document.getElementById('reverse-result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
-        document.getElementById('reverse-result-deduction').textContent = '¥' + applicableDeduction.toFixed(2);
-        
-        // 更新税率级数显示
-        let taxLevel = '';
-        if (incomeType === 'comprehensive') {
-            if (taxableIncome <= 36000) {
-                taxLevel = '级数1';
-            } else if (taxableIncome <= 144000) {
-                taxLevel = '级数2';
-            } else if (taxableIncome <= 300000) {
-                taxLevel = '级数3';
-            } else if (taxableIncome <= 420000) {
-                taxLevel = '级数4';
-            } else if (taxableIncome <= 660000) {
-                taxLevel = '级数5';
-            } else if (taxableIncome <= 960000) {
-                taxLevel = '级数6';
-            } else {
-                taxLevel = '级数7';
+        } else {
+            // 根据选择的税率计算
+            const rate = parseFloat(inputData.taxRateChoice) / 100;
+            let deduction = 0;
+            
+            switch (inputData.taxRateChoice) {
+                case '3':
+                    deduction = 0;
+                    break;
+                case '10':
+                    deduction = 2520;
+                    break;
+                case '20':
+                    deduction = 16920;
+                    break;
+                case '25':
+                    deduction = 31920;
+                    break;
+                case '30':
+                    deduction = 52920;
+                    break;
+                case '35':
+                    deduction = 85920;
+                    break;
+                case '45':
+                    deduction = 181920;
+                    break;
             }
-        } else if (incomeType === 'business') {
-            if (taxableIncome <= 30000) {
-                taxLevel = '级数1';
-            } else if (taxableIncome <= 90000) {
-                taxLevel = '级数2';
-            } else if (taxableIncome <= 300000) {
-                taxLevel = '级数3';
-            } else if (taxableIncome <= 500000) {
-                taxLevel = '级数4';
-            } else {
-                taxLevel = '级数5';
+            
+            taxableIncome = (comprehensiveTax + deduction) / rate;
+            applicableRate = rate;
+            applicableDeduction = deduction;
+        }
+    } else if (inputData.incomeType === 'business') {
+        // 经营所得反向倒算
+        for (const bracket of businessTaxRates) {
+            if (inputData.totalTax <= bracket.maxTax) {
+                taxableIncome = (inputData.totalTax + bracket.deduction) / bracket.rate;
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
+                break;
             }
         }
-        document.getElementById('reverse-result-tax-level').textContent = taxLevel;
-    } catch (error) {
-        console.error('反向倒算计算过程中出现错误:', error);
-        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+    } else {
+        // 默认使用综合所得税率表
+        const comprehensiveTax = inputData.totalTax - bonusTax;
+        for (const bracket of comprehensiveTaxRates) {
+            if (comprehensiveTax <= bracket.maxTax) {
+                taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
+                break;
+            }
+        }
     }
+    
+    // 计算税前收入
+    const totalIncome = taxableIncome + deductionData.totalDeduction;
+    
+    // 计算实际税后收入（用于验证）
+    const calculatedNetIncome = totalIncome + inputData.bonusIncome - finalTotalTax;
+    
+    return {
+        taxableIncome,
+        applicableRate,
+        applicableDeduction,
+        totalIncome,
+        finalTotalTax,
+        calculatedNetIncome
+    };
+}
+
+// 从税后收入倒算
+function calculateFromNetIncome(inputData, deductionData, bonusTax) {
+    // 综合所得税率表
+    const comprehensiveTaxRates = [
+        { max: 36000, rate: 0.03, deduction: 0, maxTax: 36000 * 0.03 },
+        { max: 144000, rate: 0.1, deduction: 2520, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 },
+        { max: 300000, rate: 0.2, deduction: 16920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 },
+        { max: 420000, rate: 0.25, deduction: 31920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 },
+        { max: 660000, rate: 0.3, deduction: 52920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 },
+        { max: 960000, rate: 0.35, deduction: 85920, maxTax: 36000 * 0.03 + (144000 - 36000) * 0.1 + (300000 - 144000) * 0.2 + (420000 - 300000) * 0.25 + (660000 - 420000) * 0.3 + (960000 - 660000) * 0.35 },
+        { max: Infinity, rate: 0.45, deduction: 181920, maxTax: Infinity }
+    ];
+    
+    // 经营所得税率表
+    const businessTaxRates = [
+        { max: 30000, rate: 0.05, deduction: 0, maxTax: 30000 * 0.05 },
+        { max: 90000, rate: 0.1, deduction: 1500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 },
+        { max: 300000, rate: 0.2, deduction: 10500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 },
+        { max: 500000, rate: 0.3, deduction: 40500, maxTax: 30000 * 0.05 + (90000 - 30000) * 0.1 + (300000 - 90000) * 0.2 + (500000 - 300000) * 0.3 },
+        { max: Infinity, rate: 0.35, deduction: 65500, maxTax: Infinity }
+    ];
+    
+    let taxableIncome = 0;
+    let applicableRate = 0;
+    let applicableDeduction = 0;
+    let finalTotalTax = 0;
+    let totalIncome = 0;
+    
+    if (inputData.incomeType === 'comprehensive') {
+        // 综合所得从税后收入倒算，需要迭代计算
+        let estimatedPreTaxIncome = inputData.netIncome + bonusTax;
+        let estimatedTax = 0;
+        let iteration = 0;
+        const maxIterations = 100;
+        const tolerance = 0.01;
+        
+        while (iteration < maxIterations) {
+            const estimatedTaxableIncome = estimatedPreTaxIncome - deductionData.totalDeduction;
+            if (estimatedTaxableIncome <= 0) {
+                estimatedTax = 0;
+                break;
+            }
+            
+            // 计算预估税额
+            for (const bracket of comprehensiveTaxRates) {
+                if (estimatedTaxableIncome <= bracket.max) {
+                    estimatedTax = estimatedTaxableIncome * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            
+            // 计算新的预估税前收入
+            const newPreTaxIncome = inputData.netIncome + estimatedTax + bonusTax;
+            
+            // 检查收敛
+            if (Math.abs(newPreTaxIncome - estimatedPreTaxIncome) < tolerance) {
+                estimatedPreTaxIncome = newPreTaxIncome;
+                estimatedTax = estimatedTax;
+                break;
+            }
+            
+            estimatedPreTaxIncome = newPreTaxIncome;
+            iteration++;
+        }
+        
+        finalTotalTax = estimatedTax + bonusTax;
+        taxableIncome = estimatedPreTaxIncome - deductionData.totalDeduction;
+        totalIncome = estimatedPreTaxIncome;
+        
+        // 确定适用税率
+        for (const bracket of comprehensiveTaxRates) {
+            if (taxableIncome <= bracket.max) {
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
+                break;
+            }
+        }
+    } else if (inputData.incomeType === 'business') {
+        // 经营所得从税后收入倒算
+        let estimatedPreTaxIncome = inputData.netIncome;
+        let estimatedTax = 0;
+        let iteration = 0;
+        const maxIterations = 100;
+        const tolerance = 0.01;
+        
+        while (iteration < maxIterations) {
+            const estimatedTaxableIncome = estimatedPreTaxIncome;
+            
+            // 计算预估税额
+            for (const bracket of businessTaxRates) {
+                if (estimatedTaxableIncome <= bracket.max) {
+                    estimatedTax = estimatedTaxableIncome * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            
+            // 计算新的预估税前收入
+            const newPreTaxIncome = inputData.netIncome + estimatedTax;
+            
+            // 检查收敛
+            if (Math.abs(newPreTaxIncome - estimatedPreTaxIncome) < tolerance) {
+                estimatedPreTaxIncome = newPreTaxIncome;
+                estimatedTax = estimatedTax;
+                break;
+            }
+            
+            estimatedPreTaxIncome = newPreTaxIncome;
+            iteration++;
+        }
+        
+        finalTotalTax = estimatedTax;
+        taxableIncome = estimatedPreTaxIncome;
+        totalIncome = estimatedPreTaxIncome;
+        
+        // 确定适用税率
+        for (const bracket of businessTaxRates) {
+            if (taxableIncome <= bracket.max) {
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
+                break;
+            }
+        }
+    }
+    
+    // 计算实际税后收入（用于验证）
+    const calculatedNetIncome = totalIncome + inputData.bonusIncome - finalTotalTax;
+    
+    return {
+        taxableIncome,
+        applicableRate,
+        applicableDeduction,
+        totalIncome,
+        finalTotalTax,
+        calculatedNetIncome
+    };
+}
+
+// 保存反向倒算计算结果
+function saveReverseCalculationResult(result, inputData, deductionData, bonusTax) {
+    reverseCalculationResults = {
+        incomeType: inputData.incomeType,
+        reverseType: inputData.reverseType,
+        workMonths: inputData.workMonths,
+        totalTax: result.finalTotalTax,
+        netIncome: result.calculatedNetIncome,
+        totalDeduction: deductionData.totalDeduction,
+        taxableIncome: result.taxableIncome,
+        applicableRate: result.applicableRate,
+        applicableDeduction: result.applicableDeduction,
+        totalIncome: result.totalIncome,
+        bonusIncome: inputData.bonusIncome,
+        bonusTax: bonusTax,
+        deductionDetails: {
+            actualMedical: deductionData.actualMedicalDeduction
+        },
+        calculationDate: new Date().toISOString()
+    };
+}
+
+// 更新反向倒算结果显示
+function updateReverseResultDisplay(result) {
+    const data = reverseCalculationResults;
+    
+    // 更新结果显示
+    document.getElementById('reverse-result-total-tax').textContent = '¥' + data.totalTax.toFixed(2);
+    document.getElementById('reverse-result-bonus').textContent = '¥' + data.bonusIncome.toFixed(2);
+    document.getElementById('reverse-result-bonus-tax').textContent = '¥' + data.bonusTax.toFixed(2);
+    document.getElementById('reverse-result-taxable-income').textContent = '¥' + data.taxableIncome.toFixed(2);
+    document.getElementById('reverse-result-total-deduction').textContent = '¥' + data.totalDeduction.toFixed(2);
+    document.getElementById('reverse-result-total-income').textContent = '¥' + data.totalIncome.toFixed(2);
+    document.getElementById('reverse-result-tax-rate').textContent = (data.applicableRate * 100).toFixed(0) + '%';
+    document.getElementById('reverse-result-deduction').textContent = '¥' + data.applicableDeduction.toFixed(2);
+    
+    // 显示税后收入
+    const netIncomeElement = document.getElementById('reverse-result-net-income');
+    if (netIncomeElement) {
+        netIncomeElement.textContent = '¥' + data.netIncome.toFixed(2);
+    }
+    
+    // 更新税率级数显示
+    let taxLevel = '';
+    if (data.incomeType === 'comprehensive') {
+        if (data.taxableIncome <= 36000) {
+            taxLevel = '级数1';
+        } else if (data.taxableIncome <= 144000) {
+            taxLevel = '级数2';
+        } else if (data.taxableIncome <= 300000) {
+            taxLevel = '级数3';
+        } else if (data.taxableIncome <= 420000) {
+            taxLevel = '级数4';
+        } else if (data.taxableIncome <= 660000) {
+            taxLevel = '级数5';
+        } else if (data.taxableIncome <= 960000) {
+            taxLevel = '级数6';
+        } else {
+            taxLevel = '级数7';
+        }
+    } else if (data.incomeType === 'business') {
+        if (data.taxableIncome <= 30000) {
+            taxLevel = '级数1';
+        } else if (data.taxableIncome <= 90000) {
+            taxLevel = '级数2';
+        } else if (data.taxableIncome <= 300000) {
+            taxLevel = '级数3';
+        } else if (data.taxableIncome <= 500000) {
+            taxLevel = '级数4';
+        } else {
+            taxLevel = '级数5';
+        }
+    }
+    document.getElementById('reverse-result-tax-level').textContent = taxLevel;
+}
+
+// 显示反向倒算计算详情
+function showReverseCalculationDetails() {
+    const detailsElement = document.getElementById('reverse-calculation-details');
+    if (!detailsElement) return;
+    
+    const result = reverseCalculationResults;
+    if (!result) return;
+    
+    let detailsHTML = `
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h4 class="font-bold mb-3">计算详情</h4>
+            <div class="space-y-2">
+                <div class="flex justify-between">
+                    <span>所得类型：</span>
+                    <span>${result.incomeType === 'comprehensive' ? '综合所得' : '经营所得'}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>倒算方式：</span>
+                    <span>${result.reverseType === 'tax' ? '从税额倒算' : '从税后收入倒算'}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>工作月数：</span>
+                    <span>${result.workMonths}个月</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>年度总扣除额：</span>
+                    <span>¥${result.totalDeduction.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>应纳税所得额：</span>
+                    <span>¥${result.taxableIncome.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>适用税率：</span>
+                    <span>${(result.applicableRate * 100).toFixed(0)}%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>速算扣除数：</span>
+                    <span>¥${result.applicableDeduction.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>综合所得税额：</span>
+                    <span>¥${(result.totalTax - result.bonusTax).toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>年终奖税额：</span>
+                    <span>¥${result.bonusTax.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between font-bold">
+                    <span>总应纳税额：</span>
+                    <span>¥${result.totalTax.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between font-bold">
+                    <span>税前收入：</span>
+                    <span>¥${result.totalIncome.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between font-bold">
+                    <span>税后收入：</span>
+                    <span>¥${result.netIncome.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    detailsElement.innerHTML = detailsHTML;
 }
 
 // 计算经营所得税
