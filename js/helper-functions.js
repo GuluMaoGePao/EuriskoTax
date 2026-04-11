@@ -89,12 +89,11 @@ function calculateReverseSocialSecurity() {
     const pensionRate = parseFloat(document.getElementById('reverse-pension-rate').value) || 0;
     const medicalRate = parseFloat(document.getElementById('reverse-medical-rate').value) || 0;
     const unemploymentRate = parseFloat(document.getElementById('reverse-unemployment-rate').value) || 0;
-    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
     
-    // 计算各项保险费用（根据工作月数调整）
-    const pensionAmount = base * (pensionRate / 100) * workMonths;
-    const medicalAmount = base * (medicalRate / 100) * workMonths;
-    const unemploymentAmount = base * (unemploymentRate / 100) * workMonths;
+    // 计算各项保险费用（月度值）
+    const pensionAmount = base * (pensionRate / 100);
+    const medicalAmount = base * (medicalRate / 100);
+    const unemploymentAmount = base * (unemploymentRate / 100);
     
     // 更新输入字段
     document.getElementById('reverse-pension-insurance').value = pensionAmount.toFixed(2);
@@ -109,10 +108,9 @@ function calculateReverseSocialSecurity() {
 function calculateReverseHousingFund() {
     let housingFundBase = parseFloat(document.getElementById('reverse-housing-fund-base').value) || 0;
     const housingFundRate = parseFloat(document.getElementById('reverse-housing-fund-rate').value) || 0;
-    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
     
-    // 计算住房公积金费用（根据工作月数调整）
-    const housingFundAmount = housingFundBase * (housingFundRate / 100) * workMonths;
+    // 计算住房公积金费用（月度值）
+    const housingFundAmount = housingFundBase * (housingFundRate / 100);
     
     // 更新输入字段
     document.getElementById('reverse-housing-fund').value = housingFundAmount.toFixed(2);
@@ -140,8 +138,6 @@ function calculateReverseSocialSecurityRate(type) {
     
     if (base === 0) return;
     
-    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
-    
     switch (type) {
         case 'pension':
             amount = parseFloat(document.getElementById('reverse-pension-insurance').value) || 0;
@@ -163,9 +159,8 @@ function calculateReverseSocialSecurityRate(type) {
             return;
     }
     
-    // 计算月度金额
-    const monthlyAmount = amount / workMonths;
-    const rate = (monthlyAmount / base) * 100;
+    // 计算费率（直接使用月度金额计算）
+    const rate = (amount / base) * 100;
     
     // 对于住房公积金，只允许5%或7%
     if (type === 'housing') {

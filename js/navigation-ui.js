@@ -183,7 +183,7 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 // 导出PDF
 function exportToPDF(elementId, title) {
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0) {
+    if (Object.keys(calculationResults).length === 0 && Object.keys(reverseCalculationResults).length === 0) {
         alert('请先进行计算，再导出文档');
         return;
     }

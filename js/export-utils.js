@@ -1,7 +1,7 @@
 // 导出到Word文档
 function exportToWord(elementId, title) {
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0) {
+    if (Object.keys(calculationResults).length === 0 && Object.keys(reverseCalculationResults).length === 0) {
         alert('请先进行计算，再导出文档');
         return;
     }
@@ -21,11 +21,73 @@ function exportToWord(elementId, title) {
 
 // 生成Word文档内容
 function generateWordDocumentContent(title) {
-    const results = calculationResults;
+    // 优先使用反向倒算结果（如果有），否则使用正向计算结果
+    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
+    const results = isReverseCalculation ? reverseCalculationResults : calculationResults;
     const workMonths = results.workMonths;
-    const incomeDetails = results.incomeDetails;
-    const deductionDetails = results.deductionDetails;
-    const taxDetails = results.taxDetails;
+    
+    // 构建收入明细（根据计算类型）
+    let incomeDetails;
+    let deductionDetails;
+    let taxDetails;
+    
+    if (isReverseCalculation) {
+        // 反向倒算结果结构
+        incomeDetails = {
+            total: results.totalIncome,
+            bonus: results.bonusIncome,
+            bonusInclude: false, // 反向倒算中默认单独计税
+            bonusTax: results.bonusTax,
+            // 添加缺失的属性，避免toFixed错误
+            labor: 0,
+            laborCalculated: 0,
+            laborTax: 0,
+            author: 0,
+            authorCalculated: 0,
+            authorTax: 0,
+            royalty: 0,
+            royaltyCalculated: 0,
+            royaltyTax: 0,
+            salary: results.totalIncome / results.workMonths // 平均月工资
+        };
+        
+        deductionDetails = {
+            total: results.totalDeduction,
+            basic: 5000,
+            pensionInsurance: 0,
+            medicalInsurance: 0,
+            unemploymentInsurance: 0,
+            housingFund: 0,
+            elderly: 0,
+            childrenInfant: 0,
+            housing: 0,
+            educationDegree: 0,
+            professional: 0,
+            actualMedical: results.deductionDetails.actualMedical || 0,
+            pension: 0,
+            enterpriseAnnuity: 0,
+            insuranceOther: 0,
+            taxDeferredPension: 0,
+            charitableDonation: 0,
+            specialAdditionalTotal: 0,
+            otherTotal: 0
+        };
+        
+        taxDetails = {
+            taxableIncome: results.taxableIncome,
+            applicableRate: results.applicableRate,
+            applicableDeduction: results.applicableDeduction,
+            totalTax: results.totalTax,
+            prepaidTax: 0,
+            refundTax: 0,
+            netIncome: results.netIncome
+        };
+    } else {
+        // 正向计算结果结构
+        incomeDetails = results.incomeDetails;
+        deductionDetails = results.deductionDetails;
+        taxDetails = results.taxDetails;
+    }
     
     // 生成月度数据
     const monthlyData = generateMonthlyData(results);
@@ -480,17 +542,33 @@ function generateWordDocumentContent(title) {
 // 生成月度数据
 function generateMonthlyData(results) {
     const workMonths = results.workMonths;
-    const monthlySalary = results.incomeDetails.salary;
-    const monthlyBasicDeduction = results.deductionDetails.basic;
-    const monthlyInsuranceDeduction = results.deductionDetails.pensionInsurance + 
+    
+    // 检查是否为反向倒算结果
+    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
+    
+    let monthlySalary, monthlyBasicDeduction, monthlyInsuranceDeduction, monthlySpecialAdditional, monthlyOtherDeduction;
+    
+    if (isReverseCalculation) {
+        // 反向倒算结果
+        monthlySalary = results.totalIncome / workMonths;
+        monthlyBasicDeduction = 5000;
+        monthlyInsuranceDeduction = 0;
+        monthlySpecialAdditional = 0;
+        monthlyOtherDeduction = (results.totalDeduction - (5000 * workMonths)) / workMonths;
+    } else {
+        // 正向计算结果
+        monthlySalary = results.incomeDetails.salary;
+        monthlyBasicDeduction = results.deductionDetails.basic;
+        monthlyInsuranceDeduction = results.deductionDetails.pensionInsurance + 
                                      results.deductionDetails.medicalInsurance + 
                                      results.deductionDetails.unemploymentInsurance + 
                                      results.deductionDetails.housingFund;
-    const monthlySpecialAdditional = results.deductionDetails.elderly + 
+        monthlySpecialAdditional = results.deductionDetails.elderly + 
                                      results.deductionDetails.childrenInfant + 
                                      results.deductionDetails.housing + 
                                      (results.deductionDetails.educationDegree || 0);
-    const monthlyOtherDeduction = results.deductionDetails.otherTotal / workMonths;
+        monthlyOtherDeduction = results.deductionDetails.otherTotal / workMonths;
+    }
     
     const monthlyData = [];
     let cumulativeTaxableIncome = 0;
@@ -592,30 +670,31 @@ function generateTaxRateDistribution(taxableIncome) {
 
 // 生成税收优化建议
 function generateOptimizationTipsForWord() {
-    if (Object.keys(calculationResults).length === 0) {
+    if (Object.keys(calculationResults).length === 0 && Object.keys(reverseCalculationResults).length === 0) {
         return '<p>暂无优化建议</p>';
     }
     
     const tips = [];
-    const results = calculationResults;
+    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
+    const results = isReverseCalculation ? reverseCalculationResults : calculationResults;
     
     // 检查专项附加扣除
-    if (results.deductionDetails.specialAdditionalTotal === 0) {
+    if (!isReverseCalculation && results.deductionDetails.specialAdditionalTotal === 0) {
         tips.push('您未填写任何专项附加扣除，建议检查是否有符合条件的扣除项目，如子女教育、赡养老人、住房贷款利息等。');
     }
     
     // 检查个人养老金
-    if (results.deductionDetails.pension === 0) {
+    if (!isReverseCalculation && results.deductionDetails.pension === 0) {
         tips.push('您未填写个人养老金扣除，建议考虑缴纳个人养老金，每年最高可扣除12000元。');
     }
     
     // 检查商业健康保险
-    if (results.deductionDetails.insuranceOther === 0) {
+    if (!isReverseCalculation && results.deductionDetails.insuranceOther === 0) {
         tips.push('您未填写商业健康保险扣除，建议考虑购买符合条件的商业健康保险，每年最高可扣除2400元。');
     }
     
     // 检查年终奖计税方式
-    if (results.incomeDetails.bonus > 0) {
+    if (!isReverseCalculation && results.incomeDetails && results.incomeDetails.bonus > 0) {
         const bonusTax = results.incomeDetails.bonusTax;
         const bonusInclude = results.incomeDetails.bonusInclude;
         const bonusAmount = results.incomeDetails.bonus;
@@ -683,12 +762,12 @@ function generateOptimizationTipsForWord() {
     }
     
     // 检查大病医疗
-    if (results.deductionDetails.medical > 0 && results.deductionDetails.actualMedical === 0) {
+    if (!isReverseCalculation && results.deductionDetails.medical > 0 && results.deductionDetails.actualMedical === 0) {
         tips.push('您填写的大病医疗费用未达到扣除标准（超过15000元的部分），建议保留相关凭证，以备后续年度可能的扣除。');
     }
     
     // 检查社保缴费
-    if (results.deductionDetails.pensionInsurance + 
+    if (!isReverseCalculation && results.deductionDetails.pensionInsurance + 
         results.deductionDetails.medicalInsurance + 
         results.deductionDetails.unemploymentInsurance + 
         results.deductionDetails.housingFund === 0) {
@@ -701,12 +780,12 @@ function generateOptimizationTipsForWord() {
     }
     
     // 检查应纳税所得额
-    if (results.taxDetails.taxableIncome === 0) {
+    if (results.taxableIncome === 0) {
         tips.push('您的应纳税所得额为0，无需缴纳个人所得税。');
     }
     
     // 检查税率级别
-    const taxRate = results.taxDetails.applicableRate * 100;
+    const taxRate = results.applicableRate * 100;
     if (taxRate > 20) {
         tips.push(`您的适用税率为${taxRate}%，属于较高税率级别，建议合理规划税务，利用各项扣除政策降低税负。`);
     }
