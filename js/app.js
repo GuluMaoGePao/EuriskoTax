@@ -49,13 +49,6 @@ window.addEventListener('DOMContentLoaded', function() {
         const content = document.getElementById('reverse-enterprise-annuity-fields');
         if (this.checked) {
             content.classList.remove('hidden');
-            // 立即计算企业年金（如果有计算结果）
-            if (window.reverseCalculationResults && window.reverseCalculationResults.totalIncome) {
-                const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
-                const monthlyIncome = window.reverseCalculationResults.totalIncome / workMonths;
-                const monthlyEnterpriseAnnuity = monthlyIncome * 0.05;
-                document.getElementById('reverse-enterprise-annuity').value = monthlyEnterpriseAnnuity.toFixed(2);
-            }
         } else {
             content.classList.add('hidden');
         }
@@ -590,10 +583,6 @@ window.addEventListener('DOMContentLoaded', function() {
         const content = document.getElementById('enterprise-annuity-fields');
         if (this.checked) {
             content.classList.remove('hidden');
-            // 立即计算企业年金
-            const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-            const enterpriseAnnuity = monthlySalaryIncome * 0.05;
-            document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
         } else {
             content.classList.add('hidden');
         }
@@ -703,14 +692,6 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('royalty-income').addEventListener('input', updateIncomeCalculation);
     document.getElementById('salary-income').addEventListener('input', function() {
         updateIncomeCalculation();
-        // 同时更新企业年金
-        const isEnterpriseAnnuityChecked = document.getElementById('enterprise-annuity-checkbox').checked;
-        if (isEnterpriseAnnuityChecked) {
-            const monthlySalaryIncome = parseFloat(this.value) || 0;
-            const enterpriseAnnuity = monthlySalaryIncome * 0.05;
-            document.getElementById('enterprise-annuity').value = enterpriseAnnuity.toFixed(2);
-            updateDeductionCalculation();
-        }
     });
     document.getElementById('bonus-income').addEventListener('input', updateIncomeCalculation);
     document.getElementById('bonus-include').addEventListener('change', updateIncomeCalculation);
