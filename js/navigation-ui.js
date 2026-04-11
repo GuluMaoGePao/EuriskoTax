@@ -231,53 +231,59 @@ function exportToPDF(elementId, title) {
                 orientation: 'portrait', // 纵向布局
                 unit: 'mm',
                 format: 'a4', // 明确指定A4格式
-                margin: { top: 10, right: 10, bottom: 10, left: 10 } // 适当边距
+                margin: { top: 10, right: 10, bottom: 10, left: 10 } // 底部边距与顶部边距一致
             });
             
             // 标准A4纵向尺寸：210mm × 297mm
             const A4_WIDTH = 210; // A4纵向宽度
             const A4_HEIGHT = 297; // A4纵向高度
-            const MARGIN = 10; // 边距
+            const TOP_MARGIN = 10; // 顶部边距
+            const BOTTOM_MARGIN = 10; // 底部边距
+            const SIDE_MARGIN = 10; // 侧边边距
             
-            const imgWidth = A4_WIDTH - (MARGIN * 2); // 可用宽度
-            const pageHeight = A4_HEIGHT - (MARGIN * 2); // 可用高度
-            let currentY = MARGIN; // 起始位置
+            const imgWidth = A4_WIDTH - (SIDE_MARGIN * 2); // 可用宽度
+            const pageHeight = A4_HEIGHT - (TOP_MARGIN + BOTTOM_MARGIN); // 可用高度
+            let currentY = TOP_MARGIN; // 起始位置
             
             // 计算图片在PDF中的高度，保持宽高比
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             
             // 检查是否需要分页
             if (imgHeight > pageHeight) {
-                // 计算需要的页数
+                // 计算需要的页数，使用实际页面高度
                 const totalPages = Math.ceil(imgHeight / pageHeight);
-                const pageImageHeight = (canvas.height / totalPages) * (imgWidth / canvas.width);
+                
+                // 计算每页的高度，确保内容完全填充页面
+                const pageImageHeight = pageHeight;
+                const canvasPageHeight = (canvas.height * pageHeight) / imgHeight;
                 
                 for (let i = 0; i < totalPages; i++) {
                     if (i > 0) {
                         // 添加新页面，保持A4纵向尺寸
                         doc.addPage('a4', 'portrait');
-                        currentY = MARGIN;
+                        currentY = TOP_MARGIN;
                     }
                     
                     // 计算当前页的图片区域
                     const pageCanvas = document.createElement('canvas');
                     pageCanvas.width = canvas.width;
-                    pageCanvas.height = canvas.height / totalPages;
+                    pageCanvas.height = canvasPageHeight;
                     const ctx = pageCanvas.getContext('2d');
                     ctx.drawImage(
                         canvas,
-                        0, i * (canvas.height / totalPages),
-                        canvas.width, canvas.height / totalPages,
+                        0, i * canvasPageHeight,
+                        canvas.width, canvasPageHeight,
                         0, 0,
-                        canvas.width, canvas.height / totalPages
+                        canvas.width, canvasPageHeight
                     );
                     
                     // 添加图片到PDF，确保在A4页面内
-                    doc.addImage(pageCanvas, 'PNG', MARGIN, currentY, imgWidth, pageImageHeight);
+                    doc.addImage(pageCanvas, 'PNG', SIDE_MARGIN, currentY, imgWidth, pageImageHeight);
                 }
             } else {
-                // 单页显示
-                doc.addImage(canvas, 'PNG', MARGIN, currentY, imgWidth, imgHeight);
+                // 单页显示，调整图片高度以确保底部边距
+                const adjustedImgHeight = imgHeight;
+                doc.addImage(canvas, 'PNG', SIDE_MARGIN, currentY, imgWidth, adjustedImgHeight);
             }
             
             // 保存PDF

@@ -110,7 +110,7 @@ function generateWordDocumentContent(title) {
         }
         body {
             font-family: 'SimSun', '宋体', serif;
-            margin: 2.5cm 2cm;
+            margin: 0;
             line-height: 1.5;
             font-size: 14pt;
             color: #000;
@@ -118,7 +118,7 @@ function generateWordDocumentContent(title) {
         .cover {
             text-align: center;
             margin-bottom: 0px;
-            padding: 60px 0;
+            padding: 0 0;
         }
         .cover h1 {
             font-size: 22pt;
@@ -139,7 +139,6 @@ function generateWordDocumentContent(title) {
             font-size: 16pt;
             font-weight: bold;
             margin-bottom: 15px;
-            border-bottom: 1px solid #000;
             padding-bottom: 5px;
             color: #000;
         }
@@ -160,6 +159,9 @@ function generateWordDocumentContent(title) {
             border-collapse: collapse;
             margin: 15px 0;
             font-size: 12pt;
+            page-break-inside: avoid;
+            page-break-before: auto;
+            page-break-after: auto;
         }
         .info-table th,
         .info-table td {
@@ -178,6 +180,9 @@ function generateWordDocumentContent(title) {
             border-collapse: collapse;
             margin: 15px 0;
             font-size: 12pt;
+            page-break-inside: avoid;
+            page-break-before: auto;
+            page-break-after: auto;
         }
         .summary-table th,
         .summary-table td {
@@ -243,8 +248,8 @@ function generateWordDocumentContent(title) {
             display: flex;
             justify-content: space-between;
             margin-top: 10px;
-            padding: 15px 0;
-            border-top: 1px solid #000;
+            padding: 0 0 10px 0;
+            border-bottom: 1px solid #000;
         }
         .cover-info span {
             font-size: 14pt;
