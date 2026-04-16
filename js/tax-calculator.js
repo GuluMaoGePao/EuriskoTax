@@ -571,48 +571,14 @@ function calculateFromTax(inputData, deductionData, bonusTax) {
         // 综合所得反向倒算
         const comprehensiveTax = inputData.totalTax - bonusTax;
         
-        if (inputData.taxRateChoice === 'auto') {
-            // 自动判断税率级别
-            for (const bracket of comprehensiveTaxRates) {
-                if (comprehensiveTax <= bracket.maxTax) {
-                    taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
-                    applicableRate = bracket.rate;
-                    applicableDeduction = bracket.deduction;
-                    break;
-                }
+        // 自动判断税率级别
+        for (const bracket of comprehensiveTaxRates) {
+            if (comprehensiveTax <= bracket.maxTax) {
+                taxableIncome = (comprehensiveTax + bracket.deduction) / bracket.rate;
+                applicableRate = bracket.rate;
+                applicableDeduction = bracket.deduction;
+                break;
             }
-        } else {
-            // 根据选择的税率计算
-            const rate = parseFloat(inputData.taxRateChoice) / 100;
-            let deduction = 0;
-            
-            switch (inputData.taxRateChoice) {
-                case '3':
-                    deduction = 0;
-                    break;
-                case '10':
-                    deduction = 2520;
-                    break;
-                case '20':
-                    deduction = 16920;
-                    break;
-                case '25':
-                    deduction = 31920;
-                    break;
-                case '30':
-                    deduction = 52920;
-                    break;
-                case '35':
-                    deduction = 85920;
-                    break;
-                case '45':
-                    deduction = 181920;
-                    break;
-            }
-            
-            taxableIncome = (comprehensiveTax + deduction) / rate;
-            applicableRate = rate;
-            applicableDeduction = deduction;
         }
     } else if (inputData.incomeType === 'business') {
         // 经营所得反向倒算
