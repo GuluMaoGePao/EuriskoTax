@@ -72,6 +72,9 @@
             .input-field {
                 @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
             }
+            .input-field.input-error {
+                @apply border-danger focus:ring-danger/50 focus:border-danger;
+            }
             .label {
                 @apply block text-sm font-medium text-gray-700 mb-1;
             }
@@ -1071,16 +1074,16 @@
                             </div>
                             
                             <div class="mt-6">
-                                <button id="export-pdf-btn" class="btn btn-secondary w-full mb-3">
-                                    <i class="fa fa-download mr-2"></i>导出PDF报告
-                                </button>
-                                <button id="export-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full mb-3">
-                                    <i class="fa fa-file-word-o mr-2"></i>导出Word报告
-                                </button>
-                                <button id="save-calculation-btn" class="btn btn-success w-full">
-                                    <i class="fa fa-save mr-2"></i>保存计算结果
-                                </button>
-                            </div>
+                                    <button id="save-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
+                                        <i class="fa fa-save mr-2"></i>保存计算结果
+                                    </button>
+                                    <button id="export-pdf-btn" class="btn btn-secondary w-full mb-3">
+                                        <i class="fa fa-download mr-2"></i>导出PDF报告
+                                    </button>
+                                    <button id="export-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
+                                        <i class="fa fa-file-word-o mr-2"></i>导出Word报告
+                                    </button>
+                                </div>
                         </div>
                         
                         <!-- 税率分布饼图卡片 -->
@@ -1828,13 +1831,16 @@
                         </div>
                         
                         <div class="mt-6">
-                            <button id="export-reverse-pdf-btn" class="btn btn-secondary w-full mb-3">
-                                <i class="fa fa-download mr-2"></i>导出PDF报告
-                            </button>
-                            <button id="export-reverse-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
-                                <i class="fa fa-file-word-o mr-2"></i>导出Word报告
-                            </button>
-                        </div>
+                                <button id="save-reverse-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
+                                    <i class="fa fa-save mr-2"></i>保存计算结果
+                                </button>
+                                <button id="export-reverse-pdf-btn" class="btn btn-secondary w-full mb-3">
+                                    <i class="fa fa-download mr-2"></i>导出PDF报告
+                                </button>
+                                <button id="export-reverse-word-btn" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">
+                                    <i class="fa fa-file-word-o mr-2"></i>导出Word报告
+                                </button>
+                            </div>
                     </div>
                     
                     <!-- 收入构成分析卡片 -->
@@ -2030,26 +2036,37 @@
                         <p class="text-sm text-gray-600 mb-4">请输入各项扣除信息</p>
                         
                         <div class="form-group">
-                            <label for="business-investor-deduction" class="label">
-                                投资者减除费用 (元/年)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">固定60000元/年，不可修改</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="business-investor-deduction" class="input-field" value="60000" min="60000" max="60000" disabled>
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" id="business-has-comprehensive-income" class="w-5 h-5 text-accent rounded" checked>
+                                <label for="business-has-comprehensive-income" class="label mb-0">
+                                    本年度有综合所得（工资薪金、劳务报酬等）
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">根据税法规定，取得经营所得的个人，没有综合所得的，可以减除费用6万元</span>
+                                    </span>
+                                </label>
                             </div>
                         </div>
                         
-
+                        <div class="form-group mt-4">
+                            <label for="business-special-additional-deduction" class="label">
+                                专项附加扣除 (元/年)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">子女教育、继续教育、大病医疗、住房贷款利息、住房租金、赡养老人、3岁以下婴幼儿照护等（需在综合所得中未申报减除）</span>
+                                </span>
+                            </label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="business-special-additional-deduction" class="input-field" value="0" min="0" step="1000">
+                            </div>
+                        </div>
                         
                         <div class="form-group">
                             <label for="business-other-deduction" class="label">
                                 其他扣除 (元/年)
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">个人养老金、商业健康保险等</span>
+                                    <span class="tooltip-text">个人养老金、商业健康保险等依法确定的其他扣除</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
@@ -2111,6 +2128,11 @@
                                     </div>
                                     
                                     <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度扣除总额</span>
+                                        <span class="font-medium text-success" id="business-result-deductions">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                         <span class="text-gray-600">年度应纳税所得额</span>
                                         <span class="font-medium" id="business-result-taxable-income">¥0</span>
                                     </div>
@@ -2126,7 +2148,12 @@
                                     </div>
                                     
                                     <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                        <span class="text-gray-600">年度应纳税额</span>
+                                        <span class="text-gray-600">减半征收减免税额</span>
+                                        <span class="font-medium text-success" id="business-result-tax-reduction">¥0</span>
+                                    </div>
+                                    
+                                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <span class="text-gray-600">年度应纳税额（实际应缴）</span>
                                         <span class="font-medium text-danger" id="business-result-total-tax">¥0</span>
                                     </div>
                                     
@@ -2147,6 +2174,9 @@
                                 </div>
                                 
                                 <div class="mt-6">
+                                    <button id="save-business-result-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
+                                        <i class="fa fa-save mr-2"></i>保存计算结果
+                                    </button>
                                     <button id="export-business-pdf-btn" class="btn btn-secondary w-full mb-3">
                                         <i class="fa fa-download mr-2"></i>导出PDF报告
                                     </button>
@@ -2156,7 +2186,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- 经营所得预算表卡片 -->
                         <div class="card lg:col-span-2">
                             <div class="flex justify-between items-center mb-4">
@@ -2386,6 +2416,9 @@
                                 </div>
                                 
                                 <div class="mt-6">
+                                    <button id="save-classification-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
+                                        <i class="fa fa-save mr-2"></i>保存计算结果
+                                    </button>
                                     <button id="export-classification-pdf-btn" class="btn btn-secondary w-full mb-3">
                                         <i class="fa fa-download mr-2"></i>导出PDF报告
                                     </button>
@@ -2524,6 +2557,49 @@
         </div>
     </div>
 
+    <!-- 自定义提示模态框 -->
+    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-primary">提示</h3>
+                    <button id="close-alert-modal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div id="alert-modal-message" class="mb-6 text-gray-700"></div>
+                <div class="flex justify-end">
+                    <button id="alert-modal-ok" class="btn bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-md">
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义确认模态框 -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-primary">提示</h3>
+                    <button id="close-confirm-modal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div id="confirm-modal-message" class="mb-6 text-gray-700"></div>
+                <div class="flex justify-end space-x-3">
+                    <button id="confirm-modal-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-md">
+                        取消
+                    </button>
+                    <button id="confirm-modal-confirm" class="btn bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-md">
+                        确认
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 关于模态框 -->
     <div id="about-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
@@ -2555,11 +2631,11 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
+    <script src="js/data-management.js"></script>
     <script src="js/tax-calculator.js"></script>
     <script src="js/helper-functions.js"></script>
     <script src="js/navigation-ui.js"></script>
     <script src="js/export-utils.js?v=202604130"></script>
-    <script src="js/data-management.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/app.js"></script>
     <script>

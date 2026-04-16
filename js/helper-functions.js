@@ -776,7 +776,7 @@ function resetForwardCalculation() {
         console.log('resetForwardCalculation函数执行完成');
     } catch (error) {
         console.error('resetForwardCalculation函数执行出错:', error);
-        alert('重置过程中出现错误，请检查控制台输出。错误信息：' + error.message);
+        showAlert('重置过程中出现错误，请检查控制台输出。错误信息：' + error.message);
     }
 }
 
@@ -872,8 +872,9 @@ function resetBusinessCalculation() {
     document.getElementById('business-previous-losses').value = 0;
     
     // 2. 重置扣除项
-    document.getElementById('business-investor-deduction').value = 60000;
+    document.getElementById('business-has-comprehensive-income').checked = true;
     document.getElementById('business-other-deduction').value = 0;
+    document.getElementById('business-special-additional-deduction').value = 0;
     document.getElementById('business-prepaid-tax').value = 0;
     
     // 3. 重置步骤
