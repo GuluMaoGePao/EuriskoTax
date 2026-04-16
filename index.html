@@ -1278,7 +1278,7 @@
                             </div>
                         </div>
                         
-                        <div class="form-group">
+                        <div id="reverse-tax-rate-input" class="form-group">
                             <label for="reverse-tax-rate" class="label">
                                 按税率预算
                                 <span class="tooltip ml-1">
@@ -2568,13 +2568,16 @@
             const reverseType = this.value;
             const taxInput = document.getElementById('reverse-tax-input');
             const netInput = document.getElementById('reverse-net-input');
+            const taxRateInput = document.getElementById('reverse-tax-rate-input');
             
             if (reverseType === 'tax') {
                 taxInput.classList.remove('hidden');
                 netInput.classList.add('hidden');
+                taxRateInput.classList.add('hidden');
             } else {
                 taxInput.classList.add('hidden');
                 netInput.classList.remove('hidden');
+                taxRateInput.classList.remove('hidden');
             }
         });
         
