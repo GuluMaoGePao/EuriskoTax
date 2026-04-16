@@ -16,6 +16,7 @@ const comprehensiveTaxRates = [
     { max: Infinity, rate: 0.45, deduction: 181920 }
 ];
 
+// 经营所得税率表（根据国家税务总局规定，5%-35%超额累进税率）
 const businessTaxRates = [
     { max: 30000, rate: 0.05, deduction: 0 },
     { max: 90000, rate: 0.1, deduction: 1500 },
@@ -23,6 +24,9 @@ const businessTaxRates = [
     { max: 500000, rate: 0.3, deduction: 40500 },
     { max: Infinity, rate: 0.35, deduction: 65500 }
 ];
+
+// 经营所得减半征收政策适用阈值（年应纳税所得额不超过200万元部分）
+const BUSINESS_HALVING_THRESHOLD = 2000000;
 
 const classificationTaxRate = 0.2;
 
@@ -340,7 +344,7 @@ function calculateTax() {
         }
     } catch (error) {
         console.error('计算过程中出现错误:', error);
-        alert('计算过程中出现错误：' + error.message);
+        showAlert('计算过程中出现错误：' + error.message);
     }
 }
 
@@ -377,7 +381,7 @@ function calculateReverseTax() {
         
     } catch (error) {
         console.error('反向倒算计算过程中出现错误:', error);
-        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+        showAlert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
     }
 }
 
@@ -911,41 +915,84 @@ function calculateBusinessTax() {
         const businessOtherExpenses = parseFloat(document.getElementById('business-other-expenses').value) || 0;
         const businessPreviousLosses = parseFloat(document.getElementById('business-previous-losses').value) || 0;
         
-        // 计算经营利润
+        // 计算经营利润 = 收入总额 - 成本 - 费用 - 税金 - 损失 - 其他支出
         const businessProfit = businessIncome - businessCost - businessExpenses - businessTaxes - businessLosses - businessOtherExpenses;
         
-        // 计算应纳税所得额（考虑以前年度亏损弥补）
-        const taxableIncome = Math.max(0, businessProfit - businessPreviousLosses);
-        
         // 获取扣除项数据
-        const investorDeduction = parseFloat(document.getElementById('business-investor-deduction').value) || 0;
+        const hasComprehensiveIncome = document.getElementById('business-has-comprehensive-income')?.checked ?? true;
+        const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
         const otherDeduction = parseFloat(document.getElementById('business-other-deduction').value) || 0;
         
-        // 计算最终应纳税所得额
-        const finalTaxableIncome = Math.max(0, taxableIncome - investorDeduction - otherDeduction);
+        // 获取专项附加扣除
+        const specialAdditionalDeduction = parseFloat(document.getElementById('business-special-additional-deduction')?.value) || 0;
         
-        // 计算应纳税额
+        // 计算应纳税所得额第一步：经营利润 - 以前年度亏损弥补
+        const incomeAfterLosses = Math.max(0, businessProfit - businessPreviousLosses);
+        
+        // 计算应纳税所得额第二步：减除费用6万元（仅当无综合所得时）+ 专项附加扣除 + 其他扣除
+        const totalDeductions = investorDeduction + specialAdditionalDeduction + otherDeduction;
+        const taxableIncomeStep1 = Math.max(0, incomeAfterLosses - totalDeductions);
+        
+        // 计算应纳税额（使用超额累进税率）
         let totalTax = 0;
         let applicableRate = 0;
         let applicableDeduction = 0;
         
         for (const bracket of businessTaxRates) {
-            if (finalTaxableIncome <= bracket.max) {
-                totalTax = finalTaxableIncome * bracket.rate - bracket.deduction;
+            if (taxableIncomeStep1 <= bracket.max) {
+                totalTax = taxableIncomeStep1 * bracket.rate - bracket.deduction;
                 applicableRate = bracket.rate;
                 applicableDeduction = bracket.deduction;
                 break;
             }
         }
         
+        // 应用减半征收政策（年应纳税所得额不超过200万元部分减半）
+        // 根据财政部、税务总局2023年第12号公告
+        let halvedTax = 0;
+        let taxReduction = 0;
+        let isHalvingApplied = false;
+        
+        if (taxableIncomeStep1 <= BUSINESS_HALVING_THRESHOLD) {
+            halvedTax = totalTax * 0.5;
+            taxReduction = totalTax - halvedTax;
+            isHalvingApplied = true;
+        } else {
+            // 分段计算：不超过200万元部分减半，超过200万元部分正常计算
+            const thresholdAmount = BUSINESS_HALVING_THRESHOLD;
+            const exceededAmount = taxableIncomeStep1 - thresholdAmount;
+            
+            // 计算不超过200万元部分的税额（使用完整的税率表）
+            let taxBelowThreshold = 0;
+            for (const bracket of businessTaxRates) {
+                if (thresholdAmount <= bracket.max) {
+                    taxBelowThreshold = thresholdAmount * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            
+            // 计算超过200万元部分的税额（使用完整的税率表）
+            let taxAboveThreshold = 0;
+            for (const bracket of businessTaxRates) {
+                if (exceededAmount <= bracket.max) {
+                    taxAboveThreshold = exceededAmount * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+            
+            halvedTax = (taxBelowThreshold * 0.5) + taxAboveThreshold;
+            taxReduction = totalTax - halvedTax;
+            isHalvingApplied = true;
+        }
+        
         // 获取已预缴税额
         const prepaidTax = parseFloat(document.getElementById('business-prepaid-tax').value) || 0;
         
         // 计算应退/应补税额
-        const refundTax = totalTax - prepaidTax;
+        const refundTax = halvedTax - prepaidTax;
         
-        // 计算税后经营所得
-        const netIncome = businessProfit - totalTax;
+        // 计算税后经营所得（经营利润减去应纳税额）
+        const netIncome = businessProfit - halvedTax;
         
         // 保存计算结果
         businessCalculationResults = {
@@ -960,14 +1007,20 @@ function calculateBusinessTax() {
                 businessProfit: businessProfit
             },
             deductionDetails: {
+                hasComprehensiveIncome: hasComprehensiveIncome,
                 investorDeduction: investorDeduction,
-                otherDeduction: otherDeduction
+                specialAdditionalDeduction: specialAdditionalDeduction,
+                otherDeduction: otherDeduction,
+                totalDeductions: totalDeductions
             },
             taxDetails: {
-                taxableIncome: finalTaxableIncome,
-                totalTax: totalTax,
+                taxableIncome: taxableIncomeStep1,
+                totalTaxBeforeHalving: totalTax,
+                taxReduction: taxReduction,
+                totalTax: halvedTax,
                 applicableRate: applicableRate,
                 applicableDeduction: applicableDeduction,
+                isHalvingApplied: isHalvingApplied,
                 prepaidTax: prepaidTax,
                 refundTax: refundTax,
                 netIncome: netIncome
@@ -979,16 +1032,150 @@ function calculateBusinessTax() {
         document.getElementById('business-result-income').textContent = '¥' + businessIncome.toFixed(2);
         document.getElementById('business-result-costs').textContent = '¥' + (businessCost + businessExpenses + businessTaxes + businessLosses + businessOtherExpenses).toFixed(2);
         document.getElementById('business-result-profit').textContent = '¥' + businessProfit.toFixed(2);
-        document.getElementById('business-result-taxable-income').textContent = '¥' + finalTaxableIncome.toFixed(2);
+        document.getElementById('business-result-deductions').textContent = '¥' + totalDeductions.toFixed(2);
+        document.getElementById('business-result-taxable-income').textContent = '¥' + taxableIncomeStep1.toFixed(2);
         document.getElementById('business-result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
         document.getElementById('business-result-deduction').textContent = '¥' + applicableDeduction.toFixed(2);
-        document.getElementById('business-result-total-tax').textContent = '¥' + totalTax.toFixed(2);
+        
+        const totalTaxElement = document.getElementById('business-result-total-tax');
+        if (totalTaxElement) {
+            totalTaxElement.textContent = '¥' + halvedTax.toFixed(2);
+        }
+        
+        const taxReductionElement = document.getElementById('business-result-tax-reduction');
+        if (taxReductionElement) {
+            taxReductionElement.textContent = isHalvingApplied ? '¥' + taxReduction.toFixed(2) : '¥0.00';
+        }
+        
         document.getElementById('business-result-prepaid-tax').textContent = '¥' + prepaidTax.toFixed(2);
         document.getElementById('business-result-refund-tax').textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
         document.getElementById('business-result-net-income').textContent = '¥' + netIncome.toFixed(2);
+        
+        // 更新预算表
+        updateBusinessBudgetTable();
     } catch (error) {
         console.error('经营所得税计算过程中出现错误:', error);
-        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+        showAlert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+    }
+}
+
+// 保存经营所得计算结果到历史记录
+function saveBusinessCalculation() {
+    if (Object.keys(businessCalculationResults).length === 0) {
+        showAlert('请先完成计算后再保存');
+        return;
+    }
+
+    try {
+        // 生成唯一ID
+        const id = Date.now().toString();
+        
+        // 构建保存的数据对象（与综合所得保持相同结构）
+        const savedData = {
+            id: id,
+            type: 'business',
+            title: `经营所得计税 - ${new Date().toLocaleDateString()}`,
+            results: businessCalculationResults,
+            date: new Date().toISOString()
+        };
+
+        // 添加到历史记录（使用全局变量）
+        calculationHistory.unshift(savedData);
+        
+        // 限制历史记录数量
+        if (calculationHistory.length > 50) {
+            calculationHistory = calculationHistory.slice(0, 50);
+        }
+
+        // 保存到localStorage
+        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        
+        // 显示成功提示
+        showSaveSuccessMessage();
+        
+    } catch (error) {
+        console.error('保存计算结果失败:', error);
+        showSaveErrorMessage();
+    }
+}
+
+// 保存分类所得计算结果到历史记录
+function saveClassificationCalculation() {
+    if (Object.keys(classificationCalculationResults).length === 0) {
+        alert('请先完成计算后再保存');
+        return;
+    }
+
+    try {
+        // 生成唯一ID
+        const id = Date.now().toString();
+        
+        // 构建保存的数据对象
+        const savedData = {
+            id: id,
+            type: 'classification',
+            title: `分类所得计税 - ${new Date().toLocaleDateString()}`,
+            results: classificationCalculationResults,
+            date: new Date().toISOString()
+        };
+
+        // 添加到历史记录
+        calculationHistory.unshift(savedData);
+        
+        // 限制历史记录数量
+        if (calculationHistory.length > 50) {
+            calculationHistory = calculationHistory.slice(0, 50);
+        }
+
+        // 保存到localStorage
+        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        
+        // 显示成功提示
+        showSaveSuccessMessage();
+        
+    } catch (error) {
+        console.error('保存计算结果失败:', error);
+        showSaveErrorMessage();
+    }
+}
+
+// 保存反向倒算计算结果到历史记录
+function saveReverseCalculation() {
+    if (Object.keys(reverseCalculationResults).length === 0) {
+        showAlert('请先完成计算后再保存');
+        return;
+    }
+
+    try {
+        // 生成唯一ID
+        const id = Date.now().toString();
+        
+        // 构建保存的数据对象
+        const savedData = {
+            id: id,
+            type: 'reverse',
+            title: `反向倒算计税 - ${new Date().toLocaleDateString()}`,
+            results: reverseCalculationResults,
+            date: new Date().toISOString()
+        };
+
+        // 添加到历史记录
+        calculationHistory.unshift(savedData);
+        
+        // 限制历史记录数量
+        if (calculationHistory.length > 50) {
+            calculationHistory = calculationHistory.slice(0, 50);
+        }
+
+        // 保存到localStorage
+        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        
+        // 显示成功提示
+        showSaveSuccessMessage();
+        
+    } catch (error) {
+        console.error('保存计算结果失败:', error);
+        showSaveErrorMessage();
     }
 }
 
@@ -1049,7 +1236,7 @@ function calculateClassificationTax() {
         updateClassificationBudgetTable();
     } catch (error) {
         console.error('分类所得税计算过程中出现错误:', error);
-        alert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
+        showAlert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
     }
 }
 

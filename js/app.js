@@ -309,22 +309,152 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 经营所得扣除项明细页面重置按钮
     document.getElementById('reset-business-deduction-btn').addEventListener('click', function() {
-        // 重置投资者减除费用
-        document.getElementById('business-investor-deduction').value = 60000;
-        
+        // 重置是否有综合所得
+        document.getElementById('business-has-comprehensive-income').checked = true;
+
+        // 重置专项附加扣除
+        document.getElementById('business-special-additional-deduction').value = 0;
+
         // 重置其他扣除
         document.getElementById('business-other-deduction').value = 0;
-        
+
         // 重置已预缴税额
         document.getElementById('business-prepaid-tax').value = 0;
+
+        // 重新计算
+        calculateBusinessTax();
     });
     
     document.getElementById('calculate-business-btn').addEventListener('click', function() {
+        // 验证输入
+        if (!validateBusinessInput()) {
+            return;
+        }
         calculateBusinessTax();
         showBusinessStep(3);
         updateBusinessBudgetTable();
         updateBusinessCharts();
     });
+
+    // 经营所得实时计算（步骤1输入时）
+    const businessIncomeInputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses'];
+    businessIncomeInputs.forEach(function(inputId) {
+        const element = document.getElementById(inputId);
+        if (element) {
+            element.addEventListener('input', function() {
+                validateBusinessInputValue(inputId);
+                performRealTimeBusinessCalculation();
+            });
+        }
+    });
+
+    // 经营所得实时计算（步骤2输入时）
+    const businessDeductionInputs = ['business-special-additional-deduction', 'business-other-deduction', 'business-prepaid-tax'];
+    businessDeductionInputs.forEach(function(inputId) {
+        const element = document.getElementById(inputId);
+        if (element) {
+            element.addEventListener('input', function() {
+                validateBusinessInputValue(inputId);
+                performRealTimeBusinessCalculation();
+            });
+        }
+    });
+
+    // 经营所得综合所得勾选变化时
+    const hasComprehensiveCheckbox = document.getElementById('business-has-comprehensive-income');
+    if (hasComprehensiveCheckbox) {
+        hasComprehensiveCheckbox.addEventListener('change', function() {
+            performRealTimeBusinessCalculation();
+        });
+    }
+
+    // 经营所得输入验证函数
+    function validateBusinessInputValue(inputId) {
+        const element = document.getElementById(inputId);
+        if (!element) return true;
+
+        const value = parseFloat(element.value);
+        const originalValue = element.value;
+
+        // 清除之前的错误状态
+        element.classList.remove('input-error');
+
+        // 验证是否为负数
+        if (!isNaN(value) && value < 0) {
+            element.classList.add('input-error');
+            showBusinessInputError(element, '输入值不能为负数');
+            return false;
+        }
+
+        // 验证是否为有效数字
+        if (originalValue !== '' && isNaN(value)) {
+            element.classList.add('input-error');
+            showBusinessInputError(element, '请输入有效数字');
+            return false;
+        }
+
+        return true;
+    }
+
+    // 显示输入错误提示
+    function showBusinessInputError(element, message) {
+        // 移除已存在的错误提示
+        const existingError = element.parentElement.querySelector('.input-error-message');
+        if (existingError) {
+            existingError.remove();
+        }
+
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'input-error-message text-danger text-sm mt-1';
+        errorDiv.textContent = message;
+        element.parentElement.appendChild(errorDiv);
+
+        // 3秒后自动移除
+        setTimeout(function() {
+            errorDiv.remove();
+            element.classList.remove('input-error');
+        }, 3000);
+    }
+
+    // 验证所有经营所得输入
+    function validateBusinessInput() {
+        let isValid = true;
+
+        const inputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses', 'business-special-additional-deduction', 'business-other-deduction', 'business-prepaid-tax'];
+
+        inputs.forEach(function(inputId) {
+            if (!validateBusinessInputValue(inputId)) {
+                isValid = false;
+            }
+        });
+
+        // 验证已预缴税额不能超过合理范围
+        const prepaidTax = parseFloat(document.getElementById('business-prepaid-tax').value) || 0;
+        const businessIncome = parseFloat(document.getElementById('business-income').value) || 0;
+        if (prepaidTax > businessIncome * 0.45) {
+            isValid = false;
+            const element = document.getElementById('business-prepaid-tax');
+            element.classList.add('input-error');
+            showBusinessInputError(element, '已预缴税额不能超过收入的45%（最高税率）');
+        }
+
+        return isValid;
+    }
+
+    // 执行实时经营所得计算
+    function performRealTimeBusinessCalculation() {
+        try {
+            calculateBusinessTax();
+            // 如果当前在结果步骤，同步更新预算表
+            const resultStep = document.getElementById('business-step-result');
+            if (resultStep && !resultStep.classList.contains('hidden')) {
+                updateBusinessBudgetTable();
+                updateBusinessCharts();
+            }
+        } catch (error) {
+            console.error('实时计算出错:', error);
+        }
+    }
     
     // 经营所得页面重置按钮
     document.getElementById('reset-business-btn').addEventListener('click', resetBusinessCalculation);
@@ -401,11 +531,11 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('close-help-modal').addEventListener('click', function() {
         document.getElementById('help-modal').classList.add('hidden');
     });
-    
+   // 关闭关于模态框
     document.getElementById('close-about-modal').addEventListener('click', function() {
         document.getElementById('about-modal').classList.add('hidden');
     });
-    
+
     // 正向计税页面导航按钮
     document.getElementById('next-to-income-btn').addEventListener('click', function() {
         goToStep(2);
@@ -446,7 +576,25 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 保存计算结果按钮
     document.getElementById('save-calculation-btn').addEventListener('click', saveCalculationResult);
-    
+
+    // 反向倒算保存按钮
+    document.getElementById('save-reverse-calculation-btn').addEventListener('click', function() {
+        if (Object.keys(reverseCalculationResults).length === 0) {
+            alert('请先完成计算后再保存');
+            return;
+        }
+        saveReverseCalculation();
+    });
+
+    // 分类所得保存按钮
+    document.getElementById('save-classification-calculation-btn').addEventListener('click', function() {
+        if (Object.keys(classificationCalculationResults).length === 0) {
+            alert('请先完成计算后再保存');
+            return;
+        }
+        saveClassificationCalculation();
+    });
+
     // 导出PDF按钮
     document.getElementById('export-pdf-btn').addEventListener('click', function() {
         exportToPDF('step-result', '个人年度个税预算表');
@@ -470,6 +618,15 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('new-business-calculation-btn').addEventListener('click', function() {
         resetBusinessCalculation();
         showBusinessStep(1);
+    });
+
+    // 保存经营所得计算结果
+    document.getElementById('save-business-result-btn').addEventListener('click', function() {
+        if (Object.keys(businessCalculationResults).length === 0) {
+            alert('请先完成计算后再保存');
+            return;
+        }
+        saveBusinessCalculation();
     });
     
     document.getElementById('new-classification-calculation-btn').addEventListener('click', function() {

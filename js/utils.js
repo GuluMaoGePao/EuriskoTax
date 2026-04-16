@@ -335,32 +335,52 @@ function updateBusinessBudgetTable() {
     
     tbody.innerHTML = '';
     
+    const results = businessCalculationResults;
+    const taxDetails = results.taxDetails;
+    const deductionDetails = results.deductionDetails;
+    
     const rows = [
-        { item: '年度经营收入总额', amount: businessCalculationResults.incomeDetails.businessIncome, description: '包括主营业务收入和其他业务收入' },
-        { item: '年度成本', amount: businessCalculationResults.incomeDetails.businessCost, description: '包括原材料、商品采购等直接成本' },
-        { item: '年度费用', amount: businessCalculationResults.incomeDetails.businessExpenses, description: '包括房租、水电费、办公费等间接费用' },
-        { item: '年度税金', amount: businessCalculationResults.incomeDetails.businessTaxes, description: '包括增值税、城建税、教育费附加等' },
-        { item: '年度损失', amount: businessCalculationResults.incomeDetails.businessLosses, description: '包括资产损失、坏账损失等' },
-        { item: '其他支出', amount: businessCalculationResults.incomeDetails.businessOtherExpenses, description: '其他与经营活动相关的支出' },
-        { item: '以前年度亏损弥补', amount: businessCalculationResults.incomeDetails.businessPreviousLosses, description: '允许弥补的以前年度亏损' },
-        { item: '投资者减除费用', amount: businessCalculationResults.deductionDetails.investorDeduction, description: '固定60000元/年' },
-        { item: '其他扣除', amount: businessCalculationResults.deductionDetails.otherDeduction, description: '个人养老金、商业健康保险等' },
-        { item: '年度应纳税所得额', amount: businessCalculationResults.taxDetails.taxableIncome, description: '经营利润减去各项扣除后的余额' },
-        { item: '适用税率', amount: businessCalculationResults.taxDetails.applicableRate * 100, description: '根据应纳税所得额确定的税率' },
-        { item: '速算扣除数', amount: businessCalculationResults.taxDetails.applicableDeduction, description: '根据税率级数确定的速算扣除数' },
-        { item: '年度应纳税额', amount: businessCalculationResults.taxDetails.totalTax, description: '应纳税所得额乘以适用税率减去速算扣除数' },
-        { item: '全年累计已预缴税额', amount: businessCalculationResults.taxDetails.prepaidTax, description: '年度内已预缴的经营所得税额' },
-        { item: '年度应退/应补税额', amount: businessCalculationResults.taxDetails.refundTax, description: '应纳税额减去已预缴税额' },
-        { item: '税后经营所得', amount: businessCalculationResults.taxDetails.netIncome, description: '经营利润减去应纳税额' }
+        { item: '一、生产经营所得计税', amount: '', description: '' },
+        { item: '1. 年度经营收入总额', amount: results.incomeDetails.businessIncome, description: '包括主营业务收入和其他业务收入' },
+        { item: '2. 年度成本', amount: results.incomeDetails.businessCost, description: '包括原材料、商品采购等直接成本' },
+        { item: '3. 年度费用', amount: results.incomeDetails.businessExpenses, description: '包括房租、水电费、办公费等间接费用' },
+        { item: '4. 年度税金', amount: results.incomeDetails.businessTaxes, description: '包括增值税、城建税、教育费附加等' },
+        { item: '5. 年度损失', amount: results.incomeDetails.businessLosses, description: '包括资产损失、坏账损失等' },
+        { item: '6. 其他支出', amount: results.incomeDetails.businessOtherExpenses, description: '其他与经营活动相关的支出' },
+        { item: '7. 以前年度亏损弥补', amount: results.incomeDetails.businessPreviousLosses, description: '允许弥补的以前年度亏损（不超过5年）' },
+        { item: '二、应纳税所得额计算', amount: '', description: '' },
+        { item: '8. 经营利润', amount: results.incomeDetails.businessProfit, description: '= 收入-成本-费用-税金-损失-其他' },
+        { item: '9. 减：以前年度亏损', amount: results.incomeDetails.businessPreviousLosses, description: '可弥补以前年度亏损' },
+        { item: '10. 减：投资者减除费用', amount: deductionDetails.investorDeduction, description: deductionDetails.hasComprehensiveIncome ? '有综合所得，不扣' : '无综合所得，扣60000元/年' },
+        { item: '11. 减：专项附加扣除', amount: deductionDetails.specialAdditionalDeduction, description: '子女教育、继续教育等7项' },
+        { item: '12. 减：其他扣除', amount: deductionDetails.otherDeduction, description: '个人养老金、商业健康保险等' },
+        { item: '三、应纳税额计算', amount: '', description: '' },
+        { item: '13. 年度应纳税所得额', amount: taxDetails.taxableIncome, description: '= 利润-亏损-各项扣除' },
+        { item: '14. 适用税率', amount: (taxDetails.applicableRate * 100).toFixed(0) + '%', description: '5%-35%超额累进税率' },
+        { item: '15. 速算扣除数', amount: taxDetails.applicableDeduction, description: '根据应纳税所得额级数确定' },
+        { item: '16. 应纳税额（未减半）', amount: taxDetails.totalTaxBeforeHalving, description: '= 应纳税所得额×税率-速算扣除数' },
+        { item: '17. 减半征收减免税额', amount: taxDetails.taxReduction, description: '≤200万元部分减半征收' },
+        { item: '18. 年度应纳税额（实际应缴）', amount: taxDetails.totalTax, description: '= 应纳税额-减免税额' },
+        { item: '四、应退/应补税额计算', amount: '', description: '' },
+        { item: '19. 全年累计已预缴税额', amount: taxDetails.prepaidTax, description: '年度内已预缴的经营所得税额' },
+        { item: '20. 年度应退/应补税额', amount: taxDetails.refundTax, description: '= 应纳税额-已预缴税额' },
+        { item: '五、税后经营所得', amount: '', description: '' },
+        { item: '21. 税后经营所得', amount: taxDetails.netIncome, description: '= 经营利润-实际应纳税额' }
     ];
     
     rows.forEach(row => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${row.item}</td>
-            <td>¥${row.amount.toFixed(2)}</td>
-            <td>${row.description}</td>
-        `;
+        if (row.amount === '') {
+            tr.innerHTML = `
+                <td class="font-bold" colspan="3">${row.item}</td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td>${row.item}</td>
+                <td>${typeof row.amount === 'number' ? '¥' + row.amount.toFixed(2) : row.amount}</td>
+                <td>${row.description}</td>
+            `;
+        }
         tbody.appendChild(tr);
     });
     
