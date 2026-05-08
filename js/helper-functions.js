@@ -409,6 +409,8 @@ function updateReverseDeductionCalculation() {
     
     // 计算专项附加扣除（与综合所得计税逻辑一致）
     let specialAdditionalDeduction = 0;
+    let actualMedicalDeduction = 0;
+    let annualProfessionalDeduction = 0;
     if (isSpecialAdditionalDeductionVisible) {
         const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction').value) || 0;
         const monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction').value) || 0;
@@ -426,10 +428,9 @@ function updateReverseDeductionCalculation() {
         
         // 计算大病医疗实际可扣除额（大病医疗是年度金额）
         const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction').value) || 0;
-        const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+        actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
         
         // 检查职业资格扣除
-        let annualProfessionalDeduction = 0;
         if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
             annualProfessionalDeduction = 3600; // 职业资格3600元/年
         }
@@ -467,7 +468,7 @@ function updateReverseDeductionCalculation() {
     let annualSpecialDeductionTotal = specialDeduction * workMonths;
     
     // 计算年度专项附加扣除合计
-    let annualSpecialAdditionalDeductionTotal = specialAdditionalDeduction * workMonths;
+    let annualSpecialAdditionalDeductionTotal = specialAdditionalDeduction * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
     
     // 计算年度其他扣除合计
     const isCharitableDonationChecked = isOtherDeductionVisible && document.getElementById('reverse-charitable-donation-checkbox').checked;
@@ -496,7 +497,6 @@ function updateReverseDeductionCalculation() {
         }
         const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction').value) || 0;
         // 检查职业资格扣除
-        let annualProfessionalDeduction = 0;
         if (document.getElementById('reverse-education-professional-checkbox') && document.getElementById('reverse-education-professional-checkbox').checked) {
             annualProfessionalDeduction = 3600; // 职业资格3600元/年
         }
@@ -782,10 +782,16 @@ function resetForwardCalculation() {
 
 // 重置反向倒算
 function resetReverseCalculation() {
-    // 1. 重置税额数据
-    document.getElementById('reverse-total-tax').value = 0;
+    // 1. 重置倒算方式为按目标税率
+    document.getElementById('reverse-type').value = 'rate';
     
-    // 2. 重置工作月数
+    // 2. 重置新输入字段
+    document.getElementById('reverse-target-rate').value = '3';
+    document.getElementById('reverse-monthly-net').value = 0;
+    document.getElementById('reverse-fixed-tax').value = 0;
+    document.getElementById('reverse-fixed-net').value = 0;
+    
+    // 3. 重置工作月数
     document.getElementById('reverse-work-months').value = 12;
     
     // 3. 重置基本减除费用
@@ -902,4 +908,196 @@ function resetClassificationCalculation() {
     
     // 5. 重置步骤
     showClassificationStep(1);
+}
+
+// 全局变量：分类所得条目列表
+let classificationItems = [];
+
+// 分类所得类型名称映射
+const classificationTypeNames = {
+    interest: '利息、股息、红利所得',
+    rent: '财产租赁所得',
+    transfer: '财产转让所得',
+    accidental: '偶然所得'
+};
+
+// 添加分类所得条目
+function addClassificationItem() {
+    const type = document.getElementById('classification-type').value;
+    const income = parseFloat(document.getElementById('classification-income').value) || 0;
+    
+    if (income <= 0) {
+        showAlert('请输入有效的收入金额');
+        return;
+    }
+    
+    // 确保类型名称存在，如果不存在使用默认值
+    const typeName = classificationTypeNames[type] || '分类所得';
+    
+    const item = {
+        type: type,
+        typeName: typeName,
+        income: income,
+        deduction: 0,
+        taxableIncome: 0,
+        totalTax: 0
+    };
+    
+    // 获取特定类型的额外参数
+    if (type === 'rent') {
+        const rentDeductions = parseFloat(document.getElementById('rent-deductions').value) || 0;
+        const rentRepair = parseFloat(document.getElementById('rent-repair').value) || 0;
+        item.deduction = rentDeductions + Math.min(rentRepair, 800);
+    } else if (type === 'transfer') {
+        const transferOriginal = parseFloat(document.getElementById('transfer-original').value) || 0;
+        const transferExpenses = parseFloat(document.getElementById('transfer-expenses').value) || 0;
+        item.deduction = transferOriginal + transferExpenses;
+    }
+    
+    // 计算应纳税所得额
+    if (type === 'interest' || type === 'accidental') {
+        // 利息、股息、红利所得，偶然所得以每次收入额为应纳税所得额
+        item.taxableIncome = income;
+    } else if (type === 'rent') {
+        // 财产租赁所得
+        if (income <= 4000) {
+            item.taxableIncome = Math.max(0, income - 800 - item.deduction);
+        } else {
+            item.taxableIncome = Math.max(0, income * 0.8 - item.deduction);
+        }
+    } else if (type === 'transfer') {
+        // 财产转让所得
+        item.taxableIncome = Math.max(0, income - item.deduction);
+    }
+    
+    // 计算应纳税额
+    // 分类所得适用20%的比例税率
+    item.totalTax = item.taxableIncome * 0.2;
+    
+    classificationItems.push(item);
+    updateClassificationItemsList();
+    
+    // 重置表单
+    resetClassificationCalculation();
+}
+
+// 更新分类所得条目列表显示
+function updateClassificationItemsList() {
+    const listElement = document.getElementById('classification-items-list');
+    if (!listElement) return;
+    
+    listElement.innerHTML = '';
+    
+    classificationItems.forEach((item, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'bg-gray-50 rounded-lg p-4 flex justify-between items-center';
+        
+        itemDiv.innerHTML = `
+            <div class="flex-1">
+                <div class="font-medium text-gray-800">${item.typeName}</div>
+                <div class="text-sm text-gray-600">
+                    收入: ¥${item.income.toFixed(2)} 
+                    ${item.deduction > 0 ? `| 扣除: ¥${item.deduction.toFixed(2)}` : ''} 
+                    | 税额: ¥${item.totalTax.toFixed(2)}
+                </div>
+            </div>
+            <button class="btn bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 text-sm" onclick="removeClassificationItem(${index})">
+                <i class="fa fa-trash"></i>
+            </button>
+        `;
+        
+        listElement.appendChild(itemDiv);
+    });
+}
+
+// 移除分类所得条目
+function removeClassificationItem(index) {
+    classificationItems.splice(index, 1);
+    updateClassificationItemsList();
+}
+
+// 更新分类所得结果显示
+function updateClassificationResultDisplay() {
+    if (classificationItems.length === 0) return;
+    
+    let totalIncome = 0;
+    let totalTaxableIncome = 0;
+    let totalTax = 0;
+    
+    classificationItems.forEach(item => {
+        totalIncome += item.income;
+        totalTaxableIncome += item.taxableIncome;
+        totalTax += item.totalTax;
+    });
+    
+    // 更新显示 - 安全检查元素是否存在
+    const resultTypeElement = document.getElementById('classification-result-type');
+    if (resultTypeElement) {
+        resultTypeElement.textContent = 
+            classificationItems.length > 1 ? '多项分类所得' : (classificationItems[0].typeName || '分类所得');
+    }
+    
+    const resultIncomeElement = document.getElementById('classification-result-income');
+    if (resultIncomeElement) {
+        resultIncomeElement.textContent = '¥' + totalIncome.toFixed(2);
+    }
+    
+    const resultTotalTaxElement = document.getElementById('classification-result-total-tax');
+    if (resultTotalTaxElement) {
+        resultTotalTaxElement.textContent = '¥' + totalTax.toFixed(2);
+    }
+    
+    const deductionsElement = document.getElementById('classification-result-deductions');
+    if (deductionsElement) {
+        if (totalTaxableIncome < totalIncome) {
+            deductionsElement.classList.remove('hidden');
+            const deductionAmountElement = document.getElementById('classification-result-deduction-amount');
+            if (deductionAmountElement) {
+                deductionAmountElement.textContent = '¥' + (totalIncome - totalTaxableIncome).toFixed(2);
+            }
+        } else {
+            deductionsElement.classList.add('hidden');
+        }
+    }
+    
+    const resultTaxableIncomeElement = document.getElementById('classification-result-taxable-income');
+    if (resultTaxableIncomeElement) {
+        resultTaxableIncomeElement.textContent = '¥' + totalTaxableIncome.toFixed(2);
+    }
+}
+
+// 计算分类所得税
+function calculateClassificationTax() {
+    if (classificationItems.length === 0) {
+        showAlert('请至少添加一个所得条目');
+        return;
+    }
+    
+    let totalIncome = 0;
+    let totalTaxableIncome = 0;
+    let totalTax = 0;
+    
+    classificationItems.forEach(item => {
+        totalIncome += item.income;
+        totalTaxableIncome += item.taxableIncome;
+        totalTax += item.totalTax;
+    });
+    
+    classificationCalculationResults = {
+        items: [...classificationItems],
+        totalIncome: totalIncome,
+        totalTaxableIncome: totalTaxableIncome,
+        totalTax: totalTax,
+        calculationDate: new Date().toISOString()
+    };
+    
+    updateClassificationResultDisplay();
+    updateClassificationBudgetTable();
+    updateClassificationCharts();
+    
+    // 更新日期显示
+    const dateElement = document.getElementById('classification-budget-table-date');
+    if (dateElement) {
+        dateElement.textContent = new Date().toLocaleDateString();
+    }
 }

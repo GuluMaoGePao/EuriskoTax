@@ -208,8 +208,11 @@ window.addEventListener('DOMContentLoaded', function() {
         updateReverseDeductionCalculation();
     });
     
-    // 反向倒算页面税额输入
-    document.getElementById('reverse-total-tax').addEventListener('input', calculateReverseTax);
+    // 反向倒算页面新输入字段事件监听
+    document.getElementById('reverse-target-rate').addEventListener('change', calculateReverseTax);
+    document.getElementById('reverse-monthly-net').addEventListener('input', calculateReverseTax);
+    document.getElementById('reverse-fixed-tax').addEventListener('input', calculateReverseTax);
+    document.getElementById('reverse-fixed-net').addEventListener('input', calculateReverseTax);
     
     // 反向倒算按钮
     document.getElementById('calculate-reverse-btn').addEventListener('click', function() {
