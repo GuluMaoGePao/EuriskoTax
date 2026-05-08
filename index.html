@@ -1189,12 +1189,13 @@
                                 倒算方式
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">选择从税额倒算或从税后收入倒算</span>
+                                    <span class="tooltip-text">选择倒算方式</span>
                                 </span>
                             </label>
                             <select id="reverse-type" class="input-field">
-                                <option value="tax">从税额倒算</option>
-                                <option value="net">从税后收入倒算</option>
+                                <option value="rate">按目标税率倒算</option>
+                                <option value="monthly">按月度税后收入倒算</option>
+                                <option value="both">固定税额+到手倒算</option>
                             </select>
                         </div>
                         
@@ -1212,29 +1213,65 @@
                             </select>
                         </div>
                         
-                        <div id="reverse-tax-input" class="form-group">
-                            <label for="reverse-total-tax" class="label">
-                                全年应缴税额 (元)
+                        <!-- 方式1：按目标税率倒算 -->
+                        <div id="reverse-rate-input" class="form-group">
+                            <label for="reverse-target-rate" class="label">
+                                目标税率
                                 <span class="tooltip ml-1">
                                     <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">个人全年应缴纳的个人所得税总额</span>
+                                    <span class="tooltip-text">选择希望适用的税率级别</span>
+                                </span>
+                            </label>
+                            <select id="reverse-target-rate" class="input-field">
+                                <option value="3">3%</option>
+                                <option value="10">10%</option>
+                                <option value="20">20%</option>
+                                <option value="25">25%</option>
+                                <option value="30">30%</option>
+                                <option value="35">35%</option>
+                                <option value="45">45%</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 方式2：按月度税后收入倒算 -->
+                        <div id="reverse-monthly-input" class="form-group hidden">
+                            <label for="reverse-monthly-net" class="label">
+                                月度税后收入 (元)
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">每月实际到手的税后收入</span>
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="reverse-total-tax" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="reverse-monthly-net" class="input-field" value="0" min="0" step="100">
                             </div>
                         </div>
                         
-                        <div id="reverse-net-input" class="form-group hidden">
-                            <label for="reverse-net-income" class="label">
-                                全年税后收入 (元)
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">个人全年实际到手的税后收入总额</span>
-                                </span>
-                            </label>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="reverse-net-income" class="input-field" value="0" min="0" step="1000">
+                        <!-- 方式3：固定税额+到手倒算 -->
+                        <div id="reverse-both-input" class="hidden">
+                            <div class="form-group">
+                                <label for="reverse-fixed-tax" class="label">
+                                    希望缴纳的税额 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">希望全年缴纳的个人所得税总额</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-fixed-tax" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="reverse-fixed-net" class="label">
+                                    希望到手的金额 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">希望全年实际到手的税后收入</span>
+                                    </span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="reverse-fixed-net" class="input-field" value="0" min="0" step="1000">
+                                </div>
                             </div>
                         </div>
                         
@@ -1279,26 +1316,6 @@
                                     <span class="ml-2 text-sm text-gray-700">并入综合所得计税（不勾选则单独计税）</span>
                                 </label>
                             </div>
-                        </div>
-                        
-                        <div id="reverse-tax-rate-input" class="form-group">
-                            <label for="reverse-tax-rate" class="label">
-                                按税率预算
-                                <span class="tooltip ml-1">
-                                    <i class="fa fa-info-circle text-gray-400"></i>
-                                    <span class="tooltip-text">选择适用的税率级别，系统将按照该税率进行反向倒算</span>
-                                </span>
-                            </label>
-                            <select id="reverse-tax-rate" class="input-field">
-                                <option value="auto">自动判断</option>
-                                <option value="3">3%</option>
-                                <option value="10">10%</option>
-                                <option value="20">20%</option>
-                                <option value="25">25%</option>
-                                <option value="30">30%</option>
-                                <option value="35">35%</option>
-                                <option value="45">45%</option>
-                            </select>
                         </div>
                         
                         <div class="mt-6 flex justify-between">
@@ -2642,18 +2659,20 @@
         // 反向倒算方式切换
         document.getElementById('reverse-type').addEventListener('change', function() {
             const reverseType = this.value;
-            const taxInput = document.getElementById('reverse-tax-input');
-            const netInput = document.getElementById('reverse-net-input');
-            const taxRateInput = document.getElementById('reverse-tax-rate-input');
+            const rateInput = document.getElementById('reverse-rate-input');
+            const monthlyInput = document.getElementById('reverse-monthly-input');
+            const bothInput = document.getElementById('reverse-both-input');
             
-            if (reverseType === 'tax') {
-                taxInput.classList.remove('hidden');
-                netInput.classList.add('hidden');
-                taxRateInput.classList.add('hidden');
+            rateInput.classList.add('hidden');
+            monthlyInput.classList.add('hidden');
+            bothInput.classList.add('hidden');
+            
+            if (reverseType === 'rate') {
+                rateInput.classList.remove('hidden');
+            } else if (reverseType === 'monthly') {
+                monthlyInput.classList.remove('hidden');
             } else {
-                taxInput.classList.add('hidden');
-                netInput.classList.remove('hidden');
-                taxRateInput.classList.remove('hidden');
+                bothInput.classList.remove('hidden');
             }
         });
         

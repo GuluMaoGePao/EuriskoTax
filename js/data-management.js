@@ -178,6 +178,51 @@ function saveCalculationResult() {
     }
 }
 
+// 辅助函数：安全获取收入值
+function getIncomeValue(item) {
+    try {
+        if (item.type === 'business') {
+            return item.results?.incomeDetails?.businessIncome || 0;
+        } else if (item.type === 'classification') {
+            return item.results?.totalIncome || 0;
+        } else if (item.type === 'reverse') {
+            // 兼容新旧数据结构
+            return item.results?.incomeDetails?.total || item.results?.totalIncome || 0;
+        } else {
+            return item.results?.incomeDetails?.total || 0;
+        }
+    } catch (e) {
+        return 0;
+    }
+}
+
+// 辅助函数：安全获取税额值
+function getTaxValue(item) {
+    try {
+        return item.results?.taxDetails?.totalTax || item.results?.totalTax || 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+// 辅助函数：安全获取税后收入值
+function getNetIncomeValue(item) {
+    try {
+        if (item.type === 'business') {
+            return item.results?.taxDetails?.netIncome || 0;
+        } else if (item.type === 'classification') {
+            const totalIncome = item.results?.totalIncome || 0;
+            const totalTax = item.results?.taxDetails?.totalTax || item.results?.totalTax || 0;
+            return Math.max(0, totalIncome - totalTax);
+        } else {
+            // 兼容新旧数据结构
+            return item.results?.taxDetails?.netIncome || item.results?.netIncome || 0;
+        }
+    } catch (e) {
+        return 0;
+    }
+}
+
 // 加载历史记录
 function loadHistoryRecords() {
     const historyList = document.getElementById('history-list');
@@ -204,6 +249,11 @@ function loadHistoryRecords() {
         const date = new Date(item.date);
         const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         
+        // 安全获取值
+        const incomeValue = getIncomeValue(item);
+        const taxValue = getTaxValue(item);
+        const netIncomeValue = getNetIncomeValue(item);
+        
         historyItem.innerHTML = `
             <div class="flex justify-between items-start">
                 <div>
@@ -223,15 +273,15 @@ function loadHistoryRecords() {
                 <div class="grid grid-cols-3 gap-2 text-sm">
                     <div>
                         <span class="text-gray-500">收入：</span>
-                        <span class="font-medium">¥${item.type === 'business' ? item.results.incomeDetails.businessIncome.toFixed(2) : item.type === 'classification' ? item.results.totalIncome.toFixed(2) : item.type === 'reverse' ? item.results.incomeDetails.total.toFixed(2) : item.results.incomeDetails.total.toFixed(2)}</span>
+                        <span class="font-medium">¥${incomeValue.toFixed(2)}</span>
                     </div>
                     <div>
                         <span class="text-gray-500">应纳税额：</span>
-                        <span class="font-medium text-danger">¥${item.results.taxDetails.totalTax.toFixed(2)}</span>
+                        <span class="font-medium text-danger">¥${taxValue.toFixed(2)}</span>
                     </div>
                     <div>
                         <span class="text-gray-500">税后收入：</span>
-                        <span class="font-medium text-primary">¥${item.type === 'business' ? item.results.taxDetails.netIncome.toFixed(2) : item.type === 'classification' ? (item.results.totalIncome - item.results.taxDetails.totalTax).toFixed(2) : item.results.taxDetails.netIncome.toFixed(2)}</span>
+                        <span class="font-medium text-primary">¥${netIncomeValue.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -255,19 +305,19 @@ function viewHistoryRecord(id) {
         const results = record.results;
         
         // 基本信息
-        document.getElementById('business-income').value = results.incomeDetails.businessIncome || 0;
-        document.getElementById('business-cost').value = results.incomeDetails.businessCost || 0;
-        document.getElementById('business-expenses').value = results.incomeDetails.businessExpenses || 0;
-        document.getElementById('business-taxes').value = results.incomeDetails.businessTaxes || 0;
-        document.getElementById('business-losses').value = results.incomeDetails.businessLosses || 0;
-        document.getElementById('business-other-expenses').value = results.incomeDetails.businessOtherExpenses || 0;
-        document.getElementById('business-previous-losses').value = results.incomeDetails.businessPreviousLosses || 0;
+        document.getElementById('business-income').value = results?.incomeDetails?.businessIncome || 0;
+        document.getElementById('business-cost').value = results?.incomeDetails?.businessCost || 0;
+        document.getElementById('business-expenses').value = results?.incomeDetails?.businessExpenses || 0;
+        document.getElementById('business-taxes').value = results?.incomeDetails?.businessTaxes || 0;
+        document.getElementById('business-losses').value = results?.incomeDetails?.businessLosses || 0;
+        document.getElementById('business-other-expenses').value = results?.incomeDetails?.businessOtherExpenses || 0;
+        document.getElementById('business-previous-losses').value = results?.incomeDetails?.businessPreviousLosses || 0;
         
         // 扣除项
-        document.getElementById('business-has-comprehensive-income').checked = results.deductionDetails.hasComprehensiveIncome ?? true;
-        document.getElementById('business-special-additional-deduction').value = results.deductionDetails.specialAdditionalDeduction || 0;
-        document.getElementById('business-other-deduction').value = results.deductionDetails.otherDeduction || 0;
-        document.getElementById('business-prepaid-tax').value = results.taxDetails.prepaidTax || 0;
+        document.getElementById('business-has-comprehensive-income').checked = results?.deductionDetails?.hasComprehensiveIncome ?? true;
+        document.getElementById('business-special-additional-deduction').value = results?.deductionDetails?.specialAdditionalDeduction || 0;
+        document.getElementById('business-other-deduction').value = results?.deductionDetails?.otherDeduction || 0;
+        document.getElementById('business-prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
         
         // 重新计算
         calculateBusinessTax();
@@ -281,25 +331,25 @@ function viewHistoryRecord(id) {
         // 填充分类所得数据
         const results = record.results;
         
-        // 清空现有条目
-        classificationItems = [];
-        
-        // 填充条目
+        // 恢复数据
+        classificationCalculationResults = results;
         if (results.items) {
-            results.items.forEach(item => {
-                addClassificationItem();
-                const index = classificationItems.length - 1;
-                document.getElementById(`classification-type-${index}`).value = item.type;
-                document.getElementById(`classification-income-${index}`).value = item.income;
-                document.getElementById(`classification-cost-${index}`).value = item.cost || 0;
-            });
+            classificationItems = [...results.items];
         }
         
-        // 重新计算
-        calculateClassificationTax();
-        showClassificationStep(2);
+        // 重新计算和显示
+        updateClassificationItemsList();
+        updateClassificationResultDisplay();
         updateClassificationBudgetTable();
         updateClassificationCharts();
+        
+        // 更新日期
+        const dateElement = document.getElementById('classification-budget-table-date');
+        if (dateElement && results.calculationDate) {
+            dateElement.textContent = new Date(results.calculationDate).toLocaleDateString();
+        }
+        
+        showClassificationStep(2);
     } else if (record.type === 'reverse') {
         // 切换到反向倒算页面
         showPage('reverse-calculation-page');
@@ -308,24 +358,22 @@ function viewHistoryRecord(id) {
         const results = record.results;
         
         // 基本参数
-        document.getElementById('reverse-type').value = results.reverseType || 'tax';
-        document.getElementById('reverse-tax-input').value = results.taxInput || 0;
-        document.getElementById('reverse-net-input').value = results.netInput || 0;
-        document.getElementById('reverse-work-months').value = results.workMonths || 12;
+        document.getElementById('reverse-type').value = results?.reverseType || 'rate';
+        document.getElementById('reverse-work-months').value = results?.workMonths || 12;
         
         // 扣除项
-        document.getElementById('reverse-basic-deduction').value = results.deductionDetails.basic || 0;
-        document.getElementById('reverse-social-security-base').value = results.deductionDetails.socialSecurityBase || 0;
-        document.getElementById('reverse-pension-insurance').value = results.deductionDetails.pensionInsurance || 0;
-        document.getElementById('reverse-medical-insurance').value = results.deductionDetails.medicalInsurance || 0;
-        document.getElementById('reverse-unemployment-insurance').value = results.deductionDetails.unemploymentInsurance || 0;
-        document.getElementById('reverse-housing-fund').value = results.deductionDetails.housingFund || 0;
-        document.getElementById('reverse-elderly-deduction').value = results.deductionDetails.elderly || 0;
-        document.getElementById('reverse-children-infant-deduction').value = results.deductionDetails.childrenInfant || 0;
-        document.getElementById('reverse-housing-deduction').value = results.deductionDetails.housing || 0;
-        document.getElementById('reverse-education-deduction').value = results.deductionDetails.education || 0;
-        document.getElementById('reverse-medical-deduction').value = results.deductionDetails.medical || 0;
-        document.getElementById('reverse-other-deduction').value = results.deductionDetails.other || 0;
+        document.getElementById('reverse-basic-deduction').value = results?.deductionDetails?.basic || 0;
+        document.getElementById('reverse-social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
+        document.getElementById('reverse-pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
+        document.getElementById('reverse-medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
+        document.getElementById('reverse-unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
+        document.getElementById('reverse-housing-fund').value = results?.deductionDetails?.housingFund || 0;
+        document.getElementById('reverse-elderly-deduction').value = results?.deductionDetails?.elderly || 0;
+        document.getElementById('reverse-children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
+        document.getElementById('reverse-housing-deduction').value = results?.deductionDetails?.housing || 0;
+        document.getElementById('reverse-education-deduction').value = results?.deductionDetails?.education || 0;
+        document.getElementById('reverse-medical-deduction').value = results?.deductionDetails?.medical || 0;
+        document.getElementById('reverse-other-deduction').value = results?.deductionDetails?.other || 0;
         
         // 重新计算
         calculateReverseTax();
@@ -340,46 +388,46 @@ function viewHistoryRecord(id) {
         const results = record.results;
         
         // 基本参数
-        document.getElementById('work-months').value = results.workMonths;
-        document.getElementById('prepaid-tax').value = results.taxDetails.prepaidTax;
+        document.getElementById('work-months').value = results?.workMonths || 12;
+        document.getElementById('prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
         
         // 收入明细
-        document.getElementById('salary-income').value = results.incomeDetails.salary;
-        document.getElementById('labor-income').value = results.incomeDetails.labor;
-        document.getElementById('author-income').value = results.incomeDetails.author;
-        document.getElementById('royalty-income').value = results.incomeDetails.royalty;
-        document.getElementById('bonus-income').value = results.incomeDetails.bonus;
-        document.getElementById('bonus-include').checked = results.incomeDetails.bonusInclude;
+        document.getElementById('salary-income').value = results?.incomeDetails?.salary || 0;
+        document.getElementById('labor-income').value = results?.incomeDetails?.labor || 0;
+        document.getElementById('author-income').value = results?.incomeDetails?.author || 0;
+        document.getElementById('royalty-income').value = results?.incomeDetails?.royalty || 0;
+        document.getElementById('bonus-income').value = results?.incomeDetails?.bonus || 0;
+        document.getElementById('bonus-include').checked = results?.incomeDetails?.bonusInclude ?? false;
         
         // 扣除项明细
-        document.getElementById('basic-deduction').value = results.deductionDetails.basic;
+        document.getElementById('basic-deduction').value = results?.deductionDetails?.basic || 5000;
         
         // 专项扣除
-        document.getElementById('social-security-base').value = results.deductionDetails.socialSecurityBase || 0;
-        document.getElementById('pension-insurance').value = results.deductionDetails.pensionInsurance;
-        document.getElementById('medical-insurance').value = results.deductionDetails.medicalInsurance;
-        document.getElementById('unemployment-insurance').value = results.deductionDetails.unemploymentInsurance;
-        document.getElementById('housing-fund').value = results.deductionDetails.housingFund;
+        document.getElementById('social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
+        document.getElementById('pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
+        document.getElementById('medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
+        document.getElementById('unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
+        document.getElementById('housing-fund').value = results?.deductionDetails?.housingFund || 0;
         
         // 专项附加扣除
-        document.getElementById('elderly-deduction').value = results.deductionDetails.elderly;
-        document.getElementById('children-infant-deduction').value = results.deductionDetails.childrenInfant;
+        document.getElementById('elderly-deduction').value = results?.deductionDetails?.elderly || 0;
+        document.getElementById('children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
         
         // 住房类型
-        const housingType = results.deductionDetails.housing > 1200 ? 'rent' : 'loan';
+        const housingType = (results?.deductionDetails?.housing || 0) > 1200 ? 'rent' : 'loan';
         document.getElementById('housing-type').value = housingType;
         
         // 住房贷款/租金扣除
-        document.getElementById('housing-deduction').value = results.deductionDetails.housing;
+        document.getElementById('housing-deduction').value = results?.deductionDetails?.housing || 0;
         
         // 继续教育扣除
-        document.getElementById('education-deduction').value = results.deductionDetails.education;
+        document.getElementById('education-deduction').value = results?.deductionDetails?.education || 0;
         
         // 大病医疗扣除
-        document.getElementById('medical-deduction').value = results.deductionDetails.medical;
+        document.getElementById('medical-deduction').value = results?.deductionDetails?.medical || 0;
         
         // 其他扣除
-        document.getElementById('other-deduction').value = results.deductionDetails.other;
+        document.getElementById('other-deduction').value = results?.deductionDetails?.other || 0;
         
         // 重新计算
         calculateTax();
@@ -397,5 +445,3 @@ function deleteHistoryRecord(id) {
         loadHistoryRecords();
     });
 }
-
-

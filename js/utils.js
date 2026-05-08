@@ -282,17 +282,27 @@ function updateReverseBudgetTable() {
     
     tbody.innerHTML = '';
     
-    const monthlyIncome = reverseCalculationResults.totalIncome / workMonths;
+    const incomeDetails = reverseCalculationResults.incomeDetails || {};
+    const deductionDetails = reverseCalculationResults.deductionDetails || {};
+    const taxDetails = reverseCalculationResults.taxDetails || {};
+    
+    const totalIncome = incomeDetails.total || 0;
+    const totalDeduction = deductionDetails.total || 0;
+    const totalTax = taxDetails.totalTax || 0;
+    
+    if (totalIncome === 0) return;
+    
+    const monthlyIncome = totalIncome / workMonths;
     // 月度扣除不包含大病医疗
-    const monthlyDeduction = (reverseCalculationResults.totalDeduction - reverseCalculationResults.deductionDetails.actualMedical) / workMonths;
+    const monthlyDeduction = (totalDeduction - (deductionDetails.actualMedical || 0)) / workMonths;
     const monthlyTaxableIncome = monthlyIncome - monthlyDeduction;
-    const monthlyTax = reverseCalculationResults.totalTax / workMonths;
+    const monthlyTax = totalTax / workMonths;
     
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
     // 大病医疗按年计算，不平均到工作月
-    const annualMedicalDeduction = reverseCalculationResults.deductionDetails.actualMedical || 0;
+    const annualMedicalDeduction = deductionDetails.actualMedical || 0;
     
     for (let month = 1; month <= workMonths; month++) {
         cumulativeTaxableIncome += monthlyTaxableIncome;
