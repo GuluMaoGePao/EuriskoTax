@@ -9,10 +9,6 @@ function updateBudgetTable() {
     tbody.innerHTML = '';
     
     const monthlySalary = calculationResults.incomeDetails.salary;
-    // laborCalculated、authorCalculated 和 royaltyCalculated 已经是年度计算后的值，需要除以12得到月度值
-    const monthlyLabor = calculationResults.incomeDetails.laborCalculated / 12;
-    const monthlyAuthor = calculationResults.incomeDetails.authorCalculated / 12;
-    const monthlyRoyalty = calculationResults.incomeDetails.royaltyCalculated / 12;
     const monthlyBonus = calculationResults.incomeDetails.bonusInclude ? calculationResults.incomeDetails.bonus / workMonths : 0;
     
     const monthlyBasicDeduction = calculationResults.deductionDetails.basic;
@@ -20,8 +16,6 @@ function updateBudgetTable() {
                                      calculationResults.deductionDetails.medicalInsurance + 
                                      calculationResults.deductionDetails.unemploymentInsurance + 
                                      calculationResults.deductionDetails.housingFund;
-    // 计算月度专项附加扣除（不包含职业资格和大病医疗扣除）
-    // 直接从calculationResults中获取各项月度扣除
     const monthlySpecialAdditional = calculationResults.deductionDetails.elderly + 
                                      calculationResults.deductionDetails.childrenInfant + 
                                      calculationResults.deductionDetails.housing + 
@@ -31,38 +25,22 @@ function updateBudgetTable() {
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
-    // 大病医疗按年计算，不平均到工作月
-    const annualMedicalDeduction = calculationResults.deductionDetails.actualMedical;
-    // 年终奖税额
     const bonusTax = calculationResults.incomeDetails.bonusTax || 0;
     const bonusIncome = calculationResults.incomeDetails.bonus || 0;
     const bonusInclude = calculationResults.incomeDetails.bonusInclude || false;
     
     // 1. 生成月度数据表格
     for (let month = 1; month <= workMonths; month++) {
-        // 只计算月工资的收入
         const monthlyIncome = monthlySalary;
-        // 月度扣除
         const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
         const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
         
-        // 计算累计应纳税所得额
         cumulativeTaxableIncome += monthlyTaxableIncome;
         
-        // 计算累计应纳税额
         let currentCumulativeTax = 0;
         let applicableRate = 0;
-        // 直接定义税率表，避免依赖外部变量
-        const taxBrackets = [
-            { max: 36000, rate: 0.03, deduction: 0 },
-            { max: 144000, rate: 0.1, deduction: 2520 },
-            { max: 300000, rate: 0.2, deduction: 16920 },
-            { max: 420000, rate: 0.25, deduction: 31920 },
-            { max: 660000, rate: 0.3, deduction: 52920 },
-            { max: 960000, rate: 0.35, deduction: 85920 },
-            { max: Infinity, rate: 0.45, deduction: 181920 }
-        ];
-        for (const bracket of taxBrackets) {
+        
+        for (const bracket of comprehensiveTaxRates) {
             if (cumulativeTaxableIncome <= bracket.max) {
                 currentCumulativeTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction;
                 applicableRate = bracket.rate;
@@ -70,12 +48,7 @@ function updateBudgetTable() {
             }
         }
         
-        // 计算本月应纳税额
         let monthTax = currentCumulativeTax - cumulativeTax;
-        
-        // 最后一个月不加年终奖税额，因为年终奖单独计税
-        
-        // 更新累计税额
         cumulativeTax = currentCumulativeTax;
         
         const row = document.createElement('tr');
@@ -94,42 +67,29 @@ function updateBudgetTable() {
     
     // 2. 添加劳务所得、稿酬所得、特许权使用费和年底一次性奖金表格
     const laborIncome = calculationResults.incomeDetails.labor || 0;
+    const laborTaxableIncome = calculationResults.incomeDetails.laborCalculated || 0;
+    const laborTax = calculationResults.incomeDetails.laborTax || 0;
     const laborDeduction = laborIncome > 4000 ? laborIncome * 0.2 : 800;
-    const laborTaxableIncome = Math.max(0, laborIncome - laborDeduction);
-    
-    // 劳务报酬预扣预缴采用累进税率
-    let laborTaxRate = 0.2;
-    let laborTax = 0;
-    if (laborTaxableIncome <= 20000) {
-        laborTax = laborTaxableIncome * 0.2;
-        laborTaxRate = 0.2;
-    } else if (laborTaxableIncome <= 50000) {
-        laborTax = laborTaxableIncome * 0.3 - 2000;
-        laborTaxRate = 0.3;
-    } else {
-        laborTax = laborTaxableIncome * 0.4 - 7000;
-        laborTaxRate = 0.4;
-    }
     
     const authorIncome = calculationResults.incomeDetails.author || 0;
+    const authorTaxableIncome = calculationResults.incomeDetails.authorCalculated || 0;
+    const authorTax = calculationResults.incomeDetails.authorTax || 0;
     const authorDeduction = authorIncome > 4000 ? authorIncome * 0.2 : 800;
-    const authorTaxableIncome = Math.max(0, authorIncome - authorDeduction) * 0.7;
-    const authorTaxRate = 0.2;
-    const authorTax = authorTaxableIncome * authorTaxRate;
     
     const royaltyIncome = calculationResults.incomeDetails.royalty || 0;
+    const royaltyTaxableIncome = calculationResults.incomeDetails.royaltyCalculated || 0;
+    const royaltyTax = calculationResults.incomeDetails.royaltyTax || 0;
     const royaltyDeduction = royaltyIncome > 4000 ? royaltyIncome * 0.2 : 800;
-    const royaltyTaxableIncome = Math.max(0, royaltyIncome - royaltyDeduction);
+    
+    // 计算税率用于显示
+    const laborTaxRate = laborTaxableIncome <= 20000 ? 0.2 : (laborTaxableIncome <= 50000 ? 0.3 : 0.4);
+    const authorTaxRate = 0.2;
     const royaltyTaxRate = 0.2;
-    const royaltyTax = royaltyTaxableIncome * royaltyTaxRate;
     
     // 检查是否有任何其他收入或年终奖
     if (laborIncome > 0 || authorIncome > 0 || royaltyIncome > 0 || (bonusIncome > 0 && !bonusInclude)) {
-        // 添加空行
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-            <td colspan="7"></td>
-        `;
+        emptyRow.innerHTML = `<td colspan="7"></td>`;
         tbody.appendChild(emptyRow);
         
         const categoryRow2 = document.createElement('tr');
@@ -144,7 +104,6 @@ function updateBudgetTable() {
         `;
         tbody.appendChild(categoryRow2);
         
-        // 劳务所得行
         if (laborIncome > 0) {
             const laborRow = document.createElement('tr');
             laborRow.innerHTML = `
@@ -159,7 +118,6 @@ function updateBudgetTable() {
             tbody.appendChild(laborRow);
         }
         
-        // 稿酬所得行
         if (authorIncome > 0) {
             const authorRow = document.createElement('tr');
             authorRow.innerHTML = `
@@ -174,7 +132,6 @@ function updateBudgetTable() {
             tbody.appendChild(authorRow);
         }
         
-        // 特许权使用费行
         if (royaltyIncome > 0) {
             const royaltyRow = document.createElement('tr');
             royaltyRow.innerHTML = `
@@ -189,24 +146,12 @@ function updateBudgetTable() {
             tbody.appendChild(royaltyRow);
         }
         
-        // 年底一次性奖金行（当单独计税时）
         if (bonusIncome > 0 && !bonusInclude) {
             const bonusRow = document.createElement('tr');
-            // 计算年终奖适用税率
-            // 计算方式：全年奖金/12，查月度税率表确定税率
             let bonusTaxRate = 0;
             const monthlyBonus = bonusIncome / 12;
-            // 年终奖月度税率表
-            const bonusMonthlyTaxBrackets = [
-                { max: 3000, rate: 0.03, deduction: 0 },
-                { max: 12000, rate: 0.1, deduction: 210 },
-                { max: 25000, rate: 0.2, deduction: 1410 },
-                { max: 35000, rate: 0.25, deduction: 2660 },
-                { max: 55000, rate: 0.3, deduction: 4410 },
-                { max: 80000, rate: 0.35, deduction: 7160 },
-                { max: Infinity, rate: 0.45, deduction: 15160 }
-            ];
-            for (const bracket of bonusMonthlyTaxBrackets) {
+            
+            for (const bracket of bonusMonthlyTaxRates) {
                 if (monthlyBonus <= bracket.max) {
                     bonusTaxRate = bracket.rate;
                     break;
@@ -236,9 +181,7 @@ function updateBudgetTable() {
     const refundTax = annualTax - prepaidTax;
     
     const finalRow1 = document.createElement('tr');
-    finalRow1.innerHTML = `
-        <td class="section-title" colspan="7">综合所得汇算</td>
-    `;
+    finalRow1.innerHTML = `<td class="section-title" colspan="7">综合所得汇算</td>`;
     tbody.appendChild(finalRow1);
     
     const finalRow2 = document.createElement('tr');
@@ -265,7 +208,6 @@ function updateBudgetTable() {
     `;
     tbody.appendChild(finalRow3);
     
-    // 更新生成日期
     const dateElement = document.getElementById('budget-table-date');
     if (dateElement) {
         dateElement.textContent = new Date().toLocaleDateString();

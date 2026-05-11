@@ -1,7 +1,9 @@
 // 导出到Word文档
 function exportToWord(elementId, title) {
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0 && Object.keys(reverseCalculationResults).length === 0) {
+    if (Object.keys(calculationResults).length === 0 && 
+        Object.keys(reverseCalculationResults).length === 0 &&
+        Object.keys(businessCalculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }
@@ -19,10 +21,29 @@ function exportToWord(elementId, title) {
     link.click();
 }
 
+// 安全格式化数值
+function safeFormatNumber(value, decimals = 2) {
+    const num = parseFloat(value);
+    if (isNaN(num) || !isFinite(num)) {
+        return '0.' + '0'.repeat(decimals);
+    }
+    return num.toFixed(decimals);
+}
+
 // 生成Word文档内容
 function generateWordDocumentContent(title) {
-    // 优先使用反向倒算结果（如果有），否则使用正向计算结果
-    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
+    // 优先使用反向倒算结果（如果有），否则使用正向计算结果，最后检查经营所得
+    const hasReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
+    const hasForwardCalculation = Object.keys(calculationResults).length > 0;
+    const hasBusinessCalculation = Object.keys(businessCalculationResults).length > 0;
+    
+    // 如果是经营所得
+    if (title.includes('经营所得')) {
+        return generateBusinessDocumentContent(title);
+    }
+    
+    // 综合所得或反向倒算
+    const isReverseCalculation = hasReverseCalculation;
     const results = isReverseCalculation ? reverseCalculationResults : calculationResults;
     const workMonths = results.workMonths;
     
@@ -74,13 +95,13 @@ function generateWordDocumentContent(title) {
         };
         
         taxDetails = {
-            taxableIncome: results.taxableIncome,
-            applicableRate: results.applicableRate,
-            applicableDeduction: results.applicableDeduction,
-            totalTax: results.totalTax,
+            taxableIncome: results.taxableIncome || 0,
+            applicableRate: results.applicableRate || 0,
+            applicableDeduction: results.applicableDeduction || 0,
+            totalTax: results.totalTax || 0,
             prepaidTax: 0,
             refundTax: 0,
-            netIncome: results.netIncome
+            netIncome: results.netIncome || 0
         };
     } else {
         // 正向计算结果结构
@@ -805,4 +826,277 @@ function generateOptimizationTipsForWord() {
         <p>${tip}</p>
     </div>
     `).join('');
+}
+
+// 生成经营所得Word文档内容
+function generateBusinessDocumentContent(title) {
+    const results = businessCalculationResults;
+    
+    // 安全获取值
+    const businessIncome = results.incomeDetails?.businessIncome || 0;
+    const businessCost = results.incomeDetails?.businessCost || 0;
+    const businessExpenses = results.incomeDetails?.businessExpenses || 0;
+    const businessTaxes = results.incomeDetails?.businessTaxes || 0;
+    const businessLosses = results.incomeDetails?.businessLosses || 0;
+    const businessOtherExpenses = results.incomeDetails?.businessOtherExpenses || 0;
+    const businessPreviousLosses = results.incomeDetails?.businessPreviousLosses || 0;
+    const businessProfit = results.incomeDetails?.businessProfit || 0;
+    
+    const hasComprehensiveIncome = results.deductionDetails?.hasComprehensiveIncome ?? true;
+    const investorDeduction = results.deductionDetails?.investorDeduction || 0;
+    const specialAdditionalDeduction = results.deductionDetails?.specialAdditionalDeduction || 0;
+    const otherDeduction = results.deductionDetails?.otherDeduction || 0;
+    
+    const taxableIncome = results.taxDetails?.taxableIncome || 0;
+    const applicableRate = results.taxDetails?.applicableRate || 0;
+    const applicableDeduction = results.taxDetails?.applicableDeduction || 0;
+    const totalTaxBeforeHalving = results.taxDetails?.totalTaxBeforeHalving || 0;
+    const taxReduction = results.taxDetails?.taxReduction || 0;
+    const totalTax = results.taxDetails?.totalTax || 0;
+    const prepaidTax = results.taxDetails?.prepaidTax || 0;
+    const refundTax = results.taxDetails?.refundTax || 0;
+    const netIncome = results.taxDetails?.netIncome || 0;
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+        * {
+            font-family: 'SimSun', '宋体', serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'SimSun', '宋体', serif;
+            margin: 0;
+            line-height: 1.5;
+            font-size: 14pt;
+            color: #000;
+        }
+        .cover {
+            text-align: center;
+            margin-bottom: 0px;
+            padding: 0 0;
+        }
+        .cover h1 {
+            font-size: 22pt;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #000;
+        }
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .section h2 {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            color: #000;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12pt;
+        }
+        .info-table th,
+        .info-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            text-align: left;
+            font-size: 12pt;
+        }
+        .info-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #000;
+            text-align: center;
+            font-size: 12pt;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="cover">
+        <h1>${title}</h1>
+        <p>生成日期：${new Date().toLocaleDateString()}</p>
+        <p>计算类型：经营所得计税</p>
+    </div>
+    
+    <div class="section">
+        <h2>一、经营所得计算</h2>
+        <table class="info-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>年度经营收入总额</td>
+                <td>${safeFormatNumber(businessIncome)}</td>
+                <td>包括主营业务收入和其他业务收入</td>
+            </tr>
+            <tr>
+                <td>年度成本</td>
+                <td>${safeFormatNumber(businessCost)}</td>
+                <td>包括原材料、商品采购等直接成本</td>
+            </tr>
+            <tr>
+                <td>年度费用</td>
+                <td>${safeFormatNumber(businessExpenses)}</td>
+                <td>包括房租、水电费、办公费等间接费用</td>
+            </tr>
+            <tr>
+                <td>年度税金</td>
+                <td>${safeFormatNumber(businessTaxes)}</td>
+                <td>包括增值税、城建税、教育费附加等</td>
+            </tr>
+            <tr>
+                <td>年度损失</td>
+                <td>${safeFormatNumber(businessLosses)}</td>
+                <td>包括资产损失、坏账损失等</td>
+            </tr>
+            <tr>
+                <td>其他支出</td>
+                <td>${safeFormatNumber(businessOtherExpenses)}</td>
+                <td>其他与经营活动相关的支出</td>
+            </tr>
+            <tr>
+                <td>以前年度亏损弥补</td>
+                <td>${safeFormatNumber(businessPreviousLosses)}</td>
+                <td>允许弥补的以前年度亏损（不超过5年）</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>二、应纳税所得额计算</h2>
+        <table class="info-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>经营利润</td>
+                <td>${safeFormatNumber(businessProfit)}</td>
+                <td>= 收入-成本-费用-税金-损失-其他</td>
+            </tr>
+            <tr>
+                <td>减：以前年度亏损</td>
+                <td>${safeFormatNumber(businessPreviousLosses)}</td>
+                <td>可弥补以前年度亏损</td>
+            </tr>
+            <tr>
+                <td>减：投资者减除费用</td>
+                <td>${safeFormatNumber(investorDeduction)}</td>
+                <td>${hasComprehensiveIncome ? '有综合所得，不扣' : '无综合所得，扣60000元/年'}</td>
+            </tr>
+            <tr>
+                <td>减：专项附加扣除</td>
+                <td>${safeFormatNumber(specialAdditionalDeduction)}</td>
+                <td>子女教育、继续教育等7项</td>
+            </tr>
+            <tr>
+                <td>减：其他扣除</td>
+                <td>${safeFormatNumber(otherDeduction)}</td>
+                <td>个人养老金、商业健康保险等</td>
+            </tr>
+            <tr>
+                <td>年度应纳税所得额</td>
+                <td>${safeFormatNumber(taxableIncome)}</td>
+                <td>= 利润-亏损-各项扣除</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>三、应纳税额计算</h2>
+        <table class="info-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>适用税率</td>
+                <td>${(applicableRate * 100).toFixed(0)}%</td>
+                <td>5%-35%超额累进税率</td>
+            </tr>
+            <tr>
+                <td>速算扣除数</td>
+                <td>${safeFormatNumber(applicableDeduction)}</td>
+                <td>根据应纳税所得额级数确定</td>
+            </tr>
+            <tr>
+                <td>应纳税额（未减半）</td>
+                <td>${safeFormatNumber(totalTaxBeforeHalving)}</td>
+                <td>= 应纳税所得额×税率-速算扣除数</td>
+            </tr>
+            <tr>
+                <td>减半征收减免税额</td>
+                <td>${safeFormatNumber(taxReduction)}</td>
+                <td>≤200万元部分减半征收</td>
+            </tr>
+            <tr>
+                <td>年度应纳税额（实际应缴）</td>
+                <td>${safeFormatNumber(totalTax)}</td>
+                <td>= 应纳税额-减免税额</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>四、应退/应补税额计算</h2>
+        <table class="info-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>全年累计已预缴税额</td>
+                <td>${safeFormatNumber(prepaidTax)}</td>
+                <td>年度内已预缴的经营所得税额</td>
+            </tr>
+            <tr>
+                <td>年度应退/应补税额</td>
+                <td>${safeFormatNumber(refundTax)}</td>
+                <td>= 应纳税额-已预缴税额</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>五、税后经营所得</h2>
+        <table class="info-table">
+            <tr>
+                <th>项目</th>
+                <th>金额（元）</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>税后经营所得</td>
+                <td>${safeFormatNumber(netIncome)}</td>
+                <td>= 经营利润-实际应纳税额</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="footer">
+        <p>声明：本报告仅供参考，实际纳税情况以税务部门核算结果为准。</p>
+        <p>版本：2026.04.13</p>
+    </div>
+</body>
+</html>
+    `;
 }

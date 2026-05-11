@@ -180,10 +180,7 @@ function calculateReverseSocialSecurityRate(type) {
 
 // 更新收入计算
 function updateIncomeCalculation() {
-    console.log('updateIncomeCalculation called');
-    // 获取工作月数
     const workMonths = parseInt(document.getElementById('work-months').value) || 12;
-    console.log('workMonths:', workMonths);
     
     const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
     const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
@@ -192,74 +189,30 @@ function updateIncomeCalculation() {
     const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
     const bonusInclude = document.getElementById('bonus-include').checked;
     
-    console.log('Inputs:', {
-        monthlySalaryIncome,
-        annualLaborIncome,
-        annualAuthorIncome,
-        annualRoyaltyIncome,
-        bonusIncome,
-        bonusInclude
-    });
-    
-    // 计算各项收入计入综合所得的金额（年度）
-        // 劳务报酬所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
-        const laborTaxableIncome = Math.max(0, annualLaborIncome <= 4000 ? (annualLaborIncome - 800) : (annualLaborIncome * 0.8));
-        // 稿酬所得：不超过4000元的减除800元，超过4000元的减除20%，再减按70%，但不低于0
-        const authorTaxableIncome = Math.max(0, annualAuthorIncome <= 4000 ? ((annualAuthorIncome - 800) * 0.7) : (annualAuthorIncome * 0.8 * 0.7));
-        // 特许权使用费所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
-        const royaltyTaxableIncome = Math.max(0, annualRoyaltyIncome <= 4000 ? (annualRoyaltyIncome - 800) : (annualRoyaltyIncome * 0.8));
-        
-        // 计算劳务报酬所得的预扣税额（根据应纳税所得额的不同档次）
-        let laborTax = 0;
-        if (laborTaxableIncome <= 20000) {
-            laborTax = laborTaxableIncome * 0.2;
-        } else if (laborTaxableIncome <= 50000) {
-            laborTax = laborTaxableIncome * 0.3 - 2000;
-        } else {
-            laborTax = laborTaxableIncome * 0.4 - 7000;
-        }
-        
-        // 计算稿酬所得的预扣税额
-        const authorTax = authorTaxableIncome * 0.2;
-        
-        // 计算特许权使用费所得的预扣税额
-        const royaltyTax = royaltyTaxableIncome * 0.2;
-        
-        // 计算计入综合所得的金额（年度）
-        const annualLaborIncomeCalculated = laborTaxableIncome;
-        const annualAuthorIncomeCalculated = authorTaxableIncome;
-        const annualRoyaltyIncomeCalculated = royaltyTaxableIncome;
+    // 使用统一函数计算其他收入
+    const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
     
     // 计算月度综合所得收入额合计（用于显示）
-    const monthlySalaryIncomeCalculated = monthlySalaryIncome;
-    const monthlyLaborIncomeCalculated = annualLaborIncomeCalculated / workMonths;
-    const monthlyAuthorIncomeCalculated = annualAuthorIncomeCalculated / workMonths;
-    const monthlyRoyaltyIncomeCalculated = annualRoyaltyIncomeCalculated / workMonths;
-    const monthlyIncomeAmount = monthlySalaryIncomeCalculated;
+    const monthlyLaborIncomeCalculated = otherIncome.laborTaxableIncome / workMonths;
+    const monthlyAuthorIncomeCalculated = otherIncome.authorTaxableIncome / workMonths;
+    const monthlyRoyaltyIncomeCalculated = otherIncome.royaltyTaxableIncome / workMonths;
     
     // 计算年度综合所得收入额合计（根据工作月数调整）
-    let totalIncomeAmount = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
+    let totalIncomeAmount = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
+        otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
     if (bonusInclude) {
         totalIncomeAmount += bonusIncome;
     }
     
     // 计算税前收入合计（所有收入的总和）
-    const preTaxIncomeAmount = monthlySalaryIncome * workMonths + annualLaborIncome + annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
-    
-    console.log('Calculations:', {
-        annualLaborIncomeCalculated,
-        annualAuthorIncomeCalculated,
-        annualRoyaltyIncomeCalculated,
-        monthlyIncomeAmount,
-        totalIncomeAmount,
-        preTaxIncomeAmount
-    });
+    const preTaxIncomeAmount = monthlySalaryIncome * workMonths + annualLaborIncome + 
+        annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
     
     // 更新显示
-    document.getElementById('labor-income-calculated').textContent = annualLaborIncomeCalculated.toFixed(2);
-    document.getElementById('author-income-calculated').textContent = annualAuthorIncomeCalculated.toFixed(2);
-    document.getElementById('royalty-income-calculated').textContent = annualRoyaltyIncomeCalculated.toFixed(2);
-    document.getElementById('monthly-income-amount').textContent = monthlyIncomeAmount.toFixed(2);
+    document.getElementById('labor-income-calculated').textContent = otherIncome.laborTaxableIncome.toFixed(2);
+    document.getElementById('author-income-calculated').textContent = otherIncome.authorTaxableIncome.toFixed(2);
+    document.getElementById('royalty-income-calculated').textContent = otherIncome.royaltyTaxableIncome.toFixed(2);
+    document.getElementById('monthly-income-amount').textContent = monthlySalaryIncome.toFixed(2);
     document.getElementById('total-income-amount').textContent = totalIncomeAmount.toFixed(2);
     document.getElementById('pre-tax-income-amount').textContent = preTaxIncomeAmount.toFixed(2);
     
@@ -524,14 +477,21 @@ function updateReverseDeductionCalculation() {
     document.getElementById('reverse-annual-other-deduction-total').textContent = annualOtherDeductionTotal.toFixed(2);
     document.getElementById('reverse-monthly-deduction-amount').textContent = monthlyDeductionAmount.toFixed(2);
     document.getElementById('reverse-total-deduction').textContent = totalDeduction.toFixed(2);
+}
+
+// 更新扣除项并触发反向倒算计算
+function updateReverseDeductionAndCalculate() {
+    // 先更新扣除项显示
+    updateReverseDeductionCalculation();
     
-    // 触发反向倒算，实现实时计算
-    calculateReverseTax();
+    // 触发反向倒算计算
+    if (Object.keys(reverseCalculationResults).length > 0 || document.getElementById('reverse-target-rate').value) {
+        calculateReverseTax();
+    }
 }
 
 // 更新预览数据
 function updatePreviewData() {
-    // 获取工作月数
     const workMonths = parseInt(document.getElementById('work-months').value) || 12;
     
     // 获取收入数据
@@ -542,100 +502,20 @@ function updatePreviewData() {
     const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
     const bonusInclude = document.getElementById('bonus-include').checked;
     
-    // 计算各项收入计入综合所得的金额（年度）
-        // 劳务报酬所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
-        const laborTaxableIncome = Math.max(0, annualLaborIncome <= 4000 ? (annualLaborIncome - 800) : (annualLaborIncome * 0.8));
-        // 稿酬所得：不超过4000元的减除800元，超过4000元的减除20%，再减按70%，但不低于0
-        const authorTaxableIncome = Math.max(0, annualAuthorIncome <= 4000 ? ((annualAuthorIncome - 800) * 0.7) : (annualAuthorIncome * 0.8 * 0.7));
-        // 特许权使用费所得：不超过4000元的减除800元，超过4000元的减除20%，但不低于0
-        const royaltyTaxableIncome = Math.max(0, annualRoyaltyIncome <= 4000 ? (annualRoyaltyIncome - 800) : (annualRoyaltyIncome * 0.8));
-        
-        // 计算劳务报酬所得的预扣税额（根据应纳税所得额的不同档次）
-        let laborTax = 0;
-        if (laborTaxableIncome <= 20000) {
-            laborTax = laborTaxableIncome * 0.2;
-        } else if (laborTaxableIncome <= 50000) {
-            laborTax = laborTaxableIncome * 0.3 - 2000;
-        } else {
-            laborTax = laborTaxableIncome * 0.4 - 7000;
-        }
-        
-        // 计算稿酬所得的预扣税额
-        const authorTax = authorTaxableIncome * 0.2;
-        
-        // 计算特许权使用费所得的预扣税额
-        const royaltyTax = royaltyTaxableIncome * 0.2;
-        
-        // 计算计入综合所得的金额（年度）
-        const annualLaborIncomeCalculated = laborTaxableIncome;
-        const annualAuthorIncomeCalculated = authorTaxableIncome;
-        const annualRoyaltyIncomeCalculated = royaltyTaxableIncome;
+    // 使用统一函数计算其他收入
+    const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
     
-    // 计算年度综合所得收入额合计（根据工作月数调整）
-    let totalIncome = monthlySalaryIncome * workMonths + annualLaborIncomeCalculated + annualAuthorIncomeCalculated + annualRoyaltyIncomeCalculated;
+    // 计算年度综合所得收入额合计
+    let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
+        otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
     if (bonusInclude) {
         totalIncome += bonusIncome;
     }
     
-    // 检查各扣除项是否显示
-    const isSpecialDeductionVisible = !document.getElementById('special-deduction-content').classList.contains('hidden');
-    const isSpecialAdditionalDeductionVisible = !document.getElementById('special-additional-deduction-content').classList.contains('hidden');
-    const isOtherDeductionVisible = !document.getElementById('other-deduction-content').classList.contains('hidden');
+    // 使用统一函数计算扣除项
+    const deductions = calculateComprehensiveDeductions(workMonths);
     
-    // 获取扣除项数据（月度）
-    const monthlyBasicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 0;
-    const monthlyPensionInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('pension-insurance').value) || 0) : 0;
-    const monthlyMedicalInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('medical-insurance').value) || 0) : 0;
-    const monthlyUnemploymentInsurance = isSpecialDeductionVisible ? (parseFloat(document.getElementById('unemployment-insurance').value) || 0) : 0;
-    const monthlyHousingFund = isSpecialDeductionVisible ? (parseFloat(document.getElementById('housing-fund').value) || 0) : 0;
-    const monthlyInsuranceDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + monthlyUnemploymentInsurance + monthlyHousingFund;
-    const monthlyElderlyDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('elderly-deduction').value) || 0) : 0;
-    const monthlyChildrenInfantDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('children-infant-deduction').value) || 0) : 0;
-    
-    // 住房扣除（二选一）
-    let monthlyHousingDeduction = 0;
-    if (isSpecialAdditionalDeductionVisible) {
-        const housingType = document.getElementById('housing-type').value;
-        if (housingType === 'rent') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('rent-deduction').value) || 0;
-        } else if (housingType === 'loan') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
-        }
-    }
-    
-    const annualEducationDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('education-deduction').value) || 0) : 0;
-    const annualMedicalDeduction = isSpecialAdditionalDeductionVisible ? (parseFloat(document.getElementById('medical-deduction').value) || 0) : 0;
-    const monthlyPensionDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('pension-deduction').value) || 0) : 0;
-    const monthlyEnterpriseAnnuity = isOtherDeductionVisible ? (parseFloat(document.getElementById('enterprise-annuity').value) || 0) : 0;
-    const monthlyInsuranceOtherDeduction = isOtherDeductionVisible ? (parseFloat(document.getElementById('insurance-other-deduction').value) || 0) : 0;
-    const monthlyTaxDeferredPension = isOtherDeductionVisible ? (parseFloat(document.getElementById('tax-deferred-pension').value) || 0) : 0;
-    const annualCharitableDonation = isOtherDeductionVisible ? (parseFloat(document.getElementById('charitable-donation').value) || 0) : 0;
-    
-    // 检查职业资格扣除
-    let annualProfessionalDeduction = 0;
-    if (isSpecialAdditionalDeductionVisible && document.getElementById('education-professional-checkbox') && document.getElementById('education-professional-checkbox').checked) {
-        annualProfessionalDeduction = 3600; // 职业资格3600元/年
-    }
-    
-    // 计算年度大病医疗实际可扣除额
-    const actualMedicalDeduction = annualMedicalDeduction > 15000 ? Math.min(annualMedicalDeduction - 15000, 80000) : 0;
-    
-    // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
-    // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
-    const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-    const monthlyEducationDeduction = educationDegreeAmount / workMonths;
-    const monthlySpecialAdditionalTotal = monthlyElderlyDeduction + monthlyChildrenInfantDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
-    
-    // 计算年度专项附加扣除合计 = 月度专项附加扣除合计 * 工作月数 + 职业资格 + 大病医疗
-    const annualSpecialAdditionalTotal = monthlySpecialAdditionalTotal * workMonths + annualProfessionalDeduction + actualMedicalDeduction;
-    
-    // 计算年度其他扣除合计（根据工作月数调整）
-    const annualOtherDeductionTotal = (monthlyPensionDeduction + monthlyEnterpriseAnnuity + monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension) * workMonths + annualCharitableDonation;
-    
-    // 计算年度总扣除额（根据工作月数调整）
-    const totalDeduction = monthlyBasicDeduction * workMonths + monthlyInsuranceDeduction * workMonths + annualSpecialAdditionalTotal + annualOtherDeductionTotal;
-    
-    const taxableIncome = totalIncome - totalDeduction;
+    const taxableIncome = totalIncome - deductions.totalDeduction;
     
     // 检查元素是否存在，避免错误
     const previewIncome = document.getElementById('preview-income');
@@ -644,7 +524,7 @@ function updatePreviewData() {
     }
     const previewDeduction = document.getElementById('preview-deduction');
     if (previewDeduction) {
-        previewDeduction.textContent = totalDeduction.toFixed(2);
+        previewDeduction.textContent = deductions.totalDeduction.toFixed(2);
     }
     const previewTaxable = document.getElementById('preview-taxable');
     if (previewTaxable) {
@@ -784,12 +664,17 @@ function resetForwardCalculation() {
 function resetReverseCalculation() {
     // 1. 重置倒算方式为按目标税率
     document.getElementById('reverse-type').value = 'rate';
+    document.getElementById('reverse-type').dispatchEvent(new Event('change'));
     
     // 2. 重置新输入字段
     document.getElementById('reverse-target-rate').value = '3';
     document.getElementById('reverse-monthly-net').value = 0;
     document.getElementById('reverse-fixed-tax').value = 0;
     document.getElementById('reverse-fixed-net').value = 0;
+    
+    // 2.1 重置年终奖
+    document.getElementById('reverse-bonus-income').value = 0;
+    document.getElementById('reverse-bonus-include').checked = false;
     
     // 3. 重置工作月数
     document.getElementById('reverse-work-months').value = 12;
@@ -852,8 +737,15 @@ function resetReverseCalculation() {
     // 12. 清空计算结果
     reverseCalculationResults = {};
     
-    // 13. 重新计算并更新显示
-    updateReverseDeductionCalculation();
+    // 13. 重置扣除项显示（不触发计算和页面跳转）
+    document.getElementById('reverse-monthly-special-deduction-total').textContent = '0.00';
+    document.getElementById('reverse-monthly-special-additional-total').textContent = '0.00';
+    document.getElementById('reverse-monthly-other-deduction-total').textContent = '0.00';
+    document.getElementById('reverse-annual-special-deduction-total').textContent = '0.00';
+    document.getElementById('reverse-annual-special-additional-total').textContent = '0.00';
+    document.getElementById('reverse-annual-other-deduction-total').textContent = '0.00';
+    document.getElementById('reverse-monthly-deduction-amount').textContent = '6000.00';
+    document.getElementById('reverse-total-deduction').textContent = '60000.00';
     
     // 14. 再次确保所有显示状态正确
     setTimeout(() => {
