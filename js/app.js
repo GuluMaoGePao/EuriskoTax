@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', function() {
         updateReverseDeductionCalculation();
     });
     
-    // 反向倒算页面企业年金输入
+    // 反向倒算页面企业年金输入（仅更新显示，不触发计算）
     document.getElementById('reverse-enterprise-annuity').addEventListener('input', updateReverseDeductionCalculation);
     
     // 反向倒算页面个人养老金复选框
@@ -583,7 +583,7 @@ window.addEventListener('DOMContentLoaded', function() {
     // 反向倒算保存按钮
     document.getElementById('save-reverse-calculation-btn').addEventListener('click', function() {
         if (Object.keys(reverseCalculationResults).length === 0) {
-            alert('请先完成计算后再保存');
+            showAlert('请先完成计算后再保存');
             return;
         }
         saveReverseCalculation();
@@ -592,7 +592,7 @@ window.addEventListener('DOMContentLoaded', function() {
     // 分类所得保存按钮
     document.getElementById('save-classification-calculation-btn').addEventListener('click', function() {
         if (Object.keys(classificationCalculationResults).length === 0) {
-            alert('请先完成计算后再保存');
+            showAlert('请先完成计算后再保存');
             return;
         }
         saveClassificationCalculation();
@@ -626,7 +626,7 @@ window.addEventListener('DOMContentLoaded', function() {
     // 保存经营所得计算结果
     document.getElementById('save-business-result-btn').addEventListener('click', function() {
         if (Object.keys(businessCalculationResults).length === 0) {
-            alert('请先完成计算后再保存');
+            showAlert('请先完成计算后再保存');
             return;
         }
         saveBusinessCalculation();
