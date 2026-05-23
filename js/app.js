@@ -19,6 +19,38 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-mode-btn').addEventListener('click', function() {
         showPage('reverse-calculation-page');
         showReverseStep(1);
+        // 初始化时触发一次倒算方式变更事件，更新描述文案
+        document.getElementById('reverse-type').dispatchEvent(new Event('change'));
+    });
+    
+    // 反向倒算页面倒算方式选择
+    document.getElementById('reverse-type').addEventListener('change', function() {
+        const type = this.value;
+        const descriptionEl = document.querySelector('#reverse-calculation-page .text-gray-600');
+        
+        // 更新描述文案
+        if (descriptionEl) {
+            if (type === 'rate') {
+                descriptionEl.textContent = '输入目标税率，反推税前收入';
+            } else if (type === 'monthly') {
+                descriptionEl.textContent = '输入月度税后收入，反推税前收入';
+            } else if (type === 'both') {
+                descriptionEl.textContent = '输入目标税额，反推税前收入';
+            }
+        }
+        
+        // 显示/隐藏相应的输入区域
+        document.getElementById('reverse-rate-input').classList.add('hidden');
+        document.getElementById('reverse-monthly-input').classList.add('hidden');
+        document.getElementById('reverse-both-input').classList.add('hidden');
+        
+        if (type === 'rate') {
+            document.getElementById('reverse-rate-input').classList.remove('hidden');
+        } else if (type === 'monthly') {
+            document.getElementById('reverse-monthly-input').classList.remove('hidden');
+        } else if (type === 'both') {
+            document.getElementById('reverse-both-input').classList.remove('hidden');
+        }
     });
     
     // 反向倒算页面扣除项显示/隐藏控制
