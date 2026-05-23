@@ -232,14 +232,11 @@ function calculateTax() {
         const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
         const bonusInclude = document.getElementById('bonus-include').checked;
 
-        // 使用统一函数计算其他收入
+        // 使用统一函数计算其他收入（用于计算总收入）
         const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
         
         // 使用统一函数计算扣除项
         const deductions = calculateComprehensiveDeductions(workMonths);
-        
-        // 使用统一函数计算年终奖税额
-        const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
 
         // 计算总收入
         let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
@@ -266,15 +263,24 @@ function calculateTax() {
             }
         }
 
-        // 计算预缴税额
+        // 计算预缴税额（工资薪金所得）
         const cumulativeTax = calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, 
             deductions.monthlyBasicDeduction, deductions.monthlyInsuranceDeduction, 
             deductions.monthlySpecialAdditionalTotal, deductions.monthlyPensionDeduction, 
             deductions.monthlyEnterpriseAnnuity, deductions.monthlyInsuranceOtherDeduction, 
             deductions.monthlyTaxDeferredPension);
         
-        const prepaidTax = cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + 
-            otherIncome.royaltyTax + bonusTax;
+        // 计算其他收入的预缴税额（劳务报酬、稿酬、特许权使用费）- 复用上面已计算的 otherIncome
+        // 计算年终奖税额
+        const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
+        
+        // 获取用户输入的已纳税额
+        const userInputPrepaidTax = parseFloat(document.getElementById('prepaid-tax')?.value);
+        
+        // 如果用户输入了已纳税额，使用用户输入值；否则使用计算的累积预缴税额 + 其他收入预缴税额 + 年终奖税额
+        const prepaidTax = (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) 
+            ? userInputPrepaidTax 
+            : (cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax);
         
         const refundTax = totalTax - prepaidTax;
         
@@ -372,8 +378,16 @@ function calculateTax() {
         
         const refundTaxElement = document.getElementById('result-refund-tax');
         if (refundTaxElement) {
-            refundTaxElement.textContent = (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2);
-            refundTaxElement.className = refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success';
+            if (refundTax === 0) {
+                refundTaxElement.textContent = '不退不补 ¥0.00';
+                refundTaxElement.className = 'font-medium text-lg';
+            } else if (refundTax > 0) {
+                refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
+                refundTaxElement.className = 'font-medium text-lg text-danger';
+            } else {
+                refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
+                refundTaxElement.className = 'font-medium text-lg text-success';
+            }
         }
         
         const resultNetIncomeElement = document.getElementById('result-net-income');
@@ -488,10 +502,32 @@ function calculateReverseBonusTax(inputData) {
     return bonusTax;
 }
 
+// 辅助函数：根据应纳税所得额计算税额
+function calculateTaxByTaxableIncome(taxableIncome) {
+    if (taxableIncome <= 0) return { tax: 0, rate: 0, deduction: 0 };
+    
+    for (const bracket of comprehensiveTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            const tax = taxableIncome * bracket.rate - bracket.deduction;
+            return {
+                tax: Math.max(0, tax),
+                rate: bracket.rate,
+                deduction: bracket.deduction
+            };
+        }
+    }
+    return { tax: 0, rate: 0, deduction: 0 };
+}
+
 // 方式1：按目标税率倒算（给定税率，计算所需收入范围）
+// 核心逻辑：
+// 1. 根据目标税率找到对应的应纳税所得额范围 [min, max]
+// 2. 税前收入 = 应纳税所得额 + 扣除总额
+// 3. 总收入 = 综合所得税前收入 + 年终奖
 function calculateFromTargetRate(inputData, deductionData, bonusTax) {
     const targetRate = inputData.targetRate / 100;
     
+    // 步骤1：找到目标税率对应的级距
     const targetBracket = comprehensiveTaxRates.find(
         bracket => Math.abs(bracket.rate - targetRate) < 0.001
     );
@@ -500,27 +536,68 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax) {
         throw new Error('找不到对应的税率级距');
     }
     
+    // 步骤2：获取该税率对应的应纳税所得额范围
+    // 数据来源：中国个人所得税法综合所得税率表
     const minTaxableIncome = targetBracket.min || 0;
     const maxTaxableIncome = targetBracket.max;
     
-    const minTotalIncome = minTaxableIncome + deductionData.totalDeduction;
-    const maxTotalIncome = maxTaxableIncome === Infinity 
+    // 步骤3：计算综合所得税前收入范围
+    // 公式：综合所得税前收入 = 应纳税所得额 + 扣除总额
+    const minPreTaxIncome = minTaxableIncome + deductionData.totalDeduction;
+    const maxPreTaxIncome = maxTaxableIncome === Infinity 
         ? Infinity 
         : maxTaxableIncome + deductionData.totalDeduction;
     
-    const middleTaxableIncome = maxTaxableIncome === Infinity 
-        ? minTaxableIncome + 1000000
-        : (minTaxableIncome + maxTaxableIncome) / 2;
+    // 步骤4：计算总收入范围
+    // 总收入 = 综合所得税前收入 + 年终奖（年终奖是否并入只影响税额，不影响收入范围）
+    let minTotalIncome, maxTotalIncome;
     
-    const middleTotalIncome = middleTaxableIncome + deductionData.totalDeduction;
-    const middleTax = middleTaxableIncome * targetBracket.rate - targetBracket.deduction + bonusTax;
+    if (inputData.bonusIncome > 0) {
+        // 有年终奖：总收入 = 综合所得 + 年终奖
+        minTotalIncome = minPreTaxIncome + inputData.bonusIncome;
+        maxTotalIncome = maxPreTaxIncome === Infinity 
+            ? Infinity 
+            : maxPreTaxIncome + inputData.bonusIncome;
+    } else {
+        // 无年终奖
+        minTotalIncome = minPreTaxIncome;
+        maxTotalIncome = maxPreTaxIncome;
+    }
+    
+    // 步骤5：计算参考中间值
+    // 对于有上限的级距，使用级距中点
+    // 对于无上限的级距（最高税率45%），使用 min + 100,000 作为参考值
+    let middleTaxableIncome;
+    if (maxTaxableIncome === Infinity) {
+        middleTaxableIncome = minTaxableIncome + 100000;
+    } else {
+        middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+    }
+    
+    // 步骤6：计算中间值对应的税额和税后收入
+    const middlePreTaxIncome = middleTaxableIncome + deductionData.totalDeduction;
+    let middleTotalIncome;
+    
+    if (inputData.bonusIncome > 0) {
+        middleTotalIncome = middlePreTaxIncome + inputData.bonusIncome;
+    } else {
+        middleTotalIncome = middlePreTaxIncome;
+    }
+    
+    // 计算综合所得税额
+    // 公式：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+    const middleComprehensiveTax = middleTaxableIncome * targetBracket.rate - targetBracket.deduction;
+    // 总税额 = 综合所得税额 + 年终奖税额
+    const middleTotalTax = middleComprehensiveTax + bonusTax;
+    // 税后收入 = 税前收入 - 总税额
+    const middleNetIncome = middleTotalIncome - middleTotalTax;
     
     return {
         totalIncome: middleTotalIncome,
         minTotalIncome: minTotalIncome,
         maxTotalIncome: maxTotalIncome,
-        finalTotalTax: middleTax,
-        calculatedNetIncome: middleTotalIncome - middleTax,
+        finalTotalTax: middleTotalTax,
+        calculatedNetIncome: middleNetIncome,
         taxableIncome: middleTaxableIncome,
         applicableRate: targetBracket.rate,
         applicableDeduction: targetBracket.deduction,
@@ -530,57 +607,63 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax) {
 }
 
 // 方式2：按月度税后收入倒算（给定税后收入，计算税前收入）
+// 核心逻辑：
+// 已知：税后收入 = 税前收入 - 应纳税额 - 年终奖税额
+// 使用二分法求解税前收入
 function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
     const monthlyNet = inputData.monthlyNet;
     const workMonths = inputData.workMonths;
+    
+    // 步骤1：计算年度目标税后收入
+    // 公式：年度税后收入 = 月度税后收入 × 工作月数
     const annualNetTarget = monthlyNet * workMonths;
     
+    // 步骤2：使用二分法求解税前收入
+    // 搜索范围：[扣除总额, 扣除总额 + 10,000,000]
     let left = deductionData.totalDeduction;
     let right = deductionData.totalDeduction + 10000000;
     const precision = 0.01;
     
     while (right - left > precision) {
+        // 中间值：假设的税前收入
         const mid = (left + right) / 2;
+        
+        // 计算应纳税所得额
+        // 公式：应纳税所得额 = 税前收入 - 扣除总额
         const taxableIncome = mid - deductionData.totalDeduction;
         
         if (taxableIncome <= 0) {
+            // 应纳税所得额为0或负数，不需要交税
             left = mid;
             continue;
         }
         
-        let tax = 0;
-        for (const bracket of comprehensiveTaxRates) {
-            if (taxableIncome <= bracket.max || bracket.max === Infinity) {
-                tax = taxableIncome * bracket.rate - bracket.deduction;
-                break;
-            }
-        }
+        // 计算综合所得税额
+        // 公式：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+        const taxResult = calculateTaxByTaxableIncome(taxableIncome);
+        const comprehensiveTax = taxResult.tax;
         
-        const netIncome = mid - tax - bonusTax;
+        // 计算税后收入
+        // 公式：税后收入 = 税前收入 - 综合所得税额 - 年终奖税额
+        const netIncome = mid - comprehensiveTax - bonusTax;
         
+        // 二分法调整
         if (netIncome < annualNetTarget) {
+            // 税后收入不足，需要增加税前收入
             left = mid;
         } else {
+            // 税后收入过多，需要减少税前收入
             right = mid;
         }
     }
     
+    // 步骤3：得到最终结果
     const totalIncome = (left + right) / 2;
     const taxableIncome = totalIncome - deductionData.totalDeduction;
     
-    let finalTotalTax = 0;
-    let applicableRate = 0;
-    let applicableDeduction = 0;
-    
-    for (const bracket of comprehensiveTaxRates) {
-        if (taxableIncome <= bracket.max || bracket.max === Infinity) {
-            finalTotalTax = taxableIncome * bracket.rate - bracket.deduction + bonusTax;
-            applicableRate = bracket.rate;
-            applicableDeduction = bracket.deduction;
-            break;
-        }
-    }
-    
+    // 计算实际税额
+    const taxResult = calculateTaxByTaxableIncome(taxableIncome);
+    const finalTotalTax = taxResult.tax + bonusTax;
     const calculatedNetIncome = totalIncome - finalTotalTax;
     
     return {
@@ -590,70 +673,73 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
         calculatedNetIncome: calculatedNetIncome,
         monthlyNet: calculatedNetIncome / workMonths,
         taxableIncome: taxableIncome,
-        applicableRate: applicableRate,
-        applicableDeduction: applicableDeduction,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
         isMonthlyMode: true,
         modeName: '月度税后倒算'
     };
 }
 
 // 方式3：按目标税额倒算（给定目标税额，计算所需税前收入）
+// 核心逻辑：
+// 已知：税额 = 应纳税所得额 × 税率 - 速算扣除数
+// 使用二分法求解应纳税所得额，然后计算税前收入
 function calculateFromTargetTax(inputData, deductionData, bonusTax) {
     const targetTax = inputData.fixedTax;
     const targetNet = inputData.fixedNet;
     
+    // 情况A：仅输入目标税额
     if (targetTax > 0 && targetNet === 0) {
+        // 步骤1：使用二分法求解税前收入
+        // 搜索范围：[扣除总额, 扣除总额 + 10,000,000]
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
         const precision = 0.01;
         
         while (right - left > precision) {
+            // 中间值：假设的税前收入
             const mid = (left + right) / 2;
+            
+            // 计算应纳税所得额
+            // 公式：应纳税所得额 = 税前收入 - 扣除总额
             const taxable = mid - deductionData.totalDeduction;
             
             if (taxable <= 0) {
+                // 应纳税所得额为0或负数，税额为0
                 left = mid;
                 continue;
             }
             
-            let currentTax = 0;
-            for (const bracket of comprehensiveTaxRates) {
-                if (taxable <= bracket.max || bracket.max === Infinity) {
-                    currentTax = taxable * bracket.rate - bracket.deduction + bonusTax;
-                    break;
-                }
-            }
+            // 计算综合所得税额
+            // 公式：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+            const taxResult = calculateTaxByTaxableIncome(taxable);
+            const currentTax = taxResult.tax + bonusTax;
             
+            // 二分法调整
             if (currentTax < targetTax) {
+                // 税额不足，需要增加税前收入
                 left = mid;
             } else {
+                // 税额过多，需要减少税前收入
                 right = mid;
             }
         }
         
+        // 步骤2：得到最终结果
         const calculatedIncome = (left + right) / 2;
         const calculatedTaxable = calculatedIncome - deductionData.totalDeduction;
         
-        let actualTax = 0;
-        let applicableRate = 0;
-        let applicableDeduction = 0;
-        
-        for (const bracket of comprehensiveTaxRates) {
-            if (calculatedTaxable <= bracket.max || bracket.max === Infinity) {
-                actualTax = calculatedTaxable * bracket.rate - bracket.deduction + bonusTax;
-                applicableRate = bracket.rate;
-                applicableDeduction = bracket.deduction;
-                break;
-            }
-        }
+        // 计算实际税额
+        const taxResult = calculateTaxByTaxableIncome(calculatedTaxable);
+        const actualTax = taxResult.tax + bonusTax;
         
         return {
             totalIncome: calculatedIncome,
             finalTotalTax: actualTax,
             calculatedNetIncome: calculatedIncome - actualTax,
             taxableIncome: calculatedTaxable,
-            applicableRate: applicableRate,
-            applicableDeduction: applicableDeduction,
+            applicableRate: taxResult.rate,
+            applicableDeduction: taxResult.deduction,
             isTaxMode: true,
             modeName: '税额倒算',
             targetTax: targetTax,
@@ -661,21 +747,14 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax) {
         };
     }
     
+    // 情况B：同时输入税额和到手金额
+    // 公式：税前收入 = 税额 + 到手金额
     const targetTotalIncome = targetTax + targetNet;
     const targetTaxableIncome = targetTotalIncome - deductionData.totalDeduction;
     
-    let actualTax = 0;
-    let applicableRate = 0;
-    let applicableDeduction = 0;
-    
-    for (const bracket of comprehensiveTaxRates) {
-        if (targetTaxableIncome <= bracket.max || bracket.max === Infinity) {
-            actualTax = targetTaxableIncome * bracket.rate - bracket.deduction;
-            applicableRate = bracket.rate;
-            applicableDeduction = bracket.deduction;
-            break;
-        }
-    }
+    // 计算实际应纳税额
+    const taxResult = calculateTaxByTaxableIncome(targetTaxableIncome);
+    const actualTax = taxResult.tax + bonusTax;
     
     return {
         totalIncome: targetTotalIncome,
@@ -683,8 +762,8 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax) {
         actualTax: actualTax,
         calculatedNetIncome: targetNet,
         taxableIncome: targetTaxableIncome,
-        applicableRate: applicableRate,
-        applicableDeduction: applicableDeduction,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
         isTaxMode: true,
         modeName: '税额+到手倒算',
         targetTax: targetTax,
