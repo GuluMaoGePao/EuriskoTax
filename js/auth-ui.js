@@ -25,13 +25,25 @@ function hideRegisterModal() {
     document.getElementById('register-confirm-password').value = '';
 }
 
+function showApp() {
+    document.getElementById('login-page').classList.add('hidden');
+    document.getElementById('app-container').classList.remove('hidden');
+}
+
+function showLoginPage() {
+    document.getElementById('app-container').classList.add('hidden');
+    document.getElementById('login-page').classList.remove('hidden');
+}
+
 function updateAuthUI() {
     if (apiClient.isLoggedIn()) {
+        showApp();
         const user = apiClient.getCurrentUser();
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('user-menu').classList.remove('hidden');
         document.getElementById('user-name').textContent = user?.username || '用户';
     } else {
+        showLoginPage();
         document.getElementById('auth-section').classList.remove('hidden');
         document.getElementById('user-menu').classList.add('hidden');
     }
@@ -199,20 +211,26 @@ async function deleteHistoryItem(id) {
 }
 
 function setupAuthEventListeners() {
-    document.getElementById('login-btn').addEventListener('click', showLoginModal);
-    document.getElementById('register-btn').addEventListener('click', showRegisterModal);
-    document.getElementById('login-close').addEventListener('click', hideLoginModal);
-    document.getElementById('register-close').addEventListener('click', hideRegisterModal);
+    document.getElementById('login-tab').addEventListener('click', () => {
+        document.getElementById('login-tab').classList.add('border-primary', 'text-primary');
+        document.getElementById('login-tab').classList.remove('border-transparent', 'text-gray-500');
+        document.getElementById('register-tab').classList.add('border-transparent', 'text-gray-500');
+        document.getElementById('register-tab').classList.remove('border-primary', 'text-primary');
+        document.getElementById('login-form').classList.remove('hidden');
+        document.getElementById('register-form').classList.add('hidden');
+    });
+    
+    document.getElementById('register-tab').addEventListener('click', () => {
+        document.getElementById('register-tab').classList.add('border-primary', 'text-primary');
+        document.getElementById('register-tab').classList.remove('border-transparent', 'text-gray-500');
+        document.getElementById('login-tab').classList.add('border-transparent', 'text-gray-500');
+        document.getElementById('login-tab').classList.remove('border-primary', 'text-primary');
+        document.getElementById('register-form').classList.remove('hidden');
+        document.getElementById('login-form').classList.add('hidden');
+    });
+    
     document.getElementById('login-submit').addEventListener('click', handleLogin);
     document.getElementById('register-submit').addEventListener('click', handleRegister);
-    document.getElementById('go-to-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        showRegisterModal();
-    });
-    document.getElementById('go-to-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        showLoginModal();
-    });
     document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
         handleLogout();
@@ -242,10 +260,6 @@ function setupAuthEventListeners() {
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#user-menu')) {
             document.getElementById('user-dropdown').classList.add('hidden');
-        }
-        if (!e.target.closest('#login-modal') && !e.target.closest('#register-modal')) {
-            hideLoginModal();
-            hideRegisterModal();
         }
     });
 }
