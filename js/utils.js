@@ -185,7 +185,13 @@ function updateBudgetTable() {
     const annualTaxableIncome = Math.max(0, annualIncome - annualDeduction);
     const annualTaxRate = calculationResults.taxDetails.applicableRate || 0;
     const annualTax = calculationResults.taxDetails.totalTax || 0;
-    const prepaidTax = calculationResults.taxDetails.prepaidTax || 0;
+    
+    // 已纳税额 = 工资薪金累计预缴税额 + 劳务报酬税额 + 稿酬税额 + 特许权使用费税额 + 年终奖税额
+    const prepaidTax = cumulativeTax + 
+        (calculationResults.incomeDetails.laborTax || 0) + 
+        (calculationResults.incomeDetails.authorTax || 0) + 
+        (calculationResults.incomeDetails.royaltyTax || 0) + 
+        (calculationResults.incomeDetails.bonusTax || 0);
     const refundTax = annualTax - prepaidTax;
     
     const finalRow1 = document.createElement('tr');
@@ -249,10 +255,23 @@ function updateReverseBudgetTable() {
     const regularIncome = calculateRegularIncome(totalIncome, bonusIncome, bonusInclude);
     
     const monthlyIncome = regularIncome / workMonths;
-    // 月度扣除不包含大病医疗
-    const monthlyDeduction = (totalDeduction - (deductionDetails.actualMedical || 0)) / workMonths;
     
-    // 1. 生成月度数据表格
+    // 月度扣除计算：月扣除=专项扣除/月+专项附加扣除/月+其他扣除/月
+    // 注意：职业资格扣除和大病医疗是年度一次性扣除，月度预缴时不扣除
+    const monthlyBasicDeduction = deductionDetails.basic || 5000;
+    const monthlyInsuranceDeduction = (deductionDetails.pensionInsurance || 0) + 
+                                     (deductionDetails.medicalInsurance || 0) + 
+                                     (deductionDetails.unemploymentInsurance || 0) + 
+                                     (deductionDetails.housingFund || 0);
+    const monthlySpecialAdditional = (deductionDetails.elderly || 0) + 
+                                     (deductionDetails.childrenInfant || 0) + 
+                                     (deductionDetails.housing || 0) + 
+                                     (deductionDetails.educationDegree || 0);
+    const monthlyOtherDeduction = ((deductionDetails.otherTotal || 0) - (deductionDetails.charitableDonation || 0)) / workMonths;
+    
+    const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
+    
+    // 1. 生成月度数据表格（不包含年度一次性扣除）
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
@@ -354,7 +373,10 @@ function updateReverseBudgetTable() {
     const annualTaxRate = taxDetails.applicableRate || 0;
     const annualTax = taxDetails.totalTax || 0;
     
-    const refundTax = annualTax - 0; // 已纳税额为0，所以应退/补税额等于应纳税额
+    // 已纳税额 = 工资薪金累计预缴税额 + 年终奖税额
+    const prepaidTax = cumulativeTax + bonusTax;
+    // 应退/补税额 = 年度应纳税额 - 已预缴税额
+    const refundTax = annualTax - prepaidTax;
     
     const finalRow3 = document.createElement('tr');
     finalRow3.innerHTML = `
@@ -363,7 +385,7 @@ function updateReverseBudgetTable() {
         <td>¥${annualTaxableIncome.toFixed(2)}</td>
         <td>${(annualTaxRate * 100).toFixed(0)}%</td>
         <td>¥${annualTax.toFixed(2)}</td>
-        <td>¥0.00</td>
+        <td>¥${prepaidTax.toFixed(2)}</td>
         <td class="${refundTax < 0 ? 'positive' : refundTax > 0 ? 'negative' : ''}">¥${refundTax.toFixed(2)}</td>
     `;
     tbody.appendChild(finalRow3);
