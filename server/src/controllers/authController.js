@@ -1,0 +1,107 @@
+const authService = require('../services/authService');
+
+const register = async (req, res, next) => {
+    try {
+        const { username, email, password, phone } = req.body;
+        
+        if (!username || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Username, email and password are required',
+                    statusCode: 400
+                }
+            });
+        }
+        
+        const user = await authService.registerUser(username, email, password, phone);
+        
+        res.status(201).json({
+            success: true,
+            data: user
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const login = async (req, res, next) => {
+    try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Email and password are required',
+                    statusCode: 400
+                }
+            });
+        }
+        
+        const result = await authService.loginUser(email, password);
+        
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const profile = async (req, res, next) => {
+    try {
+        const user = await authService.getUserById(req.user.id);
+        
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const updateProfile = async (req, res, next) => {
+    try {
+        const { username, email, phone, password } = req.body;
+        const userId = req.user.id;
+        
+        const updatedUser = await authService.updateUser(userId, {
+            username,
+            email,
+            phone,
+            password
+        });
+        
+        res.status(200).json({
+            success: true,
+            data: updatedUser
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const deleteProfile = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const result = await authService.deleteUser(userId);
+        
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+module.exports = {
+    register,
+    login,
+    profile,
+    updateProfile,
+    deleteProfile
+};

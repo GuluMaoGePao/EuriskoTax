@@ -937,6 +937,11 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('housing-loan-deduction').addEventListener('input', updateDeductionCalculation);
     document.getElementById('education-deduction').addEventListener('input', updateDeductionCalculation);
     
+    // 初始化认证系统
+    import('./auth-ui.js').then(({ initAuth }) => {
+        initAuth();
+    });
+    
     // 初始化
     loadHistoryRecords();
     
