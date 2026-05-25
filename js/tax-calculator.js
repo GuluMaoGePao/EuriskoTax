@@ -204,10 +204,10 @@ function calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, monthlyB
     let cumulativeTaxableIncome = 0;
     
     for (let i = 1; i <= workMonths; i++) {
-        const monthlyTaxable = (monthlySalaryIncome - monthlyBasicDeduction - 
+        const monthlyTaxable = monthlySalaryIncome - monthlyBasicDeduction - 
             monthlyInsuranceDeduction - monthlySpecialAdditionalTotal - monthlyPensionDeduction - 
-            monthlyEnterpriseAnnuity - monthlyInsuranceOtherDeduction - monthlyTaxDeferredPension) * i;
-        cumulativeTaxableIncome = Math.max(0, monthlyTaxable);
+            monthlyEnterpriseAnnuity - monthlyInsuranceOtherDeduction - monthlyTaxDeferredPension;
+        cumulativeTaxableIncome += Math.max(0, monthlyTaxable);
     }
     
     for (const bracket of comprehensiveTaxRates) {
@@ -408,24 +408,34 @@ function calculateReverseDeductions(inputData) {
     const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox')?.checked;
     const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox')?.checked;
     
+    let monthlyPensionInsurance = 0;
+    let monthlyMedicalInsurance = 0;
+    let monthlyUnemploymentInsurance = 0;
+    let monthlyHousingFund = 0;
     let specialDeduction = 0;
     if (isSpecialDeductionVisible) {
-        const monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance')?.value) || 0;
-        const monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance')?.value) || 0;
-        const monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance')?.value) || 0;
-        const monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund')?.value) || 0;
+        monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance')?.value) || 0;
+        monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance')?.value) || 0;
+        monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance')?.value) || 0;
+        monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund')?.value) || 0;
         specialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + 
             monthlyUnemploymentInsurance + monthlyHousingFund;
     }
     
-    let specialAdditionalDeduction = 0;
+    let monthlyChildrenInfantDeduction = 0;
+    let monthlyElderlyDeduction = 0;
+    let monthlyHousingDeduction = 0;
+    let annualEducationDeduction = 0;
+    let medicalDeduction = 0;
     let actualMedicalDeduction = 0;
     let annualProfessionalDeduction = 0;
+    let educationDegreeAmount = 0;
+    let monthlyEducationDeduction = 0;
+    let specialAdditionalDeduction = 0;
     if (isSpecialAdditionalDeductionVisible) {
-        const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction')?.value) || 0;
-        const monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction')?.value) || 0;
+        monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction')?.value) || 0;
+        monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction')?.value) || 0;
         
-        let monthlyHousingDeduction = 0;
         const housingType = document.getElementById('reverse-housing-type')?.value;
         if (housingType === 'rent') {
             monthlyHousingDeduction = parseFloat(document.getElementById('reverse-rent-deduction')?.value) || 0;
@@ -433,36 +443,40 @@ function calculateReverseDeductions(inputData) {
             monthlyHousingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction')?.value) || 0;
         }
 
-        const annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction')?.value) || 0;
-        const medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction')?.value) || 0;
+        annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction')?.value) || 0;
+        medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction')?.value) || 0;
         actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
         
         if (document.getElementById('reverse-education-professional-checkbox')?.checked) {
             annualProfessionalDeduction = 3600;
         }
         
-        const educationDegreeAmount = annualEducationDeduction - annualProfessionalDeduction;
-        const monthlyEducationDeduction = educationDegreeAmount / 12;
+        educationDegreeAmount = annualEducationDeduction - annualProfessionalDeduction;
+        monthlyEducationDeduction = educationDegreeAmount / inputData.workMonths;
         specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + 
             monthlyHousingDeduction + monthlyEducationDeduction;
     }
     
+    let monthlyPensionDeduction = 0;
+    let monthlyEnterpriseAnnuity = 0;
+    let monthlyInsuranceOtherDeduction = 0;
+    let monthlyTaxDeferredPension = 0;
     let otherDeduction = 0;
     const isPensionDeductionChecked = isOtherDeductionVisible && 
         document.getElementById('reverse-pension-deduction-checkbox')?.checked;
-    const monthlyPensionDeduction = isPensionDeductionChecked ? 
+    monthlyPensionDeduction = isPensionDeductionChecked ? 
         (parseFloat(document.getElementById('reverse-pension-deduction')?.value) || 0) : 0;
     const isEnterpriseAnnuityChecked = isOtherDeductionVisible && 
         document.getElementById('reverse-enterprise-annuity-checkbox')?.checked;
-    const monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? 
+    monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? 
         (parseFloat(document.getElementById('reverse-enterprise-annuity')?.value) || 0) : 0;
     const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && 
         document.getElementById('reverse-insurance-other-deduction-checkbox')?.checked;
-    const monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? 
+    monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? 
         (parseFloat(document.getElementById('reverse-insurance-other-deduction')?.value) || 0) : 0;
     const isTaxDeferredPensionChecked = isOtherDeductionVisible && 
         document.getElementById('reverse-tax-deferred-pension-checkbox')?.checked;
-    const monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? 
+    monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? 
         (parseFloat(document.getElementById('reverse-tax-deferred-pension')?.value) || 0) : 0;
     otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + 
         monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
@@ -477,13 +491,36 @@ function calculateReverseDeductions(inputData) {
         actualMedicalDeduction + annualCharitableDonation;
     
     return {
+        monthlyBasicDeduction: basicDeduction,
+        monthlyPensionInsurance,
+        monthlyMedicalInsurance,
+        monthlyUnemploymentInsurance,
+        monthlyHousingFund,
+        monthlyElderlyDeduction,
+        monthlyChildrenInfantDeduction,
+        monthlyHousingDeduction,
+        annualEducationDeduction,
+        annualMedicalDeduction: medicalDeduction,
+        annualProfessionalDeduction,
+        actualMedicalDeduction,
+        educationDegreeAmount,
+        monthlyEducationDeduction,
+        monthlyPensionDeduction,
+        monthlyEnterpriseAnnuity,
+        monthlyInsuranceOtherDeduction,
+        monthlyTaxDeferredPension,
+        annualCharitableDonation,
+        monthlySpecialAdditionalTotal: specialAdditionalDeduction,
+        annualSpecialAdditionalTotal: specialAdditionalDeduction * inputData.workMonths + annualProfessionalDeduction + actualMedicalDeduction,
+        annualOtherDeductionTotal: otherDeduction * inputData.workMonths + annualCharitableDonation,
+        monthlyInsuranceDeduction: specialDeduction,
+        annualSpecialDeductionTotal: specialDeduction * inputData.workMonths,
         basicDeduction,
         specialDeduction,
         specialAdditionalDeduction,
         otherDeduction,
         monthlyTotalDeduction,
-        totalDeduction,
-        actualMedicalDeduction
+        totalDeduction
     };
 }
 
@@ -862,7 +899,27 @@ function saveReverseCalculationResult(result, inputData, deductionData, bonusTax
             monthly: result.monthlyIncome
         },
         deductionDetails: {
+            basic: deductionData.monthlyBasicDeduction,
+            pensionInsurance: deductionData.monthlyPensionInsurance,
+            medicalInsurance: deductionData.monthlyMedicalInsurance,
+            unemploymentInsurance: deductionData.monthlyUnemploymentInsurance,
+            housingFund: deductionData.monthlyHousingFund,
+            elderly: deductionData.monthlyElderlyDeduction,
+            childrenInfant: deductionData.monthlyChildrenInfantDeduction,
+            housing: deductionData.monthlyHousingDeduction,
+            education: deductionData.annualEducationDeduction,
+            medical: deductionData.annualMedicalDeduction,
+            professional: deductionData.annualProfessionalDeduction,
             actualMedical: deductionData.actualMedicalDeduction,
+            educationDegree: deductionData.monthlyEducationDeduction,
+            pension: deductionData.monthlyPensionDeduction,
+            enterpriseAnnuity: deductionData.monthlyEnterpriseAnnuity,
+            insuranceOther: deductionData.monthlyInsuranceOtherDeduction,
+            taxDeferredPension: deductionData.monthlyTaxDeferredPension,
+            charitableDonation: deductionData.annualCharitableDonation,
+            specialAdditionalTotal: deductionData.annualSpecialAdditionalTotal,
+            specialDeductionTotal: deductionData.annualSpecialDeductionTotal,
+            otherTotal: deductionData.annualOtherDeductionTotal,
             total: deductionData.totalDeduction
         },
         taxDetails: {

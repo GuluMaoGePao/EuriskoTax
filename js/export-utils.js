@@ -616,10 +616,16 @@ function generateMonthlyData(results) {
         const bonusInclude = document.getElementById('reverse-bonus-include')?.checked || false;
         const regularIncome = calculateRegularIncome(results.totalIncome, results.bonusIncome, bonusInclude);
         monthlySalary = regularIncome / workMonths;
-        monthlyBasicDeduction = 5000;
-        monthlyInsuranceDeduction = 0;
-        monthlySpecialAdditional = 0;
-        monthlyOtherDeduction = (results.totalDeduction - (5000 * workMonths)) / workMonths;
+        monthlyBasicDeduction = results.deductionDetails?.basic || 5000;
+        monthlyInsuranceDeduction = (results.deductionDetails?.pensionInsurance || 0) + 
+                                     (results.deductionDetails?.medicalInsurance || 0) + 
+                                     (results.deductionDetails?.unemploymentInsurance || 0) + 
+                                     (results.deductionDetails?.housingFund || 0);
+        monthlySpecialAdditional = (results.deductionDetails?.elderly || 0) + 
+                                     (results.deductionDetails?.childrenInfant || 0) + 
+                                     (results.deductionDetails?.housing || 0) + 
+                                     (results.deductionDetails?.educationDegree || 0);
+        monthlyOtherDeduction = ((results.deductionDetails?.otherTotal || 0) - (results.deductionDetails?.charitableDonation || 0)) / workMonths;
     } else {
         // 正向计算结果
         monthlySalary = results.incomeDetails.salary;

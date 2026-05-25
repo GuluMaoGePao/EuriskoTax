@@ -394,7 +394,7 @@ function updateReverseDeductionCalculation() {
         // 计算月度专项附加扣除合计（包含学历教育，不包含职业资格和大病医疗）
         // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
         const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-        const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
+        const monthlyEducationDeduction = educationDegreeAmount / workMonths;
         specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
     } else {
         document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
@@ -455,7 +455,7 @@ function updateReverseDeductionCalculation() {
         }
         // 学历教育扣除：从annualEducationDeduction中减去职业资格的3600元，只保留学历教育的金额
         const educationDegreeAmount = annualEducationDeduction - (annualProfessionalDeduction || 0);
-        const monthlyEducationDeduction = educationDegreeAmount / 12; // 与综合所得计税一致，按12个月计算
+        const monthlyEducationDeduction = educationDegreeAmount / workMonths;
         monthlySpecialAdditionalTotal = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + monthlyHousingDeduction + monthlyEducationDeduction;
     }
     
