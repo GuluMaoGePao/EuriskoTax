@@ -466,13 +466,17 @@ const comprehensiveTaxRates = [
 | 经营所得税率表 | `js/tax-calculator.js` | 29-35 | ✅ 已实现 |
 | 分类所得税率表 | `js/tax-calculator.js` | 38-42 | ✅ 已实现 |
 | 综合所得计算 | `js/tax-calculator.js` | 224-401 | ✅ 已实现 |
-| 经营所得计算 | `js/tax-calculator.js` | 1008-1110 | ✅ 已实现 |
-| 反向倒算（税率模式） | `js/tax-calculator.js` | 564-644 | ✅ 已实现 |
-| 反向倒算（月度模式） | `js/tax-calculator.js` | 650-718 | ✅ 已实现 |
-| 反向倒算（税额模式） | `js/tax-calculator.js` | 724-810 | ✅ 已实现 |
+| 经营所得计算 | `js/tax-calculator.js` | 1168-1280 | ✅ 已实现 |
+| 综合所得反向倒算（税率模式） | `js/tax-calculator.js` | 785-865 | ✅ 已实现 |
+| 综合所得反向倒算（月度模式） | `js/tax-calculator.js` | 867-939 | ✅ 已实现 |
+| 综合所得反向倒算（税额模式） | `js/tax-calculator.js` | 941-1017 | ✅ 已实现 |
+| 经营所得反向倒算（税率模式） | `js/tax-calculator.js` | 770-853 | ✅ 已实现 |
+| 经营所得反向倒算（月度模式） | `js/tax-calculator.js` | 855-943 | ✅ 已实现 |
+| 经营所得反向倒算（税额模式） | `js/tax-calculator.js` | 945-1039 | ✅ 已实现 |
+| 经营所得扣除项计算 | `js/tax-calculator.js` | 688-741 | ✅ 已实现 |
 | 专项附加扣除计算 | `js/tax-calculator.js` | 99-184 | ✅ 已实现 |
 | 大病医疗限额计算 | `js/tax-calculator.js` | 127-129 | ✅ 已实现 |
-| 经营所得减半征收 | `js/tax-calculator.js` | 1049-1052 | ✅ 已实现 |
+| 经营所得减半征收 | `js/tax-calculator.js` | 1209-1216 | ✅ 已实现 |
 | 年终奖计税选择 | `js/tax-calculator.js` | 187-197 | ✅ 已实现 |
 | 临界点提醒 | `js/tax-calculator.js` | 45-64 | ✅ 已实现 |
 | 年终奖最优分配 | `js/tax-calculator.js` | 66-119 | ✅ 已实现 |
@@ -480,7 +484,7 @@ const comprehensiveTaxRates = [
 
 ---
 
-**文档版本**: v2026.06  
+**文档版本**: v2026.07  
 **最后更新**: 2026年5月27日  
 **编制依据**: 国家税务总局官方文件及最新政策公告  
 **定位**: 个人所得税年度预算规划工具

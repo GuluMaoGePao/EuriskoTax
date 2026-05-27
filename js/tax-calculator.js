@@ -685,6 +685,66 @@ function calculateReverseDeductions(inputData) {
     };
 }
 
+// 计算经营所得反向倒算扣除项
+function calculateBusinessReverseDeductions(inputData) {
+    const hasComprehensiveIncome = document.getElementById('reverse-business-has-comprehensive-income')?.checked ?? false;
+    const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
+    
+    let businessIncome = 0;
+    let businessCost = 0;
+    let businessExpenses = 0;
+    let businessTaxes = 0;
+    let businessLosses = 0;
+    let businessOtherExpenses = 0;
+    let businessPreviousLosses = 0;
+    
+    const isBusinessDeductionVisible = document.getElementById('reverse-business-deduction-checkbox')?.checked;
+    if (isBusinessDeductionVisible) {
+        businessCost = parseFloat(document.getElementById('reverse-business-cost')?.value) || 0;
+        businessExpenses = parseFloat(document.getElementById('reverse-business-expenses')?.value) || 0;
+        businessTaxes = parseFloat(document.getElementById('reverse-business-taxes')?.value) || 0;
+        businessLosses = parseFloat(document.getElementById('reverse-business-losses')?.value) || 0;
+        businessOtherExpenses = parseFloat(document.getElementById('reverse-business-other-expenses')?.value) || 0;
+        businessPreviousLosses = parseFloat(document.getElementById('reverse-business-previous-losses')?.value) || 0;
+    }
+    
+    let specialAdditionalDeduction = 0;
+    let otherDeduction = 0;
+    const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox')?.checked;
+    if (isSpecialAdditionalDeductionVisible) {
+        specialAdditionalDeduction = parseFloat(document.getElementById('reverse-business-special-additional-deduction')?.value) || 0;
+    }
+    
+    const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox')?.checked;
+    if (isOtherDeductionVisible) {
+        otherDeduction = parseFloat(document.getElementById('reverse-business-other-deduction')?.value) || 0;
+    }
+    
+    const annualBusinessDeduction = businessCost + businessExpenses + businessTaxes + 
+        businessLosses + businessOtherExpenses + businessPreviousLosses + 
+        investorDeduction + specialAdditionalDeduction + otherDeduction;
+    
+    return {
+        hasComprehensiveIncome,
+        investorDeduction,
+        businessCost,
+        businessExpenses,
+        businessTaxes,
+        businessLosses,
+        businessOtherExpenses,
+        businessPreviousLosses,
+        specialAdditionalDeduction,
+        otherDeduction,
+        annualBusinessDeduction,
+        totalDeduction: annualBusinessDeduction
+    };
+}
+
+// 计算经营所得年终奖税额（经营所得不涉及年终奖，返回0）
+function calculateBusinessReverseBonusTax(inputData) {
+    return 0;
+}
+
 // 计算反向倒算年终奖税额
 function calculateReverseBonusTax(inputData) {
     let bonusTax = 0;
@@ -974,19 +1034,35 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax) {
 function calculateReverseTax() {
     try {
         const inputData = collectReverseInputData();
-        const deductionData = calculateReverseDeductions(inputData);
-        const bonusTax = calculateReverseBonusTax(inputData);
         
-        let result;
-        if (inputData.reverseType === 'rate') {
-            result = calculateFromTargetRate(inputData, deductionData, bonusTax);
-        } else if (inputData.reverseType === 'monthly') {
-            result = calculateFromMonthlyNet(inputData, deductionData, bonusTax);
+        let deductionData;
+        if (inputData.incomeType === 'business') {
+            deductionData = calculateBusinessReverseDeductions(inputData);
         } else {
-            result = calculateFromTargetTax(inputData, deductionData, bonusTax);
+            deductionData = calculateReverseDeductions(inputData);
         }
         
-        saveReverseCalculationResult(result, inputData, deductionData, bonusTax);
+        let result;
+        if (inputData.incomeType === 'business') {
+            if (inputData.reverseType === 'rate') {
+                result = calculateBusinessFromTargetRate(inputData, deductionData);
+            } else if (inputData.reverseType === 'monthly') {
+                result = calculateBusinessFromMonthlyNet(inputData, deductionData);
+            } else {
+                result = calculateBusinessFromTargetTax(inputData, deductionData);
+            }
+        } else {
+            const bonusTax = calculateReverseBonusTax(inputData);
+            if (inputData.reverseType === 'rate') {
+                result = calculateFromTargetRate(inputData, deductionData, bonusTax);
+            } else if (inputData.reverseType === 'monthly') {
+                result = calculateFromMonthlyNet(inputData, deductionData, bonusTax);
+            } else {
+                result = calculateFromTargetTax(inputData, deductionData, bonusTax);
+            }
+        }
+        
+        saveReverseCalculationResult(result, inputData, deductionData, result.finalTotalTax);
         updateReverseResultDisplay(result);
         
     } catch (error) {
@@ -1163,6 +1239,225 @@ function updateReverseResultDisplay(result) {
     if (totalDeductionEl) {
         totalDeductionEl.textContent = '¥' + data.deductionDetails.total.toFixed(2);
     }
+}
+
+// 辅助函数：根据应纳税所得额和税率表计算经营所得税额
+function calculateBusinessTaxByTaxableIncome(taxableIncome) {
+    if (taxableIncome <= 0) return { tax: 0, rate: 0, deduction: 0 };
+    
+    for (const bracket of businessTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            const tax = taxableIncome * bracket.rate - bracket.deduction;
+            return {
+                tax: Math.max(0, tax),
+                rate: bracket.rate,
+                deduction: bracket.deduction
+            };
+        }
+    }
+    return { tax: 0, rate: 0, deduction: 0 };
+}
+
+// 经营所得反向倒算：按目标税率倒算
+function calculateBusinessFromTargetRate(inputData, deductionData) {
+    const targetRate = inputData.targetRate / 100;
+    
+    const targetBracket = businessTaxRates.find(
+        bracket => Math.abs(bracket.rate - targetRate) < 0.001
+    );
+    
+    if (!targetBracket) {
+        throw new Error('找不到对应的经营所得税率级距');
+    }
+    
+    const minTaxableIncome = targetBracket.min || 0;
+    const maxTaxableIncome = targetBracket.max;
+    
+    let middleTaxableIncome;
+    if (maxTaxableIncome === Infinity) {
+        middleTaxableIncome = minTaxableIncome + 100000;
+    } else {
+        middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+    }
+    
+    // 经营所得：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+    const businessTax = middleTaxableIncome * targetBracket.rate - targetBracket.deduction;
+    
+    // 经营所得：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+    const taxResult = calculateBusinessTaxByTaxableIncome(middleTaxableIncome);
+    
+    // 计算减半征收
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(middleTaxableIncome, halvingThreshold);
+    const halvingTax = halvingTaxable > 0 ? (halvingTaxable * targetBracket.rate - targetBracket.deduction) * 0.5 : 0;
+    
+    // 实际税额（考虑减半征收）
+    const actualTax = taxResult.tax > 0 ? Math.max(0, taxResult.tax - halvingTax) : 0;
+    
+    // 税前收入 = 应纳税所得额 + 扣除总额
+    const preTaxIncome = middleTaxableIncome + deductionData.totalDeduction;
+    const netIncome = preTaxIncome - actualTax;
+    
+    return {
+        totalIncome: preTaxIncome,
+        minTotalIncome: minTaxableIncome + deductionData.totalDeduction,
+        maxTotalIncome: maxTaxableIncome === Infinity ? Infinity : maxTaxableIncome + deductionData.totalDeduction,
+        finalTotalTax: actualTax,
+        calculatedNetIncome: netIncome,
+        taxableIncome: middleTaxableIncome,
+        applicableRate: targetBracket.rate,
+        applicableDeduction: targetBracket.deduction,
+        isRateMode: true,
+        modeName: '经营所得税率倒算',
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
+}
+
+// 经营所得反向倒算：按目标税后收入倒算
+function calculateBusinessFromMonthlyNet(inputData, deductionData) {
+    const monthlyNet = inputData.monthlyNet;
+    const workMonths = inputData.workMonths;
+    const annualNetTarget = monthlyNet * workMonths;
+    
+    let left = deductionData.totalDeduction;
+    let right = deductionData.totalDeduction + 10000000;
+    const precision = 0.01;
+    
+    while (right - left > precision) {
+        const mid = (left + right) / 2;
+        const taxableIncome = mid - deductionData.totalDeduction;
+        
+        if (taxableIncome <= 0) {
+            left = mid;
+            continue;
+        }
+        
+        const taxResult = calculateBusinessTaxByTaxableIncome(taxableIncome);
+        
+        // 考虑减半征收
+        const halvingThreshold = 2000000;
+        const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
+        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        
+        const netIncome = mid - actualTax;
+        
+        if (netIncome < annualNetTarget) {
+            left = mid;
+        } else {
+            right = mid;
+        }
+    }
+    
+    const totalIncome = (left + right) / 2;
+    const taxableIncome = totalIncome - deductionData.totalDeduction;
+    
+    const taxResult = calculateBusinessTaxByTaxableIncome(taxableIncome);
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
+    const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+    const actualTax = Math.max(0, taxResult.tax - halvingTax);
+    const calculatedNetIncome = totalIncome - actualTax;
+    
+    return {
+        totalIncome: totalIncome,
+        monthlyIncome: totalIncome / workMonths,
+        finalTotalTax: actualTax,
+        calculatedNetIncome: calculatedNetIncome,
+        monthlyNet: calculatedNetIncome / workMonths,
+        taxableIncome: taxableIncome,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
+        isMonthlyMode: true,
+        modeName: '经营所得月度税后倒算',
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
+}
+
+// 经营所得反向倒算：按目标税额倒算
+function calculateBusinessFromTargetTax(inputData, deductionData) {
+    const targetTax = inputData.fixedTax;
+    const targetNet = inputData.fixedNet;
+    
+    if (targetTax > 0 && targetNet === 0) {
+        let left = deductionData.totalDeduction;
+        let right = deductionData.totalDeduction + 10000000;
+        const precision = 0.01;
+        
+        while (right - left > precision) {
+            const mid = (left + right) / 2;
+            const taxable = mid - deductionData.totalDeduction;
+            
+            if (taxable <= 0) {
+                left = mid;
+                continue;
+            }
+            
+            const taxResult = calculateBusinessTaxByTaxableIncome(taxable);
+            const halvingThreshold = 2000000;
+            const halvingTaxable = Math.min(taxable, halvingThreshold);
+            const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+            const actualTax = Math.max(0, taxResult.tax - halvingTax);
+            
+            if (actualTax < targetTax) {
+                left = mid;
+            } else {
+                right = mid;
+            }
+        }
+        
+        const calculatedIncome = (left + right) / 2;
+        const calculatedTaxable = calculatedIncome - deductionData.totalDeduction;
+        
+        const taxResult = calculateBusinessTaxByTaxableIncome(calculatedTaxable);
+        const halvingThreshold = 2000000;
+        const halvingTaxable = Math.min(calculatedTaxable, halvingThreshold);
+        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        
+        return {
+            totalIncome: calculatedIncome,
+            finalTotalTax: actualTax,
+            calculatedNetIncome: calculatedIncome - actualTax,
+            taxableIncome: calculatedTaxable,
+            applicableRate: taxResult.rate,
+            applicableDeduction: taxResult.deduction,
+            isTaxMode: true,
+            modeName: '经营所得税额倒算',
+            targetTax: targetTax,
+            taxDifference: actualTax - targetTax,
+            hasHalvingDiscount: halvingTax > 0,
+            halvingTaxAmount: halvingTax
+        };
+    }
+    
+    const targetTotalIncome = targetTax + targetNet;
+    const targetTaxableIncome = targetTotalIncome - deductionData.totalDeduction;
+    
+    const taxResult = calculateBusinessTaxByTaxableIncome(targetTaxableIncome);
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(targetTaxableIncome, halvingThreshold);
+    const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+    const actualTax = Math.max(0, taxResult.tax - halvingTax);
+    
+    return {
+        totalIncome: targetTotalIncome,
+        finalTotalTax: targetTax,
+        actualTax: actualTax,
+        calculatedNetIncome: targetNet,
+        taxableIncome: targetTaxableIncome,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
+        isTaxMode: true,
+        modeName: '经营所得税额+到手倒算',
+        targetTax: targetTax,
+        targetNet: targetNet,
+        taxDifference: targetTax - actualTax,
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
 }
 
 // 计算经营所得

@@ -1285,7 +1285,7 @@
                                 <option value="business">经营所得</option>
                             </select>
                         </div>
-                        
+
                         <!-- 方式1：按目标税率倒算 -->
                         <div id="reverse-rate-input" class="form-group">
                             <label for="reverse-target-rate" class="label">
@@ -1296,14 +1296,130 @@
                                 </span>
                             </label>
                             <select id="reverse-target-rate" class="input-field">
-                                <option value="3">3%</option>
-                                <option value="10">10%</option>
-                                <option value="20">20%</option>
-                                <option value="25">25%</option>
-                                <option value="30">30%</option>
-                                <option value="35">35%</option>
-                                <option value="45">45%</option>
+                                <option value="3">3%（综合所得第1级）</option>
+                                <option value="10">10%（综合所得第2级）</option>
+                                <option value="20">20%（综合所得第3级）</option>
+                                <option value="25">25%（综合所得第4级）</option>
+                                <option value="30">30%（综合所得第5级）</option>
+                                <option value="35">35%（综合所得第6级/经营所得第5级）</option>
+                                <option value="45">45%（综合所得第7级）</option>
                             </select>
+                            <div id="business-rate-hint" class="hidden mt-2 text-sm text-orange-600">
+                                <i class="fa fa-info-circle"></i> 经营所得税率：5%、10%、20%、30%、35%
+                            </div>
+                        </div>
+
+                        <!-- 经营所得特有扣除项（仅在选择经营所得时显示） -->
+                        <div id="reverse-business-deduction-section" class="hidden mt-4 p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-medium text-blue-800 mb-3">经营所得扣除项</h4>
+                            
+                            <div class="form-group">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-business-has-comprehensive-income" class="form-checkbox text-primary">
+                                    <span class="ml-2 text-sm text-gray-700">有综合所得（无综合所得时，投资者减除费用为60000元/年）</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-business-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">成本费用扣除</span>
+                                </label>
+                            </div>
+                            
+                            <div id="reverse-business-deduction-content" class="mt-3">
+                                <div class="form-group">
+                                    <label for="reverse-business-cost" class="label text-sm">
+                                        成本 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">从事生产经营活动发生的成本</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-cost" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-expenses" class="label text-sm">
+                                        费用 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">从事生产经营活动发生的费用</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-expenses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-taxes" class="label text-sm">
+                                        税金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">已缴纳的相关税金</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-taxes" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-losses" class="label text-sm">
+                                        损失 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">生产经营活动发生的损失</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-losses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-other-expenses" class="label text-sm">
+                                        其他支出 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">其他允许扣除的支出</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-other-expenses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-previous-losses" class="label text-sm">
+                                        以前年度亏损 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">可弥补的以前年度亏损（不超过5年）</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-previous-losses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-business-special-additional-deduction" class="label text-sm">
+                                    专项附加扣除 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">仅无综合所得时可扣除</span>
+                                    </span>
+                                </label>
+                                <input type="number" id="reverse-business-special-additional-deduction" class="input-field" value="0" min="0" step="100">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-business-other-deduction" class="label text-sm">
+                                    其他扣除 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">其他允许扣除的金额</span>
+                                    </span>
+                                </label>
+                                <input type="number" id="reverse-business-other-deduction" class="input-field" value="0" min="0" step="100">
+                            </div>
+                            
+                            <div class="mt-3 p-3 bg-yellow-50 rounded text-sm">
+                                <p class="text-yellow-800"><strong>经营所得优惠：</strong>年应纳税所得额不超过200万元的部分，享受减半征收优惠（2023-2027年）</p>
+                            </div>
                         </div>
                         
                         <!-- 方式2：按月度税后收入倒算 -->
