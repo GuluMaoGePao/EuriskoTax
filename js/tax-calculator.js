@@ -42,6 +42,112 @@ const classificationTaxRates = {
     accidental: { rate: 0.20, name: '偶然所得' }
 };
 
+// 临界点提醒函数
+function checkTaxBracketThreshold(taxableIncome) {
+    for (let i = 0; i < comprehensiveTaxRates.length - 1; i++) {
+        const currentBracket = comprehensiveTaxRates[i];
+        const nextBracket = comprehensiveTaxRates[i + 1];
+        
+        const threshold = nextBracket.min - 10000;
+        if (taxableIncome > threshold && taxableIncome < nextBracket.min) {
+            return {
+                warning: true,
+                currentRate: currentBracket.rate,
+                nextRate: nextBracket.rate,
+                threshold: nextBracket.min,
+                remaining: nextBracket.min - taxableIncome,
+                message: `您的应纳税所得额接近${(nextBracket.rate * 100).toFixed(0)}%税率临界点，再增加${(nextBracket.min - taxableIncome).toFixed(2)}元将进入更高税率区间`
+            };
+        }
+    }
+    return { warning: false };
+}
+
+// 年终奖最优分配计算函数（优化版：基于税率表临界点）
+function calculateOptimalBonusAllocation(totalIncome, totalDeduction) {
+    const bonusCriticalPoints = [0, 36000, 144000, 300000, 420000, 660000, 960000];
+    
+    let minTax = Infinity;
+    let optimalBonus = 0;
+    
+    for (const criticalPoint of bonusCriticalPoints) {
+        const bonus = Math.min(criticalPoint, totalIncome);
+        const salaryIncome = totalIncome - bonus;
+        const salaryTaxable = Math.max(0, salaryIncome - totalDeduction);
+        
+        let salaryTax = 0;
+        for (const bracket of comprehensiveTaxRates) {
+            if (salaryTaxable <= bracket.max) {
+                salaryTax = salaryTaxable * bracket.rate - bracket.deduction;
+                break;
+            }
+        }
+        
+        let bonusTax = 0;
+        if (bonus > 0) {
+            const monthlyBonus = bonus / 12;
+            for (const bracket of bonusMonthlyTaxRates) {
+                if (monthlyBonus <= bracket.max) {
+                    bonusTax = bonus * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+        }
+        
+        const totalTax = Math.max(0, salaryTax) + Math.max(0, bonusTax);
+        
+        if (totalTax < minTax) {
+            minTax = totalTax;
+            optimalBonus = bonus;
+        }
+    }
+    
+    const allInTaxable = Math.max(0, totalIncome - totalDeduction);
+    let allInTax = 0;
+    for (const bracket of comprehensiveTaxRates) {
+        if (allInTaxable <= bracket.max) {
+            allInTax = allInTaxable * bracket.rate - bracket.deduction;
+            break;
+        }
+    }
+    allInTax = Math.max(0, allInTax);
+    
+    if (allInTax < minTax) {
+        return {
+            optimalBonus: 0,
+            optimalSalary: totalIncome,
+            minTax: allInTax,
+            taxSavings: 0,
+            allInTax: allInTax,
+            optimalMethod: 'include'
+        };
+    }
+    
+    return {
+        optimalBonus: optimalBonus,
+        optimalSalary: totalIncome - optimalBonus,
+        minTax: minTax,
+        taxSavings: allInTax - minTax,
+        allInTax: allInTax,
+        optimalMethod: 'separate'
+    };
+}
+
+// 公益捐赠限额校验函数
+function validateCharitableDonation(donationAmount, taxableIncome) {
+    const maxDeduction = taxableIncome * 0.3;
+    const actualDeduction = Math.min(donationAmount, maxDeduction);
+    const excessAmount = donationAmount - actualDeduction;
+    
+    return {
+        actualDeduction: actualDeduction,
+        excessAmount: excessAmount,
+        maxDeduction: maxDeduction,
+        isExcess: excessAmount > 0,
+        message: excessAmount > 0 ? `捐赠额超过应纳税所得额30%的部分(${excessAmount.toFixed(2)}元)不能享受税前扣除` : '捐赠额在允许扣除范围内'
+    };
+}
+
 // 安全设置元素文本内容
 function safeSetTextContent(id, value) {
     const element = document.getElementById(id);
@@ -246,7 +352,10 @@ function calculateTax() {
             totalIncome += bonusIncome;
         }
 
-        // 计算应纳税所得额
+        // 计算扣除捐赠前的应纳税所得额（用于捐赠限额校验，符合税法规定）
+        const donationBeforeTaxableIncome = Math.max(0, totalIncome - (deductions.totalDeduction - deductions.annualCharitableDonation));
+
+        // 计算扣除捐赠后的应纳税所得额（用于正常计税）
         const taxableIncome = Math.max(0, totalIncome - deductions.totalDeduction);
 
         // 计算应纳税额
@@ -368,6 +477,58 @@ function calculateTax() {
             const bonusDisplay = document.getElementById('bonus-tax-display');
             if (bonusDisplay) {
                 bonusDisplay.style.display = 'none';
+            }
+        }
+        
+        const thresholdWarningDisplay = document.getElementById('threshold-warning-display');
+        if (thresholdWarningDisplay) {
+            const thresholdResult = checkTaxBracketThreshold(taxableIncome);
+            if (thresholdResult.warning) {
+                thresholdWarningDisplay.style.display = 'block';
+                safeSetTextContent('threshold-warning-message', thresholdResult.message);
+                safeSetTextContent('threshold-current-rate', (thresholdResult.currentRate * 100).toFixed(0) + '%');
+                safeSetTextContent('threshold-next-rate', (thresholdResult.nextRate * 100).toFixed(0) + '%');
+                safeSetTextContent('threshold-remaining', '¥' + thresholdResult.remaining.toFixed(2));
+            } else {
+                thresholdWarningDisplay.style.display = 'none';
+            }
+        }
+        
+        const donationWarningDisplay = document.getElementById('donation-warning-display');
+        if (donationWarningDisplay) {
+            const donationResult = validateCharitableDonation(deductions.annualCharitableDonation, donationBeforeTaxableIncome);
+            if (donationResult.isExcess) {
+                donationWarningDisplay.style.display = 'block';
+                safeSetTextContent('donation-warning-message', donationResult.message);
+                safeSetTextContent('donation-max-amount', '¥' + donationResult.maxDeduction.toFixed(2));
+                safeSetTextContent('donation-actual-amount', '¥' + donationResult.actualDeduction.toFixed(2));
+                safeSetTextContent('donation-excess-amount', '¥' + donationResult.excessAmount.toFixed(2));
+            } else {
+                donationWarningDisplay.style.display = 'none';
+            }
+        }
+        
+        const optimalBonusDisplay = document.getElementById('optimal-bonus-display');
+        if (optimalBonusDisplay) {
+            const optimalResult = calculateOptimalBonusAllocation(totalIncome, deductions.totalDeduction);
+            
+            // 当存在最优分配建议时都显示（包括零节税的情况）
+            if (optimalResult.taxSavings >= 0 && optimalResult.optimalMethod === 'include') {
+                optimalBonusDisplay.style.display = 'block';
+                safeSetTextContent('optimal-bonus-amount', '¥0（并入综合所得）');
+                safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+                safeSetTextContent('optimal-tax-savings', '¥0（已是最佳方案）');
+                safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+                safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+            } else if (optimalResult.taxSavings > 0) {
+                optimalBonusDisplay.style.display = 'block';
+                safeSetTextContent('optimal-bonus-amount', '¥' + optimalResult.optimalBonus.toFixed(2));
+                safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+                safeSetTextContent('optimal-tax-savings', '¥' + optimalResult.taxSavings.toFixed(2));
+                safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+                safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+            } else {
+                optimalBonusDisplay.style.display = 'none';
             }
         }
         
