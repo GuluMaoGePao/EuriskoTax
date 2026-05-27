@@ -1307,6 +1307,29 @@
                             <div id="business-rate-hint" class="hidden mt-2 text-sm text-orange-600">
                                 <i class="fa fa-info-circle"></i> 经营所得税率：5%、10%、20%、30%、35%
                             </div>
+                            
+                            <!-- 计算模式选择器 -->
+                            <div class="mt-3">
+                                <label for="reverse-calc-mode" class="label">
+                                    计算模式
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">选择应纳税所得额的计算基准，适配不同预算规划需求</span>
+                                    </span>
+                                </label>
+                                <select id="reverse-calc-mode" class="input-field">
+                                    <option value="all">📊 全部模式（显示对比）</option>
+                                    <option value="conservative">🌱 保守模式（最低门槛）</option>
+                                    <option value="balanced">⚖️ 均衡模式（区间均值）</option>
+                                    <option value="aggressive">🚀 进取模式（接近上限）</option>
+                                </select>
+                                <div class="mt-2 text-xs text-gray-500">
+                                    <p><strong>📊 全部模式</strong>：同时计算三种模式并显示对比表格，方便全面了解不同收入水平下的税负情况</p>
+                                    <p><strong>🌱 保守模式</strong>：计算达到目标税率的最低收入门槛，适合稳健型收入规划</p>
+                                    <p><strong>⚖️ 均衡模式</strong>：使用税率档位中间值计算，反映区间内的平均税负水平</p>
+                                    <p><strong>🚀 进取模式</strong>：接近税率档位上限计算，反映较高收入水平的税负情况</p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- 经营所得特有扣除项（仅在选择经营所得时显示） -->
@@ -1983,7 +2006,7 @@
                     <div class="card lg:col-span-1">
                         <h3 class="text-lg font-bold text-primary mb-4">倒算结果</h3>
                         
-                        <div class="space-y-4">
+                        <div class="space-y-3">
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">全年应缴税额</span>
                                 <span class="font-medium" id="reverse-result-total-tax">¥0</span>
@@ -1999,12 +2022,6 @@
                                 <span class="font-medium text-danger" id="reverse-result-bonus-tax">¥0</span>
                             </div>
                             
-                            <!-- 适用税率级数已隐藏 -->
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100 hidden">
-                                <span class="text-gray-600">适用税率级数</span>
-                                <span class="font-medium" id="reverse-result-tax-level">级数1</span>
-                            </div>
-                            
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">适用税率</span>
                                 <span class="font-medium" id="reverse-result-tax-rate">3%</span>
@@ -2016,16 +2033,39 @@
                             </div>
                             
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度应纳税所得额</span>
-                                <span class="font-medium" id="reverse-result-taxable-income">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">年度扣除总额</span>
                                 <span class="font-medium text-success" id="reverse-result-total-deduction">¥0</span>
                             </div>
                             
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                            <!-- 计算模式对比表格（仅在全部模式时显示） -->
+                            <div id="reverse-mode-comparison-section" class="hidden mt-4 pt-4 border-t border-gray-200">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">📊 三种计算模式对比</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="bg-gray-50">
+                                                <th class="px-3 py-2 text-left font-medium text-gray-600">计算模式</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">应纳税所得额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">税前收入</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">应纳税额</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-mode-comparison-body">
+                                            <!-- 表格内容将由JavaScript动态生成 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 单个模式结果显示 -->
+                            <div id="reverse-single-mode-section" class="mt-4 pt-4 border-t border-gray-200">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">年度应纳税所得额</span>
+                                    <span class="font-medium text-primary" id="reverse-result-taxable-income">¥0</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center pt-4 border-t border-gray-200">
                                 <span class="text-gray-600">年度累计税前收入</span>
                                 <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
                             </div>

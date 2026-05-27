@@ -307,6 +307,7 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 反向倒算页面新输入字段事件监听
     document.getElementById('reverse-target-rate').addEventListener('change', calculateReverseTax);
+    document.getElementById('reverse-calc-mode').addEventListener('change', calculateReverseTax);
     document.getElementById('reverse-monthly-net').addEventListener('input', calculateReverseTax);
     document.getElementById('reverse-fixed-tax').addEventListener('input', calculateReverseTax);
     document.getElementById('reverse-fixed-net').addEventListener('input', calculateReverseTax);
