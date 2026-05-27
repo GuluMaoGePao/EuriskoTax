@@ -1135,6 +1135,79 @@
                             <div id="optimization-tips" class="space-y-4">
                                 <!-- 优化建议将由JavaScript动态生成 -->
                             </div>
+                            
+                            <div id="threshold-warning-display" class="mt-4 p-4 bg-yellow-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                                    <span class="font-medium text-yellow-800">税率临界点提醒</span>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <p id="threshold-warning-message"></p>
+                                    <div class="mt-2 flex justify-between text-sm">
+                                        <span>当前税率：</span>
+                                        <span class="font-medium" id="threshold-current-rate">0%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>下一税率：</span>
+                                        <span class="font-medium" id="threshold-next-rate">0%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>距离临界点：</span>
+                                        <span class="font-medium" id="threshold-remaining">¥0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="donation-warning-display" class="mt-4 p-4 bg-orange-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-info-circle text-orange-600 mr-2"></i>
+                                    <span class="font-medium text-orange-800">公益捐赠限额提示</span>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <p id="donation-warning-message"></p>
+                                    <div class="mt-2 flex justify-between text-sm">
+                                        <span>允许扣除限额：</span>
+                                        <span class="font-medium" id="donation-max-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>实际可扣除：</span>
+                                        <span class="font-medium" id="donation-actual-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>超出部分：</span>
+                                        <span class="font-medium text-danger" id="donation-excess-amount">¥0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="optimal-bonus-display" class="mt-4 p-4 bg-blue-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
+                                    <span class="font-medium text-blue-800">年终奖最优分配建议</span>
+                                </div>
+                                <div class="text-sm text-gray-600 space-y-2">
+                                    <div class="flex justify-between">
+                                        <span>最优年终奖分配：</span>
+                                        <span class="font-medium text-green-600" id="optimal-bonus-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>最优工资分配：</span>
+                                        <span class="font-medium text-green-600" id="optimal-salary-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>可节省税额：</span>
+                                        <span class="font-medium text-green-600" id="optimal-tax-savings">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>原方案税额：</span>
+                                        <span class="font-medium text-gray-500" id="optimal-original-tax">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>优化后税额：</span>
+                                        <span class="font-medium text-green-600" id="optimal-new-tax">¥0</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="lg:col-span-3 flex justify-center mt-4">
@@ -2567,6 +2640,15 @@
                             <li>劳务报酬、稿酬、特许权使用费预缴时按固定税率计税，年度汇算时并入综合所得，适用3%-45%超额累进税率，通常会产生税额差额，需通过汇算多退少补</li>
                             <li>个人独资企业、合伙企业投资者的经营所得，比照经营所得规则计税</li>
                             <li>所有计税扣除项均需符合国家税务总局相关规定，不得虚假填报扣除</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-gray-800 mb-2">预算与实际差异说明</h4>
+                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                            <li>本工具为年度预算规划工具，计算结果基于年度税率表，用于提前预估税负</li>
+                            <li>实际月度预缴可能因2026年累计减除费用新规产生差异，年度汇算时统一清算</li>
+                            <li>一次性扣除6万元政策仅适用于特定人群的预缴阶段，不影响年度预算计算</li>
+                            <li>预算结果仅供参考，实际应纳税额以年度汇算清缴结果为准</li>
                         </ul>
                     </div>
                 </div>
