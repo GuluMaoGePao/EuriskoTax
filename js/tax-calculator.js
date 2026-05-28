@@ -856,7 +856,7 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
                 middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
                 break;
             case 'aggressive':
-                middleTaxableIncome = maxTaxableIncome - 1;
+                middleTaxableIncome = maxTaxableIncome;
                 break;
             default:
                 middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
@@ -1460,7 +1460,7 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
                 middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
                 break;
             case 'aggressive':
-                middleTaxableIncome = maxTaxableIncome - 1;
+                middleTaxableIncome = maxTaxableIncome;
                 break;
             default:
                 middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
