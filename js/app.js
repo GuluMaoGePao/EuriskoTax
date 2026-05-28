@@ -19,6 +19,11 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-mode-btn').addEventListener('click', function() {
         showPage('reverse-calculation-page');
         showReverseStep(1);
+        // 初始化时显示计算模式选择器
+        const calcModeSection = document.getElementById('reverse-calc-mode-section');
+        if (calcModeSection) {
+            calcModeSection.classList.remove('hidden');
+        }
         // 初始化时触发一次倒算方式变更事件，更新描述文案
         document.getElementById('reverse-type').dispatchEvent(new Event('change'));
     });
@@ -43,6 +48,12 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reverse-rate-input').classList.add('hidden');
         document.getElementById('reverse-monthly-input').classList.add('hidden');
         document.getElementById('reverse-both-input').classList.add('hidden');
+        
+        // 显示/隐藏计算模式选择器（所有倒算方式都支持）
+        const calcModeSection = document.getElementById('reverse-calc-mode-section');
+        if (calcModeSection) {
+            calcModeSection.classList.remove('hidden');
+        }
         
         if (type === 'rate') {
             document.getElementById('reverse-rate-input').classList.remove('hidden');
