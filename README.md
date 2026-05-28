@@ -318,11 +318,21 @@
 ┌─────────────────────────────────┐
 │      tax-calculator.js          │
 ├─────────────────────────────────┤
-│ 综合所得计算                     │
+│ 数据收集层                       │
+│ └── collectTaxInputData()       │
+├─────────────────────────────────┤
+│ 业务计算层                       │
 │ ├── calculateOtherIncome()      │
 │ ├── calculateComprehensive...   │
 │ ├── calculateBonusTax()         │
-│ └── calculateCumulative...      │
+│ ├── calculateCumulative...      │
+│ ├── calculateTotalIncome()      │
+│ ├── calculateIncomeTax()        │
+│ ├── determinePrepaidTax()       │
+│ └── calculatePreTaxIncome()     │
+├─────────────────────────────────┤
+│ 核心计算协调                     │
+│ └── performTaxCalculation()     │
 ├─────────────────────────────────┤
 │ 经营所得计算                     │
 │ └── calculateBusinessTax()      │
@@ -331,6 +341,16 @@
 │ ├── calculateFromTargetRate()    │
 │ ├── calculateFromMonthlyNet()    │
 │ └── calculateFromTargetTax()     │
+├─────────────────────────────────┤
+│ 界面更新层                       │
+│ ├── updateBasicResults()        │
+│ ├── updateBonusDisplay()        │
+│ ├── updateThresholdWarning()    │
+│ ├── updateDonationWarning()     │
+│ ├── updateOptimalBonusDisplay() │
+│ ├── updatePrepaidAndRefundTax() │
+│ ├── updateNetIncome()           │
+│ └── updateTaxResultsUI()        │
 ├─────────────────────────────────┤
 │ 分类所得计算                     │
 │ ├── calculateSingle...()         │
@@ -403,6 +423,31 @@ EuriskoTax/
 ---
 
 ## 更新日志
+
+### v1.10.0 (2026-05-28)
+
+**代码重构与质量提升**：
+
+**核心重构**：
+- 将 `calculateTax()` 函数从230行重构为职责分离的架构
+- 主函数精简至仅10行，提高可读性和可维护性
+- 拆分出15个职责单一的辅助函数：
+  - `collectTaxInputData()` - 数据收集层
+  - `calculateTotalIncome()`、`calculateIncomeTax()`、`determinePrepaidTax()`、`calculatePreTaxIncome()` - 业务计算层
+  - `performTaxCalculation()` - 核心计算逻辑
+  - `updateBasicResults()`、`updateBonusDisplay()`、`updateThresholdWarning()`、`updateDonationWarning()`、`updateOptimalBonusDisplay()`、`updatePrepaidAndRefundTax()`、`updateNetIncome()` - 界面展示层
+  - `updateTaxResultsUI()` - 统一界面更新入口
+  - `handleCalculationError()` - 错误处理
+
+**Bug修复**：
+- 修复 `calculateIncomeTax()` 函数最高级距处理问题
+- 当应纳税所得额超过最大级距时，正确使用最高税率计算（45%）
+- 避免返回 `{totalTax: 0, applicableRate: 0, applicableDeduction: 0}` 的错误结果
+
+**代码质量提升**：
+- 提高代码可测试性：业务计算逻辑与DOM操作解耦
+- 提高代码可复用性：计算逻辑可在其他场景复用
+- 降低维护成本：修改时只需关注相关函数
 
 ### v1.9.2 (2026-05-28)
 

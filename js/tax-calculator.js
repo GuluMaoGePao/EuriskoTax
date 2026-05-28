@@ -326,238 +326,294 @@ function calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, monthlyB
     return cumulativeTaxableIncome * topBracket.rate - topBracket.deduction;
 }
 
+function collectTaxInputData() {
+    return {
+        workMonths: parseInt(document.getElementById('work-months').value) || 12,
+        monthlySalaryIncome: parseFloat(document.getElementById('salary-income').value) || 0,
+        annualLaborIncome: parseFloat(document.getElementById('labor-income').value) || 0,
+        annualAuthorIncome: parseFloat(document.getElementById('author-income').value) || 0,
+        annualRoyaltyIncome: parseFloat(document.getElementById('royalty-income').value) || 0,
+        bonusIncome: parseFloat(document.getElementById('bonus-income').value) || 0,
+        bonusInclude: document.getElementById('bonus-include').checked,
+        userInputPrepaidTax: parseFloat(document.getElementById('prepaid-tax')?.value)
+    };
+}
+
+function calculateTotalIncome(monthlySalaryIncome, workMonths, otherIncome, bonusIncome, bonusInclude) {
+    let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
+        otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
+    
+    if (bonusIncome > 0 && bonusInclude) {
+        totalIncome += bonusIncome;
+    }
+    
+    return totalIncome;
+}
+
+function calculateIncomeTax(taxableIncome) {
+    for (const bracket of comprehensiveTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            return {
+                totalTax: taxableIncome * bracket.rate - bracket.deduction,
+                applicableRate: bracket.rate,
+                applicableDeduction: bracket.deduction
+            };
+        }
+    }
+    const topBracket = comprehensiveTaxRates[comprehensiveTaxRates.length - 1];
+    return {
+        totalTax: taxableIncome * topBracket.rate - topBracket.deduction,
+        applicableRate: topBracket.rate,
+        applicableDeduction: topBracket.deduction
+    };
+}
+
+function determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax) {
+    if (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) {
+        return userInputPrepaidTax;
+    }
+    return cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax;
+}
+
+function calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome, bonusIncome) {
+    return monthlySalaryIncome * workMonths + annualLaborIncome + 
+        annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
+}
+
+function performTaxCalculation(inputData) {
+    const { workMonths, monthlySalaryIncome, annualLaborIncome, annualAuthorIncome, 
+            annualRoyaltyIncome, bonusIncome, bonusInclude, userInputPrepaidTax } = inputData;
+    
+    const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
+    const deductions = calculateComprehensiveDeductions(workMonths);
+    
+    const totalIncome = calculateTotalIncome(
+        monthlySalaryIncome, workMonths, otherIncome, bonusIncome, bonusInclude
+    );
+    
+    const taxableIncome = Math.max(0, totalIncome - deductions.totalDeduction);
+    const donationBeforeTaxableIncome = Math.max(0, totalIncome - (deductions.totalDeduction - deductions.annualCharitableDonation));
+    
+    const taxResult = calculateIncomeTax(taxableIncome);
+    
+    const cumulativeTax = calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, 
+        deductions.monthlyBasicDeduction, deductions.monthlyInsuranceDeduction, 
+        deductions.monthlySpecialAdditionalTotal, deductions.monthlyPensionDeduction, 
+        deductions.monthlyEnterpriseAnnuity, deductions.monthlyInsuranceOtherDeduction, 
+        deductions.monthlyTaxDeferredPension);
+    
+    const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
+    const prepaidTax = determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax);
+    
+    const refundTax = taxResult.totalTax - prepaidTax;
+    const preTaxIncome = calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, 
+        annualAuthorIncome, annualRoyaltyIncome, bonusIncome);
+    const netIncome = preTaxIncome - taxResult.totalTax;
+    
+    return {
+        workMonths,
+        incomeDetails: {
+            salary: monthlySalaryIncome,
+            labor: annualLaborIncome,
+            laborCalculated: otherIncome.laborTaxableIncome,
+            laborTax: otherIncome.laborTax,
+            author: annualAuthorIncome,
+            authorCalculated: otherIncome.authorTaxableIncome,
+            authorTax: otherIncome.authorTax,
+            royalty: annualRoyaltyIncome,
+            royaltyCalculated: otherIncome.royaltyTaxableIncome,
+            royaltyTax: otherIncome.royaltyTax,
+            bonus: bonusIncome,
+            bonusInclude: bonusInclude,
+            bonusTax: bonusTax,
+            total: totalIncome,
+            preTaxTotal: preTaxIncome
+        },
+        deductionDetails: {
+            basic: deductions.monthlyBasicDeduction,
+            pensionInsurance: deductions.monthlyPensionInsurance,
+            medicalInsurance: deductions.monthlyMedicalInsurance,
+            unemploymentInsurance: deductions.monthlyUnemploymentInsurance,
+            housingFund: deductions.monthlyHousingFund,
+            elderly: deductions.monthlyElderlyDeduction,
+            childrenInfant: deductions.monthlyChildrenInfantDeduction,
+            housing: deductions.monthlyHousingDeduction,
+            education: deductions.annualEducationDeduction,
+            medical: deductions.annualMedicalDeduction,
+            actualMedical: deductions.actualMedicalDeduction,
+            professional: deductions.annualProfessionalDeduction,
+            educationDegree: deductions.educationDegreeAmount / workMonths,
+            pension: deductions.monthlyPensionDeduction,
+            enterpriseAnnuity: deductions.monthlyEnterpriseAnnuity,
+            insuranceOther: deductions.monthlyInsuranceOtherDeduction,
+            taxDeferredPension: deductions.monthlyTaxDeferredPension,
+            charitableDonation: deductions.annualCharitableDonation,
+            specialAdditionalTotal: deductions.annualSpecialAdditionalTotal,
+            specialDeductionTotal: deductions.annualSpecialDeductionTotal,
+            otherTotal: deductions.annualOtherDeductionTotal,
+            total: deductions.totalDeduction
+        },
+        taxDetails: {
+            taxableIncome: taxableIncome,
+            totalTax: taxResult.totalTax,
+            applicableRate: taxResult.applicableRate,
+            applicableDeduction: taxResult.applicableDeduction,
+            prepaidTax: prepaidTax,
+            refundTax: refundTax,
+            netIncome: netIncome
+        },
+        donationBeforeTaxableIncome: donationBeforeTaxableIncome,
+        calculationDate: new Date().toISOString()
+    };
+}
+
+function updateBasicResults(results) {
+    document.getElementById('result-total-income').textContent = '¥' + results.incomeDetails.total.toFixed(2);
+    document.getElementById('result-total-deduction').textContent = '¥' + results.deductionDetails.total.toFixed(2);
+    document.getElementById('result-taxable-income').textContent = '¥' + results.taxDetails.taxableIncome.toFixed(2);
+    document.getElementById('result-tax-rate').textContent = (results.taxDetails.applicableRate * 100).toFixed(0) + '%';
+    document.getElementById('result-deduction-amount').textContent = '¥' + results.taxDetails.applicableDeduction.toFixed(2);
+    document.getElementById('result-total-tax').textContent = '¥' + results.taxDetails.totalTax.toFixed(2);
+}
+
+function updateBonusDisplay(results) {
+    const bonusDisplay = document.getElementById('bonus-tax-display');
+    if (!bonusDisplay) return;
+    
+    if (results.incomeDetails.bonus > 0) {
+        bonusDisplay.style.display = 'block';
+        const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
+        const bonusMethodElement = document.getElementById('bonus-method');
+        
+        if (bonusTaxAmountElement) {
+            bonusTaxAmountElement.textContent = '¥' + results.incomeDetails.bonusTax.toFixed(2);
+        }
+        if (bonusMethodElement) {
+            bonusMethodElement.textContent = results.incomeDetails.bonusInclude ? '并入综合所得计税' : '单独计税';
+        }
+    } else {
+        bonusDisplay.style.display = 'none';
+    }
+}
+
+function updateThresholdWarning(results) {
+    const thresholdWarningDisplay = document.getElementById('threshold-warning-display');
+    if (!thresholdWarningDisplay) return;
+    
+    const thresholdResult = checkTaxBracketThreshold(results.taxDetails.taxableIncome);
+    
+    if (thresholdResult.warning) {
+        thresholdWarningDisplay.style.display = 'block';
+        safeSetTextContent('threshold-warning-message', thresholdResult.message);
+        safeSetTextContent('threshold-current-rate', (thresholdResult.currentRate * 100).toFixed(0) + '%');
+        safeSetTextContent('threshold-next-rate', (thresholdResult.nextRate * 100).toFixed(0) + '%');
+        safeSetTextContent('threshold-remaining', '¥' + thresholdResult.remaining.toFixed(2));
+    } else {
+        thresholdWarningDisplay.style.display = 'none';
+    }
+}
+
+function updateDonationWarning(results) {
+    const donationWarningDisplay = document.getElementById('donation-warning-display');
+    if (!donationWarningDisplay) return;
+    
+    const donationResult = validateCharitableDonation(
+        results.deductionDetails.charitableDonation, 
+        results.donationBeforeTaxableIncome
+    );
+    
+    if (donationResult.isExcess) {
+        donationWarningDisplay.style.display = 'block';
+        safeSetTextContent('donation-warning-message', donationResult.message);
+        safeSetTextContent('donation-max-amount', '¥' + donationResult.maxDeduction.toFixed(2));
+        safeSetTextContent('donation-actual-amount', '¥' + donationResult.actualDeduction.toFixed(2));
+        safeSetTextContent('donation-excess-amount', '¥' + donationResult.excessAmount.toFixed(2));
+    } else {
+        donationWarningDisplay.style.display = 'none';
+    }
+}
+
+function updateOptimalBonusDisplay(results) {
+    const optimalBonusDisplay = document.getElementById('optimal-bonus-display');
+    if (!optimalBonusDisplay) return;
+    
+    const optimalResult = calculateOptimalBonusAllocation(
+        results.incomeDetails.total, 
+        results.deductionDetails.total
+    );
+    
+    if (optimalResult.taxSavings >= 0 && optimalResult.optimalMethod === 'include') {
+        optimalBonusDisplay.style.display = 'block';
+        safeSetTextContent('optimal-bonus-amount', '¥0（并入综合所得）');
+        safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+        safeSetTextContent('optimal-tax-savings', '¥0（已是最佳方案）');
+        safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+        safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+    } else if (optimalResult.taxSavings > 0) {
+        optimalBonusDisplay.style.display = 'block';
+        safeSetTextContent('optimal-bonus-amount', '¥' + optimalResult.optimalBonus.toFixed(2));
+        safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+        safeSetTextContent('optimal-tax-savings', '¥' + optimalResult.taxSavings.toFixed(2));
+        safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+        safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+    } else {
+        optimalBonusDisplay.style.display = 'none';
+    }
+}
+
+function updatePrepaidAndRefundTax(results) {
+    const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
+    if (resultPrepaidTaxElement) {
+        resultPrepaidTaxElement.textContent = '¥' + results.taxDetails.prepaidTax.toFixed(2);
+    }
+    
+    const refundTaxElement = document.getElementById('result-refund-tax');
+    if (refundTaxElement) {
+        const refundTax = results.taxDetails.refundTax;
+        if (refundTax === 0) {
+            refundTaxElement.textContent = '不退不补 ¥0.00';
+            refundTaxElement.className = 'font-medium text-lg';
+        } else if (refundTax > 0) {
+            refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
+            refundTaxElement.className = 'font-medium text-lg text-danger';
+        } else {
+            refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
+            refundTaxElement.className = 'font-medium text-lg text-success';
+        }
+    }
+}
+
+function updateNetIncome(results) {
+    const resultNetIncomeElement = document.getElementById('result-net-income');
+    if (resultNetIncomeElement) {
+        resultNetIncomeElement.textContent = '¥' + results.taxDetails.netIncome.toFixed(2);
+    }
+}
+
+function updateTaxResultsUI(results) {
+    updateBasicResults(results);
+    updateBonusDisplay(results);
+    updateThresholdWarning(results);
+    updateDonationWarning(results);
+    updateOptimalBonusDisplay(results);
+    updatePrepaidAndRefundTax(results);
+    updateNetIncome(results);
+}
+
+function handleCalculationError(error) {
+    console.error('计算过程中出现错误:', error);
+    showAlert('计算过程中出现错误：' + error.message);
+}
+
 // 计算综合所得应纳税额
 function calculateTax() {
     try {
-        // 收集输入数据
-        const workMonths = parseInt(document.getElementById('work-months').value) || 12;
-        const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-        const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
-        const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
-        const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
-        const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
-        const bonusInclude = document.getElementById('bonus-include').checked;
-
-        // 使用统一函数计算其他收入（用于计算总收入）
-        const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
-        
-        // 使用统一函数计算扣除项
-        const deductions = calculateComprehensiveDeductions(workMonths);
-
-        // 计算总收入
-        let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
-            otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
-        
-        if (bonusIncome > 0 && bonusInclude) {
-            totalIncome += bonusIncome;
-        }
-
-        // 计算扣除捐赠前的应纳税所得额（用于捐赠限额校验，符合税法规定）
-        const donationBeforeTaxableIncome = Math.max(0, totalIncome - (deductions.totalDeduction - deductions.annualCharitableDonation));
-
-        // 计算扣除捐赠后的应纳税所得额（用于正常计税）
-        const taxableIncome = Math.max(0, totalIncome - deductions.totalDeduction);
-
-        // 计算应纳税额
-        let totalTax = 0;
-        let applicableRate = 0;
-        let applicableDeduction = 0;
-        
-        for (const bracket of comprehensiveTaxRates) {
-            if (taxableIncome <= bracket.max) {
-                totalTax = taxableIncome * bracket.rate - bracket.deduction;
-                applicableRate = bracket.rate;
-                applicableDeduction = bracket.deduction;
-                break;
-            }
-        }
-
-        // 计算预缴税额（工资薪金所得）
-        const cumulativeTax = calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, 
-            deductions.monthlyBasicDeduction, deductions.monthlyInsuranceDeduction, 
-            deductions.monthlySpecialAdditionalTotal, deductions.monthlyPensionDeduction, 
-            deductions.monthlyEnterpriseAnnuity, deductions.monthlyInsuranceOtherDeduction, 
-            deductions.monthlyTaxDeferredPension);
-        
-        // 计算其他收入的预缴税额（劳务报酬、稿酬、特许权使用费）- 复用上面已计算的 otherIncome
-        // 计算年终奖税额
-        const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
-        
-        // 获取用户输入的已纳税额
-        const userInputPrepaidTax = parseFloat(document.getElementById('prepaid-tax')?.value);
-        
-        // 如果用户输入了已纳税额，使用用户输入值；否则使用计算的累积预缴税额 + 其他收入预缴税额 + 年终奖税额
-        const prepaidTax = (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) 
-            ? userInputPrepaidTax 
-            : (cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax);
-        
-        const refundTax = totalTax - prepaidTax;
-        
-        const preTaxIncome = monthlySalaryIncome * workMonths + annualLaborIncome + 
-            annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
-        
-        const netIncome = preTaxIncome - totalTax;
-
-        calculationResults = {
-            workMonths: workMonths,
-            incomeDetails: {
-                salary: monthlySalaryIncome,
-                labor: annualLaborIncome,
-                laborCalculated: otherIncome.laborTaxableIncome,
-                laborTax: otherIncome.laborTax,
-                author: annualAuthorIncome,
-                authorCalculated: otherIncome.authorTaxableIncome,
-                authorTax: otherIncome.authorTax,
-                royalty: annualRoyaltyIncome,
-                royaltyCalculated: otherIncome.royaltyTaxableIncome,
-                royaltyTax: otherIncome.royaltyTax,
-                bonus: bonusIncome,
-                bonusInclude: bonusInclude,
-                bonusTax: bonusTax,
-                total: totalIncome,
-                preTaxTotal: preTaxIncome
-            },
-            deductionDetails: {
-                basic: deductions.monthlyBasicDeduction,
-                pensionInsurance: deductions.monthlyPensionInsurance,
-                medicalInsurance: deductions.monthlyMedicalInsurance,
-                unemploymentInsurance: deductions.monthlyUnemploymentInsurance,
-                housingFund: deductions.monthlyHousingFund,
-                elderly: deductions.monthlyElderlyDeduction,
-                childrenInfant: deductions.monthlyChildrenInfantDeduction,
-                housing: deductions.monthlyHousingDeduction,
-                education: deductions.annualEducationDeduction,
-                medical: deductions.annualMedicalDeduction,
-                actualMedical: deductions.actualMedicalDeduction,
-                professional: deductions.annualProfessionalDeduction,
-                educationDegree: deductions.educationDegreeAmount / workMonths,
-                pension: deductions.monthlyPensionDeduction,
-                enterpriseAnnuity: deductions.monthlyEnterpriseAnnuity,
-                insuranceOther: deductions.monthlyInsuranceOtherDeduction,
-                taxDeferredPension: deductions.monthlyTaxDeferredPension,
-                charitableDonation: deductions.annualCharitableDonation,
-                specialAdditionalTotal: deductions.annualSpecialAdditionalTotal,
-                specialDeductionTotal: deductions.annualSpecialDeductionTotal,
-                otherTotal: deductions.annualOtherDeductionTotal,
-                total: deductions.totalDeduction
-            },
-            taxDetails: {
-                taxableIncome: taxableIncome,
-                totalTax: totalTax,
-                applicableRate: applicableRate,
-                applicableDeduction: applicableDeduction,
-                prepaidTax: prepaidTax,
-                refundTax: refundTax,
-                netIncome: netIncome
-            },
-            calculationDate: new Date().toISOString()
-        };
-
-        document.getElementById('result-total-income').textContent = '¥' + totalIncome.toFixed(2);
-        document.getElementById('result-total-deduction').textContent = '¥' + deductions.totalDeduction.toFixed(2);
-        document.getElementById('result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
-        document.getElementById('result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
-        document.getElementById('result-deduction-amount').textContent = '¥' + applicableDeduction.toFixed(2);
-        document.getElementById('result-total-tax').textContent = '¥' + totalTax.toFixed(2);
-        
-        if (bonusIncome > 0) {
-            const bonusDisplay = document.getElementById('bonus-tax-display');
-            if (bonusDisplay) {
-                bonusDisplay.style.display = 'block';
-                const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
-                const bonusMethodElement = document.getElementById('bonus-method');
-                if (bonusTaxAmountElement) {
-                    bonusTaxAmountElement.textContent = '¥' + bonusTax.toFixed(2);
-                }
-                if (bonusMethodElement) {
-                    bonusMethodElement.textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
-                }
-            }
-        } else {
-            const bonusDisplay = document.getElementById('bonus-tax-display');
-            if (bonusDisplay) {
-                bonusDisplay.style.display = 'none';
-            }
-        }
-        
-        const thresholdWarningDisplay = document.getElementById('threshold-warning-display');
-        if (thresholdWarningDisplay) {
-            const thresholdResult = checkTaxBracketThreshold(taxableIncome);
-            if (thresholdResult.warning) {
-                thresholdWarningDisplay.style.display = 'block';
-                safeSetTextContent('threshold-warning-message', thresholdResult.message);
-                safeSetTextContent('threshold-current-rate', (thresholdResult.currentRate * 100).toFixed(0) + '%');
-                safeSetTextContent('threshold-next-rate', (thresholdResult.nextRate * 100).toFixed(0) + '%');
-                safeSetTextContent('threshold-remaining', '¥' + thresholdResult.remaining.toFixed(2));
-            } else {
-                thresholdWarningDisplay.style.display = 'none';
-            }
-        }
-        
-        const donationWarningDisplay = document.getElementById('donation-warning-display');
-        if (donationWarningDisplay) {
-            const donationResult = validateCharitableDonation(deductions.annualCharitableDonation, donationBeforeTaxableIncome);
-            if (donationResult.isExcess) {
-                donationWarningDisplay.style.display = 'block';
-                safeSetTextContent('donation-warning-message', donationResult.message);
-                safeSetTextContent('donation-max-amount', '¥' + donationResult.maxDeduction.toFixed(2));
-                safeSetTextContent('donation-actual-amount', '¥' + donationResult.actualDeduction.toFixed(2));
-                safeSetTextContent('donation-excess-amount', '¥' + donationResult.excessAmount.toFixed(2));
-            } else {
-                donationWarningDisplay.style.display = 'none';
-            }
-        }
-        
-        const optimalBonusDisplay = document.getElementById('optimal-bonus-display');
-        if (optimalBonusDisplay) {
-            const optimalResult = calculateOptimalBonusAllocation(totalIncome, deductions.totalDeduction);
-            
-            // 当存在最优分配建议时都显示（包括零节税的情况）
-            if (optimalResult.taxSavings >= 0 && optimalResult.optimalMethod === 'include') {
-                optimalBonusDisplay.style.display = 'block';
-                safeSetTextContent('optimal-bonus-amount', '¥0（并入综合所得）');
-                safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
-                safeSetTextContent('optimal-tax-savings', '¥0（已是最佳方案）');
-                safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
-                safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
-            } else if (optimalResult.taxSavings > 0) {
-                optimalBonusDisplay.style.display = 'block';
-                safeSetTextContent('optimal-bonus-amount', '¥' + optimalResult.optimalBonus.toFixed(2));
-                safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
-                safeSetTextContent('optimal-tax-savings', '¥' + optimalResult.taxSavings.toFixed(2));
-                safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
-                safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
-            } else {
-                optimalBonusDisplay.style.display = 'none';
-            }
-        }
-        
-        const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
-        if (resultPrepaidTaxElement) {
-            resultPrepaidTaxElement.textContent = '¥' + prepaidTax.toFixed(2);
-        }
-        
-        const refundTaxElement = document.getElementById('result-refund-tax');
-        if (refundTaxElement) {
-            if (refundTax === 0) {
-                refundTaxElement.textContent = '不退不补 ¥0.00';
-                refundTaxElement.className = 'font-medium text-lg';
-            } else if (refundTax > 0) {
-                refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
-                refundTaxElement.className = 'font-medium text-lg text-danger';
-            } else {
-                refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
-                refundTaxElement.className = 'font-medium text-lg text-success';
-            }
-        }
-        
-        const resultNetIncomeElement = document.getElementById('result-net-income');
-        if (resultNetIncomeElement) {
-            resultNetIncomeElement.textContent = '¥' + netIncome.toFixed(2);
-        }
+        const inputData = collectTaxInputData();
+        const calculationData = performTaxCalculation(inputData);
+        calculationResults = calculationData;
+        updateTaxResultsUI(calculationResults);
     } catch (error) {
-        console.error('计算过程中出现错误:', error);
-        showAlert('计算过程中出现错误：' + error.message);
+        handleCalculationError(error);
     }
 }
 
