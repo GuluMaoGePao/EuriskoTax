@@ -327,6 +327,9 @@ function calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, monthlyB
 }
 
 function collectTaxInputData() {
+    const prepaidTaxElement = document.getElementById('prepaid-tax');
+    const userInputPrepaidTax = prepaidTaxElement ? parseFloat(prepaidTaxElement.value) : undefined;
+    
     return {
         workMonths: parseInt(document.getElementById('work-months').value) || 12,
         monthlySalaryIncome: parseFloat(document.getElementById('salary-income').value) || 0,
@@ -335,7 +338,7 @@ function collectTaxInputData() {
         annualRoyaltyIncome: parseFloat(document.getElementById('royalty-income').value) || 0,
         bonusIncome: parseFloat(document.getElementById('bonus-income').value) || 0,
         bonusInclude: document.getElementById('bonus-include').checked,
-        userInputPrepaidTax: parseFloat(document.getElementById('prepaid-tax')?.value)
+        userInputPrepaidTax: !isNaN(userInputPrepaidTax) ? userInputPrepaidTax : undefined
     };
 }
 
