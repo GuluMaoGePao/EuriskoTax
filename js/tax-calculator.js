@@ -830,7 +830,7 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
     // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
     // 3%档位设置12,000元（每月1,000元）作为最低基准，避免1元等不合理数值
     // 其他档位使用原值+1，确保精确性和适用性
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : 0;
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         // 最高档位：根据模式调整
@@ -1434,7 +1434,7 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
     // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
     // 5%档位设置12,000元（每月1,000元）作为最低基准，避免1元等不合理数值
     // 其他档位使用原值+1，确保精确性和适用性
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : 0;
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         // 最高档位：根据模式调整
