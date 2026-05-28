@@ -1286,6 +1286,31 @@
                             </select>
                         </div>
 
+                        <!-- 计算模式选择器 - 移到所有倒算方式之前 -->
+                        <div id="reverse-calc-mode-section" class="hidden mt-2 mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                            <div>
+                                <label for="reverse-calc-mode" class="label">
+                                    📊 计算模式
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">选择应纳税所得额的计算基准，适配不同预算规划需求</span>
+                                    </span>
+                                </label>
+                                <select id="reverse-calc-mode" class="input-field">
+                                    <option value="all">📊 全部模式（显示对比）</option>
+                                    <option value="conservative">🌱 保守模式（最低门槛）</option>
+                                    <option value="balanced" selected>⚖️ 均衡模式（区间均值）</option>
+                                    <option value="aggressive">🚀 进取模式（接近上限）</option>
+                                </select>
+                                <div class="mt-2 text-xs text-gray-600">
+                                    <p><strong>📊 全部模式</strong>：同时计算三种模式并显示对比表格，方便全面了解不同收入水平下的税负情况</p>
+                                    <p><strong>🌱 保守模式</strong>：计算达到目标税率的最低收入门槛，适合稳健型收入规划</p>
+                                    <p><strong>⚖️ 均衡模式</strong>：使用税率档位中间值计算，反映区间内的平均税负水平</p>
+                                    <p><strong>🚀 进取模式</strong>：接近税率档位上限计算，反映较高收入水平的税负情况</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 方式1：按目标税率倒算 -->
                         <div id="reverse-rate-input" class="form-group">
                             <label for="reverse-target-rate" class="label">
@@ -1306,29 +1331,6 @@
                             </select>
                             <div id="business-rate-hint" class="hidden mt-2 text-sm text-orange-600">
                                 <i class="fa fa-info-circle"></i> 经营所得税率：5%、10%、20%、30%、35%
-                            </div>
-                            
-                            <!-- 计算模式选择器 -->
-                            <div class="mt-3">
-                                <label for="reverse-calc-mode" class="label">
-                                    计算模式
-                                    <span class="tooltip ml-1">
-                                        <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">选择应纳税所得额的计算基准，适配不同预算规划需求</span>
-                                    </span>
-                                </label>
-                                <select id="reverse-calc-mode" class="input-field">
-                                    <option value="all">📊 全部模式（显示对比）</option>
-                                    <option value="conservative">🌱 保守模式（最低门槛）</option>
-                                    <option value="balanced">⚖️ 均衡模式（区间均值）</option>
-                                    <option value="aggressive">🚀 进取模式（接近上限）</option>
-                                </select>
-                                <div class="mt-2 text-xs text-gray-500">
-                                    <p><strong>📊 全部模式</strong>：同时计算三种模式并显示对比表格，方便全面了解不同收入水平下的税负情况</p>
-                                    <p><strong>🌱 保守模式</strong>：计算达到目标税率的最低收入门槛，适合稳健型收入规划</p>
-                                    <p><strong>⚖️ 均衡模式</strong>：使用税率档位中间值计算，反映区间内的平均税负水平</p>
-                                    <p><strong>🚀 进取模式</strong>：接近税率档位上限计算，反映较高收入水平的税负情况</p>
-                                </div>
                             </div>
                         </div>
 
