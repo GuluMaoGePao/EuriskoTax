@@ -208,12 +208,17 @@ const comprehensiveTaxRates = [
 ];
 ```
 
-**计算逻辑**（`js/tax-calculator.js` 第224-401行 `calculateTax` 函数）：
-1. 收集输入数据（工资薪金、劳务报酬、稿酬、特许权使用费、年终奖等）
-2. 计算综合所得收入额
-3. 计算各项扣除
-4. 计算应纳税所得额
-5. 匹配税率表计算应纳税额
+**计算逻辑**（`js/tax-calculator.js` 第608-617行 `calculateTax` 函数）：
+1. 调用 `collectTaxInputData()` 收集输入数据（第329-339行）
+2. 调用 `performTaxCalculation()` 执行核心计算（第382-466行）
+3. 调用 `updateTaxResultsUI()` 更新界面展示（第592-599行）
+
+**核心计算函数**：
+- `collectTaxInputData()`（第329-339行）：从DOM收集输入数据
+- `calculateTotalIncome()`（第342-350行）：计算总收入
+- `calculateIncomeTax()`（第353-369行）：计算个税（支持最高级距处理）
+- `performTaxCalculation()`（第382-466行）：核心业务计算逻辑
+- `updateTaxResultsUI()`（第592-599行）：统一界面更新入口
 
 ---
 
@@ -503,7 +508,8 @@ const comprehensiveTaxRates = [
 | 综合所得税率表 | `js/tax-calculator.js` | 7-15 | ✅ 已实现 |
 | 经营所得税率表 | `js/tax-calculator.js` | 29-35 | ✅ 已实现 |
 | 分类所得税率表 | `js/tax-calculator.js` | 38-42 | ✅ 已实现 |
-| 综合所得计算 | `js/tax-calculator.js` | 224-401 | ✅ 已实现 |
+| 综合所得计算主函数 | `js/tax-calculator.js` | 608-617 | ✅ 已重构 |
+| 综合所得计算核心 | `js/tax-calculator.js` | 382-466 | ✅ 已重构 |
 | 经营所得计算 | `js/tax-calculator.js` | 1168-1280 | ✅ 已实现 |
 | 综合所得反向倒算（税率模式） | `js/tax-calculator.js` | 785-865 | ✅ 已实现 |
 | 综合所得反向倒算（月度模式） | `js/tax-calculator.js` | 867-939 | ✅ 已实现 |
@@ -519,10 +525,14 @@ const comprehensiveTaxRates = [
 | 临界点提醒 | `js/tax-calculator.js` | 45-64 | ✅ 已实现 |
 | 年终奖最优分配 | `js/tax-calculator.js` | 66-119 | ✅ 已实现 |
 | 公益捐赠限额校验 | `js/tax-calculator.js` | 121-134 | ✅ 已实现 |
+| 输入数据收集 | `js/tax-calculator.js` | 329-339 | ✅ 新增 |
+| 个税计算（支持最高级距） | `js/tax-calculator.js` | 353-369 | ✅ 修复 |
+| 界面更新函数 | `js/tax-calculator.js` | 469-605 | ✅ 新增 |
 
 ---
 
 **文档版本**: v2026.09  
 **最后更新**: 2026年5月28日  
 **编制依据**: 国家税务总局官方文件及最新政策公告  
-**定位**: 个人所得税年度预算规划工具
+**定位**: 个人所得税年度预算规划工具  
+**重构说明**: 综合所得计算函数已重构为职责分离的架构，主函数从230行精简至10行，提高了可测试性和可维护性
