@@ -1382,6 +1382,7 @@ function updateReverseModeComparisonTable(data) {
     const comparisonSection = document.getElementById('reverse-mode-comparison-section');
     const singleModeSection = document.getElementById('reverse-single-mode-section');
     const tableBody = document.getElementById('reverse-mode-comparison-body');
+    const singleTaxSection = document.getElementById('reverse-single-tax-section');
     
     if (!comparisonSection || !singleModeSection || !tableBody) return;
     
@@ -1397,15 +1398,18 @@ function updateReverseModeComparisonTable(data) {
     
     // 根据用户选择决定显示内容
     if (selectedMode === 'all') {
-        // 全部模式：显示对比表格，隐藏单个模式显示
+        // 全部模式：显示对比表格，隐藏单个模式显示和顶部税额行
         comparisonSection.classList.remove('hidden');
         singleModeSection.classList.add('hidden');
+        if (singleTaxSection) {
+            singleTaxSection.classList.add('hidden');
+        }
         
         // 清空表格
         tableBody.innerHTML = '';
         
         if (Object.keys(allModeResults).length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">正在计算...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">正在计算...</td></tr>';
             return;
         }
         
@@ -1421,8 +1425,9 @@ function updateReverseModeComparisonTable(data) {
             const modeResult = allModeResults[mode];
             if (!modeResult) return;
             
+            const netIncome = modeResult.totalIncome - modeResult.finalTotalTax;
+            
             const row = document.createElement('tr');
-            // 添加斑马纹和hover效果
             row.className = index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-white';
             
             row.innerHTML = `
@@ -1438,18 +1443,23 @@ function updateReverseModeComparisonTable(data) {
                 <td class="px-3 py-2 text-right font-medium text-blue-600">
                     ¥${isFinite(modeResult.totalIncome) ? modeResult.totalIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
                 </td>
-                <td class="px-3 py-2 text-right font-medium ${mode === 'balanced' ? 'text-purple-600 font-bold' : 'text-red-600'}">
+                <td class="px-3 py-2 text-right font-medium text-red-600">
                     ¥${isFinite(modeResult.finalTotalTax) ? modeResult.finalTotalTax.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
-                    ${mode === 'balanced' ? '<span class="text-xs text-purple-500 ml-1">←当前</span>' : ''}
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-green-600">
+                    ¥${isFinite(netIncome) ? netIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
                 </td>
             `;
             
             tableBody.appendChild(row);
         });
     } else {
-        // 单个模式：隐藏对比表格，显示单个模式结果
+        // 单个模式：隐藏对比表格，显示单个模式结果和顶部税额行
         comparisonSection.classList.add('hidden');
         singleModeSection.classList.remove('hidden');
+        if (singleTaxSection) {
+            singleTaxSection.classList.remove('hidden');
+        }
     }
 }
 

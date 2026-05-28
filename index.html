@@ -1120,7 +1120,7 @@
                                             <th>应纳税所得额</th>
                                             <th>税率</th>
                                             <th>月工资应纳税额</th>
-                                            <th>累计已缴</th>
+                                            <th>累计应缴</th>
                                         </tr>
                                     </thead>
                                     <tbody id="budget-table-body">
@@ -2007,7 +2007,8 @@
                         <h3 class="text-lg font-bold text-primary mb-4">倒算结果</h3>
                         
                         <div class="space-y-3">
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                            <!-- 全年应缴税额（在全部模式下隐藏） -->
+                            <div id="reverse-single-tax-section" class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">全年应缴税额</span>
                                 <span class="font-medium" id="reverse-result-total-tax">¥0</span>
                             </div>
@@ -2045,9 +2046,10 @@
                                         <thead>
                                             <tr class="bg-gray-50">
                                                 <th class="px-3 py-2 text-left font-medium text-gray-600">计算模式</th>
-                                                <th class="px-3 py-2 text-right font-medium text-gray-600">应纳税所得额</th>
-                                                <th class="px-3 py-2 text-right font-medium text-gray-600">税前收入</th>
-                                                <th class="px-3 py-2 text-right font-medium text-gray-600">应纳税额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度应纳税所得额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度税前收入</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">全年应缴税额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度税后收入</th>
                                             </tr>
                                         </thead>
                                         <tbody id="reverse-mode-comparison-body">
@@ -2063,16 +2065,14 @@
                                     <span class="text-gray-600">年度应纳税所得额</span>
                                     <span class="font-medium text-primary" id="reverse-result-taxable-income">¥0</span>
                                 </div>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pt-4 border-t border-gray-200">
-                                <span class="text-gray-600">年度累计税前收入</span>
-                                <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600">年度税后收入</span>
-                                <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-gray-600">年度税前收入</span>
+                                    <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-gray-600">年度税后收入</span>
+                                    <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -2100,28 +2100,101 @@
                     <!-- 反向倒算预算表卡片 -->
                     <div class="card lg:col-span-3">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-primary">个人年度个税预算表（反向倒算）</h3>
+                            <h3 class="text-lg font-bold text-primary" id="reverse-budget-table-title">个人年度个税预算表（反向倒算）</h3>
                             <div class="text-sm text-gray-500">
                                 生成日期：<span id="reverse-budget-table-date"></span>
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="tax-budget-table" id="reverse-tax-budget-table">
-                                <thead>
-                                    <tr>
-                                        <th>月份</th>
-                                        <th>收入</th>
-                                        <th>扣除</th>
-                                        <th>应纳税所得额</th>
-                                        <th>税率</th>
-                                        <th>应纳税额</th>
-                                        <th>累计已缴</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="reverse-budget-table-body">
-                                    <!-- 表格内容将由JavaScript动态生成 -->
-                                </tbody>
-                            </table>
+                        
+                        <!-- 单一模式预算表（单个模式下显示） -->
+                        <div id="reverse-single-budget-section">
+                            <div class="overflow-x-auto">
+                                <table class="tax-budget-table" id="reverse-tax-budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>月份</th>
+                                            <th>收入</th>
+                                            <th>扣除</th>
+                                            <th>应纳税所得额</th>
+                                            <th>税率</th>
+                                            <th>应纳税额</th>
+                                            <th>累计应缴</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reverse-budget-table-body">
+                                        <!-- 表格内容将由JavaScript动态生成 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- 多模式预算表（全部模式下显示） -->
+                        <div id="reverse-multi-budget-section" class="hidden space-y-6">
+                            <!-- 保守模式 -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">🌱 保守模式（最低门槛）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-conservative-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 均衡模式 -->
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-purple-600 mb-3">⚖️ 均衡模式（区间均值）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-balanced-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 进取模式 -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">🚀 进取模式（接近上限）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-aggressive-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
