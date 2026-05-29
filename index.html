@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>个人所得税计算小程序 - 2026版</title>
+    <title>EuriskoTax - 个人所得税预算规划工具</title>
     <!-- Tailwind CSS v3 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -70,7 +70,7 @@
                 @apply bg-success text-white hover:bg-success/90 focus:ring-success/50;
             }
             .input-field {
-                @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+                @apply w-full pr-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
             }
             .input-field.input-error {
                 @apply border-danger focus:ring-danger/50 focus:border-danger;
@@ -184,13 +184,11 @@
     <!-- 登录页面 -->
     <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
         <div class="w-full max-w-md mx-4">
-            <!-- Logo和标题 -->
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-                    <i class="fa fa-calculator text-2xl text-primary"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-white mb-2">个人所得税计算小程序</h1>
-                <p class="text-blue-200">专业个税计算工具</p>
+            <!-- 品牌标识 -->
+            <div class="text-center mb-6">
+                <img src="images/logo.png" alt="EuriskoTax" class="mx-auto" style="width: 250px; height: 250px; margin-top: -50px; margin-bottom: -50px;">
+                <h1 class="text-2xl font-bold text-white mb-2">个人所得税预算规划工具</h1>
+                <p class="text-blue-200">专业税务参考 · 智能薪酬规划</p>
             </div>
             
             <!-- 登录表单卡片 -->
@@ -294,20 +292,25 @@
             </div>
             
             <!-- 底部信息 -->
-            <p class="text-center text-blue-200 text-sm mt-6">
-                登录即表示同意 <a href="#" class="underline">用户协议</a> 和 <a href="#" class="underline">隐私政策</a>
-            </p>
+            <div class="text-center mt-6 space-y-2">
+                <p class="text-blue-200 text-sm">
+                    登录即表示同意 <a href="#" class="underline hover:text-white">用户协议</a> 和 <a href="#" class="underline hover:text-white">隐私政策</a>
+                </p>
+                <p class="text-blue-300 text-xs">
+                    © 2026 EuriskoTax · 仅供参考，实际纳税请以税务部门核算为准
+                </p>
+            </div>
         </div>
     </div>
 
     <!-- 应用主容器 -->
     <div id="app-container" class="hidden">
         <!-- 顶部导航栏 -->
-        <nav class="bg-primary text-white shadow-md">
-            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <i class="fa fa-calculator text-xl"></i>
-                    <h1 class="text-xl font-bold">个人所得税计算小程序</h1>
+        <nav class="bg-primary text-white shadow-md" style="height: 80px;">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center" style="height: 80px;">
+                <!-- EuriskoTax 品牌导航 -->
+                <div class="flex items-center">
+                    <img src="images/logo.png" alt="EuriskoTax" style="width: 120px; height: 120px;">
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="theme-toggle" class="p-2 rounded-full hover:bg-primary/80 transition-all-300">
@@ -2950,7 +2953,7 @@
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    © 2026 个人所得税计算小程序 | 基于2026年个人所得税计算规则手册
+                    © 2026 EuriskoTax | 基于2026年个人所得税计算规则手册 · 仅供参考
                 </div>
                 <div class="flex space-x-4">
                     <button id="history-btn" class="text-sm text-gray-600 hover:text-primary flex items-center">
@@ -3072,7 +3075,7 @@
 
     <!-- 关于模态框 -->
     <div id="about-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+        <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
             <div class="p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-bold text-primary">关于本程序</h3>
@@ -3081,11 +3084,40 @@
                     </button>
                 </div>
                 <div class="space-y-4">
-                    <p class="text-sm text-gray-600">个人所得税计算小程序是一款基于2026年个人所得税计算规则手册设计的轻量化工具，支持正向计税和反向倒算，生成标准化年度个税预算表。</p>
-                    <p class="text-sm text-gray-600">本程序仅供参考使用，实际纳税请以税务部门核算为准。</p>
-                    <div class="text-center text-sm text-gray-500 mt-4">
-                        <p>版本：1.0.0</p>
-                        <p class="mt-1">© 2026 个人所得税计算小程序</p>
+                    <!-- EuriskoTax 品牌logo -->
+                    <div class="text-center mb-6">
+                        <img src="images/logo.png" alt="EuriskoTax" class="h-16 w-auto mx-auto mb-3" style="width: 200px; height: 200px; margin-top: -40px; margin-bottom: -40px;">
+                        <p class="text-sm text-gray-500">个人所得税预算规划工具</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-700 leading-relaxed">
+                            EuriskoTax是一款专业的个人所得税预算规划工具，基于2026年最新个税计算规则设计，支持正向计税和反向倒算，帮助用户科学规划个税支出。
+                        </p>
+                    </div>
+                    <div class="border-t border-gray-200 pt-4">
+                        <p class="text-sm font-semibold text-gray-800 mb-3 text-center">💡 核心价值</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-blue-50 p-3 rounded-lg text-center">
+                                <i class="fa fa-user text-primary text-xl mb-2 block"></i>
+                                <p class="font-semibold text-gray-800 text-sm">对个人</p>
+                                <p class="text-xs text-gray-600 mt-1">薪酬规划 · 合理节税</p>
+                            </div>
+                            <div class="bg-indigo-50 p-3 rounded-lg text-center">
+                                <i class="fa fa-building text-primary text-xl mb-2 block"></i>
+                                <p class="font-semibold text-gray-800 text-sm">对企业</p>
+                                <p class="text-xs text-gray-600 mt-1">成本预算 · 薪酬优化</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                        <p class="text-xs text-yellow-800">
+                            <i class="fa fa-exclamation-triangle mr-1"></i>
+                            <strong>免责声明：</strong>本工具仅供参考使用，实际纳税请以税务部门核算为准。
+                        </p>
+                    </div>
+                    <div class="text-center pt-2 border-t border-gray-100">
+                        <p class="text-xs text-gray-500">版本 1.17.0</p>
+                        <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                     </div>
                 </div>
             </div>
