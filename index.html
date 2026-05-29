@@ -1260,7 +1260,7 @@
                                             <th>应纳税所得额</th>
                                             <th>税率</th>
                                             <th>月工资应纳税额</th>
-                                            <th>累计已缴</th>
+                                            <th>累计应缴</th>
                                         </tr>
                                     </thead>
                                     <tbody id="budget-table-body">
@@ -1274,6 +1274,79 @@
                             <h3 class="text-lg font-bold text-primary mb-4">税收优化建议</h3>
                             <div id="optimization-tips" class="space-y-4">
                                 <!-- 优化建议将由JavaScript动态生成 -->
+                            </div>
+                            
+                            <div id="threshold-warning-display" class="mt-4 p-4 bg-yellow-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                                    <span class="font-medium text-yellow-800">税率临界点提醒</span>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <p id="threshold-warning-message"></p>
+                                    <div class="mt-2 flex justify-between text-sm">
+                                        <span>当前税率：</span>
+                                        <span class="font-medium" id="threshold-current-rate">0%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>下一税率：</span>
+                                        <span class="font-medium" id="threshold-next-rate">0%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>距离临界点：</span>
+                                        <span class="font-medium" id="threshold-remaining">¥0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="donation-warning-display" class="mt-4 p-4 bg-orange-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-info-circle text-orange-600 mr-2"></i>
+                                    <span class="font-medium text-orange-800">公益捐赠限额提示</span>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <p id="donation-warning-message"></p>
+                                    <div class="mt-2 flex justify-between text-sm">
+                                        <span>允许扣除限额：</span>
+                                        <span class="font-medium" id="donation-max-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>实际可扣除：</span>
+                                        <span class="font-medium" id="donation-actual-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span>超出部分：</span>
+                                        <span class="font-medium text-danger" id="donation-excess-amount">¥0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="optimal-bonus-display" class="mt-4 p-4 bg-blue-50 rounded-lg" style="display: none;">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
+                                    <span class="font-medium text-blue-800">年终奖最优分配建议</span>
+                                </div>
+                                <div class="text-sm text-gray-600 space-y-2">
+                                    <div class="flex justify-between">
+                                        <span>最优年终奖分配：</span>
+                                        <span class="font-medium text-green-600" id="optimal-bonus-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>最优工资分配：</span>
+                                        <span class="font-medium text-green-600" id="optimal-salary-amount">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>可节省税额：</span>
+                                        <span class="font-medium text-green-600" id="optimal-tax-savings">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>原方案税额：</span>
+                                        <span class="font-medium text-gray-500" id="optimal-original-tax">¥0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>优化后税额：</span>
+                                        <span class="font-medium text-green-600" id="optimal-new-tax">¥0</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -1352,7 +1425,32 @@
                                 <option value="business">经营所得</option>
                             </select>
                         </div>
-                        
+
+                        <!-- 计算模式选择器 - 移到所有倒算方式之前 -->
+                        <div id="reverse-calc-mode-section" class="hidden mt-2 mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                            <div>
+                                <label for="reverse-calc-mode" class="label">
+                                    📊 计算模式
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">选择应纳税所得额的计算基准，适配不同预算规划需求</span>
+                                    </span>
+                                </label>
+                                <select id="reverse-calc-mode" class="input-field">
+                                    <option value="all">📊 全部模式（显示对比）</option>
+                                    <option value="conservative">🌱 保守模式（最低门槛）</option>
+                                    <option value="balanced" selected>⚖️ 均衡模式（区间均值）</option>
+                                    <option value="aggressive">🚀 进取模式（接近上限）</option>
+                                </select>
+                                <div class="mt-2 text-xs text-gray-600">
+                                    <p><strong>📊 全部模式</strong>：同时计算三种模式并显示对比表格，方便全面了解不同收入水平下的税负情况</p>
+                                    <p><strong>🌱 保守模式</strong>：计算达到目标税率的最低收入门槛，适合稳健型收入规划</p>
+                                    <p><strong>⚖️ 均衡模式</strong>：使用税率档位中间值计算，反映区间内的平均税负水平</p>
+                                    <p><strong>🚀 进取模式</strong>：接近税率档位上限计算，反映较高收入水平的税负情况</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 方式1：按目标税率倒算 -->
                         <div id="reverse-rate-input" class="form-group">
                             <label for="reverse-target-rate" class="label">
@@ -1363,14 +1461,130 @@
                                 </span>
                             </label>
                             <select id="reverse-target-rate" class="input-field">
-                                <option value="3">3%</option>
-                                <option value="10">10%</option>
-                                <option value="20">20%</option>
-                                <option value="25">25%</option>
-                                <option value="30">30%</option>
-                                <option value="35">35%</option>
-                                <option value="45">45%</option>
+                                <option value="3">3%（综合所得第1级）</option>
+                                <option value="10">10%（综合所得第2级）</option>
+                                <option value="20">20%（综合所得第3级）</option>
+                                <option value="25">25%（综合所得第4级）</option>
+                                <option value="30">30%（综合所得第5级）</option>
+                                <option value="35">35%（综合所得第6级/经营所得第5级）</option>
+                                <option value="45">45%（综合所得第7级）</option>
                             </select>
+                            <div id="business-rate-hint" class="hidden mt-2 text-sm text-orange-600">
+                                <i class="fa fa-info-circle"></i> 经营所得税率：5%、10%、20%、30%、35%
+                            </div>
+                        </div>
+
+                        <!-- 经营所得特有扣除项（仅在选择经营所得时显示） -->
+                        <div id="reverse-business-deduction-section" class="hidden mt-4 p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-medium text-blue-800 mb-3">经营所得扣除项</h4>
+                            
+                            <div class="form-group">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-business-has-comprehensive-income" class="form-checkbox text-primary">
+                                    <span class="ml-2 text-sm text-gray-700">有综合所得（无综合所得时，投资者减除费用为60000元/年）</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" id="reverse-business-deduction-checkbox" class="form-checkbox text-primary" checked>
+                                    <span class="ml-2 font-medium text-gray-700">成本费用扣除</span>
+                                </label>
+                            </div>
+                            
+                            <div id="reverse-business-deduction-content" class="mt-3">
+                                <div class="form-group">
+                                    <label for="reverse-business-cost" class="label text-sm">
+                                        成本 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">从事生产经营活动发生的成本</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-cost" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-expenses" class="label text-sm">
+                                        费用 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">从事生产经营活动发生的费用</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-expenses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-taxes" class="label text-sm">
+                                        税金 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">已缴纳的相关税金</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-taxes" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-losses" class="label text-sm">
+                                        损失 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">生产经营活动发生的损失</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-losses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-other-expenses" class="label text-sm">
+                                        其他支出 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">其他允许扣除的支出</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-other-expenses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="reverse-business-previous-losses" class="label text-sm">
+                                        以前年度亏损 (元/年)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">可弥补的以前年度亏损（不超过5年）</span>
+                                        </span>
+                                    </label>
+                                    <input type="number" id="reverse-business-previous-losses" class="input-field" value="0" min="0" step="100">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-business-special-additional-deduction" class="label text-sm">
+                                    专项附加扣除 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">仅无综合所得时可扣除</span>
+                                    </span>
+                                </label>
+                                <input type="number" id="reverse-business-special-additional-deduction" class="input-field" value="0" min="0" step="100">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reverse-business-other-deduction" class="label text-sm">
+                                    其他扣除 (元/年)
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">其他允许扣除的金额</span>
+                                    </span>
+                                </label>
+                                <input type="number" id="reverse-business-other-deduction" class="input-field" value="0" min="0" step="100">
+                            </div>
+                            
+                            <div class="mt-3 p-3 bg-yellow-50 rounded text-sm">
+                                <p class="text-yellow-800"><strong>经营所得优惠：</strong>年应纳税所得额不超过200万元的部分，享受减半征收优惠（2023-2027年）</p>
+                            </div>
                         </div>
                         
                         <!-- 方式2：按月度税后收入倒算 -->
@@ -1934,8 +2148,9 @@
                     <div class="card lg:col-span-1">
                         <h3 class="text-lg font-bold text-primary mb-4">倒算结果</h3>
                         
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                        <div class="space-y-3">
+                            <!-- 全年应缴税额（在全部模式下隐藏） -->
+                            <div id="reverse-single-tax-section" class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">全年应缴税额</span>
                                 <span class="font-medium" id="reverse-result-total-tax">¥0</span>
                             </div>
@@ -1950,12 +2165,6 @@
                                 <span class="font-medium text-danger" id="reverse-result-bonus-tax">¥0</span>
                             </div>
                             
-                            <!-- 适用税率级数已隐藏 -->
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100 hidden">
-                                <span class="text-gray-600">适用税率级数</span>
-                                <span class="font-medium" id="reverse-result-tax-level">级数1</span>
-                            </div>
-                            
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">适用税率</span>
                                 <span class="font-medium" id="reverse-result-tax-rate">3%</span>
@@ -1967,23 +2176,45 @@
                             </div>
                             
                             <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度应纳税所得额</span>
-                                <span class="font-medium" id="reverse-result-taxable-income">¥0</span>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
                                 <span class="text-gray-600">年度扣除总额</span>
                                 <span class="font-medium text-success" id="reverse-result-total-deduction">¥0</span>
                             </div>
                             
-                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <span class="text-gray-600">年度累计税前收入</span>
-                                <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
+                            <!-- 计算模式对比表格（仅在全部模式时显示） -->
+                            <div id="reverse-mode-comparison-section" class="hidden mt-4 pt-4 border-t border-gray-200">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">📊 三种计算模式对比</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="bg-gray-50">
+                                                <th class="px-3 py-2 text-left font-medium text-gray-600">计算模式</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度应纳税所得额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度税前收入</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">全年应缴税额</th>
+                                                <th class="px-3 py-2 text-right font-medium text-gray-600">年度税后收入</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-mode-comparison-body">
+                                            <!-- 表格内容将由JavaScript动态生成 -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                             
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600">年度税后收入</span>
-                                <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
+                            <!-- 单个模式结果显示 -->
+                            <div id="reverse-single-mode-section" class="mt-4 pt-4 border-t border-gray-200">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">年度应纳税所得额</span>
+                                    <span class="font-medium text-primary" id="reverse-result-taxable-income">¥0</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-gray-600">年度税前收入</span>
+                                    <span class="font-medium text-primary text-lg" id="reverse-result-total-income">¥0</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-gray-600">年度税后收入</span>
+                                    <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -2011,28 +2242,101 @@
                     <!-- 反向倒算预算表卡片 -->
                     <div class="card lg:col-span-3">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-primary">个人年度个税预算表（反向倒算）</h3>
+                            <h3 class="text-lg font-bold text-primary" id="reverse-budget-table-title">个人年度个税预算表（反向倒算）</h3>
                             <div class="text-sm text-gray-500">
                                 生成日期：<span id="reverse-budget-table-date"></span>
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="tax-budget-table" id="reverse-tax-budget-table">
-                                <thead>
-                                    <tr>
-                                        <th>月份</th>
-                                        <th>收入</th>
-                                        <th>扣除</th>
-                                        <th>应纳税所得额</th>
-                                        <th>税率</th>
-                                        <th>应纳税额</th>
-                                        <th>累计已缴</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="reverse-budget-table-body">
-                                    <!-- 表格内容将由JavaScript动态生成 -->
-                                </tbody>
-                            </table>
+                        
+                        <!-- 单一模式预算表（单个模式下显示） -->
+                        <div id="reverse-single-budget-section">
+                            <div class="overflow-x-auto">
+                                <table class="tax-budget-table" id="reverse-tax-budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>月份</th>
+                                            <th>收入</th>
+                                            <th>扣除</th>
+                                            <th>应纳税所得额</th>
+                                            <th>税率</th>
+                                            <th>应纳税额</th>
+                                            <th>累计应缴</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reverse-budget-table-body">
+                                        <!-- 表格内容将由JavaScript动态生成 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- 多模式预算表（全部模式下显示） -->
+                        <div id="reverse-multi-budget-section" class="hidden space-y-6">
+                            <!-- 保守模式 -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">🌱 保守模式（最低门槛）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-conservative-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 均衡模式 -->
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-purple-600 mb-3">⚖️ 均衡模式（区间均值）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-balanced-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 进取模式 -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="text-md font-semibold text-gray-700 mb-3">🚀 进取模式（接近上限）</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="tax-budget-table">
+                                        <thead>
+                                            <tr>
+                                                <th>月份</th>
+                                                <th>收入</th>
+                                                <th>扣除</th>
+                                                <th>应纳税所得额</th>
+                                                <th>税率</th>
+                                                <th>应纳税额</th>
+                                                <th>累计应缴</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reverse-budget-aggressive-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -2707,6 +3011,15 @@
                             <li>劳务报酬、稿酬、特许权使用费预缴时按固定税率计税，年度汇算时并入综合所得，适用3%-45%超额累进税率，通常会产生税额差额，需通过汇算多退少补</li>
                             <li>个人独资企业、合伙企业投资者的经营所得，比照经营所得规则计税</li>
                             <li>所有计税扣除项均需符合国家税务总局相关规定，不得虚假填报扣除</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-gray-800 mb-2">预算与实际差异说明</h4>
+                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                            <li>本工具为年度预算规划工具，计算结果基于年度税率表，用于提前预估税负</li>
+                            <li>实际月度预缴可能因2026年累计减除费用新规产生差异，年度汇算时统一清算</li>
+                            <li>一次性扣除6万元政策仅适用于特定人群的预缴阶段，不影响年度预算计算</li>
+                            <li>预算结果仅供参考，实际应纳税额以年度汇算清缴结果为准</li>
                         </ul>
                     </div>
                 </div>

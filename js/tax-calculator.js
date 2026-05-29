@@ -42,6 +42,112 @@ const classificationTaxRates = {
     accidental: { rate: 0.20, name: '偶然所得' }
 };
 
+// 临界点提醒函数
+function checkTaxBracketThreshold(taxableIncome) {
+    for (let i = 0; i < comprehensiveTaxRates.length - 1; i++) {
+        const currentBracket = comprehensiveTaxRates[i];
+        const nextBracket = comprehensiveTaxRates[i + 1];
+        
+        const threshold = nextBracket.min - 10000;
+        if (taxableIncome > threshold && taxableIncome < nextBracket.min) {
+            return {
+                warning: true,
+                currentRate: currentBracket.rate,
+                nextRate: nextBracket.rate,
+                threshold: nextBracket.min,
+                remaining: nextBracket.min - taxableIncome,
+                message: `您的应纳税所得额接近${(nextBracket.rate * 100).toFixed(0)}%税率临界点，再增加${(nextBracket.min - taxableIncome).toFixed(2)}元将进入更高税率区间`
+            };
+        }
+    }
+    return { warning: false };
+}
+
+// 年终奖最优分配计算函数（优化版：基于税率表临界点）
+function calculateOptimalBonusAllocation(totalIncome, totalDeduction) {
+    const bonusCriticalPoints = [0, 36000, 144000, 300000, 420000, 660000, 960000];
+    
+    let minTax = Infinity;
+    let optimalBonus = 0;
+    
+    for (const criticalPoint of bonusCriticalPoints) {
+        const bonus = Math.min(criticalPoint, totalIncome);
+        const salaryIncome = totalIncome - bonus;
+        const salaryTaxable = Math.max(0, salaryIncome - totalDeduction);
+        
+        let salaryTax = 0;
+        for (const bracket of comprehensiveTaxRates) {
+            if (salaryTaxable <= bracket.max) {
+                salaryTax = salaryTaxable * bracket.rate - bracket.deduction;
+                break;
+            }
+        }
+        
+        let bonusTax = 0;
+        if (bonus > 0) {
+            const monthlyBonus = bonus / 12;
+            for (const bracket of bonusMonthlyTaxRates) {
+                if (monthlyBonus <= bracket.max) {
+                    bonusTax = bonus * bracket.rate - bracket.deduction;
+                    break;
+                }
+            }
+        }
+        
+        const totalTax = Math.max(0, salaryTax) + Math.max(0, bonusTax);
+        
+        if (totalTax < minTax) {
+            minTax = totalTax;
+            optimalBonus = bonus;
+        }
+    }
+    
+    const allInTaxable = Math.max(0, totalIncome - totalDeduction);
+    let allInTax = 0;
+    for (const bracket of comprehensiveTaxRates) {
+        if (allInTaxable <= bracket.max) {
+            allInTax = allInTaxable * bracket.rate - bracket.deduction;
+            break;
+        }
+    }
+    allInTax = Math.max(0, allInTax);
+    
+    if (allInTax < minTax) {
+        return {
+            optimalBonus: 0,
+            optimalSalary: totalIncome,
+            minTax: allInTax,
+            taxSavings: 0,
+            allInTax: allInTax,
+            optimalMethod: 'include'
+        };
+    }
+    
+    return {
+        optimalBonus: optimalBonus,
+        optimalSalary: totalIncome - optimalBonus,
+        minTax: minTax,
+        taxSavings: allInTax - minTax,
+        allInTax: allInTax,
+        optimalMethod: 'separate'
+    };
+}
+
+// 公益捐赠限额校验函数
+function validateCharitableDonation(donationAmount, taxableIncome) {
+    const maxDeduction = taxableIncome * 0.3;
+    const actualDeduction = Math.min(donationAmount, maxDeduction);
+    const excessAmount = donationAmount - actualDeduction;
+    
+    return {
+        actualDeduction: actualDeduction,
+        excessAmount: excessAmount,
+        maxDeduction: maxDeduction,
+        isExcess: excessAmount > 0,
+        message: excessAmount > 0 ? `捐赠额超过应纳税所得额30%的部分(${excessAmount.toFixed(2)}元)不能享受税前扣除` : '捐赠额在允许扣除范围内'
+    };
+}
+
 // 安全设置元素文本内容
 function safeSetTextContent(id, value) {
     const element = document.getElementById(id);
@@ -220,183 +326,297 @@ function calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, monthlyB
     return cumulativeTaxableIncome * topBracket.rate - topBracket.deduction;
 }
 
+function collectTaxInputData() {
+    const prepaidTaxElement = document.getElementById('prepaid-tax');
+    const userInputPrepaidTax = prepaidTaxElement ? parseFloat(prepaidTaxElement.value) : undefined;
+    
+    return {
+        workMonths: parseInt(document.getElementById('work-months').value) || 12,
+        monthlySalaryIncome: parseFloat(document.getElementById('salary-income').value) || 0,
+        annualLaborIncome: parseFloat(document.getElementById('labor-income').value) || 0,
+        annualAuthorIncome: parseFloat(document.getElementById('author-income').value) || 0,
+        annualRoyaltyIncome: parseFloat(document.getElementById('royalty-income').value) || 0,
+        bonusIncome: parseFloat(document.getElementById('bonus-income').value) || 0,
+        bonusInclude: document.getElementById('bonus-include').checked,
+        userInputPrepaidTax: !isNaN(userInputPrepaidTax) ? userInputPrepaidTax : undefined
+    };
+}
+
+function calculateTotalIncome(monthlySalaryIncome, workMonths, otherIncome, bonusIncome, bonusInclude) {
+    let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
+        otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
+    
+    if (bonusIncome > 0 && bonusInclude) {
+        totalIncome += bonusIncome;
+    }
+    
+    return totalIncome;
+}
+
+function calculateIncomeTax(taxableIncome) {
+    for (const bracket of comprehensiveTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            return {
+                totalTax: taxableIncome * bracket.rate - bracket.deduction,
+                applicableRate: bracket.rate,
+                applicableDeduction: bracket.deduction
+            };
+        }
+    }
+    const topBracket = comprehensiveTaxRates[comprehensiveTaxRates.length - 1];
+    return {
+        totalTax: taxableIncome * topBracket.rate - topBracket.deduction,
+        applicableRate: topBracket.rate,
+        applicableDeduction: topBracket.deduction
+    };
+}
+
+function determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax) {
+    if (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) {
+        return userInputPrepaidTax;
+    }
+    return cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax;
+}
+
+function calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome, bonusIncome) {
+    return monthlySalaryIncome * workMonths + annualLaborIncome + 
+        annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
+}
+
+function performTaxCalculation(inputData) {
+    const { workMonths, monthlySalaryIncome, annualLaborIncome, annualAuthorIncome, 
+            annualRoyaltyIncome, bonusIncome, bonusInclude, userInputPrepaidTax } = inputData;
+    
+    const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
+    const deductions = calculateComprehensiveDeductions(workMonths);
+    
+    const totalIncome = calculateTotalIncome(
+        monthlySalaryIncome, workMonths, otherIncome, bonusIncome, bonusInclude
+    );
+    
+    const taxableIncome = Math.max(0, totalIncome - deductions.totalDeduction);
+    const donationBeforeTaxableIncome = Math.max(0, totalIncome - (deductions.totalDeduction - deductions.annualCharitableDonation));
+    
+    const taxResult = calculateIncomeTax(taxableIncome);
+    
+    const cumulativeTax = calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, 
+        deductions.monthlyBasicDeduction, deductions.monthlyInsuranceDeduction, 
+        deductions.monthlySpecialAdditionalTotal, deductions.monthlyPensionDeduction, 
+        deductions.monthlyEnterpriseAnnuity, deductions.monthlyInsuranceOtherDeduction, 
+        deductions.monthlyTaxDeferredPension);
+    
+    const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
+    const prepaidTax = determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax);
+    
+    const refundTax = taxResult.totalTax - prepaidTax;
+    const preTaxIncome = calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, 
+        annualAuthorIncome, annualRoyaltyIncome, bonusIncome);
+    const netIncome = preTaxIncome - taxResult.totalTax;
+    
+    return {
+        workMonths,
+        incomeDetails: {
+            salary: monthlySalaryIncome,
+            labor: annualLaborIncome,
+            laborCalculated: otherIncome.laborTaxableIncome,
+            laborTax: otherIncome.laborTax,
+            author: annualAuthorIncome,
+            authorCalculated: otherIncome.authorTaxableIncome,
+            authorTax: otherIncome.authorTax,
+            royalty: annualRoyaltyIncome,
+            royaltyCalculated: otherIncome.royaltyTaxableIncome,
+            royaltyTax: otherIncome.royaltyTax,
+            bonus: bonusIncome,
+            bonusInclude: bonusInclude,
+            bonusTax: bonusTax,
+            total: totalIncome,
+            preTaxTotal: preTaxIncome
+        },
+        deductionDetails: {
+            basic: deductions.monthlyBasicDeduction,
+            pensionInsurance: deductions.monthlyPensionInsurance,
+            medicalInsurance: deductions.monthlyMedicalInsurance,
+            unemploymentInsurance: deductions.monthlyUnemploymentInsurance,
+            housingFund: deductions.monthlyHousingFund,
+            elderly: deductions.monthlyElderlyDeduction,
+            childrenInfant: deductions.monthlyChildrenInfantDeduction,
+            housing: deductions.monthlyHousingDeduction,
+            education: deductions.annualEducationDeduction,
+            medical: deductions.annualMedicalDeduction,
+            actualMedical: deductions.actualMedicalDeduction,
+            professional: deductions.annualProfessionalDeduction,
+            educationDegree: deductions.educationDegreeAmount / workMonths,
+            pension: deductions.monthlyPensionDeduction,
+            enterpriseAnnuity: deductions.monthlyEnterpriseAnnuity,
+            insuranceOther: deductions.monthlyInsuranceOtherDeduction,
+            taxDeferredPension: deductions.monthlyTaxDeferredPension,
+            charitableDonation: deductions.annualCharitableDonation,
+            specialAdditionalTotal: deductions.annualSpecialAdditionalTotal,
+            specialDeductionTotal: deductions.annualSpecialDeductionTotal,
+            otherTotal: deductions.annualOtherDeductionTotal,
+            total: deductions.totalDeduction
+        },
+        taxDetails: {
+            taxableIncome: taxableIncome,
+            totalTax: taxResult.totalTax,
+            applicableRate: taxResult.applicableRate,
+            applicableDeduction: taxResult.applicableDeduction,
+            prepaidTax: prepaidTax,
+            refundTax: refundTax,
+            netIncome: netIncome
+        },
+        donationBeforeTaxableIncome: donationBeforeTaxableIncome,
+        calculationDate: new Date().toISOString()
+    };
+}
+
+function updateBasicResults(results) {
+    document.getElementById('result-total-income').textContent = '¥' + results.incomeDetails.total.toFixed(2);
+    document.getElementById('result-total-deduction').textContent = '¥' + results.deductionDetails.total.toFixed(2);
+    document.getElementById('result-taxable-income').textContent = '¥' + results.taxDetails.taxableIncome.toFixed(2);
+    document.getElementById('result-tax-rate').textContent = (results.taxDetails.applicableRate * 100).toFixed(0) + '%';
+    document.getElementById('result-deduction-amount').textContent = '¥' + results.taxDetails.applicableDeduction.toFixed(2);
+    document.getElementById('result-total-tax').textContent = '¥' + results.taxDetails.totalTax.toFixed(2);
+}
+
+function updateBonusDisplay(results) {
+    const bonusDisplay = document.getElementById('bonus-tax-display');
+    if (!bonusDisplay) return;
+    
+    if (results.incomeDetails.bonus > 0) {
+        bonusDisplay.style.display = 'block';
+        const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
+        const bonusMethodElement = document.getElementById('bonus-method');
+        
+        if (bonusTaxAmountElement) {
+            bonusTaxAmountElement.textContent = '¥' + results.incomeDetails.bonusTax.toFixed(2);
+        }
+        if (bonusMethodElement) {
+            bonusMethodElement.textContent = results.incomeDetails.bonusInclude ? '并入综合所得计税' : '单独计税';
+        }
+    } else {
+        bonusDisplay.style.display = 'none';
+    }
+}
+
+function updateThresholdWarning(results) {
+    const thresholdWarningDisplay = document.getElementById('threshold-warning-display');
+    if (!thresholdWarningDisplay) return;
+    
+    const thresholdResult = checkTaxBracketThreshold(results.taxDetails.taxableIncome);
+    
+    if (thresholdResult.warning) {
+        thresholdWarningDisplay.style.display = 'block';
+        safeSetTextContent('threshold-warning-message', thresholdResult.message);
+        safeSetTextContent('threshold-current-rate', (thresholdResult.currentRate * 100).toFixed(0) + '%');
+        safeSetTextContent('threshold-next-rate', (thresholdResult.nextRate * 100).toFixed(0) + '%');
+        safeSetTextContent('threshold-remaining', '¥' + thresholdResult.remaining.toFixed(2));
+    } else {
+        thresholdWarningDisplay.style.display = 'none';
+    }
+}
+
+function updateDonationWarning(results) {
+    const donationWarningDisplay = document.getElementById('donation-warning-display');
+    if (!donationWarningDisplay) return;
+    
+    const donationResult = validateCharitableDonation(
+        results.deductionDetails.charitableDonation, 
+        results.donationBeforeTaxableIncome
+    );
+    
+    if (donationResult.isExcess) {
+        donationWarningDisplay.style.display = 'block';
+        safeSetTextContent('donation-warning-message', donationResult.message);
+        safeSetTextContent('donation-max-amount', '¥' + donationResult.maxDeduction.toFixed(2));
+        safeSetTextContent('donation-actual-amount', '¥' + donationResult.actualDeduction.toFixed(2));
+        safeSetTextContent('donation-excess-amount', '¥' + donationResult.excessAmount.toFixed(2));
+    } else {
+        donationWarningDisplay.style.display = 'none';
+    }
+}
+
+function updateOptimalBonusDisplay(results) {
+    const optimalBonusDisplay = document.getElementById('optimal-bonus-display');
+    if (!optimalBonusDisplay) return;
+    
+    const optimalResult = calculateOptimalBonusAllocation(
+        results.incomeDetails.total, 
+        results.deductionDetails.total
+    );
+    
+    if (optimalResult.taxSavings >= 0 && optimalResult.optimalMethod === 'include') {
+        optimalBonusDisplay.style.display = 'block';
+        safeSetTextContent('optimal-bonus-amount', '¥0（并入综合所得）');
+        safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+        safeSetTextContent('optimal-tax-savings', '¥0（已是最佳方案）');
+        safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+        safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+    } else if (optimalResult.taxSavings > 0) {
+        optimalBonusDisplay.style.display = 'block';
+        safeSetTextContent('optimal-bonus-amount', '¥' + optimalResult.optimalBonus.toFixed(2));
+        safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
+        safeSetTextContent('optimal-tax-savings', '¥' + optimalResult.taxSavings.toFixed(2));
+        safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
+        safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
+    } else {
+        optimalBonusDisplay.style.display = 'none';
+    }
+}
+
+function updatePrepaidAndRefundTax(results) {
+    const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
+    if (resultPrepaidTaxElement) {
+        resultPrepaidTaxElement.textContent = '¥' + results.taxDetails.prepaidTax.toFixed(2);
+    }
+    
+    const refundTaxElement = document.getElementById('result-refund-tax');
+    if (refundTaxElement) {
+        const refundTax = results.taxDetails.refundTax;
+        if (refundTax === 0) {
+            refundTaxElement.textContent = '不退不补 ¥0.00';
+            refundTaxElement.className = 'font-medium text-lg';
+        } else if (refundTax > 0) {
+            refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
+            refundTaxElement.className = 'font-medium text-lg text-danger';
+        } else {
+            refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
+            refundTaxElement.className = 'font-medium text-lg text-success';
+        }
+    }
+}
+
+function updateNetIncome(results) {
+    const resultNetIncomeElement = document.getElementById('result-net-income');
+    if (resultNetIncomeElement) {
+        resultNetIncomeElement.textContent = '¥' + results.taxDetails.netIncome.toFixed(2);
+    }
+}
+
+function updateTaxResultsUI(results) {
+    updateBasicResults(results);
+    updateBonusDisplay(results);
+    updateThresholdWarning(results);
+    updateDonationWarning(results);
+    updateOptimalBonusDisplay(results);
+    updatePrepaidAndRefundTax(results);
+    updateNetIncome(results);
+}
+
+function handleCalculationError(error) {
+    console.error('计算过程中出现错误:', error);
+    showAlert('计算过程中出现错误：' + error.message);
+}
+
 // 计算综合所得应纳税额
 function calculateTax() {
     try {
-        // 收集输入数据
-        const workMonths = parseInt(document.getElementById('work-months').value) || 12;
-        const monthlySalaryIncome = parseFloat(document.getElementById('salary-income').value) || 0;
-        const annualLaborIncome = parseFloat(document.getElementById('labor-income').value) || 0;
-        const annualAuthorIncome = parseFloat(document.getElementById('author-income').value) || 0;
-        const annualRoyaltyIncome = parseFloat(document.getElementById('royalty-income').value) || 0;
-        const bonusIncome = parseFloat(document.getElementById('bonus-income').value) || 0;
-        const bonusInclude = document.getElementById('bonus-include').checked;
-
-        // 使用统一函数计算其他收入（用于计算总收入）
-        const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
-        
-        // 使用统一函数计算扣除项
-        const deductions = calculateComprehensiveDeductions(workMonths);
-
-        // 计算总收入
-        let totalIncome = monthlySalaryIncome * workMonths + otherIncome.laborTaxableIncome + 
-            otherIncome.authorTaxableIncome + otherIncome.royaltyTaxableIncome;
-        
-        if (bonusIncome > 0 && bonusInclude) {
-            totalIncome += bonusIncome;
-        }
-
-        // 计算应纳税所得额
-        const taxableIncome = Math.max(0, totalIncome - deductions.totalDeduction);
-
-        // 计算应纳税额
-        let totalTax = 0;
-        let applicableRate = 0;
-        let applicableDeduction = 0;
-        
-        for (const bracket of comprehensiveTaxRates) {
-            if (taxableIncome <= bracket.max) {
-                totalTax = taxableIncome * bracket.rate - bracket.deduction;
-                applicableRate = bracket.rate;
-                applicableDeduction = bracket.deduction;
-                break;
-            }
-        }
-
-        // 计算预缴税额（工资薪金所得）
-        const cumulativeTax = calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, 
-            deductions.monthlyBasicDeduction, deductions.monthlyInsuranceDeduction, 
-            deductions.monthlySpecialAdditionalTotal, deductions.monthlyPensionDeduction, 
-            deductions.monthlyEnterpriseAnnuity, deductions.monthlyInsuranceOtherDeduction, 
-            deductions.monthlyTaxDeferredPension);
-        
-        // 计算其他收入的预缴税额（劳务报酬、稿酬、特许权使用费）- 复用上面已计算的 otherIncome
-        // 计算年终奖税额
-        const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
-        
-        // 获取用户输入的已纳税额
-        const userInputPrepaidTax = parseFloat(document.getElementById('prepaid-tax')?.value);
-        
-        // 如果用户输入了已纳税额，使用用户输入值；否则使用计算的累积预缴税额 + 其他收入预缴税额 + 年终奖税额
-        const prepaidTax = (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) 
-            ? userInputPrepaidTax 
-            : (cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax);
-        
-        const refundTax = totalTax - prepaidTax;
-        
-        const preTaxIncome = monthlySalaryIncome * workMonths + annualLaborIncome + 
-            annualAuthorIncome + annualRoyaltyIncome + bonusIncome;
-        
-        const netIncome = preTaxIncome - totalTax;
-
-        calculationResults = {
-            workMonths: workMonths,
-            incomeDetails: {
-                salary: monthlySalaryIncome,
-                labor: annualLaborIncome,
-                laborCalculated: otherIncome.laborTaxableIncome,
-                laborTax: otherIncome.laborTax,
-                author: annualAuthorIncome,
-                authorCalculated: otherIncome.authorTaxableIncome,
-                authorTax: otherIncome.authorTax,
-                royalty: annualRoyaltyIncome,
-                royaltyCalculated: otherIncome.royaltyTaxableIncome,
-                royaltyTax: otherIncome.royaltyTax,
-                bonus: bonusIncome,
-                bonusInclude: bonusInclude,
-                bonusTax: bonusTax,
-                total: totalIncome,
-                preTaxTotal: preTaxIncome
-            },
-            deductionDetails: {
-                basic: deductions.monthlyBasicDeduction,
-                pensionInsurance: deductions.monthlyPensionInsurance,
-                medicalInsurance: deductions.monthlyMedicalInsurance,
-                unemploymentInsurance: deductions.monthlyUnemploymentInsurance,
-                housingFund: deductions.monthlyHousingFund,
-                elderly: deductions.monthlyElderlyDeduction,
-                childrenInfant: deductions.monthlyChildrenInfantDeduction,
-                housing: deductions.monthlyHousingDeduction,
-                education: deductions.annualEducationDeduction,
-                medical: deductions.annualMedicalDeduction,
-                actualMedical: deductions.actualMedicalDeduction,
-                professional: deductions.annualProfessionalDeduction,
-                educationDegree: deductions.educationDegreeAmount / workMonths,
-                pension: deductions.monthlyPensionDeduction,
-                enterpriseAnnuity: deductions.monthlyEnterpriseAnnuity,
-                insuranceOther: deductions.monthlyInsuranceOtherDeduction,
-                taxDeferredPension: deductions.monthlyTaxDeferredPension,
-                charitableDonation: deductions.annualCharitableDonation,
-                specialAdditionalTotal: deductions.annualSpecialAdditionalTotal,
-                specialDeductionTotal: deductions.annualSpecialDeductionTotal,
-                otherTotal: deductions.annualOtherDeductionTotal,
-                total: deductions.totalDeduction
-            },
-            taxDetails: {
-                taxableIncome: taxableIncome,
-                totalTax: totalTax,
-                applicableRate: applicableRate,
-                applicableDeduction: applicableDeduction,
-                prepaidTax: prepaidTax,
-                refundTax: refundTax,
-                netIncome: netIncome
-            },
-            calculationDate: new Date().toISOString()
-        };
-
-        document.getElementById('result-total-income').textContent = '¥' + totalIncome.toFixed(2);
-        document.getElementById('result-total-deduction').textContent = '¥' + deductions.totalDeduction.toFixed(2);
-        document.getElementById('result-taxable-income').textContent = '¥' + taxableIncome.toFixed(2);
-        document.getElementById('result-tax-rate').textContent = (applicableRate * 100).toFixed(0) + '%';
-        document.getElementById('result-deduction-amount').textContent = '¥' + applicableDeduction.toFixed(2);
-        document.getElementById('result-total-tax').textContent = '¥' + totalTax.toFixed(2);
-        
-        if (bonusIncome > 0) {
-            const bonusDisplay = document.getElementById('bonus-tax-display');
-            if (bonusDisplay) {
-                bonusDisplay.style.display = 'block';
-                const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
-                const bonusMethodElement = document.getElementById('bonus-method');
-                if (bonusTaxAmountElement) {
-                    bonusTaxAmountElement.textContent = '¥' + bonusTax.toFixed(2);
-                }
-                if (bonusMethodElement) {
-                    bonusMethodElement.textContent = bonusInclude ? '并入综合所得计税' : '单独计税';
-                }
-            }
-        } else {
-            const bonusDisplay = document.getElementById('bonus-tax-display');
-            if (bonusDisplay) {
-                bonusDisplay.style.display = 'none';
-            }
-        }
-        
-        const resultPrepaidTaxElement = document.getElementById('result-prepaid-tax');
-        if (resultPrepaidTaxElement) {
-            resultPrepaidTaxElement.textContent = '¥' + prepaidTax.toFixed(2);
-        }
-        
-        const refundTaxElement = document.getElementById('result-refund-tax');
-        if (refundTaxElement) {
-            if (refundTax === 0) {
-                refundTaxElement.textContent = '不退不补 ¥0.00';
-                refundTaxElement.className = 'font-medium text-lg';
-            } else if (refundTax > 0) {
-                refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
-                refundTaxElement.className = 'font-medium text-lg text-danger';
-            } else {
-                refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
-                refundTaxElement.className = 'font-medium text-lg text-success';
-            }
-        }
-        
-        const resultNetIncomeElement = document.getElementById('result-net-income');
-        if (resultNetIncomeElement) {
-            resultNetIncomeElement.textContent = '¥' + netIncome.toFixed(2);
-        }
+        const inputData = collectTaxInputData();
+        const calculationData = performTaxCalculation(inputData);
+        calculationResults = calculationData;
+        updateTaxResultsUI(calculationResults);
     } catch (error) {
-        console.error('计算过程中出现错误:', error);
-        showAlert('计算过程中出现错误：' + error.message);
+        handleCalculationError(error);
     }
 }
 
@@ -524,6 +744,66 @@ function calculateReverseDeductions(inputData) {
     };
 }
 
+// 计算经营所得反向倒算扣除项
+function calculateBusinessReverseDeductions(inputData) {
+    const hasComprehensiveIncome = document.getElementById('reverse-business-has-comprehensive-income')?.checked ?? false;
+    const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
+    
+    let businessIncome = 0;
+    let businessCost = 0;
+    let businessExpenses = 0;
+    let businessTaxes = 0;
+    let businessLosses = 0;
+    let businessOtherExpenses = 0;
+    let businessPreviousLosses = 0;
+    
+    const isBusinessDeductionVisible = document.getElementById('reverse-business-deduction-checkbox')?.checked;
+    if (isBusinessDeductionVisible) {
+        businessCost = parseFloat(document.getElementById('reverse-business-cost')?.value) || 0;
+        businessExpenses = parseFloat(document.getElementById('reverse-business-expenses')?.value) || 0;
+        businessTaxes = parseFloat(document.getElementById('reverse-business-taxes')?.value) || 0;
+        businessLosses = parseFloat(document.getElementById('reverse-business-losses')?.value) || 0;
+        businessOtherExpenses = parseFloat(document.getElementById('reverse-business-other-expenses')?.value) || 0;
+        businessPreviousLosses = parseFloat(document.getElementById('reverse-business-previous-losses')?.value) || 0;
+    }
+    
+    let specialAdditionalDeduction = 0;
+    let otherDeduction = 0;
+    const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox')?.checked;
+    if (isSpecialAdditionalDeductionVisible) {
+        specialAdditionalDeduction = parseFloat(document.getElementById('reverse-business-special-additional-deduction')?.value) || 0;
+    }
+    
+    const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox')?.checked;
+    if (isOtherDeductionVisible) {
+        otherDeduction = parseFloat(document.getElementById('reverse-business-other-deduction')?.value) || 0;
+    }
+    
+    const annualBusinessDeduction = businessCost + businessExpenses + businessTaxes + 
+        businessLosses + businessOtherExpenses + businessPreviousLosses + 
+        investorDeduction + specialAdditionalDeduction + otherDeduction;
+    
+    return {
+        hasComprehensiveIncome,
+        investorDeduction,
+        businessCost,
+        businessExpenses,
+        businessTaxes,
+        businessLosses,
+        businessOtherExpenses,
+        businessPreviousLosses,
+        specialAdditionalDeduction,
+        otherDeduction,
+        annualBusinessDeduction,
+        totalDeduction: annualBusinessDeduction
+    };
+}
+
+// 计算经营所得年终奖税额（经营所得不涉及年终奖，返回0）
+function calculateBusinessReverseBonusTax(inputData) {
+    return 0;
+}
+
 // 计算反向倒算年终奖税额
 function calculateReverseBonusTax(inputData) {
     let bonusTax = 0;
@@ -561,7 +841,7 @@ function calculateTaxByTaxableIncome(taxableIncome) {
 // 1. 根据目标税率找到对应的应纳税所得额范围 [min, max]
 // 2. 税前收入 = 应纳税所得额 + 扣除总额
 // 3. 总收入 = 综合所得税前收入 + 年终奖
-function calculateFromTargetRate(inputData, deductionData, bonusTax) {
+function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'conservative') {
     const targetRate = inputData.targetRate / 100;
     
     // 步骤1：找到目标税率对应的级距
@@ -601,15 +881,49 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax) {
         maxTotalIncome = maxPreTaxIncome;
     }
     
-    // 步骤5：计算参考中间值
-    // 对于有上限的级距，使用级距中点
-    // 对于无上限的级距（最高税率45%），使用 min + 100,000 作为参考值
+    // 步骤5：根据计算模式确定参考应纳税所得额
+    // 保守模式（conservative）：最低值+1，确保达到目标税率（仅对最低档位设置小额最低值）
+    // 均衡模式（balanced）：区间中间值，反映平均税负水平
+    // 进取模式（aggressive）：最高值，接近上限的税负水平
     let middleTaxableIncome;
+    // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
+    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+    // 其他档位使用原值+1，确保精确性和适用性
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+    
     if (maxTaxableIncome === Infinity) {
-        middleTaxableIncome = minTaxableIncome + 100000;
+        // 最高档位：根据模式调整
+        switch(mode) {
+            case 'conservative':
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                middleTaxableIncome = minTaxableIncome + 100000;
+                break;
+            case 'aggressive':
+                middleTaxableIncome = minTaxableIncome + 200000;
+                break;
+            default:
+                middleTaxableIncome = minTaxableIncome + 100000;
+        }
     } else {
-        middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+        switch(mode) {
+            case 'conservative':
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                break;
+            case 'aggressive':
+                middleTaxableIncome = maxTaxableIncome;
+                break;
+            default:
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+        }
     }
+    
+    // 确保应纳税所得额非负
+    middleTaxableIncome = Math.max(0, middleTaxableIncome);
     
     // 步骤6：计算中间值对应的税额和税后收入
     const middlePreTaxIncome = middleTaxableIncome + deductionData.totalDeduction;
@@ -636,18 +950,29 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax) {
         finalTotalTax: middleTotalTax,
         calculatedNetIncome: middleNetIncome,
         taxableIncome: middleTaxableIncome,
+        taxableIncomeRange: {
+            min: minTaxableIncome,
+            max: maxTaxableIncome
+        },
         applicableRate: targetBracket.rate,
         applicableDeduction: targetBracket.deduction,
         isRateMode: true,
-        modeName: '税率倒算'
+        modeName: '税率倒算',
+        calculationMode: mode,
+        bracketInfo: {
+            rate: targetBracket.rate,
+            min: minTaxableIncome,
+            max: maxTaxableIncome,
+            deduction: targetBracket.deduction
+        }
     };
 }
 
 // 方式2：按月度税后收入倒算（给定税后收入，计算税前收入）
 // 核心逻辑：
 // 已知：税后收入 = 税前收入 - 应纳税额 - 年终奖税额
-// 使用二分法求解税前收入
-function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
+// 使用二分法求解税前收入，支持三种计算模式
+function calculateFromMonthlyNet(inputData, deductionData, bonusTax, mode = 'balanced') {
     const monthlyNet = inputData.monthlyNet;
     const workMonths = inputData.workMonths;
     
@@ -655,52 +980,110 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
     // 公式：年度税后收入 = 月度税后收入 × 工作月数
     const annualNetTarget = monthlyNet * workMonths;
     
-    // 步骤2：使用二分法求解税前收入
+    // 步骤2：使用二分法求解基准应纳税所得额
     // 搜索范围：[扣除总额, 扣除总额 + 10,000,000]
     let left = deductionData.totalDeduction;
     let right = deductionData.totalDeduction + 10000000;
     const precision = 0.01;
     
+    let baseTaxableIncome = 0;
+    
     while (right - left > precision) {
-        // 中间值：假设的税前收入
         const mid = (left + right) / 2;
-        
-        // 计算应纳税所得额
-        // 公式：应纳税所得额 = 税前收入 - 扣除总额
         const taxableIncome = mid - deductionData.totalDeduction;
         
         if (taxableIncome <= 0) {
-            // 应纳税所得额为0或负数，不需要交税
             left = mid;
             continue;
         }
         
-        // 计算综合所得税额
-        // 公式：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
         const taxResult = calculateTaxByTaxableIncome(taxableIncome);
         const comprehensiveTax = taxResult.tax;
-        
-        // 计算税后收入
-        // 公式：税后收入 = 税前收入 - 综合所得税额 - 年终奖税额
         const netIncome = mid - comprehensiveTax - bonusTax;
         
-        // 二分法调整
         if (netIncome < annualNetTarget) {
-            // 税后收入不足，需要增加税前收入
             left = mid;
         } else {
-            // 税后收入过多，需要减少税前收入
             right = mid;
         }
     }
     
-    // 步骤3：得到最终结果
-    const totalIncome = (left + right) / 2;
-    const taxableIncome = totalIncome - deductionData.totalDeduction;
+    baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
+    baseTaxableIncome = Math.max(0, baseTaxableIncome);
     
-    // 计算实际税额
-    const taxResult = calculateTaxByTaxableIncome(taxableIncome);
-    const finalTotalTax = taxResult.tax + bonusTax;
+    // 步骤3：确定基准应纳税所得额所在的税率档位
+    let targetBracket = null;
+    for (const bracket of comprehensiveTaxRates) {
+        if (baseTaxableIncome <= bracket.max) {
+            targetBracket = bracket;
+            break;
+        }
+    }
+    if (!targetBracket) {
+        targetBracket = comprehensiveTaxRates[comprehensiveTaxRates.length - 1];
+    }
+    
+    // 步骤4：根据计算模式确定应纳税所得额
+    // 保守模式：档位下限+1
+    // 均衡模式：档位中间值
+    // 进取模式：档位上限（或最大值）
+    const minTaxableIncome = targetBracket.min || 0;
+    const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
+    
+    let modeTaxableIncome;
+    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+    
+    if (maxTaxableIncome === Infinity) {
+        // 最高档位：基于基准应纳税所得额调整
+        switch(mode) {
+            case 'conservative':
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                // 均衡模式：使用二分法算出的基准值
+                modeTaxableIncome = baseTaxableIncome;
+                break;
+            case 'aggressive':
+                // 进取模式：确保不低于基准值，且至少比下限高20万
+                modeTaxableIncome = Math.max(baseTaxableIncome, minTaxableIncome + 200000);
+                break;
+            default:
+                modeTaxableIncome = baseTaxableIncome;
+        }
+    } else {
+        switch(mode) {
+            case 'conservative':
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                modeTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                break;
+            case 'aggressive':
+                modeTaxableIncome = maxTaxableIncome;
+                break;
+            default:
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+        }
+    }
+    
+    // 确保应纳税所得额非负
+    modeTaxableIncome = Math.max(0, modeTaxableIncome);
+    
+    // 步骤5：计算对应的税前收入
+    const preTaxIncome = modeTaxableIncome + deductionData.totalDeduction;
+    let totalIncome;
+    
+    if (inputData.bonusIncome > 0) {
+        totalIncome = preTaxIncome + inputData.bonusIncome;
+    } else {
+        totalIncome = preTaxIncome;
+    }
+    
+    // 步骤6：计算税额
+    const taxResult = calculateTaxByTaxableIncome(modeTaxableIncome);
+    const comprehensiveTax = taxResult.tax;
+    const finalTotalTax = comprehensiveTax + bonusTax;
     const calculatedNetIncome = totalIncome - finalTotalTax;
     
     return {
@@ -709,76 +1092,145 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
         finalTotalTax: finalTotalTax,
         calculatedNetIncome: calculatedNetIncome,
         monthlyNet: calculatedNetIncome / workMonths,
-        taxableIncome: taxableIncome,
+        taxableIncome: modeTaxableIncome,
         applicableRate: taxResult.rate,
         applicableDeduction: taxResult.deduction,
         isMonthlyMode: true,
-        modeName: '月度税后倒算'
+        modeName: '月度税后倒算',
+        calculationMode: mode,
+        bracketInfo: {
+            rate: targetBracket.rate,
+            min: minTaxableIncome,
+            max: maxTaxableIncome,
+            deduction: targetBracket.deduction
+        }
     };
 }
 
 // 方式3：按目标税额倒算（给定目标税额，计算所需税前收入）
 // 核心逻辑：
 // 已知：税额 = 应纳税所得额 × 税率 - 速算扣除数
-// 使用二分法求解应纳税所得额，然后计算税前收入
-function calculateFromTargetTax(inputData, deductionData, bonusTax) {
+// 使用二分法求解应纳税所得额，然后计算税前收入，支持三种计算模式
+function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'balanced') {
     const targetTax = inputData.fixedTax;
     const targetNet = inputData.fixedNet;
     
     // 情况A：仅输入目标税额
     if (targetTax > 0 && targetNet === 0) {
-        // 步骤1：使用二分法求解税前收入
-        // 搜索范围：[扣除总额, 扣除总额 + 10,000,000]
+        // 步骤1：使用二分法求解基准应纳税所得额
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
         const precision = 0.01;
         
+        let baseTaxableIncome = 0;
+        
         while (right - left > precision) {
-            // 中间值：假设的税前收入
             const mid = (left + right) / 2;
-            
-            // 计算应纳税所得额
-            // 公式：应纳税所得额 = 税前收入 - 扣除总额
             const taxable = mid - deductionData.totalDeduction;
             
             if (taxable <= 0) {
-                // 应纳税所得额为0或负数，税额为0
                 left = mid;
                 continue;
             }
             
-            // 计算综合所得税额
-            // 公式：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
             const taxResult = calculateTaxByTaxableIncome(taxable);
             const currentTax = taxResult.tax + bonusTax;
             
-            // 二分法调整
             if (currentTax < targetTax) {
-                // 税额不足，需要增加税前收入
                 left = mid;
             } else {
-                // 税额过多，需要减少税前收入
                 right = mid;
             }
         }
         
-        // 步骤2：得到最终结果
-        const calculatedIncome = (left + right) / 2;
-        const calculatedTaxable = calculatedIncome - deductionData.totalDeduction;
+        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
+        baseTaxableIncome = Math.max(0, baseTaxableIncome);
         
-        // 计算实际税额
-        const taxResult = calculateTaxByTaxableIncome(calculatedTaxable);
+        // 步骤2：确定基准应纳税所得额所在的税率档位
+        let targetBracket = null;
+        for (const bracket of comprehensiveTaxRates) {
+            if (baseTaxableIncome <= bracket.max) {
+                targetBracket = bracket;
+                break;
+            }
+        }
+        if (!targetBracket) {
+            targetBracket = comprehensiveTaxRates[comprehensiveTaxRates.length - 1];
+        }
+        
+        // 步骤3：根据计算模式确定应纳税所得额
+        const minTaxableIncome = targetBracket.min || 0;
+        const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
+        
+        let modeTaxableIncome;
+        // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+        const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+        
+        if (maxTaxableIncome === Infinity) {
+            // 最高档位：基于基准应纳税所得额调整
+            switch(mode) {
+                case 'conservative':
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    break;
+                case 'balanced':
+                    // 均衡模式：使用二分法算出的基准值
+                    modeTaxableIncome = baseTaxableIncome;
+                    break;
+                case 'aggressive':
+                    // 进取模式：确保不低于基准值，且至少比下限高20万
+                    modeTaxableIncome = Math.max(baseTaxableIncome, minTaxableIncome + 200000);
+                    break;
+                default:
+                    modeTaxableIncome = baseTaxableIncome;
+            }
+        } else {
+            switch(mode) {
+                case 'conservative':
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    break;
+                case 'balanced':
+                    modeTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                    break;
+                case 'aggressive':
+                    modeTaxableIncome = maxTaxableIncome;
+                    break;
+                default:
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+            }
+        }
+        
+        modeTaxableIncome = Math.max(0, modeTaxableIncome);
+        
+        // 步骤4：计算对应的税前收入
+        const preTaxIncome = modeTaxableIncome + deductionData.totalDeduction;
+        let totalIncome;
+        
+        if (inputData.bonusIncome > 0) {
+            totalIncome = preTaxIncome + inputData.bonusIncome;
+        } else {
+            totalIncome = preTaxIncome;
+        }
+        
+        // 步骤5：计算实际税额
+        const taxResult = calculateTaxByTaxableIncome(modeTaxableIncome);
         const actualTax = taxResult.tax + bonusTax;
         
         return {
-            totalIncome: calculatedIncome,
+            totalIncome: totalIncome,
             finalTotalTax: actualTax,
-            calculatedNetIncome: calculatedIncome - actualTax,
-            taxableIncome: calculatedTaxable,
+            calculatedNetIncome: totalIncome - actualTax,
+            taxableIncome: modeTaxableIncome,
             applicableRate: taxResult.rate,
             applicableDeduction: taxResult.deduction,
             isTaxMode: true,
             modeName: '税额倒算',
+            calculationMode: mode,
+            bracketInfo: {
+                rate: targetBracket.rate,
+                min: minTaxableIncome,
+                max: maxTaxableIncome,
+                deduction: targetBracket.deduction
+            },
             targetTax: targetTax,
             taxDifference: actualTax - targetTax
         };
@@ -813,19 +1265,97 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax) {
 function calculateReverseTax() {
     try {
         const inputData = collectReverseInputData();
-        const deductionData = calculateReverseDeductions(inputData);
-        const bonusTax = calculateReverseBonusTax(inputData);
         
-        let result;
-        if (inputData.reverseType === 'rate') {
-            result = calculateFromTargetRate(inputData, deductionData, bonusTax);
-        } else if (inputData.reverseType === 'monthly') {
-            result = calculateFromMonthlyNet(inputData, deductionData, bonusTax);
+        let deductionData;
+        if (inputData.incomeType === 'business') {
+            deductionData = calculateBusinessReverseDeductions(inputData);
         } else {
-            result = calculateFromTargetTax(inputData, deductionData, bonusTax);
+            deductionData = calculateReverseDeductions(inputData);
         }
         
-        saveReverseCalculationResult(result, inputData, deductionData, bonusTax);
+        let result;
+        let allModeResults = {}; // 存储三种模式的结果
+        let bonusTax = 0; // 初始化年终奖税额，经营所得不涉及年终奖
+        
+        if (inputData.incomeType === 'business') {
+            if (inputData.reverseType === 'rate') {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateBusinessFromTargetRate(inputData, deductionData, 'conservative');
+                allModeResults.balanced = calculateBusinessFromTargetRate(inputData, deductionData, 'balanced');
+                allModeResults.aggressive = calculateBusinessFromTargetRate(inputData, deductionData, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    // 全部模式：使用均衡模式作为默认显示，但保存所有结果
+                    result = allModeResults.balanced;
+                } else {
+                    // 使用用户选择的模式
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            } else if (inputData.reverseType === 'monthly') {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateBusinessFromMonthlyNet(inputData, deductionData, 'conservative');
+                allModeResults.balanced = calculateBusinessFromMonthlyNet(inputData, deductionData, 'balanced');
+                allModeResults.aggressive = calculateBusinessFromMonthlyNet(inputData, deductionData, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    result = allModeResults.balanced;
+                } else {
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            } else {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateBusinessFromTargetTax(inputData, deductionData, 'conservative');
+                allModeResults.balanced = calculateBusinessFromTargetTax(inputData, deductionData, 'balanced');
+                allModeResults.aggressive = calculateBusinessFromTargetTax(inputData, deductionData, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    result = allModeResults.balanced;
+                } else {
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            }
+        } else {
+            bonusTax = calculateReverseBonusTax(inputData);
+            if (inputData.reverseType === 'rate') {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateFromTargetRate(inputData, deductionData, bonusTax, 'conservative');
+                allModeResults.balanced = calculateFromTargetRate(inputData, deductionData, bonusTax, 'balanced');
+                allModeResults.aggressive = calculateFromTargetRate(inputData, deductionData, bonusTax, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    // 全部模式：使用均衡模式作为默认显示，但保存所有结果
+                    result = allModeResults.balanced;
+                } else {
+                    // 使用用户选择的模式
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            } else if (inputData.reverseType === 'monthly') {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateFromMonthlyNet(inputData, deductionData, bonusTax, 'conservative');
+                allModeResults.balanced = calculateFromMonthlyNet(inputData, deductionData, bonusTax, 'balanced');
+                allModeResults.aggressive = calculateFromMonthlyNet(inputData, deductionData, bonusTax, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    result = allModeResults.balanced;
+                } else {
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            } else {
+                // 计算三种模式的结果
+                allModeResults.conservative = calculateFromTargetTax(inputData, deductionData, bonusTax, 'conservative');
+                allModeResults.balanced = calculateFromTargetTax(inputData, deductionData, bonusTax, 'balanced');
+                allModeResults.aggressive = calculateFromTargetTax(inputData, deductionData, bonusTax, 'aggressive');
+                // 根据用户选择决定显示的结果
+                if (inputData.calcMode === 'all') {
+                    result = allModeResults.balanced;
+                } else {
+                    result = allModeResults[inputData.calcMode] || allModeResults.conservative;
+                }
+            }
+        }
+        
+        // 保存结果（包含所有模式的结果和用户选择的模式）
+        saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults);
         updateReverseResultDisplay(result);
         
     } catch (error) {
@@ -838,6 +1368,7 @@ function calculateReverseTax() {
 function collectReverseInputData() {
     const reverseType = document.getElementById('reverse-type')?.value || 'rate';
     const incomeType = document.getElementById('reverse-income-type')?.value || 'comprehensive';
+    const calcMode = document.getElementById('reverse-calc-mode')?.value || 'conservative';
     
     let targetRate = 3;
     let monthlyNet = 0;
@@ -873,6 +1404,7 @@ function collectReverseInputData() {
     return {
         reverseType,
         incomeType,
+        calcMode,
         targetRate,
         monthlyNet,
         fixedTax,
@@ -884,14 +1416,16 @@ function collectReverseInputData() {
 }
 
 // 保存反向倒算计算结果
-function saveReverseCalculationResult(result, inputData, deductionData, bonusTax) {
+function saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults = {}) {
     reverseCalculationResults = {
         incomeType: inputData.incomeType,
         reverseType: inputData.reverseType,
         workMonths: inputData.workMonths,
+        calcMode: inputData.calcMode,
         totalIncome: result.totalIncome,
         totalDeduction: deductionData.totalDeduction,
         totalTax: result.finalTotalTax,
+        allModeResults: allModeResults, // 保存所有模式的结果
         incomeDetails: {
             total: result.totalIncome,
             minTotal: result.minTotalIncome,
@@ -963,6 +1497,7 @@ function updateReverseResultDisplay(result) {
         bonusTaxEl.textContent = '¥' + (data.bonusTax || 0).toFixed(2);
     }
     if (totalIncomeEl) {
+        // 按目标税率倒算：显示范围
         if (result.isRateMode && result.minTotalIncome !== undefined) {
             const minStr = isFinite(result.minTotalIncome) ? '¥' + result.minTotalIncome.toFixed(2) : '¥0';
             const maxStr = isFinite(result.maxTotalIncome) ? '¥' + result.maxTotalIncome.toFixed(2) : '无上限';
@@ -971,23 +1506,14 @@ function updateReverseResultDisplay(result) {
                 `${minStr} - ${maxStr}` +
                 `<br><span style="font-size: 14px; color: #666;">(中间值: ${midStr})</span>`;
         } else {
+            // 月度税后倒算、目标税额倒算：只显示数值
             const incomeValue = isFinite(result.totalIncome) ? result.totalIncome : 0;
             totalIncomeEl.textContent = '¥' + incomeValue.toFixed(2);
-            if (result.isMonthlyMode && result.monthlyIncome) {
-                const monthlyValue = isFinite(result.monthlyIncome) ? result.monthlyIncome : 0;
-                totalIncomeEl.innerHTML += 
-                    `<br><span style="font-size: 14px; color: #666;">(月均: ¥${monthlyValue.toFixed(2)})</span>`;
-            }
         }
     }
     if (netIncomeEl) {
         const netValue = isFinite(result.calculatedNetIncome) ? result.calculatedNetIncome : 0;
         netIncomeEl.textContent = '¥' + netValue.toFixed(2);
-        if (result.isMonthlyMode && result.monthlyNet) {
-            const monthlyNetValue = isFinite(result.monthlyNet) ? result.monthlyNet : 0;
-            netIncomeEl.innerHTML += 
-                `<br><span style="font-size: 14px; color: #666;">(月均: ¥${monthlyNetValue.toFixed(2)})</span>`;
-        }
     }
     if (rateEl) {
         rateEl.textContent = (result.applicableRate * 100).toFixed(0) + '%';
@@ -997,11 +1523,498 @@ function updateReverseResultDisplay(result) {
     }
     if (taxableIncomeEl) {
         const taxableValue = isFinite(result.taxableIncome) ? result.taxableIncome : 0;
-        taxableIncomeEl.textContent = '¥' + taxableValue.toFixed(2);
+        taxableIncomeEl.textContent = '¥' + taxableValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
     if (totalDeductionEl) {
         totalDeductionEl.textContent = '¥' + data.deductionDetails.total.toFixed(2);
     }
+    
+    // 更新三种计算模式对比表格
+    updateReverseModeComparisonTable(data);
+}
+
+// 更新三种计算模式对比表格
+function updateReverseModeComparisonTable(data) {
+    const comparisonSection = document.getElementById('reverse-mode-comparison-section');
+    const singleModeSection = document.getElementById('reverse-single-mode-section');
+    const tableBody = document.getElementById('reverse-mode-comparison-body');
+    const singleTaxSection = document.getElementById('reverse-single-tax-section');
+    
+    if (!comparisonSection || !singleModeSection || !tableBody) return;
+    
+    const allModeResults = data.allModeResults || {};
+    const selectedMode = data.calcMode || 'all';
+    
+    const modeNames = {
+        all: '📊 全部模式',
+        conservative: '🌱 保守模式',
+        balanced: '⚖️ 均衡模式',
+        aggressive: '🚀 进取模式'
+    };
+    
+    // 根据用户选择决定显示内容
+    if (selectedMode === 'all') {
+        // 全部模式：显示对比表格，隐藏单个模式显示和顶部税额行
+        comparisonSection.classList.remove('hidden');
+        singleModeSection.classList.add('hidden');
+        if (singleTaxSection) {
+            singleTaxSection.classList.add('hidden');
+        }
+        
+        // 清空表格
+        tableBody.innerHTML = '';
+        
+        if (Object.keys(allModeResults).length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">正在计算...</td></tr>';
+            return;
+        }
+        
+        // 添加三种模式的数据
+        const modeOrder = ['conservative', 'balanced', 'aggressive'];
+        const modeDescriptions = {
+            conservative: '最低门槛',
+            balanced: '区间均值',
+            aggressive: '接近上限'
+        };
+        
+        modeOrder.forEach((mode, index) => {
+            const modeResult = allModeResults[mode];
+            if (!modeResult) return;
+            
+            const netIncome = modeResult.totalIncome - modeResult.finalTotalTax;
+            
+            const row = document.createElement('tr');
+            row.className = index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-white';
+            
+            row.innerHTML = `
+                <td class="px-3 py-2">
+                    <div class="flex flex-col">
+                        <span class="font-medium text-gray-800">${modeNames[mode]}</span>
+                        <span class="text-xs text-gray-500">${modeDescriptions[mode]}</span>
+                    </div>
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-gray-700">
+                    ¥${isFinite(modeResult.taxableIncome) ? modeResult.taxableIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-blue-600">
+                    ¥${isFinite(modeResult.totalIncome) ? modeResult.totalIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-red-600">
+                    ¥${isFinite(modeResult.finalTotalTax) ? modeResult.finalTotalTax.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-green-600">
+                    ¥${isFinite(netIncome) ? netIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    } else {
+        // 单个模式：隐藏对比表格，显示单个模式结果和顶部税额行
+        comparisonSection.classList.add('hidden');
+        singleModeSection.classList.remove('hidden');
+        if (singleTaxSection) {
+            singleTaxSection.classList.remove('hidden');
+        }
+    }
+}
+
+// 辅助函数：根据应纳税所得额和税率表计算经营所得税额
+function calculateBusinessTaxByTaxableIncome(taxableIncome) {
+    if (taxableIncome <= 0) return { tax: 0, rate: 0, deduction: 0 };
+    
+    for (const bracket of businessTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            const tax = taxableIncome * bracket.rate - bracket.deduction;
+            return {
+                tax: Math.max(0, tax),
+                rate: bracket.rate,
+                deduction: bracket.deduction
+            };
+        }
+    }
+    return { tax: 0, rate: 0, deduction: 0 };
+}
+
+// 经营所得反向倒算：按目标税率倒算
+function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conservative') {
+    const targetRate = inputData.targetRate / 100;
+    
+    const targetBracket = businessTaxRates.find(
+        bracket => Math.abs(bracket.rate - targetRate) < 0.001
+    );
+    
+    if (!targetBracket) {
+        throw new Error('找不到对应的经营所得税率级距');
+    }
+    
+    const minTaxableIncome = targetBracket.min || 0;
+    const maxTaxableIncome = targetBracket.max;
+    
+    // 根据计算模式确定参考应纳税所得额
+    // 保守模式（conservative）：最低值+1，确保达到目标税率（仅对最低档位设置小额最低值）
+    // 均衡模式（balanced）：区间中间值，反映平均税负水平
+    // 进取模式（aggressive）：最高值-1，接近上限的税负水平
+    let middleTaxableIncome;
+    // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
+    // 5%档位设置12,000元（每月1,000元）作为最低基准，避免1元等不合理数值
+    // 其他档位使用原值+1，确保精确性和适用性
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
+    
+    if (maxTaxableIncome === Infinity) {
+        // 最高档位：根据模式调整
+        switch(mode) {
+            case 'conservative':
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                middleTaxableIncome = minTaxableIncome + 100000;
+                break;
+            case 'aggressive':
+                middleTaxableIncome = minTaxableIncome + 200000;
+                break;
+            default:
+                middleTaxableIncome = minTaxableIncome + 100000;
+        }
+    } else {
+        switch(mode) {
+            case 'conservative':
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                break;
+            case 'aggressive':
+                middleTaxableIncome = maxTaxableIncome;
+                break;
+            default:
+                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+        }
+    }
+    
+    // 确保应纳税所得额非负
+    middleTaxableIncome = Math.max(0, middleTaxableIncome);
+    
+    // 经营所得：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
+    const taxResult = calculateBusinessTaxByTaxableIncome(middleTaxableIncome);
+    
+    // 计算减半征收
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(middleTaxableIncome, halvingThreshold);
+    const halvingTax = halvingTaxable > 0 ? (halvingTaxable * targetBracket.rate - targetBracket.deduction) * 0.5 : 0;
+    
+    // 实际税额（考虑减半征收）
+    const actualTax = taxResult.tax > 0 ? Math.max(0, taxResult.tax - halvingTax) : 0;
+    
+    // 税前收入 = 应纳税所得额 + 扣除总额
+    const preTaxIncome = middleTaxableIncome + deductionData.totalDeduction;
+    const netIncome = preTaxIncome - actualTax;
+    
+    return {
+        totalIncome: preTaxIncome,
+        minTotalIncome: minTaxableIncome + deductionData.totalDeduction,
+        maxTotalIncome: maxTaxableIncome === Infinity ? Infinity : maxTaxableIncome + deductionData.totalDeduction,
+        finalTotalTax: actualTax,
+        calculatedNetIncome: netIncome,
+        taxableIncome: middleTaxableIncome,
+        taxableIncomeRange: {
+            min: minTaxableIncome,
+            max: maxTaxableIncome
+        },
+        applicableRate: targetBracket.rate,
+        applicableDeduction: targetBracket.deduction,
+        isRateMode: true,
+        modeName: '经营所得税率倒算',
+        calculationMode: mode,
+        bracketInfo: {
+            rate: targetBracket.rate,
+            min: minTaxableIncome,
+            max: maxTaxableIncome,
+            deduction: targetBracket.deduction
+        },
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
+}
+
+// 经营所得反向倒算：按目标税后收入倒算，支持三种计算模式
+function calculateBusinessFromMonthlyNet(inputData, deductionData, mode = 'balanced') {
+    const monthlyNet = inputData.monthlyNet;
+    const workMonths = inputData.workMonths;
+    const annualNetTarget = monthlyNet * workMonths;
+    
+    // 步骤1：使用二分法求解基准应纳税所得额
+    let left = deductionData.totalDeduction;
+    let right = deductionData.totalDeduction + 10000000;
+    const precision = 0.01;
+    
+    let baseTaxableIncome = 0;
+    
+    while (right - left > precision) {
+        const mid = (left + right) / 2;
+        const taxableIncome = mid - deductionData.totalDeduction;
+        
+        if (taxableIncome <= 0) {
+            left = mid;
+            continue;
+        }
+        
+        const taxResult = calculateBusinessTaxByTaxableIncome(taxableIncome);
+        const halvingThreshold = 2000000;
+        const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
+        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        
+        const netIncome = mid - actualTax;
+        
+        if (netIncome < annualNetTarget) {
+            left = mid;
+        } else {
+            right = mid;
+        }
+    }
+    
+    baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
+    baseTaxableIncome = Math.max(0, baseTaxableIncome);
+    
+    // 步骤2：确定基准应纳税所得额所在的税率档位
+    let targetBracket = null;
+    for (const bracket of businessTaxRates) {
+        if (baseTaxableIncome <= bracket.max) {
+            targetBracket = bracket;
+            break;
+        }
+    }
+    if (!targetBracket) {
+        targetBracket = businessTaxRates[businessTaxRates.length - 1];
+    }
+    
+    // 步骤3：根据计算模式确定应纳税所得额
+    const minTaxableIncome = targetBracket.min || 0;
+    const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
+    
+    let modeTaxableIncome;
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 30000 : minTaxableIncome + 1;
+    
+    if (maxTaxableIncome === Infinity) {
+        // 最高档位：基于基准应纳税所得额调整
+        switch(mode) {
+            case 'conservative':
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                // 均衡模式：使用二分法算出的基准值
+                modeTaxableIncome = baseTaxableIncome;
+                break;
+            case 'aggressive':
+                // 进取模式：确保不低于基准值，且至少比下限高10万
+                modeTaxableIncome = Math.max(baseTaxableIncome, minTaxableIncome + 100000);
+                break;
+            default:
+                modeTaxableIncome = baseTaxableIncome;
+        }
+    } else {
+        switch(mode) {
+            case 'conservative':
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                break;
+            case 'balanced':
+                modeTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                break;
+            case 'aggressive':
+                modeTaxableIncome = maxTaxableIncome;
+                break;
+            default:
+                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+        }
+    }
+    
+    modeTaxableIncome = Math.max(0, modeTaxableIncome);
+    
+    // 步骤4：计算对应的收入
+    const totalIncome = modeTaxableIncome + deductionData.totalDeduction;
+    
+    // 步骤5：计算税额
+    const taxResult = calculateBusinessTaxByTaxableIncome(modeTaxableIncome);
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(modeTaxableIncome, halvingThreshold);
+    const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+    const actualTax = Math.max(0, taxResult.tax - halvingTax);
+    const calculatedNetIncome = totalIncome - actualTax;
+    
+    return {
+        totalIncome: totalIncome,
+        monthlyIncome: totalIncome / workMonths,
+        finalTotalTax: actualTax,
+        calculatedNetIncome: calculatedNetIncome,
+        monthlyNet: calculatedNetIncome / workMonths,
+        taxableIncome: modeTaxableIncome,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
+        isMonthlyMode: true,
+        modeName: '经营所得月度税后倒算',
+        calculationMode: mode,
+        bracketInfo: {
+            rate: targetBracket.rate,
+            min: minTaxableIncome,
+            max: maxTaxableIncome,
+            deduction: targetBracket.deduction
+        },
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
+}
+
+// 经营所得反向倒算：按目标税额倒算，支持三种计算模式
+function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanced') {
+    const targetTax = inputData.fixedTax;
+    const targetNet = inputData.fixedNet;
+    
+    if (targetTax > 0 && targetNet === 0) {
+        // 步骤1：使用二分法求解基准应纳税所得额
+        let left = deductionData.totalDeduction;
+        let right = deductionData.totalDeduction + 10000000;
+        const precision = 0.01;
+        
+        let baseTaxableIncome = 0;
+        
+        while (right - left > precision) {
+            const mid = (left + right) / 2;
+            const taxable = mid - deductionData.totalDeduction;
+            
+            if (taxable <= 0) {
+                left = mid;
+                continue;
+            }
+            
+            const taxResult = calculateBusinessTaxByTaxableIncome(taxable);
+            const halvingThreshold = 2000000;
+            const halvingTaxable = Math.min(taxable, halvingThreshold);
+            const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+            const actualTax = Math.max(0, taxResult.tax - halvingTax);
+            
+            if (actualTax < targetTax) {
+                left = mid;
+            } else {
+                right = mid;
+            }
+        }
+        
+        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
+        baseTaxableIncome = Math.max(0, baseTaxableIncome);
+        
+        // 步骤2：确定基准应纳税所得额所在的税率档位
+        let targetBracket = null;
+        for (const bracket of businessTaxRates) {
+            if (baseTaxableIncome <= bracket.max) {
+                targetBracket = bracket;
+                break;
+            }
+        }
+        if (!targetBracket) {
+            targetBracket = businessTaxRates[businessTaxRates.length - 1];
+        }
+        
+        // 步骤3：根据计算模式确定应纳税所得额
+        const minTaxableIncome = targetBracket.min || 0;
+        const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
+        
+        let modeTaxableIncome;
+        const minimumTaxableIncome = minTaxableIncome === 0 ? 30000 : minTaxableIncome + 1;
+        
+        if (maxTaxableIncome === Infinity) {
+            // 最高档位：基于基准应纳税所得额调整
+            switch(mode) {
+                case 'conservative':
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    break;
+                case 'balanced':
+                    // 均衡模式：使用二分法算出的基准值
+                    modeTaxableIncome = baseTaxableIncome;
+                    break;
+                case 'aggressive':
+                    // 进取模式：确保不低于基准值，且至少比下限高10万
+                    modeTaxableIncome = Math.max(baseTaxableIncome, minTaxableIncome + 100000);
+                    break;
+                default:
+                    modeTaxableIncome = baseTaxableIncome;
+            }
+        } else {
+            switch(mode) {
+                case 'conservative':
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    break;
+                case 'balanced':
+                    modeTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+                    break;
+                case 'aggressive':
+                    modeTaxableIncome = maxTaxableIncome;
+                    break;
+                default:
+                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+            }
+        }
+        
+        modeTaxableIncome = Math.max(0, modeTaxableIncome);
+        
+        // 步骤4：计算对应的收入
+        const totalIncome = modeTaxableIncome + deductionData.totalDeduction;
+        
+        // 步骤5：计算税额
+        const taxResult = calculateBusinessTaxByTaxableIncome(modeTaxableIncome);
+        const halvingThreshold = 2000000;
+        const halvingTaxable = Math.min(modeTaxableIncome, halvingThreshold);
+        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        
+        return {
+            totalIncome: totalIncome,
+            finalTotalTax: actualTax,
+            calculatedNetIncome: totalIncome - actualTax,
+            taxableIncome: modeTaxableIncome,
+            applicableRate: taxResult.rate,
+            applicableDeduction: taxResult.deduction,
+            isTaxMode: true,
+            modeName: '经营所得税额倒算',
+            calculationMode: mode,
+            bracketInfo: {
+                rate: targetBracket.rate,
+                min: minTaxableIncome,
+                max: maxTaxableIncome,
+                deduction: targetBracket.deduction
+            },
+            targetTax: targetTax,
+            taxDifference: actualTax - targetTax,
+            hasHalvingDiscount: halvingTax > 0,
+            halvingTaxAmount: halvingTax
+        };
+    }
+    
+    const targetTotalIncome = targetTax + targetNet;
+    const targetTaxableIncome = targetTotalIncome - deductionData.totalDeduction;
+    
+    const taxResult = calculateBusinessTaxByTaxableIncome(targetTaxableIncome);
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(targetTaxableIncome, halvingThreshold);
+    const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
+    const actualTax = Math.max(0, taxResult.tax - halvingTax);
+    
+    return {
+        totalIncome: targetTotalIncome,
+        finalTotalTax: targetTax,
+        actualTax: actualTax,
+        calculatedNetIncome: targetNet,
+        taxableIncome: targetTaxableIncome,
+        applicableRate: taxResult.rate,
+        applicableDeduction: taxResult.deduction,
+        isTaxMode: true,
+        modeName: '经营所得税额+到手倒算',
+        targetTax: targetTax,
+        targetNet: targetNet,
+        taxDifference: targetTax - actualTax,
+        hasHalvingDiscount: halvingTax > 0,
+        halvingTaxAmount: halvingTax
+    };
 }
 
 // 计算经营所得
