@@ -28,7 +28,7 @@ function updateBudgetTable() {
                                      calculationResults.deductionDetails.childrenInfant + 
                                      calculationResults.deductionDetails.housing + 
                                      (calculationResults.deductionDetails.educationDegree || 0);
-    const monthlyOtherDeduction = calculationResults.deductionDetails.otherTotal / workMonths;
+    const monthlyOtherDeduction = (calculationResults.deductionDetails.otherTotal - calculationResults.deductionDetails.charitableDonation) / workMonths;
     
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
@@ -205,7 +205,7 @@ function updateBudgetTable() {
         <td>应纳税所得额合计</td>
         <td>税率</td>
         <td>应纳税额</td>
-        <td>已纳税额</td>
+        <td>累计预缴税额</td>
         <td>应退/补税额</td>
     `;
     tbody.appendChild(finalRow2);
@@ -232,7 +232,35 @@ function updateBudgetTable() {
 function updateReverseBudgetTable() {
     if (Object.keys(reverseCalculationResults).length === 0) return;
     
-    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
+    const calcMode = reverseCalculationResults.calcMode || 'balanced';
+    const tableTitle = document.getElementById('reverse-budget-table-title');
+    const singleBudgetSection = document.getElementById('reverse-single-budget-section');
+    const multiBudgetSection = document.getElementById('reverse-multi-budget-section');
+    
+    // 根据计算模式更新标题和显示内容
+    if (tableTitle) {
+        if (calcMode === 'all') {
+            tableTitle.textContent = '个人年度个税预算表（反向倒算 · 三种模式对比）';
+            singleBudgetSection.classList.add('hidden');
+            multiBudgetSection.classList.remove('hidden');
+            updateMultiModeBudgetTables();
+        } else {
+            tableTitle.textContent = '个人年度个税预算表（反向倒算）';
+            singleBudgetSection.classList.remove('hidden');
+            multiBudgetSection.classList.add('hidden');
+            updateSingleModeBudgetTable();
+        }
+    }
+    
+    // 更新生成日期
+    const dateElement = document.getElementById('reverse-budget-table-date');
+    if (dateElement) {
+        dateElement.textContent = new Date().toLocaleDateString();
+    }
+}
+
+// 更新单一模式预算表
+function updateSingleModeBudgetTable() {
     const tbody = document.getElementById('reverse-budget-table-body');
     if (!tbody) return;
     
@@ -244,20 +272,16 @@ function updateReverseBudgetTable() {
     
     const totalIncome = incomeDetails.total || 0;
     const totalDeduction = deductionDetails.total || 0;
-    const totalTax = taxDetails.totalTax || 0;
     const bonusIncome = reverseCalculationResults.bonusIncome || 0;
     const bonusTax = reverseCalculationResults.bonusTax || 0;
     const bonusInclude = document.getElementById('reverse-bonus-include')?.checked || false;
+    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
     
     if (totalIncome === 0) return;
     
-    // 计算不含年终奖的收入
     const regularIncome = calculateRegularIncome(totalIncome, bonusIncome, bonusInclude);
-    
     const monthlyIncome = regularIncome / workMonths;
     
-    // 月度扣除计算：月扣除=专项扣除/月+专项附加扣除/月+其他扣除/月
-    // 注意：职业资格扣除和大病医疗是年度一次性扣除，月度预缴时不扣除
     const monthlyBasicDeduction = deductionDetails.basic || 5000;
     const monthlyInsuranceDeduction = (deductionDetails.pensionInsurance || 0) + 
                                      (deductionDetails.medicalInsurance || 0) + 
@@ -271,7 +295,6 @@ function updateReverseBudgetTable() {
     
     const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
     
-    // 1. 生成月度数据表格（不包含年度一次性扣除）
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
     
@@ -307,7 +330,6 @@ function updateReverseBudgetTable() {
         tbody.appendChild(row);
     }
     
-    // 2. 添加年底一次性奖金（如果是单独计税）
     if (bonusIncome > 0 && !bonusInclude) {
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `<td colspan="7"></td>`;
@@ -348,7 +370,6 @@ function updateReverseBudgetTable() {
         tbody.appendChild(bonusRow);
     }
     
-    // 3. 添加综合所得汇算表格
     const emptyRow2 = document.createElement('tr');
     emptyRow2.innerHTML = `<td colspan="7"></td>`;
     tbody.appendChild(emptyRow2);
@@ -364,7 +385,7 @@ function updateReverseBudgetTable() {
         <td>应纳税所得额合计</td>
         <td>税率</td>
         <td>应纳税额</td>
-        <td>已纳税额</td>
+        <td>累计预缴税额</td>
         <td>应退/补税额</td>
     `;
     tbody.appendChild(finalRow2);
@@ -372,11 +393,8 @@ function updateReverseBudgetTable() {
     const annualTaxableIncome = taxDetails.taxableIncome || 0;
     const annualTaxRate = taxDetails.applicableRate || 0;
     const annualTax = taxDetails.totalTax || 0;
-    
-    // 已纳税额 = 工资薪金累计预缴税额 + 年终奖税额
     const prepaidTax = cumulativeTax + bonusTax;
-    // 应退/补税额 = 年度应纳税额 - 已预缴税额
-    const refundTax = annualTax - prepaidTax;
+    const refundTax = Math.round((annualTax - prepaidTax) * 100) / 100;
     
     const finalRow3 = document.createElement('tr');
     finalRow3.innerHTML = `
@@ -389,12 +407,162 @@ function updateReverseBudgetTable() {
         <td class="${refundTax < 0 ? 'positive' : refundTax > 0 ? 'negative' : ''}">¥${refundTax.toFixed(2)}</td>
     `;
     tbody.appendChild(finalRow3);
+}
+
+// 更新多模式预算表
+function updateMultiModeBudgetTables() {
+    const allModeResults = reverseCalculationResults.allModeResults || {};
+    const deductionDetails = reverseCalculationResults.deductionDetails || {};
+    const totalDeduction = reverseCalculationResults.totalDeduction || 0;
+    const bonusIncome = reverseCalculationResults.bonusIncome || 0;
+    const bonusTax = reverseCalculationResults.bonusTax || 0;
+    const bonusInclude = document.getElementById('reverse-bonus-include')?.checked || false;
+    const workMonths = parseInt(document.getElementById('reverse-work-months').value) || 12;
     
-    // 更新生成日期
-    const dateElement = document.getElementById('reverse-budget-table-date');
-    if (dateElement) {
-        dateElement.textContent = new Date().toLocaleDateString();
-    }
+    const modes = ['conservative', 'balanced', 'aggressive'];
+    const tbodyIds = ['reverse-budget-conservative-body', 'reverse-budget-balanced-body', 'reverse-budget-aggressive-body'];
+    
+    modes.forEach((mode, index) => {
+        const modeResult = allModeResults[mode];
+        const tbody = document.getElementById(tbodyIds[index]);
+        if (!tbody || !modeResult) return;
+        
+        tbody.innerHTML = '';
+        
+        const totalIncome = modeResult.totalIncome || 0;
+        if (totalIncome === 0) return;
+        
+        const regularIncome = calculateRegularIncome(totalIncome, bonusIncome, bonusInclude);
+        const monthlyIncome = regularIncome / workMonths;
+        
+        const monthlyBasicDeduction = deductionDetails.basic || 5000;
+        const monthlyInsuranceDeduction = (deductionDetails.pensionInsurance || 0) + 
+                                         (deductionDetails.medicalInsurance || 0) + 
+                                         (deductionDetails.unemploymentInsurance || 0) + 
+                                         (deductionDetails.housingFund || 0);
+        const monthlySpecialAdditional = (deductionDetails.elderly || 0) + 
+                                         (deductionDetails.childrenInfant || 0) + 
+                                         (deductionDetails.housing || 0) + 
+                                         (deductionDetails.educationDegree || 0);
+        const monthlyOtherDeduction = ((deductionDetails.otherTotal || 0) - (deductionDetails.charitableDonation || 0)) / workMonths;
+        
+        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
+        
+        let cumulativeTaxableIncome = 0;
+        let cumulativeTax = 0;
+        
+        for (let month = 1; month <= workMonths; month++) {
+            const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
+            cumulativeTaxableIncome += monthlyTaxableIncome;
+            
+            let currentCumulativeTax = 0;
+            let applicableRate = 0;
+            
+            for (const bracket of comprehensiveTaxRates) {
+                if (cumulativeTaxableIncome <= bracket.max) {
+                    currentCumulativeTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction;
+                    applicableRate = bracket.rate;
+                    break;
+                }
+            }
+            
+            let monthTax = currentCumulativeTax - cumulativeTax;
+            cumulativeTax = currentCumulativeTax;
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${month}月</td>
+                <td>¥${monthlyIncome.toFixed(2)}</td>
+                <td>¥${monthlyDeduction.toFixed(2)}</td>
+                <td>¥${monthlyTaxableIncome.toFixed(2)}</td>
+                <td>${(applicableRate * 100).toFixed(0)}%</td>
+                <td>¥${Math.max(0, monthTax).toFixed(2)}</td>
+                <td>¥${cumulativeTax.toFixed(2)}</td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+        
+        // 添加年终奖行（如果是单独计税）
+        if (bonusIncome > 0 && !bonusInclude) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `<td colspan="7"></td>`;
+            tbody.appendChild(emptyRow);
+            
+            const categoryRow = document.createElement('tr');
+            categoryRow.innerHTML = `
+                <td class="font-bold">类型</td>
+                <td class="font-bold">收入</td>
+                <td class="font-bold">扣除</td>
+                <td class="font-bold">应纳税所得额</td>
+                <td class="font-bold">税率</td>
+                <td class="font-bold">预缴税额</td>
+                <td></td>
+            `;
+            tbody.appendChild(categoryRow);
+            
+            const bonusRow = document.createElement('tr');
+            let bonusTaxRate = 0;
+            const monthlyBonus = bonusIncome / 12;
+            
+            for (const bracket of bonusMonthlyTaxRates) {
+                if (monthlyBonus <= bracket.max) {
+                    bonusTaxRate = bracket.rate;
+                    break;
+                }
+            }
+            
+            bonusRow.innerHTML = `
+                <td>年底一次性奖金</td>
+                <td>¥${bonusIncome.toFixed(2)}</td>
+                <td>0.00</td>
+                <td>¥${bonusIncome.toFixed(2)}</td>
+                <td>${(bonusTaxRate * 100).toFixed(0)}%</td>
+                <td>¥${bonusTax.toFixed(2)}</td>
+                <td></td>
+            `;
+            tbody.appendChild(bonusRow);
+        }
+        
+        // 添加综合所得汇算表格
+        const emptyRow2 = document.createElement('tr');
+        emptyRow2.innerHTML = `<td colspan="7"></td>`;
+        tbody.appendChild(emptyRow2);
+        
+        const finalRow1 = document.createElement('tr');
+        finalRow1.innerHTML = `<td class="section-title" colspan="7">综合所得汇算</td>`;
+        tbody.appendChild(finalRow1);
+        
+        const finalRow2 = document.createElement('tr');
+        finalRow2.innerHTML = `
+            <td>全年收入额</td>
+            <td>年度扣除合计</td>
+            <td>应纳税所得额合计</td>
+            <td>税率</td>
+            <td>应纳税额</td>
+            <td>累计预缴税额</td>
+            <td>应退/补税额</td>
+        `;
+        tbody.appendChild(finalRow2);
+        
+        const annualTaxableIncome = modeResult.taxableIncome || 0;
+        const annualTax = modeResult.finalTotalTax || 0;
+        const annualTaxRate = modeResult.applicableRate || 0;
+        const prepaidTax = cumulativeTax + bonusTax;
+        const refundTax = Math.round((annualTax - prepaidTax) * 100) / 100;
+        
+        const finalRow3 = document.createElement('tr');
+        finalRow3.innerHTML = `
+            <td>¥${totalIncome.toFixed(2)}</td>
+            <td>¥${totalDeduction.toFixed(2)}</td>
+            <td>¥${annualTaxableIncome.toFixed(2)}</td>
+            <td>${(annualTaxRate * 100).toFixed(0)}%</td>
+            <td>¥${annualTax.toFixed(2)}</td>
+            <td>¥${prepaidTax.toFixed(2)}</td>
+            <td class="${refundTax < 0 ? 'positive' : refundTax > 0 ? 'negative' : ''}">¥${refundTax.toFixed(2)}</td>
+        `;
+        tbody.appendChild(finalRow3);
+    });
 }
 
 // 更新经营所得预算表

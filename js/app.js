@@ -19,6 +19,11 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reverse-mode-btn').addEventListener('click', function() {
         showPage('reverse-calculation-page');
         showReverseStep(1);
+        // 初始化时显示计算模式选择器
+        const calcModeSection = document.getElementById('reverse-calc-mode-section');
+        if (calcModeSection) {
+            calcModeSection.classList.remove('hidden');
+        }
         // 初始化时触发一次倒算方式变更事件，更新描述文案
         document.getElementById('reverse-type').dispatchEvent(new Event('change'));
     });
@@ -44,6 +49,12 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reverse-monthly-input').classList.add('hidden');
         document.getElementById('reverse-both-input').classList.add('hidden');
         
+        // 显示/隐藏计算模式选择器（所有倒算方式都支持）
+        const calcModeSection = document.getElementById('reverse-calc-mode-section');
+        if (calcModeSection) {
+            calcModeSection.classList.remove('hidden');
+        }
+        
         if (type === 'rate') {
             document.getElementById('reverse-rate-input').classList.remove('hidden');
         } else if (type === 'monthly') {
@@ -53,10 +64,75 @@ window.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // 反向倒算页面所得类型选择
+    document.getElementById('reverse-income-type').addEventListener('change', function() {
+        const incomeType = this.value;
+        
+        // 显示/隐藏经营所得特有扣除项
+        const businessSection = document.getElementById('reverse-business-deduction-section');
+        if (businessSection) {
+            if (incomeType === 'business') {
+                businessSection.classList.remove('hidden');
+            } else {
+                businessSection.classList.add('hidden');
+            }
+        }
+        
+        // 显示/隐藏经营所得提示和年终奖
+        const bonusSection = document.getElementById('reverse-bonus-income').closest('.form-group');
+        const businessHint = document.getElementById('business-rate-hint');
+        const reverseWorkMonths = document.getElementById('reverse-work-months').closest('.form-group');
+        
+        if (incomeType === 'business') {
+            // 隐藏年终奖和工作月数（经营所得不适用）
+            if (bonusSection) bonusSection.classList.add('hidden');
+            if (reverseWorkMonths) reverseWorkMonths.classList.add('hidden');
+            if (businessHint) businessHint.classList.remove('hidden');
+            
+            // 更新税率选项为经营所得税率
+            const rateSelect = document.getElementById('reverse-target-rate');
+            rateSelect.innerHTML = `
+                <option value="5">5%（经营所得第1级）</option>
+                <option value="10">10%（经营所得第2级）</option>
+                <option value="20">20%（经营所得第3级）</option>
+                <option value="30">30%（经营所得第4级）</option>
+                <option value="35">35%（经营所得第5级）</option>
+            `;
+            rateSelect.value = '10';
+            
+            // 隐藏综合所得特有扣除项，显示经营所得特有扣除项
+            document.getElementById('reverse-special-deduction-checkbox').closest('.mt-4')?.classList.add('hidden');
+            document.getElementById('reverse-basic-deduction').closest('.form-group')?.classList.add('hidden');
+        } else {
+            // 显示年终奖和工作月数（综合所得适用）
+            if (bonusSection) bonusSection.classList.remove('hidden');
+            if (reverseWorkMonths) reverseWorkMonths.classList.remove('hidden');
+            if (businessHint) businessHint.classList.add('hidden');
+            
+            // 恢复综合所得税率选项
+            const rateSelect = document.getElementById('reverse-target-rate');
+            rateSelect.innerHTML = `
+                <option value="3">3%（综合所得第1级）</option>
+                <option value="10">10%（综合所得第2级）</option>
+                <option value="20">20%（综合所得第3级）</option>
+                <option value="25">25%（综合所得第4级）</option>
+                <option value="30">30%（综合所得第5级）</option>
+                <option value="35">35%（综合所得第6级/经营所得第5级）</option>
+                <option value="45">45%（综合所得第7级）</option>
+            `;
+            rateSelect.value = '3';
+            
+            // 显示综合所得特有扣除项
+            document.getElementById('reverse-special-deduction-checkbox').closest('.mt-4')?.classList.remove('hidden');
+            document.getElementById('reverse-basic-deduction').closest('.form-group')?.classList.remove('hidden');
+        }
+    });
+    
     // 反向倒算页面扣除项显示/隐藏控制
     setupReverseDeductionToggle('reverse-special-deduction-checkbox', 'reverse-special-deduction-content');
     setupReverseDeductionToggle('reverse-special-additional-deduction-checkbox', 'reverse-special-additional-deduction-content');
     setupReverseDeductionToggle('reverse-other-deduction-checkbox', 'reverse-other-deduction-content');
+    setupReverseDeductionToggle('reverse-business-deduction-checkbox', 'reverse-business-deduction-content');
     
     // 反向倒算页面住房类型选择
     document.getElementById('reverse-housing-type').addEventListener('change', function() {
@@ -242,6 +318,7 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 反向倒算页面新输入字段事件监听
     document.getElementById('reverse-target-rate').addEventListener('change', calculateReverseTax);
+    document.getElementById('reverse-calc-mode').addEventListener('change', calculateReverseTax);
     document.getElementById('reverse-monthly-net').addEventListener('input', calculateReverseTax);
     document.getElementById('reverse-fixed-tax').addEventListener('input', calculateReverseTax);
     document.getElementById('reverse-fixed-net').addEventListener('input', calculateReverseTax);
