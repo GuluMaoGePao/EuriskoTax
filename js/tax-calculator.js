@@ -884,12 +884,12 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
     // 步骤5：根据计算模式确定参考应纳税所得额
     // 保守模式（conservative）：最低值+1，确保达到目标税率（仅对最低档位设置小额最低值）
     // 均衡模式（balanced）：区间中间值，反映平均税负水平
-    // 进取模式（aggressive）：最高值-1，接近上限的税负水平
+    // 进取模式（aggressive）：最高值，接近上限的税负水平
     let middleTaxableIncome;
     // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
-    // 3%档位设置12,000元（每月1,000元）作为最低基准，避免1元等不合理数值
+    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
     // 其他档位使用原值+1，确保精确性和适用性
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         // 最高档位：根据模式调整
@@ -1031,7 +1031,8 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax, mode = 'bal
     const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
     
     let modeTaxableIncome;
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
+    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         // 最高档位：基于基准应纳税所得额调整
@@ -1162,7 +1163,8 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
         
         let modeTaxableIncome;
-        const minimumTaxableIncome = minTaxableIncome === 0 ? 12000 : minTaxableIncome + 1;
+        // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+        const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
         
         if (maxTaxableIncome === Infinity) {
             // 最高档位：基于基准应纳税所得额调整
