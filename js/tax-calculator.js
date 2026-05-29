@@ -1275,6 +1275,7 @@ function calculateReverseTax() {
         
         let result;
         let allModeResults = {}; // 存储三种模式的结果
+        let bonusTax = 0; // 初始化年终奖税额，经营所得不涉及年终奖
         
         if (inputData.incomeType === 'business') {
             if (inputData.reverseType === 'rate') {
@@ -1314,7 +1315,7 @@ function calculateReverseTax() {
                 }
             }
         } else {
-            const bonusTax = calculateReverseBonusTax(inputData);
+            bonusTax = calculateReverseBonusTax(inputData);
             if (inputData.reverseType === 'rate') {
                 // 计算三种模式的结果
                 allModeResults.conservative = calculateFromTargetRate(inputData, deductionData, bonusTax, 'conservative');
@@ -1354,7 +1355,7 @@ function calculateReverseTax() {
         }
         
         // 保存结果（包含所有模式的结果和用户选择的模式）
-        saveReverseCalculationResult(result, inputData, deductionData, result.finalTotalTax, allModeResults);
+        saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults);
         updateReverseResultDisplay(result);
         
     } catch (error) {
