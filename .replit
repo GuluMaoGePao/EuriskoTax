@@ -1,0 +1,12 @@
+run = "cd server && npx prisma migrate deploy && npm start"
+language = "nodejs"
+
+[env]
+JWT_SECRET="your-secret-key-change-in-production"
+DATABASE_URL="file:./server/prisma/dev.db"
+
+[packager]
+language = "nodejs"
+
+[deploy]
+target = "nodejs"
