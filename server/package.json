@@ -9,7 +9,8 @@
     "prisma:init": "prisma init",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate"
   },
   "keywords": [
     "tax",
