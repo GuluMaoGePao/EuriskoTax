@@ -1,4 +1,11 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+// 动态获取 API 地址：生产环境使用当前域名，开发环境使用 localhost
+const API_BASE_URL = (() => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:3000/api';
+    }
+    // 生产环境：使用当前域名
+    return `${window.location.protocol}//${window.location.host}/api`;
+})();
 
 function getAuthToken() {
     return localStorage.getItem('auth_token');

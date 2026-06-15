@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 
@@ -22,8 +23,8 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: `http://localhost:${PORT}`,
-                description: '开发服务器'
+                url: process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`,
+                description: 'API服务器'
             }
         ],
         components: {
@@ -41,29 +42,43 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-app.use(cors());
+// CORS 配置
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(logger);
 
+// API 路由
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
 app.use('/api/auth', authRoutes);
 app.use('/api/calculations', calculationRoutes);
 
-app.get('/', (req, res) => {
-    res.json({
-        success: true,
-        message: '个人所得税计算系统 API 服务已启动',
-        version: '1.0.0',
-        docs: `/api/docs`
-    });
+// 健康检查端点（用于云平台健康检查）
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 静态文件服务（生产环境）
+// 前端文件位于 server 目录的上一级
+const staticPath = path.join(__dirname, '../../');
+app.use(express.static(staticPath));
+
+// SPA 回退：所有非 API 路由返回 index.html
+app.get('*', (req, res, next) => {
+    // 跳过 API 路由
+    if (req.path.startsWith('/api/')) {
+        return next();
+    }
+    res.sendFile(path.join(staticPath, 'index.html'));
 });
 
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
     console.log(`API文档地址: http://localhost:${PORT}/api/docs`);
 });
