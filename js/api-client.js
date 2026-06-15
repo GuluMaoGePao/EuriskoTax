@@ -49,6 +49,11 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     const result = await response.json();
 
     if (!result.success) {
+        if (result.error?.message === 'Token expired or invalid') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '#login';
+        }
         throw new Error(result.error?.message || '请求失败');
     }
 
@@ -89,6 +94,11 @@ async function updateProfile(data) {
     const result = await apiRequest('/auth/profile', 'PUT', data, true);
     setCurrentUser(result);
     return result;
+}
+
+async function verifyPassword(currentPassword) {
+    const result = await apiRequest('/auth/verify-password', 'POST', { currentPassword }, true);
+    return result.valid;
 }
 
 async function deleteProfile() {
@@ -140,6 +150,7 @@ const apiClient = {
     logoutUser,
     getProfile,
     updateProfile,
+    verifyPassword,
     deleteProfile,
     calculateComprehensive,
     calculateReverse,

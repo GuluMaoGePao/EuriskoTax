@@ -99,6 +99,18 @@ const getUserById = async (userId) => {
     return user;
 };
 
+const verifyPassword = async (userId, password) => {
+    const user = await prisma.user.findUnique({
+        where: { id: userId }
+    });
+    
+    if (!user) {
+        return false;
+    }
+    
+    return await bcrypt.compare(password, user.password_hash);
+};
+
 const updateUser = async (userId, data) => {
     const updateData = {};
     
@@ -143,6 +155,7 @@ module.exports = {
     registerUser,
     loginUser,
     getUserById,
+    verifyPassword,
     updateUser,
     deleteUser
 };
