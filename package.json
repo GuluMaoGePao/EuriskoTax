@@ -1,0 +1,8 @@
+{
+  "name": "EuriskoTax",
+  "version": "1.0.0",
+  "description": "个人所得税预算规划工具 - 全栈部署",
+  "scripts": {
+    "build": "echo 'Build complete - all files ready to deploy'"
+  }
+}
