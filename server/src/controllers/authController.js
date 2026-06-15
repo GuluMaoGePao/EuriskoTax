@@ -65,8 +65,21 @@ const profile = async (req, res, next) => {
 
 const updateProfile = async (req, res, next) => {
     try {
-        const { username, email, phone, password } = req.body;
+        const { username, email, phone, password, currentPassword } = req.body;
         const userId = req.user.id;
+        
+        if (password) {
+            const isValid = await authService.verifyPassword(userId, currentPassword);
+            if (!isValid) {
+                return res.status(401).json({
+                    success: false,
+                    error: {
+                        message: '当前密码验证失败',
+                        statusCode: 401
+                    }
+                });
+            }
+        }
         
         const updatedUser = await authService.updateUser(userId, {
             username,
@@ -78,6 +91,22 @@ const updateProfile = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: updatedUser
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const verifyPassword = async (req, res, next) => {
+    try {
+        const { currentPassword } = req.body;
+        const userId = req.user.id;
+        
+        const isValid = await authService.verifyPassword(userId, currentPassword);
+        
+        res.status(200).json({
+            success: true,
+            data: { valid: isValid }
         });
     } catch (err) {
         next(err);
@@ -103,5 +132,6 @@ module.exports = {
     login,
     profile,
     updateProfile,
-    deleteProfile
+    deleteProfile,
+    verifyPassword
 };

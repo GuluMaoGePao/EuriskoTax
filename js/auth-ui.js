@@ -68,6 +68,22 @@ async function handleLogin() {
     }
 }
 
+async function handleQuickLogin() {
+    const email = 'dev@example.com';
+    const password = 'password';
+    
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-password').value = password;
+    
+    try {
+        await apiClient.loginUser(email, password);
+        updateAuthUI();
+        showAlert('快速登录成功', 'success');
+    } catch (error) {
+        showAlert('快速登录失败: ' + error.message);
+    }
+}
+
 async function handleRegister() {
     const username = document.getElementById('register-username').value;
     const email = document.getElementById('register-email').value;
@@ -113,6 +129,8 @@ async function loadProfile() {
         document.getElementById('profile-username').value = user.username;
         document.getElementById('profile-email').value = user.email;
         document.getElementById('profile-phone').value = user.phone || '';
+        document.getElementById('profile-display-name').textContent = user.username;
+        document.getElementById('profile-display-email').textContent = user.email;
     } catch (error) {
         showAlert('加载失败: ' + error.message);
     }
@@ -120,11 +138,33 @@ async function loadProfile() {
 
 async function saveProfile() {
     const phone = document.getElementById('profile-phone').value;
+    const currentPassword = document.getElementById('profile-current-password').value;
     const password = document.getElementById('profile-password').value;
+    const confirmPassword = document.getElementById('profile-confirm-password').value;
+    
+    if (password || confirmPassword) {
+        if (!currentPassword) {
+            showAlert('请输入当前密码以验证身份');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            showAlert('两次输入的新密码不一致');
+            return;
+        }
+        
+        if (password.length < 6) {
+            showAlert('新密码长度至少6位');
+            return;
+        }
+    }
     
     const updateData = {};
     if (phone) updateData.phone = phone;
-    if (password) updateData.password = password;
+    if (password) {
+        updateData.password = password;
+        updateData.currentPassword = currentPassword;
+    }
     
     if (Object.keys(updateData).length === 0) {
         showAlert('请修改至少一项信息');
@@ -134,12 +174,20 @@ async function saveProfile() {
     try {
         await apiClient.updateProfile(updateData);
         showAlert('修改成功', 'success');
-        if (password) {
-            document.getElementById('profile-password').value = '';
-        }
+        document.getElementById('profile-current-password').value = '';
+        document.getElementById('profile-password').value = '';
+        document.getElementById('profile-confirm-password').value = '';
     } catch (error) {
         showAlert('修改失败: ' + error.message);
     }
+}
+
+function resetProfileForm() {
+    document.getElementById('profile-phone').value = '';
+    document.getElementById('profile-current-password').value = '';
+    document.getElementById('profile-password').value = '';
+    document.getElementById('profile-confirm-password').value = '';
+    loadProfile();
 }
 
 async function loadHistory() {
@@ -230,6 +278,7 @@ function setupAuthEventListeners() {
     });
     
     document.getElementById('login-submit').addEventListener('click', handleLogin);
+    document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
     document.getElementById('register-submit').addEventListener('click', handleRegister);
     document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
@@ -252,6 +301,21 @@ function setupAuthEventListeners() {
         showPage('mode-selection-page');
     });
     document.getElementById('profile-save').addEventListener('click', saveProfile);
+    document.getElementById('profile-cancel').addEventListener('click', resetProfileForm);
+    
+    document.getElementById('profile-nav-history').addEventListener('click', (e) => {
+        e.preventDefault();
+        loadHistory();
+        showPage('history-page');
+    });
+    document.getElementById('profile-nav-help').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('help-modal').classList.remove('hidden');
+    });
+    document.getElementById('profile-nav-about').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('help-modal').classList.remove('hidden');
+    });
     
     document.getElementById('user-btn').addEventListener('click', () => {
         document.getElementById('user-dropdown').classList.toggle('hidden');
