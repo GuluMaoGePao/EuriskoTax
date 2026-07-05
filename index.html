@@ -152,6 +152,7 @@
             }
             .tax-budget-table {
                 @apply w-full border-collapse border border-gray-200 shadow-sm;
+                min-width: 700px;
             }
             .tax-budget-table th {
                 @apply px-4 py-3 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200;
@@ -175,7 +176,9 @@
                 @apply text-success font-medium;
             }
             .overflow-x-auto {
-                @apply rounded-lg overflow-hidden;
+                overflow-x: auto;
+                overflow-y: hidden;
+                border-radius: 0.5rem;
             }
         }
     </style>
