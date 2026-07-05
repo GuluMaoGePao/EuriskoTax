@@ -510,8 +510,8 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax) {
 }
 
 function calculateFromTargetTax(inputData, deductionData, bonusTax) {
-    const targetTax = parseFloat(inputData.fixedTax) || 0;
-    const targetNet = parseFloat(inputData.fixedNet) || 0;
+    const targetTax = parseFloat(inputData.fixedTax) || parseFloat(inputData.targetTax) || 0;
+    const targetNet = parseFloat(inputData.fixedNet) || parseFloat(inputData.targetNet) || 0;
     
     if (targetTax > 0 && targetNet === 0) {
         let left = deductionData.totalDeduction;
@@ -583,7 +583,20 @@ function calculateReverseTax(inputData) {
     const deductionData = calculateReverseDeductions(inputData);
     const bonusTax = calculateReverseBonusTax(inputData);
     
-    const reverseType = inputData.reverseType || 'rate';
+    let reverseType = inputData.reverseType;
+    if (!reverseType) {
+        if (inputData.targetTax || inputData.fixedTax) {
+            reverseType = 'tax';
+        } else if (inputData.targetNet || inputData.fixedNet) {
+            reverseType = 'tax';
+        } else if (inputData.targetRate) {
+            reverseType = 'rate';
+        } else if (inputData.targetMonthlyNet) {
+            reverseType = 'monthly';
+        } else {
+            reverseType = 'tax';
+        }
+    }
     
     let result;
     if (reverseType === 'rate') {

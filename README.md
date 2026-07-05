@@ -474,34 +474,11 @@ npm start
 
 ## API 文档
 
-### 访问地址
+完整的API接口文档请参考：[docs/api/api-reference.md](docs/api/api-reference.md)
 
-启动后端服务后，访问：
+启动后端服务后，可访问：
 - Swagger UI: http://localhost:3000/api/docs
 - OpenAPI JSON: http://localhost:3000/api/docs.json
-
-### 主要接口
-
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/api/auth/register` | POST | 用户注册 |
-| `/api/auth/login` | POST | 用户登录 |
-| `/api/auth/profile` | GET | 获取用户信息 |
-| `/api/calculations` | GET | 获取计算记录列表 |
-| `/api/calculations` | POST | 创建计算记录 |
-| `/api/calculations/:id` | GET | 获取单个计算记录 |
-| `/api/calculations/:id` | PUT | 更新计算记录 |
-| `/api/calculations/:id` | DELETE | 删除计算记录 |
-| `/api/health` | GET | 健康检查 |
-
-### 环境变量
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `JWT_SECRET` | JWT 签名密钥 | 必需 |
-| `DATABASE_URL` | 数据库连接地址 | `file:./dev.db` |
-| `NODE_ENV` | 运行环境 | `development` |
-| `PORT` | 服务端口 | `3000` |
 
 ---
 

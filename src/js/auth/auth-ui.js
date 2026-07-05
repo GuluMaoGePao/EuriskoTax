@@ -1,4 +1,4 @@
-import apiClient from './api-client.js';
+import apiClient from '../api/api-client.js';
 
 function showLoginModal() {
     document.getElementById('login-modal').classList.remove('hidden');
