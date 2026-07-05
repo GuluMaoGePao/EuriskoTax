@@ -225,7 +225,7 @@ EuriskoTax/
 | 阶段2：用户认证系统 | ✅ 已完成 | 1周 | 2026-05-26 |
 | 阶段3：计算逻辑迁移 | ✅ 已完成 | 1.5周 | 2026-05-27 |
 | 阶段4：前端改造集成 | ✅ 已完成 | 1周 | 2026-05-28 |
-| 阶段5：数据库配置与测试 | ✅ 已完成 | 1周 | 2026-05-29 |
+| 阶段5：部署与上线准备 | ✅ 已完成 | 1周 | 2026-07-05 |
 
 ### 当前状态
 
@@ -234,12 +234,38 @@ EuriskoTax/
 - API文档：http://localhost:3000/api/docs
 - 数据库：SQLite（dev.db）
 - 认证方式：JWT Token
+- 前端：HTML5 + CSS3 + JavaScript（原生技术）
 
 ### 开发账号
 
 - 用户名：devuser
 - 邮箱：dev@example.com
 - 密码：dev123456
+
+---
+
+## 🚀 部署方案
+
+### 本地开发
+```bash
+cd server
+npm install
+npx prisma migrate dev
+npm start
+```
+
+### 云平台部署
+
+| 平台 | 是否需绑卡 | 配置文件 |
+|------|-----------|---------|
+| Render | 是 | `server/render.yaml` |
+| Railway | 是 | `server/railway.json` |
+| Cyclic | 否 | `server/cyclic.json` |
+
+### cpolar内网穿透（测试用）
+```bash
+cpolar http 3000 --region cn
+```
 
 ---
 
@@ -250,6 +276,7 @@ EuriskoTax/
 3. **输入验证**：服务端二次验证所有输入，防止SQL注入和XSS攻击
 4. **HTTPS**：生产环境必须启用HTTPS
 5. **日志脱敏**：日志中不记录密码等敏感信息
+6. **环境变量**：敏感配置（如JWT_SECRET）通过环境变量管理，不提交到代码仓库
 
 ---
 
@@ -300,9 +327,10 @@ EuriskoTax/
 - API文档：http://localhost:3000/api/docs
 - 数据库模型：`server/prisma/schema.prisma`
 - 源代码：`server/src/`
+- 计税规则：`docs/tax-calculation-rules.md`
 
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-05-30*
-*版本：v1.17.0*
+*最后更新：2026-07-05*
+*版本：v1.18.0*
