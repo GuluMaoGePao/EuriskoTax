@@ -131,14 +131,30 @@
 EuriskoTax/
 ├── index.html                    # 主页面（前端）
 ├── README.md                     # 项目说明
-├── DEVELOPMENT_PLAN.md           # 开发计划文档
-├── js/                           # 前端JavaScript
-│   ├── app.js                    # 应用主逻辑
-│   ├── tax-calculator.js         # 前端计算逻辑（保留作为降级方案）
-│   ├── utils.js                  # 工具函数
-│   ├── export-utils.js           # 导出功能
-│   ├── data-management.js        # 数据管理
-│   └── navigation-ui.js          # 导航和UI
+├── docs/                         # 文档目录
+│   ├── development/              # 开发相关文档
+│   │   └── development-plan.md # 开发计划文档
+│   ├── guides/                   # 使用指南和规则文档
+│   │   └── tax-calculation-rules.md # 计税规则手册
+│   └── api/                      # API文档
+│       └── api-reference.md   # API参考文档
+├── src/                          # 前端源代码
+│   └── js/                       # 前端JavaScript
+│       ├── app.js                # 应用主逻辑
+│       ├── api/                  # API客户端
+│       │   └── api-client.js
+│       ├── auth/                 # 认证相关
+│       │   └── auth-ui.js
+│       ├── calculation/          # 计算相关
+│       │   ├── tax-calculator.js # 税务计算核心
+│       │   ├── helper-functions.js
+│       │   └── utils.js
+│       ├── data/                 # 数据管理
+│       │   └── data-management.js
+│       ├── export/               # 导出功能
+│       │   └── export-utils.js
+│       └── ui/                   # UI组件
+│           └── navigation-ui.js
 └── server/                       # 后端服务
     ├── package.json              # 后端依赖
     ├── .env                      # 环境变量
@@ -192,28 +208,7 @@ EuriskoTax/
 
 ## 🔌 API接口设计
 
-### 认证接口
-
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 用户注册 | POST | `/api/auth/register` | 创建新用户 |
-| 用户登录 | POST | `/api/auth/login` | 用户登录，返回JWT |
-| 用户登出 | POST | `/api/auth/logout` | 清除token（前端处理） |
-| 获取用户信息 | GET | `/api/auth/profile` | 获取当前用户信息 |
-| 更新用户信息 | PUT | `/api/auth/profile` | 更新用户信息 |
-| 密码重置 | POST | `/api/auth/reset-password` | 重置密码 |
-
-### 计算接口
-
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 综合所得计算 | POST | `/api/calculations/comprehensive` | 正向计税 |
-| 经营所得计算 | POST | `/api/calculations/business` | 经营所得 |
-| 分类所得计算 | POST | `/api/calculations/classification` | 分类所得 |
-| 反向倒算 | POST | `/api/calculations/reverse` | 反向倒算 |
-| 获取历史记录 | GET | `/api/calculations/history` | 获取用户计算历史 |
-| 获取单条记录 | GET | `/api/calculations/:id` | 获取单个计算记录 |
-| 删除记录 | DELETE | `/api/calculations/:id` | 删除计算记录 |
+完整的API接口文档请参考：[docs/api/api-reference.md](../api/api-reference.md)
 
 ---
 
@@ -256,11 +251,21 @@ npm start
 
 ### 云平台部署
 
-| 平台 | 是否需绑卡 | 配置文件 |
-|------|-----------|---------|
-| Render | 是 | `server/render.yaml` |
-| Railway | 是 | `server/railway.json` |
-| Cyclic | 否 | `server/cyclic.json` |
+#### 国内云平台（推荐）
+
+| 平台 | 是否需绑卡 | 特点 |
+|------|-----------|------|
+| 阿里云 ECS | 是 | 稳定可靠，国内访问快，适合生产环境 |
+| 腾讯云 CVM | 是 | 性价比高，国内访问快 |
+| Zeabur | 否 | 无需绑卡，一键部署，国内访问快 |
+
+#### 海外云平台
+
+| 平台 | 是否需绑卡 | 特点 |
+|------|-----------|------|
+| Render | 是 | 功能完善，适合海外用户 |
+| Railway | 是 | 功能完善，适合海外用户 |
+| Cyclic | 否 | 无需绑卡，适合测试 |
 
 ### cpolar内网穿透（测试用）
 ```bash
@@ -327,7 +332,7 @@ cpolar http 3000 --region cn
 - API文档：http://localhost:3000/api/docs
 - 数据库模型：`server/prisma/schema.prisma`
 - 源代码：`server/src/`
-- 计税规则：`docs/tax-calculation-rules.md`
+- 计税规则：`docs/guides/tax-calculation-rules.md`
 
 ---
 

@@ -1136,7 +1136,7 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('education-deduction').addEventListener('input', updateDeductionCalculation);
     
     // 初始化认证系统
-    import('./auth-ui.js').then(({ initAuth }) => {
+    import('/src/js/auth/auth-ui.js?v=2').then(({ initAuth }) => {
         initAuth();
     });
     

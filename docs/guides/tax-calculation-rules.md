@@ -105,7 +105,7 @@
 
 ### 1.5 代码实现
 
-**税率表定义**: `js/tax-calculator.js` 第7-15行
+**税率表定义**: `src/js/calculation/tax-calculator.js` 第7-15行
 
 **核心计算函数**:
 - `collectTaxInputData()`: 从DOM收集输入数据（第329-339行）
@@ -172,7 +172,7 @@
 应纳税额 = 应纳税所得额 × 适用税率 - 速算扣除数
 ```
 
-**代码实现**: `js/tax-calculator.js` 第1008-1110行 `calculateBusinessTax()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第1008-1110行 `calculateBusinessTax()` 函数
 
 ---
 
@@ -238,7 +238,7 @@
 - 最低档位（min=0）: 设置合理基准1元/年，符合应纳税所得额1-36000元适用3%税率
 - 最高档位（无上限）: 使用固定增量（均衡+10万，进取+20万）
 
-**代码实现**: `js/tax-calculator.js` 第785-865行 `calculateFromTargetRate()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第785-865行 `calculateFromTargetRate()` 函数
 
 ### 4.4 按月度税后收入倒算
 
@@ -249,7 +249,7 @@
 
 **计算精度**: 二分法，精度达0.01元
 
-**代码实现**: `js/tax-calculator.js` 第867-939行 `calculateFromMonthlyNet()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第867-939行 `calculateFromMonthlyNet()` 函数
 
 ### 4.5 按目标税额倒算
 
@@ -257,7 +257,7 @@
 1. 已知税额，反推应纳税所得额
 2. 税前收入 = 应纳税所得额 + 扣除总额
 
-**代码实现**: `js/tax-calculator.js` 第941-1017行 `calculateFromTargetTax()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第941-1017行 `calculateFromTargetTax()` 函数
 
 ### 4.6 最高档位计算规则
 
@@ -277,7 +277,7 @@
 - `bonusTax` 变量在函数开头初始化为0，确保所有代码路径都能访问
 - 经营所得不涉及年终奖，始终使用0作为年终奖税额
 
-**代码实现**: `js/tax-calculator.js` 第1278行初始化，第1318行计算，第1357行保存
+**代码实现**: `src/js/calculation/tax-calculator.js` 第1278行初始化，第1318行计算，第1357行保存
 
 ---
 
@@ -306,19 +306,19 @@
 
 **政策依据**: 财政部公告2023年第28号
 
-**代码实现**: `js/tax-calculator.js` 第187-197行 `calculateBonusTax()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第187-197行 `calculateBonusTax()` 函数
 
 ### 5.3 临界点提醒
 
 当应纳税所得额接近税率跳档临界点时自动提醒，帮助用户优化收入结构
 
-**代码实现**: `js/tax-calculator.js` 第45-64行 `checkTaxBracketThreshold()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第45-64行 `checkTaxBracketThreshold()` 函数
 
 ### 5.4 年终奖最优分配
 
 自动计算工资与年终奖的最优分配比例，基于税率表临界点直接计算，O(1)复杂度
 
-**代码实现**: `js/tax-calculator.js` 第66-119行 `calculateOptimalBonusAllocation()` 函数
+**代码实现**: `src/js/calculation/tax-calculator.js` 第66-119行 `calculateOptimalBonusAllocation()` 函数
 
 ---
 
@@ -403,7 +403,7 @@ updateTaxResultsUI()       → 界面更新层
 - `MIN_SOCIAL_SECURITY_BASE = 4250`：社保缴费基数最低标准
 - `MIN_HOUSING_FUND_BASE = 4250`：住房公积金基数最低标准
 
-**代码实现**: `js/helper-functions.js` 第3-5行
+**代码实现**: `src/js/calculation/helper-functions.js` 第3-5行
 
 ### 8.2 默认值设置
 
@@ -422,7 +422,7 @@ updateTaxResultsUI()       → 界面更新层
 - 失业保险：基数 × 0.5%
 - 住房公积金：基数 × 5%（或7%）
 
-**代码实现**: `js/app.js` 第1156-1162行
+**代码实现**: `src/js/app.js` 第1156-1162行
 
 ### 8.3 基数验证
 
@@ -437,7 +437,7 @@ updateTaxResultsUI()       → 界面更新层
 
 **警告提示**: `⚠️ 当前基数低于最低标准 4250 元/月`
 
-**代码实现**: `js/helper-functions.js` 第7-39行
+**代码实现**: `src/js/calculation/helper-functions.js` 第7-39行
 
 **事件绑定**: 在基数输入变化时触发验证：
 - `social-security-base`: `input` 事件
@@ -445,7 +445,7 @@ updateTaxResultsUI()       → 界面更新层
 - `reverse-social-security-base`: `input` 事件
 - `reverse-housing-fund-base`: `input` 事件
 
-**代码实现**: `js/app.js` 第1091、1124、216、241行
+**代码实现**: `src/js/app.js` 第1091、1124、216、241行
 
 ---
 
@@ -482,7 +482,7 @@ if (targetType === 'tax') {
 
 **前端验证**: 当两个字段都填写时，抛出错误提示："希望缴纳的税额和希望到手的金额请只填写一项"
 
-**代码实现**: `js/tax-calculator.js` 第1478-1492行
+**代码实现**: `src/js/calculation/tax-calculator.js` 第1478-1492行
 
 ### 9.3 计算逻辑优化
 
@@ -506,7 +506,7 @@ modeTaxableIncome = baseTaxableIncome;
 - `calculateFromMonthlyNet()`: 综合所得按月度税后收入倒算
 - `calculateBusinessFromMonthlyNet()`: 经营所得按月度税后收入倒算
 
-**代码实现**: `js/tax-calculator.js` 第1186、1056、1815、1941行
+**代码实现**: `src/js/calculation/tax-calculator.js` 第1186、1056、1815、1941行
 
 ### 9.4 差异字段修复
 
@@ -521,7 +521,7 @@ taxDifference: (totalIncome - actualTax) - targetNet
 - `calculateFromTargetTax()`: 综合所得
 - `calculateBusinessFromTargetTax()`: 经营所得
 
-**代码实现**: `js/tax-calculator.js` 第1286、2118行
+**代码实现**: `src/js/calculation/tax-calculator.js` 第1286、2118行
 
 ---
 
