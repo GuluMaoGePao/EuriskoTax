@@ -2531,10 +2531,34 @@
                                     本年度有综合所得（工资薪金、劳务报酬等）
                                     <span class="tooltip ml-1">
                                         <i class="fa fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">根据税法规定，取得经营所得的个人，没有综合所得的，可以减除费用6万元及本人缴纳的社保公积金</span>
+                                        <span class="tooltip-text">有综合所得：基本减除费用6万元及社保公积金已在综合所得中扣除，经营所得不再重复扣除<br>无综合所得：可享受每月5000元减除费用并扣除社保公积金</span>
                                     </span>
                                 </label>
                             </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="business-work-months" class="label">
+                                年工作总月数
+                                <span class="tooltip ml-1">
+                                    <i class="fa fa-info-circle text-gray-400"></i>
+                                    <span class="tooltip-text">一年中实际工作的月数，不满12个月时需要调整计算</span>
+                                </span>
+                            </label>
+                            <select id="business-work-months" class="input-field">
+                                <option value="12">12个月</option>
+                                <option value="11">11个月</option>
+                                <option value="10">10个月</option>
+                                <option value="9">9个月</option>
+                                <option value="8">8个月</option>
+                                <option value="7">7个月</option>
+                                <option value="6">6个月</option>
+                                <option value="5">5个月</option>
+                                <option value="4">4个月</option>
+                                <option value="3">3个月</option>
+                                <option value="2">2个月</option>
+                                <option value="1">1个月</option>
+                            </select>
                         </div>
                         
                         <div class="mt-4">
@@ -2547,8 +2571,22 @@
                             
                             <div id="business-special-deduction-content" class="mb-6 hidden">
                                 <div class="form-group">
+                                    <label for="business-social-security-base" class="label">
+                                        社保缴费基数 (元/月)
+                                        <span class="tooltip ml-1">
+                                            <i class="fa fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">社会保险缴费的基数，一般为本人上年度月平均工资</span>
+                                        </span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" id="business-social-security-base" class="input-field" value="4250" min="0" step="100">
+                                    </div>
+                                    <div id="business-social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
+                                </div>
+                                
+                                <div class="form-group">
                                     <label for="business-pension-insurance" class="label">
-                                        养老保险金 (元/年)
+                                        养老保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的养老保险部分（灵活就业人员缴纳）</span>
@@ -2557,11 +2595,16 @@
                                     <div class="flex items-center space-x-2">
                                         <input type="number" id="business-pension-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="business-pension-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="business-pension-rate" class="input-field w-24" value="8" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
                                 </div>
                                 
                                 <div class="form-group">
                                     <label for="business-medical-insurance" class="label">
-                                        医疗保险金 (元/年)
+                                        医疗保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的医疗保险部分（灵活就业人员缴纳）</span>
@@ -2570,11 +2613,16 @@
                                     <div class="flex items-center space-x-2">
                                         <input type="number" id="business-medical-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="business-medical-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="business-medical-rate" class="input-field w-24" value="2" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
                                 </div>
                                 
                                 <div class="form-group">
                                     <label for="business-unemployment-insurance" class="label">
-                                        失业保险金 (元/年)
+                                        失业保险金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的失业保险部分（灵活就业人员缴纳）</span>
@@ -2583,11 +2631,28 @@
                                     <div class="flex items-center space-x-2">
                                         <input type="number" id="business-unemployment-insurance" class="input-field" value="0" min="0" step="100">
                                     </div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="business-unemployment-rate" class="label">缴费比例：</label>
+                                        <input type="number" id="business-unemployment-rate" class="input-field w-24" value="0.5" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="business-housing-fund" class="label">
-                                        住房公积金 (元/年)
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="business-housing-fund-base" class="label">住房公积金基数：</label>
+                                        <input type="number" id="business-housing-fund-base" class="input-field" value="4250" min="0" step="100">
+                                    </div>
+                                    <div id="business-housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <label for="business-housing-fund-rate" class="label">缴费比例：</label>
+                                        <select id="business-housing-fund-rate" class="input-field w-24">
+                                            <option value="5">5%</option>
+                                            <option value="7">7%</option>
+                                        </select>
+                                    </div>
+                                    <label for="business-housing-fund" class="label mt-2">
+                                        住房公积金 (元/月)
                                         <span class="tooltip ml-1">
                                             <i class="fa fa-info-circle text-gray-400"></i>
                                             <span class="tooltip-text">个人承担的住房公积金部分</span>
@@ -2813,27 +2878,98 @@
                         </div>
                         
                         <div class="mt-6 p-4 bg-blue-50 rounded-lg">
-                            <div class="space-y-2">
+                            <div class="space-y-3">
+                                <h4 class="font-medium text-gray-700 border-b border-blue-200 pb-2">扣除项明细</h4>
+                                
                                 <div class="flex justify-between items-center">
-                                    <span class="text-gray-700">投资者减除费用</span>
+                                    <span class="text-gray-600">投资者减除费用</span>
                                     <span id="business-investor-deduction">0</span> 元
                                 </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-700">专项扣除合计</span>
-                                    <span id="business-special-deduction-total">0</span> 元
+                                
+                                <div class="border-t border-blue-100 pt-2 mt-2">
+                                    <div class="flex justify-between items-center font-medium text-gray-700">
+                                        <span>专项扣除（社保/公积金）</span>
+                                        <span id="business-special-deduction-total">0</span> 元
+                                    </div>
+                                    <div class="mt-1 space-y-1 pl-3">
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>养老保险金</span>
+                                            <span id="business-pension-insurance-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>医疗保险金</span>
+                                            <span id="business-medical-insurance-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>失业保险金</span>
+                                            <span id="business-unemployment-insurance-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>住房公积金</span>
+                                            <span id="business-housing-fund-total">0</span> 元
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-700">专项附加扣除合计</span>
-                                    <span id="business-special-additional-total">0</span> 元
+                                
+                                <div class="border-t border-blue-100 pt-2 mt-2">
+                                    <div class="flex justify-between items-center font-medium text-gray-700">
+                                        <span>专项附加扣除</span>
+                                        <span id="business-special-additional-total">0</span> 元
+                                    </div>
+                                    <div class="mt-1 space-y-1 pl-3">
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>子女教育+婴幼儿照护</span>
+                                            <span id="business-children-infant-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>赡养老人</span>
+                                            <span id="business-elderly-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>住房租金/贷款利息</span>
+                                            <span id="business-housing-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>继续教育</span>
+                                            <span id="business-education-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>大病医疗（实际扣除）</span>
+                                            <span id="business-medical-total">0</span> 元
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-700">其他扣除合计</span>
-                                    <span id="business-other-deduction-total">0</span> 元
+                                
+                                <div class="border-t border-blue-100 pt-2 mt-2">
+                                    <div class="flex justify-between items-center font-medium text-gray-700">
+                                        <span>其他扣除</span>
+                                        <span id="business-other-deduction-total">0</span> 元
+                                    </div>
+                                    <div class="mt-1 space-y-1 pl-3">
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>个人养老金</span>
+                                            <span id="business-pension-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>企业年金</span>
+                                            <span id="business-enterprise-annuity-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>商业健康保险</span>
+                                            <span id="business-insurance-total">0</span> 元
+                                        </div>
+                                        <div class="flex justify-between text-sm text-gray-600">
+                                            <span>公益捐赠支出（实际扣除）</span>
+                                            <span id="business-charitable-total">0</span> 元
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="border-t border-blue-200 my-2"></div>
-                                <div class="flex justify-between items-center">
-                                    <span class="font-medium text-gray-700">年度扣除总额</span>
-                                    <span class="font-bold text-primary text-lg" id="business-total-deduction">0</span> 元
+                                
+                                <div class="border-t border-blue-200 my-2 pt-2">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-medium text-gray-700">年度扣除总额</span>
+                                        <span class="font-bold text-primary text-lg" id="business-total-deduction">0</span> 元
+                                    </div>
                                 </div>
                             </div>
                         </div>

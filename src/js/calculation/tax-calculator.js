@@ -2233,12 +2233,17 @@ function calculateBusinessTax() {
         const businessOtherExpenses = parseFloat(document.getElementById('business-other-expenses')?.value) || 0;
         const businessPreviousLosses = parseFloat(document.getElementById('business-previous-losses')?.value) || 0;
         const hasComprehensiveIncome = document.getElementById('business-has-comprehensive-income')?.checked ?? true;
+        const workMonths = parseInt(document.getElementById('business-work-months')?.value) || 12;
         
-        // 专项扣除（社保/公积金）
-        const pensionInsurance = parseFloat(document.getElementById('business-pension-insurance')?.value) || 0;
-        const medicalInsurance = parseFloat(document.getElementById('business-medical-insurance')?.value) || 0;
-        const unemploymentInsurance = parseFloat(document.getElementById('business-unemployment-insurance')?.value) || 0;
-        const housingFund = parseFloat(document.getElementById('business-housing-fund')?.value) || 0;
+        // 专项扣除（社保/公积金）- 月度金额，需乘以工作月数转换为年度
+        const monthlyPensionInsurance = parseFloat(document.getElementById('business-pension-insurance')?.value) || 0;
+        const monthlyMedicalInsurance = parseFloat(document.getElementById('business-medical-insurance')?.value) || 0;
+        const monthlyUnemploymentInsurance = parseFloat(document.getElementById('business-unemployment-insurance')?.value) || 0;
+        const monthlyHousingFund = parseFloat(document.getElementById('business-housing-fund')?.value) || 0;
+        const pensionInsurance = monthlyPensionInsurance * workMonths;
+        const medicalInsurance = monthlyMedicalInsurance * workMonths;
+        const unemploymentInsurance = monthlyUnemploymentInsurance * workMonths;
+        const housingFund = monthlyHousingFund * workMonths;
         const specialDeductionTotal = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
         
         // 专项附加扣除明细
@@ -2266,8 +2271,8 @@ function calculateBusinessTax() {
         // 扣除以前年度亏损
         const netIncomeAfterLoss = Math.max(0, businessProfit - businessPreviousLosses);
         
-        // 计算投资者减除费用（60000元/年）
-        const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
+        // 计算投资者减除费用（5000元/月，按实际工作月数计算）
+        const investorDeduction = hasComprehensiveIncome ? 0 : 5000 * workMonths;
         
         // 计算公益性捐赠前的应纳税所得额
         const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction - 
@@ -2418,6 +2423,23 @@ function calculateBusinessTax() {
         safeSetTextContent('business-special-additional-total', '¥' + specialAdditionalDeductionTotal.toFixed(2));
         safeSetTextContent('business-other-deduction-total', '¥' + otherDeductionTotal.toFixed(2));
         safeSetTextContent('business-total-deduction', '¥' + totalDeduction.toFixed(2));
+        
+        // 更新步骤2扣除项明细
+        safeSetTextContent('business-pension-insurance-total', '¥' + pensionInsurance.toFixed(2));
+        safeSetTextContent('business-medical-insurance-total', '¥' + medicalInsurance.toFixed(2));
+        safeSetTextContent('business-unemployment-insurance-total', '¥' + unemploymentInsurance.toFixed(2));
+        safeSetTextContent('business-housing-fund-total', '¥' + housingFund.toFixed(2));
+        
+        safeSetTextContent('business-children-infant-total', '¥' + childrenInfantDeduction.toFixed(2));
+        safeSetTextContent('business-elderly-total', '¥' + elderlyDeduction.toFixed(2));
+        safeSetTextContent('business-housing-total', '¥' + housingDeduction.toFixed(2));
+        safeSetTextContent('business-education-total', '¥' + educationDeduction.toFixed(2));
+        safeSetTextContent('business-medical-total', '¥' + actualMedicalDeduction.toFixed(2));
+        
+        safeSetTextContent('business-pension-total', '¥' + pensionDeduction.toFixed(2));
+        safeSetTextContent('business-enterprise-annuity-total', '¥' + enterpriseAnnuity.toFixed(2));
+        safeSetTextContent('business-insurance-total', '¥' + insuranceDeduction.toFixed(2));
+        safeSetTextContent('business-charitable-total', '¥' + actualCharitableDonation.toFixed(2));
         
     } catch (error) {
         console.error('经营所得计算过程中出现错误:', error);
