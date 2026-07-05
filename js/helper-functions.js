@@ -771,8 +771,44 @@ function resetBusinessCalculation() {
     
     // 2. 重置扣除项
     document.getElementById('business-has-comprehensive-income').checked = true;
-    document.getElementById('business-other-deduction').value = 0;
-    document.getElementById('business-special-additional-deduction').value = 0;
+    
+    // 重置专项扣除
+    document.getElementById('business-special-deduction-checkbox').checked = false;
+    document.getElementById('business-special-deduction-content').classList.add('hidden');
+    document.getElementById('business-pension-insurance').value = 0;
+    document.getElementById('business-medical-insurance').value = 0;
+    document.getElementById('business-unemployment-insurance').value = 0;
+    document.getElementById('business-housing-fund').value = 0;
+
+    // 重置专项附加扣除
+    document.getElementById('business-special-additional-checkbox').checked = false;
+    document.getElementById('business-special-additional-content').classList.add('hidden');
+    document.getElementById('business-children-infant-count').value = 0;
+    document.getElementById('business-children-infant-rate').value = '100';
+    document.getElementById('business-children-infant-deduction').value = 0;
+    document.getElementById('business-elderly-type').value = 'none';
+    document.getElementById('business-elderly-deduction').value = 0;
+    document.getElementById('business-housing-type').value = 'none';
+    document.getElementById('business-housing-deduction').value = 0;
+    document.getElementById('business-education-deduction').value = 0;
+    document.getElementById('business-medical-deduction').value = 0;
+
+    // 重置其他扣除
+    document.getElementById('business-other-deduction-checkbox').checked = false;
+    document.getElementById('business-other-deduction-content').classList.add('hidden');
+    document.getElementById('business-pension-checkbox').checked = false;
+    document.getElementById('business-pension-fields').classList.add('hidden');
+    document.getElementById('business-pension-deduction').value = 0;
+    document.getElementById('business-enterprise-annuity-checkbox').checked = false;
+    document.getElementById('business-enterprise-annuity-fields').classList.add('hidden');
+    document.getElementById('business-enterprise-annuity').value = 0;
+    document.getElementById('business-insurance-checkbox').checked = false;
+    document.getElementById('business-insurance-fields').classList.add('hidden');
+    document.getElementById('business-insurance-deduction').value = 0;
+    document.getElementById('business-charitable-checkbox').checked = false;
+    document.getElementById('business-charitable-fields').classList.add('hidden');
+    document.getElementById('business-charitable-donation').value = 0;
+    
     document.getElementById('business-prepaid-tax').value = 0;
     
     // 3. 重置步骤

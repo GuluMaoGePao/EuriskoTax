@@ -314,9 +314,69 @@ function viewHistoryRecord(id) {
         document.getElementById('business-previous-losses').value = results?.incomeDetails?.businessPreviousLosses || 0;
         
         // 扣除项
-        document.getElementById('business-has-comprehensive-income').checked = results?.deductionDetails?.hasComprehensiveIncome ?? true;
-        document.getElementById('business-special-additional-deduction').value = results?.deductionDetails?.specialAdditionalDeduction || 0;
-        document.getElementById('business-other-deduction').value = results?.deductionDetails?.otherDeduction || 0;
+        const deductionDetails = results?.deductionDetails || {};
+        document.getElementById('business-has-comprehensive-income').checked = deductionDetails.hasComprehensiveIncome ?? true;
+        
+        // 专项扣除 - 兼容新旧格式
+        const specialDeduction = deductionDetails.specialDeduction || {};
+        const hasSpecialDeduction = typeof specialDeduction === 'object' && specialDeduction.total > 0;
+        document.getElementById('business-special-deduction-checkbox').checked = hasSpecialDeduction;
+        if (hasSpecialDeduction) {
+            document.getElementById('business-special-deduction-content').classList.remove('hidden');
+            document.getElementById('business-pension-insurance').value = specialDeduction.pensionInsurance || 0;
+            document.getElementById('business-medical-insurance').value = specialDeduction.medicalInsurance || 0;
+            document.getElementById('business-unemployment-insurance').value = specialDeduction.unemploymentInsurance || 0;
+            document.getElementById('business-housing-fund').value = specialDeduction.housingFund || 0;
+        }
+        
+        // 专项附加扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
+        const rawSpecialAdditional = deductionDetails.specialAdditionalDeduction || {};
+        const specialAdditional = typeof rawSpecialAdditional === 'number' 
+            ? { total: rawSpecialAdditional, childrenInfant: 0, elderly: 0, housing: 0, education: 0, medical: 0 }
+            : rawSpecialAdditional;
+        const hasSpecialAdditional = specialAdditional.total > 0;
+        document.getElementById('business-special-additional-checkbox').checked = hasSpecialAdditional;
+        if (hasSpecialAdditional) {
+            document.getElementById('business-special-additional-content').classList.remove('hidden');
+            document.getElementById('business-children-infant-deduction').value = specialAdditional.childrenInfant || 0;
+            document.getElementById('business-elderly-deduction').value = specialAdditional.elderly || 0;
+            document.getElementById('business-housing-deduction').value = specialAdditional.housing || 0;
+            document.getElementById('business-education-deduction').value = specialAdditional.education || 0;
+            document.getElementById('business-medical-deduction').value = specialAdditional.medical || 0;
+        }
+        
+        // 其他扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
+        const rawOtherDeduction = deductionDetails.otherDeduction || {};
+        const otherDeduction = typeof rawOtherDeduction === 'number'
+            ? { total: rawOtherDeduction, pension: 0, enterpriseAnnuity: 0, insurance: 0, charitableDonation: 0 }
+            : rawOtherDeduction;
+        const hasOtherDeduction = otherDeduction.total > 0;
+        document.getElementById('business-other-deduction-checkbox').checked = hasOtherDeduction;
+        if (hasOtherDeduction) {
+            document.getElementById('business-other-deduction-content').classList.remove('hidden');
+            
+            if (otherDeduction.pension > 0) {
+                document.getElementById('business-pension-checkbox').checked = true;
+                document.getElementById('business-pension-fields').classList.remove('hidden');
+                document.getElementById('business-pension-deduction').value = otherDeduction.pension || 0;
+            }
+            if (otherDeduction.enterpriseAnnuity > 0) {
+                document.getElementById('business-enterprise-annuity-checkbox').checked = true;
+                document.getElementById('business-enterprise-annuity-fields').classList.remove('hidden');
+                document.getElementById('business-enterprise-annuity').value = otherDeduction.enterpriseAnnuity || 0;
+            }
+            if (otherDeduction.insurance > 0) {
+                document.getElementById('business-insurance-checkbox').checked = true;
+                document.getElementById('business-insurance-fields').classList.remove('hidden');
+                document.getElementById('business-insurance-deduction').value = otherDeduction.insurance || 0;
+            }
+            if (otherDeduction.charitableDonation > 0) {
+                document.getElementById('business-charitable-checkbox').checked = true;
+                document.getElementById('business-charitable-fields').classList.remove('hidden');
+                document.getElementById('business-charitable-donation').value = otherDeduction.charitableDonation || 0;
+            }
+        }
+        
         document.getElementById('business-prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
         
         // 重新计算

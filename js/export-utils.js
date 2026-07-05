@@ -862,8 +862,12 @@ function generateBusinessDocumentContent(title) {
     
     const hasComprehensiveIncome = results.deductionDetails?.hasComprehensiveIncome ?? true;
     const investorDeduction = results.deductionDetails?.investorDeduction || 0;
-    const specialAdditionalDeduction = results.deductionDetails?.specialAdditionalDeduction || 0;
-    const otherDeduction = results.deductionDetails?.otherDeduction || 0;
+    
+    const specialAdd = results.deductionDetails?.specialAdditionalDeduction || {};
+    const specialAdditionalDeduction = typeof specialAdd === 'number' ? specialAdd : (specialAdd.total || 0);
+    
+    const other = results.deductionDetails?.otherDeduction || {};
+    const otherDeduction = typeof other === 'number' ? other : (other.total || 0);
     
     const taxableIncome = results.taxDetails?.taxableIncome || 0;
     const applicableRate = results.taxDetails?.applicableRate || 0;

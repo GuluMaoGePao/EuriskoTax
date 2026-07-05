@@ -658,8 +658,6 @@ function calculateBusinessTax(inputData) {
     const businessOtherExpenses = parseFloat(inputData.businessOtherExpenses) || 0;
     const businessPreviousLosses = parseFloat(inputData.businessPreviousLosses) || 0;
     const hasComprehensiveIncome = inputData.hasComprehensiveIncome ?? true;
-    const specialAdditionalDeduction = parseFloat(inputData.specialAdditionalDeduction) || 0;
-    const otherDeduction = parseFloat(inputData.otherDeduction) || 0;
     const prepaidTax = parseFloat(inputData.prepaidTax) || 0;
     
     const businessProfit = Math.max(0, businessIncome - businessCost - businessExpenses - 
@@ -669,7 +667,89 @@ function calculateBusinessTax(inputData) {
     
     const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
     
-    const taxableIncome = Math.max(0, netIncomeAfterLoss - investorDeduction - specialAdditionalDeduction - otherDeduction);
+    // 专项扣除（社保/公积金）- 兼容新旧格式
+    const specialDeduction = inputData.specialDeduction || {};
+    const pensionInsurance = parseFloat(specialDeduction.pensionInsurance) || 0;
+    const medicalInsurance = parseFloat(specialDeduction.medicalInsurance) || 0;
+    const unemploymentInsurance = parseFloat(specialDeduction.unemploymentInsurance) || 0;
+    const housingFund = parseFloat(specialDeduction.housingFund) || 0;
+    const specialDeductionTotal = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
+    
+    // 专项附加扣除 - 兼容新旧格式
+    const rawSpecialAdditional = inputData.specialAdditionalDeduction || {};
+    let specialAdditionalDeductionTotal = 0;
+    let specialAdditionalDetails = {
+        childrenInfant: 0,
+        elderly: 0,
+        housing: 0,
+        education: 0,
+        medical: 0,
+        actualMedical: 0,
+        total: 0
+    };
+    
+    if (typeof rawSpecialAdditional === 'number') {
+        specialAdditionalDeductionTotal = rawSpecialAdditional;
+        specialAdditionalDetails.total = rawSpecialAdditional;
+    } else {
+        const childrenInfant = parseFloat(rawSpecialAdditional.childrenInfant) || 0;
+        const elderly = parseFloat(rawSpecialAdditional.elderly) || 0;
+        const housing = parseFloat(rawSpecialAdditional.housing) || 0;
+        const education = parseFloat(rawSpecialAdditional.education) || 0;
+        const medical = parseFloat(rawSpecialAdditional.medical) || 0;
+        
+        const medicalThreshold = 15000;
+        const actualMedical = medical > medicalThreshold ? medical - medicalThreshold : 0;
+        
+        specialAdditionalDeductionTotal = childrenInfant + elderly + housing + education + actualMedical;
+        specialAdditionalDetails = {
+            childrenInfant,
+            elderly,
+            housing,
+            education,
+            medical,
+            actualMedical,
+            total: specialAdditionalDeductionTotal
+        };
+    }
+    
+    // 其他扣除 - 兼容新旧格式
+    const rawOtherDeduction = inputData.otherDeduction || {};
+    let otherDeductionTotal = 0;
+    let otherDeductionDetails = {
+        pension: 0,
+        enterpriseAnnuity: 0,
+        insurance: 0,
+        charitableDonation: 0,
+        actualCharitableDonation: 0,
+        total: 0
+    };
+    
+    if (typeof rawOtherDeduction === 'number') {
+        otherDeductionTotal = rawOtherDeduction;
+        otherDeductionDetails.total = rawOtherDeduction;
+    } else {
+        const pension = parseFloat(rawOtherDeduction.pension) || 0;
+        const enterpriseAnnuity = parseFloat(rawOtherDeduction.enterpriseAnnuity) || 0;
+        const insurance = parseFloat(rawOtherDeduction.insurance) || 0;
+        const charitableDonation = parseFloat(rawOtherDeduction.charitableDonation) || 0;
+        
+        const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction - specialDeductionTotal - specialAdditionalDeductionTotal);
+        const charitableDonationLimit = taxableIncomeBeforeDonation * 0.3;
+        const actualCharitableDonation = Math.min(charitableDonation, charitableDonationLimit);
+        
+        otherDeductionTotal = pension + enterpriseAnnuity + insurance + actualCharitableDonation;
+        otherDeductionDetails = {
+            pension,
+            enterpriseAnnuity,
+            insurance,
+            charitableDonation,
+            actualCharitableDonation,
+            total: otherDeductionTotal
+        };
+    }
+    
+    const taxableIncome = Math.max(0, netIncomeAfterLoss - investorDeduction - specialDeductionTotal - specialAdditionalDeductionTotal - otherDeductionTotal);
     
     let totalTaxBeforeHalving = 0;
     let applicableRate = 0;
@@ -708,8 +788,16 @@ function calculateBusinessTax(inputData) {
         deductionDetails: {
             hasComprehensiveIncome,
             investorDeduction,
-            specialAdditionalDeduction,
-            otherDeduction
+            specialDeduction: {
+                pensionInsurance,
+                medicalInsurance,
+                unemploymentInsurance,
+                housingFund,
+                total: specialDeductionTotal,
+                deductible: hasComprehensiveIncome ? 0 : specialDeductionTotal
+            },
+            specialAdditionalDeduction: specialAdditionalDetails,
+            otherDeduction: otherDeductionDetails
         },
         taxDetails: {
             netIncome: netIncomeAfterLoss,
