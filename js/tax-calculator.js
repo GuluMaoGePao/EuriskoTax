@@ -2028,8 +2028,30 @@ function calculateBusinessTax() {
         const businessOtherExpenses = parseFloat(document.getElementById('business-other-expenses')?.value) || 0;
         const businessPreviousLosses = parseFloat(document.getElementById('business-previous-losses')?.value) || 0;
         const hasComprehensiveIncome = document.getElementById('business-has-comprehensive-income')?.checked ?? true;
-        const specialAdditionalDeduction = parseFloat(document.getElementById('business-special-additional-deduction')?.value) || 0;
-        const otherDeduction = parseFloat(document.getElementById('business-other-deduction')?.value) || 0;
+        
+        // 专项扣除（社保/公积金）
+        const pensionInsurance = parseFloat(document.getElementById('business-pension-insurance')?.value) || 0;
+        const medicalInsurance = parseFloat(document.getElementById('business-medical-insurance')?.value) || 0;
+        const unemploymentInsurance = parseFloat(document.getElementById('business-unemployment-insurance')?.value) || 0;
+        const housingFund = parseFloat(document.getElementById('business-housing-fund')?.value) || 0;
+        const specialDeductionTotal = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
+        
+        // 专项附加扣除明细
+        const childrenInfantDeduction = parseFloat(document.getElementById('business-children-infant-deduction')?.value) || 0;
+        const elderlyDeduction = parseFloat(document.getElementById('business-elderly-deduction')?.value) || 0;
+        const housingDeduction = parseFloat(document.getElementById('business-housing-deduction')?.value) || 0;
+        const educationDeduction = parseFloat(document.getElementById('business-education-deduction')?.value) || 0;
+        const medicalDeduction = parseFloat(document.getElementById('business-medical-deduction')?.value) || 0;
+        const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+        const specialAdditionalDeductionTotal = childrenInfantDeduction + elderlyDeduction + housingDeduction + educationDeduction + actualMedicalDeduction;
+        
+        // 其他扣除明细
+        const pensionDeduction = parseFloat(document.getElementById('business-pension-deduction')?.value) || 0;
+        const enterpriseAnnuity = parseFloat(document.getElementById('business-enterprise-annuity')?.value) || 0;
+        const insuranceDeduction = parseFloat(document.getElementById('business-insurance-deduction')?.value) || 0;
+        const charitableDonation = parseFloat(document.getElementById('business-charitable-donation')?.value) || 0;
+        const otherDeductionTotalBeforeDonation = pensionDeduction + enterpriseAnnuity + insuranceDeduction;
+        
         const prepaidTax = parseFloat(document.getElementById('business-prepaid-tax')?.value) || 0;
         
         // 计算经营利润
@@ -2042,8 +2064,17 @@ function calculateBusinessTax() {
         // 计算投资者减除费用（60000元/年）
         const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
         
+        // 计算公益性捐赠前的应纳税所得额
+        const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction - 
+            (hasComprehensiveIncome ? 0 : specialDeductionTotal) - specialAdditionalDeductionTotal - otherDeductionTotalBeforeDonation);
+        
+        // 公益性捐赠扣除限额为应纳税所得额的30%
+        const charitableDonationLimit = taxableIncomeBeforeDonation * 0.3;
+        const actualCharitableDonation = Math.min(charitableDonation, charitableDonationLimit);
+        const otherDeductionTotal = otherDeductionTotalBeforeDonation + actualCharitableDonation;
+        
         // 计算应纳税所得额
-        const taxableIncome = Math.max(0, netIncomeAfterLoss - investorDeduction - specialAdditionalDeduction - otherDeduction);
+        const taxableIncome = Math.max(0, taxableIncomeBeforeDonation - actualCharitableDonation);
         
         // 计算应纳税额（未减半）
         let totalTaxBeforeHalving = 0;
@@ -2073,6 +2104,12 @@ function calculateBusinessTax() {
         // 计算税后经营所得
         const netIncomeAfterTax = netIncomeAfterLoss - totalTax;
         
+        // 计算可扣除的专项扣除（无综合所得时才允许扣除）
+        const deductibleSpecialDeduction = hasComprehensiveIncome ? 0 : specialDeductionTotal;
+        
+        // 计算总扣除额
+        const totalDeduction = investorDeduction + deductibleSpecialDeduction + specialAdditionalDeductionTotal + otherDeductionTotal;
+        
         businessCalculationResults = {
             incomeDetails: {
                 businessIncome,
@@ -2087,8 +2124,33 @@ function calculateBusinessTax() {
             deductionDetails: {
                 hasComprehensiveIncome,
                 investorDeduction,
-                specialAdditionalDeduction,
-                otherDeduction
+                specialDeduction: {
+                    pensionInsurance,
+                    medicalInsurance,
+                    unemploymentInsurance,
+                    housingFund,
+                    total: specialDeductionTotal,
+                    deductible: deductibleSpecialDeduction
+                },
+                specialAdditionalDeduction: {
+                    childrenInfant: childrenInfantDeduction,
+                    elderly: elderlyDeduction,
+                    housing: housingDeduction,
+                    education: educationDeduction,
+                    medical: medicalDeduction,
+                    actualMedical: actualMedicalDeduction,
+                    total: specialAdditionalDeductionTotal
+                },
+                otherDeduction: {
+                    pension: pensionDeduction,
+                    enterpriseAnnuity,
+                    insurance: insuranceDeduction,
+                    charitableDonation,
+                    actualCharitableDonation,
+                    charitableDonationLimit,
+                    total: otherDeductionTotal
+                },
+                total: totalDeduction
             },
             taxDetails: {
                 netIncome: netIncomeAfterLoss,
@@ -2114,7 +2176,43 @@ function calculateBusinessTax() {
         safeSetClass('business-result-refund-tax', refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success');
         safeSetTextContent('business-result-deduction', '¥' + applicableDeduction.toFixed(2));
         safeSetTextContent('business-result-tax-reduction', '¥' + taxReduction.toFixed(2));
-        safeSetTextContent('business-result-deductions', '¥' + (investorDeduction + specialAdditionalDeduction + otherDeduction).toFixed(2));
+        safeSetTextContent('business-result-deductions', '¥' + totalDeduction.toFixed(2));
+        
+        const deductionDetails = businessCalculationResults.deductionDetails;
+        const hasDeductions = deductionDetails.specialDeduction.total > 0 || 
+            deductionDetails.specialAdditionalDeduction.total > 0 || 
+            deductionDetails.otherDeduction.total > 0;
+        
+        if (hasDeductions) {
+            document.getElementById('business-deduction-details')?.classList.remove('hidden');
+            safeSetTextContent('business-result-pension-insurance', '¥' + deductionDetails.specialDeduction.pensionInsurance.toFixed(2));
+            safeSetTextContent('business-result-medical-insurance', '¥' + deductionDetails.specialDeduction.medicalInsurance.toFixed(2));
+            safeSetTextContent('business-result-unemployment-insurance', '¥' + deductionDetails.specialDeduction.unemploymentInsurance.toFixed(2));
+            safeSetTextContent('business-result-housing-fund', '¥' + deductionDetails.specialDeduction.housingFund.toFixed(2));
+            safeSetTextContent('business-result-special-deduction', '¥' + deductionDetails.specialDeduction.deductible.toFixed(2));
+            
+            safeSetTextContent('business-result-children-infant', '¥' + deductionDetails.specialAdditionalDeduction.childrenInfant.toFixed(2));
+            safeSetTextContent('business-result-elderly', '¥' + deductionDetails.specialAdditionalDeduction.elderly.toFixed(2));
+            safeSetTextContent('business-result-housing', '¥' + deductionDetails.specialAdditionalDeduction.housing.toFixed(2));
+            safeSetTextContent('business-result-education', '¥' + deductionDetails.specialAdditionalDeduction.education.toFixed(2));
+            safeSetTextContent('business-result-medical', '¥' + deductionDetails.specialAdditionalDeduction.actualMedical.toFixed(2));
+            safeSetTextContent('business-result-special-additional', '¥' + deductionDetails.specialAdditionalDeduction.total.toFixed(2));
+            
+            safeSetTextContent('business-result-pension-deduction', '¥' + deductionDetails.otherDeduction.pension.toFixed(2));
+            safeSetTextContent('business-result-enterprise-annuity', '¥' + deductionDetails.otherDeduction.enterpriseAnnuity.toFixed(2));
+            safeSetTextContent('business-result-insurance-deduction', '¥' + deductionDetails.otherDeduction.insurance.toFixed(2));
+            safeSetTextContent('business-result-charitable', '¥' + deductionDetails.otherDeduction.actualCharitableDonation.toFixed(2));
+            safeSetTextContent('business-result-other-deduction', '¥' + deductionDetails.otherDeduction.total.toFixed(2));
+        } else {
+            document.getElementById('business-deduction-details')?.classList.add('hidden');
+        }
+        
+        // 更新步骤2扣除项汇总
+        safeSetTextContent('business-investor-deduction', '¥' + investorDeduction.toFixed(2));
+        safeSetTextContent('business-special-deduction-total', '¥' + specialDeductionTotal.toFixed(2));
+        safeSetTextContent('business-special-additional-total', '¥' + specialAdditionalDeductionTotal.toFixed(2));
+        safeSetTextContent('business-other-deduction-total', '¥' + otherDeductionTotal.toFixed(2));
+        safeSetTextContent('business-total-deduction', '¥' + totalDeduction.toFixed(2));
         
     } catch (error) {
         console.error('经营所得计算过程中出现错误:', error);

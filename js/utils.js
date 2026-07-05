@@ -578,6 +578,10 @@ function updateBusinessBudgetTable() {
     const taxDetails = results.taxDetails;
     const deductionDetails = results.deductionDetails;
     
+    const specialDeduction = deductionDetails.specialDeduction || {};
+    const specialAdditional = deductionDetails.specialAdditionalDeduction || {};
+    const otherDeduction = deductionDetails.otherDeduction || {};
+    
     const rows = [
         { item: '一、生产经营所得计税', amount: '', description: '' },
         { item: '1. 年度经营收入总额', amount: results.incomeDetails.businessIncome, description: '包括主营业务收入和其他业务收入' },
@@ -591,20 +595,37 @@ function updateBusinessBudgetTable() {
         { item: '8. 经营利润', amount: results.incomeDetails.businessProfit, description: '= 收入-成本-费用-税金-损失-其他' },
         { item: '9. 减：以前年度亏损', amount: results.incomeDetails.businessPreviousLosses, description: '可弥补以前年度亏损' },
         { item: '10. 减：投资者减除费用', amount: deductionDetails.investorDeduction, description: deductionDetails.hasComprehensiveIncome ? '有综合所得，不扣' : '无综合所得，扣60000元/年' },
-        { item: '11. 减：专项附加扣除', amount: deductionDetails.specialAdditionalDeduction, description: '子女教育、继续教育等7项' },
-        { item: '12. 减：其他扣除', amount: deductionDetails.otherDeduction, description: '个人养老金、商业健康保险等' },
+        { item: '11. 减：专项扣除（社保/公积金）', amount: '', description: '' },
+        { item: '   其中：养老保险金', amount: specialDeduction.pensionInsurance || 0, description: '个人承担部分' },
+        { item: '   其中：医疗保险金', amount: specialDeduction.medicalInsurance || 0, description: '个人承担部分' },
+        { item: '   其中：失业保险金', amount: specialDeduction.unemploymentInsurance || 0, description: '个人承担部分' },
+        { item: '   其中：住房公积金', amount: specialDeduction.housingFund || 0, description: '个人承担部分' },
+        { item: '   专项扣除合计', amount: specialDeduction.deductible || 0, description: deductionDetails.hasComprehensiveIncome ? '有综合所得，不可扣除' : '无综合所得，可扣除' },
+        { item: '12. 减：专项附加扣除', amount: '', description: '' },
+        { item: '   其中：子女教育/婴幼儿照护', amount: specialAdditional.childrenInfant || 0, description: '2000元/人/月' },
+        { item: '   其中：赡养老人', amount: specialAdditional.elderly || 0, description: '独生子女3000元/月，非独生子女最高1500元/月' },
+        { item: '   其中：住房租金/贷款利息', amount: specialAdditional.housing || 0, description: '租金800-1500元/月，贷款利息1000元/月' },
+        { item: '   其中：继续教育', amount: specialAdditional.education || 0, description: '学历教育400元/月，职业资格3600元/年' },
+        { item: '   其中：大病医疗', amount: specialAdditional.actualMedical || 0, description: '超过15000元部分，最高80000元' },
+        { item: '   专项附加扣除合计', amount: specialAdditional.total || 0, description: '7项专项附加扣除合计' },
+        { item: '13. 减：其他扣除', amount: '', description: '' },
+        { item: '   其中：个人养老金', amount: otherDeduction.pension || 0, description: '年度限额12000元' },
+        { item: '   其中：企业年金', amount: otherDeduction.enterpriseAnnuity || 0, description: '单位年金个人部分' },
+        { item: '   其中：商业健康保险', amount: otherDeduction.insurance || 0, description: '年度限额2400元' },
+        { item: '   其中：公益捐赠支出', amount: otherDeduction.actualCharitableDonation || 0, description: '限额为应纳税所得额的30%' },
+        { item: '   其他扣除合计', amount: otherDeduction.total || 0, description: '其他依法确定的扣除项目合计' },
         { item: '三、应纳税额计算', amount: '', description: '' },
-        { item: '13. 年度应纳税所得额', amount: taxDetails.taxableIncome, description: '= 利润-亏损-各项扣除' },
-        { item: '14. 适用税率', amount: (taxDetails.applicableRate * 100).toFixed(0) + '%', description: '5%-35%超额累进税率' },
-        { item: '15. 速算扣除数', amount: taxDetails.applicableDeduction, description: '根据应纳税所得额级数确定' },
-        { item: '16. 应纳税额（未减半）', amount: taxDetails.totalTaxBeforeHalving, description: '= 应纳税所得额×税率-速算扣除数' },
-        { item: '17. 减半征收减免税额', amount: taxDetails.taxReduction, description: '≤200万元部分减半征收' },
-        { item: '18. 年度应纳税额（实际应缴）', amount: taxDetails.totalTax, description: '= 应纳税额-减免税额' },
+        { item: '14. 年度应纳税所得额', amount: taxDetails.taxableIncome, description: '= 利润-亏损-各项扣除' },
+        { item: '15. 适用税率', amount: (taxDetails.applicableRate * 100).toFixed(0) + '%', description: '5%-35%超额累进税率' },
+        { item: '16. 速算扣除数', amount: taxDetails.applicableDeduction, description: '根据应纳税所得额级数确定' },
+        { item: '17. 应纳税额（未减半）', amount: taxDetails.totalTaxBeforeHalving, description: '= 应纳税所得额×税率-速算扣除数' },
+        { item: '18. 减半征收减免税额', amount: taxDetails.taxReduction, description: '≤200万元部分减半征收' },
+        { item: '19. 年度应纳税额（实际应缴）', amount: taxDetails.totalTax, description: '= 应纳税额-减免税额' },
         { item: '四、应退/应补税额计算', amount: '', description: '' },
-        { item: '19. 全年累计已预缴税额', amount: taxDetails.prepaidTax, description: '年度内已预缴的经营所得税额' },
-        { item: '20. 年度应退/应补税额', amount: taxDetails.refundTax, description: '= 应纳税额-已预缴税额' },
+        { item: '20. 全年累计已预缴税额', amount: taxDetails.prepaidTax, description: '年度内已预缴的经营所得税额' },
+        { item: '21. 年度应退/应补税额', amount: taxDetails.refundTax, description: '= 应纳税额-已预缴税额' },
         { item: '五、税后经营所得', amount: '', description: '' },
-        { item: '21. 税后经营所得', amount: taxDetails.netIncome, description: '= 经营利润-实际应纳税额' }
+        { item: '22. 税后经营所得', amount: taxDetails.netIncome, description: '= 经营利润-实际应纳税额' }
     ];
     
     rows.forEach(row => {

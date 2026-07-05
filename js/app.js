@@ -424,11 +424,42 @@ window.addEventListener('DOMContentLoaded', function() {
         // 重置是否有综合所得
         document.getElementById('business-has-comprehensive-income').checked = true;
 
+        // 重置专项扣除
+        document.getElementById('business-special-deduction-checkbox').checked = false;
+        document.getElementById('business-special-deduction-content').classList.add('hidden');
+        document.getElementById('business-pension-insurance').value = 0;
+        document.getElementById('business-medical-insurance').value = 0;
+        document.getElementById('business-unemployment-insurance').value = 0;
+        document.getElementById('business-housing-fund').value = 0;
+
         // 重置专项附加扣除
-        document.getElementById('business-special-additional-deduction').value = 0;
+        document.getElementById('business-special-additional-checkbox').checked = false;
+        document.getElementById('business-special-additional-content').classList.add('hidden');
+        document.getElementById('business-children-infant-count').value = 0;
+        document.getElementById('business-children-infant-rate').value = '100';
+        document.getElementById('business-children-infant-deduction').value = 0;
+        document.getElementById('business-elderly-type').value = 'none';
+        document.getElementById('business-elderly-deduction').value = 0;
+        document.getElementById('business-housing-type').value = 'none';
+        document.getElementById('business-housing-deduction').value = 0;
+        document.getElementById('business-education-deduction').value = 0;
+        document.getElementById('business-medical-deduction').value = 0;
 
         // 重置其他扣除
-        document.getElementById('business-other-deduction').value = 0;
+        document.getElementById('business-other-deduction-checkbox').checked = false;
+        document.getElementById('business-other-deduction-content').classList.add('hidden');
+        document.getElementById('business-pension-checkbox').checked = false;
+        document.getElementById('business-pension-fields').classList.add('hidden');
+        document.getElementById('business-pension-deduction').value = 0;
+        document.getElementById('business-enterprise-annuity-checkbox').checked = false;
+        document.getElementById('business-enterprise-annuity-fields').classList.add('hidden');
+        document.getElementById('business-enterprise-annuity').value = 0;
+        document.getElementById('business-insurance-checkbox').checked = false;
+        document.getElementById('business-insurance-fields').classList.add('hidden');
+        document.getElementById('business-insurance-deduction').value = 0;
+        document.getElementById('business-charitable-checkbox').checked = false;
+        document.getElementById('business-charitable-fields').classList.add('hidden');
+        document.getElementById('business-charitable-donation').value = 0;
 
         // 重置已预缴税额
         document.getElementById('business-prepaid-tax').value = 0;
@@ -461,7 +492,15 @@ window.addEventListener('DOMContentLoaded', function() {
     });
 
     // 经营所得实时计算（步骤2输入时）
-    const businessDeductionInputs = ['business-special-additional-deduction', 'business-other-deduction', 'business-prepaid-tax'];
+    const businessDeductionInputs = [
+        'business-pension-insurance', 'business-medical-insurance', 'business-unemployment-insurance', 'business-housing-fund',
+        'business-children-infant-count', 'business-children-infant-rate', 'business-children-infant-deduction',
+        'business-elderly-type', 'business-elderly-deduction',
+        'business-housing-type', 'business-housing-deduction',
+        'business-education-deduction', 'business-medical-deduction',
+        'business-pension-deduction', 'business-enterprise-annuity', 'business-insurance-deduction', 'business-charitable-donation',
+        'business-prepaid-tax'
+    ];
     businessDeductionInputs.forEach(function(inputId) {
         const element = document.getElementById(inputId);
         if (element) {
@@ -476,9 +515,79 @@ window.addEventListener('DOMContentLoaded', function() {
     const hasComprehensiveCheckbox = document.getElementById('business-has-comprehensive-income');
     if (hasComprehensiveCheckbox) {
         hasComprehensiveCheckbox.addEventListener('change', function() {
+            const specialDeductionCheckbox = document.getElementById('business-special-deduction-checkbox');
+            const specialDeductionContent = document.getElementById('business-special-deduction-content');
+            if (this.checked) {
+                specialDeductionCheckbox.checked = false;
+                specialDeductionContent.classList.add('hidden');
+            }
             performRealTimeBusinessCalculation();
         });
     }
+
+    // 经营所得专项扣除checkbox交互
+    const businessSpecialDeductionCheckbox = document.getElementById('business-special-deduction-checkbox');
+    const businessSpecialDeductionContent = document.getElementById('business-special-deduction-content');
+    if (businessSpecialDeductionCheckbox && businessSpecialDeductionContent) {
+        businessSpecialDeductionCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                const hasComprehensive = document.getElementById('business-has-comprehensive-income').checked;
+                if (hasComprehensive) {
+                    showAlert('有综合所得时，专项扣除（社保/公积金）已在综合所得中扣除，不可重复扣除');
+                    this.checked = false;
+                    return;
+                }
+                businessSpecialDeductionContent.classList.remove('hidden');
+            } else {
+                businessSpecialDeductionContent.classList.add('hidden');
+            }
+            performRealTimeBusinessCalculation();
+        });
+    }
+
+    // 经营所得专项附加扣除checkbox交互
+    const businessSpecialAdditionalCheckbox = document.getElementById('business-special-additional-checkbox');
+    const businessSpecialAdditionalContent = document.getElementById('business-special-additional-content');
+    if (businessSpecialAdditionalCheckbox && businessSpecialAdditionalContent) {
+        businessSpecialAdditionalCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                businessSpecialAdditionalContent.classList.remove('hidden');
+            } else {
+                businessSpecialAdditionalContent.classList.add('hidden');
+            }
+            performRealTimeBusinessCalculation();
+        });
+    }
+
+    // 经营所得其他扣除checkbox交互
+    const businessOtherDeductionCheckbox = document.getElementById('business-other-deduction-checkbox');
+    const businessOtherDeductionContent = document.getElementById('business-other-deduction-content');
+    if (businessOtherDeductionCheckbox && businessOtherDeductionContent) {
+        businessOtherDeductionCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                businessOtherDeductionContent.classList.remove('hidden');
+            } else {
+                businessOtherDeductionContent.classList.add('hidden');
+            }
+            performRealTimeBusinessCalculation();
+        });
+    }
+
+    // 经营所得其他扣除子项checkbox交互
+    ['business-pension', 'business-enterprise-annuity', 'business-insurance', 'business-charitable'].forEach(function(id) {
+        const checkbox = document.getElementById(id + '-checkbox');
+        const fields = document.getElementById(id + '-fields');
+        if (checkbox && fields) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    fields.classList.remove('hidden');
+                } else {
+                    fields.classList.add('hidden');
+                }
+                performRealTimeBusinessCalculation();
+            });
+        }
+    });
 
     // 经营所得输入验证函数
     function validateBusinessInputValue(inputId) {
@@ -532,7 +641,15 @@ window.addEventListener('DOMContentLoaded', function() {
     function validateBusinessInput() {
         let isValid = true;
 
-        const inputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses', 'business-special-additional-deduction', 'business-other-deduction', 'business-prepaid-tax'];
+        const inputs = [
+            'business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses',
+            'business-pension-insurance', 'business-medical-insurance', 'business-unemployment-insurance', 'business-housing-fund',
+            'business-children-infant-count', 'business-children-infant-deduction',
+            'business-elderly-deduction', 'business-housing-deduction',
+            'business-education-deduction', 'business-medical-deduction',
+            'business-pension-deduction', 'business-enterprise-annuity', 'business-insurance-deduction', 'business-charitable-donation',
+            'business-prepaid-tax'
+        ];
 
         inputs.forEach(function(inputId) {
             if (!validateBusinessInputValue(inputId)) {
