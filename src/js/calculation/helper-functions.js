@@ -810,13 +810,20 @@ function resetBusinessCalculation() {
     
     // 2. 重置扣除项
     document.getElementById('business-has-comprehensive-income').checked = true;
+    document.getElementById('business-work-months').value = 12;
     
     // 重置专项扣除
     document.getElementById('business-special-deduction-checkbox').checked = false;
     document.getElementById('business-special-deduction-content').classList.add('hidden');
+    document.getElementById('business-social-security-base').value = 4250;
     document.getElementById('business-pension-insurance').value = 0;
+    document.getElementById('business-pension-rate').value = 8;
     document.getElementById('business-medical-insurance').value = 0;
+    document.getElementById('business-medical-rate').value = 2;
     document.getElementById('business-unemployment-insurance').value = 0;
+    document.getElementById('business-unemployment-rate').value = 0.5;
+    document.getElementById('business-housing-fund-base').value = 4250;
+    document.getElementById('business-housing-fund-rate').value = '5';
     document.getElementById('business-housing-fund').value = 0;
 
     // 重置专项附加扣除
