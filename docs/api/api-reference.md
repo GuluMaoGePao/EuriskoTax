@@ -2,7 +2,7 @@
 
 > **定位**: API接口完整参考  
 > **适用**: 开发者集成、前端对接  
-> **版本**: v1.0  
+> **版本**: v1.1  
 > **最后更新**: 2026年7月5日
 
 ---
@@ -197,9 +197,20 @@
 | businessOtherExpenses | number | 否 | 其他支出（元/年） |
 | businessPreviousLosses | number | 否 | 以前年度亏损（元/年） |
 | hasComprehensiveIncome | boolean | 是 | 是否有综合所得 |
+| workMonths | number | 是 | 年工作总月数（1-12） |
 | investorDeduction | number | 否 | 投资者减除费用 |
+| specialDeduction | object | 否 | 专项扣除（社保/公积金） |
 | specialAdditionalDeduction | object | 否 | 专项附加扣除 |
 | otherDeduction | object | 否 | 其他扣除 |
+
+**specialDeduction 结构**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| pensionInsurance | number | 养老保险（元/月） |
+| medicalInsurance | number | 医疗保险（元/月） |
+| unemploymentInsurance | number | 失业保险（元/月） |
+| housingFund | number | 住房公积金（元/月） |
 
 ### 3.3 分类所得计算
 
