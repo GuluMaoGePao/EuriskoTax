@@ -352,6 +352,159 @@
 
 ---
 
+## 开发环境搭建
+
+### 环境要求
+
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+
+### 步骤
+
+**1. 克隆项目**
+```bash
+git clone https://github.com/GuluMaoGePao/EuriskoTax.git
+cd EuriskoTax
+```
+
+**2. 安装后端依赖**
+```bash
+cd server
+npm install
+```
+
+**3. 配置数据库**
+```bash
+npx prisma migrate dev
+```
+
+**4. 设置环境变量**
+创建 `server/.env` 文件：
+```env
+JWT_SECRET=your-secret-key
+DATABASE_URL=file:./dev.db
+```
+
+**5. 启动后端服务**
+```bash
+npm start
+```
+
+服务启动后访问：
+- API: http://localhost:3000
+- API 文档: http://localhost:3000/api/docs
+- 健康检查: http://localhost:3000/health
+
+**6. 启动前端**
+使用 VS Code Live Server 打开 `index.html`，或使用任意静态文件服务器。
+
+---
+
+## 部署方式
+
+### 方式一：cpolar 内网穿透（推荐测试使用）
+
+**优点**: 无需访问国外网站，国内访问稳定，免费可用
+
+**步骤**:
+
+1. **下载安装 cpolar**
+   - 访问 https://www.cpolar.com/download
+   - 下载并安装 Windows 版本
+
+2. **登录账号**
+   ```bash
+   cpolar login
+   ```
+
+3. **配置 authtoken**
+   在 `~/.cpolar/cpolar.yml` 中添加：
+   ```yaml
+   authtoken: your-authtoken
+   ```
+
+4. **启动后端服务**
+   ```bash
+   cd server
+   npm start
+   ```
+
+5. **开启隧道**
+   ```bash
+   cpolar http 3000 --region cn
+   ```
+
+6. **分享链接**
+   输出类似：
+   ```
+   https://abc123.cpolar.cn -> http://localhost:3000
+   ```
+   把链接分享给伙伴即可。
+
+### 方式二：云平台部署
+
+#### Render（需绑卡验证）
+
+1. 访问 https://render.com
+2. 创建 Web Service，选择 GitHub 仓库
+3. 配置：
+   - Root Directory: `server`
+   - Build Command: `npm install && npx prisma generate`
+   - Start Command: `npx prisma migrate deploy && npm start`
+4. 添加环境变量：
+   - `JWT_SECRET`: 任意随机字符串
+   - `NODE_ENV`: `production`
+
+#### Railway（需绑卡验证）
+
+1. 访问 https://railway.app
+2. 创建项目，选择 GitHub 仓库
+3. 设置 Root Directory 为 `server`
+4. 添加 `JWT_SECRET` 环境变量
+
+#### Cyclic（无需绑卡）
+
+1. 访问 https://cyclic.sh
+2. 链接 GitHub 仓库
+3. 配置环境变量：
+   - `JWT_SECRET`: 任意随机字符串
+   - `DATABASE_URL`: `file:./dev.db`
+
+---
+
+## API 文档
+
+### 访问地址
+
+启动后端服务后，访问：
+- Swagger UI: http://localhost:3000/api/docs
+- OpenAPI JSON: http://localhost:3000/api/docs.json
+
+### 主要接口
+
+| 接口 | 方法 | 描述 |
+|------|------|------|
+| `/api/auth/register` | POST | 用户注册 |
+| `/api/auth/login` | POST | 用户登录 |
+| `/api/auth/profile` | GET | 获取用户信息 |
+| `/api/calculations` | GET | 获取计算记录列表 |
+| `/api/calculations` | POST | 创建计算记录 |
+| `/api/calculations/:id` | GET | 获取单个计算记录 |
+| `/api/calculations/:id` | PUT | 更新计算记录 |
+| `/api/calculations/:id` | DELETE | 删除计算记录 |
+| `/api/health` | GET | 健康检查 |
+
+### 环境变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `JWT_SECRET` | JWT 签名密钥 | 必需 |
+| `DATABASE_URL` | 数据库连接地址 | `file:./dev.db` |
+| `NODE_ENV` | 运行环境 | `development` |
+| `PORT` | 服务端口 | `3000` |
+
+---
+
 ## 使用声明
 
 ### 核心价值
