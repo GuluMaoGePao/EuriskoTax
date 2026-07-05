@@ -1113,8 +1113,8 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
     const targetTax = inputData.fixedTax;
     const targetNet = inputData.fixedNet;
     
-    // 情况A：仅输入目标税额（或同时输入时优先使用税额）
-    if (targetTax > 0) {
+    // 情况A：仅输入目标税额（或同时输入时优先使用税额），税额为0时也允许计算
+    if (targetTax >= 0) {
         // 步骤1：使用二分法求解基准应纳税所得额
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
@@ -1231,8 +1231,8 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         };
     }
     
-    // 情况B：仅输入到手金额（税额为0时）
-    if (targetNet > 0) {
+    // 情况B：仅输入到手金额（税额为0时），到手金额为0时也允许计算
+    if (targetNet >= 0) {
         // 使用二分法求解基准应纳税所得额
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
@@ -1348,9 +1348,6 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
             taxDifference: (totalIncome - actualTax) - targetNet
         };
     }
-    
-    // 情况C：都未输入，返回默认值
-    throw new Error('请填写希望缴纳的税额或希望到手的金额');
 }
 
 // 反向倒算主函数
@@ -1479,14 +1476,34 @@ function collectReverseInputData() {
         if (targetType === 'tax') {
             fixedTax = parseFloat(document.getElementById('reverse-fixed-tax')?.value) || 0;
             fixedNet = 0;
-            if (fixedTax < 0) {
-                throw new Error('希望缴纳的税额不能为负数');
+            const taxWarning = document.getElementById('reverse-fixed-tax-warning');
+            const netWarning = document.getElementById('reverse-fixed-net-warning');
+            if (taxWarning) {
+                if (fixedTax < 0) {
+                    taxWarning.textContent = '⚠️ 税额不能为负数';
+                    taxWarning.classList.remove('hidden');
+                } else {
+                    taxWarning.classList.add('hidden');
+                }
+            }
+            if (netWarning) {
+                netWarning.classList.add('hidden');
             }
         } else {
             fixedNet = parseFloat(document.getElementById('reverse-fixed-net')?.value) || 0;
             fixedTax = 0;
-            if (fixedNet < 0) {
-                throw new Error('希望到手的金额不能为负数');
+            const taxWarning = document.getElementById('reverse-fixed-tax-warning');
+            const netWarning = document.getElementById('reverse-fixed-net-warning');
+            if (netWarning) {
+                if (fixedNet < 0) {
+                    netWarning.textContent = '⚠️ 到手金额不能为负数';
+                    netWarning.classList.remove('hidden');
+                } else {
+                    netWarning.classList.add('hidden');
+                }
+            }
+            if (taxWarning) {
+                taxWarning.classList.add('hidden');
             }
         }
     }
@@ -1969,8 +1986,8 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
     const targetTax = inputData.fixedTax;
     const targetNet = inputData.fixedNet;
     
-    if (targetTax > 0) {
-        // 步骤1：使用二分法求解基准应纳税所得额
+    if (targetTax >= 0) {
+        // 步骤1：使用二分法求解基准应纳税所得额，税额为0时也允许计算
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
         const precision = 0.01;
@@ -2089,7 +2106,8 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         };
     }
     
-    if (targetNet > 0) {
+    if (targetNet >= 0) {
+        // 到手金额为0时也允许计算
         let left = deductionData.totalDeduction;
         let right = deductionData.totalDeduction + 10000000;
         const precision = 0.01;
@@ -2202,8 +2220,6 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
             halvingTaxAmount: halvingTax
         };
     }
-    
-    throw new Error('请填写希望缴纳的税额或希望到手的金额');
 }
 
 // 计算经营所得

@@ -1638,6 +1638,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="number" id="reverse-fixed-tax" class="input-field" value="0" min="0" step="100">
                                 </div>
+                                <div id="reverse-fixed-tax-warning" class="hidden text-red-500 text-sm mt-1">⚠️ 税额不能为负数</div>
                             </div>
                             <div id="reverse-fixed-net-input" class="form-group hidden">
                                 <label for="reverse-fixed-net" class="label">
@@ -1650,6 +1651,7 @@
                                 <div class="flex items-center space-x-2">
                                     <input type="number" id="reverse-fixed-net" class="input-field" value="0" min="0" step="1000">
                                 </div>
+                                <div id="reverse-fixed-net-warning" class="hidden text-red-500 text-sm mt-1">⚠️ 到手金额不能为负数</div>
                             </div>
                         </div>
                         
@@ -3506,13 +3508,37 @@
             const targetType = this.value;
             const taxInput = document.getElementById('reverse-fixed-tax-input');
             const netInput = document.getElementById('reverse-fixed-net-input');
+            const taxWarning = document.getElementById('reverse-fixed-tax-warning');
+            const netWarning = document.getElementById('reverse-fixed-net-warning');
             
             if (targetType === 'tax') {
                 taxInput.classList.remove('hidden');
                 netInput.classList.add('hidden');
+                const fixedTax = parseFloat(document.getElementById('reverse-fixed-tax')?.value) || 0;
+                if (taxWarning) {
+                    if (fixedTax < 0) {
+                        taxWarning.classList.remove('hidden');
+                    } else {
+                        taxWarning.classList.add('hidden');
+                    }
+                }
+                if (netWarning) {
+                    netWarning.classList.add('hidden');
+                }
             } else {
                 taxInput.classList.add('hidden');
                 netInput.classList.remove('hidden');
+                const fixedNet = parseFloat(document.getElementById('reverse-fixed-net')?.value) || 0;
+                if (netWarning) {
+                    if (fixedNet < 0) {
+                        netWarning.classList.remove('hidden');
+                    } else {
+                        netWarning.classList.add('hidden');
+                    }
+                }
+                if (taxWarning) {
+                    taxWarning.classList.add('hidden');
+                }
             }
         });
         
