@@ -1,5 +1,43 @@
 
 
+// 社保缴费基数最低标准（根据国家规定，各城市略有不同，这里使用全国平均值）
+const MIN_SOCIAL_SECURITY_BASE = 4250;
+const MIN_HOUSING_FUND_BASE = 4250;
+
+// 验证社保缴费基数是否低于最低标准
+function validateSocialSecurityBase(prefix = '') {
+    const elementId = prefix ? `${prefix}-social-security-base` : 'social-security-base';
+    const warningId = prefix ? `${prefix}-social-security-base-warning` : 'social-security-base-warning';
+    
+    const base = parseFloat(document.getElementById(elementId).value) || 0;
+    const warningElement = document.getElementById(warningId);
+    
+    if (base > 0 && base < MIN_SOCIAL_SECURITY_BASE) {
+        warningElement.textContent = `⚠️ 当前基数低于最低标准 ${MIN_SOCIAL_SECURITY_BASE} 元/月`;
+        warningElement.classList.remove('hidden');
+    } else {
+        warningElement.textContent = '';
+        warningElement.classList.add('hidden');
+    }
+}
+
+// 验证住房公积金基数是否低于最低标准
+function validateHousingFundBase(prefix = '') {
+    const elementId = prefix ? `${prefix}-housing-fund-base` : 'housing-fund-base';
+    const warningId = prefix ? `${prefix}-housing-fund-base-warning` : 'housing-fund-base-warning';
+    
+    const base = parseFloat(document.getElementById(elementId).value) || 0;
+    const warningElement = document.getElementById(warningId);
+    
+    if (base > 0 && base < MIN_HOUSING_FUND_BASE) {
+        warningElement.textContent = `⚠️ 当前基数低于最低标准 ${MIN_HOUSING_FUND_BASE} 元/月`;
+        warningElement.classList.remove('hidden');
+    } else {
+        warningElement.textContent = '';
+        warningElement.classList.add('hidden');
+    }
+}
+
 // 计算社保费用（养老保险、医疗保险、失业保险）
 function calculateSocialSecurity() {
     let base = parseFloat(document.getElementById('social-security-base').value) || 0;
@@ -567,11 +605,12 @@ function resetDeductionData() {
     document.getElementById('basic-deduction').value = 5000;
     
     // 专项扣除
-    document.getElementById('social-security-base').value = 0;
-    document.getElementById('pension-insurance').value = 0;
-    document.getElementById('medical-insurance').value = 0;
-    document.getElementById('unemployment-insurance').value = 0;
-    document.getElementById('housing-fund').value = 0;
+    document.getElementById('social-security-base').value = 4250;
+    document.getElementById('pension-insurance').value = 340;
+    document.getElementById('medical-insurance').value = 85;
+    document.getElementById('unemployment-insurance').value = 21.25;
+    document.getElementById('housing-fund').value = 212.5;
+    document.getElementById('housing-fund-base').value = 4250;
     document.getElementById('pension-rate').value = 8;
     document.getElementById('medical-rate').value = 2;
     document.getElementById('unemployment-rate').value = 0.5;
@@ -688,12 +727,8 @@ function resetReverseCalculation() {
     document.getElementById('reverse-other-deduction-checkbox').checked = false;
     
     // 5. 重置专项扣除数据
-    document.getElementById('reverse-social-security-base').value = 0;
-    document.getElementById('reverse-housing-fund-base').value = 0;
-    document.getElementById('reverse-pension-insurance').value = 0;
-    document.getElementById('reverse-medical-insurance').value = 0;
-    document.getElementById('reverse-unemployment-insurance').value = 0;
-    document.getElementById('reverse-housing-fund').value = 0;
+    document.getElementById('reverse-social-security-base').value = 4250;
+    document.getElementById('reverse-housing-fund-base').value = 4250;
     document.getElementById('reverse-pension-rate').value = 8;
     document.getElementById('reverse-medical-rate').value = 2;
     document.getElementById('reverse-unemployment-rate').value = 0.5;
@@ -755,6 +790,10 @@ function resetReverseCalculation() {
         document.getElementById('reverse-rent-fields').classList.add('hidden');
         document.getElementById('reverse-loan-fields').classList.add('hidden');
         document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
+        
+        calculateReverseSocialSecurity();
+        calculateReverseHousingFund();
+        updateReverseDeductionCalculation();
     }, 100);
 }
 
