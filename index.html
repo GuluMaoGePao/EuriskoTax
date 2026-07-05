@@ -740,8 +740,9 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="social-security-base" class="input-field" value="0" min="0" step="100">
+                                        <input type="number" id="social-security-base" class="input-field" value="4250" min="0" step="100">
                                     </div>
+                                    <div id="social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                 </div>
                                 
                                 <div class="form-group">
@@ -801,8 +802,9 @@
                                 <div class="form-group">
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="housing-fund-base" class="label">住房公积金基数：</label>
-                                        <input type="number" id="housing-fund-base" class="input-field" value="0" min="0" step="100">
+                                        <input type="number" id="housing-fund-base" class="input-field" value="4250" min="0" step="100">
                                     </div>
+                                    <div id="housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="housing-fund-rate" class="label">缴费比例：</label>
                                         <select id="housing-fund-rate" class="input-field w-24">
@@ -1613,6 +1615,19 @@
                         <!-- 方式3：按目标税额倒算 -->
                         <div id="reverse-both-input" class="hidden">
                             <div class="form-group">
+                                <label for="reverse-target-type" class="label">
+                                    倒算目标
+                                    <span class="tooltip ml-1">
+                                        <i class="fa fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">选择倒算的目标类型</span>
+                                    </span>
+                                </label>
+                                <select id="reverse-target-type" class="input-field">
+                                    <option value="tax">希望缴纳的税额</option>
+                                    <option value="net">希望到手的金额</option>
+                                </select>
+                            </div>
+                            <div id="reverse-fixed-tax-input" class="form-group">
                                 <label for="reverse-fixed-tax" class="label">
                                     希望缴纳的税额 (元/年)
                                     <span class="tooltip ml-1">
@@ -1624,7 +1639,7 @@
                                     <input type="number" id="reverse-fixed-tax" class="input-field" value="0" min="0" step="100">
                                 </div>
                             </div>
-                            <div class="form-group">
+                            <div id="reverse-fixed-net-input" class="form-group hidden">
                                 <label for="reverse-fixed-net" class="label">
                                     希望到手的金额 (元/年)
                                     <span class="tooltip ml-1">
@@ -1729,8 +1744,9 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-social-security-base" class="input-field" value="0" min="0" step="100">
+                                        <input type="number" id="reverse-social-security-base" class="input-field" value="4250" min="0" step="100">
                                     </div>
+                                    <div id="reverse-social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                 </div>
                                 
                                 <div class="form-group">
@@ -1790,8 +1806,9 @@
                                 <div class="form-group">
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-housing-fund-base" class="label">住房公积金基数：</label>
-                                        <input type="number" id="reverse-housing-fund-base" class="input-field" value="0" min="0" step="100">
+                                        <input type="number" id="reverse-housing-fund-base" class="input-field" value="4250" min="0" step="100">
                                     </div>
+                                    <div id="reverse-housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
                                         <select id="reverse-housing-fund-rate" class="input-field w-24">
@@ -3481,6 +3498,21 @@
                 monthlyInput.classList.remove('hidden');
             } else {
                 bothInput.classList.remove('hidden');
+            }
+        });
+        
+        // 倒算目标类型切换
+        document.getElementById('reverse-target-type').addEventListener('change', function() {
+            const targetType = this.value;
+            const taxInput = document.getElementById('reverse-fixed-tax-input');
+            const netInput = document.getElementById('reverse-fixed-net-input');
+            
+            if (targetType === 'tax') {
+                taxInput.classList.remove('hidden');
+                netInput.classList.add('hidden');
+            } else {
+                taxInput.classList.add('hidden');
+                netInput.classList.remove('hidden');
             }
         });
         

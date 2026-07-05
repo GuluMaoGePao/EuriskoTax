@@ -393,6 +393,138 @@ updateTaxResultsUI()       → 界面更新层
 
 ---
 
-**文档版本**: v2.1  
+## 8. 社保缴费基数规则
+
+### 8.1 最低基数标准
+
+**国家规定**: 根据国家相关规定，各城市社保缴费基数存在最低标准，本系统使用全国平均值4250元/月。
+
+**常量定义**:
+- `MIN_SOCIAL_SECURITY_BASE = 4250`：社保缴费基数最低标准
+- `MIN_HOUSING_FUND_BASE = 4250`：住房公积金基数最低标准
+
+**代码实现**: `js/helper-functions.js` 第3-5行
+
+### 8.2 默认值设置
+
+所有社保缴费基数和住房公积金基数输入框默认值为4250元/月：
+
+| 输入框ID | 默认值 | 页面 |
+|---------|--------|------|
+| `social-security-base` | 4250 | 正向计算 |
+| `housing-fund-base` | 4250 | 正向计算 |
+| `reverse-social-security-base` | 4250 | 反向倒算 |
+| `reverse-housing-fund-base` | 4250 | 反向倒算 |
+
+**初始化计算**: 页面加载时自动使用默认基数计算社保金额，包括：
+- 养老保险：基数 × 8%
+- 医疗保险：基数 × 2%
+- 失业保险：基数 × 0.5%
+- 住房公积金：基数 × 5%（或7%）
+
+**代码实现**: `js/app.js` 第1156-1162行
+
+### 8.3 基数验证
+
+**验证规则**: 当用户输入的基数大于0但低于最低标准时，显示红色警告提示。
+
+**验证函数**:
+- `validateSocialSecurityBase(prefix)`: 验证社保缴费基数
+- `validateHousingFundBase(prefix)`: 验证住房公积金基数
+
+**参数说明**:
+- `prefix`: 前缀，用于区分正向计算（空）和反向倒算（`reverse`）
+
+**警告提示**: `⚠️ 当前基数低于最低标准 4250 元/月`
+
+**代码实现**: `js/helper-functions.js` 第7-39行
+
+**事件绑定**: 在基数输入变化时触发验证：
+- `social-security-base`: `input` 事件
+- `housing-fund-base`: `input` 事件
+- `reverse-social-security-base`: `input` 事件
+- `reverse-housing-fund-base`: `input` 事件
+
+**代码实现**: `js/app.js` 第1091、1124、216、241行
+
+---
+
+## 9. 反向倒算目标选择规则
+
+### 9.1 二选一机制
+
+**规则**: 按目标税额倒算方式下，"希望缴纳的税额"和"希望到手的金额"二选一填写，优先使用税额。
+
+**下拉选项**:
+- `tax`: 希望缴纳的税额（默认）
+- `net`: 希望到手的金额
+
+**交互逻辑**:
+- 选择"希望缴纳的税额"时，显示税额输入框，隐藏到手金额输入框
+- 选择"希望到手的金额"时，显示到手金额输入框，隐藏税额输入框
+
+**代码实现**: `index.html` 第1616-1649行，`index.html` 第3520-3531行
+
+### 9.2 数据收集逻辑
+
+**收集规则**: 根据下拉选项的值来设置 `fixedTax` 和 `fixedNet`：
+
+```javascript
+const targetType = document.getElementById('reverse-target-type')?.value || 'tax';
+if (targetType === 'tax') {
+    fixedTax = parseFloat(document.getElementById('reverse-fixed-tax')?.value) || 0;
+    fixedNet = 0;
+} else {
+    fixedNet = parseFloat(document.getElementById('reverse-fixed-net')?.value) || 0;
+    fixedTax = 0;
+}
+```
+
+**前端验证**: 当两个字段都填写时，抛出错误提示："希望缴纳的税额和希望到手的金额请只填写一项"
+
+**代码实现**: `js/tax-calculator.js` 第1478-1492行
+
+### 9.3 计算逻辑优化
+
+**均衡模式修复**: 按目标税额倒算均衡模式使用二分法计算的基准值，而非档位中间值。
+
+**修复前**:
+```javascript
+// 使用档位中间值
+modeTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
+```
+
+**修复后**:
+```javascript
+// 使用二分法计算的基准值
+modeTaxableIncome = baseTaxableIncome;
+```
+
+**涉及函数**:
+- `calculateFromTargetTax()`: 综合所得按目标税额倒算
+- `calculateBusinessFromTargetTax()`: 经营所得按目标税额倒算
+- `calculateFromMonthlyNet()`: 综合所得按月度税后收入倒算
+- `calculateBusinessFromMonthlyNet()`: 经营所得按月度税后收入倒算
+
+**代码实现**: `js/tax-calculator.js` 第1186、1056、1815、1941行
+
+### 9.4 差异字段修复
+
+**问题**: 在到手金额模式下，`taxDifference` 字段显示 `actualTax - targetTax`，但 `targetTax` 为0，结果无意义。
+
+**修复**: 在到手金额模式下，`taxDifference` 改为显示到手金额差异：
+```javascript
+taxDifference: (totalIncome - actualTax) - targetNet
+```
+
+**涉及函数**:
+- `calculateFromTargetTax()`: 综合所得
+- `calculateBusinessFromTargetTax()`: 经营所得
+
+**代码实现**: `js/tax-calculator.js` 第1286、2118行
+
+---
+
+**文档版本**: v2.2  
 **最后更新**: 2026年7月5日  
 **维护者**: 开发团队
