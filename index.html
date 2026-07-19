@@ -188,6 +188,71 @@
                 overflow-y: hidden;
                 border-radius: 0.5rem;
             }
+            .page-transition {
+                transition: opacity 0.2s ease, transform 0.2s ease;
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            .page-transition.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            .help-modal-scrollbar::-webkit-scrollbar {
+                width: 6px;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 3px;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+                background-color: #94a3b8;
+            }
+            .help-modal-scrollbar {
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e1 transparent;
+            }
+            .loading-spinner {
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #3b82f6;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .loading-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255, 255, 255, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 0.5rem;
+                z-index: 10;
+            }
+            .dark .loading-overlay {
+                background: rgba(31, 41, 55, 0.8);
+            }
+            .btn:disabled {
+                @apply opacity-50 cursor-not-allowed;
+            }
+            .profile-card-hover {
+                @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5;
+            }
+            .menu-item-active {
+                @apply bg-primary/10 text-primary font-medium;
+            }
         }
 
         /* 暗色模式基础样式 */
@@ -266,7 +331,8 @@
                         <label for="login-password" class="label">密码</label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="login-password" class="input-field pl-10" placeholder="请输入密码">
+                            <input type="password" id="login-password" class="input-field pl-10 pr-10" placeholder="请输入密码">
+                            <i id="login-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
                     </div>
                     <div class="flex items-center justify-between">
@@ -311,14 +377,16 @@
                         <label for="register-password" class="label">密码</label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="register-password" class="input-field pl-10" placeholder="请输入密码（至少6位）">
+                            <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="请输入密码（至少6位）">
+                            <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
                     </div>
                     <div>
                         <label for="register-confirm-password" class="label">确认密码</label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="register-confirm-password" class="input-field pl-10" placeholder="请再次输入密码">
+                            <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码">
+                            <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
                     </div>
                     <button type="button" id="register-submit" class="btn btn-primary w-full py-3 text-lg">
@@ -385,8 +453,6 @@
                             </button>
                             <div id="user-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden">
                                 <a href="#" id="profile-link" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">个人中心</a>
-                                <a href="#" id="history-link" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">计算历史</a>
-                                <hr class="my-2 border-gray-200">
                                 <a href="#" id="logout-link" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">退出登录</a>
                             </div>
                         </div>
@@ -3469,103 +3535,243 @@
             </div>
         </div>
 
-        <!-- 历史记录页面 -->
-        <div id="history-page" class="page hidden">
-            <div class="mb-6">
-                <button id="back-to-home-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-4">
-                    <i class="fa fa-arrow-left mr-2"></i>返回首页
-                </button>
-                
-                <h2 class="text-2xl font-bold text-gray-800 mb-2">历史计算记录</h2>
-                <p class="text-gray-600 mb-6">查看和管理您保存的计算记录</p>
-            </div>
-            
-            <div id="history-list" class="space-y-4">
-                <!-- 历史记录将由JavaScript动态生成 -->
-                <div class="text-center py-8 text-gray-500">
-                    <i class="fa fa-history text-4xl mb-2"></i>
-                    <p>暂无保存的计算记录</p>
-                </div>
-            </div>
-        </div>
+
     </div>
 
     <!-- 帮助模态框 -->
-    <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-primary">使用帮助</h3>
-                    <button id="close-help-modal" class="text-gray-400 hover:text-gray-600">
+    <div id="help-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-question-circle text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold">使用帮助</h3>
+                            <p class="text-white/80 text-sm">了解如何使用本工具</p>
+                        </div>
+                    </div>
+                    <button id="close-help-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">正向计税</h4>
-                        <p class="text-sm text-gray-600">输入您的收入和扣除项信息，系统将自动计算年度个人所得税，并生成标准化年度个税预算表。</p>
+            </div>
+            
+            <div class="border-b border-gray-100 px-6">
+                <div class="flex space-x-2 py-4 overflow-x-auto">
+                    <button class="help-tab-btn active px-4 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg transition-colors" data-tab="calculation">
+                        <i class="fa fa-calculator mr-2"></i>计算功能
+                    </button>
+                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="data">
+                        <i class="fa fa-database mr-2"></i>数据管理
+                    </button>
+                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="rules">
+                        <i class="fa fa-book mr-2"></i>计税规则
+                    </button>
+                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="tips">
+                        <i class="fa fa-lightbulb-o mr-2"></i>实操提示
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto help-modal-scrollbar px-6 pr-8">
+                <div class="py-6">
+                <div id="help-tab-calculation" class="help-tab-content space-y-4">
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-arrow-up text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">正向计税</h4>
+                                <p class="text-sm text-gray-600">输入您的收入和扣除项信息，系统将自动计算年度个人所得税，并生成标准化年度个税预算表。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">反向倒算</h4>
-                        <p class="text-sm text-gray-600">输入税额信息和扣除项，系统将自动反推税前收入，适用于财务人员和薪酬规划。</p>
+                    
+                    <div class="bg-green-50 border border-green-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-arrow-down text-green-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">反向倒算</h4>
+                                <p class="text-sm text-gray-600">输入税额信息和扣除项，系统将自动反推税前收入，适用于财务人员和薪酬规划。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">数据保存</h4>
-                        <p class="text-sm text-gray-600">您可以保存计算结果，以便后续查看和比较。所有数据仅保存在本地，不会上传至服务器。</p>
+                    
+                    <div class="bg-purple-50 border border-purple-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-building text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">经营所得计税</h4>
+                                <p class="text-sm text-gray-600">适用于个体工商户、个人独资企业、合伙企业投资者，支持成本、费用等扣除项。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">PDF导出</h4>
-                        <p class="text-sm text-gray-600">计算完成后，您可以将预算表导出为PDF格式，方便打印和保存。</p>
+                    
+                    <div class="bg-orange-50 border border-orange-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-tags text-orange-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">分类所得计税</h4>
+                                <p class="text-sm text-gray-600">适用于利息、股息、红利所得、财产租赁、转让所得及偶然所得的计税计算。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">关于计税规则</h4>
-                        <p class="text-sm text-gray-600">本小程序根据2026年个人所得税计算规则手册设计，确保计算结果准确无误。</p>
+                </div>
+                
+                <div id="help-tab-data" class="help-tab-content space-y-4 hidden">
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-save text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">数据保存</h4>
+                                <p class="text-sm text-gray-600">您可以保存计算结果，以便后续查看和比较。所有数据仅保存在本地，不会上传至服务器。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">个税免征特殊规则</h4>
-                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                            <li>福利彩票、体育彩票单次中奖收入≤10000元（含1万元），免征个人所得税</li>
-                            <li>餐饮发票等单张发票奖金≤800元，免征个人所得税</li>
-                            <li>仅大病医疗个人负担累计超过15000元的部分，可纳入扣除范围，年度扣除上限80000元</li>
-                        </ul>
+                    
+                    <div class="bg-green-50 border border-green-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-download text-green-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">数据导出</h4>
+                                <p class="text-sm text-gray-600">支持将计算历史导出为JSON或CSV格式，方便数据备份和迁移。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">计税实操核心注意事项</h4>
-                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                            <li>综合所得年度汇算清缴时间为次年3月1日至6月30日，经营所得年度汇算清缴时间为次年1月1日至3月31日</li>
-                            <li>专项附加扣除需在个人所得税APP中据实填报，留存相关佐证材料备查</li>
-                            <li>劳务报酬、稿酬、特许权使用费预缴时按固定税率计税，年度汇算时并入综合所得，适用3%-45%超额累进税率，通常会产生税额差额，需通过汇算多退少补</li>
-                            <li>个人独资企业、合伙企业投资者的经营所得，比照经营所得规则计税</li>
-                            <li>所有计税扣除项均需符合国家税务总局相关规定，不得虚假填报扣除</li>
-                        </ul>
+                    
+                    <div class="bg-purple-50 border border-purple-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-file-pdf-o text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">PDF导出</h4>
+                                <p class="text-sm text-gray-600">计算完成后，您可以将预算表导出为PDF格式，方便打印和保存。</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">预算与实际差异说明</h4>
-                        <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                            <li>本工具为年度预算规划工具，计算结果基于年度税率表，用于提前预估税负</li>
-                            <li>实际月度预缴可能因2026年累计减除费用新规产生差异，年度汇算时统一清算</li>
-                            <li>一次性扣除6万元政策仅适用于特定人群的预缴阶段，不影响年度预算计算</li>
-                            <li>预算结果仅供参考，实际应纳税额以年度汇算清缴结果为准</li>
-                        </ul>
+                </div>
+                
+                <div id="help-tab-rules" class="help-tab-content space-y-4 hidden">
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-book text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">计税规则依据</h4>
+                                <p class="text-sm text-gray-600">本小程序根据2026年个人所得税计算规则手册设计，确保计算结果准确无误。</p>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <div class="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-shield text-amber-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">个税免征特殊规则</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li><i class="fa fa-check-circle text-amber-500 mr-2"></i>福利彩票、体育彩票单次中奖收入≤10000元（含1万元），免征个人所得税</li>
+                                    <li><i class="fa fa-check-circle text-amber-500 mr-2"></i>餐饮发票等单张发票奖金≤800元，免征个人所得税</li>
+                                    <li><i class="fa fa-check-circle text-amber-500 mr-2"></i>仅大病医疗个人负担累计超过15000元的部分，可纳入扣除范围，年度扣除上限80000元</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="help-tab-tips" class="help-tab-content space-y-4 hidden">
+                    <div class="bg-green-50 border border-green-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-calendar-check-o text-green-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">汇算清缴时间</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li><i class="fa fa-clock-o text-green-500 mr-2"></i>综合所得年度汇算清缴：次年3月1日至6月30日</li>
+                                    <li><i class="fa fa-clock-o text-green-500 mr-2"></i>经营所得年度汇算清缴：次年1月1日至3月31日</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-file-text-o text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">专项附加扣除</h4>
+                                <p class="text-sm text-gray-600">专项附加扣除需在个人所得税APP中据实填报，留存相关佐证材料备查。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 border border-purple-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-exchange text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">汇算差异说明</h4>
+                                <p class="text-sm text-gray-600">劳务报酬、稿酬、特许权使用费预缴时按固定税率计税，年度汇算时并入综合所得，通常会产生税额差额，需通过汇算多退少补。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fa fa-info-circle text-amber-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-2">预算与实际差异</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>本工具为年度预算规划工具，计算结果基于年度税率表</li>
+                                    <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>实际月度预缴可能因累计减除费用新规产生差异</li>
+                                    <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>预算结果仅供参考，实际应纳税额以年度汇算清缴结果为准</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- 自定义提示模态框 -->
-    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+    <div id="alert-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
             <div class="p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-primary">提示</h3>
-                    <button id="close-alert-modal" class="text-gray-400 hover:text-gray-600">
-                        <i class="fa fa-times"></i>
+                    <div class="flex items-center">
+                        <div id="alert-modal-icon" class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <i id="alert-modal-icon-i" class="fa fa-info-circle text-blue-600"></i>
+                        </div>
+                        <h3 id="alert-modal-title" class="text-lg font-bold text-gray-800">提示</h3>
+                    </div>
+                    <button id="close-alert-modal" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times text-gray-500"></i>
                     </button>
                 </div>
                 <div id="alert-modal-message" class="mb-6 text-gray-700"></div>
                 <div class="flex justify-end">
-                    <button id="alert-modal-ok" class="btn bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-md">
+                    <button id="alert-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg">
                         确定
                     </button>
                 </div>
@@ -3574,21 +3780,26 @@
     </div>
 
     <!-- 自定义确认模态框 -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
             <div class="p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-primary">提示</h3>
-                    <button id="close-confirm-modal" class="text-gray-400 hover:text-gray-600">
-                        <i class="fa fa-times"></i>
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mr-3">
+                            <i class="fa fa-question-circle text-amber-600"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800">确认操作</h3>
+                    </div>
+                    <button id="close-confirm-modal" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times text-gray-500"></i>
                     </button>
                 </div>
                 <div id="confirm-modal-message" class="mb-6 text-gray-700"></div>
                 <div class="flex justify-end space-x-3">
-                    <button id="confirm-modal-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-md">
+                    <button id="confirm-modal-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-lg">
                         取消
                     </button>
-                    <button id="confirm-modal-confirm" class="btn bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-md">
+                    <button id="confirm-modal-confirm" class="btn btn-primary px-6 py-2 rounded-lg">
                         确认
                     </button>
                 </div>
@@ -3597,17 +3808,18 @@
     </div>
 
     <!-- 关于模态框 -->
-    <div id="about-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-primary">关于本程序</h3>
-                    <button id="close-about-modal" class="text-gray-400 hover:text-gray-600">
+    <div id="about-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold">关于本程序</h3>
+                    <button id="close-about-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
+            </div>
+            <div class="p-6">
                 <div class="space-y-4">
-                    <!-- EuriskoTax 品牌logo -->
                     <div class="text-center mb-6">
                         <img src="images/logo.png" alt="EuriskoTax" class="h-16 w-auto mx-auto mb-3" style="width: 200px; height: 200px; margin-top: -40px; margin-bottom: -40px;">
                         <p class="text-sm text-gray-500">个人所得税预算规划工具</p>
@@ -3656,14 +3868,14 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
+    <script type="module" src="src/js/api/api-client.js"></script>
+    <script type="module" src="src/js/auth/auth-ui.js"></script>
     <script src="src/js/data/data-management.js"></script>
     <script src="src/js/calculation/tax-calculator.js"></script>
     <script src="src/js/calculation/helper-functions.js"></script>
     <script src="src/js/ui/navigation-ui.js"></script>
     <script src="src/js/export/export-utils.js?v=202604130"></script>
     <script src="src/js/calculation/utils.js"></script>
-    <script type="module" src="src/js/api/api-client.js"></script>
-    <script type="module" src="src/js/auth/auth-ui.js"></script>
     <script src="src/js/app.js"></script>
     <script>
         // 反向倒算方式切换
@@ -3736,13 +3948,15 @@
     </script>
 
     <!-- 登录模态框 -->
-    <div id="login-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="flex justify-between items-center p-6 border-b">
-                <h3 class="text-xl font-bold text-gray-800">用户登录</h3>
-                <button id="login-close" class="text-gray-500 hover:text-gray-700">
-                    <i class="fa fa-times text-xl"></i>
-                </button>
+    <div id="login-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform scale-95 transition-transform duration-300">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">用户登录</h3>
+                    <button id="login-close" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="p-6">
                 <div class="form-group">
@@ -3769,13 +3983,15 @@
     </div>
 
     <!-- 注册模态框 -->
-    <div id="register-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="flex justify-between items-center p-6 border-b">
-                <h3 class="text-xl font-bold text-gray-800">用户注册</h3>
-                <button id="register-close" class="text-gray-500 hover:text-gray-700">
-                    <i class="fa fa-times text-xl"></i>
-                </button>
+    <div id="register-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform scale-95 transition-transform duration-300">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">用户注册</h3>
+                    <button id="register-close" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="p-6">
                 <div class="form-group">
@@ -3806,231 +4022,387 @@
         </div>
     </div>
 
-    <!-- 用户中心页面 -->
+    <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
         <div class="max-w-4xl mx-auto">
             <button id="back-from-profile" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-6">
                 <i class="fa fa-arrow-left mr-2"></i>返回
             </button>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- 左侧侧边栏 -->
-                <div class="lg:col-span-1">
-                    <div class="card">
-                        <!-- 用户信息卡片 -->
-                        <div class="text-center mb-6">
-                            <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                                <i class="fa fa-user text-3xl text-primary"></i>
-                            </div>
-                            <h4 id="profile-display-name" class="text-lg font-bold text-gray-800 mb-1">用户名</h4>
-                            <p id="profile-display-email" class="text-sm text-gray-500">email@example.com</p>
+            <!-- 用户信息卡片 -->
+            <div class="card mb-6">
+                <div class="flex items-center">
+                    <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mr-6">
+                        <i class="fa fa-user text-3xl text-primary"></i>
+                    </div>
+                    <div>
+                        <h3 id="profile-display-name" class="text-xl font-bold text-gray-800">用户名</h3>
+                        <p id="profile-display-email" class="text-gray-500">email@example.com</p>
+                    </div>
+                    <div class="ml-auto">
+                        <a href="#" id="profile-nav-settings" class="btn btn-primary">
+                            <i class="fa fa-cog mr-2"></i>账户设置
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 数据统计卡片 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-calculator text-white"></i>
                         </div>
-                        
-                        <!-- 功能菜单 -->
-                        <div class="space-y-1">
-                            <a href="#" id="profile-nav-history" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
-                                <i class="fa fa-history mr-3"></i> 计算历史
-                            </a>
-                            <a href="#" id="profile-nav-help" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
-                                <i class="fa fa-question-circle mr-3"></i> 使用帮助
-                            </a>
-                            <a href="#" id="profile-nav-about" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
-                                <i class="fa fa-info-circle mr-3"></i> 关于我们
-                            </a>
-                            <hr class="my-2">
-                            <a href="#" id="profile-logout-link" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-danger transition-colors">
-                                <i class="fa fa-sign-out mr-3"></i> 退出登录
-                            </a>
-                            <a href="#" id="profile-delete-account" class="flex items-center px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-danger transition-colors">
-                                <i class="fa fa-trash-o mr-3"></i> 注销账号
-                            </a>
+                        <div>
+                            <p class="text-sm text-blue-600 font-medium">计算次数</p>
+                            <p id="profile-stats-calculations" class="text-2xl font-bold text-blue-800">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-file-text-o text-white"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-green-600 font-medium">档案数量</p>
+                            <p id="profile-stats-profiles" class="text-2xl font-bold text-green-800">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-history text-white"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium">历史记录</p>
+                            <p id="profile-stats-history" class="text-2xl font-bold text-purple-800">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-calendar-check-o text-white"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-orange-600 font-medium">本月提醒</p>
+                            <p id="profile-stats-reminders" class="text-2xl font-bold text-orange-800">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 功能模块卡片网格 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 计算历史 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-history">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-history text-2xl text-blue-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">计算历史</h3>
+                        <p class="text-sm text-gray-500">查看和管理您的计算记录</p>
+                    </div>
+                </div>
+                
+                <!-- 税务档案 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-tax">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-file-text-o text-2xl text-green-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">税务档案</h3>
+                        <p class="text-sm text-gray-500">设置常用扣除配置，快速应用</p>
+                    </div>
+                </div>
+                
+                <!-- 数据管理 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-data">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-database text-2xl text-purple-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">数据管理</h3>
+                        <p class="text-sm text-gray-500">导出计算数据，备份与迁移</p>
+                    </div>
+                </div>
+                
+                <!-- 税务日历 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-calendar">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-calendar text-2xl text-orange-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">税务日历</h3>
+                        <p class="text-sm text-gray-500">关键时间节点提醒</p>
+                    </div>
+                </div>
+                
+                <!-- 使用帮助 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-help">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-question-circle text-2xl text-gray-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">使用帮助</h3>
+                        <p class="text-sm text-gray-500">了解如何使用本工具</p>
+                    </div>
+                </div>
+                
+                <!-- 关于我们 -->
+                <div class="card cursor-pointer profile-card-hover" id="profile-card-about">
+                    <div class="p-6">
+                        <div class="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center mb-4">
+                            <i class="fa fa-info-circle text-2xl text-indigo-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">关于我们</h3>
+                        <p class="text-sm text-gray-500">了解更多信息</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部操作 -->
+            <div class="mt-6 flex justify-center space-x-4">
+                <button id="profile-logout-link" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    <i class="fa fa-sign-out mr-2"></i>退出登录
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 账户设置页面 -->
+    <div id="profile-settings-page" class="page hidden">
+        <div class="max-w-2xl mx-auto">
+            <button id="back-from-settings" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-6">
+                <i class="fa fa-arrow-left mr-2"></i>返回个人中心
+            </button>
+            
+            <div class="card">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">账户设置</h3>
+                
+                <!-- 基本信息 -->
+                <div class="mb-8">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">基本信息</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="label">用户名</label>
+                            <input type="text" id="profile-username" class="input-field" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">邮箱</label>
+                            <input type="email" id="profile-email" class="input-field" readonly>
+                        </div>
+                        <div class="form-group md:col-span-2">
+                            <label class="label">手机号</label>
+                            <input type="tel" id="profile-phone" class="input-field" placeholder="请输入手机号">
                         </div>
                     </div>
                 </div>
                 
-                <!-- 右侧内容区 -->
-                <div class="lg:col-span-2">
-                    <div class="card">
-                        <h3 class="text-xl font-bold text-gray-800 mb-6">账户设置</h3>
-                        
-                        <!-- 基本信息 -->
-                        <div class="mb-8">
-                            <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">基本信息</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="label">用户名</label>
-                                    <input type="text" id="profile-username" class="input-field" readonly>
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">邮箱</label>
-                                    <input type="email" id="profile-email" class="input-field" readonly>
-                                </div>
-                                <div class="form-group md:col-span-2">
-                                    <label class="label">手机号</label>
-                                    <input type="tel" id="profile-phone" class="input-field" placeholder="请输入手机号">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <hr class="my-6">
-                        
-                        <!-- 修改密码 -->
-                        <div class="mb-6">
-                            <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">修改密码</h4>
-                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                                <div class="flex items-start">
-                                    <i class="fa fa-exclamation-triangle text-yellow-500 mt-0.5 mr-3"></i>
-                                    <p class="text-sm text-yellow-700">修改密码前请先验证您的当前密码</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="label">当前密码</label>
-                                    <input type="password" id="profile-current-password" class="input-field" placeholder="请输入当前密码">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">新密码</label>
-                                    <input type="password" id="profile-password" class="input-field" placeholder="请输入新密码（至少6位）">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">确认新密码</label>
-                                    <input type="password" id="profile-confirm-password" class="input-field" placeholder="请再次输入新密码">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 保存按钮 -->
-                        <div class="flex justify-end space-x-3">
-                            <button id="profile-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                                取消
-                            </button>
-                            <button id="profile-save" class="btn btn-primary">保存修改</button>
+                <hr class="my-6">
+                
+                <!-- 修改密码 -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">修改密码</h4>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-start">
+                            <i class="fa fa-exclamation-triangle text-yellow-500 mt-0.5 mr-3"></i>
+                            <p class="text-sm text-yellow-700">修改密码前请先验证您的当前密码</p>
                         </div>
                     </div>
-
-                    <!-- 税务档案卡片 -->
-                    <div class="card mt-6">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-xl font-bold text-gray-800">税务档案</h3>
-                            <span class="text-xs text-gray-500">
-                                <i class="fa fa-info-circle mr-1"></i>保存常用扣除配置，便于下次计算时快速应用
-                            </span>
-                        </div>
-
-                        <!-- 默认社保公积金基数 -->
-                        <div class="mb-6">
-                            <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">默认社保公积金基数</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="label">默认社保缴费基数（元/月）</label>
-                                    <input type="number" id="tax-profile-social-base" class="input-field" placeholder="4250" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">默认公积金基数（元/月）</label>
-                                    <input type="number" id="tax-profile-housing-base" class="input-field" placeholder="4250" min="0">
-                                </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="label">当前密码</label>
+                            <div class="relative">
+                                <input type="password" id="profile-current-password" class="input-field pr-10" placeholder="请输入当前密码">
+                                <i id="profile-current-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                             </div>
                         </div>
-
-                        <hr class="my-6">
-
-                        <!-- 默认专项附加扣除 -->
-                        <div class="mb-6">
-                            <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">默认专项附加扣除（元/月）</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="label">子女教育/3岁以下婴幼儿照护</label>
-                                    <input type="number" id="tax-profile-children" class="input-field" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">赡养老人</label>
-                                    <input type="number" id="tax-profile-elderly" class="input-field" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">住房租金</label>
-                                    <input type="number" id="tax-profile-rent" class="input-field" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">住房贷款利息</label>
-                                    <input type="number" id="tax-profile-housing-loan" class="input-field" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">继续教育</label>
-                                    <input type="number" id="tax-profile-education" class="input-field" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">个人养老金（元/年）</label>
-                                    <input type="number" id="tax-profile-pension" class="input-field" placeholder="0" min="0" max="12000">
-                                </div>
+                        <div class="form-group">
+                            <label class="label">新密码</label>
+                            <div class="relative">
+                                <input type="password" id="profile-password" class="input-field pr-10" placeholder="请输入新密码（至少6位）">
+                                <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                             </div>
                         </div>
-
-                        <hr class="my-6">
-
-                        <!-- 默认工作月数 -->
-                        <div class="mb-6">
-                            <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">其他默认参数</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="label">默认工作月数</label>
-                                    <input type="number" id="tax-profile-work-months" class="input-field" placeholder="12" min="1" max="12">
-                                </div>
-                                <div class="form-group">
-                                    <label class="label">用户身份类型</label>
-                                    <select id="tax-profile-user-type" class="input-field">
-                                        <option value="employee">企业员工（综合所得）</option>
-                                        <option value="self-employed">个体工商户（经营所得）</option>
-                                        <option value="freelancer">自由职业者（劳务报酬为主）</option>
-                                    </select>
-                                </div>
+                        <div class="form-group">
+                            <label class="label">确认新密码</label>
+                            <div class="relative">
+                                <input type="password" id="profile-confirm-password" class="input-field pr-10" placeholder="请再次输入新密码">
+                                <i id="profile-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                             </div>
-                        </div>
-
-                        <!-- 保存按钮 -->
-                        <div class="flex justify-end space-x-3">
-                            <button id="tax-profile-reset" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                                重置
-                            </button>
-                            <button id="tax-profile-save" class="btn btn-primary">保存档案</button>
                         </div>
                     </div>
-
-                    <!-- 税务日历卡片 -->
-                    <div class="card mt-6">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-xl font-bold text-gray-800">税务日历</h3>
-                            <span class="text-xs text-gray-500">
-                                <i class="fa fa-calendar mr-1"></i>关键时间节点提醒
-                            </span>
-                        </div>
-                        <div id="tax-calendar-list" class="space-y-3">
-                            <!-- 由 JS 动态填充 -->
-                        </div>
-                    </div>
-
-                    <!-- 数据管理卡片 -->
-                    <div class="card mt-6">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-xl font-bold text-gray-800">数据管理</h3>
-                            <span class="text-xs text-gray-500">
-                                <i class="fa fa-database mr-1"></i>导出您的计算数据
-                            </span>
-                        </div>
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <div class="flex items-start">
-                                <i class="fa fa-info-circle text-blue-500 mt-0.5 mr-3"></i>
-                                <p class="text-sm text-blue-700">导出文件包含您所有的计算历史记录，可用于数据备份或迁移。导出格式为 JSON，便于后续处理。</p>
+                </div>
+                
+                <hr class="my-6">
+                
+                <!-- 注销账号 -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">账号安全</h4>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <i class="fa fa-warning text-red-500 mt-0.5 mr-3"></i>
+                            <div>
+                                <p class="text-sm text-red-700 font-medium mb-2">注销账号</p>
+                                <p class="text-xs text-red-600">注销账号将永久删除您的账户及所有计算历史记录，且无法恢复！</p>
+                                <button id="profile-delete-account" class="mt-3 text-red-600 hover:text-red-700 text-sm font-medium">
+                                    <i class="fa fa-trash-o mr-1"></i>确认注销账号
+                                </button>
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-3">
-                            <button id="export-json-btn" class="btn btn-primary">
-                                <i class="fa fa-download mr-2"></i>导出为 JSON
-                            </button>
-                            <button id="export-csv-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                                <i class="fa fa-file-excel-o mr-2"></i>导出为 CSV
-                            </button>
+                    </div>
+                </div>
+                
+                <!-- 保存按钮 -->
+                <div class="flex justify-end space-x-3">
+                    <button id="profile-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                        取消
+                    </button>
+                    <button id="profile-save" class="btn btn-primary">保存修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 税务档案页面 -->
+    <div id="profile-tax-page" class="page hidden">
+        <div class="max-w-3xl mx-auto">
+            <button id="back-from-tax" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-6">
+                <i class="fa fa-arrow-left mr-2"></i>返回个人中心
+            </button>
+            
+            <div class="card">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">税务档案</h3>
+                    <span class="text-xs text-gray-500">
+                        <i class="fa fa-info-circle mr-1"></i>保存常用扣除配置，便于下次计算时快速应用
+                    </span>
+                </div>
+
+                <!-- 默认社保公积金基数 -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">默认社保公积金基数</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="label">默认社保缴费基数（元/月）</label>
+                            <input type="number" id="tax-profile-social-base" class="input-field" placeholder="4250" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">默认公积金基数（元/月）</label>
+                            <input type="number" id="tax-profile-housing-base" class="input-field" placeholder="4250" min="0">
                         </div>
                     </div>
+                </div>
+
+                <hr class="my-6">
+
+                <!-- 默认专项附加扣除 -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">默认专项附加扣除（元/月）</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="label">子女教育/3岁以下婴幼儿照护</label>
+                            <input type="number" id="tax-profile-children" class="input-field" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">赡养老人</label>
+                            <input type="number" id="tax-profile-elderly" class="input-field" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">住房租金</label>
+                            <input type="number" id="tax-profile-rent" class="input-field" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">住房贷款利息</label>
+                            <input type="number" id="tax-profile-housing-loan" class="input-field" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">继续教育</label>
+                            <input type="number" id="tax-profile-education" class="input-field" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">个人养老金（元/年）</label>
+                            <input type="number" id="tax-profile-pension" class="input-field" placeholder="0" min="0" max="12000">
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-6">
+
+                <!-- 默认工作月数 -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">其他默认参数</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="label">默认工作月数</label>
+                            <input type="number" id="tax-profile-work-months" class="input-field" placeholder="12" min="1" max="12">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">用户身份类型</label>
+                            <select id="tax-profile-user-type" class="input-field">
+                                <option value="employee">企业员工（综合所得）</option>
+                                <option value="self-employed">个体工商户（经营所得）</option>
+                                <option value="freelancer">自由职业者（劳务报酬为主）</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 保存按钮 -->
+                <div class="flex justify-end space-x-3">
+                    <button id="tax-profile-reset" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                        重置
+                    </button>
+                    <button id="tax-profile-save" class="btn btn-primary">保存档案</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据管理页面 -->
+    <div id="profile-data-page" class="page hidden">
+        <div class="max-w-2xl mx-auto">
+            <button id="back-from-data" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-6">
+                <i class="fa fa-arrow-left mr-2"></i>返回个人中心
+            </button>
+            
+            <div class="card">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">数据管理</h3>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fa fa-info-circle text-blue-500 mt-0.5 mr-3"></i>
+                        <p class="text-sm text-blue-700">导出文件包含您所有的计算历史记录，可用于数据备份或迁移。导出格式为 JSON，便于后续处理。</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <button id="export-json-btn" class="btn btn-primary w-full flex items-center justify-center">
+                        <i class="fa fa-download mr-2"></i>导出为 JSON
+                    </button>
+                    <button id="export-csv-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 w-full flex items-center justify-center">
+                        <i class="fa fa-file-excel-o mr-2"></i>导出为 CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 税务日历页面 -->
+    <div id="profile-calendar-page" class="page hidden">
+        <div class="max-w-3xl mx-auto">
+            <button id="back-from-calendar" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-6">
+                <i class="fa fa-arrow-left mr-2"></i>返回个人中心
+            </button>
+            
+            <div class="card">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">税务日历</h3>
+                <div id="tax-calendar-list" class="space-y-3">
+                    <!-- 由 JS 动态填充 -->
                 </div>
             </div>
         </div>
@@ -4059,14 +4431,7 @@
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
                     © 2026 EuriskoTax | 基于2026年个人所得税计算规则手册 · 仅供参考
                 </div>
-                <div class="flex space-x-4">
-                    <button id="history-btn" class="text-sm text-gray-600 hover:text-primary flex items-center">
-                        <i class="fa fa-history mr-1"></i> 历史记录
-                    </button>
-                    <button id="about-btn" class="text-sm text-gray-600 hover:text-primary flex items-center">
-                        <i class="fa fa-info-circle mr-1"></i> 关于
-                    </button>
-                </div>
+
             </div>
         </div>
     </footer>

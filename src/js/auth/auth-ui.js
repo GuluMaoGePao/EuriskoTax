@@ -1,23 +1,23 @@
 import apiClient from '../api/api-client.js';
 
 function showLoginModal() {
-    document.getElementById('login-modal').classList.remove('hidden');
-    document.getElementById('register-modal').classList.add('hidden');
+    openModal(document.getElementById('login-modal'));
+    closeModal(document.getElementById('register-modal'));
 }
 
 function hideLoginModal() {
-    document.getElementById('login-modal').classList.add('hidden');
+    closeModal(document.getElementById('login-modal'));
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
 }
 
 function showRegisterModal() {
-    document.getElementById('register-modal').classList.remove('hidden');
-    document.getElementById('login-modal').classList.add('hidden');
+    openModal(document.getElementById('register-modal'));
+    closeModal(document.getElementById('login-modal'));
 }
 
 function hideRegisterModal() {
-    document.getElementById('register-modal').classList.add('hidden');
+    closeModal(document.getElementById('register-modal'));
     document.getElementById('register-username').value = '';
     document.getElementById('register-email').value = '';
     document.getElementById('register-phone').value = '';
@@ -49,9 +49,26 @@ function updateAuthUI() {
     }
 }
 
+function setLoading(btn, loading) {
+    if (!btn) return;
+    const originalText = btn.dataset.originalText || btn.textContent;
+    if (!btn.dataset.originalText) {
+        btn.dataset.originalText = originalText;
+    }
+    
+    if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="loading-spinner inline-block w-4 h-4 mr-2"></span>处理中...`;
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
 async function handleLogin() {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
+    const btn = document.getElementById('login-submit');
     
     if (!email || !password) {
         showAlert('请填写邮箱和密码');
@@ -59,6 +76,7 @@ async function handleLogin() {
     }
     
     try {
+        setLoading(btn, true);
         await apiClient.loginUser(email, password);
         clearPageHistory();
         updateAuthUI();
@@ -66,6 +84,8 @@ async function handleLogin() {
         showAlert('登录成功', 'success');
     } catch (error) {
         showAlert('登录失败: ' + error.message);
+    } finally {
+        setLoading(btn, false);
     }
 }
 
@@ -91,6 +111,7 @@ async function handleRegister() {
     const phone = document.getElementById('register-phone').value;
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
+    const btn = document.getElementById('register-submit');
     
     if (!username || !email || !password) {
         showAlert('请填写用户名、邮箱和密码');
@@ -108,20 +129,20 @@ async function handleRegister() {
     }
     
     try {
+        setLoading(btn, true);
         await apiClient.registerUser(username, email, password, phone || null);
         showAlert('注册成功，请登录', 'success');
-        // 切换到登录 tab，而不是显示废弃的 login-modal
         document.getElementById('login-tab').click();
-        // 清空注册表单
         document.getElementById('register-username').value = '';
         document.getElementById('register-email').value = '';
         document.getElementById('register-phone').value = '';
         document.getElementById('register-password').value = '';
         document.getElementById('register-confirm-password').value = '';
-        // 预填邮箱到登录表单
         document.getElementById('login-email').value = email;
     } catch (error) {
         showAlert('注册失败: ' + error.message);
+    } finally {
+        setLoading(btn, false);
     }
 }
 
@@ -140,7 +161,8 @@ async function loadProfile() {
         document.getElementById('profile-phone').value = user.phone || '';
         document.getElementById('profile-display-name').textContent = user.username;
         document.getElementById('profile-display-email').textContent = user.email;
-        // 同步加载税务档案和税务日历
+        
+        updateProfileStats();
         loadTaxProfile();
         renderTaxCalendar();
     } catch (error) {
@@ -148,7 +170,40 @@ async function loadProfile() {
     }
 }
 
-// 税务档案：使用 localStorage 存储，便于快速应用默认扣除配置
+function updateProfileStats() {
+    const history = JSON.parse(localStorage.getItem('calculation_history') || '[]');
+    const taxProfile = localStorage.getItem('tax_profile');
+    
+    document.getElementById('profile-stats-calculations').textContent = history.length;
+    document.getElementById('profile-stats-history').textContent = history.length;
+    document.getElementById('profile-stats-profiles').textContent = taxProfile ? 1 : 0;
+    document.getElementById('profile-stats-reminders').textContent = getMonthlyReminders();
+}
+
+function getMonthlyReminders() {
+    const today = new Date();
+    const month = today.getMonth() + 1;
+    const reminders = [];
+    
+    if (month >= 3 && month <= 6) reminders.push('综合所得汇算');
+    if (month >= 1 && month <= 3) reminders.push('经营所得汇算');
+    if (month === 1 || month === 4 || month === 7 || month === 10) reminders.push('季度申报');
+    
+    return reminders.length;
+}
+
+async function loadProfileSettings() {
+    await loadProfile();
+}
+
+function loadProfileTax() {
+    loadTaxProfile();
+}
+
+function loadProfileCalendar() {
+    renderTaxCalendar();
+}
+
 const TAX_PROFILE_KEY = 'tax_profile';
 
 function getDefaultTaxProfile() {
@@ -167,18 +222,22 @@ function getDefaultTaxProfile() {
 }
 
 function loadTaxProfile() {
-    const saved = JSON.parse(localStorage.getItem(TAX_PROFILE_KEY) || 'null');
-    const profile = { ...getDefaultTaxProfile(), ...(saved || {}) };
-    document.getElementById('tax-profile-social-base').value = profile.socialBase;
-    document.getElementById('tax-profile-housing-base').value = profile.housingBase;
-    document.getElementById('tax-profile-children').value = profile.children;
-    document.getElementById('tax-profile-elderly').value = profile.elderly;
-    document.getElementById('tax-profile-rent').value = profile.rent;
-    document.getElementById('tax-profile-housing-loan').value = profile.housingLoan;
-    document.getElementById('tax-profile-education').value = profile.education;
-    document.getElementById('tax-profile-pension').value = profile.pension;
-    document.getElementById('tax-profile-work-months').value = profile.workMonths;
-    document.getElementById('tax-profile-user-type').value = profile.userType;
+    try {
+        const saved = JSON.parse(localStorage.getItem(TAX_PROFILE_KEY) || 'null');
+        const profile = { ...getDefaultTaxProfile(), ...(saved || {}) };
+        document.getElementById('tax-profile-social-base').value = profile.socialBase;
+        document.getElementById('tax-profile-housing-base').value = profile.housingBase;
+        document.getElementById('tax-profile-children').value = profile.children;
+        document.getElementById('tax-profile-elderly').value = profile.elderly;
+        document.getElementById('tax-profile-rent').value = profile.rent;
+        document.getElementById('tax-profile-housing-loan').value = profile.housingLoan;
+        document.getElementById('tax-profile-education').value = profile.education;
+        document.getElementById('tax-profile-pension').value = profile.pension;
+        document.getElementById('tax-profile-work-months').value = profile.workMonths;
+        document.getElementById('tax-profile-user-type').value = profile.userType;
+    } catch (e) {
+        console.error('Failed to load tax profile:', e);
+    }
 }
 
 function saveTaxProfile() {
@@ -194,6 +253,7 @@ function saveTaxProfile() {
         workMonths: parseInt(document.getElementById('tax-profile-work-months').value) || 12,
         userType: document.getElementById('tax-profile-user-type').value
     };
+    
     if (profile.workMonths < 1 || profile.workMonths > 12) {
         showAlert('工作月数应在 1-12 之间');
         return;
@@ -202,11 +262,19 @@ function saveTaxProfile() {
         showAlert('个人养老金年度上限为 12000 元');
         return;
     }
+    if (profile.socialBase < 0 || profile.housingBase < 0) {
+        showAlert('基数不能为负数');
+        return;
+    }
+    
     localStorage.setItem(TAX_PROFILE_KEY, JSON.stringify(profile));
     showAlert('税务档案已保存', 'success');
 }
 
 function resetTaxProfile() {
+    const confirmed = confirm('确定要重置税务档案为默认值吗？');
+    if (!confirmed) return;
+    
     const defaults = getDefaultTaxProfile();
     document.getElementById('tax-profile-social-base').value = defaults.socialBase;
     document.getElementById('tax-profile-housing-base').value = defaults.housingBase;
@@ -222,10 +290,12 @@ function resetTaxProfile() {
     showAlert('税务档案已重置为默认值', 'success');
 }
 
-// 税务日历：根据当前日期动态生成关键时间节点提醒
 function renderTaxCalendar() {
     const listEl = document.getElementById('tax-calendar-list');
-    if (!listEl) return;
+    if (!listEl) {
+        return;
+    }
+    
     const now = new Date();
     const year = now.getFullYear();
     const nextYear = year + 1;
@@ -254,10 +324,11 @@ function renderTaxCalendar() {
         }
     ];
 
-    listEl.innerHTML = events.map(event => {
-        let badgeClass = 'bg-gray-100 text-gray-700';
-        let statusText = '已结束';
-        let statusIcon = 'fa-times-circle';
+    let badgeClass = 'bg-gray-100 text-gray-700';
+    let statusText = '已结束';
+    let statusIcon = 'fa-times-circle';
+    
+    const sortedEvents = events.map(event => {
         if (now < event.start) {
             badgeClass = 'bg-yellow-100 text-yellow-700';
             statusText = '即将开始';
@@ -267,25 +338,54 @@ function renderTaxCalendar() {
             statusText = '进行中';
             statusIcon = 'fa-check-circle';
         }
-        return `
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex items-start justify-between mb-2">
-                    <h4 class="font-semibold text-gray-800">${event.title}</h4>
-                    <span class="${badgeClass} px-2 py-0.5 rounded text-xs">
-                        <i class="fa ${statusIcon} mr-1"></i>${statusText}
-                    </span>
-                </div>
-                <p class="text-sm text-gray-600 mb-2"><i class="fa fa-calendar-o mr-2"></i>${event.period}</p>
-                <p class="text-xs text-gray-500">${event.description}</p>
+        return {
+            ...event,
+            badgeClass,
+            statusText,
+            statusIcon
+        };
+    }).sort((a, b) => a.start - b.start);
+
+    listEl.innerHTML = sortedEvents.map(event => `
+        <div class="border border-gray-200 rounded-lg p-4 profile-card-hover">
+            <div class="flex items-start justify-between mb-2">
+                <h4 class="font-semibold text-gray-800">${event.title}</h4>
+                <span class="${event.badgeClass} px-2 py-0.5 rounded text-xs">
+                    <i class="fa ${event.statusIcon} mr-1"></i>${event.statusText}
+                </span>
             </div>
-        `;
-    }).join('');
+            <p class="text-sm text-gray-600 mb-2"><i class="fa fa-calendar-o mr-2"></i>${event.period}</p>
+            <p class="text-xs text-gray-500">${event.description}</p>
+        </div>
+    `).join('');
 }
 
-// 数据导出：导出用户的所有计算历史
+let historyCache = {
+    data: null,
+    timestamp: 0
+};
+
+async function getHistoryData(forceRefresh = false) {
+    const cacheExpire = 5 * 60 * 1000;
+    if (!forceRefresh && historyCache.data && Date.now() - historyCache.timestamp < cacheExpire) {
+        return historyCache.data;
+    }
+    
+    const history = await apiClient.getCalculationHistory();
+    historyCache = {
+        data: history,
+        timestamp: Date.now()
+    };
+    return history;
+}
+
 async function exportData(format) {
+    const btn = format === 'json' ? document.getElementById('export-json-btn') : document.getElementById('export-csv-btn');
+    
     try {
-        const history = await apiClient.getCalculationHistory();
+        setLoading(btn, true);
+        const history = await getHistoryData(true);
+        
         if (history.length === 0) {
             showAlert('暂无计算历史可导出');
             return;
@@ -303,22 +403,28 @@ async function exportData(format) {
             mimeType = 'application/json';
             extension = 'json';
         } else if (format === 'csv') {
-            const rows = [['ID', '类型', '创建时间', '税额合计']];
+            const rows = [['ID', '类型', '创建时间', '税额合计', '税前收入', '税后收入']];
             const typeNames = {
                 comprehensive: '综合所得',
                 business: '经营所得',
                 classification: '分类所得',
                 reverse: '反向倒算'
             };
+            
             history.forEach(item => {
                 const tax = item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0;
+                const income = item.result_data?.taxDetails?.totalIncome || item.result_data?.totalIncome || 0;
+                const netIncome = item.result_data?.taxDetails?.netIncome || item.result_data?.netIncome || 0;
                 rows.push([
                     item.id,
-                    typeNames[item.type] || item.type,
-                    new Date(item.created_at).toLocaleString('zh-CN'),
-                    tax
+                    `"${typeNames[item.type] || item.type}"`,
+                    `"${new Date(item.created_at).toLocaleString('zh-CN')}"`,
+                    tax,
+                    income,
+                    netIncome
                 ].join(','));
             });
+            
             content = '\uFEFF' + rows.join('\n');
             mimeType = 'text/csv;charset=utf-8';
             extension = 'csv';
@@ -338,6 +444,8 @@ async function exportData(format) {
         showAlert(`已导出 ${history.length} 条记录`, 'success');
     } catch (error) {
         showAlert('导出失败: ' + error.message);
+    } finally {
+        setLoading(btn, false);
     }
 }
 
@@ -346,6 +454,7 @@ async function saveProfile() {
     const currentPassword = document.getElementById('profile-current-password').value;
     const password = document.getElementById('profile-password').value;
     const confirmPassword = document.getElementById('profile-confirm-password').value;
+    const btn = document.getElementById('profile-save');
     
     if (password || confirmPassword) {
         if (!currentPassword) {
@@ -364,6 +473,11 @@ async function saveProfile() {
         }
     }
     
+    if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+        showAlert('请输入有效的手机号');
+        return;
+    }
+    
     const updateData = {};
     if (phone) updateData.phone = phone;
     if (password) {
@@ -377,17 +491,19 @@ async function saveProfile() {
     }
     
     try {
+        setLoading(btn, true);
         const updatedUser = await apiClient.updateProfile(updateData);
         showAlert('修改成功', 'success');
         document.getElementById('profile-current-password').value = '';
         document.getElementById('profile-password').value = '';
         document.getElementById('profile-confirm-password').value = '';
-        // 同步刷新侧边栏和导航栏的用户信息
         document.getElementById('profile-display-name').textContent = updatedUser.username;
         document.getElementById('profile-display-email').textContent = updatedUser.email;
         updateAuthUI();
     } catch (error) {
         showAlert('修改失败: ' + error.message);
+    } finally {
+        setLoading(btn, false);
     }
 }
 
@@ -419,12 +535,37 @@ function resetProfileForm() {
     loadProfile();
 }
 
+function renderHistoryItems(history, listElement) {
+    const fragment = document.createDocumentFragment();
+    
+    history.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card profile-card-hover';
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="font-medium text-gray-800">${getCalculationTypeName(item.type)}</div>
+                    <div class="text-sm text-gray-500">${formatDate(item.created_at)}</div>
+                </div>
+                <div class="text-right">
+                    <div class="font-bold text-primary">¥${formatAmount(item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0)}</div>
+                </div>
+            </div>
+            <button onclick="deleteHistoryItem(${item.id})" class="mt-3 text-sm text-danger hover:underline">删除</button>
+        `;
+        fragment.appendChild(card);
+    });
+    
+    listElement.innerHTML = '';
+    listElement.appendChild(fragment);
+}
+
 async function loadHistory() {
     const historyList = document.getElementById('history-list');
     const historyEmpty = document.getElementById('history-empty');
     
     try {
-        const history = await apiClient.getCalculationHistory();
+        const history = await getHistoryData();
         
         if (history.length === 0) {
             historyEmpty.classList.remove('hidden');
@@ -432,21 +573,7 @@ async function loadHistory() {
         }
         
         historyEmpty.classList.add('hidden');
-        
-        historyList.innerHTML = history.map(item => `
-            <div class="card">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div class="font-medium text-gray-800">${getCalculationTypeName(item.type)}</div>
-                        <div class="text-sm text-gray-500">${formatDate(item.created_at)}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="font-bold text-primary">¥${formatAmount(item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0)}</div>
-                    </div>
-                </div>
-                <button onclick="deleteHistoryItem(${item.id})" class="mt-3 text-sm text-danger hover:underline">删除</button>
-            </div>
-        `).join('');
+        renderHistoryItems(history, historyList);
     } catch (error) {
         showAlert('加载失败: ' + error.message);
     }
@@ -457,7 +584,7 @@ async function loadProfileHistory() {
     const historyEmpty = document.getElementById('profile-history-empty');
     
     try {
-        const history = await apiClient.getCalculationHistory();
+        const history = await getHistoryData();
         
         if (history.length === 0) {
             historyEmpty.classList.remove('hidden');
@@ -465,21 +592,7 @@ async function loadProfileHistory() {
         }
         
         historyEmpty.classList.add('hidden');
-        
-        historyList.innerHTML = history.map(item => `
-            <div class="card">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div class="font-medium text-gray-800">${getCalculationTypeName(item.type)}</div>
-                        <div class="text-sm text-gray-500">${formatDate(item.created_at)}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="font-bold text-primary">¥${formatAmount(item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0)}</div>
-                    </div>
-                </div>
-                <button onclick="deleteHistoryItem(${item.id}); loadProfileHistory();" class="mt-3 text-sm text-danger hover:underline">删除</button>
-            </div>
-        `).join('');
+        renderHistoryItems(history, historyList);
     } catch (error) {
         showAlert('加载失败: ' + error.message);
     }
@@ -514,10 +627,27 @@ async function deleteHistoryItem(id) {
     
     try {
         await apiClient.deleteCalculation(id);
+        historyCache = { data: null, timestamp: 0 };
         loadHistory();
+        loadProfileHistory();
         showAlert('删除成功', 'success');
     } catch (error) {
         showAlert('删除失败: ' + error.message);
+    }
+}
+
+function togglePasswordVisibility(inputId, toggleId) {
+    const input = document.getElementById(inputId);
+    const toggle = document.getElementById(toggleId);
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        toggle.classList.remove('fa-eye');
+        toggle.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        toggle.classList.remove('fa-eye-slash');
+        toggle.classList.add('fa-eye');
     }
 }
 
@@ -543,35 +673,26 @@ function setupAuthEventListeners() {
     document.getElementById('login-submit').addEventListener('click', handleLogin);
     document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
     document.getElementById('register-submit').addEventListener('click', handleRegister);
-    document.getElementById('logout-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        handleLogout();
-    });
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
         loadProfile();
         showPage('profile-page');
     });
-    document.getElementById('history-link').addEventListener('click', (e) => {
+    document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
-        loadHistory();
-        showPage('history-page');
+        handleLogout();
     });
     document.getElementById('back-from-profile').addEventListener('click', () => {
         goBack();
     });
-    const backFromHistoryBtn = document.getElementById('back-from-history');
-    if (backFromHistoryBtn) {
-        backFromHistoryBtn.addEventListener('click', () => {
-            goBack();
-        });
-    }
+    
     const backFromProfileHistoryBtn = document.getElementById('back-from-profile-history');
     if (backFromProfileHistoryBtn) {
         backFromProfileHistoryBtn.addEventListener('click', () => {
             goBack();
         });
     }
+    
     document.getElementById('profile-save').addEventListener('click', saveProfile);
     document.getElementById('profile-cancel').addEventListener('click', resetProfileForm);
     document.getElementById('profile-logout-link').addEventListener('click', (e) => {
@@ -582,25 +703,56 @@ function setupAuthEventListeners() {
         e.preventDefault();
         deleteAccount();
     });
-    // 税务档案事件
+    
     document.getElementById('tax-profile-save').addEventListener('click', saveTaxProfile);
     document.getElementById('tax-profile-reset').addEventListener('click', resetTaxProfile);
-    // 数据导出事件
+    
     document.getElementById('export-json-btn').addEventListener('click', () => exportData('json'));
     document.getElementById('export-csv-btn').addEventListener('click', () => exportData('csv'));
 
-    document.getElementById('profile-nav-history').addEventListener('click', (e) => {
-        e.preventDefault();
+    document.getElementById('profile-card-history').addEventListener('click', () => {
         loadProfileHistory();
         showPage('profile-history-page');
     });
-    document.getElementById('profile-nav-help').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('help-modal').classList.remove('hidden');
+    document.getElementById('profile-card-tax').addEventListener('click', () => {
+        loadProfileTax();
+        showPage('profile-tax-page');
     });
-    document.getElementById('profile-nav-about').addEventListener('click', (e) => {
+    document.getElementById('profile-card-data').addEventListener('click', () => {
+        showPage('profile-data-page');
+    });
+    document.getElementById('profile-card-calendar').addEventListener('click', () => {
+        loadProfileCalendar();
+        showPage('profile-calendar-page');
+    });
+    document.getElementById('profile-card-help').addEventListener('click', () => {
+        const modal = document.getElementById('help-modal');
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modal.querySelector('div').classList.remove('scale-95');
+        }, 10);
+    });
+    document.getElementById('profile-card-about').addEventListener('click', () => {
+        openModal(document.getElementById('about-modal'));
+    });
+    document.getElementById('profile-nav-settings').addEventListener('click', (e) => {
         e.preventDefault();
-        document.getElementById('about-modal').classList.remove('hidden');
+        loadProfileSettings();
+        showPage('profile-settings-page');
+    });
+    
+    document.getElementById('back-from-settings').addEventListener('click', () => {
+        goBack();
+    });
+    document.getElementById('back-from-tax').addEventListener('click', () => {
+        goBack();
+    });
+    document.getElementById('back-from-data').addEventListener('click', () => {
+        goBack();
+    });
+    document.getElementById('back-from-calendar').addEventListener('click', () => {
+        goBack();
     });
     
     document.getElementById('user-btn').addEventListener('click', () => {
@@ -612,20 +764,117 @@ function setupAuthEventListeners() {
             document.getElementById('user-dropdown').classList.add('hidden');
         }
     });
+    
+    const passwordToggleIds = [
+        { input: 'login-password', toggle: 'login-password-toggle' },
+        { input: 'register-password', toggle: 'register-password-toggle' },
+        { input: 'register-confirm-password', toggle: 'register-confirm-password-toggle' },
+        { input: 'profile-current-password', toggle: 'profile-current-password-toggle' },
+        { input: 'profile-password', toggle: 'profile-password-toggle' },
+        { input: 'profile-confirm-password', toggle: 'profile-confirm-password-toggle' }
+    ];
+    
+    passwordToggleIds.forEach(({ input, toggle }) => {
+        const toggleEl = document.getElementById(toggle);
+        if (toggleEl) {
+            toggleEl.addEventListener('click', () => togglePasswordVisibility(input, toggle));
+        }
+    });
 }
 
-function showAlert(message, type = 'error') {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 ${
-        type === 'success' ? 'bg-success text-white' : 'bg-danger text-white'
-    }`;
-    alertDiv.textContent = message;
-    document.body.appendChild(alertDiv);
+function showAlert(message, type = 'error', callback) {
+    const modal = document.getElementById('alert-modal');
+    const iconDiv = document.getElementById('alert-modal-icon');
+    const iconI = document.getElementById('alert-modal-icon-i');
+    const title = document.getElementById('alert-modal-title');
+    const msg = document.getElementById('alert-modal-message');
+    const okButton = document.getElementById('alert-modal-ok');
+    const closeButton = document.getElementById('close-alert-modal');
     
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 3000);
+    const typeConfig = {
+        success: { icon: 'fa-check-circle', bg: 'bg-green-100', color: 'text-green-600', title: '操作成功' },
+        warning: { icon: 'fa-exclamation-triangle', bg: 'bg-amber-100', color: 'text-amber-600', title: '警告' },
+        error: { icon: 'fa-times-circle', bg: 'bg-red-100', color: 'text-red-600', title: '操作失败' },
+        info: { icon: 'fa-info-circle', bg: 'bg-blue-100', color: 'text-blue-600', title: '提示' }
+    };
+    
+    const config = typeConfig[type] || typeConfig.info;
+    
+    iconDiv.className = `w-10 h-10 ${config.bg} rounded-full flex items-center justify-center mr-3`;
+    iconI.className = `fa ${config.icon} ${config.color}`;
+    title.textContent = config.title;
+    msg.textContent = message;
+    
+    openModal(modal);
+    
+    function handleOk() {
+        closeModal(modal);
+        if (callback) callback();
+        okButton.removeEventListener('click', handleOk);
+        closeButton.removeEventListener('click', handleOk);
+    }
+    
+    okButton.addEventListener('click', handleOk);
+    closeButton.addEventListener('click', handleOk);
 }
+
+function openModal(modal) {
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        modal.querySelector('div').classList.remove('scale-95');
+    }, 10);
+}
+
+function closeModal(modal) {
+    modal.classList.add('opacity-0');
+    modal.querySelector('div').classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+function showConfirm(message, onConfirm, onCancel) {
+    const modal = document.getElementById('confirm-modal');
+    const messageElement = document.getElementById('confirm-modal-message');
+    const confirmButton = document.getElementById('confirm-modal-confirm');
+    const cancelButton = document.getElementById('confirm-modal-cancel');
+    const closeButton = document.getElementById('close-confirm-modal');
+
+    messageElement.textContent = message;
+    openModal(modal);
+
+    function handleConfirm() {
+        closeModal(modal);
+        if (onConfirm) onConfirm();
+        cleanup();
+    }
+
+    function handleCancel() {
+        closeModal(modal);
+        if (onCancel) onCancel();
+        cleanup();
+    }
+
+    function cleanup() {
+        confirmButton.removeEventListener('click', handleConfirm);
+        cancelButton.removeEventListener('click', handleCancel);
+        closeButton.removeEventListener('click', handleCancel);
+    }
+
+    confirmButton.addEventListener('click', handleConfirm);
+    cancelButton.addEventListener('click', handleCancel);
+    closeButton.addEventListener('click', handleCancel);
+}
+
+window.showConfirm = showConfirm;
+window.showLoginModal = showLoginModal;
+window.hideLoginModal = hideLoginModal;
+window.showRegisterModal = showRegisterModal;
+window.hideRegisterModal = hideRegisterModal;
 
 const pageHistory = [];
 let isInitialNavigation = true;
@@ -640,6 +889,7 @@ function showPage(pageId) {
         const page = document.getElementById(pageId);
         if (page) {
             page.classList.remove('hidden');
+            page.classList.add('page-transition', 'active');
         }
         return;
     }
@@ -664,23 +914,29 @@ function showPage(pageId) {
     }
 
     const loginPage = document.getElementById('login-page');
-    if (pageId === 'login-page') {
-        loginPage.classList.remove('hidden');
-        document.querySelectorAll('.page').forEach(page => {
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+        setTimeout(() => {
             page.classList.add('hidden');
-        });
-        document.querySelector('.app-container')?.classList.add('hidden');
-    } else {
-        loginPage?.classList.add('hidden');
-        document.querySelector('.app-container')?.classList.remove('hidden');
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.add('hidden');
-        });
-        const page = document.getElementById(pageId);
-        if (page) {
-            page.classList.remove('hidden');
+        }, 200);
+    });
+
+    setTimeout(() => {
+        if (pageId === 'login-page') {
+            loginPage.classList.remove('hidden');
+            loginPage.classList.add('page-transition', 'active');
+            document.querySelector('.app-container')?.classList.add('hidden');
+        } else {
+            loginPage?.classList.add('hidden');
+            document.querySelector('.app-container')?.classList.remove('hidden');
+            const page = document.getElementById(pageId);
+            if (page) {
+                page.classList.remove('hidden');
+                page.classList.add('page-transition', 'active');
+            }
         }
-    }
+    }, 200);
+    
     isGoingBack = false;
 }
 
@@ -706,5 +962,6 @@ function initAuth() {
 window.deleteHistoryItem = deleteHistoryItem;
 window.showPage = showPage;
 window.goBack = goBack;
+window.showAlert = showAlert;
 
 export { initAuth, updateAuthUI, apiClient, showAlert };
