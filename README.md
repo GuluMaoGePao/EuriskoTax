@@ -524,6 +524,13 @@ npm start
 
 ## 版本更新日志
 
+### v1.19.1 (2026-07-20)
+
+**代码质量优化**:
+- 移除 `loadTaxProfile()` 和 `renderTaxCalendar()` 中的不必要 Promise 包装，恢复为同步函数
+- 移除同步函数调用前的不必要 `await`，避免微任务延迟
+- 修复密码可见性切换函数 `togglePasswordVisibility` 使用 `className` 覆盖导致样式丢失的问题，改用 `classList.add/remove`
+
 ### v1.19.0 (2026-07-19)
 
 **个人中心优化**:
