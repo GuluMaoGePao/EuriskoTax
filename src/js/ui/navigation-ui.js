@@ -1,10 +1,5 @@
-// 页面切换
-function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.add('hidden');
-    });
-    document.getElementById(pageId).classList.remove('hidden');
-}
+// 页面切换 - 委托给 auth-ui.js 中的 showPage（带历史记录）
+// 确保全局只有一个 showPage 实现，保持页面历史一致性
 
 // 通用步骤导航函数
 function updateStepIndicator(pageId, step) {

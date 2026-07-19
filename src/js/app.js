@@ -725,21 +725,21 @@ window.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 返回按钮
+    // 返回按钮 - 使用 goBack() 实现"从哪来回哪去"
     document.getElementById('back-to-mode-selection').addEventListener('click', function() {
-        showPage('mode-selection-page');
+        goBack();
     });
     
     document.getElementById('back-to-mode-selection-reverse').addEventListener('click', function() {
-        showPage('mode-selection-page');
+        goBack();
     });
     
     document.getElementById('back-to-mode-selection-business').addEventListener('click', function() {
-        showPage('mode-selection-page');
+        goBack();
     });
     
     document.getElementById('back-to-mode-selection-classification').addEventListener('click', function() {
-        showPage('mode-selection-page');
+        goBack();
     });
     
     // 历史记录按钮
@@ -765,6 +765,21 @@ window.addEventListener('DOMContentLoaded', function() {
    // 关闭关于模态框
     document.getElementById('close-about-modal').addEventListener('click', function() {
         document.getElementById('about-modal').classList.add('hidden');
+    });
+
+    // 主题切换按钮
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeIcon = themeToggleBtn.querySelector('i');
+    // 初始化图标显示
+    if (document.documentElement.classList.contains('dark')) {
+        themeIcon.className = 'fa fa-sun-o';
+    } else {
+        themeIcon.className = 'fa fa-moon-o';
+    }
+    themeToggleBtn.addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        themeIcon.className = isDark ? 'fa fa-sun-o' : 'fa fa-moon-o';
     });
 
     // 正向计税页面导航按钮
@@ -895,9 +910,9 @@ window.addEventListener('DOMContentLoaded', function() {
         exportToWord('classification-result', '分类所得计税表');
     });
     
-    // 历史记录页面返回按钮
+    // 历史记录页面返回按钮 - 使用 goBack() 实现"从哪来回哪去"
     document.getElementById('back-to-home-btn').addEventListener('click', function() {
-        showPage('mode-selection-page');
+        goBack();
     });
     
     // 专项扣除显示/隐藏控制

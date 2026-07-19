@@ -37,11 +37,15 @@ const authenticateToken = async (req, res, next) => {
         req.user = user;
         next();
     } catch (err) {
-        return res.status(403).json({
+        // 区分 token 过期和无效，便于前端处理
+        const message = err.name === 'TokenExpiredError'
+            ? 'Token expired'
+            : 'Token invalid';
+        return res.status(401).json({
             success: false,
             error: {
-                message: 'Token expired or invalid',
-                statusCode: 403
+                message: message,
+                statusCode: 401
             }
         });
     }

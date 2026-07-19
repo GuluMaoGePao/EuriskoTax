@@ -56,12 +56,14 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     const result = await response.json();
 
     if (!result.success) {
-        if (result.error?.message === 'Token expired or invalid') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '#login';
+        const errorMessage = result.error?.message || '';
+        // Token 过期或无效时，清理登录状态并刷新页面回到登录页
+        if (errorMessage === 'Token expired' || errorMessage === 'Token invalid' || errorMessage === 'Token expired or invalid' || errorMessage === 'Access token is missing' || errorMessage === 'Invalid token') {
+            removeAuthToken();
+            removeCurrentUser();
+            window.location.reload();
         }
-        throw new Error(result.error?.message || '请求失败');
+        throw new Error(errorMessage || '请求失败');
     }
 
     return result.data;

@@ -20,7 +20,7 @@ const registerUser = async (username, email, password, phone = null) => {
         throw error;
     }
     
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS));
+    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
     
     const user = await prisma.user.create({
         data: {
@@ -63,7 +63,7 @@ const loginUser = async (email, password) => {
     const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
     
     return {
@@ -119,7 +119,7 @@ const updateUser = async (userId, data) => {
     if (data.phone !== undefined) updateData.phone = data.phone;
     
     if (data.password) {
-        updateData.password_hash = await bcrypt.hash(data.password, parseInt(process.env.BCRYPT_ROUNDS));
+        updateData.password_hash = await bcrypt.hash(data.password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
     }
     
     const user = await prisma.user.update({
