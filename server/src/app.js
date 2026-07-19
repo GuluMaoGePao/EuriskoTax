@@ -13,6 +13,16 @@ const calculationRoutes = require('./routes/calculations');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 基础安全 HTTP 头部（不引入额外依赖）
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+});
+
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
@@ -47,8 +57,9 @@ app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 请求体大小限制（防止过大请求导致 DoS）
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(logger);
 
 // API 路由
