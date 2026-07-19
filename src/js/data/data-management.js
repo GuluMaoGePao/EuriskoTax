@@ -83,60 +83,7 @@ function showSaveErrorMessage() {
     }, 3000);
 }
 
-// 自定义提示模态框
-function showAlert(message, callback) {
-    const modal = document.getElementById('alert-modal');
-    const messageElement = document.getElementById('alert-modal-message');
-    const okButton = document.getElementById('alert-modal-ok');
-    const closeButton = document.getElementById('close-alert-modal');
 
-    messageElement.textContent = message;
-    modal.classList.remove('hidden');
-
-    function handleOk() {
-        modal.classList.add('hidden');
-        if (callback) callback();
-        okButton.removeEventListener('click', handleOk);
-        closeButton.removeEventListener('click', handleOk);
-    }
-
-    okButton.addEventListener('click', handleOk);
-    closeButton.addEventListener('click', handleOk);
-}
-
-// 自定义确认模态框
-function showConfirm(message, onConfirm, onCancel) {
-    const modal = document.getElementById('confirm-modal');
-    const messageElement = document.getElementById('confirm-modal-message');
-    const confirmButton = document.getElementById('confirm-modal-confirm');
-    const cancelButton = document.getElementById('confirm-modal-cancel');
-    const closeButton = document.getElementById('close-confirm-modal');
-
-    messageElement.textContent = message;
-    modal.classList.remove('hidden');
-
-    function handleConfirm() {
-        modal.classList.add('hidden');
-        if (onConfirm) onConfirm();
-        cleanup();
-    }
-
-    function handleCancel() {
-        modal.classList.add('hidden');
-        if (onCancel) onCancel();
-        cleanup();
-    }
-
-    function cleanup() {
-        confirmButton.removeEventListener('click', handleConfirm);
-        cancelButton.removeEventListener('click', handleCancel);
-        closeButton.removeEventListener('click', handleCancel);
-    }
-
-    confirmButton.addEventListener('click', handleConfirm);
-    cancelButton.addEventListener('click', handleCancel);
-    closeButton.addEventListener('click', handleCancel);
-}
 
 // 保存计算结果
 function saveCalculationResult() {

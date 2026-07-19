@@ -539,6 +539,6 @@ taxDifference: (totalIncome - actualTax) - targetNet
 
 ---
 
-**文档版本**: v2.3  
-**最后更新**: 2026年7月5日  
+**文档版本**: v2.4  
+**最后更新**: 2026年7月19日  
 **维护者**: 开发团队

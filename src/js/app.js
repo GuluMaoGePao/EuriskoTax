@@ -742,29 +742,36 @@ window.addEventListener('DOMContentLoaded', function() {
         goBack();
     });
     
-    // 历史记录按钮
-    document.getElementById('history-btn').addEventListener('click', function() {
-        showPage('history-page');
-        loadHistoryRecords();
-    });
-    
-    // 关于按钮
-    document.getElementById('about-btn').addEventListener('click', function() {
-        document.getElementById('about-modal').classList.remove('hidden');
-    });
-    
     // 帮助按钮
     document.getElementById('help-btn').addEventListener('click', function() {
-        document.getElementById('help-modal').classList.remove('hidden');
+        openModal(document.getElementById('help-modal'));
     });
     
     // 关闭模态框按钮
     document.getElementById('close-help-modal').addEventListener('click', function() {
-        document.getElementById('help-modal').classList.add('hidden');
+        closeModal(document.getElementById('help-modal'));
+    });
+    
+    // 帮助模态框标签页切换
+    document.querySelectorAll('.help-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.help-tab-btn').forEach(b => {
+                b.classList.remove('active', 'text-primary', 'bg-primary/10');
+                b.classList.add('text-gray-600', 'hover:text-gray-800', 'hover:bg-gray-100');
+            });
+            this.classList.remove('text-gray-600', 'hover:text-gray-800', 'hover:bg-gray-100');
+            this.classList.add('active', 'text-primary', 'bg-primary/10');
+            
+            const tabId = this.getAttribute('data-tab');
+            document.querySelectorAll('.help-tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById('help-tab-' + tabId).classList.remove('hidden');
+        });
     });
    // 关闭关于模态框
     document.getElementById('close-about-modal').addEventListener('click', function() {
-        document.getElementById('about-modal').classList.add('hidden');
+        closeModal(document.getElementById('about-modal'));
     });
 
     // 主题切换按钮
@@ -908,11 +915,6 @@ window.addEventListener('DOMContentLoaded', function() {
     // 分类所得页面导出Word按钮
     document.getElementById('export-classification-word-btn').addEventListener('click', function() {
         exportToWord('classification-result', '分类所得计税表');
-    });
-    
-    // 历史记录页面返回按钮 - 使用 goBack() 实现"从哪来回哪去"
-    document.getElementById('back-to-home-btn').addEventListener('click', function() {
-        goBack();
     });
     
     // 专项扣除显示/隐藏控制
