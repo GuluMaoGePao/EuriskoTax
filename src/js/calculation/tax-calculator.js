@@ -482,12 +482,12 @@ function updateBasicResults(results) {
 function updateBonusDisplay(results) {
     const bonusDisplay = document.getElementById('bonus-tax-display');
     if (!bonusDisplay) return;
-    
+
     if (results.incomeDetails.bonus > 0) {
-        bonusDisplay.style.display = 'block';
+        bonusDisplay.classList.remove('hidden');
         const bonusTaxAmountElement = document.getElementById('bonus-tax-amount');
         const bonusMethodElement = document.getElementById('bonus-method');
-        
+
         if (bonusTaxAmountElement) {
             bonusTaxAmountElement.textContent = '¥' + results.incomeDetails.bonusTax.toFixed(2);
         }
@@ -495,72 +495,72 @@ function updateBonusDisplay(results) {
             bonusMethodElement.textContent = results.incomeDetails.bonusInclude ? '并入综合所得计税' : '单独计税';
         }
     } else {
-        bonusDisplay.style.display = 'none';
+        bonusDisplay.classList.add('hidden');
     }
 }
 
 function updateThresholdWarning(results) {
     const thresholdWarningDisplay = document.getElementById('threshold-warning-display');
     if (!thresholdWarningDisplay) return;
-    
+
     const thresholdResult = checkTaxBracketThreshold(results.taxDetails.taxableIncome);
-    
+
     if (thresholdResult.warning) {
-        thresholdWarningDisplay.style.display = 'block';
+        thresholdWarningDisplay.classList.remove('hidden');
         safeSetTextContent('threshold-warning-message', thresholdResult.message);
         safeSetTextContent('threshold-current-rate', (thresholdResult.currentRate * 100).toFixed(0) + '%');
         safeSetTextContent('threshold-next-rate', (thresholdResult.nextRate * 100).toFixed(0) + '%');
         safeSetTextContent('threshold-remaining', '¥' + thresholdResult.remaining.toFixed(2));
     } else {
-        thresholdWarningDisplay.style.display = 'none';
+        thresholdWarningDisplay.classList.add('hidden');
     }
 }
 
 function updateDonationWarning(results) {
     const donationWarningDisplay = document.getElementById('donation-warning-display');
     if (!donationWarningDisplay) return;
-    
+
     const donationResult = validateCharitableDonation(
-        results.deductionDetails.charitableDonation, 
+        results.deductionDetails.charitableDonation,
         results.donationBeforeTaxableIncome
     );
-    
+
     if (donationResult.isExcess) {
-        donationWarningDisplay.style.display = 'block';
+        donationWarningDisplay.classList.remove('hidden');
         safeSetTextContent('donation-warning-message', donationResult.message);
         safeSetTextContent('donation-max-amount', '¥' + donationResult.maxDeduction.toFixed(2));
         safeSetTextContent('donation-actual-amount', '¥' + donationResult.actualDeduction.toFixed(2));
         safeSetTextContent('donation-excess-amount', '¥' + donationResult.excessAmount.toFixed(2));
     } else {
-        donationWarningDisplay.style.display = 'none';
+        donationWarningDisplay.classList.add('hidden');
     }
 }
 
 function updateOptimalBonusDisplay(results) {
     const optimalBonusDisplay = document.getElementById('optimal-bonus-display');
     if (!optimalBonusDisplay) return;
-    
+
     const optimalResult = calculateOptimalBonusAllocation(
-        results.incomeDetails.total, 
+        results.incomeDetails.total,
         results.deductionDetails.total
     );
-    
+
     if (optimalResult.taxSavings >= 0 && optimalResult.optimalMethod === 'include') {
-        optimalBonusDisplay.style.display = 'block';
+        optimalBonusDisplay.classList.remove('hidden');
         safeSetTextContent('optimal-bonus-amount', '¥0（并入综合所得）');
         safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
         safeSetTextContent('optimal-tax-savings', '¥0（已是最佳方案）');
         safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
         safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
     } else if (optimalResult.taxSavings > 0) {
-        optimalBonusDisplay.style.display = 'block';
+        optimalBonusDisplay.classList.remove('hidden');
         safeSetTextContent('optimal-bonus-amount', '¥' + optimalResult.optimalBonus.toFixed(2));
         safeSetTextContent('optimal-salary-amount', '¥' + optimalResult.optimalSalary.toFixed(2));
         safeSetTextContent('optimal-tax-savings', '¥' + optimalResult.taxSavings.toFixed(2));
         safeSetTextContent('optimal-original-tax', '¥' + optimalResult.allInTax.toFixed(2));
         safeSetTextContent('optimal-new-tax', '¥' + optimalResult.minTax.toFixed(2));
     } else {
-        optimalBonusDisplay.style.display = 'none';
+        optimalBonusDisplay.classList.add('hidden');
     }
 }
 
@@ -569,19 +569,19 @@ function updatePrepaidAndRefundTax(results) {
     if (resultPrepaidTaxElement) {
         resultPrepaidTaxElement.textContent = '¥' + results.taxDetails.prepaidTax.toFixed(2);
     }
-    
+
     const refundTaxElement = document.getElementById('result-refund-tax');
     if (refundTaxElement) {
         const refundTax = results.taxDetails.refundTax;
+        refundTaxElement.classList.remove('text-danger', 'text-success', 'text-primary');
         if (refundTax === 0) {
             refundTaxElement.textContent = '不退不补 ¥0.00';
-            refundTaxElement.className = 'font-medium text-lg';
         } else if (refundTax > 0) {
             refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
-            refundTaxElement.className = 'font-medium text-lg text-danger';
+            refundTaxElement.classList.add('text-danger');
         } else {
             refundTaxElement.textContent = '应退 ¥' + Math.abs(refundTax).toFixed(2);
-            refundTaxElement.className = 'font-medium text-lg text-success';
+            refundTaxElement.classList.add('text-success');
         }
     }
 }
@@ -593,6 +593,26 @@ function updateNetIncome(results) {
     }
 }
 
+function updateTaxBarVisualization(results) {
+    const start = performance.now();
+    const totalIncome = results.incomeDetails.total;
+    const totalTax = results.taxDetails.totalTax;
+    const effectiveRate = totalIncome > 0 ? (totalTax / totalIncome * 100) : 0;
+
+    const barFill = document.getElementById('result-tax-bar-fill');
+    if (barFill) {
+        barFill.style.width = Math.min(effectiveRate, 100) + '%';
+    }
+    const rateEl = document.getElementById('result-effective-rate');
+    if (rateEl) {
+        rateEl.textContent = effectiveRate.toFixed(1) + '%';
+    }
+    const duration = +(performance.now() - start).toFixed(3);
+    if (typeof InteractionLog !== 'undefined') {
+        InteractionLog.calc('税负条渲染', { totalIncome, totalTax, effectiveRate: effectiveRate.toFixed(2) + '%' }, { durationMs: duration });
+    }
+}
+
 function updateTaxResultsUI(results) {
     updateBasicResults(results);
     updateBonusDisplay(results);
@@ -601,6 +621,7 @@ function updateTaxResultsUI(results) {
     updateOptimalBonusDisplay(results);
     updatePrepaidAndRefundTax(results);
     updateNetIncome(results);
+    updateTaxBarVisualization(results);
 }
 
 function handleCalculationError(error) {
@@ -2383,7 +2404,31 @@ function calculateBusinessTax() {
         safeSetTextContent('business-result-total-tax', '¥' + totalTax.toFixed(2));
         safeSetTextContent('business-result-prepaid-tax', '¥' + prepaidTax.toFixed(2));
         safeSetTextContent('business-result-refund-tax', (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2));
-        safeSetClass('business-result-refund-tax', refundTax >= 0 ? 'font-medium text-lg text-danger' : 'font-medium text-lg text-success');
+
+        // 颜色切换 + 税负条渲染（含性能日志）
+        const bizRenderStart = performance.now();
+
+        const businessRefundEl = document.getElementById('business-result-refund-tax');
+        if (businessRefundEl) {
+            businessRefundEl.classList.remove('text-danger', 'text-success', 'text-primary');
+            businessRefundEl.classList.add(refundTax >= 0 ? 'text-danger' : 'text-success');
+        }
+
+        // 税负可视化条
+        const businessTotalIncome = businessCalculationResults.income || 0;
+        const businessEffectiveRate = businessTotalIncome > 0 ? (totalTax / businessTotalIncome * 100) : 0;
+        const businessBarFill = document.getElementById('business-tax-bar-fill');
+        if (businessBarFill) businessBarFill.style.width = Math.min(businessEffectiveRate, 100) + '%';
+        const businessRateEl = document.getElementById('business-effective-rate');
+        if (businessRateEl) businessRateEl.textContent = businessEffectiveRate.toFixed(1) + '%';
+
+        const bizRenderDuration = +(performance.now() - bizRenderStart).toFixed(3);
+        if (typeof InteractionLog !== 'undefined') {
+            InteractionLog.calc('经营所得指标卡渲染',
+                { income: businessTotalIncome, tax: totalTax, effectiveRate: businessEffectiveRate.toFixed(2) + '%' },
+                { durationMs: bizRenderDuration });
+        }
+
         safeSetTextContent('business-result-deduction', '¥' + applicableDeduction.toFixed(2));
         safeSetTextContent('business-result-tax-reduction', '¥' + taxReduction.toFixed(2));
         safeSetTextContent('business-result-deductions', '¥' + totalDeduction.toFixed(2));
@@ -2448,19 +2493,18 @@ function calculateBusinessTax() {
 }
 
 // 保存经营所得计算结果到历史记录
-function saveBusinessCalculation() {
-    if (Object.keys(businessCalculationResults).length === 0) {
+// 通用保存到历史记录
+function saveToHistory(results, type, titlePrefix) {
+    if (!results || Object.keys(results).length === 0) {
         showAlert('请先完成计算后再保存');
-        return;
+        return false;
     }
-
     try {
-        const id = Date.now().toString();
         const savedData = {
-            id: id,
-            type: 'business',
-            title: '经营所得计税 - ' + new Date().toLocaleDateString(),
-            results: businessCalculationResults,
+            id: Date.now().toString(),
+            type: type,
+            title: titlePrefix + ' - ' + new Date().toLocaleDateString(),
+            results: results,
             date: new Date().toISOString()
         };
         calculationHistory.unshift(savedData);
@@ -2469,66 +2513,26 @@ function saveBusinessCalculation() {
         }
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
         showSaveSuccessMessage();
+        return true;
     } catch (error) {
         console.error('保存计算结果失败:', error);
         showSaveErrorMessage();
+        return false;
     }
+}
+
+function saveBusinessCalculation() {
+    saveToHistory(businessCalculationResults, 'business', '经营所得计税');
 }
 
 // 保存分类所得计算结果到历史记录
 function saveClassificationCalculation() {
-    if (Object.keys(classificationCalculationResults).length === 0) {
-        showAlert('请先完成计算后再保存');
-        return;
-    }
-
-    try {
-        const id = Date.now().toString();
-        const savedData = {
-            id: id,
-            type: 'classification',
-            title: '分类所得计税 - ' + new Date().toLocaleDateString(),
-            results: classificationCalculationResults,
-            date: new Date().toISOString()
-        };
-        calculationHistory.unshift(savedData);
-        if (calculationHistory.length > 50) {
-            calculationHistory = calculationHistory.slice(0, 50);
-        }
-        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
-        showSaveSuccessMessage();
-    } catch (error) {
-        console.error('保存计算结果失败:', error);
-        showSaveErrorMessage();
-    }
+    saveToHistory(classificationCalculationResults, 'classification', '分类所得计税');
 }
 
 // 保存反向倒算计算结果到历史记录
 function saveReverseCalculation() {
-    if (Object.keys(reverseCalculationResults).length === 0) {
-        showAlert('请先完成计算后再保存');
-        return;
-    }
-
-    try {
-        const id = Date.now().toString();
-        const savedData = {
-            id: id,
-            type: 'reverse',
-            title: '反向倒算计税 - ' + new Date().toLocaleDateString(),
-            results: reverseCalculationResults,
-            date: new Date().toISOString()
-        };
-        calculationHistory.unshift(savedData);
-        if (calculationHistory.length > 50) {
-            calculationHistory = calculationHistory.slice(0, 50);
-        }
-        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
-        showSaveSuccessMessage();
-    } catch (error) {
-        console.error('保存计算结果失败:', error);
-        showSaveErrorMessage();
-    }
+    saveToHistory(reverseCalculationResults, 'reverse', '反向倒算计税');
 }
 
 // 计算单个分类所得条目

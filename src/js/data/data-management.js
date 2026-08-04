@@ -87,15 +87,17 @@ function showSaveErrorMessage() {
 
 // 保存计算结果
 function saveCalculationResult() {
+    console.log('%c[EuriskoTax] SAVE → 开始保存计算结果', 'color: #1e40af; font-weight: bold;');
     if (Object.keys(calculationResults).length === 0) {
+        console.warn('[EuriskoTax] SAVE → 计算结果为空，无法保存');
         showAlert('请先进行计算，再保存结果');
         return;
     }
-    
+
     try {
         // 生成唯一ID
         const id = Date.now().toString();
-        
+
         // 构建保存的数据对象
         const savedData = {
             id: id,
@@ -104,23 +106,32 @@ function saveCalculationResult() {
             results: calculationResults,
             date: new Date().toISOString()
         };
-        
+
+        console.log('[EuriskoTax] SAVE → 保存数据:', {
+            id: id,
+            type: savedData.type,
+            title: savedData.title,
+            income: calculationResults?.incomeDetails?.total,
+            tax: calculationResults?.taxDetails?.totalTax
+        });
+
         // 添加到历史记录
         calculationHistory.unshift(savedData);
-        
+
         // 限制历史记录数量
         if (calculationHistory.length > 50) {
             calculationHistory = calculationHistory.slice(0, 50);
         }
-        
+
         // 保存到本地存储
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
-        
+        console.log('%c[EuriskoTax] SAVE → 保存成功，历史记录共 ' + calculationHistory.length + ' 条', 'color: #16a34a; font-weight: bold;');
+
         // 显示保存成功提示
         showSaveSuccessMessage();
-        
+
     } catch (error) {
-        console.error('保存计算结果失败:', error);
+        console.error('[EuriskoTax] SAVE → 保存失败:', error);
         showSaveErrorMessage();
     }
 }

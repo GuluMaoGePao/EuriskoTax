@@ -20,6 +20,12 @@ npm-debug.log*
 dist/
 build/
 
+# Test coverage
+coverage/
+
+# Local backups
+backup/
+
 # OS files
 .DS_Store
 Thumbs.db
