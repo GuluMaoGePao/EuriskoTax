@@ -153,27 +153,132 @@ async function handleLogout() {
     showPage('mode-selection-page');
 }
 
+// === 个人中心性能日志工具 ===
+const ProfilePerf = {
+    log(action, durationMs, extra = {}) {
+        const now = new Date();
+        const time = now.toISOString().split('T')[1].split('.')[0];
+        const ts = now.getTime();
+        console.log(
+            `%c[EuriskoTax Profile ${time}]`,
+            'color: #7c3aed; font-weight: bold;',
+            `${action} → ${durationMs.toFixed(2)}ms`,
+            { timestamp: ts, ...extra }
+        );
+    },
+    measure(action, fn, extra = {}) {
+        const start = performance.now();
+        const result = fn();
+        const duration = performance.now() - start;
+        this.log(action, duration, extra);
+        return result;
+    },
+    async measureAsync(action, fn, extra = {}) {
+        const start = performance.now();
+        const result = await fn();
+        const duration = performance.now() - start;
+        this.log(action, duration, extra);
+        return result;
+    },
+    // 测量多个子步骤并汇总
+    measureSteps(action, steps, extra = {}) {
+        const totalStart = performance.now();
+        const timings = {};
+        for (const [name, fn] of steps) {
+            const s = performance.now();
+            fn();
+            timings[name] = +(performance.now() - s).toFixed(2);
+        }
+        const total = +(performance.now() - totalStart).toFixed(2);
+        this.log(action, total, { steps: timings, ...extra });
+        return timings;
+    }
+};
+
 async function loadProfile() {
+    const totalStart = performance.now();
     try {
-        const user = await apiClient.getProfile();
+        const user = await ProfilePerf.measureAsync('loadProfile → API获取用户信息', () => apiClient.getProfile());
         document.getElementById('profile-username').value = user.username;
         document.getElementById('profile-email').value = user.email;
         document.getElementById('profile-phone').value = user.phone || '';
         document.getElementById('profile-display-name').textContent = user.username;
         document.getElementById('profile-display-email').textContent = user.email;
-        
-        updateProfileStats();
-        loadTaxProfile();
-        renderTaxCalendar();
+
+        ProfilePerf.measure('loadProfile → 渲染统计卡片', renderProfileStats);
+        ProfilePerf.measure('loadProfile → 更新统计数据', updateProfileStats);
+        ProfilePerf.measure('loadProfile → 渲染模块卡片', renderProfileCards);
+        ProfilePerf.measure('loadProfile → 加载税务档案', loadTaxProfile);
+        ProfilePerf.measure('loadProfile → 渲染税务日历', renderTaxCalendar);
+
+        const totalDuration = performance.now() - totalStart;
+        ProfilePerf.log('loadProfile → 总耗时', totalDuration, { user: user.username });
     } catch (error) {
         showAlert('加载失败: ' + error.message);
+        ProfilePerf.log('loadProfile → 错误', performance.now() - totalStart, { error: error.message });
     }
+}
+
+// === 个人中心统计卡片配置 ===
+const PROFILE_STATS_CONFIG = [
+    { id: 'profile-stats-calculations', icon: 'fa-calculator', color: 'blue', label: '计算次数' },
+    { id: 'profile-stats-profiles', icon: 'fa-file-text-o', color: 'green', label: '档案数量' },
+    { id: 'profile-stats-history', icon: 'fa-history', color: 'purple', label: '历史记录' },
+    { id: 'profile-stats-reminders', icon: 'fa-calendar-check-o', color: 'orange', label: '本月提醒' }
+];
+
+// 渲染统计卡片
+function renderProfileStats() {
+    const grid = document.getElementById('profile-stats-grid');
+    if (!grid || grid.children.length > 0) return; // 已渲染则跳过
+
+    grid.innerHTML = PROFILE_STATS_CONFIG.map(({ id, icon, color, label }) => `
+        <div class="bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-xl p-4 border border-${color}-200">
+            <div class="flex items-center">
+                <div class="w-10 h-10 bg-${color}-500 rounded-lg flex items-center justify-center mr-3">
+                    <i class="fa ${icon} text-white"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-${color}-600 font-medium">${label}</p>
+                    <p id="${id}" class="text-2xl font-bold text-${color}-800">0</p>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// === 个人中心功能模块卡片配置 ===
+const PROFILE_CARDS_CONFIG = [
+    { id: 'profile-card-history', icon: 'fa-history', color: 'blue', title: '计算历史', desc: '查看和管理您的计算记录' },
+    { id: 'profile-card-tax', icon: 'fa-file-text-o', color: 'green', title: '税务档案', desc: '设置常用扣除配置，快速应用' },
+    { id: 'profile-card-data', icon: 'fa-database', color: 'purple', title: '数据管理', desc: '导出计算数据，备份与迁移' },
+    { id: 'profile-card-calendar', icon: 'fa-calendar', color: 'orange', title: '税务日历', desc: '关键时间节点提醒' },
+    { id: 'profile-card-help', icon: 'fa-question-circle', color: 'gray', title: '使用帮助', desc: '了解如何使用本工具' },
+    { id: 'profile-card-about', icon: 'fa-info-circle', color: 'indigo', title: '关于我们', desc: '了解更多信息' }
+];
+
+// 渲染功能模块卡片
+function renderProfileCards() {
+    const grid = document.getElementById('profile-cards-grid');
+    if (!grid || grid.children.length > 0) return; // 已渲染则跳过
+
+    grid.innerHTML = PROFILE_CARDS_CONFIG.map(({ id, icon, color, title, desc }) => `
+        <div class="card cursor-pointer profile-card-hover" id="${id}">
+            <div class="p-6">
+                <div class="w-12 h-12 rounded-lg bg-${color}-100 flex items-center justify-center mb-4">
+                    <i class="fa ${icon} text-2xl text-${color}-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">${title}</h3>
+                <p class="text-sm text-gray-500">${desc}</p>
+            </div>
+        </div>
+    `).join('');
 }
 
 function updateProfileStats() {
     const history = JSON.parse(localStorage.getItem('calculation_history') || '[]');
     const taxProfile = localStorage.getItem('tax_profile');
-    
+
     document.getElementById('profile-stats-calculations').textContent = history.length;
     document.getElementById('profile-stats-history').textContent = history.length;
     document.getElementById('profile-stats-profiles').textContent = taxProfile ? 1 : 0;
@@ -560,42 +665,32 @@ function renderHistoryItems(history, listElement) {
     listElement.appendChild(fragment);
 }
 
-async function loadHistory() {
-    const historyList = document.getElementById('history-list');
-    const historyEmpty = document.getElementById('history-empty');
-    
+// 通用历史记录加载函数（合并原 loadHistory 和 loadProfileHistory）
+async function loadHistoryToList(listId, emptyId) {
+    const historyList = document.getElementById(listId);
+    const historyEmpty = document.getElementById(emptyId);
+
     try {
         const history = await getHistoryData();
-        
+
         if (history.length === 0) {
-            historyEmpty.classList.remove('hidden');
+            if (historyEmpty) historyEmpty.classList.remove('hidden');
             return;
         }
-        
-        historyEmpty.classList.add('hidden');
+
+        if (historyEmpty) historyEmpty.classList.add('hidden');
         renderHistoryItems(history, historyList);
     } catch (error) {
         showAlert('加载失败: ' + error.message);
     }
 }
 
+async function loadHistory() {
+    return loadHistoryToList('history-list', 'history-empty');
+}
+
 async function loadProfileHistory() {
-    const historyList = document.getElementById('profile-history-list');
-    const historyEmpty = document.getElementById('profile-history-empty');
-    
-    try {
-        const history = await getHistoryData();
-        
-        if (history.length === 0) {
-            historyEmpty.classList.remove('hidden');
-            return;
-        }
-        
-        historyEmpty.classList.add('hidden');
-        renderHistoryItems(history, historyList);
-    } catch (error) {
-        showAlert('加载失败: ' + error.message);
-    }
+    return loadHistoryToList('profile-history-list', 'profile-history-empty');
 }
 
 function getCalculationTypeName(type) {
@@ -675,24 +770,32 @@ function setupAuthEventListeners() {
     document.getElementById('register-submit').addEventListener('click', handleRegister);
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
+        const eventTime = Date.now();
         loadProfile();
+        const showPageStart = performance.now();
         showPage('profile-page');
+        const showPageDuration = performance.now() - showPageStart;
+        ProfilePerf.log('进入个人中心 → showPage', showPageDuration, { eventTime });
     });
     document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
         handleLogout();
     });
-    document.getElementById('back-from-profile').addEventListener('click', () => {
-        goBack();
-    });
-    
-    const backFromProfileHistoryBtn = document.getElementById('back-from-profile-history');
-    if (backFromProfileHistoryBtn) {
-        backFromProfileHistoryBtn.addEventListener('click', () => {
-            goBack();
+
+    // === 通用返回按钮绑定（所有 back-from-* 按钮统一调用 goBack） ===
+    document.querySelectorAll('[id^="back-from-"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const eventTime = Date.now();
+            const fromPage = btn.closest('.page')?.id || 'unknown';
+            const steps = [['goBack', goBack]];
+            ProfilePerf.measureSteps('返回按钮点击', steps, {
+                from: fromPage,
+                buttonId: btn.id,
+                eventTime
+            });
         });
-    }
-    
+    });
+
     document.getElementById('profile-save').addEventListener('click', saveProfile);
     document.getElementById('profile-cancel').addEventListener('click', resetProfileForm);
     document.getElementById('profile-logout-link').addEventListener('click', (e) => {
@@ -703,62 +806,70 @@ function setupAuthEventListeners() {
         e.preventDefault();
         deleteAccount();
     });
-    
+
     document.getElementById('tax-profile-save').addEventListener('click', saveTaxProfile);
     document.getElementById('tax-profile-reset').addEventListener('click', resetTaxProfile);
-    
+
     document.getElementById('export-json-btn').addEventListener('click', () => exportData('json'));
     document.getElementById('export-csv-btn').addEventListener('click', () => exportData('csv'));
 
-    document.getElementById('profile-card-history').addEventListener('click', () => {
-        loadProfileHistory();
-        showPage('profile-history-page');
-    });
-    document.getElementById('profile-card-tax').addEventListener('click', () => {
-        loadProfileTax();
-        showPage('profile-tax-page');
-    });
-    document.getElementById('profile-card-data').addEventListener('click', () => {
-        showPage('profile-data-page');
-    });
-    document.getElementById('profile-card-calendar').addEventListener('click', () => {
-        loadProfileCalendar();
-        showPage('profile-calendar-page');
-    });
-    document.getElementById('profile-card-help').addEventListener('click', () => {
-        const modal = document.getElementById('help-modal');
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            modal.classList.remove('opacity-0');
-            modal.querySelector('div').classList.remove('scale-95');
-        }, 10);
-    });
-    document.getElementById('profile-card-about').addEventListener('click', () => {
-        openModal(document.getElementById('about-modal'));
-    });
+    // === 通用个人中心卡片点击处理（事件委托，支持动态生成的卡片） ===
+    // 配置: { 卡片ID, 目标页面ID, 加载函数(可选), 特殊处理(可选) }
+    const profileCardConfigs = [
+        { cardId: 'profile-card-history', pageId: 'profile-history-page', loadFn: loadProfileHistory },
+        { cardId: 'profile-card-tax', pageId: 'profile-tax-page', loadFn: loadProfileTax },
+        { cardId: 'profile-card-data', pageId: 'profile-data-page' },
+        { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
+        { cardId: 'profile-card-help', specialFn: () => {
+            const modal = document.getElementById('help-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }},
+        { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) }
+    ];
+
+    const profileCardsGrid = document.getElementById('profile-cards-grid');
+    if (profileCardsGrid) {
+        profileCardsGrid.addEventListener('click', (e) => {
+            const card = e.target.closest('[id^="profile-card-"]');
+            if (!card) return;
+            const config = profileCardConfigs.find(c => c.cardId === card.id);
+            if (!config) return;
+            const eventTime = Date.now();
+            if (config.specialFn) {
+                ProfilePerf.measure('卡片点击 → 特殊处理', config.specialFn, {
+                    cardId: card.id, target: 'modal', eventTime
+                });
+            } else {
+                const steps = [];
+                if (config.loadFn) steps.push(['loadFn', config.loadFn]);
+                if (config.pageId) steps.push(['showPage', () => showPage(config.pageId)]);
+                ProfilePerf.measureSteps('卡片点击', steps, {
+                    cardId: card.id,
+                    target: config.pageId || 'unknown',
+                    hasLoadFn: !!config.loadFn,
+                    eventTime
+                });
+            }
+        });
+    }
+
     document.getElementById('profile-nav-settings').addEventListener('click', (e) => {
         e.preventDefault();
-        loadProfileSettings();
-        showPage('profile-settings-page');
+        const eventTime = Date.now();
+        ProfilePerf.measureSteps('导航 → 账户设置', [
+            ['loadProfileSettings', () => loadProfileSettings()],
+            ['showPage', () => showPage('profile-settings-page')]
+        ], { eventTime });
     });
-    
-    document.getElementById('back-from-settings').addEventListener('click', () => {
-        goBack();
-    });
-    document.getElementById('back-from-tax').addEventListener('click', () => {
-        goBack();
-    });
-    document.getElementById('back-from-data').addEventListener('click', () => {
-        goBack();
-    });
-    document.getElementById('back-from-calendar').addEventListener('click', () => {
-        goBack();
-    });
-    
+
     document.getElementById('user-btn').addEventListener('click', () => {
         document.getElementById('user-dropdown').classList.toggle('hidden');
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#user-menu')) {
             document.getElementById('user-dropdown').classList.add('hidden');

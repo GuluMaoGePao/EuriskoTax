@@ -1,13 +1,48 @@
 // 页面切换 - 委托给 auth-ui.js 中的 showPage（带历史记录）
 // 确保全局只有一个 showPage 实现，保持页面历史一致性
 
+// 交互日志工具
+const InteractionLog = {
+    enabled: true,
+    log(type, action, details = {}) {
+        if (!this.enabled) return;
+        const time = new Date().toISOString().split('T')[1].split('.')[0];
+        console.log(
+            `%c[EuriskoTax ${time}]`,
+            'color: #1e40af; font-weight: bold;',
+            `${type} → ${action}`,
+            details
+        );
+    },
+    step(pageId, step, totalSteps) {
+        this.log('STEP', `${pageId} → 步骤 ${step}/${totalSteps}`, {
+            page: pageId, step, total: totalSteps
+        });
+    },
+    preview(pageId, values) {
+        this.log('PREVIEW', `${pageId} 预览条更新`, values);
+    },
+    calc(action, input, output) {
+        this.log('CALC', action, { input, output });
+    },
+    save(action, data) {
+        this.log('SAVE', action, data);
+    },
+    error(action, error) {
+        console.error(`[EuriskoTax ERROR] ${action}:`, error);
+    }
+};
+
 // 通用步骤导航函数
 function updateStepIndicator(pageId, step) {
     // 更新步骤指示器
     const steps = document.querySelectorAll(`#${pageId} .step-number`);
     const stepTitles = document.querySelectorAll(`#${pageId} .step-title`);
     const stepLines = document.querySelectorAll(`#${pageId} .step-line`);
-    
+    const totalSteps = steps.length;
+
+    InteractionLog.step(pageId, step, totalSteps);
+
     steps.forEach((stepEl, index) => {
         const stepNum = index + 1;
         if (stepNum < step) {
@@ -23,7 +58,7 @@ function updateStepIndicator(pageId, step) {
             stepEl.textContent = stepNum;
         }
     });
-    
+
     stepTitles.forEach((titleEl, index) => {
         const stepNum = index + 1;
         if (stepNum < step) {
@@ -36,7 +71,7 @@ function updateStepIndicator(pageId, step) {
             titleEl.classList.remove('active', 'completed');
         }
     });
-    
+
     stepLines.forEach((lineEl, index) => {
         const lineNum = index + 1;
         if (lineNum < step) {
@@ -49,12 +84,229 @@ function updateStepIndicator(pageId, step) {
             lineEl.classList.remove('active', 'completed');
         }
     });
+
+    // 结果步骤隐藏预览条
+    const previewBar = document.querySelector(`#${pageId} .calc-preview-bar`);
+    if (previewBar) {
+        if (step === totalSteps) {
+            previewBar.classList.add('is-result-step');
+        } else {
+            previewBar.classList.remove('is-result-step');
+        }
+    }
+
+    // 触发预览条刷新
+    if (typeof updateCalcPreview === 'function') {
+        updateCalcPreview(pageId);
+    }
+
+    // 更新步骤进度文字（移动端显示 "1/4"）
+    const indicator = document.querySelector(`#${pageId} .step-indicator`);
+    if (indicator && totalSteps > 0) {
+        let progressEl = indicator.querySelector('.step-progress-text');
+        if (!progressEl) {
+            progressEl = document.createElement('span');
+            progressEl.className = 'step-progress-text';
+            indicator.appendChild(progressEl);
+        }
+        progressEl.textContent = `${step}/${totalSteps}`;
+    }
+}
+
+// === 预览条实时更新 ===
+function formatPreviewNum(n) {
+    const num = Math.max(0, Math.round(Number(n) || 0));
+    return num.toLocaleString('zh-CN');
+}
+
+function updateCalcPreview(pageId) {
+    try {
+        if (pageId === 'forward-calculation-page') {
+            const income = parseFloat(document.getElementById('total-income-amount')?.textContent.replace(/,/g, '')) || 0;
+            const deductionEl = document.getElementById('total-deduction-amount');
+            const deduction = deductionEl ? (parseFloat(deductionEl.textContent.replace(/,/g, '')) || 0) : 0;
+            const tax = (typeof calculationResults !== 'undefined' && calculationResults?.taxDetails?.totalTax) || 0;
+            const incEl = document.getElementById('forward-preview-income');
+            const dedEl = document.getElementById('forward-preview-deduction');
+            const taxEl = document.getElementById('forward-preview-tax');
+            if (incEl) incEl.textContent = formatPreviewNum(income);
+            if (dedEl) dedEl.textContent = formatPreviewNum(deduction);
+            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
+            InteractionLog.preview(pageId, { income, deduction, tax });
+        } else if (pageId === 'reverse-calculation-page') {
+            // 根据 reverse-type 取对应输入
+            let target = 0;
+            const reverseType = document.getElementById('reverse-type')?.value;
+            if (reverseType === 'rate') {
+                target = parseFloat(document.getElementById('reverse-target-rate')?.value) || 0;
+            } else if (reverseType === 'monthly') {
+                target = parseFloat(document.getElementById('reverse-monthly-net')?.value) || 0;
+            } else if (reverseType === 'both') {
+                const targetType = document.getElementById('reverse-target-type')?.value;
+                target = parseFloat(document.getElementById(targetType === 'net' ? 'reverse-fixed-net' : 'reverse-fixed-tax')?.value) || 0;
+            }
+            const deduction = (typeof reverseDeductionAmount !== 'undefined' && reverseDeductionAmount) || 0;
+            const income = (typeof reverseCalculationResults !== 'undefined' &&
+                (reverseCalculationResults?.incomeDetails?.total || reverseCalculationResults?.totalIncome)) || 0;
+            const tEl = document.getElementById('reverse-preview-target');
+            const dEl = document.getElementById('reverse-preview-deduction');
+            const iEl = document.getElementById('reverse-preview-income');
+            if (tEl) tEl.textContent = formatPreviewNum(target);
+            if (dEl) dEl.textContent = formatPreviewNum(deduction);
+            if (iEl) iEl.textContent = formatPreviewNum(income);
+            InteractionLog.preview(pageId, { target, deduction, income });
+        } else if (pageId === 'business-calculation-page') {
+            const taxable = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxableIncome) || 0;
+            const deduction = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.deductionDetails?.totalDeduction) || 0;
+            const tax = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxDetails?.totalTax) || 0;
+            const tEl = document.getElementById('business-preview-taxable');
+            const dEl = document.getElementById('business-preview-deduction');
+            const taxEl = document.getElementById('business-preview-tax');
+            if (tEl) tEl.textContent = formatPreviewNum(taxable);
+            if (dEl) dEl.textContent = formatPreviewNum(deduction);
+            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
+            InteractionLog.preview(pageId, { taxable, deduction, tax });
+        } else if (pageId === 'classification-calculation-page') {
+            const income = parseFloat(document.getElementById('classification-income')?.value) || 0;
+            // 分类所得无显式税率字段，按类型估算
+            const type = document.getElementById('classification-type')?.value || 'interest';
+            const rateMap = { interest: 20, rent: 20, transfer: 20, accidental: 20 };
+            const rate = rateMap[type] || 20;
+            const tax = (typeof classificationCalculationResults !== 'undefined' && classificationCalculationResults?.taxDetails?.totalTax) || (income * rate / 100);
+            const iEl = document.getElementById('classification-preview-income');
+            const rEl = document.getElementById('classification-preview-rate');
+            const tEl = document.getElementById('classification-preview-tax');
+            if (iEl) iEl.textContent = formatPreviewNum(income);
+            if (rEl) rEl.textContent = rate;
+            if (tEl) tEl.textContent = formatPreviewNum(tax);
+            InteractionLog.preview(pageId, { income, rate, tax });
+        }
+    } catch (e) {
+        // 预览条更新失败不应影响主流程
+        InteractionLog.error('预览条更新', e);
+    }
+}
+
+// 延迟刷新，确保在其他计算函数更新显示值之后再读取
+function schedulePreviewUpdate(pageId) {
+    if (window.requestAnimationFrame) {
+        requestAnimationFrame(() => updateCalcPreview(pageId));
+    } else {
+        setTimeout(() => updateCalcPreview(pageId), 0);
+    }
+}
+
+// 绑定输入实时刷新预览条
+function bindPreviewLiveUpdate() {
+    const forwardInputs = ['salary-income', 'labor-income', 'author-income', 'royalty-income', 'bonus-income',
+        'social-security-base', 'pension-insurance', 'medical-insurance', 'unemployment-insurance', 'housing-fund'];
+    forwardInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => schedulePreviewUpdate('forward-calculation-page'));
+    });
+
+    const reverseInputs = ['reverse-target-rate', 'reverse-monthly-net', 'reverse-fixed-tax', 'reverse-fixed-net',
+        'reverse-social-security-base', 'reverse-pension-insurance', 'reverse-medical-insurance'];
+    reverseInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => schedulePreviewUpdate('reverse-calculation-page'));
+            el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
+        }
+    });
+    // reverse-type / reverse-target-type 改变时也刷新
+    ['reverse-type', 'reverse-target-type'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
+    });
+
+    const businessInputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes',
+        'business-losses', 'business-other-expenses', 'business-pension-insurance', 'business-medical-insurance'];
+    businessInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => schedulePreviewUpdate('business-calculation-page'));
+    });
+
+    const classificationInputs = ['classification-income'];
+    classificationInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => schedulePreviewUpdate('classification-calculation-page'));
+    });
+    // classification-type 改变时刷新税率显示
+    const classificationTypeEl = document.getElementById('classification-type');
+    if (classificationTypeEl) {
+        classificationTypeEl.addEventListener('change', () => schedulePreviewUpdate('classification-calculation-page'));
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindPreviewLiveUpdate);
+} else {
+    bindPreviewLiveUpdate();
+}
+
+// === 参数提示系统：初始化 tooltip 交互 ===
+// 将 data-hint 属性对应的文本注入 tooltip-text，并绑定点击展开/收起
+function initTooltipHints() {
+    const tooltips = document.querySelectorAll('.tooltip[data-hint]');
+    if (!tooltips.length) return;
+
+    // 从 FIELD_HINTS 数据注入文本
+    tooltips.forEach(tip => {
+        const key = tip.getAttribute('data-hint');
+        const text = (window.FIELD_HINTS && window.FIELD_HINTS[key]) || '';
+        const textEl = tip.querySelector('.tooltip-text');
+        if (textEl && text) {
+            textEl.innerHTML = text;
+        }
+
+        // 点击切换展开/收起
+        tip.addEventListener('click', function(e) {
+            e.preventDefault();   // 阻止 label 将点击转发到关联的 select/input
+            e.stopPropagation();  // 阻止冒泡到 document
+            const wasOpen = this.classList.contains('is-open');
+            // 先关闭所有其他 tooltip
+            document.querySelectorAll('.tooltip.is-open').forEach(t => {
+                if (t !== this) t.classList.remove('is-open');
+            });
+            if (!wasOpen) {
+                this.classList.add('is-open');
+            } else {
+                this.classList.remove('is-open');
+            }
+        });
+    });
+
+    // 点击页面其他区域关闭 tooltip
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.tooltip')) {
+            document.querySelectorAll('.tooltip.is-open').forEach(t => {
+                t.classList.remove('is-open');
+            });
+        }
+    });
+
+    // ESC 键关闭 tooltip
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.tooltip.is-open').forEach(t => {
+                t.classList.remove('is-open');
+            });
+        }
+    });
+}
+
+// 初始化 tooltip
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTooltipHints);
+} else {
+    initTooltipHints();
 }
 
 // 步骤导航
 function goToStep(step) {
-    currentStep = step;
-    
+    InteractionLog.log('NAV', `goToStep(${step}) → 综合所得计税`);
+
     // 更新步骤指示器
     updateStepIndicator('forward-calculation-page', step);
     
@@ -89,67 +341,36 @@ function goToStep(step) {
     }
 }
 
+// 通用步骤面板切换（用于反向/经营/分类所得）
+function showStepByPanes(pageId, step, paneIds) {
+    paneIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    const currentPane = document.getElementById(paneIds[step - 1]);
+    if (currentPane) currentPane.classList.remove('hidden');
+    updateStepIndicator(pageId, step);
+}
+
 // 反向倒算步骤导航
 function showReverseStep(step) {
-    currentStep = step;
-    
-    // 隐藏所有步骤
-    document.getElementById('reverse-step-parameters').classList.add('hidden');
-    document.getElementById('reverse-step-deductions').classList.add('hidden');
-    document.getElementById('reverse-step-result').classList.add('hidden');
-    
-    // 显示当前步骤
-    if (step === 1) {
-        document.getElementById('reverse-step-parameters').classList.remove('hidden');
-    } else if (step === 2) {
-        document.getElementById('reverse-step-deductions').classList.remove('hidden');
-    } else if (step === 3) {
-        document.getElementById('reverse-step-result').classList.remove('hidden');
-    }
-    
-    // 更新步骤指示器
-    updateStepIndicator('reverse-calculation-page', step);
+    showStepByPanes('reverse-calculation-page', step, [
+        'reverse-step-parameters', 'reverse-step-deductions', 'reverse-step-result'
+    ]);
 }
 
 // 经营所得步骤导航
 function showBusinessStep(step) {
-    currentStep = step;
-    
-    // 隐藏所有步骤
-    document.getElementById('business-step-income-cost').classList.add('hidden');
-    document.getElementById('business-step-deductions').classList.add('hidden');
-    document.getElementById('business-step-result').classList.add('hidden');
-    
-    // 显示当前步骤
-    if (step === 1) {
-        document.getElementById('business-step-income-cost').classList.remove('hidden');
-    } else if (step === 2) {
-        document.getElementById('business-step-deductions').classList.remove('hidden');
-    } else if (step === 3) {
-        document.getElementById('business-step-result').classList.remove('hidden');
-    }
-    
-    // 更新步骤指示器
-    updateStepIndicator('business-calculation-page', step);
+    showStepByPanes('business-calculation-page', step, [
+        'business-step-income-cost', 'business-step-deductions', 'business-step-result'
+    ]);
 }
 
 // 分类所得步骤导航
 function showClassificationStep(step) {
-    currentStep = step;
-    
-    // 隐藏所有步骤
-    document.getElementById('classification-step-info').classList.add('hidden');
-    document.getElementById('classification-step-result').classList.add('hidden');
-    
-    // 显示当前步骤
-    if (step === 1) {
-        document.getElementById('classification-step-info').classList.remove('hidden');
-    } else if (step === 2) {
-        document.getElementById('classification-step-result').classList.remove('hidden');
-    }
-    
-    // 更新步骤指示器
-    updateStepIndicator('classification-calculation-page', step);
+    showStepByPanes('classification-calculation-page', step, [
+        'classification-step-info', 'classification-step-result'
+    ]);
 }
 
 // 反向倒算扣除项显示/隐藏控制

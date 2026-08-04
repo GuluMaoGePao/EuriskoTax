@@ -3,6 +3,33 @@
   "version": "1.0.0",
   "description": "个人所得税预算规划工具 - 全栈部署",
   "scripts": {
-    "build": "echo 'Build complete - all files ready to deploy'"
+    "build": "echo 'Build complete - all files ready to deploy'",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:performance": "node tests/performance/benchmark.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/js/calculation/tax-calculator.js",
+      "src/js/calculation/helper-functions.js",
+      "src/js/calculation/utils.js",
+      "src/js/ui/navigation-ui.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "html"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/setup.js"
+    ]
   }
 }

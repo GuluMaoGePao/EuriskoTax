@@ -1007,36 +1007,52 @@ function updateClassificationResultDisplay() {
     // 更新显示 - 安全检查元素是否存在
     const resultTypeElement = document.getElementById('classification-result-type');
     if (resultTypeElement) {
-        resultTypeElement.textContent = 
+        resultTypeElement.textContent =
             classificationItems.length > 1 ? '多项分类所得' : (classificationItems[0].typeName || '分类所得');
     }
-    
+
     const resultIncomeElement = document.getElementById('classification-result-income');
     if (resultIncomeElement) {
         resultIncomeElement.textContent = '¥' + totalIncome.toFixed(2);
     }
-    
+
     const resultTotalTaxElement = document.getElementById('classification-result-total-tax');
     if (resultTotalTaxElement) {
         resultTotalTaxElement.textContent = '¥' + totalTax.toFixed(2);
     }
-    
-    const deductionsElement = document.getElementById('classification-result-deductions');
-    if (deductionsElement) {
-        if (totalTaxableIncome < totalIncome) {
-            deductionsElement.classList.remove('hidden');
-            const deductionAmountElement = document.getElementById('classification-result-deduction-amount');
-            if (deductionAmountElement) {
-                deductionAmountElement.textContent = '¥' + (totalIncome - totalTaxableIncome).toFixed(2);
-            }
-        } else {
-            deductionsElement.classList.add('hidden');
-        }
+
+    // 扣除项行（隐藏/显示 + 设置金额）
+    const deductionsRowElement = document.getElementById('classification-result-deductions-row');
+    const deductionsValueElement = document.getElementById('classification-result-deductions');
+    if (totalTaxableIncome < totalIncome) {
+        if (deductionsRowElement) deductionsRowElement.classList.remove('hidden');
+        if (deductionsValueElement) deductionsValueElement.textContent = '¥' + (totalIncome - totalTaxableIncome).toFixed(2);
+    } else {
+        if (deductionsRowElement) deductionsRowElement.classList.add('hidden');
     }
-    
+
     const resultTaxableIncomeElement = document.getElementById('classification-result-taxable-income');
     if (resultTaxableIncomeElement) {
         resultTaxableIncomeElement.textContent = '¥' + totalTaxableIncome.toFixed(2);
+    }
+
+    // 税后收入 + 税负可视化（含性能日志）
+    const classRenderStart = performance.now();
+    const netIncome = totalIncome - totalTax;
+    const netIncomeEl = document.getElementById('classification-result-net-income');
+    if (netIncomeEl) netIncomeEl.textContent = '¥' + netIncome.toFixed(2);
+
+    const effectiveRate = totalIncome > 0 ? (totalTax / totalIncome * 100) : 0;
+    const classBarFill = document.getElementById('classification-tax-bar-fill');
+    if (classBarFill) classBarFill.style.width = Math.min(effectiveRate, 100) + '%';
+    const classRateEl = document.getElementById('classification-effective-rate');
+    if (classRateEl) classRateEl.textContent = effectiveRate.toFixed(1) + '%';
+
+    const classRenderDuration = +(performance.now() - classRenderStart).toFixed(3);
+    if (typeof InteractionLog !== 'undefined') {
+        InteractionLog.calc('分类所得指标卡渲染',
+            { income: totalIncome, tax: totalTax, netIncome, effectiveRate: effectiveRate.toFixed(2) + '%' },
+            { durationMs: classRenderDuration });
     }
 }
 

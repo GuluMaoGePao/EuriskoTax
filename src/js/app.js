@@ -2,21 +2,25 @@
 window.addEventListener('DOMContentLoaded', function() {
     // 模式选择按钮
     document.getElementById('forward-mode-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] MODE → 选择"综合所得计税"模式', 'color: #1e40af; font-weight: bold;');
         showPage('forward-calculation-page');
         goToStep(1);
     });
-    
+
     document.getElementById('business-mode-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] MODE → 选择"经营所得计税"模式', 'color: #1e40af; font-weight: bold;');
         showPage('business-calculation-page');
         showBusinessStep(1);
     });
-    
+
     document.getElementById('classification-mode-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] MODE → 选择"分类所得计税"模式', 'color: #1e40af; font-weight: bold;');
         showPage('classification-calculation-page');
         showClassificationStep(1);
     });
-    
+
     document.getElementById('reverse-mode-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] MODE → 选择"反向倒算"模式', 'color: #1e40af; font-weight: bold;');
         showPage('reverse-calculation-page');
         showReverseStep(1);
         // 初始化时显示计算模式选择器
@@ -777,37 +781,49 @@ window.addEventListener('DOMContentLoaded', function() {
     // 主题切换按钮
     const themeToggleBtn = document.getElementById('theme-toggle');
     const themeIcon = themeToggleBtn.querySelector('i');
-    // 初始化图标显示
-    if (document.documentElement.classList.contains('dark')) {
-        themeIcon.className = 'fa fa-sun-o';
-    } else {
-        themeIcon.className = 'fa fa-moon-o';
+    // 初始化图标显示（使用 classList 避免覆盖定位样式）
+    function setThemeIcon(isDark) {
+        themeIcon.classList.remove('fa-moon-o', 'fa-sun-o');
+        themeIcon.classList.add(isDark ? 'fa-sun-o' : 'fa-moon-o');
     }
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setThemeIcon(isDarkMode);
     themeToggleBtn.addEventListener('click', function() {
         const isDark = document.documentElement.classList.toggle('dark');
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        themeIcon.className = isDark ? 'fa fa-sun-o' : 'fa fa-moon-o';
+        setThemeIcon(isDark);
     });
 
     // 正向计税页面导航按钮
     document.getElementById('next-to-income-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] NAV → 基本参数 → 收入明细', 'color: #1e40af; font-weight: bold;', { prepaidTax: document.getElementById('prepaid-tax')?.value });
         goToStep(2);
     });
    // 收入明细页面导航按钮
     document.getElementById('back-to-parameters-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] NAV → 收入明细 → 基本参数（返回）', 'color: #1e40af; font-weight: bold;');
         goToStep(1);
     });
-    
+
     document.getElementById('next-to-deductions-btn').addEventListener('click', function() {
+        const incomeData = {
+            salary: document.getElementById('salary-income')?.value,
+            labor: document.getElementById('labor-income')?.value,
+            author: document.getElementById('author-income')?.value,
+            bonus: document.getElementById('bonus-income')?.value
+        };
+        console.log('%c[EuriskoTax] NAV → 收入明细 → 扣除项', 'color: #1e40af; font-weight: bold;', incomeData);
         goToStep(3);
     });
-    
+
     // 收入明细页面重置按钮
     document.getElementById('reset-income-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] RESET → 重置收入明细', 'color: #f59e0b; font-weight: bold;');
         resetIncomeData();
     });
-    
+
     document.getElementById('back-to-income-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] NAV → 扣除项 → 收入明细（返回）', 'color: #1e40af; font-weight: bold;');
         goToStep(2);
     });
     
@@ -817,11 +833,23 @@ window.addEventListener('DOMContentLoaded', function() {
     });
     
     document.getElementById('next-to-result-btn').addEventListener('click', function() {
+        console.log('%c[EuriskoTax] CALC → 开始正向计税计算', 'color: #1e40af; font-weight: bold;');
+        const startTime = performance.now();
         calculateTax();
+        const calcTime = performance.now() - startTime;
+        const result = typeof calculationResults !== 'undefined' ? {
+            totalIncome: calculationResults?.incomeDetails?.total,
+            totalDeduction: calculationResults?.deductionDetails?.total,
+            taxableIncome: calculationResults?.taxDetails?.taxableIncome,
+            totalTax: calculationResults?.taxDetails?.totalTax,
+            netIncome: calculationResults?.taxDetails?.netIncome
+        } : 'no results';
+        console.log('%c[EuriskoTax] CALC → 计算完成 (' + calcTime.toFixed(1) + 'ms)', 'color: #16a34a; font-weight: bold;', result);
         goToStep(4);
         updateBudgetTable();
         updateCharts();
         generateOptimizationTips();
+        console.log('%c[EuriskoTax] CALC → 结果页面渲染完成', 'color: #16a34a; font-weight: bold;');
     });
     
     // 正向计税页面重置按钮
@@ -847,6 +875,27 @@ window.addEventListener('DOMContentLoaded', function() {
         }
         saveClassificationCalculation();
     });
+
+    // === 阶段2：顶部操作区按钮绑定（通用绑定） ===
+    function bindCalcActionBtns(config) {
+        const { modeName, saveBtnId, resetBtnId, saveFn, resetFn, stepFn } = config;
+        const saveBtn = document.getElementById(saveBtnId);
+        if (saveBtn) saveBtn.addEventListener('click', function() {
+            console.log('%c[EuriskoTax] ACTION → 顶栏保存按钮（' + modeName + '）', 'color: #1e40af; font-weight: bold;');
+            saveFn();
+        });
+        const resetBtn = document.getElementById(resetBtnId);
+        if (resetBtn) resetBtn.addEventListener('click', function() {
+            console.log('%c[EuriskoTax] ACTION → 顶栏重置按钮（' + modeName + '）', 'color: #f59e0b; font-weight: bold;');
+            resetFn();
+            if (stepFn) stepFn(1);
+        });
+    }
+
+    bindCalcActionBtns({ modeName: '综合所得', saveBtnId: 'forward-save-btn', resetBtnId: 'forward-reset-btn', saveFn: saveCalculationResult, resetFn: resetForwardCalculation });
+    bindCalcActionBtns({ modeName: '反向倒算', saveBtnId: 'reverse-save-btn', resetBtnId: 'reverse-reset-btn', saveFn: saveReverseCalculation, resetFn: resetReverseCalculation, stepFn: showReverseStep });
+    bindCalcActionBtns({ modeName: '经营所得', saveBtnId: 'business-save-btn', resetBtnId: 'business-reset-btn', saveFn: saveBusinessCalculation, resetFn: resetBusinessCalculation, stepFn: showBusinessStep });
+    bindCalcActionBtns({ modeName: '分类所得', saveBtnId: 'classification-save-btn', resetBtnId: 'classification-reset-btn', saveFn: saveClassificationCalculation, resetFn: resetClassificationCalculation, stepFn: showClassificationStep });
 
     // 导出PDF按钮
     document.getElementById('export-pdf-btn').addEventListener('click', function() {

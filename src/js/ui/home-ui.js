@@ -460,8 +460,8 @@
             msgEl.innerHTML = `
                 <div class="text-left">
                     <div class="flex items-center mb-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center mr-3" style="background-color: rgba(30,64,175,0.1);">
-                            <i class="fa ${info.icon}" style="color: #1e40af; font-size: 1.1rem;"></i>
+                        <div class="tip-icon-wrapper w-10 h-10 rounded-lg flex items-center justify-center mr-3">
+                            <i class="tip-icon fa ${info.icon}"></i>
                         </div>
                         <span class="text-base font-bold text-gray-800">${info.title}</span>
                     </div>
