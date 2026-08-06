@@ -11,6 +11,9 @@ server/prisma/*.db
 .env.local
 .env.*.local
 
+# Watchdog notification config (contains SMTP credentials)
+notify.config.json
+
 # Logs
 logs/
 *.log

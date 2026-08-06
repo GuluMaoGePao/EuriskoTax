@@ -191,6 +191,28 @@ if ($cpolarStarted) {
     Write-Host "  - 停止服务后请手动结束 cpolar 进程（任务管理器搜 cpolar）" -ForegroundColor Gray
 }
 
+# ====== 6. (可选) 启动守护脚本 ======
+$watchdogProc = $null
+if ($Watchdog) {
+    $stepNumWd = if ($Share) { "6/6" } else { "5/5" }
+    Write-Host ""
+    Write-Host "[$stepNumWd] 启动守护脚本（自动重启异常进程）..." -ForegroundColor Yellow
+    $watchdogLog = Join-Path $ProjectRoot "watchdog.log"
+    $watchdogArgs = @("-File", (Join-Path $ProjectRoot "watchdog.ps1"), "-IntervalSec", "20")
+    if ($Share) { $watchdogArgs += "-Share" }
+    try {
+        $watchdogProc = Start-Process -FilePath "powershell.exe" `
+            -ArgumentList $watchdogArgs `
+            -WindowStyle Minimized `
+            -PassThru
+        Write-Host "  [OK] 守护脚本已后台运行 (PID: $($watchdogProc.Id))" -ForegroundColor Green
+        Write-Host "  - 检查间隔: 20秒 | 日志: $watchdogLog" -ForegroundColor Gray
+        Write-Host "  - 会自动重启异常的后端服务和 cpolar 隧道" -ForegroundColor Gray
+    } catch {
+        Write-Host "  [WARN] 守护脚本启动失败: $_" -ForegroundColor Yellow
+    }
+}
+
 Write-Host ""
 Write-Host "  按 Ctrl+C 停止服务" -ForegroundColor Gray
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -201,4 +223,11 @@ try {
     npm start
 } finally {
     Pop-Location
+    # Ctrl+C 退出后，顺手结束守护进程
+    if ($watchdogProc -and -not $watchdogProc.HasExited) {
+        try {
+            Stop-Process -Id $watchdogProc.Id -Force -ErrorAction SilentlyContinue
+            Write-Host "[INFO] 守护进程 (PID: $($watchdogProc.Id)) 已停止" -ForegroundColor Gray
+        } catch { }
+    }
 }

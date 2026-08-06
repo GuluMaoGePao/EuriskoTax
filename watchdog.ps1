@@ -1,30 +1,42 @@
-# EuriskoTax 服务守护脚本（PowerShell）
-# 功能：监控后端服务和 cpolar 隧道，异常时自动重启，避免好友测试中断
-# 用法：
-#   .\watchdog.ps1                     # 监控本地3000端口（后端服务）
-#   .\watchdog.ps1 -Share              # 同时监控 cpolar 公网隧道
-#   .\watchdog.ps1 -IntervalSec 30     # 自定义检查间隔（默认20秒）
-#   .\watchdog.ps1 -MaxRestarts 0      # 不限制重启次数（默认0=无限制）
-#   启动后按 Ctrl+C 停止守护
+# EuriskoTax Service Watchdog (PowerShell)
+# Monitors backend server on port 3000 and (optionally) cpolar tunnel.
+# Auto-restarts processes when they crash or stop responding.
+# Records detailed events to events.log and sends email notifications.
+#
+# Usage:
+#   .\watchdog.ps1                     # Monitor local :3000 only
+#   .\watchdog.ps1 -Share              # Monitor + cpolar public tunnel
+#   .\watchdog.ps1 -IntervalSec 30     # Custom check interval (default 20s)
+#   .\watchdog.ps1 -MaxRestarts 10     # Max restarts before giving up (0 = unlimited)
+#   Press Ctrl+C to stop the watchdog.
 
 param(
     [switch]$Share,
     [int]$IntervalSec = 20,
-    [int]$MaxRestarts = 0   # 0 = 无限制
+    [int]$MaxRestarts = 0
 )
 
 $ErrorActionPreference = "Continue"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ServerDir = Join-Path $ProjectRoot "server"
-$CpolaExe = Join-Path $ProjectRoot "cpolar\cpolar.exe"
+$CpolarExe = Join-Path $ProjectRoot "cpolar\cpolar.exe"
 $CpolarLog = Join-Path $env:TEMP "cpolar-euriskotax-watchdog.log"
 $WatchdogLog = Join-Path $ProjectRoot "watchdog.log"
-$CpolarStartedByWatchdog = $false
-$ServerStartedByWatchdog = $false
-$RestartCount = 0
+$EventLog = Join-Path $ProjectRoot "events.log"
+$NotifyModule = Join-Path $ProjectRoot "notify.ps1"
 $LastCpolarUrl = ""
+$RestartCount = 0
+$global:WatchdogRunning = $true
 
-# ====== 日志函数 ======
+# ====== Load notification module ======
+if (Test-Path $NotifyModule) {
+    . $NotifyModule
+    $NotifyAvailable = $true
+} else {
+    $NotifyAvailable = $false
+}
+
+# ====== Logger ======
 function Write-Log {
     param([string]$Level, [string]$Msg)
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -39,30 +51,54 @@ function Write-Log {
     Add-Content -Path $WatchdogLog -Value $line -ErrorAction SilentlyContinue
 }
 
-# ====== 清理函数（Ctrl+C触发） ======
-$global:WatchdogRunning = $true
-$null = Register-EngineEvent -SourceIdentifier 'PowerShell.Exiting' -Action {
-    if ($global:WatchdogStarted) {
-        Write-Host ""
-        Write-Host "[INFO] 守护脚本正在退出..." -ForegroundColor Gray
-        if ($global:CleanupServer) {
-            Write-Host "[INFO] 不结束后端服务（手动管理）" -ForegroundColor Gray
+# ====== Event logger (writes to events.log with structured fields) ======
+function Write-EventLog {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$EventType,    # BACKEND_RESTART | CPOLAR_RESTART | URL_CHANGED | RESTART_FAILED
+        [Parameter(Mandatory=$true)]
+        [string]$Reason,
+        [string]$Details = "",
+        [int]$RecoveryMs = 0,
+        [string]$NewUrl = "",
+        [string]$OldUrl = ""
+    )
+    $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $fields = @("event=$EventType", "reason=$Reason")
+    if ($RecoveryMs -gt 0) { $fields += "recovery_ms=$RecoveryMs" }
+    if ($NewUrl) { $fields += "new_url=$NewUrl" }
+    if ($OldUrl) { $fields += "old_url=$OldUrl" }
+    if ($Details) { $fields += "details=$Details" }
+    $line = "[$ts] [$EventType] " + ($fields -join " | ")
+    Add-Content -Path $EventLog -Value $line -ErrorAction SilentlyContinue
+    Write-Host "[EVENT] $line" -ForegroundColor Magenta
+}
+
+# ====== Notify helper (email + console, uses Chinese templates) ======
+function Invoke-Notification {
+    param(
+        [string]$EventType,
+        [hashtable]$TemplateData
+    )
+    if ($NotifyAvailable) {
+        $sent = Send-WatchdogNotification -EventType $EventType -TemplateData $TemplateData
+        if (-not $sent) {
+            Write-Log "WARN" "Email not sent (config disabled or SMTP issue). Event still logged to events.log"
         }
-        if ($global:CleanupCpolar) {
-            Write-Host "[INFO] 不结束 cpolar（手动管理）" -ForegroundColor Gray
-        }
+    } else {
+        Write-Log "WARN" "notify.ps1 not found, skip email. Event still logged to events.log"
     }
 }
 
-# ====== 检查后端服务健康（3000端口监听 + HTTP响应） ======
+# ====== Server health check (port 3000 listening + HTTP 200/401 response) ======
 function Test-ServerHealth {
     try {
         $conn = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
         if (-not $conn) { return $false }
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/auth/profile" -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/auth/profile" `
+            -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
         return $true
     } catch {
-        # 返回401也算正常（说明接口在响应）
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 401) {
             return $true
         }
@@ -70,67 +106,142 @@ function Test-ServerHealth {
     }
 }
 
-# ====== 重启后端服务 ======
-function Restart-ServerService {
-    Write-Log "WARN" "后端服务异常，正在重启..."
+# ====== Diagnose backend failure reason ======
+function Get-BackendFailureReason {
+    $conn = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
+    if (-not $conn) { return "port_3000_not_listening" }
     try {
-        # 清理残留 node 进程（监听3000端口的）
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/auth/profile" `
+            -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        return "http_unexpected_status_" + $resp.StatusCode
+    } catch {
+        if ($_.Exception.Response) {
+            $code = $_.Exception.Response.StatusCode.value__
+            if ($code -eq 401) { return "false_positive_ok" }
+            return "http_error_$code"
+        }
+        $msg = $_.Exception.Message
+        if ($msg -match "timed out" -or $msg -match "Unable to connect") {
+            return "connection_refused_or_timeout"
+        }
+        return "http_exception"
+    }
+}
+
+# ====== Restart backend server ======
+function Restart-ServerService {
+    Write-Log "WARN" "Backend service down, diagnosing..."
+    $reason = Get-BackendFailureReason
+    Write-Log "WARN" "Backend failure reason: $reason"
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        # Kill processes holding port 3000
         $oldConns = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
         if ($oldConns) {
             $oldPids = $oldConns.OwningProcess | Sort-Object -Unique
-            foreach ($pid in $oldPids) {
-                Get-Process -Id $pid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            foreach ($p in $oldPids) {
+                Get-Process -Id $p -ErrorAction SilentlyContinue |
+                    Stop-Process -Force -ErrorAction SilentlyContinue
             }
             Start-Sleep -Seconds 2
         }
-        # 后台启动 node src/app.js
         $stdoutLog = Join-Path $env:TEMP "eurisko-server-watchdog.log"
+        $stderrLog = Join-Path $env:TEMP "eurisko-server-watchdog.err"
         $proc = Start-Process -FilePath "node" `
             -ArgumentList "src/app.js" `
             -WorkingDirectory $ServerDir `
             -WindowStyle Hidden `
             -RedirectStandardOutput $stdoutLog `
-            -RedirectStandardError $stdoutLog `
+            -RedirectStandardError $stderrLog `
             -PassThru
-        # 等待服务就绪
+        # Wait up to 30 seconds for service to become ready
+        $ready = $false
         for ($i = 0; $i -lt 15; $i++) {
             Start-Sleep -Seconds 2
             if (Test-ServerHealth) {
-                Write-Log "OK" "后端服务重启成功 (PID: $($proc.Id))"
-                return $true
+                $ready = $true
+                break
             }
         }
-        Write-Log "ERROR" "后端服务重启超时（30秒内未就绪）"
-        return $false
+        $sw.Stop()
+        $recoveryMs = [int]$sw.ElapsedMilliseconds
+
+        if ($ready) {
+            Write-Log "OK" ("Backend restarted OK (PID: " + $proc.Id + ") in ${recoveryMs}ms")
+            Write-EventLog -EventType "BACKEND_RESTART" -Reason $reason -RecoveryMs $recoveryMs -Details ("new_pid=" + $proc.Id)
+            $tplData = @{ reason=$reason; recoveryMs=$recoveryMs; newPid=$proc.Id; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+            Invoke-Notification -EventType "BACKEND_RESTART" -TemplateData $tplData
+            return $true
+        } else {
+            $sw.Stop()
+            $recoveryMs = [int]$sw.ElapsedMilliseconds
+            Write-Log "ERROR" "Backend restart timed out (not ready in 30s)"
+            Write-EventLog -EventType "RESTART_FAILED" -Reason "backend_timeout_30s" -RecoveryMs $recoveryMs -Details ("attempted_pid=" + $proc.Id)
+            $tplData = @{ target="backend"; reason=$reason; restartCount=$RestartCount; details=("timeout 30s, attempted_pid=" + $proc.Id); timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog; cpolarLogPath=$CpolarLog }
+            Invoke-Notification -EventType "RESTART_FAILED" -TemplateData $tplData
+            return $false
+        }
     } catch {
-        Write-Log "ERROR" "后端服务重启失败: $_"
+        $sw.Stop()
+        $recoveryMs = [int]$sw.ElapsedMilliseconds
+        Write-Log "ERROR" ("Backend restart failed: " + $_)
+        Write-EventLog -EventType "RESTART_FAILED" -Reason "backend_exception" -RecoveryMs $recoveryMs -Details $_.Exception.Message
+        $tplData = @{ target="backend"; reason=$reason; restartCount=$RestartCount; details=$_.Exception.Message; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog; cpolarLogPath=$CpolarLog }
+        Invoke-Notification -EventType "RESTART_FAILED" -TemplateData $tplData
         return $false
     }
 }
 
-# ====== 从日志解析 cpolar 公网URL ======
+# ====== Parse cpolar public url from log ======
 function Get-CpolarUrl {
     param([string]$LogPath)
     if (-not (Test-Path $LogPath)) { return $null }
     $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
     if (-not $content) { return $null }
-    $m = [regex]::Match($content, 'Tunnel established at (https://[^\s"]+)')
+    $pattern = 'Tunnel established at (https://[^\s"]+)'
+    $m = [regex]::Match($content, $pattern)
     if ($m.Success) { return $m.Groups[1].Value }
-    $m = [regex]::Match($content, 'Tunnel established at (http://[^\s"]+)')
+    $pattern = 'Tunnel established at (http://[^\s"]+)'
+    $m = [regex]::Match($content, $pattern)
     if ($m.Success) { return $m.Groups[1].Value }
     return $null
 }
 
-# ====== 检查 cpolar 进程和隧道 ======
-function Test-CpolarHealth {
+# ====== Diagnose cpolar failure reason ======
+function Get-CpolarFailureReason {
     param([string]$ExpectedUrl)
-    # 1. 进程是否存在
     $proc = Get-Process -Name "cpolar" -ErrorAction SilentlyContinue
-    if (-not $proc) { return $false }
-    # 2. 如果有URL，检查公网可达
+    if (-not $proc) { return "cpolar_process_dead" }
     if ($ExpectedUrl) {
         try {
-            $resp = Invoke-WebRequest -Uri "$ExpectedUrl/api/auth/profile" -Method GET -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
+            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/api/auth/profile") `
+                -Method GET -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
+            return "false_positive_ok"
+        } catch {
+            if ($_.Exception.Response) {
+                $code = $_.Exception.Response.StatusCode.value__
+                if ($code -eq 401) { return "false_positive_ok" }
+                return "public_url_http_$code"
+            }
+            $msg = $_.Exception.Message
+            if ($msg -match "timed out") { return "public_url_timeout" }
+            if ($msg -match "Unable to connect") { return "public_url_unreachable" }
+            return "public_url_error"
+        }
+    }
+    return "no_url_and_process_alive"
+}
+
+# ====== Cpolar health check (process alive + public URL reachable) ======
+function Test-CpolarHealth {
+    param([string]$ExpectedUrl)
+    $proc = Get-Process -Name "cpolar" -ErrorAction SilentlyContinue
+    if (-not $proc) { return $false }
+    if ($ExpectedUrl) {
+        try {
+            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/api/auth/profile") `
+                -Method GET -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
             return $true
         } catch {
             if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 401) {
@@ -139,127 +250,175 @@ function Test-CpolarHealth {
             return $false
         }
     }
-    # 无URL时只要进程存活就算通过（可能隧道还在建立）
     return $true
 }
 
-# ====== 重启 cpolar 隧道 ======
+# ====== Restart cpolar tunnel ======
 function Restart-CpolarTunnel {
-    Write-Log "WARN" "cpolar 隧道异常，正在重启..."
+    Write-Log "WARN" "cpolar tunnel down, diagnosing..."
+    $reason = Get-CpolarFailureReason -ExpectedUrl $LastCpolarUrl
+    Write-Log "WARN" "cpolar failure reason: $reason"
+    $oldUrl = $LastCpolarUrl
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        # 清理残留进程
-        Get-Process -Name "cpolar" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Get-Process -Name "cpolar" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
-        # 清空旧日志，避免解析到旧URL
-        if (Test-Path $CpolarLog) { Remove-Item $CpolarLog -Force -ErrorAction SilentlyContinue }
-        # 用配置文件中的 eurisko 隧道预设启动
-        if (Test-Path $CpolaExe) {
-            # 优先用预设隧道（已在 cpolar.yml 配置 region=cn）
-            $proc = Start-Process -FilePath $CpolaExe `
-                -ArgumentList "start", "eurisko", "-log=stdout" `
-                -WindowStyle Hidden `
-                -RedirectStandardOutput $CpolarLog `
-                -RedirectStandardError $CpolarLog `
-                -PassThru
-        } else {
-            Write-Log "ERROR" "找不到 cpolar.exe: $CpolaExe"
+        if (Test-Path $CpolarLog) {
+            Remove-Item $CpolarLog -Force -ErrorAction SilentlyContinue
+        }
+        if (-not (Test-Path $CpolarExe)) {
+            Write-Log "ERROR" ("cpolar.exe not found: " + $CpolarExe)
+            Write-EventLog -EventType "RESTART_FAILED" -Reason "cpolar_exe_not_found" -Details $CpolarExe
+            $tplData = @{ target="cpolar"; reason="cpolar_exe_not_found"; restartCount=$RestartCount; details=$CpolarExe; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog; cpolarLogPath=$CpolarLog }
+            Invoke-Notification -EventType "RESTART_FAILED" -TemplateData $tplData
             return $false
         }
-        # 等待隧道建立并解析URL
+        # Use pre-configured tunnel "eurisko" in cpolar.yml (region=cn, port 3000)
+        $cpolarErrLog = Join-Path $env:TEMP "cpolar-euriskotax-watchdog.err"
+        $proc = Start-Process -FilePath $CpolarExe `
+            -ArgumentList @("start", "eurisko", "-log=stdout") `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $CpolarLog `
+            -RedirectStandardError $cpolarErrLog `
+            -PassThru
+        # Wait up to 30s for tunnel establishment
         $newUrl = $null
         for ($i = 0; $i -lt 15; $i++) {
             Start-Sleep -Seconds 2
             $newUrl = Get-CpolarUrl -LogPath $CpolarLog
             if ($newUrl) { break }
         }
+        $sw.Stop()
+        $recoveryMs = [int]$sw.ElapsedMilliseconds
+
         if ($newUrl) {
-            $global:LastCpolarUrl = $newUrl
-            Write-Log "OK" "cpolar 隧道重启成功: $newUrl"
+            $script:LastCpolarUrl = $newUrl
+            Write-Log "OK" ("cpolar restart OK: " + $newUrl + " in ${recoveryMs}ms")
+            Write-EventLog -EventType "CPOLAR_RESTART" -Reason $reason -RecoveryMs $recoveryMs -NewUrl $newUrl -OldUrl $oldUrl
+            $ts = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+            # If URL changed, also fire URL_CHANGED event + notification
+            if ($oldUrl -and $newUrl -ne $oldUrl) {
+                Write-EventLog -EventType "URL_CHANGED" -Reason "cpolar_restart_new_url" -NewUrl $newUrl -OldUrl $oldUrl
+                $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason=$reason; recoveryMs=$recoveryMs; timestamp=$ts }
+                Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+            } else {
+                $tplData = @{ reason=$reason; recoveryMs=$recoveryMs; newUrl=$newUrl; timestamp=$ts }
+                Invoke-Notification -EventType "CPOLAR_RESTART" -TemplateData $tplData
+            }
             return $true
         } else {
-            Write-Log "WARN" "cpolar 进程已启动但30秒内未获取到公网地址，可能仍在建立中"
+            $sw.Stop()
+            $recoveryMs = [int]$sw.ElapsedMilliseconds
+            Write-Log "WARN" "cpolar process started but no tunnel URL within 30s"
+            Write-EventLog -EventType "RESTART_FAILED" -Reason "cpolar_url_timeout_30s" -RecoveryMs $recoveryMs -Details ("process_pid=" + $proc.Id)
+            $tplData = @{ target="cpolar"; reason=$reason; restartCount=$RestartCount; details=("timeout 30s, process_pid=" + $proc.Id); timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog; cpolarLogPath=$CpolarLog }
+            Invoke-Notification -EventType "RESTART_FAILED" -TemplateData $tplData
             return $true
         }
     } catch {
-        Write-Log "ERROR" "cpolar 重启失败: $_"
+        $sw.Stop()
+        $recoveryMs = [int]$sw.ElapsedMilliseconds
+        Write-Log "ERROR" ("cpolar restart failed: " + $_)
+        Write-EventLog -EventType "RESTART_FAILED" -Reason "cpolar_exception" -RecoveryMs $recoveryMs -Details $_.Exception.Message
+        $tplData = @{ target="cpolar"; reason=$reason; restartCount=$RestartCount; details=$_.Exception.Message; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog; cpolarLogPath=$CpolarLog }
+        Invoke-Notification -EventType "RESTART_FAILED" -TemplateData $tplData
         return $false
     }
 }
 
-# ====== 主循环 ======
+# ====== Banner ======
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  EuriskoTax 服务守护脚本" -ForegroundColor Cyan
+Write-Host "  EuriskoTax Service Watchdog" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  检查间隔:   ${IntervalSec}秒" -ForegroundColor Gray
-Write-Host "  监控项目:   后端服务(3000端口)" -ForegroundColor Gray
-if ($Share) { Write-Host "  + 公网隧道  cpolar" -ForegroundColor Gray }
-$limitText = if ($MaxRestarts -eq 0) { "无限制" } else { $MaxRestarts.ToString() }
-Write-Host "  重启上限:   $limitText" -ForegroundColor Gray
-Write-Host "  日志文件:   $WatchdogLog" -ForegroundColor Gray
-Write-Host "  按 Ctrl+C 停止" -ForegroundColor Gray
+Write-Host ("  Interval:     " + $IntervalSec + "s") -ForegroundColor Gray
+Write-Host "  Targets:      Backend (:3000)" -ForegroundColor Gray
+if ($Share) { Write-Host "                + cpolar tunnel" -ForegroundColor Gray }
+$limitText = if ($MaxRestarts -eq 0) { "unlimited" } else { $MaxRestarts.ToString() }
+Write-Host ("  Max restarts: " + $limitText) -ForegroundColor Gray
+Write-Host ("  Watchdog log: " + $WatchdogLog) -ForegroundColor Gray
+Write-Host ("  Event log:    " + $EventLog) -ForegroundColor Magenta
+if ($NotifyAvailable) {
+    Write-Host ("  Notify module: loaded (notify.ps1)") -ForegroundColor Green
+} else {
+    Write-Host ("  Notify module: NOT FOUND (email disabled)") -ForegroundColor Yellow
+}
+Write-Host "  Press Ctrl+C to stop" -ForegroundColor Gray
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$global:WatchdogStarted = $true
-Write-Log "INFO" "守护脚本启动"
+Write-Log "INFO" "Watchdog started (notify_available=$NotifyAvailable)"
 
-# 首次检查，获取当前 cpolar URL
+# Initial URL seed (if a previous log exists)
 if ($Share -and (Test-Path $CpolarLog)) {
     $LastCpolarUrl = Get-CpolarUrl -LogPath $CpolarLog
+    if ($LastCpolarUrl) {
+        Write-Log "INFO" ("Initial cpolar URL: " + $LastCpolarUrl)
+    }
 }
 
+# ====== Main loop ======
 $loopCount = 0
 while ($global:WatchdogRunning) {
     $loopCount++
-    $needRestart = $false
 
-    # ---- 1. 检查后端服务 ----
+    # 1) Server
     $serverOk = Test-ServerHealth
     if (-not $serverOk) {
         if ($MaxRestarts -eq 0 -or $RestartCount -lt $MaxRestarts) {
             if (Restart-ServerService) {
                 $RestartCount++
-                $needRestart = $true
             }
         } else {
-            Write-Log "ERROR" "后端服务异常，但已达重启上限($MaxRestarts)，不再自动重启"
+            Write-Log "ERROR" ("Backend down but max restarts (" + $MaxRestarts + ") reached, giving up.")
+            Write-EventLog -EventType "RESTART_FAILED" -Reason "max_restarts_reached" -Details ("target=backend count=$RestartCount")
+            $tplData = @{ target="backend"; reason="max_restarts_reached"; maxRestarts=$MaxRestarts; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+            Invoke-Notification -EventType "MAX_RESTARTS_REACHED" -TemplateData $tplData
         }
     }
 
-    # ---- 2. 检查 cpolar 隧道（Share模式） ----
+    # 2) Cpolar tunnel (Share mode)
     if ($Share) {
         $cpolarOk = Test-CpolarHealth -ExpectedUrl $LastCpolarUrl
         if (-not $cpolarOk) {
             if ($MaxRestarts -eq 0 -or $RestartCount -lt $MaxRestarts) {
                 if (Restart-CpolarTunnel) {
                     $RestartCount++
-                    $needRestart = $true
                 }
             } else {
-                Write-Log "ERROR" "cpolar 隧道异常，但已达重启上限($MaxRestarts)，不再自动重启"
+                Write-Log "ERROR" ("cpolar down but max restarts (" + $MaxRestarts + ") reached, giving up.")
+                Write-EventLog -EventType "RESTART_FAILED" -Reason "max_restarts_reached" -Details ("target=cpolar count=$RestartCount")
+                $tplData = @{ target="cpolar"; reason="max_restarts_reached"; maxRestarts=$MaxRestarts; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+                Invoke-Notification -EventType "MAX_RESTARTS_REACHED" -TemplateData $tplData
             }
         } else {
-            # 隧道正常，但日志里有新URL时更新一下显示
+            # Detect URL change (tunnel auto-reconnected with new URL, no restart needed)
             $currentUrl = Get-CpolarUrl -LogPath $CpolarLog
-            if ($currentUrl -and $currentUrl -ne $LastCpolarUrl) {
+            if ($currentUrl -and $LastCpolarUrl -and $currentUrl -ne $LastCpolarUrl) {
+                $oldUrl = $LastCpolarUrl
                 $LastCpolarUrl = $currentUrl
-                Write-Log "INFO" "当前公网地址: $LastCpolarUrl"
+                Write-Log "INFO" ("cpolar URL changed (no restart): " + $oldUrl + " -> " + $currentUrl)
+                Write-EventLog -EventType "URL_CHANGED" -Reason "auto_reconnect_new_url" -NewUrl $currentUrl -OldUrl $oldUrl
+                $tplData = @{ oldUrl=$oldUrl; newUrl=$currentUrl; reason="auto_reconnect_new_url"; recoveryMs=0; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+                Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+            } elseif ($currentUrl -and -not $LastCpolarUrl) {
+                $LastCpolarUrl = $currentUrl
+                Write-Log "INFO" ("cpolar URL detected: " + $currentUrl)
             }
         }
     }
 
-    # ---- 心跳日志（每10轮一次） ----
+    # Heartbeat every 10 rounds (~3-4 min at default interval)
     if ($loopCount % 10 -eq 0) {
-        $status = @()
-        if (Test-ServerHealth) { $status += "后端=OK" } else { $status += "后端=FAIL" }
+        $parts = @()
+        if (Test-ServerHealth) { $parts += "backend=OK" } else { $parts += "backend=FAIL" }
         if ($Share) {
-            if (Test-CpolarHealth -ExpectedUrl $LastCpolarUrl) { $status += "cpolar=OK" } else { $status += "cpolar=FAIL" }
+            if (Test-CpolarHealth -ExpectedUrl $LastCpolarUrl) { $parts += "cpolar=OK" } else { $parts += "cpolar=FAIL" }
         }
-        $statusStr = $status -join " | "
-        Write-Log "INFO" "心跳检查 [$loopCount]: $statusStr | 累计重启=$RestartCount"
+        Write-Log "INFO" ("Heartbeat [" + $loopCount + "]: " + ($parts -join " | ") + " | restarts=" + $RestartCount + " | url=" + $LastCpolarUrl)
     }
 
-    # ---- 等待下一轮 ----
     Start-Sleep -Seconds $IntervalSec
 }
