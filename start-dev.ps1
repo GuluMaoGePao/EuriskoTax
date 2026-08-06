@@ -1,14 +1,17 @@
 # EuriskoTax 一键启动脚本（PowerShell）
-# 功能：检查环境 → 安装依赖 → 重置 dev 用户 → 启动后端服务 → (可选)cpolar公网分享
+# 功能：检查环境 → 安装依赖 → 重置 dev 用户 → 启动后端服务 → (可选)cpolar公网分享 → (可选)守护
 # 用法：
 #   .\start-dev.ps1              # 标准启动
 #   .\start-dev.ps1 -Share       # 启动并生成 cpolar 公网分享地址
+#   .\start-dev.ps1 -Watchdog    # 启动后自动拉起守护脚本（防止意外中断）
+#   .\start-dev.ps1 -Share -Watchdog        # 公网分享 + 守护（推荐给好友测试时使用）
 #   .\start-dev.ps1 -SkipInstall -SkipResetUser   # 跳过安装和重置，快速启动
 
 param(
     [switch]$SkipInstall,
     [switch]$SkipResetUser,
-    [switch]$Share
+    [switch]$Share,
+    [switch]$Watchdog
 )
 
 $ErrorActionPreference = "Stop"
