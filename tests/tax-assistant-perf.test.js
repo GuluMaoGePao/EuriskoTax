@@ -207,3 +207,101 @@ describe('MockClient 并发请求日志顺序', () => {
         }
     });
 });
+
+describe('搜索联想模块：同步性 & 免受 MockClient 异步延迟影响', () => {
+    beforeEach(() => {
+        // 供联想匹配的问答数据（与主测试一致）
+        window.TAX_ASSISTANT_QA = [
+            { id: 'q1', category: '综合所得', keywords: ['年终奖', '奖金'], question: '年终奖如何计税？', answer: '单独或并入综合所得。' },
+            { id: 'q2', category: '经营所得', keywords: ['个体户', '减半'], question: '经营所得减半征收怎么享受？', answer: '200万以下减半。' },
+            { id: 'q3', category: '分类所得', keywords: ['租金', '租赁'], question: '房屋租金如何计税？', answer: '税率20%。' }
+        ];
+        // 还原一个干净的助手 DOM（与主测试一致）
+        document.body.innerHTML = `
+            <button id="tax-assistant-fab" class="assistant-fab" style="display:flex;"></button>
+            <div id="tax-assistant-overlay" class="assistant-overlay"></div>
+            <div id="tax-assistant-drawer" class="assistant-drawer assistant-drawer-closed">
+                <div class="assistant-header">
+                    <button id="assistant-close" class="assistant-close">×</button>
+                    <input type="text" id="assistant-search" class="assistant-search" />
+                    <button id="assistant-search-clear" style="display:none;"></button>
+                </div>
+                <div class="assistant-body">
+                    <div id="assistant-shortcuts" class="assistant-shortcuts"></div>
+                    <div id="assistant-hot" class="assistant-hot"></div>
+                    <div id="assistant-categories" class="assistant-categories"></div>
+                    <div id="assistant-qa-list" class="assistant-qa-list"></div>
+                    <div id="assistant-suggest" class="assistant-suggest" style="display:none;"></div>
+                </div>
+            </div>
+        `;
+        localStorage.clear();
+        // 重新加载源码以将事件监听绑定到新 DOM（与主测试文件一致）
+        loadSource('src/js/ui/tax-assistant-ui.js');
+        // 打开抽屉以初始化事件绑定
+        document.getElementById('tax-assistant-fab').click();
+    });
+
+    test('input 事件后联想下拉同步渲染，无需等待任何异步延迟', () => {
+        // 给 MockApi 注入一个未决的异步请求，证明联想不被其阻塞
+        const pending = window.TaxAssistant.mockApi.saveFavorite('block_test', 'add');
+        // 此时 MockApi 内部 setTimeout 尚未触发（80-200ms 后才 resolve）
+
+        const search = document.getElementById('assistant-search');
+        const suggest = document.getElementById('assistant-suggest');
+
+        // 输入触发 handleSearch → handleSuggest（同步）
+        search.value = '年终';
+        search.dispatchEvent(new Event('input'));
+
+        // 不等待任何定时器：联想应已同步渲染
+        expect(suggest.style.display).toBe('block');
+        const items = suggest.querySelectorAll('.assistant-suggest-item');
+        expect(items.length).toBeGreaterThan(0);
+        expect(items[0].textContent).toContain('年终');
+
+        // 清理未决 Promise（避免泄漏到后续测试）
+        pending.catch(() => {});
+    });
+
+    test('高频连续输入下每次联想结果立即正确（500 次 < 200ms）', () => {
+        const search = document.getElementById('assistant-search');
+        const suggest = document.getElementById('assistant-suggest');
+        const keys = ['年', '年终', '年终奖', '经营', '租金', '税', '扣', '汇算', '租金', '经营'];
+
+        const ms = bench((i) => {
+            search.value = keys[i % keys.length];
+            search.dispatchEvent(new Event('input'));
+        }, 500);
+
+        // 末次输入 '经营'（500 % 10 = 0 → '年'，补一次有匹配词验证）
+        search.value = '经营';
+        search.dispatchEvent(new Event('input'));
+        expect(suggest.querySelectorAll('.assistant-suggest-item').length).toBeGreaterThan(0);
+        console.log('  [联想高频输入 ×500] = ' + ms.toFixed(2) + 'ms');
+        expect(ms).toBeLessThan(200);
+    });
+
+    test('联想结果不依赖 MockApi 的 setTimeout 延迟', () => {
+        // 把 MockApi 延迟调到极大值，若联想依赖它则会被卡住
+        const origMin = window.TaxAssistant.mockApi._latencyMin;
+        const origMax = window.TaxAssistant.mockApi._latencyMax;
+        window.TaxAssistant.mockApi._latencyMin = 5000;
+        window.TaxAssistant.mockApi._latencyMax = 5000;
+
+        try {
+            const search = document.getElementById('assistant-search');
+            const suggest = document.getElementById('assistant-suggest');
+
+            search.value = '经营';
+            search.dispatchEvent(new Event('input'));
+
+            // 联想立即渲染，未被 5s 延迟阻塞
+            expect(suggest.style.display).toBe('block');
+            expect(suggest.querySelectorAll('.assistant-suggest-item').length).toBeGreaterThan(0);
+        } finally {
+            window.TaxAssistant.mockApi._latencyMin = origMin;
+            window.TaxAssistant.mockApi._latencyMax = origMax;
+        }
+    });
+});

@@ -1,13 +1,28 @@
-// === 通用 Mock 工具：Logger + MockClient ===
-// 提供可复用的日志器与模拟网络请求客户端，供各模块共享，避免重复实现。
-// 用法：
-//   var logger = Logger.create({ tag: 'MyModule', level: 2 });
-//   var mockApi = MockClient.create({ logger: logger, tag: 'API' });
-//   mockApi.saveFavorite = function (id, action) {
-//       return this.request('POST', '/api/fav', { id: id, action: action })
-//           .then(function () { return { id: id, action: action }; });
-//   };
-//   // 失败注入：mockApi.failNext = 1; 或 mockApi.failRate = 0.3;
+/**
+ * === 通用 Mock 工具：Logger + MockClient ===
+ *
+ * 提供可复用的日志器与模拟网络请求客户端，供各模块共享，避免重复实现。
+ *
+ * 用法示例：
+ *   var logger = Logger.create({ tag: 'MyModule', level: 2 });
+ *   var mockApi = MockClient.create({ logger: logger, tag: 'API' });
+ *   mockApi.saveFavorite = function (id, action) {
+ *       return this.request('POST', '/api/fav', { id: id, action: action })
+ *           .then(function () { return { id: id, action: action }; });
+ *   };
+ *
+ * 失败注入（测试用）：
+ *   mockApi.failNext = 1;     // 强制下一次请求失败
+ *   mockApi.failRate = 0.3;   // 30% 随机失败率
+ *
+ * 并发追踪（reqId）：
+ *   每次调用 request() 会分配一个模块级递增的 reqId，并写入日志详情。
+ *   由于各请求延迟随机，完成顺序可能与发起顺序不同；
+ *   通过日志中的 reqId 可在并发场景下回溯单次请求的发起顺序与归属。
+ *   reqId 跨实例全局递增，不同模块的并发请求也能统一排序追踪。
+ *
+ * 加载顺序：本文件需在依赖它的业务模块之前加载（见 index.html）。
+ */
 
 (function () {
     'use strict';
@@ -18,6 +33,7 @@
     // ====== Logger 工厂：可配置 tag 和 level 的轻量日志器 ======
     // level: 0=DEBUG, 1=INFO, 2=WARN(默认/生产), 3=ERROR
     // 生产默认 level=2 静默 INFO，仅保留 WARN/ERROR，消除高频日志开销
+    // 调试时可动态修改实例 .level（如 window.TaxAssistant.logger.level = 1）
     function createLogger(opts) {
         opts = opts || {};
         var tag = opts.tag || 'App';
@@ -60,17 +76,18 @@
     }
 
     // ====== MockClient 工厂：通用模拟网络请求客户端 ======
-    // 配置：
+    // 配置项（opts）：
     //   latencyMin/latencyMax  延迟范围（默认 80-200ms，模拟真实快速网络）
     //   logger                 日志器实例（可选，自动记录请求日志）
     //   tag                    日志标签（默认 'API'）
     // 实例属性：
     //   failRate   随机失败率 0-1（0=永不失败）
-    //   failNext   强制下 N 次请求失败（测试用）
+    //   failNext   强制下 N 次请求失败（测试用，每次请求自减）
     // 实例方法：
     //   request(method, url, payload) → Promise
     //     resolve: { success: true }
     //     reject : { status: 500, message: '服务器内部错误' }
+    //   业务方法（如 saveFavorite）可在实例上自行扩展，内部调用 this.request。
     function createMockClient(opts) {
         opts = opts || {};
         var logger = opts.logger || null;
