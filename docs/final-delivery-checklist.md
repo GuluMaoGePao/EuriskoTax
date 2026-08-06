@@ -1,8 +1,8 @@
 # EuriskoTax 最终项目交付清单
 
-**交付日期**: 2026-08-04
-**项目版本**: 1.0.0（含三批重构 + 个人中心 UI 重设计 + 完整测试体系）
-**交付范围**: 代码重构 + UI 重设计 + 单元测试 + 性能基准 + 交互测试 + 交付文档
+**交付日期**: 2026-08-05
+**项目版本**: 1.1.0（含三批重构 + 个人中心 UI 重设计 + 悬浮税助手 + MockClient 工具封装 + 完整测试体系）
+**交付范围**: 代码重构 + UI 重设计 + 悬浮税助手 + 工具封装 + 单元测试 + 性能基准 + 交互测试 + 交付文档
 
 ---
 
@@ -14,7 +14,8 @@
 | 2 | 单元测试报告（含浏览器交互测试） | docs/test-report.md | 已完成 |
 | 3 | UI 组件复用指南 | docs/ui-component-reuse-guide.md | 已完成 |
 | 4 | 最终交付清单 | docs/final-delivery-checklist.md | 本文档 |
-| 5 | 交付打包文件 | docs/EuriskoTax-交付包-20260804-final.zip | 已打包 |
+
+> 旧版交付打包 zip 已纳入 .gitignore，不再作为交付物引用，文档以 Markdown 源文件形式交付。
 
 ---
 
@@ -58,6 +59,18 @@
 | index.html | 6 个返回按钮重设计为 sticky 子导航栏；统计卡片和模块卡片改为 JS 动态生成（-111 行 HTML） |
 | auth-ui.js | 返回按钮通用绑定；`loadHistoryToList` 通用函数；卡片点击事件委托；`ProfilePerf` 性能日志工具 |
 
+### 2.4 Phase 4（悬浮税助手与 MockClient 工具封装）
+
+| 项目 | 内容 |
+|------|------|
+| 新增数据层 | src/js/data/tax-assistant.js（28 条 Q&A + 4 个快捷功能） |
+| 新增 UI 层 | src/js/ui/tax-assistant-ui.js（悬浮 FAB/半屏抽屉/搜索联想/分类筛选/收藏反馈/搜索历史） |
+| 新增工具层 | src/js/utils/mock-client.js（Logger + MockClient 通用封装） |
+| 重构 | tax-assistant-ui.js 移除内嵌 logger/MockApi，改用通用工具，window.TaxAssistant 对外接口不变 |
+| 并发 reqId 修复 | 模块级 reqSeq 跨实例全局递增，并发请求可回溯发起顺序 |
+| 加载顺序 | index.html 中 mock-client.js 在 tax-assistant-ui.js 之前加载 |
+| 状态 | 已完成 |
+
 ---
 
 ## 三、单元测试交付
@@ -76,8 +89,10 @@
 | 文件 | 测试数 | 覆盖范围 |
 |------|--------|---------|
 | tests/tax-calculator.test.js | 51 | 9 个核心计算函数 |
-| tests/interaction.test.js | 39 | 步骤导航、保存历史、扣除项切换、分类所得 |
-| **合计** | **90** | **全部通过** |
+| tests/interaction.test.js | 45 | 步骤导航、保存历史、扣除项切换、分类所得、参数提示 tooltip |
+| tests/tax-assistant.test.js | 35 | 税助手初始化/渲染/搜索/分类/收藏/反馈/失败回滚 |
+| tests/tax-assistant-perf.test.js | 12 | logger 性能、MockClient 工具复用、并发 reqId、延迟边界、搜索联想同步性 |
+| **合计** | **143** | **全部通过** |
 
 ### 3.3 性能基准测试
 
@@ -121,6 +136,15 @@ npm run test:performance    # 性能基准测试
 | 卡片点击 | < 1 ms |
 | 返回按钮 | < 1 ms |
 
+### 4.3 悬浮税助手性能（Node.js 基准）
+
+| 测试项 | 实测 |
+|--------|------|
+| logger level=2 静默态 5000 次过滤 | 比开启态快 5 倍以上 |
+| handleSuggest 连续 500 次联想生成 | < 200 ms |
+| MockApi saveFavorite 单次请求 | 80-200 ms（设计延迟） |
+| 搜索联想高频输入 500 次 | < 200 ms |
+
 ---
 
 ## 五、交互测试结果
@@ -135,6 +159,10 @@ npm run test:performance    # 性能基准测试
 | 卡片点击交互 | PASS |
 | 返回按钮交互 | PASS |
 | 性能日志输出 | PASS |
+| 税助手抽屉渲染（FAB/分类/热门/28 条 Q&A） | PASS |
+| 搜索联想（同步下拉 + 实时过滤 + 高亮） | PASS |
+| 收藏与失败回滚（乐观更新 + failNext 回滚） | PASS |
+| 日志静默（level=2 静默 INFO） | PASS |
 
 ---
 
@@ -144,31 +172,40 @@ npm run test:performance    # 性能基准测试
 
 | 文件 | 变更内容 |
 |------|---------|
-| index.html | 子导航栏 CSS + 6 个返回按钮重设计 + 卡片容器改 JS 生成 |
+| index.html | 子导航栏 CSS + 6 个返回按钮重设计 + 卡片容器改 JS 生成；新增税助手 FAB/抽屉 DOM；加载 mock-client.js（先于 tax-assistant-ui.js） |
 | src/js/auth/auth-ui.js | ProfilePerf + 配置驱动渲染 + 事件委托 + 通用返回绑定 + loadHistoryToList |
-| src/js/ui/navigation-ui.js | showStepByPanes + 移除 currentStep |
+| src/js/ui/navigation-ui.js | showStepByPanes + 移除 currentStep + initTooltipHints 参数提示 |
 | src/js/calculation/tax-calculator.js | saveToHistory 通用函数 |
 | src/js/app.js | bindCalcActionBtns 通用函数 |
 
-### 6.2 新增的测试文件
+### 6.2 新增的源码文件（Phase 4）
+
+| 文件 | 用途 |
+|------|------|
+| src/js/data/tax-assistant.js | 税助手问答库数据（28 条 Q&A + 4 快捷功能） |
+| src/js/ui/tax-assistant-ui.js | 悬浮税助手 UI 逻辑（FAB/抽屉/搜索/收藏/反馈/联想） |
+| src/js/utils/mock-client.js | 通用工具封装（Logger + MockClient） |
+
+### 6.3 新增的测试文件
 
 | 文件 | 用途 |
 |------|------|
 | tests/setup.js | 测试环境初始化 |
 | tests/helpers/load-source.js | 源码加载辅助 |
 | tests/tax-calculator.test.js | 核心计算逻辑测试（51 个） |
-| tests/interaction.test.js | 交互流程测试（39 个） |
+| tests/interaction.test.js | 交互流程测试（45 个） |
+| tests/tax-assistant.test.js | 悬浮税助手功能测试（35 个） |
+| tests/tax-assistant-perf.test.js | 税助手性能与工具测试（12 个） |
 | tests/performance/benchmark.js | 性能基准测试 |
 
-### 6.3 文档结构（整理后）
+### 6.4 文档结构（整理后）
 
 ```
 docs/
 ├── final-delivery-checklist.md      # 最终交付清单（本文档，总入口）
-├── refactor-summary-report.md       # 重构成果汇总报告（三批次合并）
+├── refactor-summary-report.md       # 重构成果汇总报告（三批次 + Phase 4）
 ├── test-report.md                   # 单元测试 + 浏览器交互测试报告
 ├── ui-component-reuse-guide.md      # UI 组件复用指南
-├── EuriskoTax-交付包-20260804-final.zip  # 全部文档打包
 ├── api/
 │   └── api-reference.md             # API 接口参考文档
 ├── development/
@@ -179,8 +216,9 @@ docs/
 
 > 已合并：refactor-comparison-report.md + profile-refactor-report.md → refactor-summary-report.md
 > 已清理：旧版交付清单、Phase2 测试报告、delivery 临时目录、2 个旧 zip 包。
+> 旧版交付打包 zip 已纳入 .gitignore，不再列入文档结构。
 
-### 6.4 备份文件
+### 6.5 备份文件
 
 | 路径 | 说明 |
 |------|------|
@@ -194,15 +232,17 @@ docs/
 
 | 验收项 | 标准 | 实际 | 结论 |
 |--------|------|------|------|
-| 单元测试通过率 | 100% | 90/90 (100%) | 通过 |
+| 单元测试通过率 | 100% | 143/143 (100%) | 通过 |
 | 意外警告/错误 | 0 | 0 | 通过 |
 | 核心函数性能 | < 100ms | < 3.1 μs | 通过 |
 | 个人中心加载性能 | < 200ms | ~80ms | 通过 |
-| 代码体积减少 | > 0 | -8.10 KB / -210 行（合计） | 通过 |
+| 代码体积减少 | > 0 | -8.10 KB / -210 行（三批合计） | 通过 |
 | 重复逻辑消除 | > 0 | 三批重构共消除 ~300 行重复 | 通过 |
-| 深色模式兼容 | 全部适配 | 子导航栏 + 卡片 + 文字 | 通过 |
+| 深色模式兼容 | 全部适配 | 子导航栏 + 卡片 + 文字 + 税助手 | 通过 |
 | 移动端适配 | 375px 可用 | 自适应布局正常 | 通过 |
 | 备份完整性 | 重构前已备份 | 3 份完整备份 | 通过 |
+| Phase 4 工具复用 | 通用封装可跨模块 | MockClient/Logger 已被税助手复用 | 通过 |
+| Phase 4 失败回滚 | 乐观更新 + 失败回滚 | 收藏/反馈失败自动回滚 | 通过 |
 
 ---
 
@@ -212,7 +252,8 @@ docs/
 |---------|---------|--------|
 | 第二批重构 | navigation-ui.js + tax-calculator.js + app.js | -4.29 KB / -113 行 |
 | 个人中心重构 | index.html + auth-ui.js | -3.81 KB / -97 行 |
-| **合计** | — | **-8.10 KB / -210 行** |
+| **三批合计** | — | **-8.10 KB / -210 行** |
+| Phase 4 | 新增 tax-assistant.js + tax-assistant-ui.js + mock-client.js | 新增模块（不计入净减） |
 
 ---
 
@@ -224,6 +265,8 @@ docs/
 4. **性能监控**: ProfilePerf 日志已建立基线，可考虑上报到监控系统
 5. **第三批重构**: 可考虑重构 helper-functions.js 和 utils.js 中的重复模式
 6. **Tailwind 生产构建**: 将 CDN 版本替换为本地构建，消除生产环境警告
+7. **MockClient 后端切换**: 后端就绪后，可将 MockClient 替换为真实 fetch 客户端，window.TaxAssistant 对外接口无需变动
+8. **性能测试稳定性**: tax-assistant-perf.test.js 的时序断言在机器高负载时偶发抖动，CI 中可适当放宽阈值或重试
 
 ---
 
@@ -233,9 +276,10 @@ docs/
 |------|------|
 | 代码重构 | 已完成（3 批次） |
 | UI 重设计 | 已完成（个人中心子导航栏） |
-| 单元测试 | 已通过（90/90） |
-| 性能基准 | 已达标（核心 < 3.1μs，个人中心 ~80ms） |
-| 交互测试 | 已通过（浅色/深色/移动端） |
+| Phase 4 悬浮税助手 | 已完成（数据 + UI + MockClient 工具封装 + 并发 reqId 修复） |
+| 单元测试 | 已通过（143/143） |
+| 性能基准 | 已达标（核心 < 3.1μs，个人中心 ~80ms，联想高频 < 200ms） |
+| 交互测试 | 已通过（浅色/深色/移动端 + 税助手抽屉/联想/收藏/回滚/日志） |
 | 文档 | 已生成（4 份报告 + 本清单 + 3 份既有文档） |
 
-**交付结论**: 全部重构、测试和文档工作已完成，所有质量验收标准满足，可交付。
+**交付结论**: 全部重构、Phase 4 悬浮税助手与工具封装、测试和文档工作已完成，所有质量验收标准满足，可交付。
