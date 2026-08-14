@@ -272,6 +272,10 @@ npm start
 cpolar http 3000 --region cn
 ```
 
+> **更优方案**：项目已配置 `cpolar.yml` 预设隧道（`eurisko`），可直接运行 `cpolar start eurisko`。
+> 配合 `scripts\start-dev.ps1 -Share -Watchdog` 可一键启动后端 + cpolar + 守护脚本，支持自动重启和邮件通知。
+> 详见 [README.md](../../README.md) 和 [守护脚本邮件通知与事件日志规范](../tech-reports/watchdog-notification-and-event-log-spec.md)。
+
 ---
 
 ## 🛡️ 安全注意事项

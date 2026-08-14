@@ -1,27 +1,15 @@
 {
-  "_comment": "EuriskoTax Watchdog 中文邮件通知模板。占位符 {xxx} 由 notify.ps1 在发送时替换。",
-  "BACKEND_RESTART": {
-    "subject": "【EuriskoTax】后端服务已自动重启",
-    "body": "后端服务出现异常，守护脚本已自动重启恢复。\n\n━━━ 故障信息 ━━━\n故障原因：{reason}\n恢复耗时：{recoveryMs} 毫秒\n新进程 PID：{newPid}\n发生时间：{timestamp}\n\n━━━ 当前状态 ━━━\n服务已恢复正常，测试可继续进行。\n如有疑问请查看 events.log 了解详情。"
-  },
-  "CPOLAR_RESTART": {
-    "subject": "【EuriskoTax】cpolar 隧道已自动重启",
-    "body": "cpolar 公网隧道出现异常，守护脚本已自动重启恢复。\n\n━━━ 故障信息 ━━━\n故障原因：{reason}\n恢复耗时：{recoveryMs} 毫秒\n当前公网地址：{newUrl}\n发生时间：{timestamp}\n\n━━━ 当前状态 ━━━\n隧道已恢复正常，测试可继续进行。\n如有疑问请查看 events.log 了解详情。"
-  },
+  "_comment": "EuriskoTax Watchdog 中文邮件通知模板 v3.1（简化版）",
+  "_comment_scope": "仅公网地址变更（URL_CHANGED）通过邮件通知，其他事件仅记录到 events.log",
+  "_comment_placeholders": "可用占位符: oldUrl, newUrl, reason, recoveryMs, timestamp, from, recipients, smtpHost, smtpPort",
+
   "URL_CHANGED": {
     "subject": "【EuriskoTax】公网测试地址已变更",
-    "body": "cpolar 公网地址已发生变化，请通知测试员使用新地址。\n\n━━━ 地址变更 ━━━\n旧地址：{oldUrl}\n新地址：{newUrl}\n变更原因：{reason}\n发生时间：{timestamp}\n\n━━━ 重要提醒 ━━━\n旧地址已失效，请将新地址发送给测试员！\n测试账号：dev@example.com / password\n如有疑问请查看 events.log 了解详情。"
+    "body": "公网测试地址已变更\n\n新地址\n  {newUrl}\n\n旧地址\n  {oldUrl}\n\n变更原因\n  {reason}\n\n发生时间\n  {timestamp}\n\n请立即将新地址发送给测试员，通知所有正在测试的人员更换访问地址。\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：dev@example.com\n  测试密码：password\n\n说明\n  cpolar 免费版公网地址在隧道重启或自动重连后可能发生变化。\n  本邮件由 EuriskoTax Watchdog 自动发送。"
   },
-  "RESTART_FAILED": {
-    "subject": "【EuriskoTax 告警】服务重启失败，需人工介入",
-    "body": "服务自动重启失败，需要人工介入处理。\n\n━━━ 告警信息 ━━━\n故障对象：{target}\n故障原因：{reason}\n已重启次数：{restartCount}\n错误详情：{details}\n发生时间：{timestamp}\n\n━━━ 处理建议 ━━━\n请尽快检查服务状态并手动处理。\n后端日志：{logPath}\ncpolar 日志：{cpolarLogPath}\n事件日志：events.log\n\n如多次失败，可尝试运行 .\\start-dev.ps1 -Share -Watchdog 重新启动全套服务。"
-  },
-  "MAX_RESTARTS_REACHED": {
-    "subject": "【EuriskoTax 告警】重启次数已达上限，守护停止",
-    "body": "服务持续异常，重启次数已达配置上限，守护脚本放弃自动恢复。\n\n━━━ 告警信息 ━━━\n故障对象：{target}\n最大重启次数：{maxRestarts}\n发生时间：{timestamp}\n\n━━━ 处理建议 ━━━\n需要人工介入！请检查服务状态并手动重启。\n可运行 .\\start-dev.ps1 -Share -Watchdog 重新启动全套服务。"
-  },
+
   "TEST": {
     "subject": "【EuriskoTax】邮件通知测试",
-    "body": "这是一封来自 EuriskoTax 守护脚本的测试邮件。\n\n如果您收到了这封邮件，说明 SMTP 邮件通知功能已正常工作。\n\n━━━ 配置信息 ━━━\n发件邮箱：{from}\n收件邮箱：{recipients}\nSMTP 服务器：{smtpHost}:{smtpPort} (SSL)\n\n━━━ 通知事件类型 ━━━\n1. 后端服务自动重启（BACKEND_RESTART）\n2. cpolar 隧道自动重启（CPOLAR_RESTART）\n3. 公网地址变更（URL_CHANGED）\n4. 重启失败告警（RESTART_FAILED）\n5. 重启次数达上限告警（MAX_RESTARTS_REACHED）\n\n发生时间：{timestamp}"
+    "body": "邮件通知测试\n\n如果您收到了这封邮件，说明 SMTP 邮件通知功能已正常工作。\n\n配置信息\n  发件邮箱：{from}\n  收件邮箱：{recipients}\n  SMTP 服务器：{smtpHost}:{smtpPort} (SSL)\n\n通知策略\n  当前仅公网地址变更事件会发送邮件通知。\n  其他事件（后端重启、隧道重启、重启失败等）仅记录到 events.log。\n\n发生时间：{timestamp}\n\n本邮件由 EuriskoTax Watchdog 自动发送。"
   }
 }

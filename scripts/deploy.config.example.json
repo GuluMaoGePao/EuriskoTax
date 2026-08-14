@@ -1,0 +1,72 @@
+{
+  "_comment": "EuriskoTax 部署配置文件模板 - 复制为 deploy.config.json 并填入实际值",
+  "_comment_usage": "cp scripts/deploy.config.example.json scripts/deploy.config.json && 编辑实际值",
+
+  "server": {
+    "host": "your-server-ip",
+    "port": 22,
+    "user": "root",
+    "_comment_auth": "authMethod: key (推荐，需指定 privateKeyPath) 或 password (需指定 password)",
+    "authMethod": "key",
+    "privateKeyPath": "~/.ssh/id_rsa",
+    "password": ""
+  },
+
+  "deploy": {
+    "_comment_remotePath": "服务器上的部署目录（会自动创建）",
+    "remotePath": "/opt/euriskotax",
+    "_comment_releaseDir": "每次发布存放到 releases/时间戳 目录，current 软链接指向当前版本",
+    "keepReleases": 5,
+    "_comment_processManager": "进程管理方式: pm2 (推荐) 或 systemd 或 direct",
+    "processManager": "pm2",
+    "processName": "euriskotax",
+    "_comment_nodeVersion": "服务器上需要的 Node.js 版本，脚本会检查",
+    "nodeVersion": "18"
+  },
+
+  "build": {
+    "_comment_excludePatterns": "打包时排除的文件/目录（相对于项目根目录）",
+    "_comment_optimized": "v1.1 优化：新增 cpolar/(Windows工具)、dev.db(开发数据库)、package-lock.json(根目录)、CHANGELOG/README/.gitignore(部署不需要)",
+    "excludePatterns": [
+      "node_modules/",
+      "tests/",
+      "docs/",
+      "scripts/",
+      "coverage/",
+      "backup/",
+      ".trae/",
+      "images/",
+      "cpolar/",
+      "*.log",
+      "*.zip",
+      "deploy.config.json",
+      ".git/",
+      "server/prisma/dev.db",
+      "package-lock.json",
+      "CHANGELOG.md",
+      "README.md",
+      ".gitignore"
+    ]
+  },
+
+  "env": {
+    "_comment": "仅配置非敏感的环境变量。敏感变量（JWT_SECRET, DATABASE_URL 等）在服务器 .env.shared 中维护，避免本地泄露",
+    "_comment_serverEnvFile": "服务器上的共享环境变量文件路径，部署时自动复制到新版本的 server/.env",
+    "serverEnvFile": "/opt/euriskotax/.env.shared",
+    "_comment_initEnv": "首次部署时，如果 serverEnvFile 不存在，脚本会引导在服务器上创建",
+    "_comment_vars": "以下变量会合并到 .env（非敏感，可入库）",
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "CORS_ORIGIN": "*"
+  },
+
+  "hooks": {
+    "_comment_preDeploy": "部署前在服务器上执行的命令",
+    "preDeploy": "",
+    "_comment_postDeploy": "部署后在服务器上执行的命令",
+    "postDeploy": "",
+    "_comment_healthCheck": "部署后的健康检查 URL（相对路径）",
+    "healthCheckPath": "/api/auth/profile",
+    "healthCheckTimeout": 30
+  }
+}

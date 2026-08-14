@@ -12,7 +12,10 @@ server/prisma/*.db
 .env.*.local
 
 # Watchdog notification config (contains SMTP credentials)
-notify.config.json
+scripts/notify.config.json
+
+# Deploy config (contains server credentials)
+scripts/deploy.config.json
 
 # Logs
 logs/

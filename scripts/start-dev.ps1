@@ -1,4 +1,4 @@
-# EuriskoTax 一键启动脚本（PowerShell）
+﻿# EuriskoTax 一键启动脚本（PowerShell）
 # 功能：检查环境 → 安装依赖 → 重置 dev 用户 → 启动后端服务 → (可选)cpolar公网分享 → (可选)守护
 # 用法：
 #   .\start-dev.ps1              # 标准启动
@@ -15,7 +15,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 脚本位于 scripts/ 子目录，项目根目录为上一级
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
 $ServerDir = Join-Path $ProjectRoot "server"
 
 Write-Host ""
@@ -197,8 +199,8 @@ if ($Watchdog) {
     $stepNumWd = if ($Share) { "6/6" } else { "5/5" }
     Write-Host ""
     Write-Host "[$stepNumWd] 启动守护脚本（自动重启异常进程）..." -ForegroundColor Yellow
-    $watchdogLog = Join-Path $ProjectRoot "watchdog.log"
-    $watchdogArgs = @("-File", (Join-Path $ProjectRoot "watchdog.ps1"), "-IntervalSec", "20")
+    $watchdogLog = Join-Path $ScriptDir "watchdog.log"
+    $watchdogArgs = @("-File", (Join-Path $ScriptDir "watchdog.ps1"), "-IntervalSec", "20")
     if ($Share) { $watchdogArgs += "-Share" }
     try {
         $watchdogProc = Start-Process -FilePath "powershell.exe" `

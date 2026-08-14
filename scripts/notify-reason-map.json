@@ -1,0 +1,17 @@
+{
+  "_comment": "Watchdog reason code to Chinese description map. Loaded by notify.ps1 Convert-ReasonToChinese.",
+  "port_3000_not_listening": "后端服务端口 3000 未监听，进程已崩溃",
+  "connection_refused_or_timeout": "后端服务连接被拒绝或请求超时",
+  "http_error_500": "后端服务返回 HTTP 500 内部错误",
+  "http_unexpected_status_200": "后端服务返回意外的 200 状态码",
+  "backend_timeout_30s": "后端服务在 30 秒内未能恢复",
+  "max_restarts_reached": "自动重启次数已达上限，守护停止",
+  "cpolar_process_dead": "cpolar 进程意外退出",
+  "public_url_timeout": "公网地址访问超时（隧道可能已断开）",
+  "public_url_unreachable": "公网地址不可达（DNS 或连接问题）",
+  "public_url_http_502": "公网地址返回 502（后端服务不可达）",
+  "cpolar_exe_not_found": "未找到 cpolar.exe，文件路径可能有误",
+  "cpolar_restart_new_url": "隧道重启后分配了新的公网地址",
+  "auto_reconnect_new_url": "cpolar 自动重连后分配了新的公网地址",
+  "false_positive_ok": "服务正常（误报）"
+}

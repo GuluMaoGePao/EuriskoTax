@@ -1,4 +1,4 @@
-# EuriskoTax Service Watchdog (PowerShell)
+﻿# EuriskoTax Service Watchdog (PowerShell)
 # Monitors backend server on port 3000 and (optionally) cpolar tunnel.
 # Auto-restarts processes when they crash or stop responding.
 # Records detailed events to events.log and sends email notifications.
@@ -17,13 +17,15 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 脚本位于 scripts/ 子目录，项目根目录为上一级
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
 $ServerDir = Join-Path $ProjectRoot "server"
 $CpolarExe = Join-Path $ProjectRoot "cpolar\cpolar.exe"
 $CpolarLog = Join-Path $env:TEMP "cpolar-euriskotax-watchdog.log"
-$WatchdogLog = Join-Path $ProjectRoot "watchdog.log"
-$EventLog = Join-Path $ProjectRoot "events.log"
-$NotifyModule = Join-Path $ProjectRoot "notify.ps1"
+$WatchdogLog = Join-Path $ScriptDir "watchdog.log"
+$EventLog = Join-Path $ScriptDir "events.log"
+$NotifyModule = Join-Path $ScriptDir "notify.ps1"
 $LastCpolarUrl = ""
 $RestartCount = 0
 $global:WatchdogRunning = $true
@@ -170,7 +172,7 @@ function Restart-ServerService {
         if ($ready) {
             Write-Log "OK" ("Backend restarted OK (PID: " + $proc.Id + ") in ${recoveryMs}ms")
             Write-EventLog -EventType "BACKEND_RESTART" -Reason $reason -RecoveryMs $recoveryMs -Details ("new_pid=" + $proc.Id)
-            $tplData = @{ reason=$reason; recoveryMs=$recoveryMs; newPid=$proc.Id; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+            $tplData = @{ reason=$reason; recoveryMs=$recoveryMs; newPid=$proc.Id; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss"); logPath=$stdoutLog }
             Invoke-Notification -EventType "BACKEND_RESTART" -TemplateData $tplData
             return $true
         } else {
@@ -193,18 +195,30 @@ function Restart-ServerService {
     }
 }
 
-# ====== Parse cpolar public url from log ======
+# ====== Get cpolar public url (API first, log fallback) ======
 function Get-CpolarUrl {
     param([string]$LogPath)
-    if (-not (Test-Path $LogPath)) { return $null }
-    $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
-    if (-not $content) { return $null }
-    $pattern = 'Tunnel established at (https://[^\s"]+)'
-    $m = [regex]::Match($content, $pattern)
-    if ($m.Success) { return $m.Groups[1].Value }
-    $pattern = 'Tunnel established at (http://[^\s"]+)'
-    $m = [regex]::Match($content, $pattern)
-    if ($m.Success) { return $m.Groups[1].Value }
+
+    # 1) Try cpolar local dashboard API (works regardless of how cpolar was started)
+    try {
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4040" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        if ($resp.Content -match 'https://[a-z0-9]+\.r8\.cpolar\.cn') { return $matches[0] }
+        if ($resp.Content -match 'https://[a-z0-9]+\.cpolar\.[a-z]+') { return $matches[0] }
+    } catch { }
+
+    # 2) Fallback: parse from log file
+    if ($LogPath -and (Test-Path $LogPath)) {
+        $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
+        if ($content) {
+            $pattern = 'Tunnel established at (https://[^\s"]+)'
+            $m = [regex]::Match($content, $pattern)
+            if ($m.Success) { return $m.Groups[1].Value }
+            $pattern = 'Tunnel established at (http://[^\s"]+)'
+            $m = [regex]::Match($content, $pattern)
+            if ($m.Success) { return $m.Groups[1].Value }
+        }
+    }
+
     return $null
 }
 
@@ -234,6 +248,8 @@ function Get-CpolarFailureReason {
 }
 
 # ====== Cpolar health check (process alive + public URL reachable) ======
+# Note: If old URL is unreachable but process is alive, check if URL changed
+# (cpolar auto-reconnect assigns new URL). Returns true to avoid unnecessary restart.
 function Test-CpolarHealth {
     param([string]$ExpectedUrl)
     $proc = Get-Process -Name "cpolar" -ErrorAction SilentlyContinue
@@ -246,6 +262,12 @@ function Test-CpolarHealth {
         } catch {
             if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 401) {
                 return $true
+            }
+            # Old URL unreachable, but process is alive - check if URL changed via dashboard
+            $freshUrl = Get-CpolarUrl -LogPath $CpolarLog
+            if ($freshUrl -and $freshUrl -ne $ExpectedUrl) {
+                Write-Log "INFO" "cpolar URL changed (old unreachable, new detected): $ExpectedUrl -> $freshUrl"
+                return $true  # Process healthy, just URL changed (no restart needed)
             }
             return $false
         }
@@ -301,7 +323,7 @@ function Restart-CpolarTunnel {
             # If URL changed, also fire URL_CHANGED event + notification
             if ($oldUrl -and $newUrl -ne $oldUrl) {
                 Write-EventLog -EventType "URL_CHANGED" -Reason "cpolar_restart_new_url" -NewUrl $newUrl -OldUrl $oldUrl
-                $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason=$reason; recoveryMs=$recoveryMs; timestamp=$ts }
+                $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason="cpolar_restart_new_url"; recoveryMs=$recoveryMs; timestamp=$ts }
                 Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
             } else {
                 $tplData = @{ reason=$reason; recoveryMs=$recoveryMs; newUrl=$newUrl; timestamp=$ts }

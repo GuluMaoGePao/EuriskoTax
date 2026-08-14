@@ -10,10 +10,10 @@
 
 | 序号 | 交付物 | 路径 | 状态 |
 |------|--------|------|------|
-| 1 | 重构成果汇总报告 | docs/refactor-summary-report.md | 已完成 |
-| 2 | 单元测试报告（含浏览器交互测试） | docs/test-report.md | 已完成 |
-| 3 | UI 组件复用指南 | docs/ui-component-reuse-guide.md | 已完成 |
-| 4 | 最终交付清单 | docs/final-delivery-checklist.md | 本文档 |
+| 1 | 重构成果汇总报告 | reports/refactor-summary-report.md | 已完成 |
+| 2 | 单元测试报告（含浏览器交互测试） | reports/test-report.md | 已完成 |
+| 3 | UI 组件复用指南 | guides/ui-component-reuse-guide.md | 已完成 |
+| 4 | 最终交付清单 | reports/final-delivery-checklist.md | 本文档 |
 
 > 旧版交付打包 zip 已纳入 .gitignore，不再作为交付物引用，文档以 Markdown 源文件形式交付。
 
@@ -25,14 +25,14 @@
 
 | 项目 | 内容 |
 |------|------|
-| 备份位置 | backup/refactor-batch1-20260803-235720/ |
+| 备份位置 | _(已清理，git 历史可查)_ |
 | 状态 | 已完成 |
 
 ### 2.2 第二批重构（重复逻辑和未使用变量清理）
 
 | 项目 | 内容 |
 |------|------|
-| 备份位置 | backup/refactor-batch2-20260804-000444/ |
+| 备份位置 | _(已清理，git 历史可查)_ |
 | 代码减少 | -4.29 KB / -113 行 |
 | 状态 | 已完成 |
 
@@ -48,7 +48,7 @@
 
 | 项目 | 内容 |
 |------|------|
-| 备份位置 | backup/refactor-profile-20260804-002749/ |
+| 备份位置 | _(已清理，git 历史可查)_ |
 | 代码净减少 | -3.81 KB / -97 行 |
 | 状态 | 已完成 |
 
@@ -220,11 +220,13 @@ docs/
 
 ### 6.5 备份文件
 
-| 路径 | 说明 |
+> 重构备份已完成历史使命，已从本地清理（git 历史中可追溯）。
+
+| 原路径 | 说明 |
 |------|------|
-| backup/refactor-batch1-20260803-235720/ | 第一批重构前备份 |
-| backup/refactor-batch2-20260804-000444/ | 第二批重构前备份 |
-| backup/refactor-profile-20260804-002749/ | 个人中心重构前备份 |
+| ~~backup/refactor-batch1-20260803-235720/~~ | 第一批重构前备份（已清理） |
+| ~~backup/refactor-batch2-20260804-000444/~~ | 第二批重构前备份（已清理） |
+| ~~backup/refactor-profile-20260804-002749/~~ | 个人中心重构前备份（已清理） |
 
 ---
 

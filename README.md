@@ -8,15 +8,33 @@
 
 ```powershell
 # 标准启动（本地开发）
-.\start-dev.ps1
+.\scripts\start-dev.ps1
 
 # 公网分享 + 守护脚本（给好友测试时推荐）
-.\start-dev.ps1 -Share -Watchdog
+.\scripts\start-dev.ps1 -Share -Watchdog
 ```
 
 启动后会自动：检查环境 → 安装依赖 → 重置 dev 用户 → 启动后端 → (可选)启动 cpolar 公网隧道 → (可选)启动守护脚本
 
 **测试账号**：`dev@example.com` / `password`
+
+---
+
+## 项目结构
+
+```
+EuriskoTax/
+├── src/                # 前端源码（主项目）
+├── server/             # 后端源码（主项目）
+├── tests/              # 测试代码
+├── scripts/            # 运维脚本（watchdog/notify/start-dev + 通知配置）
+├── docs/               # 项目文档（索引见 docs/README.md）
+├── images/             # 项目图片资源
+├── cpolar/             # cpolar 内网穿透工具
+└── index.html          # 前端入口
+```
+
+> 主项目代码、运维脚本、测试代码、文档职责分离。详见 [docs/README.md](docs/README.md)。
 
 ---
 
@@ -26,13 +44,13 @@
 
 | 文件 | 作用 |
 |------|------|
-| [start-dev.ps1](start-dev.ps1) | 一键启动脚本（环境检查+依赖安装+服务启动） |
-| [watchdog.ps1](watchdog.ps1) | 守护主脚本（每20秒监控+自动重启+事件记录） |
-| [notify.ps1](notify.ps1) | 邮件通知模块（SMTP发送+模板渲染） |
-| [notify.config.json](notify.config.json) | SMTP配置（邮箱+授权码+收件人，**已加入.gitignore**） |
-| [notify-templates.json](notify-templates.json) | 中文邮件模板（6种事件） |
-| watchdog.log | 守护运行日志 |
-| events.log | 重启事件日志（结构化） |
+| [scripts/start-dev.ps1](scripts/start-dev.ps1) | 一键启动脚本（环境检查+依赖安装+服务启动） |
+| [scripts/watchdog.ps1](scripts/watchdog.ps1) | 守护主脚本（每20秒监控+自动重启+事件记录） |
+| [scripts/notify.ps1](scripts/notify.ps1) | 邮件通知模块（SMTP发送+模板渲染） |
+| [scripts/notify.config.json](scripts/notify.config.json) | SMTP配置（邮箱+授权码+收件人，**已加入.gitignore**） |
+| [scripts/notify-templates.json](scripts/notify-templates.json) | 中文邮件模板（URL_CHANGED + TEST） |
+| scripts/watchdog.log | 守护运行日志 |
+| scripts/events.log | 重启事件日志（结构化） |
 
 ### 监控范围
 
@@ -47,7 +65,7 @@
 
 ### 配置方法
 
-1. 编辑 [notify.config.json](notify.config.json)，填写QQ邮箱和授权码
+1. 编辑 [notify.config.json](scripts/notify.config.json)，填写QQ邮箱和授权码
 2. 将 `enabled` 设为 `true`
 3. 发送测试邮件验证：
 
@@ -58,31 +76,62 @@ Send-TestNotification
 
 > **QQ邮箱授权码获取**：登录 mail.qq.com → 设置 → 账户 → POP3/SMTP服务 → 开启 → 获取授权码
 
-### 通知事件类型
+### 通知策略
 
-| 事件 | 标题 | 触发条件 |
-|------|------|---------|
-| 后端重启 | 【EuriskoTax】后端服务已自动重启 | 后端崩溃后自动重启成功 |
-| 隧道重启 | 【EuriskoTax】cpolar 隧道已自动重启 | 隧道断连后自动重启成功 |
-| 地址变更 | 【EuriskoTax】公网测试地址已变更 | 公网URL变化（含新旧对比） |
-| 重启失败 | 【EuriskoTax 告警】服务重启失败，需人工介入 | 自动重启超时或异常 |
-| 重启上限 | 【EuriskoTax 告警】重启次数已达上限，守护停止 | 达到MaxRestarts限制 |
-| 测试邮件 | 【EuriskoTax】邮件通知测试 | 手动调用 Send-TestNotification |
+**仅公网地址变更（URL_CHANGED）通过邮件通知**，其他事件仅记录到 events.log。
+
+| 事件 | 邮件通知 | 记录日志 | 说明 |
+|------|---------|---------|------|
+| 后端重启 | ❌ 不通知 | ✅ events.log | 自动恢复，无需人工干预 |
+| 隧道重启 | ❌ 不通知 | ✅ events.log | 自动恢复，无需人工干预 |
+| **地址变更** | **✅ 发送邮件** | ✅ events.log | **含新地址+测试账号，需通知测试员** |
+| 重启失败 | ❌ 不通知 | ✅ events.log | 查看 events.log 了解详情 |
+| 重启上限 | ❌ 不通知 | ✅ events.log | 查看 events.log 了解详情 |
+| 测试邮件 | ✅ 手动触发 | — | 验证 SMTP 配置 |
+
+> 如需启用其他事件的邮件通知，编辑 [notify.config.json](scripts/notify.config.json) 的 `notifyOn` 节点，将对应开关设为 `true`。
 
 ### 邮件模板
 
-所有邮件内容使用中文模板，定义在 [notify-templates.json](notify-templates.json)。
+中文邮件模板（v3.0），定义在 [notify-templates.json](scripts/notify-templates.json)，仅包含 2 种模板：
 
-模板使用 `{占位符}` 语法，例如：
+- **URL_CHANGED** — 公网地址变更通知
+- **TEST** — 邮件通知测试
+
+URL_CHANGED 模板使用 `★★★ 新公网地址 ★★★` 醒目标记新地址，并包含测试员登录信息：
 
 ```
-故障原因：{reason}
-恢复耗时：{recoveryMs} 毫秒
-新进程 PID：{newPid}
-发生时间：{timestamp}
+★★★ 新公网地址 ★★★
+
+  {newUrl}
+
+【地址变更详情】
+  旧地址：{oldUrl}
+  新地址：{newUrl}
+  变更原因：{reason}
+  发生时间：{timestamp}
+
+【测试员登录信息】
+  访问地址：{newUrl}
+  测试账号：dev@example.com
+  测试密码：password
 ```
 
 修改模板无需重启 watchdog，下次触发事件时自动读取最新配置。
+
+### 收件人配置
+
+在 [notify.config.json](scripts/notify.config.json) 的 `recipients` 数组中添加多个收件人：
+
+```json
+"recipients": [
+    "your_qq@qq.com",
+    "tester1@qq.com",
+    "tester2@qq.com"
+]
+```
+
+公网地址变更邮件会同时发送给全部收件人。
 
 ---
 
@@ -92,13 +141,13 @@ Send-TestNotification
 
 ```powershell
 # 查看最近20条重启事件
-Get-Content .\events.log -Tail 20
+Get-Content .\scripts\events.log -Tail 20
 
 # 筛选地址变更事件
-Select-String -Path .\events.log -Pattern "URL_CHANGED"
+Select-String -Path .\scripts\events.log -Pattern "URL_CHANGED"
 
 # 筛选重启失败事件
-Select-String -Path .\events.log -Pattern "RESTART_FAILED"
+Select-String -Path .\scripts\events.log -Pattern "RESTART_FAILED"
 ```
 
 ### 日志格式
@@ -132,10 +181,10 @@ Select-String -Path .\events.log -Pattern "RESTART_FAILED"
 
 ```powershell
 # 启动全套服务（本地）
-.\start-dev.ps1
+.\scripts\start-dev.ps1
 
 # 启动全套服务 + 公网分享 + 守护
-.\start-dev.ps1 -Share -Watchdog
+.\scripts\start-dev.ps1 -Share -Watchdog
 
 # 单独启动守护脚本
 .\watchdog.ps1 -Share -IntervalSec 20
@@ -144,10 +193,10 @@ Select-String -Path .\events.log -Pattern "RESTART_FAILED"
 . .\notify.ps1; Send-TestNotification
 
 # 查看事件日志
-Get-Content .\events.log -Tail 20
+Get-Content .\scripts\events.log -Tail 20
 
 # 查看守护心跳日志
-Get-Content .\watchdog.log -Tail 20
+Get-Content .\scripts\watchdog.log -Tail 20
 ```
 
 ---
