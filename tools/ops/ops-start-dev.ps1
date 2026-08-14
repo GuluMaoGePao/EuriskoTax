@@ -15,9 +15,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-# 脚本位于 scripts/ 子目录，项目根目录为上一级
+# 脚本位于 tools/ops/ 子目录，项目根目录需向上两层
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$ToolsDir = Split-Path -Parent $ScriptDir
 $ServerDir = Join-Path $ProjectRoot "server"
 
 Write-Host ""
@@ -103,7 +104,7 @@ if (-not $SkipResetUser) {
 # ====== 4. (可选) 启动 cpolar 公网分享 ======
 $cpolarStarted = $false
 if ($Share) {
-    $cpolarDir = Join-Path $ProjectRoot "cpolar"
+    $cpolarDir = Join-Path $ToolsDir "cpolar"
     $cpolarExe = Join-Path $cpolarDir "cpolar.exe"
 
     Write-Host ""
@@ -114,7 +115,7 @@ if ($Share) {
         Write-Host "  跳过公网分享，仅本地访问" -ForegroundColor Gray
     } elseif (-not (Test-Path "$env:USERPROFILE\.cpolar\cpolar.yml")) {
         Write-Host "  [WARN] cpolar 未配置 authtoken" -ForegroundColor Yellow
-        Write-Host "  请运行: .\cpolar\cpolar.exe authtoken <你的token>" -ForegroundColor Gray
+        Write-Host "  请运行: .\tools\cpolar\cpolar.exe authtoken <你的token>" -ForegroundColor Gray
         Write-Host "  跳过公网分享，仅本地访问" -ForegroundColor Gray
     } else {
         # 先清理可能残留的 cpolar 进程
@@ -200,7 +201,7 @@ if ($Watchdog) {
     Write-Host ""
     Write-Host "[$stepNumWd] 启动守护脚本（自动重启异常进程）..." -ForegroundColor Yellow
     $watchdogLog = Join-Path $ScriptDir "watchdog.log"
-    $watchdogArgs = @("-File", (Join-Path $ScriptDir "watchdog.ps1"), "-IntervalSec", "20")
+    $watchdogArgs = @("-File", (Join-Path $ScriptDir "ops-watchdog.ps1"), "-IntervalSec", "20")
     if ($Share) { $watchdogArgs += "-Share" }
     try {
         $watchdogProc = Start-Process -FilePath "powershell.exe" `

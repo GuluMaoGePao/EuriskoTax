@@ -45,7 +45,9 @@ const swaggerOptions = {
                     bearerFormat: 'JWT'
                 }
             }
-        }
+        },
+        // 全局安全要求：默认所有端点需要 bearerAuth；登录/注册/健康检查等在 JSDoc 中显式 security: []
+        security: [{ bearerAuth: [] }]
     },
     apis: ['./src/routes/*.js']
 };
@@ -63,6 +65,10 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(logger);
 
 // API 路由
+app.get('/api/docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.json(swaggerSpec);
+});
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', authRoutes);
 app.use('/api/calculations', calculationRoutes);

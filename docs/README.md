@@ -54,6 +54,7 @@ EuriskoTax/
 |------|------|---------|
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
+| [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（22 项规则+性能数据+验证方法） | 2026-08-10 |
 
 ### 项目报告
 
@@ -87,6 +88,7 @@ EuriskoTax/
 
 - 计税逻辑：[计税规则手册](guides/tax-calculation-rules.md)
 - 前端复用：[UI 组件复用指南](guides/ui-component-reuse-guide.md)
+- 响应式适配：[响应式规则维护手册](guides/responsive-rules-reference.md)
 - 接口联调：[API 接口文档](api/api-reference.md)
 
 ### 故障排查

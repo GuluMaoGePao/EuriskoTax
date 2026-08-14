@@ -1,4 +1,4 @@
-# EuriskoTax 运维脚本目录
+﻿# EuriskoTax 运维脚本目录
 
 > 本目录存放开发环境运维脚本、通知配置和部署脚本，与主项目代码（src/、server/）分离。
 
@@ -8,18 +8,45 @@
 
 | 文件 | 用途 | Git 跟踪 |
 |------|------|---------|
-| `start-dev.ps1` | 一键启动脚本（环境检查+依赖+重置用户+启动服务+守护） | ✅ |
-| `watchdog.ps1` | 服务守护脚本（监控后端+cpolar，自动重启，事件记录） | ✅ |
-| `notify.ps1` | 邮件通知模块（模板渲染+SMTP发送+详细日志） | ✅ |
-| `deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
-| `notify-templates.json` | 中文邮件模板 v3.1（URL_CHANGED + TEST） | ✅ |
-| `notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
-| `deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
+| `ops-start-dev.ps1` | 一键启动脚本（环境检查+依赖+重置用户+启动服务+守护） | ✅ |
+| `ops-watchdog.ps1` | 服务守护脚本（监控后端+cpolar，自动重启，事件记录） | ✅ |
+| `ops-notify.ps1` | 邮件通知模块（模板渲染+SMTP发送+详细日志） | ✅ |
+| `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
+| `ops-notify-templates.json` | 中文邮件模板 v3.1（URL_CHANGED + TEST） | ✅ |
+| `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
+| `ops-deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
 | `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
 | `watchdog.log` | 守护脚本运行日志（运行时生成） | ❌ *.log 已 gitignore |
 | `events.log` | 结构化事件日志（运行时生成） | ❌ *.log 已 gitignore |
 | `notify.log` | 邮件发送详细日志（运行时生成） | ❌ *.log 已 gitignore |
+
+---
+
+## 相关工具
+
+### EuriskoTax 开发控制台（GUI）
+
+> 本地可视化 GUI 工具，双击即可执行常用开发指令，**完全不消耗 AI 积分**。
+
+位置：[`tools/gui/`](../gui/)
+
+| 文件 | 用途 |
+|------|------|
+| `tools/gui/gui-启动.bat` | 双击启动器 |
+| `tools/gui/gui-创建快捷方式.bat` | 一次性创建桌面快捷方式 |
+| `tools/gui/gui-dev-console.ps1` | GUI 主脚本（WinForms） |
+| `tools/gui/README.md` | 详细使用说明 |
+
+GUI 内置 6 大功能面板（共 40+ 按钮），调用本目录下的 `ops-start-dev.ps1`、`ops-deploy.ps1`、`ops-notify.ps1` 等脚本：
+- 🚀 启动管理（标准/快速/cpolar/守护/nodemon 等启动模式）
+- 🗄️ 数据库（重置用户/迁移/Prisma Studio/重置数据库）
+- 🧪 测试（全部测试/监听/性能/覆盖率）
+- 📋 日志查看（watchdog/events/notify 日志）
+- 🚢 部署（DryRun/正式/回滚/InitEnv）
+- 🛠️ 常用工具（目录浏览/PowerShell/Git 操作）
+
+详细使用说明见 [tools/gui/README.md](../gui/README.md)。
 
 ---
 
@@ -29,19 +56,19 @@
 
 ```powershell
 # 在项目根目录执行
-.\scripts\start-dev.ps1 -Share -Watchdog
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
 ### 单独启动守护脚本
 
 ```powershell
-.\scripts\watchdog.ps1 -Share -IntervalSec 20
+.\tools\ops\ops-watchdog.ps1 -Share -IntervalSec 20
 ```
 
 ### 发送测试邮件
 
 ```powershell
-. .\scripts\notify.ps1
+. .\tools\ops\ops-notify.ps1
 Send-TestNotification
 ```
 
@@ -49,39 +76,39 @@ Send-TestNotification
 
 ```powershell
 # 1. 首次使用：复制配置模板并填入服务器信息
-Copy-Item .\scripts\deploy.config.example.json .\scripts\deploy.config.json
+Copy-Item .\tools\ops\ops-deploy.config.example.json .\tools\ops\deploy.config.json
 # 编辑 deploy.config.json 填入 host/user/privateKeyPath 等
 
 # 2. 首次部署前：在服务器上初始化环境变量文件（敏感变量不经过本地）
-.\scripts\deploy.ps1 -InitEnv
+.\tools\ops\ops-deploy.ps1 -InitEnv
 #   交互式输入 JWT_SECRET 和 DATABASE_URL
 #   自动生成 32 字符随机 JWT_SECRET（如留空）
 #   文件权限设为 600，存储在服务器 /opt/euriskotax/.env.shared
 
 # 3. DryRun 预览打包结果（不实际部署）
-.\scripts\deploy.ps1 -DryRun
+.\tools\ops\ops-deploy.ps1 -DryRun
 
 # 4. 正式部署（自动跑测试 → 打包 → 传输 → 同步.env → 安装 → 迁移 → 重启 → 健康检查）
-.\scripts\deploy.ps1
+.\tools\ops\ops-deploy.ps1
 
 # 5. 跳过测试快速部署
-.\scripts\deploy.ps1 -SkipTest
+.\tools\ops\ops-deploy.ps1 -SkipTest
 
 # 6. 回滚到上一版本
-.\scripts\deploy.ps1 -Rollback
+.\tools\ops\ops-deploy.ps1 -Rollback
 ```
 
 ### 查看日志
 
 ```powershell
 # 守护脚本日志
-Get-Content .\scripts\watchdog.log -Tail 20
+Get-Content .\tools\ops\watchdog.log -Tail 20
 
 # 事件日志
-Get-Content .\scripts\events.log -Tail 20
+Get-Content .\tools\ops\events.log -Tail 20
 
 # 邮件发送日志
-Get-Content .\scripts\notify.log -Tail 30
+Get-Content .\tools\ops\notify.log -Tail 30
 ```
 
 ---
@@ -95,10 +122,10 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 ```
 
-- **配置文件**（notify-*.json）→ 与脚本同目录（`$ScriptDir`）
+- **配置文件**（ops-notify-*.json）→ 与脚本同目录（`$ScriptDir`）
 - **日志文件**（*.log）→ 与脚本同目录（`$ScriptDir`）
 - **后端服务**（server/）→ 项目根目录下（`$ProjectRoot\server`）
-- **cpolar**（cpolar/）→ 项目根目录下（`$ProjectRoot\cpolar`）
+- **cpolar**（tools/cpolar/）→ 项目根目录下（`$ProjectRoot\cpolar`）
 
 ---
 
@@ -107,12 +134,12 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 ### 本地开发
 
 1. 编辑 `notify.config.json` 填入 SMTP 授权码和收件人
-2. 配置 cpolar（如需公网分享）：`.\cpolar\cpolar.exe authtoken <token>`
+2. 配置 cpolar（如需公网分享）：`.\tools\cpolar\cpolar.exe authtoken <token>`
 3. 详细步骤参考 [部署指南](../docs/tech-reports/watchdog-deployment-guide.md)
 
 ### 服务器部署
 
-1. 复制部署配置模板：`Copy-Item .\scripts\deploy.config.example.json .\scripts\deploy.config.json`
+1. 复制部署配置模板：`Copy-Item .\tools\ops\ops-deploy.config.example.json .\tools\ops\deploy.config.json`
 2. 编辑 `deploy.config.json` 填入：
    - `server.host` — 服务器 IP
    - `server.user` — SSH 用户名
@@ -127,7 +154,7 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 
 ---
 
-## 部署脚本详解（deploy.ps1）
+## 部署脚本详解（ops-deploy.ps1）
 
 ### 部署流程
 
@@ -163,7 +190,7 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 
 ```powershell
 # 回滚到上一版本（切换 current 软链接 + 重启进程）
-.\scripts\deploy.ps1 -Rollback
+.\tools\ops\ops-deploy.ps1 -Rollback
 ```
 
 ### 自定义 Hooks

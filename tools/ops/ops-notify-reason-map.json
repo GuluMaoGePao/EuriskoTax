@@ -1,4 +1,4 @@
-{
+﻿{
   "_comment": "Watchdog reason code to Chinese description map. Loaded by notify.ps1 Convert-ReasonToChinese.",
   "port_3000_not_listening": "后端服务端口 3000 未监听，进程已崩溃",
   "connection_refused_or_timeout": "后端服务连接被拒绝或请求超时",

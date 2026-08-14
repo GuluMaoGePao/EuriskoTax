@@ -197,34 +197,110 @@ const ProfilePerf = {
 
 async function loadProfile() {
     const totalStart = performance.now();
+    ProfilePerf.log('loadProfile → 开始', 0, { timestamp: Date.now() });
+    let apiDuration = 0;
+    let syncDuration = 0;
+    let rafScheduledAt = 0;
     try {
+        // 阶段1：API 获取用户信息
+        const apiStart = performance.now();
         const user = await ProfilePerf.measureAsync('loadProfile → API获取用户信息', () => apiClient.getProfile());
+        apiDuration = performance.now() - apiStart;
+        ProfilePerf.log('loadProfile → 阶段1完成-API', apiDuration, { user: user.username, phone: !!user.phone });
+
+        // 阶段2：同步更新顶栏关键信息（5 个字段）
+        const syncStart = performance.now();
         document.getElementById('profile-username').value = user.username;
         document.getElementById('profile-email').value = user.email;
         document.getElementById('profile-phone').value = user.phone || '';
         document.getElementById('profile-display-name').textContent = user.username;
         document.getElementById('profile-display-email').textContent = user.email;
+        syncDuration = performance.now() - syncStart;
+        ProfilePerf.log('loadProfile → 阶段2完成-同步更新顶栏', syncDuration, { fields: 5 });
 
-        ProfilePerf.measure('loadProfile → 渲染统计卡片', renderProfileStats);
-        ProfilePerf.measure('loadProfile → 更新统计数据', updateProfileStats);
-        ProfilePerf.measure('loadProfile → 渲染模块卡片', renderProfileCards);
-        ProfilePerf.measure('loadProfile → 加载税务档案', loadTaxProfile);
-        ProfilePerf.measure('loadProfile → 渲染税务日历', renderTaxCalendar);
+        // 阶段3：调度 requestAnimationFrame 延迟非关键 DOM 渲染
+        // 涉及大量 innerHTML 与连续 input value 写入，同步执行会阻塞页面切换动画
+        rafScheduledAt = performance.now();
+        ProfilePerf.log('loadProfile → 阶段3-调度rAF延迟渲染', 0, { scheduledAt: +rafScheduledAt.toFixed(2) });
 
-        const totalDuration = performance.now() - totalStart;
-        ProfilePerf.log('loadProfile → 总耗时', totalDuration, { user: user.username });
+        requestAnimationFrame(() => {
+            // 测量 rAF 实际触发延迟（若过长说明主线程被阻塞）
+            const rafDelay = performance.now() - rafScheduledAt;
+            ProfilePerf.log('loadProfile → rAF回调触发', rafDelay, { waitDelay: +rafDelay.toFixed(2) });
+
+            // 阶段4：执行 5 个渲染子步骤
+            const renderStart = performance.now();
+            ProfilePerf.measure('loadProfile → 渲染统计卡片', renderProfileStats);
+            ProfilePerf.measure('loadProfile → 更新统计数据', updateProfileStats);
+            ProfilePerf.measure('loadProfile → 渲染模块卡片', renderProfileCards);
+            ProfilePerf.measure('loadProfile → 加载税务档案', loadTaxProfile);
+            ProfilePerf.measure('loadProfile → 渲染税务日历', renderTaxCalendar);
+            const renderDuration = performance.now() - renderStart;
+
+            // 阶段5：汇总
+            const totalDuration = performance.now() - totalStart;
+            ProfilePerf.log('loadProfile → 阶段4完成-渲染', renderDuration, { steps: 5 });
+            ProfilePerf.log('loadProfile → 总耗时', totalDuration, {
+                user: user.username,
+                breakdown: {
+                    api: +apiDuration.toFixed(2),
+                    syncUpdate: +syncDuration.toFixed(2),
+                    rafWait: +rafDelay.toFixed(2),
+                    rendering: +renderDuration.toFixed(2)
+                }
+            });
+        });
     } catch (error) {
+        const errorDuration = performance.now() - totalStart;
+        ProfilePerf.log('loadProfile → 错误', errorDuration, {
+            error: error.message,
+            stack: error.stack,
+            phase: apiDuration === 0 ? 'api' : (syncDuration === 0 ? 'sync' : 'rAF')
+        });
         showAlert('加载失败: ' + error.message);
-        ProfilePerf.log('loadProfile → 错误', performance.now() - totalStart, { error: error.message });
     }
 }
 
 // === 个人中心统计卡片配置 ===
+// 注意：所有 Tailwind 类名必须为完整静态字符串，避免动态拼接（${color}）
+// 因为 cdn.tailwindcss.com 的 JIT 会监听 DOM 变化，动态类名会触发重扫和实时生成，造成卡顿。
 const PROFILE_STATS_CONFIG = [
-    { id: 'profile-stats-calculations', icon: 'fa-calculator', color: 'blue', label: '计算次数' },
-    { id: 'profile-stats-profiles', icon: 'fa-file-text-o', color: 'green', label: '档案数量' },
-    { id: 'profile-stats-history', icon: 'fa-history', color: 'purple', label: '历史记录' },
-    { id: 'profile-stats-reminders', icon: 'fa-calendar-check-o', color: 'orange', label: '本月提醒' }
+    {
+        id: 'profile-stats-calculations',
+        icon: 'fa-calculator',
+        label: '计算次数',
+        cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200',
+        iconBg: 'w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3',
+        labelClass: 'text-sm text-blue-600 font-medium',
+        valueClass: 'text-2xl font-bold text-blue-800'
+    },
+    {
+        id: 'profile-stats-profiles',
+        icon: 'fa-file-text-o',
+        label: '档案数量',
+        cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200',
+        iconBg: 'w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3',
+        labelClass: 'text-sm text-green-600 font-medium',
+        valueClass: 'text-2xl font-bold text-green-800'
+    },
+    {
+        id: 'profile-stats-history',
+        icon: 'fa-history',
+        label: '历史记录',
+        cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200',
+        iconBg: 'w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3',
+        labelClass: 'text-sm text-purple-600 font-medium',
+        valueClass: 'text-2xl font-bold text-purple-800'
+    },
+    {
+        id: 'profile-stats-reminders',
+        icon: 'fa-calendar-check-o',
+        label: '本月提醒',
+        cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200',
+        iconBg: 'w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mr-3',
+        labelClass: 'text-sm text-orange-600 font-medium',
+        valueClass: 'text-2xl font-bold text-orange-800'
+    }
 ];
 
 // 渲染统计卡片
@@ -232,15 +308,15 @@ function renderProfileStats() {
     const grid = document.getElementById('profile-stats-grid');
     if (!grid || grid.children.length > 0) return; // 已渲染则跳过
 
-    grid.innerHTML = PROFILE_STATS_CONFIG.map(({ id, icon, color, label }) => `
-        <div class="bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-xl p-4 border border-${color}-200">
+    grid.innerHTML = PROFILE_STATS_CONFIG.map(({ id, icon, label, cardClass, iconBg, labelClass, valueClass }) => `
+        <div class="${cardClass}">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-${color}-500 rounded-lg flex items-center justify-center mr-3">
+                <div class="${iconBg}">
                     <i class="fa ${icon} text-white"></i>
                 </div>
-                <div>
-                    <p class="text-sm text-${color}-600 font-medium">${label}</p>
-                    <p id="${id}" class="text-2xl font-bold text-${color}-800">0</p>
+                <div class="min-w-0">
+                    <p class="${labelClass}">${label}</p>
+                    <p id="${id}" class="${valueClass}">0</p>
                 </div>
             </div>
         </div>
@@ -248,13 +324,56 @@ function renderProfileStats() {
 }
 
 // === 个人中心功能模块卡片配置 ===
+// 同样使用完整静态类名，避免动态拼接触发 Tailwind CDN 重扫
 const PROFILE_CARDS_CONFIG = [
-    { id: 'profile-card-history', icon: 'fa-history', color: 'blue', title: '计算历史', desc: '查看和管理您的计算记录' },
-    { id: 'profile-card-tax', icon: 'fa-file-text-o', color: 'green', title: '税务档案', desc: '设置常用扣除配置，快速应用' },
-    { id: 'profile-card-data', icon: 'fa-database', color: 'purple', title: '数据管理', desc: '导出计算数据，备份与迁移' },
-    { id: 'profile-card-calendar', icon: 'fa-calendar', color: 'orange', title: '税务日历', desc: '关键时间节点提醒' },
-    { id: 'profile-card-help', icon: 'fa-question-circle', color: 'gray', title: '使用帮助', desc: '了解如何使用本工具' },
-    { id: 'profile-card-about', icon: 'fa-info-circle', color: 'indigo', title: '关于我们', desc: '了解更多信息' }
+    {
+        id: 'profile-card-history',
+        icon: 'fa-history',
+        title: '计算历史',
+        desc: '查看和管理您的计算记录',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-history text-2xl text-blue-600'
+    },
+    {
+        id: 'profile-card-tax',
+        icon: 'fa-file-text-o',
+        title: '税务档案',
+        desc: '设置常用扣除配置，快速应用',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-file-text-o text-2xl text-green-600'
+    },
+    {
+        id: 'profile-card-data',
+        icon: 'fa-database',
+        title: '数据管理',
+        desc: '导出计算数据，备份与迁移',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-database text-2xl text-purple-600'
+    },
+    {
+        id: 'profile-card-calendar',
+        icon: 'fa-calendar',
+        title: '税务日历',
+        desc: '关键时间节点提醒',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-calendar text-2xl text-orange-600'
+    },
+    {
+        id: 'profile-card-help',
+        icon: 'fa-question-circle',
+        title: '使用帮助',
+        desc: '了解如何使用本工具',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-question-circle text-2xl text-gray-600'
+    },
+    {
+        id: 'profile-card-about',
+        icon: 'fa-info-circle',
+        title: '关于我们',
+        desc: '了解更多信息',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-info-circle text-2xl text-indigo-600'
+    }
 ];
 
 // 渲染功能模块卡片
@@ -262,11 +381,11 @@ function renderProfileCards() {
     const grid = document.getElementById('profile-cards-grid');
     if (!grid || grid.children.length > 0) return; // 已渲染则跳过
 
-    grid.innerHTML = PROFILE_CARDS_CONFIG.map(({ id, icon, color, title, desc }) => `
+    grid.innerHTML = PROFILE_CARDS_CONFIG.map(({ id, title, desc, iconWrapClass, iconClass }) => `
         <div class="card cursor-pointer profile-card-hover" id="${id}">
             <div class="p-6">
-                <div class="w-12 h-12 rounded-lg bg-${color}-100 flex items-center justify-center mb-4">
-                    <i class="fa ${icon} text-2xl text-${color}-600"></i>
+                <div class="${iconWrapClass}">
+                    <i class="${iconClass}"></i>
                 </div>
                 <h3 class="text-lg font-semibold text-gray-800 mb-2">${title}</h3>
                 <p class="text-sm text-gray-500">${desc}</p>
@@ -346,6 +465,9 @@ function loadTaxProfile() {
 }
 
 function saveTaxProfile() {
+    // workMonths 有效值为 1-12，parseInt('0')=0 是合法解析结果但业务无效，
+    // 不能用 || 12（0 是 falsy 会被吞掉），改用 isNaN 判断仅兜底 NaN
+    const workMonthsRaw = parseInt(document.getElementById('tax-profile-work-months').value);
     const profile = {
         socialBase: parseFloat(document.getElementById('tax-profile-social-base').value) || 0,
         housingBase: parseFloat(document.getElementById('tax-profile-housing-base').value) || 0,
@@ -355,7 +477,7 @@ function saveTaxProfile() {
         housingLoan: parseFloat(document.getElementById('tax-profile-housing-loan').value) || 0,
         education: parseFloat(document.getElementById('tax-profile-education').value) || 0,
         pension: parseFloat(document.getElementById('tax-profile-pension').value) || 0,
-        workMonths: parseInt(document.getElementById('tax-profile-work-months').value) || 12,
+        workMonths: isNaN(workMonthsRaw) ? 12 : workMonthsRaw,
         userType: document.getElementById('tax-profile-user-type').value
     };
     
@@ -771,11 +893,13 @@ function setupAuthEventListeners() {
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
         const eventTime = Date.now();
-        loadProfile();
+        // 先切换页面（让动画立即开始），再异步加载数据，避免同步渲染阻塞页面切换
         const showPageStart = performance.now();
         showPage('profile-page');
         const showPageDuration = performance.now() - showPageStart;
         ProfilePerf.log('进入个人中心 → showPage', showPageDuration, { eventTime });
+        // 在下一帧加载数据，让浏览器先完成页面切换渲染
+        requestAnimationFrame(() => loadProfile());
     });
     document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
@@ -992,24 +1116,42 @@ let isInitialNavigation = true;
 let isGoingBack = false;
 
 function showPage(pageId) {
+    const start = performance.now();
+    const wasInitial = isInitialNavigation;
+    ProfilePerf.log('showPage → 开始', 0, {
+        pageId,
+        isInitialNavigation: wasInitial,
+        isGoingBack,
+        historyLength: pageHistory.length
+    });
+
+    // === 分支A：初始导航（首次进入页面，无过渡动画） ===
     if (isInitialNavigation) {
         isInitialNavigation = false;
+        const hideStart = performance.now();
         document.querySelectorAll('.page').forEach(page => {
             page.classList.add('hidden');
         });
+        ProfilePerf.log('showPage → 初始导航-隐藏所有页面', performance.now() - hideStart);
+
         const page = document.getElementById(pageId);
         if (page) {
             page.classList.remove('hidden');
             page.classList.add('page-transition', 'active');
         }
+        ProfilePerf.log('showPage → 初始导航完成', performance.now() - start, {
+            pageId,
+            pageFound: !!page
+        });
         return;
     }
 
+    // === 分支B：常规导航 ===
+    // B-1：检测当前页面并压入历史栈（非返回操作时）
+    let currentPageId = null;
     if (!isGoingBack) {
         const loginPage = document.getElementById('login-page');
         const isOnLoginPage = loginPage && !loginPage.classList.contains('hidden');
-        let currentPageId = null;
-
         if (isOnLoginPage) {
             currentPageId = 'login-page';
         } else {
@@ -1021,22 +1163,52 @@ function showPage(pageId) {
 
         if (currentPageId && currentPageId !== pageId) {
             pageHistory.push(currentPageId);
+            ProfilePerf.log('showPage → 压入历史栈', 0, {
+                pushed: currentPageId,
+                newLength: pageHistory.length
+            });
+        } else {
+            ProfilePerf.log('showPage → 跳过历史栈', 0, {
+                currentPageId,
+                reason: currentPageId === pageId ? 'samePage' : 'noCurrentPage'
+            });
         }
+    } else {
+        ProfilePerf.log('showPage → 返回模式-跳过历史栈检测', 0);
     }
 
+    // B-2：阶段1 - 移除所有页面的 active 类（触发淡出动画）
+    const phase1Start = performance.now();
     const loginPage = document.getElementById('login-page');
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
-        setTimeout(() => {
-            page.classList.add('hidden');
-        }, 200);
     });
+    ProfilePerf.log('showPage → 阶段1-移除active类', performance.now() - phase1Start);
+
+    // B-3：200ms 后隐藏所有页面并显示目标页面
+    const phase2ScheduledAt = performance.now();
+    ProfilePerf.log('showPage → 调度200ms延迟', 0, { scheduledAt: +phase2ScheduledAt.toFixed(2) });
 
     setTimeout(() => {
+        const phase2Delay = performance.now() - phase2ScheduledAt;
+        ProfilePerf.log('showPage → 阶段2回调触发', phase2Delay, { actualDelay: +phase2Delay.toFixed(2) });
+
+        // 阶段2a：隐藏所有页面
+        const hideStart = performance.now();
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.add('hidden');
+        });
+        const hideDuration = performance.now() - hideStart;
+        ProfilePerf.log('showPage → 阶段2a-隐藏所有页面', hideDuration);
+
+        // 阶段2b：显示目标页面
+        const showStart = performance.now();
+        let pageFound = false;
         if (pageId === 'login-page') {
             loginPage.classList.remove('hidden');
             loginPage.classList.add('page-transition', 'active');
             document.querySelector('.app-container')?.classList.add('hidden');
+            pageFound = true;
         } else {
             loginPage?.classList.add('hidden');
             document.querySelector('.app-container')?.classList.remove('hidden');
@@ -1044,10 +1216,31 @@ function showPage(pageId) {
             if (page) {
                 page.classList.remove('hidden');
                 page.classList.add('page-transition', 'active');
+                pageFound = true;
             }
         }
+        const showDuration = performance.now() - showStart;
+        ProfilePerf.log('showPage → 阶段2b-显示目标页面', showDuration, {
+            pageId,
+            pageFound,
+            isLoginPage: pageId === 'login-page'
+        });
+
+        // 汇总
+        ProfilePerf.log('showPage → 总耗时', performance.now() - start, {
+            pageId,
+            fromPage: currentPageId,
+            isGoingBack,
+            wasInitial: false,
+            breakdown: {
+                phase1Sync: +(phase2ScheduledAt - phase1Start).toFixed(2),
+                waitDelay: +phase2Delay.toFixed(2),
+                hidePages: +hideDuration.toFixed(2),
+                showTarget: +showDuration.toFixed(2)
+            }
+        });
     }, 200);
-    
+
     isGoingBack = false;
 }
 

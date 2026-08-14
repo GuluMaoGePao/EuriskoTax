@@ -26,7 +26,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
 # ====== 日志函数 ======
 function Write-DeployLog {
@@ -51,7 +51,7 @@ function Load-DeployConfig {
     }
     if (-not (Test-Path $Path)) {
         Write-DeployLog "ERROR" "部署配置文件不存在: $Path"
-        Write-DeployLog "INFO" "请复制模板: cp scripts/deploy.config.example.json scripts/deploy.config.json"
+        Write-DeployLog "INFO" "请复制模板: cp tools/ops/ops-deploy.config.example.json tools/ops/deploy.config.json"
         exit 1
     }
     $raw = Get-Content $Path -Raw -Encoding UTF8
@@ -575,7 +575,7 @@ DATABASE_URL=$databaseUrl
 
     if ($result.Output -match "INIT_OK") {
         Write-DeployLog "OK" "环境变量文件已创建: $serverEnvFile（权限 600）"
-        Write-DeployLog "INFO" "现在可以运行 .\scripts\deploy.ps1 正式部署"
+        Write-DeployLog "INFO" "现在可以运行 .\tools\ops\ops-deploy.ps1 正式部署"
     } else {
         Write-DeployLog "ERROR" "环境变量文件创建失败"
         Write-DeployLog "ERROR" $result.Output
@@ -633,5 +633,5 @@ Write-Host ""
 Write-Host "常用运维命令:" -ForegroundColor Cyan
 Write-Host "  查看日志:   ssh $($Config.server.user)@$($Config.server.host) 'pm2 logs $($Config.deploy.processName)'" -ForegroundColor Gray
 Write-Host "  查看状态:   ssh $($Config.server.user)@$($Config.server.host) 'pm2 status'" -ForegroundColor Gray
-Write-Host "  回滚版本:   .\scripts\deploy.ps1 -Rollback" -ForegroundColor Gray
+Write-Host "  回滚版本:   .\tools\ops\ops-deploy.ps1 -Rollback" -ForegroundColor Gray
 Write-Host ""

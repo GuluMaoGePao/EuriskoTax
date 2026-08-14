@@ -17,15 +17,16 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-# 脚本位于 scripts/ 子目录，项目根目录为上一级
+# 脚本位于 tools/ops/ 子目录，项目根目录需向上两层
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$ToolsDir = Split-Path -Parent $ScriptDir
 $ServerDir = Join-Path $ProjectRoot "server"
-$CpolarExe = Join-Path $ProjectRoot "cpolar\cpolar.exe"
+$CpolarExe = Join-Path $ToolsDir "cpolar\cpolar.exe"
 $CpolarLog = Join-Path $env:TEMP "cpolar-euriskotax-watchdog.log"
 $WatchdogLog = Join-Path $ScriptDir "watchdog.log"
 $EventLog = Join-Path $ScriptDir "events.log"
-$NotifyModule = Join-Path $ScriptDir "notify.ps1"
+$NotifyModule = Join-Path $ScriptDir "ops-notify.ps1"
 $LastCpolarUrl = ""
 $RestartCount = 0
 $global:WatchdogRunning = $true
