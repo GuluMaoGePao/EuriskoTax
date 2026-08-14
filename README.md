@@ -18,6 +18,8 @@
 
 **测试账号**：`dev@example.com` / `password`
 
+> 💡 **图形化一键启动（推荐）**：双击 `tools/gui/gui-启动.bat` 打开「EuriskoTax 开发控制台」。在「🚀 启动管理」Tab 中点击 **🔥 完整测试** 即可一键开启「后端 + cpolar + 守护」，GUI 会在**启动管理 Tab 顶部**显示「🌐 公网地址速览」卡片（点击卡片一键复制地址），并以**弹窗**主动提醒：公网地址首次生成、地址变更、邮件发送成功/失败。所有弹窗均内置 **180s 去重**，同一事件只弹 1 次。
+
 ---
 
 ## 项目结构
@@ -57,7 +59,7 @@ EuriskoTax/
 | 监控对象 | 健康判定 | 异常处理 |
 |---------|---------|---------|
 | 后端服务（:3000） | 端口监听 + HTTP 200/401 响应 | 杀旧进程 → `node src/app.js` → 30秒等待就绪 |
-| cpolar 隧道 | 进程存活 + 公网URL可达 | 杀旧进程 → `cpolar start eurisko` → 30秒等待URL |
+| cpolar 隧道 | 进程存活 + 公网URL可达 | 杀旧进程 → `cpolar http 3000 -region=cn`（临时隧道，无需预设 eurisko 名称）→ 30秒等待URL |
 
 ---
 
@@ -78,27 +80,31 @@ Send-TestNotification
 
 ### 通知策略
 
-**仅公网地址变更（URL_CHANGED）通过邮件通知**，其他事件仅记录到 events.log。
+**默认仅以下 2 个事件会触发邮件通知**（GUI 弹窗会在本机同步提示），其他事件仅记录到 events.log。通知总开关在 `notify.config.json` → `enabled`。
 
-| 事件 | 邮件通知 | 记录日志 | 说明 |
-|------|---------|---------|------|
-| 后端重启 | ❌ 不通知 | ✅ events.log | 自动恢复，无需人工干预 |
-| 隧道重启 | ❌ 不通知 | ✅ events.log | 自动恢复，无需人工干预 |
-| **地址变更** | **✅ 发送邮件** | ✅ events.log | **含新地址+测试账号，需通知测试员** |
-| 重启失败 | ❌ 不通知 | ✅ events.log | 查看 events.log 了解详情 |
-| 重启上限 | ❌ 不通知 | ✅ events.log | 查看 events.log 了解详情 |
-| 测试邮件 | ✅ 手动触发 | — | 验证 SMTP 配置 |
+| 事件 | 邮件通知 | GUI 弹窗 | 记录日志 | 说明 |
+|------|---------|---------|---------|------|
+| 后端重启 | ❌ 不通知 | ❌ 不弹窗 | ✅ events.log | 自动恢复，无需人工干预 |
+| 隧道重启 | ❌ 不通知 | ❌ 不弹窗 | ✅ events.log | 自动恢复，无需人工干预 |
+| **URL_CREATED（首次生成）** | **✅ notifyOn.urlCreated=true 时** | **✅ 首次 1 次（180s 去重）** | ✅ events.log | 新建公网隧道时立即给测试员发地址+账号 |
+| **URL_CHANGED（地址变更）** | **✅ notifyOn.urlChanged=true 时** | **✅ 变更 1 次（180s 去重）** | ✅ events.log | 旧地址失效，必须通知测试员更换 |
+| 重启失败 | ❌ 不通知 | ❌ 不弹窗 | ✅ events.log | 查看 events.log 了解详情 |
+| 重启上限 | ❌ 不通知 | ❌ 不弹窗 | ✅ events.log | 查看 events.log 了解详情 |
+| **邮件发送成功** | — | **✅ 1 次（180s 去重）** | ✅ notify.log | GUI 提示"已发送，叫朋友查收" |
+| **邮件发送失败/未发送** | — | **✅ 1 次（180s 去重）** | ✅ notify.log | GUI 提示排查 notify.config.json |
+| 测试邮件 | ✅ 手动触发 | ❌ 不弹窗 | — | 验证 SMTP 配置 |
 
 > 如需启用其他事件的邮件通知，编辑 [notify.config.json](scripts/notify.config.json) 的 `notifyOn` 节点，将对应开关设为 `true`。
 
 ### 邮件模板
 
-中文邮件模板（v3.0），定义在 [notify-templates.json](scripts/notify-templates.json)，仅包含 2 种模板：
+中文邮件模板（v3.2），定义在 [notify-templates.json](scripts/notify-templates.json)，包含 3 种模板：
 
+- **URL_CREATED** — 首次生成公网地址通知（启动分享时立即发出）
 - **URL_CHANGED** — 公网地址变更通知
 - **TEST** — 邮件通知测试
 
-URL_CHANGED 模板使用 `★★★ 新公网地址 ★★★` 醒目标记新地址，并包含测试员登录信息：
+URL_CREATED / URL_CHANGED 模板均使用 `★★★ 新公网地址 ★★★` 醒目标记地址，并附带测试员登录信息：
 
 ```
 ★★★ 新公网地址 ★★★

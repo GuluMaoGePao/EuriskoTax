@@ -1,4 +1,4 @@
-﻿# EuriskoTax 开发控制台 - 使用说明
+# EuriskoTax 开发控制台 - 使用说明
 
 > 一个基于 Windows Forms 的本地 GUI 工具，可视化执行常用开发指令。
 > **完全本地运行，不消耗任何 AI 积分。**
@@ -34,11 +34,15 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 │  EuriskoTax  开发控制台              本地运行 · 不消耗积分       │ ← 顶部标题栏
 ├──────────┬───────────────────────────────────────────────────────┤
 │ 🚀 启动管理 │  启动管理 - 选择启动模式                          │
-│ 🗄️ 数据库  │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│ 🧪 测试    │  │ ▶ 标准启动│ │⚡快速启动│ │🌐公网分享│         │
-│ 📋 日志查看│  └──────────┘ └──────────┘ └──────────┘         │
-│ 🚢 部署    │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│ 🛠️ 常用工具│  │🛡️启动+守护│ │🔥完整测试│ │🔄开发模式│         │ ← 操作按钮区
+│ 🗄️ 数据库  │  ┌────────────────────────────────────────────┐  │
+│ 🧪 测试    │  │ 🌐 公网地址速览（仅 -Share 启动后显示）        │  │ ← 公网卡片
+│ 📋 日志查看│  │  https://xxx.cpolar.cn   [复制] [发邮件]  │  │
+│ 🚢 部署    │  └────────────────────────────────────────────┘  │
+│ 🛠️ 常用工具│  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
+│            │  │ ▶ 标准启动│ │⚡快速启动│ │🌐公网分享│         │
+│            │  └──────────┘ └──────────┘ └──────────┘         │
+│            │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
+│            │  │🛡️启动+守护│ │🔥完整测试│ │🔄开发模式│         │ ← 操作按钮区
 │            │  └──────────┘ └──────────┘ └──────────┘         │
 │            │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
 │            │  │🛑停止后端│ │🔒释放端口│ │📊查看端口│         │
@@ -61,8 +65,9 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 |------|------|------|
 | **顶部标题栏** | 上方 60px | 显示应用名称和标语 |
 | **左侧菜单** | 左侧 220px | 6 个功能 Tab 切换 + 紧急停止按钮 |
+| **公网地址速览卡片** | 启动管理 Tab 顶部（仅 -Share 模式出现） | 显示最新 cpolar 公网地址 + 一键复制 + 一键发邮件 + 自动刷新（3s） |
 | **右侧操作区** | 右侧上半部 | 当前 Tab 对应的按钮组（每 Tab 6-9 个按钮） |
-| **右侧输出区** | 右侧下半部 | RichTextBox，实时显示命令输出（彩色） |
+| **右侧输出区** | 右侧下半部 | RichTextBox，实时显示命令输出（彩色）；通过 `[GUI-EVENT]` 前缀捕获关键事件触发弹窗 |
 | **输出工具栏** | 输出区底部 | 清空、保存、复制、打开浏览器、打开 API 文档 |
 | **状态栏** | 最底部 | 服务状态、PID、端口、运行时长、当前 Tab |
 
@@ -89,9 +94,9 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 |------|---------|---------|
 | **▶ 标准启动** | `ops-start-dev.ps1` | 首次启动、改动较大后启动（含环境检查、依赖、重置用户） |
 | **⚡ 快速启动** | `ops-start-dev.ps1 -SkipInstall -SkipResetUser` | 日常调试，跳过依赖和用户重置，启动最快 |
-| **🌐 公网分享启动** | `ops-start-dev.ps1 -Share` | 启动 + cpolar 公网隧道，给好友远程测试 |
+| **🌐 公网分享启动** | `ops-start-dev.ps1 -Share` | 启动 + cpolar 公网隧道（临时 `http 3000 -region=cn`，无需预设命名隧道），给好友远程测试 |
 | **🛡️ 启动 + 守护脚本** | `ops-start-dev.ps1 -Watchdog` | 启动 + watchdog 守护，进程异常自动重启 |
-| **🔥 一键完整测试** | `ops-start-dev.ps1 -Share -Watchdog` | 公网分享 + 守护，长期给好友测试时使用 |
+| **🔥 一键完整测试** | `ops-start-dev.ps1 -Share -Watchdog` | 后端 + cpolar 临时隧道 + watchdog，长期给好友测试时推荐（GUI 会显示公网卡片并弹窗通知） |
 | **🔄 开发模式 (nodemon)** | `npm run dev` (server/) | 后端开发时使用，改后端代码自动重启 |
 | **🛑 停止后端服务** | `Stop-Job backend` | 停止当前后端服务（含子进程） |
 | **🔒 释放 3000 端口** | `Stop-Process` | 端口被占用时强制释放（找到并杀掉占用进程） |
@@ -216,11 +221,14 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 ### 场景 3：给好友远程测试
 
 1. 双击 `tools/gui/gui-启动.bat`
-2. 在「启动管理」Tab 点击 **🔥 一键完整测试**（含 cpolar 公网 + 守护脚本）
-3. 等待输出区显示 cpolar 公网地址（形如 `https://xxx.r6.cpolar.cn`）
-4. 将该地址发给好友，他们用任意浏览器访问
-5. 测试账号仍是 `dev@example.com / password`
-6. 守护脚本会自动重启异常进程，并在公网地址变更时发邮件通知
+2. 在「启动管理」Tab 点击 **🔥 一键完整测试**（后端 + cpolar 临时隧道 + 守护脚本）
+3. GUI 顶部会出现「🌐 公网地址速览」卡片，**首次生成公网地址时会弹出 MessageBox（仅 1 次，180s 内去重）**，同时地址自动写入剪贴板
+4. 卡片中也可随时点「复制」按钮 / 点卡片主体再次复制；点「📮 发邮件」按钮把新地址手动发给收件人
+5. 邮件**成功发送** / **失败/未发送**也会分别弹 1 个 MessageBox（各带 180s 去重）
+6. 守护脚本会自动重启异常进程；**地址变更**会再弹 1 个 MessageBox，并触发 URL_CHANGED 邮件
+7. 测试账号仍是 `dev@example.com / password`
+
+> 🔁 **关于"为什么不重复弹窗"**：GUI 对 4 类事件（URL 首次 / URL 变更 / 邮件成功 / 邮件失败）均内置 180s 全局去重，且 outHandler 与公网卡片刷新函数通过 `PublicUrlLastSeen`、`UrlPopupMode` 做了职责互斥，同一件事不会被多个入口重复弹窗。如果你在 180s 内确实需要再看一次，可切换到「📋 日志查看」→ 看 events.log / notify.log，或直接点「🌐 公网地址速览」卡片即可重新复制。
 
 ### 场景 4：跑测试
 
@@ -305,11 +313,15 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 ### Q6：cpolar 公网地址获取失败
 
-**原因**：cpolar 未配置 authtoken 或网络问题。
+**原因**：cpolar 未配置 authtoken、网络问题或 watchdog 尝试启动命名隧道（eurisko）但用户 cpolar.yml 中无此预设。
+
+> 自 v1.2.0 起，`ops-start-dev.ps1 -Share` 与 `ops-watchdog.ps1` 已**统一使用临时隧道 `cpolar http 3000 -region=cn`**，不再依赖命名隧道。若你仍遇到问题，按以下步骤排查：
 
 **解决**：
-1. 打开终端执行 `.\tools\cpolar\cpolar.exe authtoken <你的token>`
-2. 或访问 cpolar 仪表盘 `http://127.0.0.1:4040/` 手动查看
+1. 打开终端执行 `.\tools\cpolar\cpolar.exe authtoken <你的token>`（只需一次）
+2. 确认无需配置 `~/.cpolar/cpolar.yml` 的 named tunnels，直接使用临时命令即可
+3. 或访问 cpolar 仪表盘 `http://127.0.0.1:4040/` 手动查看
+4. 如 watchdog 之前仍在用旧脚本，重启 GUI 后重新点击 **🔥 一键完整测试**
 
 ---
 

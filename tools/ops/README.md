@@ -1,4 +1,4 @@
-﻿# EuriskoTax 运维脚本目录
+# EuriskoTax 运维脚本目录
 
 > 本目录存放开发环境运维脚本、通知配置和部署脚本，与主项目代码（src/、server/）分离。
 
@@ -12,10 +12,10 @@
 | `ops-watchdog.ps1` | 服务守护脚本（监控后端+cpolar，自动重启，事件记录） | ✅ |
 | `ops-notify.ps1` | 邮件通知模块（模板渲染+SMTP发送+详细日志） | ✅ |
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
-| `ops-notify-templates.json` | 中文邮件模板 v3.1（URL_CHANGED + TEST） | ✅ |
+| `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
 | `ops-deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
-| `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码） | ❌ 已 gitignore |
+| `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码、新增 urlCreated） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
 | `watchdog.log` | 守护脚本运行日志（运行时生成） | ❌ *.log 已 gitignore |
 | `events.log` | 结构化事件日志（运行时生成） | ❌ *.log 已 gitignore |
@@ -39,7 +39,7 @@
 | `tools/gui/README.md` | 详细使用说明 |
 
 GUI 内置 6 大功能面板（共 40+ 按钮），调用本目录下的 `ops-start-dev.ps1`、`ops-deploy.ps1`、`ops-notify.ps1` 等脚本：
-- 🚀 启动管理（标准/快速/cpolar/守护/nodemon 等启动模式）
+- 🚀 启动管理（标准/快速/cpolar 临时隧道/守护/nodemon 等启动模式 + **🌐 公网地址速览卡片**：3 秒刷新、一键复制、180s 去重弹窗）
 - 🗄️ 数据库（重置用户/迁移/Prisma Studio/重置数据库）
 - 🧪 测试（全部测试/监听/性能/覆盖率）
 - 📋 日志查看（watchdog/events/notify 日志）

@@ -7,6 +7,51 @@
 
 ---
 
+## [1.2.0] - 2026-04-15
+
+### 新增
+
+- **GUI 公网地址速览卡片**：在「🚀 启动管理」Tab 顶部新增「🌐 公网地址速览」卡片
+  - 每 3 秒自动刷新最新 cpolar 公网地址，从共享文件 `%TEMP%\euriskotax-last-cpolar-url.txt` 读取
+  - 卡片支持一键复制到剪贴板（点击卡片主体即可）
+  - 显示地址状态、刷新时间、操作提示（等待 / 已就绪 / 已变更）
+  - 地址变更时颜色高亮 + 一键发送最新地址给朋友按钮
+
+- **GUI 事件弹窗通知**：启动/分享期间以下 4 类关键事件会主动弹出 MessageBox 提醒
+  1. URL_CREATED（公网地址首次生成）
+  2. URL_CHANGED（公网地址变更）
+  3. 邮件发送成功
+  4. 邮件发送失败/未发送
+
+- **邮件通知事件扩充**：在 notify-templates.json v3.2 中新增 **URL_CREATED** 模板
+  - 标题：【EuriskoTax】公网分享地址已生成
+  - 与 URL_CHANGED 同样附带新地址 + 测试账号信息
+  - notifyOn 新增 `urlCreated` 开关，默认 true（首次分享时自动发邮件）
+
+### 变更
+
+- **cpolar 启动参数统一（临时隧道）**
+  - 之前：`ops-start-dev.ps1` 使用 `http 3000 -region=cn`，`ops-watchdog.ps1` 使用 `start eurisko`（依赖用户预设命名隧道，若没配会启动失败）
+  - 之后：**两个脚本都统一使用 `cpolar http 3000 -region=cn` 临时隧道**，无需任何 cpolar.yml 预设即可跑通
+  - 避免了"GUI 启动分享不会启动 cpolar"的常见坑
+
+- **GUI 弹窗全局 180s 去重（修复重复弹窗 N 次的问题）**
+  - 新增 `$script:DedupPopup` + `Test-AllowPopup`：同一事件 key 在 180 秒内只允许弹 1 次
+  - URL 首次弹窗的职责划归 `outHandler`；`Update-PublicUrlCard` 只负责"已变化"弹窗（通过 `UrlPopupMode` 与 `PublicUrlLastSeen` 互斥）
+  - outHandler 命中 URL 事件后立即写 `PublicUrlLastSeen = $url`，避免后续定时器再误判为变化
+
+- **GUI 子进程输出捕获增强：[GUI-EVENT] 双通道**
+  - `ops-start-dev.ps1`、`ops-watchdog.ps1` 对关键事件（公网地址、邮件成功、邮件失败）除了 `Write-Host` 外额外 `Write-Output "[GUI-EVENT] ..."`
+  - `RedirectStandardOutput` 与 `RedirectStandardError` 拆到独立文件，避免争用
+
+### 修复
+
+- fix(gui): 【启动 + 分享 + 自动重启 + 朋友联调推荐】按钮因 watchdog 使用命名隧道（eurisko）而 cpolar 起不来的问题（统一为临时隧道）
+- fix(gui): URL 首次生成、地址变更、邮件成功/失败等事件重复弹窗 N 次的问题（全局 180s 去重 + 职责互斥）
+- fix(gui): Write-Host 的关键信息 GUI 无法捕获的问题（全部改为同时 Write-Output [GUI-EVENT]）
+
+---
+
 ## [1.1.0] - 2026-08-07
 
 ### 新增

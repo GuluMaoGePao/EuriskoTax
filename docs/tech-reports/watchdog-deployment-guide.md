@@ -1,6 +1,6 @@
 # EuriskoTax Watchdog 监控与邮件通知系统部署指南
 
-> 文档版本：v1.0 | 更新日期：2026-08-10
+> 文档版本：v1.2 | 更新日期：2026-04-15
 > 适用范围：EuriskoTax 开发环境完整监控与通知系统部署
 
 ---
@@ -10,10 +10,11 @@
 EuriskoTax Watchdog 是一套完整的开发环境守护系统，包含以下核心能力：
 
 1. **后端服务监控** — 每 20 秒检查 Node.js 后端是否存活，崩溃时自动重启
-2. **cpolar 隧道监控** — 检查公网隧道是否正常，断连时自动重启
+2. **cpolar 隧道监控** — 检查公网隧道是否正常，断连时自动重启（使用临时隧道，无需预设命名隧道）
 3. **公网地址变更检测** — 当 cpolar 分配新的公网 URL 时自动检测
-4. **邮件通知** — 仅公网地址变更时发送中文邮件通知给测试员
+4. **邮件通知** — 首次生成地址（URL_CREATED）与地址变更（URL_CHANGED）均会发送中文邮件通知给测试员
 5. **结构化事件日志** — 所有重启/变更事件记录到 events.log 便于排查
+6. **GUI 可视化与主动弹窗** — EuriskoTax 开发控制台（WinForms GUI）提供「🌐 公网地址速览」卡片，并对 URL 首次生成 / URL 变更 / 邮件成功 / 邮件失败 4 类事件弹 MessageBox；所有弹窗均带 180s 全局去重，不会重复弹出
 
 ### 架构图
 
@@ -53,18 +54,22 @@ EuriskoTax Watchdog 是一套完整的开发环境守护系统，包含以下核
 
 | 文件 | 用途 | 必需 |
 |------|------|------|
-| [watchdog.ps1](../../scripts/watchdog.ps1) | 守护主脚本，监控+重启+事件记录 | 是 |
-| [notify.ps1](../../scripts/notify.ps1) | 邮件发送模块，模板加载+SMTP发送+日志 | 是 |
-| [start-dev.ps1](../../scripts/start-dev.ps1) | 一键启动脚本（环境检查+依赖+重置用户+启动服务+守护） | 是 |
+| [ops-watchdog.ps1](../../tools/ops/ops-watchdog.ps1) | 守护主脚本，监控+重启+事件记录+公网URL文件持久化+[GUI-EVENT]输出 | 是 |
+| [ops-notify.ps1](../../tools/ops/ops-notify.ps1) | 邮件发送模块，模板加载+SMTP发送+日志 | 是 |
+| [ops-start-dev.ps1](../../tools/ops/ops-start-dev.ps1) | 一键启动脚本（环境检查+依赖+重置用户+启动服务+守护，输出[GUI-EVENT]） | 是 |
+| [gui-dev-console.ps1](../../tools/gui/gui-dev-console.ps1) | GUI 开发控制台（公网卡片+180s去重弹窗） | 否（但推荐） |
 
 ### 配置文件
 
 | 文件 | 用途 | 必需 | Git跟踪 |
 |------|------|------|---------|
-| [notify.config.json](../../scripts/notify.config.json) | SMTP配置、收件人列表、通知开关 | 是 | ❌ 已gitignore |
-| [notify-templates.json](../../scripts/notify-templates.json) | 中文邮件模板 v3.1（URL_CHANGED + TEST） | 是 | ✅ |
-| [notify-reason-map.json](../../scripts/notify-reason-map.json) | reason代码到中文描述的映射（14种） | 是 | ✅ |
-| `~/.cpolar/cpolar.yml` | cpolar隧道预设配置 | 是（-Share模式） | — |
+| [notify.config.json](../../tools/ops/notify.config.json) | SMTP配置、收件人列表、通知开关（**新增notifyOn.urlCreated**） | 是 | ❌ 已gitignore |
+| [ops-notify-templates.json](../../tools/ops/ops-notify-templates.json) | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | 是 | ✅ |
+| [ops-notify-reason-map.json](../../tools/ops/ops-notify-reason-map.json) | reason代码到中文描述的映射（14种） | 是 | ✅ |
+| `%TEMP%\euriskotax-last-cpolar-url.txt` | 共享公网地址持久化文件（GUI/启动脚本/守护脚本互通） | 运行时生成 | — |
+| `~/.cpolar/cpolar.yml` | cpolar authtoken 配置（*无需*配置 named tunnels） | 仅 authtoken 必需 | — |
+
+> 💡 **v1.2+ 变更**：cpolar 启动已从 `cpolar start eurisko`（命名隧道，需要用户 cpolar.yml 配置 eurisko 隧道）统一为 **`cpolar http 3000 -region=cn`（临时隧道）**。用户只需执行一次 `cpolar authtoken <token>` 即可，无需任何 tunnels 段配置。
 
 ### 日志文件（自动生成）
 
@@ -137,21 +142,18 @@ DATABASE_URL="file:./dev.db"
 
 ### 4.4 配置 cpolar（如需公网分享）
 
-编辑 `~/.cpolar/cpolar.yml`（首次运行 `cpolar authtoken <token>` 后生成）：
+> **自 v1.2 起不再需要配置 named tunnels（eurisko 段）**，只需执行 1 次 authtoken，所有脚本（ops-start-dev / ops-watchdog / GUI）均使用临时命令 `cpolar http 3000 -region=cn`。
 
-```yaml
-authtoken: your-cpolar-token
-tunnels:
-  eurisko:
-    addr: 3000
-    proto: http
-    region: cn
-    host_header: localhost:3000
+```powershell
+# 执行 1 次即可（把 <your-token> 换成 cpolar 控制台获取到的 authtoken）
+.\tools\cpolar\cpolar.exe authtoken <your-token>
 ```
+
+执行后 `~/.cpolar/cpolar.yml` 会自动生成 authtoken 字段，无需再手工添加 `tunnels:` 段。
 
 ### 4.5 配置邮件通知
 
-创建 [notify.config.json](../../scripts/notify.config.json)：
+创建 [notify.config.json](../../tools/ops/notify.config.json)：
 
 ```json
 {
@@ -171,13 +173,14 @@ tunnels:
   "notifyOn": {
     "backendRestart": false,
     "cpolarRestart": false,
+    "urlCreated": true,
     "urlChanged": true,
     "restartFailed": false
   }
 }
 ```
 
-> **通知策略**：默认仅 `urlChanged` 为 `true`，其他事件仅记录到 events.log。如需调整，修改对应开关即可，无需重启 watchdog。
+> **通知策略**：默认 `urlCreated` 与 `urlChanged` 为 `true`，其他事件仅记录到 events.log。`urlCreated=true` 时每次点击「启动+分享」或「🔥 完整测试」首次生成公网地址也会立即发邮件，不用等地址变更。调整开关无需重启 watchdog。
 
 ### 4.6 重置开发用户
 
@@ -205,34 +208,45 @@ Send-TestNotification
 
 ### 5.1 一键启动（推荐）
 
+#### 方式 A：图形化（给"朋友联调"时最省事）—— GUI
+
+双击 `tools/gui/gui-启动.bat` 打开 EuriskoTax 开发控制台 → 进入「🚀 启动管理」Tab → 点击 **🔥 完整测试**（= `-Share -Watchdog`）。GUI 会：
+- 捕获子进程的 `[GUI-EVENT]` 行；
+- 在 Tab 顶部显示「🌐 公网地址速览」卡片（点一下复制，每 3s 刷新）；
+- 对 4 类事件弹 1 次 MessageBox（180s 去重，不会重复弹）：URL 首次生成 / URL 变更 / 邮件成功 / 邮件失败。
+
+#### 方式 B：命令行
+
 ```powershell
-# 完整启动：环境检查 + 依赖安装 + 重置用户 + 启动后端 + cpolar + 守护
-.\scripts\start-dev.ps1 -Share -Watchdog
+# 完整启动：环境检查 + 依赖安装 + 重置用户 + 启动后端 + cpolar 临时隧道 + 守护
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 
 # 跳过依赖安装和用户重置（快速启动）
-.\scripts\start-dev.ps1 -Share -Watchdog -SkipInstall -SkipResetUser
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog -SkipInstall -SkipResetUser
 ```
 
 ### 5.2 单独启动 watchdog
 
 ```powershell
-# 带公网分享
-.\scripts\watchdog.ps1 -Share -IntervalSec 20
+# 带公网分享（临时隧道 http 3000 -region=cn）
+.\tools\ops\ops-watchdog.ps1 -Share -IntervalSec 20
 
 # 不带公网分享（仅监控后端）
-.\scripts\watchdog.ps1 -IntervalSec 20
+.\tools\ops\ops-watchdog.ps1 -IntervalSec 20
 ```
 
 ### 5.3 启动参数说明
 
 | 参数 | 脚本 | 说明 |
 |------|------|------|
-| `-Share` | start-dev.ps1, watchdog.ps1 | 启用 cpolar 公网隧道监控 |
-| `-Watchdog` | start-dev.ps1 | 启动后自动拉起 watchdog 守护进程 |
-| `-SkipInstall` | start-dev.ps1 | 跳过 npm install |
-| `-SkipResetUser` | start-dev.ps1 | 跳过用户重置 |
-| `-IntervalSec` | watchdog.ps1 | 轮询间隔秒数（默认20） |
-| `-MaxRestarts` | watchdog.ps1 | 最大重启次数（默认0=无限） |
+| `-Share` | ops-start-dev.ps1, ops-watchdog.ps1 | 启用 cpolar 公网隧道监控（临时命令 `cpolar http 3000 -region=cn`） |
+| `-Watchdog` | ops-start-dev.ps1 | 启动后自动拉起 ops-watchdog 守护进程 |
+| `-SkipInstall` | ops-start-dev.ps1 | 跳过 npm install |
+| `-SkipResetUser` | ops-start-dev.ps1 | 跳过用户重置 |
+| `-IntervalSec` | ops-watchdog.ps1 | 轮询间隔秒数（默认20） |
+| `-MaxRestarts` | ops-watchdog.ps1 | 最大重启次数（默认0=无限） |
+
+> 🔁 **GUI 与命令行共享 URL**：无论哪种方式启动，最新公网地址都会写入 `%TEMP%\euriskotax-last-cpolar-url.txt`，GUI 读这个文件刷新卡片，无需猜测"到底哪个端口在跑 cpolar"。
 
 ---
 
@@ -338,31 +352,40 @@ Clear-Content .\scripts\notify.log
 | 监控对象 | 检查方式 | 检查间隔 | 异常动作 |
 |---------|---------|---------|---------|
 | 后端服务 | 3000端口监听 + HTTP响应 | 20秒 | 自动重启 node src/app.js |
-| cpolar隧道 | 进程存活 + 公网URL可达 | 20秒 | 自动重启 cpolar |
-| 公网URL | 对比当前URL与上次记录 | 20秒 | 记录URL_CHANGED + 发送邮件 |
+| cpolar隧道 | 进程存活 + 公网URL可达 | 20秒 | 自动重启 cpolar（命令：`cpolar http 3000 -region=cn` 临时隧道） |
+| 公网URL | 对比当前URL与上次记录（持久化到 `%TEMP%\euriskotax-last-cpolar-url.txt`） | 20秒 | 记录URL_CREATED / URL_CHANGED + 发邮件 + GUI 弹窗（180s去重） |
 
 ### 7.2 通知策略
 
-**仅公网地址变更（URL_CHANGED）通过邮件通知**，其他事件仅记录到 events.log。
+**URL_CREATED（首次生成）与 URL_CHANGED（地址变更）都会发邮件 + GUI 弹窗；其他事件仅记录到 events.log。**
 
-| 事件 | 邮件 | 日志 | 理由 |
-|------|------|------|------|
-| BACKEND_RESTART | ❌ | ✅ | 自动恢复，无需人工干预 |
-| CPOLAR_RESTART | ❌ | ✅ | 自动恢复，无需人工干预 |
-| **URL_CHANGED** | **✅** | ✅ | **旧地址失效，需通知测试员** |
-| RESTART_FAILED | ❌ | ✅ | 查看 events.log |
-| MAX_RESTARTS_REACHED | ❌ | ✅ | 查看 events.log |
+| 事件 | 邮件（notifyOn 开关） | GUI 弹窗（180s 去重） | 日志 | 理由 |
+|------|------|------|------|------|
+| BACKEND_RESTART | ❌ `backendRestart=false` | ❌ | ✅ | 自动恢复，无需人工干预 |
+| CPOLAR_RESTART | ❌ `cpolarRestart=false` | ❌ | ✅ | 自动恢复，无需人工干预 |
+| **URL_CREATED** | **✅ `urlCreated=true`（默认）** | **✅ URL_FIRST 弹 1 次** | ✅ | 启动分享时立即发地址给测试员 |
+| **URL_CHANGED** | **✅ `urlChanged=true`（默认）** | **✅ URL_CHANGED 弹 1 次** | ✅ | 旧地址失效，必须通知测试员更换 |
+| RESTART_FAILED | ❌ `restartFailed=false` | ❌ | ✅ | 查看 events.log |
+| MAX_RESTARTS_REACHED | ❌ `restartFailed=false` | ❌ | ✅ | 查看 events.log |
+| **邮件发送成功** | — | **✅ EMAIL_OK 弹 1 次** | ✅ notify.log | 提示"已发出，叫朋友查收" |
+| **邮件未发送/失败** | — | **✅ EMAIL_FAIL 弹 1 次** | ✅ notify.log | 提示排查 notify.config.json |
 
 > 如需启用其他事件通知，编辑 `notify.config.json` 的 `notifyOn` 节点。
 
 ### 7.3 邮件模板
 
-模板定义在 [notify-templates.json](../../scripts/notify-templates.json)，v3.1 简化版包含2种：
+模板定义在 [ops-notify-templates.json](../../tools/ops/ops-notify-templates.json)，v3.2 包含 3 种：
 
-- **URL_CHANGED** — 公网地址变更通知（含新地址+测试账号）
+- **URL_CREATED** — 首次公网地址生成通知（含新地址+测试账号）
+- **URL_CHANGED** — 公网地址变更通知（含新地址+旧地址+测试账号）
 - **TEST** — 邮件通知测试
 
-模板中的 `{reason}` 占位符会自动转换为中文描述（通过 [notify-reason-map.json](../../scripts/notify-reason-map.json)）。
+模板中的 `{reason}` 占位符会自动转换为中文描述（通过 [ops-notify-reason-map.json](../../tools/ops/ops-notify-reason-map.json)）。
+
+> 🔁 **GUI 弹窗去重机制（为什么不会重复弹）**：`gui-dev-console.ps1` 维护 `$script:DedupPopup` 字典和 `Test-AllowPopup` 函数。4 类事件分别用独立 key：`URL_FIRST::<url>`、`URL_CHANGED::<newUrl>`、`EMAIL_OK::SENT`、`EMAIL_FAIL::NOT_SENT`，同一 key 180s 内只允许弹 1 次。并且：
+> - URL 首次弹窗**只由 outHandler** 负责，弹出后立即写 `PublicUrlLastSeen=$url`，让 3s 定时器里的 `Update-PublicUrlCard` 不会再把同一个 URL 判成"变化"；
+> - URL 变更弹窗只在 `PublicUrlLastSeen` 真的不同时触发，且同样走 180s 去重。
+> 因此不会出现"一个地址连续弹 N 次"的情况。
 
 ### 7.4 reason 中文映射
 
