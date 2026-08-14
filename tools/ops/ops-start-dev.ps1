@@ -103,9 +103,44 @@ if (-not $SkipResetUser) {
 
 # ====== 4. (可选) 启动 cpolar 公网分享 ======
 $cpolarStarted = $false
+$lastUrlFile  = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"   # 记录上次 URL，用于变更检测
+function Get-CpolarTunnelUrls {
+    param([int]$MaxRetries=5, [int]$RetryMs=1200, [string]$LogFile)
+    # 优先级：1) 本地管理API 4040 返回 JSON；2) 输出/日志正则解析 Forwarding
+    for ($r=0; $r -lt $MaxRetries; $r++) {
+        Start-Sleep -Milliseconds $RetryMs
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            $j = $resp.Content | ConvertFrom-Json -ErrorAction Stop
+            if ($j -and $j.tunnels -and $j.tunnels.Count -gt 0) {
+                # 优先 https，其次 http
+                $best = $null
+                foreach ($t in $j.tunnels) {
+                    if ($t.public_url -match '^https://') { $best = $t.public_url; break }
+                    elseif (-not $best -and $t.public_url -match '^http://') { $best = $t.public_url }
+                }
+                if ($best) { return @{ Url=$best; Source="api_4040"; Retries=($r+1) } }
+            }
+        } catch {
+            # 继续 fallback 到日志解析
+        }
+        if ($LogFile -and (Test-Path $LogFile)) {
+            $raw = Get-Content $LogFile -Raw -ErrorAction SilentlyContinue
+            if ($raw) {
+                $m = [regex]::Match($raw, '(?:Tunnel established at|Forwarding)\s+(https://[^\s"]+)')
+                if ($m.Success) { return @{ Url=$m.Groups[1].Value; Source="log_https"; Retries=($r+1) } }
+                $m2 = [regex]::Match($raw, '(?:Tunnel established at|Forwarding)\s+(http://[^\s"]+)')
+                if ($m2.Success) { return @{ Url=$m2.Groups[1].Value; Source="log_http"; Retries=($r+1) } }
+            }
+        }
+    }
+    return $null
+}
+
 if ($Share) {
     $cpolarDir = Join-Path $ToolsDir "cpolar"
     $cpolarExe = Join-Path $cpolarDir "cpolar.exe"
+    $notifyScript = Join-Path $ScriptDir "ops-notify.ps1"
 
     Write-Host ""
     Write-Host "[4/5] 启动 cpolar 公网分享..." -ForegroundColor Yellow
@@ -123,42 +158,68 @@ if ($Share) {
         Start-Sleep -Seconds 1
 
         # 后台启动 cpolar（cn 地区），输出重定向到临时文件
-        $cpolarLog = Join-Path $env:TEMP "cpolar-euriskotax.log"
+        $cpolarLog    = Join-Path $env:TEMP "cpolar-euriskotax.log"
+        $cpolarErrLog = Join-Path $env:TEMP "cpolar-euriskotax.err"
+        if (Test-Path $cpolarLog)    { Remove-Item $cpolarLog    -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $cpolarErrLog) { Remove-Item $cpolarErrLog -Force -ErrorAction SilentlyContinue }
         Start-Process -FilePath $cpolarExe `
             -ArgumentList "http", "3000", "-region=cn", "-log=stdout" `
             -WindowStyle Hidden `
             -RedirectStandardOutput $cpolarLog `
-            -RedirectStandardError $cpolarLog `
+            -RedirectStandardError  $cpolarErrLog `
             -PassThru | Out-Null
 
         Write-Host "  等待隧道建立..." -ForegroundColor Gray
-        $tunnelUrl = $null
-        for ($i = 0; $i -lt 15; $i++) {
-            Start-Sleep -Seconds 2
-            # 从 cpolar 日志文件中解析公网URL（日志含 "Tunnel established at <url>" 行）
-            if (Test-Path $cpolarLog) {
-                $logContent = Get-Content $cpolarLog -Raw -ErrorAction SilentlyContinue
-                if ($logContent) {
-                    # 优先匹配 https 地址
-                    $httpsMatch = [regex]::Match($logContent, 'Tunnel established at (https://[^\s"]+)')
-                    if ($httpsMatch.Success) {
-                        $tunnelUrl = $httpsMatch.Groups[1].Value
-                        break
-                    }
-                    # 退而求其次匹配 http 地址
-                    $httpMatch = [regex]::Match($logContent, 'Tunnel established at (http://[^\s"]+)')
-                    if ($httpMatch.Success) {
-                        $tunnelUrl = $httpMatch.Groups[1].Value
-                        break
-                    }
-                }
-            }
-        }
-
+        $tunnelInfo = Get-CpolarTunnelUrls -MaxRetries 10 -RetryMs 1500 -LogFile $cpolarLog
+        $tunnelUrl  = if ($tunnelInfo) { $tunnelInfo.Url } else { $null }
         if ($tunnelUrl) {
-            $cpolarStarted = $true
-            Write-Host "  [OK] cpolar 隧道已建立" -ForegroundColor Green
+            Write-Host "  [OK] cpolar 隧道已建立 (来源: $($tunnelInfo.Source), $($tunnelInfo.Retries) 次探测)" -ForegroundColor Green
             Write-Host "  公网分享地址: $tunnelUrl" -ForegroundColor Magenta
+            # ⚠️ 下面 Write-Output 不写控制台彩色，但进入 stdout 供 GUI 的
+            # RedirectStandardOutput 异步事件捕获（GUI 弹窗+复制剪贴板靠这个）
+            Write-Output "[GUI-EVENT] 公网分享地址: $tunnelUrl"
+
+            # URL 持久化 + 发邮件通知
+            $previousUrl = $null
+            if (Test-Path $lastUrlFile) { $previousUrl = (Get-Content $lastUrlFile -Raw -ErrorAction SilentlyContinue).Trim() }
+            Set-Content -Path $lastUrlFile -Value $tunnelUrl -Encoding UTF8 -ErrorAction SilentlyContinue
+
+            $sendMail = $true
+            if (Test-Path $notifyScript) {
+                try {
+                    $tplData = @{
+                        newUrl    = $tunnelUrl
+                        oldUrl    = if ($previousUrl) { $previousUrl } else { "(无，首次生成)" }
+                        reason    = "手动启动公网分享（ops-start-dev -Share）"
+                        timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+                    }
+                    # 判断这次是"首次创建"还是"变更"
+                    if ([string]::IsNullOrWhiteSpace($previousUrl) -or ($previousUrl -ne $tunnelUrl)) {
+                        $eventType = if ([string]::IsNullOrWhiteSpace($previousUrl)) { "URL_CREATED" } else { "URL_CHANGED" }
+                        . $notifyScript
+                        $sent = Send-WatchdogNotification -EventType $eventType -TemplateData $tplData
+                        if ($sent) {
+                            Write-Host "  [OK] 公网地址邮件通知已发送给: $($script:NotifyConfig.recipients -join ', ')" -ForegroundColor Green
+                            Write-Output "[GUI-EVENT] [OK] 公网地址邮件通知已发送给: $($script:NotifyConfig.recipients -join ', ')"
+                        } else {
+                            Write-Host "  [WARN] 邮件未发送（notify.enabled=false 或 SMTP 未配置？详见 tools/ops/notify.log）" -ForegroundColor Yellow
+                            Write-Output "[GUI-EVENT] [WARN] 邮件未发送（notify.enabled=false 或 SMTP 未配置？详见 tools/ops/notify.log）"
+                        }
+                    } else {
+                        Write-Host "  [INFO] 公网地址未变化，跳过重复邮件" -ForegroundColor Gray
+                        $sendMail = $false
+                    }
+                } catch {
+                    Write-Host "  [WARN] 发送邮件通知失败: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "         详情: tools/ops/notify.log" -ForegroundColor Gray
+                    Write-Output "[GUI-EVENT] [WARN] 发送邮件通知失败: $($_.Exception.Message)"
+                }
+            } else {
+                Write-Host "  [WARN] 邮件脚本未找到: $notifyScript" -ForegroundColor Yellow
+                Write-Output "[GUI-EVENT] [WARN] 邮件未发送（脚本缺失: $notifyScript）"
+            }
+
+            $cpolarStarted = $true
         } else {
             Write-Host "  [WARN] cpolar 隧道建立超时（15秒内未获取到公网地址）" -ForegroundColor Yellow
             Write-Host "  可手动访问 cpolar 仪表盘查看: http://127.0.0.1:4040/" -ForegroundColor Gray
@@ -166,7 +227,7 @@ if ($Share) {
     }
 } else {
     Write-Host ""
-    Write-Host "  (未启用 cpolar 公网分享，加 -Share 参数可生成公网地址)" -ForegroundColor Gray
+    Write-Host "  (未启用 cpolar 公网分享，加 -Share 参数可生成公网地址并自动邮件通知)" -ForegroundColor Gray
 }
 
 # ====== 5. 启动后端服务 ======

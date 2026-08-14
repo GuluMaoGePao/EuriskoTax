@@ -84,21 +84,22 @@ function Load-NotifyTemplates {
 
 function Should-Notify {
     param([string]$EventType)
-    if (-not $NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
-    if (-not $NotifyConfig) {
+    if (-not $script:NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
+    if (-not $script:NotifyConfig) {
         Write-NotifyLog "WARN" "Should-Notify: config not loaded -> false (event=$EventType)"
         return $false
     }
-    if (-not $NotifyConfig.enabled) {
+    if (-not $script:NotifyConfig.enabled) {
         Write-NotifyLog "WARN" "Should-Notify: master switch disabled -> false (event=$EventType)"
         return $false
     }
     $result = switch ($EventType) {
-        "BACKEND_RESTART"        { $NotifyConfig.notifyOn.backendRestart }
-        "CPOLAR_RESTART"         { $NotifyConfig.notifyOn.cpolarRestart }
-        "URL_CHANGED"            { $NotifyConfig.notifyOn.urlChanged }
-        "RESTART_FAILED"         { $NotifyConfig.notifyOn.restartFailed }
-        "MAX_RESTARTS_REACHED"   { $NotifyConfig.notifyOn.restartFailed }
+        "BACKEND_RESTART"        { $script:NotifyConfig.notifyOn.backendRestart }
+        "CPOLAR_RESTART"         { $script:NotifyConfig.notifyOn.cpolarRestart }
+        "URL_CHANGED"            { $script:NotifyConfig.notifyOn.urlChanged }
+        "URL_CREATED"            { $script:NotifyConfig.notifyOn.urlCreated }
+        "RESTART_FAILED"         { $script:NotifyConfig.notifyOn.restartFailed }
+        "MAX_RESTARTS_REACHED"   { $script:NotifyConfig.notifyOn.restartFailed }
         default                  { $true }
     }
     Write-NotifyLog "DEBUG" "Should-Notify: event=$EventType result=$result"
@@ -128,9 +129,9 @@ function Load-ReasonMap {
 function Convert-ReasonToChinese {
     param([string]$Reason)
     if ([string]::IsNullOrWhiteSpace($Reason)) { return $Reason }
-    if (-not $ReasonMap) { $script:ReasonMap = Load-ReasonMap }
-    if (-not $ReasonMap) { return $Reason }
-    $prop = $ReasonMap.PSObject.Properties[$Reason]
+    if (-not $script:ReasonMap) { $script:ReasonMap = Load-ReasonMap }
+    if (-not $script:ReasonMap) { return $Reason }
+    $prop = $script:ReasonMap.PSObject.Properties[$Reason]
     if ($prop -and $prop.Value) {
         Write-NotifyLog "DEBUG" "Reason translated: $Reason -> $($prop.Value)"
         return $prop.Value
@@ -182,22 +183,26 @@ function Get-NotificationFromTemplate {
         [hashtable]$TemplateData
     )
     Write-NotifyLog "INFO" "Rendering template for event: $EventType"
-    if (-not $NotifyTemplates) { $script:NotifyTemplates = Load-NotifyTemplates }
-    if (-not $NotifyTemplates) {
+    if (-not $script:NotifyTemplates) { $script:NotifyTemplates = Load-NotifyTemplates }
+    if (-not $script:NotifyTemplates) {
         Write-NotifyLog "ERROR" "Templates not loaded, cannot render"
         return $null
     }
 
-    $tpl = $NotifyTemplates.$EventType
+    $tpl = $script:NotifyTemplates.$EventType
     if (-not $tpl) {
         Write-NotifyLog "ERROR" "No template found for event: $EventType"
         return $null
     }
 
     $subject = Format-Template -Template $tpl.subject -Data $TemplateData
-    $body = Format-Template -Template $tpl.body -Data $TemplateData
+    $body    = Format-Template -Template $tpl.body -Data $TemplateData
     Write-NotifyLog "INFO" "Template rendered OK (subject length=$($subject.Length), body length=$($body.Length))"
     return @{ Subject = $subject; Body = $body }
+}
+
+function Load-NotifyReasonMapSafe {
+    if (-not $script:ReasonMap) { $script:ReasonMap = Load-ReasonMap }
 }
 
 function Send-WatchdogNotification {
@@ -210,15 +215,16 @@ function Send-WatchdogNotification {
         [switch]$IsHtml
     )
     Write-NotifyLog "INFO" "===== Send-WatchdogNotification start (event=$EventType) ====="
-    if (-not $NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
+    if (-not $script:NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
 
     # If no raw Subject/Body provided, try loading from Chinese template
     if (-not $Subject -and -not $Body) {
         Write-NotifyLog "INFO" "No raw subject/body, using template rendering"
+        Load-NotifyReasonMapSafe
         $rendered = Get-NotificationFromTemplate -EventType $EventType -TemplateData $TemplateData
         if ($rendered) {
             $Subject = $rendered.Subject
-            $Body = $rendered.Body
+            $Body    = $rendered.Body
         } else {
             Write-NotifyLog "ERROR" "Template rendering failed and no raw subject/body provided, aborting"
             return $false
@@ -227,11 +233,11 @@ function Send-WatchdogNotification {
         Write-NotifyLog "INFO" "Using raw subject/body (template bypassed)"
     }
 
-    if (-not $NotifyConfig) {
+    if (-not $script:NotifyConfig) {
         Write-NotifyLog "WARN" "Config not loaded, skip email"
         return $false
     }
-    if (-not $NotifyConfig.enabled) {
+    if (-not $script:NotifyConfig.enabled) {
         Write-NotifyLog "WARN" "Notification master switch disabled (enabled=false), skip email"
         return $false
     }
@@ -240,14 +246,14 @@ function Send-WatchdogNotification {
         return $false
     }
 
-    $smtp = $NotifyConfig.smtp
-    $recipients = $NotifyConfig.recipients
+    $smtp       = $script:NotifyConfig.smtp
+    $recipients = $script:NotifyConfig.recipients
     if (-not $recipients -or $recipients.Count -eq 0) {
         Write-NotifyLog "ERROR" "No recipients configured in notify.config.json"
         return $false
     }
 
-    $from = $smtp.from
+    $from     = $smtp.from
     $password = $smtp.password
     if ($from -match "your_qq_number" -or $password -match "your_auth_code") {
         Write-NotifyLog "ERROR" "SMTP credentials not filled (placeholder detected). Edit: $NotifyConfigPath"
@@ -321,16 +327,16 @@ function Send-WatchdogNotification {
 # Convenience function: send test email using TEST template
 function Send-TestNotification {
     Write-NotifyLog "INFO" "===== Send-TestNotification invoked ====="
-    if (-not $NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
-    if (-not $NotifyConfig) {
+    if (-not $script:NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
+    if (-not $script:NotifyConfig) {
         Write-NotifyLog "ERROR" "Cannot send test: config not loaded"
         return $false
     }
     $data = @{
-        from = $NotifyConfig.smtp.from
-        recipients = ($NotifyConfig.recipients -join ", ")
-        smtpHost = $NotifyConfig.smtp.host
-        smtpPort = $NotifyConfig.smtp.port
+        from = $script:NotifyConfig.smtp.from
+        recipients = ($script:NotifyConfig.recipients -join ", ")
+        smtpHost = $script:NotifyConfig.smtp.host
+        smtpPort = $script:NotifyConfig.smtp.port
         timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
     }
     return Send-WatchdogNotification -EventType "TEST" -TemplateData $data

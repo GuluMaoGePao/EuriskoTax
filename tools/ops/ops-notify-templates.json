@@ -1,7 +1,12 @@
-﻿{
-  "_comment": "EuriskoTax Watchdog 中文邮件通知模板 v3.1（简化版）",
-  "_comment_scope": "仅公网地址变更（URL_CHANGED）通过邮件通知，其他事件仅记录到 events.log",
-  "_comment_placeholders": "可用占位符: oldUrl, newUrl, reason, recoveryMs, timestamp, from, recipients, smtpHost, smtpPort",
+{
+  "_comment": "EuriskoTax Watchdog 中文邮件通知模板 v3.2",
+  "_comment_scope": "公网地址首次创建（URL_CREATED）、地址变更（URL_CHANGED）通过邮件通知；其他事件仅记录到 events.log",
+  "_comment_placeholders": "可用占位符: oldUrl, newUrl, reason, recoveryMs, timestamp, from, recipients, smtpHost, smtpPort, email, password",
+
+  "URL_CREATED": {
+    "subject": "【EuriskoTax】公网分享地址已生成",
+    "body": "公网隧道已启动，生成新的公网访问地址。\n\n新地址\n  {newUrl}\n\n生成时间\n  {timestamp}\n\n变更原因\n  {reason}\n\n请把下面链接和账号发给测试员直接访问即可，无需再 VPN 或连同一局域网：\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：dev@example.com\n  测试密码：password\n  一键登录：{newUrl}\n\n说明\n  cpolar 免费版公网地址在隧道重启/自动重连后会变化，如有变更会再次发送新邮件。\n  本邮件由 EuriskoTax 启动脚本 / 守护进程自动发送。"
+  },
 
   "URL_CHANGED": {
     "subject": "【EuriskoTax】公网测试地址已变更",
@@ -10,6 +15,6 @@
 
   "TEST": {
     "subject": "【EuriskoTax】邮件通知测试",
-    "body": "邮件通知测试\n\n如果您收到了这封邮件，说明 SMTP 邮件通知功能已正常工作。\n\n配置信息\n  发件邮箱：{from}\n  收件邮箱：{recipients}\n  SMTP 服务器：{smtpHost}:{smtpPort} (SSL)\n\n通知策略\n  当前仅公网地址变更事件会发送邮件通知。\n  其他事件（后端重启、隧道重启、重启失败等）仅记录到 events.log。\n\n发生时间：{timestamp}\n\n本邮件由 EuriskoTax Watchdog 自动发送。"
+    "body": "邮件通知测试\n\n如果您收到了这封邮件，说明 SMTP 邮件通知功能已正常工作。\n\n配置信息\n  发件邮箱：{from}\n  收件邮箱：{recipients}\n  SMTP 服务器：{smtpHost}:{smtpPort} (SSL)\n\n通知策略\n  当前公网地址首次创建和变更事件都会发送邮件通知。\n  其他事件（后端重启、隧道重启、重启失败等）仅记录到 events.log。\n\n发生时间：{timestamp}\n\n本邮件由 EuriskoTax Watchdog 自动发送。"
   }
 }

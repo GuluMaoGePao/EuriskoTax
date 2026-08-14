@@ -60,6 +60,40 @@ $script:StatusBar = $null
 $script:TabPanels = @{ }
 $script:TabCtxMap = @{ }
 
+# 公网地址面板控件引用（启动管理页 → 公网地址速览卡片）
+$script:PublicUrlCardLabel = $null   # 显示 URL 的大标签（可点击复制）
+$script:PublicUrlCardHint  = $null   # 小字状态提示（有/无地址、更新时间）
+$script:PublicUrlLastSeen  = ""      # 上次 URL，用于变化时触发弹窗
+
+# ===== 弹窗去重 (v3.3 修复重复弹 4~6 次问题) =====
+# 同一个 URL / 同一封邮件状态，180 秒内相同 key 只允许弹一次
+$script:DedupPopup        = @{}   # key=事件key  value=DateTime(上次弹出时间)
+$script:DedupPopupWindow  = 180   # 秒
+# URL 首次"已生成"弹窗由 outHandler 负责，Set-Content 之后 Update-PublicUrlCard 就不要再弹 "首次出现"了
+$script:UrlPopupMode      = $null # $null=从未弹过  "first"=已弹过首次  "change"=已弹过变更
+
+# 辅助: 检查是否可以弹窗（180s 内同 key 只弹 1 次）；返回 true=允许弹窗，同时写入时间
+function Test-AllowPopup {
+    param([string]$Key)
+    if ([string]::IsNullOrWhiteSpace($Key)) { return $true }
+    $now = Get-Date
+    # 防御性编程：
+    #   1) 先 ContainsKey，避免不存在时访问索引器拿不到明确的 null/非 null 语义；
+    #   2) 显式判断 $last -ne $null，再做减法 —— 不依赖「-and 短路」这一隐含知识。
+    #      （因为 DateTime - $null 会抛 "Cannot find an overload for op_Subtraction"，
+    #       虽然原写法靠 `$last -and (...)` 的短路能"侥幸"躲过去，但很脆弱。）
+    #   3) 额外加 `-is [DateTime]` 类型检查：如果字典未来被塞入非 DateTime 脏值，
+    #      宁可当作"无记录/允许弹窗"也不要让 GUI 抛异常。
+    if ($script:DedupPopup.ContainsKey($Key)) {
+        $last = $script:DedupPopup[$Key]
+        if ($last -ne $null -and $last -is [DateTime] -and ($now - $last).TotalSeconds -lt $script:DedupPopupWindow) {
+            return $false
+        }
+    }
+    $script:DedupPopup[$Key] = $now
+    return $true
+}
+
 # ==============================================================================
 # 布局参数 (v3.2 更宽松)
 # ==============================================================================
@@ -187,51 +221,61 @@ function Open-ApiDocsAuto {
     Write-Log "[API文档] [步骤4/5] 生成自定义 Swagger 页面（自动授权）..." "INFO"
     $hasToken = (-not [string]::IsNullOrWhiteSpace($token))
 
-    # PS 5.1 兼容：预先计算所有变量，不在 Here-string 内用 if 表达式
+    # === PS 5.1 兼容：JS 代码统一用单引号字符串 + 占位符替换，避免 Here-string 在 if 块内解析失败 ===
+    # 预先定义两个 onComplete 模板（有Token vs 无Token），然后在 if 外面做字符串替换
+    $onCompleteTplWithToken =
+        'onComplete: function() { ' +
+        'try { ' +
+        'ui.preauthorizeApiKey("bearerAuth", "Bearer __TOKEN__"); ' +
+        'setTimeout(function(){ ' +
+        'var topAuthBtn = document.querySelector(".topbar .authorization__btn"); ' +
+        'if (topAuthBtn) topAuthBtn.click(); ' +
+        'setTimeout(function(){ ' +
+        'var dialog = document.querySelector(".dialog-ux"); ' +
+        'if (dialog) { ' +
+        'var btns = dialog.querySelectorAll("button"); ' +
+        'for (var i=0; i<btns.length; i++) { ' +
+        'if (/^Authorize$/i.test(btns[i].innerText.trim())) { btns[i].click(); break; } ' +
+        '} ' +
+        'setTimeout(function(){ ' +
+        'var d2 = document.querySelector(".dialog-ux"); ' +
+        'if (d2) { ' +
+        'var cbtns = d2.querySelectorAll("button"); ' +
+        'for (var j=0; j<cbtns.length; j++) { ' +
+        'if (/^Close$/i.test(cbtns[j].innerText.trim())) { cbtns[j].click(); break; } ' +
+        '} ' +
+        '} ' +
+        '}, 400); ' +
+        '} ' +
+        '}, 500); ' +
+        '}, 700); ' +
+        '} catch(e) { console.warn(e); } ' +
+        '}'
+    $onCompleteTplNoToken = 'onComplete: function(){}'
+
+    # PS 5.1 兼容：预先计算所有变量
     if ($hasToken) {
         $statusHtml    = '<span style="color:#52c41a;font-weight:700">✅ Bearer Token 已自动注入，全自动授权完成</span>'
         $tokenPreview  = $token.Substring(0, [Math]::Min(50, $token.Length)) + '...'
         $tokenForJs    = $token -replace "'", "\'"   # JS 字符串转义
 
-        # requestInterceptor JS 代码（自动注入 Authorization header）
-        $reqInterceptorJs = "      if (!/\/auth\/login$|\/auth\/register$/.test(req.url) && !req.headers.Authorization) { req.headers.Authorization = 'Bearer ' + '$tokenForJs'; }"
+        # requestInterceptor JS 代码（放在 PowerShell 单引号字符串里）
+        # 说明：PS 5.1 中只有双引号 "..." 才会展开 $变量 和 特殊字符；
+        #       单引号 '...' 内 $ 、 & 、 \ 、 / 都是字面量，因此正则里的 $ 锚点可以直接写，
+        #       不需要再拆成多段拼接。之前拆成 "'...' + '$|...' + '$/'" 的写法已被误读为 regex bug，
+        #       现改为一个单引号整串，输出结果字节级一致（JS 正则仍为 /\/auth\/login$|\/auth\/register$/）。
+        $reqPart1 = '      if (!/\/auth\/login$|\/auth\/register$/.test(req.url) && !req.headers.Authorization) { req.headers.Authorization = '
+        $reqPart2 = "'Bearer ' + '" + $tokenForJs + "'; }"
+        $reqInterceptorJs = $reqPart1 + $reqPart2
 
-        # onComplete JS 代码（自动点 Authorize → Close）
-        $onCompleteJs = @"
-onComplete: function() {
-    try {
-        ui.preauthorizeApiKey("bearerAuth", "Bearer $tokenForJs");
-        setTimeout(function(){
-            var topAuthBtn = document.querySelector('.topbar .authorization__btn');
-            if (topAuthBtn) topAuthBtn.click();
-            setTimeout(function(){
-                var dialog = document.querySelector('.dialog-ux');
-                if (dialog) {
-                    var btns = dialog.querySelectorAll('button');
-                    for (var i=0; i<btns.length; i++) {
-                        if (/^Authorize$/i.test(btns[i].innerText.trim())) { btns[i].click(); break; }
-                    }
-                    setTimeout(function(){
-                        var d2 = document.querySelector('.dialog-ux');
-                        if (d2) {
-                            var cbtns = d2.querySelectorAll('button');
-                            for (var j=0; j<cbtns.length; j++) {
-                                if (/^Close$/i.test(cbtns[j].innerText.trim())) { cbtns[j].click(); break; }
-                            }
-                        }
-                    }, 400);
-                }
-            }, 500);
-        }, 700);
-    } catch(e) { console.warn(e); }
-}
-"@
+        # onComplete: 替换占位符
+        $onCompleteJs = $onCompleteTplWithToken -replace '__TOKEN__', $tokenForJs
     } else {
         $statusHtml    = '<span style="color:#faad14;font-weight:700">⚠️ Token 获取失败，请手动点击 Authorize 粘贴</span>'
         $tokenPreview  = '（无）'
         $tokenForJs    = ''
         $reqInterceptorJs = '      // no token available'
-        $onCompleteJs  = 'onComplete: function(){}'
+        $onCompleteJs  = $onCompleteTplNoToken
     }
 
     $html = @"
@@ -341,6 +385,101 @@ function Update-StatusBar {
 }
 
 # ==============================================================================
+# 辅助函数: Update-PublicUrlCard（刷新公网地址速览卡片 + 变化弹窗）
+#   数据源：%TEMP%\euriskotax-last-cpolar-url.txt（ops-start-dev 和 watchdog 共享）
+# ==============================================================================
+function Update-PublicUrlCard {
+    if (-not $script:PublicUrlCardLabel) { return }
+    $urlFile = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+    $url = $null
+    $fileTs = $null
+    if (Test-Path $urlFile) {
+        try {
+            $url = (Get-Content $urlFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue).Trim()
+            $fileTs = (Get-Item $urlFile -ErrorAction SilentlyContinue).LastWriteTime
+        } catch { }
+    }
+
+    $tsText = if ($fileTs) { $fileTs.ToString("yyyy-MM-dd HH:mm:ss") } else { "-" }
+
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        $script:PublicUrlCardLabel.Text = "（暂无公网地址）→ 点下方紫色或红色【启动+公网分享】按钮"
+        $script:PublicUrlCardLabel.ForeColor = $C_FG_DIM
+        $script:PublicUrlCardLabel.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+        $script:PublicUrlCardHint.Text = "  未检测到 cpolar 隧道。点【启动 + 分享 + 自动重启】后会自动刷新，地址生成后会自动复制并发送邮件。  |  共享文件：$urlFile  |  更新：$tsText"
+        $script:PublicUrlCardLabel.Cursor = [System.Windows.Forms.Cursors]::Default
+        $script:PublicUrlLastSeen = ""
+    } else {
+        $script:PublicUrlCardLabel.Text = "🌐  $url"
+        $script:PublicUrlCardLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 185, 120)
+        $script:PublicUrlCardLabel.Font = New-Object System.Drawing.Font("Consolas", 13.5, [System.Drawing.FontStyle]::Bold)
+        $script:PublicUrlCardLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $script:PublicUrlCardHint.Text = "  ✅ 点击上面链接复制到剪贴板  |  打开 cpolar 仪表盘：http://127.0.0.1:4040/  |  地址来源：共享文件  |  最近更新：$tsText"
+
+        $isFirstTime = ([string]::IsNullOrWhiteSpace($script:PublicUrlLastSeen))
+        $isChanged   = (-not $isFirstTime) -and ($script:PublicUrlLastSeen -ne $url)
+
+        # 首次出现：不弹窗（首次弹窗由 outHandler 的"公网地址已生成"负责，避免重复）
+        # URL 变更：只弹 1 次，180 秒内同 URL 不重复弹
+        if ($isChanged) {
+            $key = "URL_CHANGED::$url"
+            if (Test-AllowPopup -Key $key) {
+                try { Set-Clipboard -Value $url } catch { }
+                $msg = "公网地址已更新！已自动复制到剪贴板：`n`n  新地址：$url`n  上次地址：$script:PublicUrlLastSeen`n`n如果开启了邮件通知，收件箱也会收到变更邮件。"
+                [System.Windows.Forms.MessageBox]::Show($msg, "公网地址变更", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                $script:UrlPopupMode = "change"
+            }
+        } elseif ($isFirstTime) {
+            # 首次：只做 剪贴板 同步（如果 outHandler 之前没执行过），不弹窗
+            # (outHandler 会负责首次弹窗，Update-PublicUrlCard 只是 UI 刷新辅助)
+            try {
+                $curr = Get-Clipboard -ErrorAction SilentlyContinue
+                if ($curr -ne $url) { Set-Clipboard -Value $url -ErrorAction SilentlyContinue }
+            } catch { }
+            if (-not $script:UrlPopupMode) { $script:UrlPopupMode = "first-known" }
+        }
+        $script:PublicUrlLastSeen = $url
+    }
+}
+
+# ==============================================================================
+# 辅助函数: Show-GuiAlert（GUI 顶部显眼事件提示）
+# ==============================================================================
+function Show-GuiAlert {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [ValidateSet("Info","Warning","Error")]
+        [string]$Kind = "Info"
+    )
+    $icon = switch ($Kind) {
+        "Info"    { [System.Windows.Forms.MessageBoxIcon]::Information }
+        "Warning" { [System.Windows.Forms.MessageBoxIcon]::Warning }
+        "Error"   { [System.Windows.Forms.MessageBoxIcon]::Error }
+    }
+    [System.Windows.Forms.MessageBox]::Show($Message, $Title, [System.Windows.Forms.MessageBoxButtons]::OK, $icon) | Out-Null
+}
+
+# ==============================================================================
+# 辅助函数: Copy-PublicUrlToClipboard（公网地址标签点击时触发）
+# ==============================================================================
+function Copy-PublicUrlToClipboard {
+    $urlFile = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+    $url = $null
+    if (Test-Path $urlFile) { $url = (Get-Content $urlFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue).Trim() }
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        Show-GuiAlert -Title "暂无公网地址" -Message "当前没有检测到公网地址。请先点下方【启动 + 分享 + 自动重启】按钮，cpolar 建立隧道后这里会自动显示。" -Kind Warning
+        return
+    }
+    try {
+        Set-Clipboard -Value $url
+        Show-GuiAlert -Title "✅ 已复制到剪贴板" -Message "公网地址已复制：`n`n  $url`n`n把这个链接粘贴发给朋友即可访问（配合 dev@example.com / password）。"
+    } catch {
+        Show-GuiAlert -Title "复制失败" -Message "剪贴板写入失败，请手动复制：$url" -Kind Error
+    }
+}
+
+# ==============================================================================
 # 辅助函数: Invoke-AsyncCommand (异步执行命令)
 # ==============================================================================
 function Invoke-AsyncCommand {
@@ -377,10 +516,65 @@ function Invoke-AsyncCommand {
     $outHandler = {
         if ($EventArgs.Data) {
             if (-not $script:OutputBox) { return }
+            $line = [string]$EventArgs.Data
+
+            # ===== 关键事件捕获：公网地址 / 邮件通知 → 触发 GUI 弹窗 + 自动刷新 =====
+            # 【去重】每个事件 key 在 180s 内只允许弹 1 次（同 URL/同邮件状态不重复打扰用户）
+            # 1) ops-start-dev / watchdog 输出： 公网分享地址: https://xxx.cpolar.cn
+            if ($line -match '公网分享地址:\s*(https?://\S+)') {
+                $url = $matches[1]
+                # 写入共享文件（防止 ops-start-dev 异常导致没写）
+                $uf = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+                try { Set-Content -Path $uf -Value $url -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+                try { Set-Clipboard -Value $url -ErrorAction SilentlyContinue } catch { }
+                # 区分"首次生成"还是"变更" → 使用不同 key 分别去重
+                $isFirst = [string]::IsNullOrWhiteSpace($script:PublicUrlLastSeen)
+                $key = if ($isFirst) { "URL_FIRST::$url" } else { "URL_CHANGED::$url" }
+                if (Test-AllowPopup -Key $key) {
+                    if ($isFirst) {
+                        $msg = "✅ cpolar 公网隧道建立成功！地址已复制到剪贴板：`n`n  $url`n`n👉 如果开启了邮件通知（notify.config.json 的 urlCreated=true），收件箱很快也会收到。`n👉 在下方【🌐 公网地址速览】卡片里也能看到地址，点击可再次复制。"
+                        [System.Windows.Forms.MessageBox]::Show($msg, "公网地址已生成", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                        $script:UrlPopupMode = "first"
+                    } else {
+                        # outHandler 里也可能看门狗导致 URL 变化（会输出 GUI-EVENT），弹变更提示
+                        $msg = "公网地址已更新！已自动复制到剪贴板：`n`n  新地址：$url`n  上次地址：$script:PublicUrlLastSeen`n`n如果开启了邮件通知，收件箱也会收到变更邮件。"
+                        [System.Windows.Forms.MessageBox]::Show($msg, "公网地址变更", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                        $script:UrlPopupMode = "change"
+                    }
+                }
+                # 无论弹不弹窗，都要更新 LastSeen，避免 Update-PublicUrlCard 再判成"变化"
+                $script:PublicUrlLastSeen = $url
+            }
+            # 2) 输出： [OK] 公网地址邮件通知已发送给: xxx@qq.com
+            if ($line -match '公网地址邮件通知已发送给') {
+                # 去重 key = 固定的"邮件成功"（只要 180s 内发过，就别反复弹）
+                $key = "EMAIL_OK::SENT"
+                if (Test-AllowPopup -Key $key) {
+                    [System.Windows.Forms.MessageBox]::Show(
+                        "邮件已成功发送给配置的收件人！`n`n日志行：`n$line`n`n请叫朋友查收收件箱（如果没找到看一下垃圾箱）。",
+                        "✅ 公网地址邮件已发送",
+                        [System.Windows.Forms.MessageBoxButtons]::OK,
+                        [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                }
+            }
+            # 3) 输出： 邮件未发送 或 发送失败
+            if ($line -match '发送邮件通知失败|邮件未发送') {
+                $key = "EMAIL_FAIL::NOT_SENT"
+                if (Test-AllowPopup -Key $key) {
+                    [System.Windows.Forms.MessageBox]::Show(
+                        "邮件发送出现问题，没有发出。`n`n可能原因：`n  ① notify.config.json 中 enabled=false`n  ② QQ 邮箱授权码已过期或填错`n  ③ SMTP 服务器无法连接`n`n👉 排查方式：到【🛠 运维辅助】→ 邮件通知配置 → 查看通知日志 tools/ops/notify.log",
+                        "⚠️ 邮件通知未发送",
+                        [System.Windows.Forms.MessageBoxButtons]::OK,
+                        [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+                }
+            }
+            # 4) 每次关键输出都立即刷新公网地址卡片（仅刷新显示，不再重复弹窗）
+            try { Update-PublicUrlCard } catch { }
+
             $script:OutputBox.SelectionStart = $script:OutputBox.TextLength
             $script:OutputBox.SelectionLength = 0
             $script:OutputBox.SelectionColor = $C_FG_MUTED
-            $script:OutputBox.AppendText($EventArgs.Data + "`r`n")
+            $script:OutputBox.AppendText($line + "`r`n")
             $script:OutputBox.ScrollToCaret()
         }
     }
@@ -392,6 +586,7 @@ function Invoke-AsyncCommand {
             $script:OutputBox.SelectionColor = [System.Drawing.Color]::Yellow
             $script:OutputBox.AppendText($EventArgs.Data + "`r`n")
             $script:OutputBox.ScrollToCaret()
+            try { Update-PublicUrlCard } catch { }
         }
     }
     $exitedHandler = {
@@ -1053,6 +1248,44 @@ function Reflow-TabCards {
         }
         # Recalculate card height with actual description height
         $actualTopOffset = $cpad + $titleH + $subH + $actualDescH + 8
+
+        # ===== 公网地址速览卡片专属：在 description 和按钮之间插入 "大URL标签 + Hint" =====
+        if ($cardInfo.IsPublicUrlCard) {
+            if (-not $cardInfo.Controls.ContainsKey('BigUrlLabel')) {
+                $big = New-Object System.Windows.Forms.Label
+                $big.Text = "（暂无公网地址）→ 点下方红色【启动 + 分享 + 自动重启】生成公网地址"
+                $big.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+                $big.ForeColor = $C_FG_DIM
+                $big.AutoSize = $false
+                $big.BackColor = $C_BG_DARK
+                $big.Padding = "14, 12, 14, 12"
+                $big.BorderStyle = "FixedSingle"
+                $big.Cursor = [System.Windows.Forms.Cursors]::Default
+                $big.Add_Click({ Copy-PublicUrlToClipboard })
+                $card.Controls.Add($big)
+                $cardInfo.Controls['BigUrlLabel'] = $big
+                # 注册为全局"公网地址卡片主标签"，供 Update-PublicUrlCard 更新
+                $script:PublicUrlCardLabel = $big
+
+                $hint = New-Object System.Windows.Forms.Label
+                $hint.Text = "  未检测到公网隧道。启动 cpolar 后会自动刷新。也可以点下面 🔄 刷新地址 按钮。"
+                $hint.Font = $F_CARD_DESC
+                $hint.ForeColor = [System.Drawing.Color]::FromArgb(180, 180, 200)
+                $hint.AutoSize = $false
+                $card.Controls.Add($hint)
+                $cardInfo.Controls['HintLabel'] = $hint
+                $script:PublicUrlCardHint = $hint
+            }
+            $bigCtrl = $cardInfo.Controls['BigUrlLabel']
+            $hintCtrl = $cardInfo.Controls['HintLabel']
+            $bigCtrl.Location = New-Object System.Drawing.Point(($cpad + 2), $actualTopOffset)
+            $bigCtrl.Size = New-Object System.Drawing.Size(($innerW - 4), 58)
+            $actualTopOffset += 58 + 6
+            $hintCtrl.Location = New-Object System.Drawing.Point(($cpad + 2), $actualTopOffset)
+            $hintCtrl.Size = New-Object System.Drawing.Size(($innerW - 4), 26)
+            $actualTopOffset += 26 + 8
+        }
+
         $actualCardH = $actualTopOffset + ($rows * $BTN_H) + ([Math]::Max(0, $rows - 1) * $gap) + $cpad
         $cardInfo.Card.Size = New-Object System.Drawing.Size($availW, $actualCardH)
         $cardInfo.Controls['Accent'].Size = New-Object System.Drawing.Size(5, $actualCardH)
@@ -1086,6 +1319,66 @@ Add-SectionCard -TabCtx $tab1Ctx -IsGuide `
     @{ Text = "④ 启动成功后 → 点下方【打开前端 http://localhost:3000/】 去玩！"; Color = "guide" }
 )
 
+# --- 🌐 公网地址速览（v3.3 新增：显眼显示 + 一键复制）---
+# 数据来源：%TEMP%\euriskotax-last-cpolar-url.txt（ops-start-dev 和 watchdog 共享）
+$puCardInfo = @{
+    Title          = "🌐 公网地址速览（朋友访问用这个）"
+    Subtitle       = "自动刷新 · 点击复制 · 看门狗变更后 3 秒内同步"
+    Description    = "详细说明：cpolar 生成的公网链接会立即显示在这里。地址变化自动弹窗并复制到剪贴板；邮件也会同步发给收件人列表。如果暂时为「暂无」，点下面红色【启动 + 分享 + 自动重启】即可。"
+    AccentColor    = [System.Drawing.Color]::FromArgb(235, 140, 85)   # 橙色突出
+    ButtonsPerRow  = 0
+    Buttons        = @(
+        @{ Text = "🔄 刷新地址"; Desc = "立即重新读取共享文件（通常 3 秒自动刷新一次）。"
+           Color = "200, 140, 75"
+           OnClick = { try { Update-PublicUrlCard } catch { } Show-GuiAlert -Title "已刷新" -Message "公网地址卡片已刷新。若仍为空，请稍等 5~15 秒（cpolar 建立隧道需要时间）。" }
+        },
+        @{ Text = "📋 复制地址"; Desc = "把当前公网地址复制到剪贴板，方便粘贴发给朋友。"
+           Color = "160, 110, 200"
+           OnClick = { Copy-PublicUrlToClipboard }
+        },
+        @{ Text = "🌐 浏览器打开"; Desc = "用默认浏览器打开公网地址，预览朋友看到的效果。"
+           Color = "75, 170, 190"
+           OnClick = {
+                $uf = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+                $u = $null
+                if (Test-Path $uf) { $u = (Get-Content $uf -Raw -Encoding UTF8 -ErrorAction SilentlyContinue).Trim() }
+                if ([string]::IsNullOrWhiteSpace($u)) {
+                    Show-GuiAlert -Title "暂无公网地址" -Message "请先点下方红色【启动 + 分享 + 自动重启】按钮，cpolar 建立隧道后这里会自动出现地址。" -Kind Warning
+                } else {
+                    try { Start-Process $u } catch { Show-GuiAlert -Title "打开失败" -Message "无法打开浏览器。请手动在浏览器访问：$u" -Kind Error }
+                }
+           }
+        },
+        @{ Text = "📧 测试邮件通知"; Desc = "立即发送一封【邮件通知测试】到 notify.config.json 中配置的收件人，验证 SMTP 是否正常。"
+           Color = "85, 180, 110"
+           OnClick = {
+                Write-Log "[MAIL] 正在发送测试邮件..." "INFO"
+                $notifyScript = Join-Path $OpsDir "ops-notify.ps1"
+                if (-not (Test-Path $notifyScript)) {
+                    Show-GuiAlert -Title "脚本缺失" -Message "找不到通知脚本：$notifyScript" -Kind Error
+                    return
+                }
+                try {
+                    . $notifyScript
+                    $sent = Send-TestNotification
+                    if ($sent) {
+                        Show-GuiAlert -Title "✅ 测试邮件已发送" -Message "测试邮件已发出，请在以下收件人邮箱中查收（约 10~60 秒）：`n`n  $($script:NotifyConfig.recipients -join "`n  ")`n`n如果没收到：`n  ① 检查垃圾箱`n  ② 去 tools/ops/notify.log 看详细错误`n  ③ 确认 QQ 邮箱授权码未过期"
+                    } else {
+                        Show-GuiAlert -Title "⚠️ 邮件未发出" -Message "发送失败！请立即查看 tools/ops/notify.log 定位原因。常见原因：`n  ① notify.config.json 里 enabled=false`n  ② QQ 授权码错误或过期`n  ③ SMTP 端口 587 被防火墙拦截" -Kind Warning
+                    }
+                } catch {
+                    Show-GuiAlert -Title "测试邮件异常" -Message "异常信息：$($_.Exception.Message)`n`n详情查看 tools/ops/notify.log" -Kind Error
+                }
+           }
+        }
+    )
+    Card           = $null
+    Controls       = @{}
+    IsGuide        = $false
+    IsPublicUrlCard = $true   # 特殊标记 → Reflow-TabCards 会额外注入 URL 大标签 + Hint
+}
+$tab1Ctx.Cards += $puCardInfo
+
 # --- 启动后端 (更清晰的按钮名) ---
 Add-SectionCard -TabCtx $tab1Ctx `
     -Title "1. 启动后端服务" `
@@ -1096,11 +1389,11 @@ Add-SectionCard -TabCtx $tab1Ctx `
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1'" -WorkingDir $ProjectRoot -IsBackend } },
     @{ Text = "日常启动：快速启动`n跳过安装，跳过重置`n⭐推荐日常开发"; Desc = "直接启动后端服务，跳过依赖安装和用户重置。只适合之前已经成功启动过、依赖已装齐的情况。速度快很多。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1' -SkipInstall -SkipResetUser" -WorkingDir $ProjectRoot -IsBackend } },
-    @{ Text = "启动 + 公网分享`n开启 cpolar 内网穿透"; Desc = "启动后端后会同时开启 cpolar 隧道，生成公网 URL，把链接发给朋友就可以在外面访问你的系统。"; Color = "165, 105, 210";
+    @{ Text = "启动 + 公网分享`n开启 cpolar 内网穿透`n✉️ 地址生成后自动发邮件"; Desc = "启动后端后会同时开启 cpolar 隧道，自动生成公网 URL。【新增】URL 获取成功后会自动发送邮件给配置的收件人（notify.config.json），内容含新地址+登录账号密码，朋友直接点击链接就能访问。"; Color = "165, 105, 210";
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1' -Share" -WorkingDir $ProjectRoot -IsBackend } },
-    @{ Text = "启动 + 崩溃自动重启`n看门狗守护模式"; Desc = "启动后端的同时开启看门狗守护，后端如果意外崩溃会被自动重启。长时间运行或者给朋友测试时推荐。"; Color = "225, 165, 80";
+    @{ Text = "启动 + 崩溃自动重启`n看门狗守护模式（仅本地）"; Desc = "启动后端的同时开启看门狗守护，后端如果意外崩溃会被自动重启。长时间运行推荐使用。【注意】本按钮不开启公网分享，如果要发公网链接给朋友，请点【启动 + 分享 + 自动重启】。"; Color = "225, 165, 80";
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1' -Watchdog" -WorkingDir $ProjectRoot -IsBackend } },
-    @{ Text = "启动 + 分享 + 自动重启`n⭐朋友联调推荐"; Desc = "启动后端 + cpolar 公网分享 + 看门狗守护三件套。推荐把系统给朋友访问时使用。"; Color = "225, 95, 90";
+    @{ Text = "启动 + 分享 + 自动重启`n⭐朋友联调推荐`n✉️ 新建/变更都自动发邮件"; Desc = "启动后端 + cpolar 公网分享 + 看门狗守护三件套。【新增】URL 首次创建自动发 URL_CREATED 邮件；cpolar 自动重连/重启地址变更自动发 URL_CHANGED 邮件。推荐把系统给朋友访问时直接点这个按钮，通知交给程序。"; Color = "225, 95, 90";
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1' -Share -Watchdog" -WorkingDir $ProjectRoot -IsBackend } },
     @{ Text = "Nodemon 开发模式`n修改代码自动重启"; Desc = "在 server/ 目录运行 npm run dev，用 Nodemon 启动，修改后端代码后会自动重启。开发调试时用这个。"; Color = "85, 180, 190";
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "npm run dev" -WorkingDir $ServerDir -IsBackend } }
@@ -1631,7 +1924,13 @@ $rightSplit.Panel2.Controls.Add($outputOuter)
 # ==============================================================================
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 1000
-$timer.Add_Tick({ Update-StatusBar })
+$timer.Add_Tick({
+    Update-StatusBar
+    # 每 3 秒刷新一次公网地址卡片（看门狗变 URL 后不用手动点刷新）
+    if (([DateTime]::Now.Second % 3) -eq 0) {
+        try { Update-PublicUrlCard } catch { }
+    }
+})
 $timer.Start()
 
 # ==============================================================================
