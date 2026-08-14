@@ -10,9 +10,9 @@
 
 | 批次 | 范围 | 净变化 | 备份位置 |
 |------|------|--------|---------|
-| 第一批 | index.html 内联样式清理、CSS 重复规则合并 | — | `backup/refactor-batch1-20260803-235720/` |
-| 第二批 | 通用函数提取（showStepByPanes / saveToHistory / bindCalcActionBtns） | -4.29 KB / -113 行 | `backup/refactor-batch2-20260804-000444/` |
-| 个人中心 | 返回按钮重设计 + 配置驱动渲染 + 事件委托 + 性能日志 | -3.81 KB / -97 行 | `backup/refactor-profile-20260804-002749/` |
+| 第一批 | index.html 内联样式清理、CSS 重复规则合并 | — | _(已清理，git 历史可查)_ |
+| 第二批 | 通用函数提取（showStepByPanes / saveToHistory / bindCalcActionBtns） | -4.29 KB / -113 行 | _(已清理，git 历史可查)_ |
+| 个人中心 | 返回按钮重设计 + 配置驱动渲染 + 事件委托 + 性能日志 | -3.81 KB / -97 行 | _(已清理，git 历史可查)_ |
 | Phase 4 | 悬浮税助手（数据 + UI）+ MockClient 通用工具封装 + 并发 reqId 修复 | 新增 3 个源文件 + 2 个测试文件 | — |
 
 ---

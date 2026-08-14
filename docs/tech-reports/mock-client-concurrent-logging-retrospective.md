@@ -149,7 +149,7 @@ _latency: function () {
 - src/js/utils/mock-client.js — 新增 reqSeq、分配逻辑、logReq 包装、_latency 边界保护
 - tests/tax-assistant-perf.test.js — 新增并发 reqId 连续递增测试、延迟不为负测试
 - src/js/ui/tax-assistant-ui.js — 消费 MockClient.request，日志链路前后衔接
-- docs/test-report.md — 测试结果汇总（含本用例通过记录）
+- docs/reports/test-report.md — 测试结果汇总（含本用例通过记录）
 
 ## 附录：reqId 与浏览器 Network 面板的关系
 

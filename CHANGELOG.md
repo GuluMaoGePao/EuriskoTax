@@ -62,9 +62,9 @@
 
 ### 文档
 
-- `docs/test-report.md`：更新至 2026-08-05 / v1.1.0，4 套件 143 通过，新增税助手模块测试章节与浏览器交互验证结果
-- `docs/refactor-summary-report.md`：新增 Phase 4 悬浮税助手与 MockClient 工具封装章节
-- `docs/final-delivery-checklist.md`：版本升级为 1.1.0，质量验收标准 143/143
+- `docs/reports/test-report.md`：更新至 2026-08-05 / v1.1.0，4 套件 143 通过，新增税助手模块测试章节与浏览器交互验证结果
+- `docs/reports/refactor-summary-report.md`：新增 Phase 4 悬浮税助手与 MockClient 工具封装章节
+- `docs/reports/final-delivery-checklist.md`：版本升级为 1.1.0，质量验收标准 143/143
 
 ### 浏览器端实证（2026-08-05）
 
