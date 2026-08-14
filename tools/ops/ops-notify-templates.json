@@ -1,4 +1,4 @@
-{
+﻿{
   "_comment": "EuriskoTax Watchdog 中文邮件通知模板 v3.1（简化版）",
   "_comment_scope": "仅公网地址变更（URL_CHANGED）通过邮件通知，其他事件仅记录到 events.log",
   "_comment_placeholders": "可用占位符: oldUrl, newUrl, reason, recoveryMs, timestamp, from, recipients, smtpHost, smtpPort",

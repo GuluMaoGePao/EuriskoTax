@@ -310,7 +310,6 @@
             /* === 个人中心子页面顶栏 === */
             .profile-sub-nav {
                 @apply sticky top-14 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 transition-all duration-200;
-                margin: 0 -1rem 1.5rem;
                 padding: 0.625rem 1rem;
             }
             .profile-sub-nav-inner {
@@ -330,6 +329,41 @@
             }
             .dark .profile-sub-nav-title {
                 @apply text-gray-200;
+            }
+
+            /* === 个人中心用户信息卡片自适应 === */
+            /* 小屏：头像、信息、按钮垂直堆叠；大屏：横向排列 */
+            .profile-user-card {
+                @apply flex flex-col items-center text-center gap-3 py-2;
+            }
+            .profile-user-card .profile-user-avatar {
+                @apply mr-0;
+            }
+            .profile-user-card .profile-user-info {
+                @apply w-full;
+            }
+            .profile-user-card .profile-user-action {
+                @apply w-full;
+            }
+            .profile-user-card .profile-user-action .btn {
+                @apply w-full;
+            }
+            @media (min-width: 640px) {
+                .profile-user-card {
+                    @apply flex-row items-center text-left gap-0;
+                }
+                .profile-user-card .profile-user-avatar {
+                    @apply mr-6;
+                }
+                .profile-user-card .profile-user-info {
+                    @apply w-auto flex-1 min-w-0;
+                }
+                .profile-user-card .profile-user-action {
+                    @apply w-auto ml-auto;
+                }
+                .profile-user-card .profile-user-action .btn {
+                    @apply w-auto;
+                }
             }
 
             /* 页面切换过渡动画 */
@@ -358,7 +392,7 @@
 
             /* 首页卡片 */
             .home-card {
-                @apply bg-white rounded-xl shadow-card px-5 py-4 mb-4 transition-all-300;
+                @apply bg-white rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 mb-3 sm:mb-4 transition-all-300;
             }
             .home-card-header {
                 @apply flex items-center justify-between mb-3;
@@ -371,7 +405,12 @@
             .mode-card {
                 @apply rounded-xl shadow-card cursor-pointer transition-all-300 flex flex-col items-center text-center relative overflow-hidden;
                 border: 1px solid transparent;
-                padding: 1.25rem 1rem 1rem;
+                padding: 0.875rem 0.75rem 0.75rem;
+            }
+            @media (min-width: 640px) {
+                .mode-card {
+                    padding: 1.25rem 1rem 1rem;
+                }
             }
             .mode-card::before {
                 content: '';
@@ -411,7 +450,7 @@
 
             /* 大图标 - 渐变填充 */
             .mode-card-icon {
-                @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-3 text-2xl text-white;
+                @apply w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3 text-xl sm:text-2xl text-white;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                 transition: transform 0.3s ease;
             }
@@ -451,9 +490,12 @@
             }
             .dark .recent-scroll::-webkit-scrollbar-thumb { background: #475569; }
             .recent-card {
-                flex: 0 0 180px;
+                flex: 0 0 160px;
                 scroll-snap-align: start;
                 @apply bg-gray-50 rounded-lg p-3 cursor-pointer transition-all-300 border border-transparent;
+            }
+            @media (min-width: 640px) {
+                .recent-card { flex-basis: 180px; }
             }
             .dark .recent-card { @apply bg-gray-700; }
             .recent-card:hover {
@@ -1438,8 +1480,46 @@
             .assistant-drawer {
                 width: 100%;
             }
+            .assistant-header {
+                padding: 12px 16px;
+            }
+            .assistant-title {
+                font-size: 16px;
+            }
+            .assistant-body {
+                padding: 12px 16px;
+            }
+            .assistant-suggest {
+                left: 16px;
+                right: 16px;
+                max-height: 200px;
+            }
             .assistant-shortcuts {
                 grid-template-columns: repeat(4, 1fr);
+            }
+            /* 修复：iOS Safari 对 font-size < 16px 的 input 会自动缩放页面 */
+            .assistant-search {
+                font-size: 16px;
+            }
+            /* 修复：快捷功能文字过小 */
+            .assistant-shortcut {
+                font-size: 12px;
+            }
+            /* 修复：触摸区偏小，增大 padding 至接近 44px 触摸标准 */
+            .assistant-cat {
+                padding: 8px 14px;
+            }
+            .assistant-hot-chip {
+                padding: 8px 13px;
+            }
+            .assistant-fav-btn {
+                padding: 6px 12px;
+            }
+            .assistant-fb-btn {
+                padding: 6px 12px;
+            }
+            .assistant-related-btn {
+                padding: 7px 14px;
             }
         }
 
@@ -1630,7 +1710,7 @@
                 <div class="home-card">
                     <div class="flex items-start justify-between mb-3">
                         <div>
-                            <h2 id="home-greeting" class="text-xl font-bold text-gray-800 mb-1">你好 👋</h2>
+                            <h2 id="home-greeting" class="text-lg sm:text-xl font-bold text-gray-800 mb-1">你好 👋</h2>
                             <p class="text-sm text-gray-500" id="home-date-text">今天是 ...</p>
                         </div>
                         <img src="images/logo.png" alt="EuriskoTax" class="w-24 h-24 opacity-90 hidden sm:block -my-6">
@@ -5344,7 +5424,7 @@
 
     <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-4xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile" class="profile-sub-nav-back">
@@ -5356,17 +5436,17 @@
             
             <!-- 用户信息卡片 -->
             <div class="card mb-6">
-                <div class="flex items-center">
-                    <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mr-6">
+                <div class="profile-user-card">
+                    <div class="profile-user-avatar w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <i class="fa fa-user text-3xl text-primary"></i>
                     </div>
-                    <div>
+                    <div class="profile-user-info">
                         <h3 id="profile-display-name" class="text-xl font-bold text-gray-800">用户名</h3>
-                        <p id="profile-display-email" class="text-gray-500">email@example.com</p>
+                        <p id="profile-display-email" class="text-gray-500 break-all">email@example.com</p>
                     </div>
-                    <div class="ml-auto">
+                    <div class="profile-user-action">
                         <a href="#" id="profile-nav-settings" class="btn btn-primary">
-                            <i class="fa fa-cog mr-2"></i>账户设置
+                            <i class="fa fa-cog mr-2"></i><span>账户设置</span>
                         </a>
                     </div>
                 </div>
@@ -5389,7 +5469,7 @@
     
     <!-- 账户设置页面 -->
     <div id="profile-settings-page" class="page hidden">
-        <div class="max-w-2xl mx-auto">
+        <div class="max-w-2xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-settings" class="profile-sub-nav-back">
@@ -5489,7 +5569,7 @@
     
     <!-- 税务档案页面 -->
     <div id="profile-tax-page" class="page hidden">
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-3xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-tax" class="profile-sub-nav-back">
@@ -5500,7 +5580,7 @@
             </div>
             
             <div class="card">
-                <div class="flex items-center justify-between mb-6">
+                <div class="flex flex-col gap-2 mb-6 sm:flex-row sm:items-center sm:justify-between">
                     <h3 class="text-xl font-bold text-gray-800">税务档案</h3>
                     <span class="text-xs text-gray-500">
                         <i class="fa fa-info-circle mr-1"></i>保存常用扣除配置，便于下次计算时快速应用
@@ -5589,7 +5669,7 @@
 
     <!-- 数据管理页面 -->
     <div id="profile-data-page" class="page hidden">
-        <div class="max-w-2xl mx-auto">
+        <div class="max-w-2xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-data" class="profile-sub-nav-back">
@@ -5623,7 +5703,7 @@
     
     <!-- 税务日历页面 -->
     <div id="profile-calendar-page" class="page hidden">
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-3xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-calendar" class="profile-sub-nav-back">
@@ -5644,7 +5724,7 @@
 
     <!-- 计算历史页面（个人中心内） -->
     <div id="profile-history-page" class="page hidden">
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-3xl mx-auto px-4">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile-history" class="profile-sub-nav-back">

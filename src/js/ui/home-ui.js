@@ -10,6 +10,27 @@
 (function () {
     'use strict';
 
+    // ====== 首页渲染性能日志（与个人中心 ProfilePerf / 税务助手 AssistantPerf 风格对齐） ======
+    // 用于确认 initHome 中 5 个渲染步骤是否达到低耗时标准
+    const HomePerf = {
+        log(action, durationMs, extra = {}) {
+            const now = new Date();
+            const time = now.toISOString().split('T')[1].split('.')[0];
+            console.log(
+                `%c[EuriskoTax Home ${time}]`,
+                'color: #16a34a; font-weight: bold;',
+                `${action} → ${durationMs.toFixed(2)}ms`,
+                { timestamp: now.getTime(), ...extra }
+            );
+        },
+        measure(action, fn, extra = {}) {
+            const start = performance.now();
+            const result = fn();
+            this.log(action, performance.now() - start, extra);
+            return result;
+        }
+    };
+
     // ====== 数据：税务节点表（配置化，便于后续扩展） ======
     // type: ongoing(进行中) | upcoming(即将到来) | expired(已结束但仍提示)
     const TAX_NODES = [
@@ -551,11 +572,14 @@
 
     // ====== 主初始化 ======
     function initHome() {
-        renderGreeting();
-        renderTaxFeel();
-        renderRecentCalculations();
-        renderTaxCalendar();
-        renderTaxTip();
+        const renderStart = performance.now();
+        HomePerf.measure('initHome → 渲染问候语与日期', renderGreeting);
+        HomePerf.measure('initHome → 渲染今日税感', renderTaxFeel);
+        HomePerf.measure('initHome → 渲染最近计算', renderRecentCalculations);
+        HomePerf.measure('initHome → 渲染税务日历', renderTaxCalendar);
+        HomePerf.measure('initHome → 渲染税务小贴士', renderTaxTip);
+        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 5 });
+
         setupModeCards();
         setupInteractions();
     }

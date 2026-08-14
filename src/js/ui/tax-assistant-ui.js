@@ -50,6 +50,29 @@
     // 调试时可手动 window.TaxAssistant.logger.level = 1 临时打开 INFO
     var logger = window.Logger.create({ tag: 'Assistant', level: 2 });
 
+    // ====== 抽屉渲染性能日志（与个人中心 ProfilePerf 风格对齐） ======
+    // 用于确认 openAssistant 中 4 个渲染步骤是否达到低耗时标准
+    // level=2 时 ProfilePerf.log 仍会输出（独立于 logger.level），便于线上排查
+    var AssistantPerf = {
+        log: function (action, durationMs, extra) {
+            extra = extra || {};
+            var now = new Date();
+            var time = now.toISOString().split('T')[1].split('.')[0];
+            console.log(
+                '%c[EuriskoTax Assistant ' + time + ']',
+                'color: #0891b2; font-weight: bold;',
+                action + ' → ' + Number(durationMs).toFixed(2) + 'ms',
+                Object.assign({ timestamp: now.getTime() }, extra)
+            );
+        },
+        measure: function (action, fn, extra) {
+            var start = performance.now();
+            var result = fn();
+            this.log(action, performance.now() - start, extra);
+            return result;
+        }
+    };
+
     // ====== MockApi：基于通用 MockClient 的业务封装（收藏 / 反馈同步） ======
     // 本地 localStorage 做乐观更新，后台异步"同步"到模拟服务端
     // 延迟 80-200ms 模拟真实快速网络；支持失败注入（failRate / failNext）验证 UI 回滚
@@ -429,6 +452,124 @@
         });
     }
 
+    // ====== 快捷功能：打开帮助模态框 ======
+    function showHelpModal() {
+        if (typeof window.openModal === 'function') {
+            var modal = document.getElementById('help-modal');
+            if (modal) window.openModal(modal);
+        }
+    }
+
+    // ====== 快捷功能：税率表速查 ======
+    function buildRateTableModalHTML() {
+        // 税率表数据（与 tax-calculator.js 中的税率表保持同步）
+        var comprehensive = [
+            { range: '0 - 36,000', rate: '3%', deduction: '0' },
+            { range: '36,000 - 144,000', rate: '10%', deduction: '2,520' },
+            { range: '144,000 - 300,000', rate: '20%', deduction: '16,920' },
+            { range: '300,000 - 420,000', rate: '25%', deduction: '31,920' },
+            { range: '420,000 - 660,000', rate: '30%', deduction: '52,920' },
+            { range: '660,000 - 960,000', rate: '35%', deduction: '85,920' },
+            { range: '960,000 以上', rate: '45%', deduction: '181,920' }
+        ];
+        var business = [
+            { range: '0 - 30,000', rate: '5%', deduction: '0' },
+            { range: '30,000 - 90,000', rate: '10%', deduction: '1,500' },
+            { range: '90,000 - 300,000', rate: '20%', deduction: '10,500' },
+            { range: '300,000 - 500,000', rate: '30%', deduction: '40,500' },
+            { range: '500,000 以上', rate: '35%', deduction: '65,500' }
+        ];
+        var bonus = [
+            { range: '0 - 3,000', rate: '3%', deduction: '0' },
+            { range: '3,000 - 12,000', rate: '10%', deduction: '210' },
+            { range: '12,000 - 25,000', rate: '20%', deduction: '1,410' },
+            { range: '25,000 - 35,000', rate: '25%', deduction: '2,660' },
+            { range: '35,000 - 55,000', rate: '30%', deduction: '4,410' },
+            { range: '55,000 - 80,000', rate: '35%', deduction: '7,160' },
+            { range: '80,000 以上', rate: '45%', deduction: '15,160' }
+        ];
+
+        function buildTable(title, subtitle, data, rangeLabel) {
+            var rows = data.map(function (r) {
+                return '<tr class="border-b border-gray-100">' +
+                    '<td class="py-2 px-3 text-sm text-gray-700">' + r.range + '</td>' +
+                    '<td class="py-2 px-3 text-sm text-center font-medium text-primary">' + r.rate + '</td>' +
+                    '<td class="py-2 px-3 text-sm text-center text-gray-600">' + r.deduction + '</td>' +
+                    '</tr>';
+            }).join('');
+            return '<div class="mb-6">' +
+                '<h4 class="text-sm font-bold text-gray-800 mb-1">' + title + '</h4>' +
+                '<p class="text-xs text-gray-500 mb-2">' + subtitle + '</p>' +
+                '<table class="w-full">' +
+                '<thead><tr class="border-b-2 border-gray-200">' +
+                '<th class="py-2 px-3 text-xs text-left text-gray-500">' + rangeLabel + '</th>' +
+                '<th class="py-2 px-3 text-xs text-center text-gray-500">税率</th>' +
+                '<th class="py-2 px-3 text-xs text-center text-gray-500">速算扣除数</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+                '</div>';
+        }
+
+        return '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">' +
+            '<div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-t-xl">' +
+                '<div class="flex justify-between items-center">' +
+                    '<div class="flex items-center">' +
+                        '<div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">' +
+                            '<i class="fa fa-table text-xl"></i>' +
+                        '</div>' +
+                        '<div>' +
+                            '<h3 class="text-xl font-bold">税率表速查</h3>' +
+                            '<p class="text-white/80 text-sm">综合所得 / 经营所得 / 年终奖</p>' +
+                        '</div>' +
+                    '</div>' +
+                    '<button id="close-rate-table-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">' +
+                        '<i class="fa fa-times"></i>' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="overflow-y-auto p-6 help-modal-scrollbar">' +
+                buildTable('综合所得', '工资薪金、劳务报酬、稿酬、特许权使用费合并计税', comprehensive, '全年应纳税所得额（元）') +
+                buildTable('年终奖单独计税', '年终奖÷12 按月度税率表确定适用税率', bonus, '月均奖金额（元）') +
+                buildTable('经营所得', '个体工商户、个人独资企业、合伙企业', business, '全年应纳税所得额（元）') +
+                '<div class="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-gray-600">' +
+                    '<p class="font-medium text-blue-700 mb-1">分类所得</p>' +
+                    '<p>利息股息红利、财产租赁、财产转让、偶然所得：统一适用 <strong>20%</strong> 比例税率</p>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function showRateTable() {
+        // 动态创建或复用税率表模态框
+        var modal = document.getElementById('rate-table-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'rate-table-modal';
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+            modal.innerHTML = buildRateTableModalHTML();
+            document.body.appendChild(modal);
+            // 绑定关闭按钮
+            var closeBtn = modal.querySelector('#close-rate-table-modal');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    if (typeof window.closeModal === 'function') {
+                        window.closeModal(modal);
+                    }
+                });
+            }
+            // 点击遮罩关闭
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal && typeof window.closeModal === 'function') {
+                    window.closeModal(modal);
+                }
+            });
+        }
+        if (typeof window.openModal === 'function') {
+            window.openModal(modal);
+        }
+    }
+
     // ====== 快捷功能动作处理 ======
     function handleShortcutAction(action) {
         InteractionLog.log('ASSISTANT', '快捷功能: ' + action);
@@ -438,15 +579,15 @@
         setTimeout(function () {
             switch (action) {
                 case 'showRateTable':
-                    // 滚动到帮助弹窗或显示税率表
-                    if (typeof showHelpModal === 'function') {
-                        showHelpModal();
-                    }
+                    showRateTable();
                     break;
                 case 'goBonusCalc':
-                    // 跳转到综合所得计算页面
+                    // 跳转到综合所得计算页面，再切换到步骤1（参数入口）
+                    if (typeof showPage === 'function') {
+                        showPage('forward-calculation-page');
+                    }
                     if (typeof goToStep === 'function') {
-                        goToStep('forward');
+                        goToStep(1);
                     }
                     break;
                 case 'goHistory':
@@ -458,9 +599,7 @@
                     }
                     break;
                 case 'showHelp':
-                    if (typeof showHelpModal === 'function') {
-                        showHelpModal();
-                    }
+                    showHelpModal();
                     break;
             }
         }, 300);
@@ -651,10 +790,14 @@
         hideSuggest();
         toggleClearBtn('');
 
-        renderCategories();
-        renderHot();
-        renderQAList();
-        renderShortcuts();
+        // 渲染 4 个区块并测量耗时（与个人中心 ProfilePerf 风格对齐）
+        var renderStart = performance.now();
+        AssistantPerf.measure('openAssistant → 渲染分类标签', renderCategories);
+        AssistantPerf.measure('openAssistant → 渲染热门问答', renderHot);
+        AssistantPerf.measure('openAssistant → 渲染问答列表', renderQAList);
+        AssistantPerf.measure('openAssistant → 渲染快捷功能', renderShortcuts);
+        AssistantPerf.log('openAssistant → 渲染总耗时', performance.now() - renderStart, { steps: 4 });
+
         logger.info('CLICK_OPEN', '渲染完成（分类 / 热门 / 问答 / 快捷功能）', {
             category: currentCategory,
             keyword: currentKeyword,
@@ -1079,9 +1222,15 @@
         recordFeedback: recordFeedback,
         expandQaById: expandQaById,
         goToRelatedPage: goToRelatedPage,
+        showHelpModal: showHelpModal,
+        showRateTable: showRateTable,
         mockApi: MockApi,   // 暴露 MockApi 便于测试注入失败
         logger: logger      // 暴露 logger 便于动态调级别
     };
+
+    // 暴露快捷功能到全局，便于其他模块和测试调用
+    window.showHelpModal = showHelpModal;
+    window.showRateTable = showRateTable;
 
     // 自动初始化
     if (document.readyState === 'loading') {

@@ -13,8 +13,8 @@
 #   Log levels: INFO (normal flow), WARN (skipped/degraded), ERROR (failures), DEBUG (detailed).
 
 $NotifyConfigPath = Join-Path $PSScriptRoot "notify.config.json"
-$NotifyTemplatesPath = Join-Path $PSScriptRoot "notify-templates.json"
-$ReasonMapPath = Join-Path $PSScriptRoot "notify-reason-map.json"
+$NotifyTemplatesPath = Join-Path $PSScriptRoot "ops-notify-templates.json"
+$ReasonMapPath = Join-Path $PSScriptRoot "ops-notify-reason-map.json"
 $NotifyLogPath = Join-Path $PSScriptRoot "notify.log"
 $NotifyConfig = $null
 $NotifyTemplates = $null
