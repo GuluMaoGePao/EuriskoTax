@@ -7,6 +7,45 @@
 
 ---
 
+## [1.3.0] - 2026-08-15
+
+### 新增
+
+- **GUI 覆盖式滚动条 v3.2（精致 macOS 风）**：全面重构 GUI 滚动条，实现 Chromium/VSCode 级别的现代滚动体验
+  - **超细**：常态视觉仅 5px，悬停/拖拽柔和增粗到 8px；命中区为完整原生条宽度（DPI 自适应），5px 细条也容易抓取
+  - **高透明**：4 档 Alpha 不透明度（静止 0 完全隐藏 / 滚动中 85 / 悬停 155 / 拖拽 210），每帧 35% 收敛插值，无跳变
+  - **精致**：胶囊圆角（两端半圆）+ 悬停双层柔光光晕（外层 0.35×alpha + 内层 1×alpha）+ 悬停宽度插值变粗
+  - **智能隐藏**：macOS 风格，静止 1.1s 后自动淡出消失，画面干净；滚轮/拖拽/点击/翻页/键盘箭头均触发显示
+  - **平滑动画**：60FPS 全局共享定时器，滑块位置 45%/帧收敛 + Alpha 35%/帧收敛 + 宽度 50%/帧收敛，三重插值
+  - **白底覆盖**：主动画 Target.BackColor 填满 overlay 区域，彻底覆盖原生滚动条白底（根因修复）
+  - **DPI 自适应**：使用 `SystemInformation.VerticalScrollBarWidth` 获取真实原生条宽度，125%/150% 缩放下不再漏白底
+  - **滚轮转发**：overlay 捕获 MouseWheel 后直接计算目标滚动位置（跨 32/64 位无差异），避免原生滚轮事件被吞
+
+- **GUI 桌面快捷方式图标优化**：logo 图片放大 1.5× 生成 `logo-zoomed.png`，多尺寸 ICO（256/128/64/48/32/24/16）独立缩放，小尺寸填充率最高 97%
+  - 桌面快捷方式和任务栏图标视觉更饱满，不再因原图标空白边距导致显示过小
+  - 新增 `Ensure-ZoomedIcoBuilt` 函数：源 PNG 更新后自动重建 ICO
+  - 新增 `Invoke-IconCacheRefresh`：清理 `IconCache.db` + 广播 `SHChangeNotify`，强制 Windows 刷新图标缓存
+
+- **GUI 启动器 UTF8 BOM 自动修复**：`EuriskoTax-Console.bat` 启动前自动检测并补充 UTF8 BOM
+  - 解决 PowerShell 5.1 中文 Windows 环境下，Edit 工具保存后丢失 BOM 导致中文乱码、270 个连锁解析错误的问题
+
+### 变更
+
+- **GUI 滚动条架构**：从 Dock=Right 布局参与式改为绝对定位覆盖式（v2→v3.2），彻底消除与主内容面板的布局冲突
+- **GUI 滚动条变量名规范化**：`$_overlayBgCache` → `$scrollBgBrush`（避免 `$_` 前缀在 scriptblock 中的解析歧义），`$HIT_W` → `$NATIVE_W`，`$THIN_W` → `$STRIP_W`，`$R_PAD` → `$STRIP_RPAD`
+
+### 修复
+
+- fix(gui): 滚动条底色为白色（非透明）的问题 —— 改为主动画 Target.BackColor 覆盖原生条区域
+- fix(gui): `Panel.Selectable` 属性不存在（protected）导致运行时报错 —— 移除该行，`TabStop=false` 已足够
+- fix(gui): 鼠标在滚动条区域滚轮无法滚动（事件被 overlay 吞掉）—— 直接计算滚动位置替代 SendMessage 转发
+- fix(gui): `SystemInformation.VerticalScrollBarWidth` 在某些环境可能抛异常 —— 包裹 try/catch，异常时回退 17px
+- fix(gui): `getScrollInfo`/`setScrollY` 在 Handle 未创建时崩溃 —— 增加 `IsHandleCreated` 检查
+- fix(gui): 共享动画定时器无异常保护，单个 overlay 崩溃会影响所有滚动条 —— 包裹 try/catch + 自动清理已销毁的 overlay
+- fix(gui): UTF8 BOM 缺失导致 PowerShell 5.1 中文乱码（270 个解析错误）—— 启动器自动补 BOM
+
+---
+
 ## [1.2.0] - 2026-04-15
 
 ### 新增

@@ -265,9 +265,10 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 | 文件 | 用途 |
 |------|------|
-| `tools/gui/gui-启动.bat` | 双击启动器（位于 tools/gui/） |
-| `tools/gui/gui-创建快捷方式.bat` | 一次性创建桌面快捷方式 |
-| `tools/gui/gui-dev-console.ps1` | GUI 主脚本 |
+| `tools/gui/EuriskoTax-Console.bat` | 双击启动器（含 UTF8 BOM 自动修复） |
+| `tools/gui/EuriskoTax-创建桌面快捷方式.bat` | 一次性创建桌面快捷方式（含图标缓存刷新） |
+| `tools/gui/gui-dev-console.ps1` | GUI 主脚本（含覆盖式滚动条 v3.2） |
+| `tools/gui/_create_shortcut.ps1` | 桌面快捷方式创建脚本（含 ICO 自动重建） |
 | `tools/gui/README.md` | 本说明文档 |
 
 ---
@@ -401,6 +402,36 @@ $btnPanel1.Controls.Add((New-ActionButton -Text "🎁 我的新功能" -X 10 -Y 
 - `ScrollToCaret()` 自动滚动到最新行
 - UTF-8 编码确保中文正常显示
 
+### 覆盖式滚动条 v3.2（macOS 风）
+
+GUI 输出区和滚动面板使用自定义覆盖式滚动条替代原生 Windows 滚动条，实现 Chromium/VSCode 级别的现代滚动体验。
+
+**核心原理**：创建一个与原生滚动条同宽的透明 Panel 覆盖在原生条上方，主动画 Target 背景色填满 overlay（彻底覆盖原生条白底），再在上面绘制 5/8px 视觉胶囊滑块。
+
+| 特性 | 实现细节 |
+|------|---------|
+| **超细** | 常态 5px，悬停/拖拽插值增粗到 8px |
+| **高透明** | 4 档 Alpha：静止 0（完全隐藏）/ 滚动中 85 / 悬停 155 / 拖拽 210 |
+| **精致** | 胶囊圆角（两端半圆）+ 悬停双层柔光光晕 |
+| **智能隐藏** | 静止 1.1s 后淡出消失（macOS 风） |
+| **平滑动画** | 60FPS 全局共享定时器，位置/Alpha/宽度三重插值 |
+| **DPI 自适应** | `SystemInformation.VerticalScrollBarWidth` 获取真实原生条宽度 |
+| **滚轮转发** | overlay 捕获 MouseWheel 后直接计算滚动位置 |
+
+**几何参数**（位于 `New-ScrollbarOverlay` 函数顶部，调观感只需改这几个数字）：
+
+```powershell
+[int]$NATIVE_W = 17  # 默认值，实际从 SystemInformation 获取
+[int]$STRIP_W  = 5   # 常态视觉宽
+[int]$FAT_W    = 8   # 悬停/拖拽视觉宽
+[int]$MIN_H    = 26  # 滑块最小高度
+[int]$STRIP_RPAD = 4 # 右侧留白
+```
+
+### UTF8 BOM 自动修复
+
+`EuriskoTax-Console.bat` 启动前会自动检测 `gui-dev-console.ps1` 是否有 UTF8 BOM，缺失时自动补充。这是为了解决 PowerShell 5.1 在中文 Windows 环境下，使用 GBK 编码读取无 BOM 的 UTF8 文件导致中文乱码的问题。
+
 ### 路径解析
 
 ```powershell
@@ -417,6 +448,8 @@ $ServerDir = Join-Path $ProjectRoot "server"                   # server/
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.3 | 2026-08-15 | 覆盖式滚动条 v3.2（超细5px+高透明+macOS风智能隐藏）；桌面图标放大1.5×；UTF8 BOM 自动修复；多项健壮性修复 |
+| v1.2 | 2026-04-15 | 公网地址速览卡片；事件弹窗通知（180s 去重）；cpolar 临时隧道统一；[GUI-EVENT] 双通道输出捕获 |
 | v1.0 | 2026-08-14 | 初始版本：6 大面板、30+ 按钮、实时输出、进程管理 |
 
 ---

@@ -1,6 +1,6 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-08-10
+> 最后更新：2026-08-15
 > 维护原则：按用途分类存放，本文件为统一入口索引
 
 ---
@@ -158,6 +158,7 @@ EuriskoTax/
 ## 相关资源
 
 - [项目根 README](../README.md) — 项目简介与快速启动
+- [GUI 开发控制台说明](../tools/gui/README.md) — GUI 工具使用说明（含覆盖式滚动条 v3.2 技术细节）
 - [运维脚本目录](../scripts/README.md) — watchdog/notify/start-dev 脚本说明
 - [CHANGELOG.md](../CHANGELOG.md) — 版本变更记录
 - [项目 .trae/rules](../.trae/rules/) — 工程规范（Git 提交信息等）
