@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 try {
     # 1. 检查 swagger 规范文档
     $json = Invoke-RestMethod -Uri "http://localhost:3000/api/docs.json" -TimeoutSec 5
