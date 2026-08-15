@@ -65,6 +65,20 @@ $script:PublicUrlCardLabel = $null   # 显示 URL 的大标签（可点击复制
 $script:PublicUrlCardHint  = $null   # 小字状态提示（有/无地址、更新时间）
 $script:PublicUrlLastSeen  = ""      # 上次 URL，用于变化时触发弹窗
 
+# ====== 性能优化: Font 缓存 + 输出节流 (v3.4) ======
+# 之前 Update-PublicUrlCard 每次调用都 New Font 不 Dispose → GDI 句柄泄漏
+$script:FontUrlDisplay = New-Object System.Drawing.Font("Consolas", 13.5, [System.Drawing.FontStyle]::Bold)
+$script:FontUrlEmpty   = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+$script:FontUrlCached  = $null  # 标记当前 Label 上设的哪个 Font，避免重复赋值
+
+# outHandler 每行都调 Update-PublicUrlCard → 每行读文件 I/O。改为节流：3 秒内只调 1 次
+$script:LastUrlCardUpdateTime = [DateTime]::MinValue
+$script:UrlCardUpdateMinIntervalSec = 3
+
+# 输出区行数上限：超过则自动裁剪旧行，防止 RichTextBox 无限增长吃满内存
+$script:OutputMaxLines = 5000
+$script:OutputTrimTo   = 4000  # 裁剪后保留的行数
+
 # ===== 弹窗去重 (v3.3 修复重复弹 4~6 次问题) =====
 # 同一个 URL / 同一封邮件状态，180 秒内相同 key 只允许弹一次
 $script:DedupPopup        = @{}   # key=事件key  value=DateTime(上次弹出时间)
@@ -389,7 +403,18 @@ function Update-StatusBar {
 #   数据源：%TEMP%\euriskotax-last-cpolar-url.txt（ops-start-dev 和 watchdog 共享）
 # ==============================================================================
 function Update-PublicUrlCard {
+    param([switch]$Force)
     if (-not $script:PublicUrlCardLabel) { return }
+
+    # 节流：非强制调用时，3 秒内只执行 1 次（减少文件 I/O 和 UI 重绘）
+    if (-not $Force) {
+        $now = [DateTime]::Now
+        if (($now - $script:LastUrlCardUpdateTime).TotalSeconds -lt $script:UrlCardUpdateMinIntervalSec) {
+            return
+        }
+        $script:LastUrlCardUpdateTime = $now
+    }
+
     $urlFile = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
     $url = $null
     $fileTs = $null
@@ -405,22 +430,26 @@ function Update-PublicUrlCard {
     if ([string]::IsNullOrWhiteSpace($url)) {
         $script:PublicUrlCardLabel.Text = "（暂无公网地址）→ 点下方紫色或红色【启动+公网分享】按钮"
         $script:PublicUrlCardLabel.ForeColor = $C_FG_DIM
-        $script:PublicUrlCardLabel.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+        if ($script:FontUrlCached -ne "empty") {
+            $script:PublicUrlCardLabel.Font = $script:FontUrlEmpty
+            $script:FontUrlCached = "empty"
+        }
         $script:PublicUrlCardHint.Text = "  未检测到 cpolar 隧道。点【启动 + 分享 + 自动重启】后会自动刷新，地址生成后会自动复制并发送邮件。  |  共享文件：$urlFile  |  更新：$tsText"
         $script:PublicUrlCardLabel.Cursor = [System.Windows.Forms.Cursors]::Default
         $script:PublicUrlLastSeen = ""
     } else {
         $script:PublicUrlCardLabel.Text = "🌐  $url"
         $script:PublicUrlCardLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 185, 120)
-        $script:PublicUrlCardLabel.Font = New-Object System.Drawing.Font("Consolas", 13.5, [System.Drawing.FontStyle]::Bold)
+        if ($script:FontUrlCached -ne "display") {
+            $script:PublicUrlCardLabel.Font = $script:FontUrlDisplay
+            $script:FontUrlCached = "display"
+        }
         $script:PublicUrlCardLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
         $script:PublicUrlCardHint.Text = "  ✅ 点击上面链接复制到剪贴板  |  打开 cpolar 仪表盘：http://127.0.0.1:4040/  |  地址来源：共享文件  |  最近更新：$tsText"
 
         $isFirstTime = ([string]::IsNullOrWhiteSpace($script:PublicUrlLastSeen))
         $isChanged   = (-not $isFirstTime) -and ($script:PublicUrlLastSeen -ne $url)
 
-        # 首次出现：不弹窗（首次弹窗由 outHandler 的"公网地址已生成"负责，避免重复）
-        # URL 变更：只弹 1 次，180 秒内同 URL 不重复弹
         if ($isChanged) {
             $key = "URL_CHANGED::$url"
             if (Test-AllowPopup -Key $key) {
@@ -430,8 +459,6 @@ function Update-PublicUrlCard {
                 $script:UrlPopupMode = "change"
             }
         } elseif ($isFirstTime) {
-            # 首次：只做 剪贴板 同步（如果 outHandler 之前没执行过），不弹窗
-            # (outHandler 会负责首次弹窗，Update-PublicUrlCard 只是 UI 刷新辅助)
             try {
                 $curr = Get-Clipboard -ErrorAction SilentlyContinue
                 if ($curr -ne $url) { Set-Clipboard -Value $url -ErrorAction SilentlyContinue }
@@ -562,20 +589,27 @@ function Invoke-AsyncCommand {
                 $key = "EMAIL_FAIL::NOT_SENT"
                 if (Test-AllowPopup -Key $key) {
                     [System.Windows.Forms.MessageBox]::Show(
-                        "邮件发送出现问题，没有发出。`n`n可能原因：`n  ① notify.config.json 中 enabled=false`n  ② QQ 邮箱授权码已过期或填错`n  ③ SMTP 服务器无法连接`n`n👉 排查方式：到【🛠 运维辅助】→ 邮件通知配置 → 查看通知日志 tools/ops/notify.log",
+                        "邮件发送出现问题，没有发出。`n`n可能原因：`n  ① notify.config.json 中 enabled=false`n  ② QQ 邮箱授权码已过期或填错`n  ③ SMTP 服务器无法连接`n`n👉 排查方式：到【📧 通知日志】→ 邮件通知配置 → 查看通知日志 tools/ops/notify.log",
                         "⚠️ 邮件通知未发送",
                         [System.Windows.Forms.MessageBoxButtons]::OK,
                         [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
                 }
             }
-            # 4) 每次关键输出都立即刷新公网地址卡片（仅刷新显示，不再重复弹窗）
-            try { Update-PublicUrlCard } catch { }
+            # 4) outHandler 不再每行调 Update-PublicUrlCard（timer 3 秒刷一次足够）
+            #    URL 变化的弹窗由上面的 regex 匹配直接处理，不依赖 Update-PublicUrlCard
 
             $script:OutputBox.SelectionStart = $script:OutputBox.TextLength
             $script:OutputBox.SelectionLength = 0
             $script:OutputBox.SelectionColor = $C_FG_MUTED
             $script:OutputBox.AppendText($line + "`r`n")
             $script:OutputBox.ScrollToCaret()
+
+            # 输出区行数上限：超过 5000 行时裁剪旧内容，防止内存膨胀
+            if ($script:OutputBox.TextLength -gt 300000) {
+                $script:OutputBox.SelectionStart = 0
+                $script:OutputBox.SelectionLength = ($script:OutputBox.TextLength - 200000)
+                $script:OutputBox.SelectedText = ""
+            }
         }
     }
     $errHandler = {
@@ -586,7 +620,6 @@ function Invoke-AsyncCommand {
             $script:OutputBox.SelectionColor = [System.Drawing.Color]::Yellow
             $script:OutputBox.AppendText($EventArgs.Data + "`r`n")
             $script:OutputBox.ScrollToCaret()
-            try { Update-PublicUrlCard } catch { }
         }
     }
     $exitedHandler = {
@@ -760,12 +793,14 @@ $leftPanel.BackColor = $C_BG_L1
 
 $menuButtons = @()
 $tabs = @(
-    @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 (12个功能)";   Color = $C_SUCCESS },
+    @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 · 健康检查";   Color = $C_SUCCESS },
     @{ Name = "数据库";   Icon = "💾"; Desc = "迁移 · 生成 · 重置账号 · 可视化管理 (6个功能)";     Color = $C_ACCENT   },
     @{ Name = "测试中心"; Icon = "🧪"; Desc = "单元测试 · 覆盖率 · 性能基准 (9个功能)";           Color = $C_PURPLE   },
-    @{ Name = "运维辅助"; Icon = "🛠"; Desc = "看门狗 · 内网穿透 · 邮件 · 日志 (19个功能)";       Color = $C_WARN     },
+    @{ Name = "运维监控"; Icon = "🛠"; Desc = "看门狗守护 · cpolar 内网穿透 (6个功能)";           Color = $C_WARN     },
+    @{ Name = "通知日志"; Icon = "📧"; Desc = "邮件通知配置 · 日志查看 (12个功能)";               Color = $C_CYAN     },
     @{ Name = "部署";     Icon = "📦"; Desc = "远程部署 · 回滚 · 服务器初始化 (11个功能)";        Color = $C_ACCENT   },
-    @{ Name = "常用工具"; Icon = "📂"; Desc = "目录 · 终端 · 浏览器 · Git · 文档 (24个功能)";     Color = $C_GRAY     }
+    @{ Name = "快捷入口"; Icon = "📂"; Desc = "目录 · 终端 · 浏览器 · 文档 (16个功能)";           Color = $C_GRAY     },
+    @{ Name = "Git & 账号"; Icon = "🔐"; Desc = "Git 操作 · 账号密码管理 (18个功能)";              Color = $C_PURPLE   }
 )
 
 $yPos = 18
@@ -1330,7 +1365,7 @@ $puCardInfo = @{
     Buttons        = @(
         @{ Text = "🔄 刷新地址"; Desc = "立即重新读取共享文件（通常 3 秒自动刷新一次）。"
            Color = "200, 140, 75"
-           OnClick = { try { Update-PublicUrlCard } catch { } Show-GuiAlert -Title "已刷新" -Message "公网地址卡片已刷新。若仍为空，请稍等 5~15 秒（cpolar 建立隧道需要时间）。" }
+           OnClick = { try { Update-PublicUrlCard -Force } catch { } Show-GuiAlert -Title "已刷新" -Message "公网地址卡片已刷新。若仍为空，请稍等 5~15 秒（cpolar 建立隧道需要时间）。" }
         },
         @{ Text = "📋 复制地址"; Desc = "把当前公网地址复制到剪贴板，方便粘贴发给朋友。"
            Color = "160, 110, 200"
@@ -1378,6 +1413,134 @@ $puCardInfo = @{
     IsPublicUrlCard = $true   # 特殊标记 → Reflow-TabCards 会额外注入 URL 大标签 + Hint
 }
 $tab1Ctx.Cards += $puCardInfo
+
+# --- 系统健康状态速览 (v3.4 新增) ---
+$healthCardInfo = @{
+    Title          = "📊 系统健康状态"
+    Subtitle       = "一键检测 · 实时状态 · 环境诊断"
+    Description    = "详细说明：快速检查后端服务、cpolar 隧道、看门狗、数据库连接、依赖安装等关键状态。无需手动逐个排查，一键定位问题。"
+    AccentColor    = [System.Drawing.Color]::FromArgb(85, 180, 110)
+    ButtonsPerRow  = 0
+    Buttons        = @(
+        @{ Text = "🔍 一键全面体检`n后端+cpolar+数据库+依赖"; Desc = "检查后端是否在线、cpolar 隧道状态、看门狗运行状态、数据库连接、node_modules 是否安装。结果输出到下方日志区。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+           OnClick = {
+                Write-Log "===== 系统健康检查 =====" "CMD"
+
+                # 1. 后端
+                Write-Log "[1/5] 检查后端服务..." "INFO"
+                $backendOk = $false
+                try {
+                    $null = Invoke-WebRequest -Uri "http://localhost:3000/health" -TimeoutSec 3 -UseBasicParsing
+                    $backendOk = $true
+                    Write-Log "  ✅ 后端在线 (localhost:3000)" "OK"
+                } catch {
+                    Write-Log "  ❌ 后端未启动或无响应" "ERROR"
+                }
+
+                # 2. cpolar
+                Write-Log "[2/5] 检查 cpolar 隧道..." "INFO"
+                $cpolarOk = $false
+                try {
+                    $null = Invoke-WebRequest -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 3 -UseBasicParsing
+                    $cpolarOk = $true
+                    Write-Log "  ✅ cpolar 面板可访问 (4040端口)" "OK"
+                } catch {
+                    Write-Log "  ❌ cpolar 未运行或面板不可访问" "WARN"
+                }
+
+                # 3. 看门狗
+                Write-Log "[3/5] 检查看门狗..." "INFO"
+                $wdRunning = $false
+                if ($script:WatchdogProcess -and -not $script:WatchdogProcess.HasExited) {
+                    $wdRunning = $true
+                    Write-Log "  ✅ 看门狗运行中 (PID=$($script:WatchdogProcess.Id))" "OK"
+                } else {
+                    Write-Log "  ❌ 看门狗未启动" "WARN"
+                }
+
+                # 4. 数据库
+                Write-Log "[4/5] 检查数据库连接..." "INFO"
+                $dbOk = $false
+                if ($backendOk) {
+                    try {
+                        $resp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"dev@example.com","password":"password"}' -TimeoutSec 5
+                        if ($resp.success) { $dbOk = $true; Write-Log "  ✅ 数据库连接正常（登录API成功）" "OK" }
+                        else { Write-Log "  ⚠️ 登录API返回失败，可能数据库未初始化" "WARN" }
+                    } catch {
+                        Write-Log "  ❌ 登录API无响应，数据库可能未连接" "ERROR"
+                    }
+                } else {
+                    Write-Log "  ⏭ 后端未启动，跳过数据库检查" "GRAY"
+                }
+
+                # 5. 依赖
+                Write-Log "[5/5] 检查依赖安装..." "INFO"
+                $nmPath = Join-Path $ProjectRoot "node_modules"
+                $depOk = (Test-Path $nmPath) -and (Test-Path (Join-Path $ServerDir "node_modules"))
+                if ($depOk) { Write-Log "  ✅ node_modules 已安装" "OK" }
+                else { Write-Log "  ❌ node_modules 缺失，需要运行 npm install" "ERROR" }
+
+                # 总结
+                Write-Log "" "INFO"
+                $score = ($backendOk + $cpolarOk + $wdRunning + $dbOk + $depOk)
+                Write-Log "===== 体检结果: $score/5 通过 =====" $(if ($score -ge 4) { "OK" } elseif ($score -ge 2) { "WARN" } else { "ERROR" })
+                if (-not $backendOk) { Write-Log "  → 建议：到【启动管理】点【日常启动】或【一键启动】" "WARN" }
+                if (-not $depOk) { Write-Log "  → 建议：到【启动管理】点【第一次用：一键启动】安装依赖" "WARN" }
+                if (-not $cpolarOk -and $backendOk) { Write-Log "  → 建议：如需公网访问，点【启动 + 公网分享】" "INFO" }
+                if (-not $wdRunning -and $backendOk) { Write-Log "  → 建议：长时间运行建议开启看门狗守护" "INFO" }
+                Write-Log "=================================" "CMD"
+           }
+        },
+        @{ Text = "📋 查看后端环境`n.env 文件检查"; Desc = "检查 server/.env 文件是否存在、关键变量（JWT_SECRET, DATABASE_URL）是否配置。"; Color = "120, 120, 160";
+           OnClick = {
+                Write-Log "===== 后端环境检查 =====" "CMD"
+                $envFile = Join-Path $ServerDir ".env"
+                if (-not (Test-Path $envFile)) {
+                    Write-Log "❌ server/.env 文件不存在！请从 .env.example 复制并配置。" "ERROR"
+                    return
+                }
+                Write-Log "✅ .env 文件存在" "OK"
+                $content = Get-Content $envFile -Encoding UTF8
+                $hasJwt = $false; $hasDb = $false; $hasPort = $false
+                foreach ($line in $content) {
+                    if ($line -match '^\s*JWT_SECRET\s*=\s*(\S+)') { $hasJwt = $true; $v = $matches[1]; Write-Log "  JWT_SECRET = $($v.Substring(0, [Math]::Min(10, $v.Length)))..." "GRAY" }
+                    if ($line -match '^\s*DATABASE_URL\s*=\s*(\S+)') { $hasDb = $true; Write-Log "  DATABASE_URL = $($matches[1].Substring(0, [Math]::Min(30, $matches[1].Length)))..." "GRAY" }
+                    if ($line -match '^\s*PORT\s*=\s*(\d+)') { $hasPort = $true; Write-Log "  PORT = $($matches[1])" "GRAY" }
+                }
+                if (-not $hasJwt) { Write-Log "  ⚠️ JWT_SECRET 未配置" "WARN" }
+                if (-not $hasDb)  { Write-Log "  ⚠️ DATABASE_URL 未配置" "WARN" }
+                if (-not $hasPort) { Write-Log "  ℹ️ PORT 未配置（默认 3000）" "INFO" }
+                Write-Log "===== 环境检查完成 =====" "CMD"
+           }
+        },
+        @{ Text = "🔧 检查端口占用`n3000/4040/5555"; Desc = "检查后端(3000)、cpolar(4040)、Prisma(5555) 三个关键端口的占用情况。"; Color = "120, 120, 160";
+           OnClick = {
+                Write-Log "===== 端口占用检查 =====" "CMD"
+                foreach ($port in @(3000, 4040, 5555)) {
+                    $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+                    if (-not $conns) {
+                        Write-Log "  端口 $port : 空闲" "OK"
+                    } else {
+                        foreach ($c in $conns) {
+                            try {
+                                $pi = Get-Process -Id $c.OwningProcess -ErrorAction Stop
+                                Write-Log "  端口 $port : 占用 (PID=$($c.OwningProcess) [$($pi.ProcessName)] State=$($c.State))" "WARN"
+                            } catch {
+                                Write-Log "  端口 $port : 占用 (PID=$($c.OwningProcess) State=$($c.State))" "WARN"
+                            }
+                        }
+                    }
+                }
+                Write-Log "=========================" "CMD"
+           }
+        }
+    )
+    Card           = $null
+    Controls       = @{}
+    IsGuide        = $false
+    IsPublicUrlCard = $false
+}
+$tab1Ctx.Cards += $healthCardInfo
 
 # --- 启动后端 (更清晰的按钮名) ---
 Add-SectionCard -TabCtx $tab1Ctx `
@@ -1517,9 +1680,9 @@ Add-SectionCard -TabCtx $tab3Ctx `
 )
 
 # ==============================================================================
-# ============ 标签页 4: 运维辅助 ============
+# ============ 标签页 4: 运维监控 ============
 # ==============================================================================
-$tab4Ctx = New-TabPanel -HeaderText "🛠  运维辅助" -HeaderTagline "看门狗守护 · cpolar 内网穿透 · 邮件通知 · 日志查看" -HeaderDesc "本页包含 4 个功能区：① 看门狗守护（启动/停止/编辑脚本）  ② Cpolar 内网穿透（启动隧道/查看面板/停止）  ③ 邮件通知配置（测试/编辑配置/模板/原因映射）  ④ 日志查看（看门狗/事件/通知日志）"
+$tab4Ctx = New-TabPanel -HeaderText "🛠  运维监控" -HeaderTagline "看门狗守护 · cpolar 内网穿透" -HeaderDesc "本页包含 2 个功能区：① 看门狗守护（启动/停止/编辑脚本）  ② Cpolar 内网穿透（启动隧道/查看面板/停止）"
 
 Add-SectionCard -TabCtx $tab4Ctx `
     -Title "1. 看门狗守护" `
@@ -1552,8 +1715,13 @@ Add-SectionCard -TabCtx $tab4Ctx `
        OnClick = { Stop-Job -Name "cpolar-http"; Stop-Job -Name "cpolar-other" } }
 )
 
-Add-SectionCard -TabCtx $tab4Ctx `
-    -Title "3. 邮件通知配置" `
+# ==============================================================================
+# ============ 标签页 4b: 通知日志 ============
+# ==============================================================================
+$tab4bCtx = New-TabPanel -HeaderText "📧  通知日志" -HeaderTagline "邮件通知配置 · 日志查看" -HeaderDesc "本页包含 2 个功能区：① 邮件通知配置（测试/编辑配置/模板/原因映射）  ② 日志查看（看门狗/事件/通知日志）"
+
+Add-SectionCard -TabCtx $tab4bCtx `
+    -Title "1. 邮件通知配置" `
     -Subtitle "脚本：tools/ops/ops-notify.ps1" `
     -Description "详细说明：邮件通知用于后端崩溃、看门狗重启、部署成功等事件的告警。必须先在 notify.config.json 配置 SMTP 账号密码才能发送。" `
     -AccentColor $C_PURPLE -Buttons @(
@@ -1571,8 +1739,8 @@ Add-SectionCard -TabCtx $tab4Ctx `
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\tech-reports\watchdog-notification-and-event-log-spec.md") } }
 )
 
-Add-SectionCard -TabCtx $tab4Ctx `
-    -Title "4. 日志查看" `
+Add-SectionCard -TabCtx $tab4bCtx `
+    -Title "2. 日志查看" `
     -Subtitle "日志位置：tools/ops/*.log" `
     -Description "详细说明：以下三个日志文件会把最后100行内容输出到下方输出区，也可以点 打开ops目录 用编辑器查看完整文件。" `
     -AccentColor $C_ACCENT -Buttons @(
@@ -1670,9 +1838,9 @@ Add-SectionCard -TabCtx $tab5Ctx `
 )
 
 # ==============================================================================
-# ============ 标签页 6: 常用工具 ============
+# ============ 标签页 6: 快捷入口 ============
 # ==============================================================================
-$tab6Ctx = New-TabPanel -HeaderText "📂  常用工具" -HeaderTagline "文件夹 · 终端 · 浏览器 · Git · 文档 · 账号管理" -HeaderDesc "本页包含 4 个功能区：① 打开项目目录（8个目录快捷入口）  ② 终端和浏览器（PowerShell/前端/API/Prisma Studio）  ③ Git 操作和文档（status/log/pull/push/diff + 项目文档）  ④ 账号密码管理（所有账号统一列表+一键复制）"
+$tab6Ctx = New-TabPanel -HeaderText "📂  快捷入口" -HeaderTagline "文件夹 · 终端 · 浏览器 · 文档" -HeaderDesc "本页包含 2 个功能区：① 打开项目目录（8个目录快捷入口）  ② 终端和浏览器（PowerShell/前端/API/Prisma Studio）"
 
 Add-SectionCard -TabCtx $tab6Ctx `
     -Title "1. 打开项目目录" `
@@ -1720,8 +1888,13 @@ Add-SectionCard -TabCtx $tab6Ctx `
        OnClick = { Start-Process (Join-Path $ProjectRoot "README.md") } }
 )
 
-Add-SectionCard -TabCtx $tab6Ctx `
-    -Title "3. Git 操作 & 项目文档" `
+# ==============================================================================
+# ============ 标签页 6b: Git & 账号 ============
+# ==============================================================================
+$tab6bCtx = New-TabPanel -HeaderText "🔐  Git & 账号" -HeaderTagline "Git 操作 · 账号密码管理" -HeaderDesc "本页包含 2 个功能区：① Git 操作和文档（status/log/pull/push/diff + 项目文档）  ② 账号密码管理（所有账号统一列表+一键复制）"
+
+Add-SectionCard -TabCtx $tab6bCtx `
+    -Title "1. Git 操作 & 项目文档" `
     -Subtitle "常用 Git 命令和关键文档" `
     -Description "详细说明：Git 命令在项目根目录执行，输出会显示在下方输出区。push 前会弹窗确认，避免误推送。" `
     -AccentColor $C_WARN -ButtonsPerRow 4 -Buttons @(
@@ -1746,8 +1919,8 @@ Add-SectionCard -TabCtx $tab6Ctx `
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\tax-calculation-rules.md") } }
 )
 
-Add-SectionCard -TabCtx $tab6Ctx `
-    -Title "4. 账号 & 密码管理" `
+Add-SectionCard -TabCtx $tab6bCtx `
+    -Title "2. 账号 & 密码管理" `
     -Subtitle "所有需要登录/认证的账号密码统一列表（点击按钮可复制到剪贴板）" `
     -Description "详细说明：本项目开发环境涉及多种账号和密码，统一整理在此方便查阅。生产环境请自行替换为强密码。所有密码仅限本人使用，请勿外传。" `
     -AccentColor $C_PURPLE -ButtonsPerRow 3 -Buttons @(
@@ -1806,20 +1979,24 @@ $tabHost.Dock = "Fill"
 $tabHost.BackColor = $C_BG_FORM
 
 $script:TabPanels = @{
-    "启动管理" = $tab1Ctx.Panel
-    "数据库"   = $tab2Ctx.Panel
-    "测试中心" = $tab3Ctx.Panel
-    "运维辅助" = $tab4Ctx.Panel
-    "部署"     = $tab5Ctx.Panel
-    "常用工具" = $tab6Ctx.Panel
+    "启动管理"   = $tab1Ctx.Panel
+    "数据库"     = $tab2Ctx.Panel
+    "测试中心"   = $tab3Ctx.Panel
+    "运维监控"   = $tab4Ctx.Panel
+    "通知日志"   = $tab4bCtx.Panel
+    "部署"       = $tab5Ctx.Panel
+    "快捷入口"   = $tab6Ctx.Panel
+    "Git & 账号" = $tab6bCtx.Panel
 }
 $script:TabCtxMap = @{
-    "启动管理" = $tab1Ctx
-    "数据库"   = $tab2Ctx
-    "测试中心" = $tab3Ctx
-    "运维辅助" = $tab4Ctx
-    "部署"     = $tab5Ctx
-    "常用工具" = $tab6Ctx
+    "启动管理"   = $tab1Ctx
+    "数据库"     = $tab2Ctx
+    "测试中心"   = $tab3Ctx
+    "运维监控"   = $tab4Ctx
+    "通知日志"   = $tab4bCtx
+    "部署"       = $tab5Ctx
+    "快捷入口"   = $tab6Ctx
+    "Git & 账号" = $tab6bCtx
 }
 foreach ($p in $script:TabPanels.Values) {
     $p.Visible = $false
@@ -1908,12 +2085,53 @@ $obGuide = New-OutBtn -Text "❓ 按钮说明" -Color "225, 165, 80" -W 104 -OnC
     [System.Windows.Forms.MessageBox]::Show($msg, "按钮使用说明", "OK", "Information")
 }
 
+# 输出区搜索框 (v3.4 新增)
+$obSearchBox = New-Object System.Windows.Forms.TextBox
+$obSearchBox.Size = New-Object System.Drawing.Size(160, 32)
+$obSearchBox.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
+$obSearchBox.BackColor = $C_BG_DARK
+$obSearchBox.ForeColor = $C_FG
+$obSearchBox.BorderStyle = "FixedSingle"
+$obSearchBox.Text = "搜索输出..."
+$obSearchBox.Margin = New-Object System.Windows.Forms.Padding(0, 0, 6, 0)
+$obSearchBox.Add_Enter({
+    if ($obSearchBox.Text -eq "搜索输出...") { $obSearchBox.Text = "" }
+})
+$obSearchBox.Add_Leave({
+    if ([string]::IsNullOrWhiteSpace($obSearchBox.Text)) { $obSearchBox.Text = "搜索输出..." }
+})
+$obSearchBox.Add_KeyDown({
+    param($s, $e)
+    if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+        $keyword = $obSearchBox.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($keyword)) { return }
+        $idx = $script:OutputBox.Find($keyword, $script:OutputBox.SelectionStart + 1, [System.Windows.Forms.RichTextBoxFinds]::None)
+        if ($idx -ge 0) {
+            $script:OutputBox.Select($idx, $keyword.Length)
+            $script:OutputBox.ScrollToCaret()
+            $script:OutputBox.SelectionBackColor = [System.Drawing.Color]::FromArgb(80, 80, 30)
+            $script:OutputBox.SelectionColor = [System.Drawing.Color]::Yellow
+        } else {
+            # 从头搜索
+            $idx2 = $script:OutputBox.Find($keyword, 0, [System.Windows.Forms.RichTextBoxFinds]::None)
+            if ($idx2 -ge 0) {
+                $script:OutputBox.Select($idx2, $keyword.Length)
+                $script:OutputBox.ScrollToCaret()
+            } else {
+                [System.Windows.Forms.MessageBox]::Show("未找到匹配: $keyword", "搜索结果", "OK", "Information")
+            }
+        }
+        $e.SuppressKeyPress = $true
+    }
+})
+
 $outputBar.Controls.Add($obClear)
 $outputBar.Controls.Add($obSave)
 $outputBar.Controls.Add($obCopy)
 $outputBar.Controls.Add($obFront)
 $outputBar.Controls.Add($obApi)
 $outputBar.Controls.Add($obGuide)
+$outputBar.Controls.Add($obSearchBox)
 
 $outputOuter.Controls.Add($outputBox)
 $outputOuter.Controls.Add($outputBar)
@@ -1928,7 +2146,7 @@ $timer.Add_Tick({
     Update-StatusBar
     # 每 3 秒刷新一次公网地址卡片（看门狗变 URL 后不用手动点刷新）
     if (([DateTime]::Now.Second % 3) -eq 0) {
-        try { Update-PublicUrlCard } catch { }
+        try { Update-PublicUrlCard -Force } catch { }
     }
 })
 $timer.Start()
@@ -1968,7 +2186,7 @@ if ($firstBar) { $firstBar.Visible = $true; $firstBar.BringToFront() }
 # ==============================================================================
 $form.Add_Shown({
     Invoke-FormLayout
-    foreach ($name in @("启动管理", "数据库", "测试中心", "运维辅助", "部署", "常用工具")) {
+    foreach ($name in @("启动管理", "数据库", "测试中心", "运维监控", "通知日志", "部署", "快捷入口", "Git & 账号")) {
         $ctx = $script:TabCtxMap[$name]
         Reflow-TabCards -Ctx $ctx
     }
@@ -1987,7 +2205,7 @@ $form.Add_Shown({
     Write-Log "  👉 启动成功后 → 点 【打开前端 http://localhost:3000/】" "INFO"
     Write-Log ""
     Write-Log "【账号密码统一管理：】" "OK"
-    Write-Log "  👉 左侧导航 → 【📂 常用工具】 → 【4. 账号 & 密码管理】 查看所有账号" "INFO"
+    Write-Log "  👉 左侧导航 → 【🔐 Git & 账号】 → 【2. 账号 & 密码管理】 查看所有账号" "INFO"
     Write-Log "  👉 一键复制登录邮箱 dev@example.com  /  密码 password" "GRAY"
     Write-Log "  👉 账号文档: docs/account-credentials.md" "GRAY"
     Write-Log ""

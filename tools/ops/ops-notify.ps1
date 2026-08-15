@@ -20,6 +20,137 @@ $NotifyConfig = $null
 $NotifyTemplates = $null
 $ReasonMap = $null
 
+# ====== Mail-spam prevention: global URL event dedup + cooldown ======
+# v3.3: URL_CREATED / URL_CHANGED 必须通过 Send-WatchdogNotification 这"最后一道闸门"
+#       —— 无论调用方是 ops-start-dev.ps1 / ops-watchdog.ps1 / 还是未来新入口，
+#       只要走的是同一个 AppDomain（PS 进程里同一个 module scope），就统一按：
+#         1) (event,old,new) 有序对 + 5 分钟窗口 内存/审计去重
+#         2) 数量级速率天花板（URL_CHANGED 任意组合 ≤ 2 封/5min；URL_CREATED 同一 newUrl ≤ 1 封/5min）
+#       双层过滤。审计文件跨进程重启也生效。
+$script:__NotifDedupWindowSec    = 300   # 5 分钟冷却（同一有序对只允许 1 封邮件）
+$script:__NotifUrlChangedCeiling = 2     # URL_CHANGED 事件：5 分钟内最多 2 封（防止 A↔B 抖动把"先 A→B 再 B→A"两封合理邮件以外的垃圾全封掉）
+$script:__NotifDedupMemory       = @{}   # Key: ordered/rate keys, Value: last-sent DateTime OR List[DateTime] (for ceiling counts)
+$script:__NotifDedupAuditFile = Join-Path $env:TEMP "euriskotax-notif-dedup-audit.log"
+
+function Test-AllowSendUrlNotification {
+    param(
+        [Parameter(Mandatory=$true)][string]$EventType,
+        [string]$OldUrl,
+        [string]$NewUrl
+    )
+    if ($EventType -ne "URL_CHANGED" -and $EventType -ne "URL_CREATED") { return $true }
+    if ([string]::IsNullOrWhiteSpace($NewUrl)) {
+        Write-NotifyLog "WARN" "Test-AllowSendUrlNotification: NewUrl 为空，拒绝发送 $EventType"
+        return $false
+    }
+
+    $oldKey = if ($OldUrl) { $OldUrl } else { "" }
+    $orderedKey = "$EventType|$oldKey|$NewUrl"
+
+    # Rate ceiling keys:
+    #   URL_CHANGED -> "URL_CHANGED#count" stores recent 5min timestamps list (max count allowed)
+    #   URL_CREATED -> per newUrl single shot list
+    $rateCeilingKey = if ($EventType -eq "URL_CHANGED") { "__CEILING_URL_CHANGED__" } else { "__CEILING_URL_CREATED_$NewUrl__" }
+    $rateCeilingMax = if ($EventType -eq "URL_CHANGED") { $script:__NotifUrlChangedCeiling } else { 1 }
+
+    $now = Get-Date
+    $win = [TimeSpan]::FromSeconds($script:__NotifDedupWindowSec)
+
+    # 1) Memory checks
+    # 1a) Ordered pair dedup
+    if ($script:__NotifDedupMemory.ContainsKey($orderedKey)) {
+        $last = $script:__NotifDedupMemory[$orderedKey]
+        if ($last -ne $null -and $last -is [DateTime] -and ($now - $last) -lt $win) {
+            $remain = [int]($win.TotalSeconds - ($now - $last).TotalSeconds)
+            Write-NotifyLog "WARN" ("DEDUP-BLOCKED (mem ordered pair, " + $remain + "s left): " + $orderedKey)
+            return $false
+        }
+    }
+    # 1b) Count ceiling in memory
+    if ($script:__NotifDedupMemory.ContainsKey($rateCeilingKey)) {
+        $list = $script:__NotifDedupMemory[$rateCeilingKey]
+        if ($list -and $list -is [System.Collections.Generic.List[DateTime]]) {
+            # Drop out-of-window timestamps, then count
+            while ($list.Count -gt 0 -and ($now - $list[0]) -ge $win) { [void]$list.RemoveAt(0) }
+            if ($list.Count -ge $rateCeilingMax) {
+                $remain = [int]($win.TotalSeconds - ($now - $list[0]).TotalSeconds)
+                Write-NotifyLog "WARN" ("DEDUP-BLOCKED (mem rate ceiling: " + $list.Count + "/" + $rateCeilingMax + " in " + $win.TotalSeconds + "s, " + $remain + "s until next slot): " + $rateCeilingKey + " ordered=" + $orderedKey)
+                return $false
+            }
+        }
+    }
+
+    # 2) Persisted audit: dual check (ordered + rate ceiling across process)
+    $orderedBlocked = $false
+    $rateBlocked = $false
+    if (Test-Path $script:__NotifDedupAuditFile) {
+        try {
+            $lines = Get-Content -Path $script:__NotifDedupAuditFile -Encoding UTF8 -ErrorAction Stop
+            $recentTimestampsForCeiling = New-Object System.Collections.Generic.List[DateTime]
+            $count = [Math]::Min($lines.Count, 100)
+            for ($i = $lines.Count - 1; $i -ge 0 -and $count -gt 0; $i--, $count--) {
+                $line = $lines[$i]
+                if (-not $line -or -not $line.StartsWith("[")) { continue }
+                $m = [regex]::Match($line, '^\[([^\]]+)\]\s+(.+)$')
+                if (-not $m.Success) { continue }
+                try {
+                    $ts = [DateTime]::ParseExact($m.Groups[1].Value, "yyyy-MM-dd HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
+                    if (($now - $ts) -lt $win) {
+                        $storedKey = $m.Groups[2].Value
+                        if (-not $orderedBlocked -and $storedKey -eq $orderedKey) {
+                            Write-NotifyLog "WARN" ("DEDUP-BLOCKED (audit ordered pair): " + $orderedKey + " at=" + $m.Groups[1].Value)
+                            $script:__NotifDedupMemory[$orderedKey] = $ts
+                            $orderedBlocked = $true
+                        }
+                        if (-not $rateBlocked) {
+                            $match = $false
+                            if ($EventType -eq "URL_CHANGED" -and $storedKey.StartsWith("URL_CHANGED|")) { $match = $true }
+                            elseif ($EventType -eq "URL_CREATED" -and $storedKey -eq ("URL_CREATED||" + $NewUrl)) { $match = $true }
+                            if ($match) { $recentTimestampsForCeiling.Add($ts) }
+                        }
+                    }
+                } catch { }
+            }
+            if ($recentTimestampsForCeiling.Count -ge $rateCeilingMax) {
+                # Sort ascending, get oldest (index 0)
+                $recentTimestampsForCeiling.Sort()
+                $remain = [int]($win.TotalSeconds - ($now - $recentTimestampsForCeiling[0]).TotalSeconds)
+                Write-NotifyLog "WARN" ("DEDUP-BLOCKED (audit rate ceiling: " + $recentTimestampsForCeiling.Count + "/" + $rateCeilingMax + " in " + $win.TotalSeconds + "s, " + $remain + "s until next slot). ordered=" + $orderedKey)
+                $rateBlocked = $true
+                # Sync to memory so subsequent calls don't re-read audit repeatedly
+                if (-not $script:__NotifDedupMemory.ContainsKey($rateCeilingKey)) {
+                    $script:__NotifDedupMemory[$rateCeilingKey] = (New-Object System.Collections.Generic.List[DateTime])
+                }
+                $lstMem = $script:__NotifDedupMemory[$rateCeilingKey]
+                foreach ($t in $recentTimestampsForCeiling) { if (-not $lstMem.Contains($t)) { $lstMem.Add($t) } }
+                $lstMem.Sort()
+            }
+        } catch {
+            Write-NotifyLog "DEBUG" ("Test-AllowSendUrlNotification audit file read skipped: " + $_.Exception.Message)
+        }
+    }
+    if ($orderedBlocked -or $rateBlocked) { return $false }
+
+    # 3) Pass: update memory list + append audit
+    try {
+        $script:__NotifDedupMemory[$orderedKey] = $now
+        if (-not $script:__NotifDedupMemory.ContainsKey($rateCeilingKey) -or
+            -not ($script:__NotifDedupMemory[$rateCeilingKey] -is [System.Collections.Generic.List[DateTime]])) {
+            $script:__NotifDedupMemory[$rateCeilingKey] = (New-Object System.Collections.Generic.List[DateTime])
+        }
+        ([System.Collections.Generic.List[DateTime]]$script:__NotifDedupMemory[$rateCeilingKey]).Add($now)
+        # Trim out-of-window
+        $lst = [System.Collections.Generic.List[DateTime]]$script:__NotifDedupMemory[$rateCeilingKey]
+        while ($lst.Count -gt 0 -and ($now - $lst[0]) -ge $win) { [void]$lst.RemoveAt(0) }
+
+        $line = "[" + ($now.ToString("yyyy-MM-dd HH:mm:ss")) + "] " + $orderedKey
+        Add-Content -Path $script:__NotifDedupAuditFile -Value $line -Encoding UTF8 -ErrorAction Stop
+    } catch {
+        Write-NotifyLog "WARN" ("Test-AllowSendUrlNotification cannot write audit file (send will still proceed, dedup only in-memory): " + $_.Exception.Message)
+    }
+    return $true
+}
+
 # ====== Unified logger ======
 # Levels: INFO | WARN | ERROR | DEBUG
 # DEBUG only writes when $env:NOTIFY_DEBUG = "1"
@@ -215,6 +346,20 @@ function Send-WatchdogNotification {
         [switch]$IsHtml
     )
     Write-NotifyLog "INFO" "===== Send-WatchdogNotification start (event=$EventType) ====="
+    #region debug-point mail-spam-H2-H4-unified-entry  (插桩：记录所有 URL_CHANGED/URL_CREATED 事件的调用参数与调用来源，用于确认密集发送的根因)
+    if ($EventType -eq "URL_CHANGED" -or $EventType -eq "URL_CREATED") {
+        try {
+            $oldUrl = if ($TemplateData -and $TemplateData.ContainsKey("oldUrl")) { $TemplateData.oldUrl } else { "" }
+            $newUrl = if ($TemplateData -and $TemplateData.ContainsKey("newUrl")) { $TemplateData.newUrl } else { "" }
+            $reason = if ($TemplateData -and $TemplateData.ContainsKey("reason")) { $TemplateData.reason } else { "" }
+            $caller = (Get-PSCallStack)[1]
+            $callerDesc = if ($caller) { "caller=$($caller.FunctionName)@L$($caller.ScriptLineNumber)" } else { "caller=unknown" }
+            Write-NotifyLog "DEBUG" "[DEBUG][SEND ENTRY] event=$EventType | oldUrl='$oldUrl' | newUrl='$newUrl' | reason='$reason' | pid=$PID | $callerDesc"
+        } catch {
+            Write-NotifyLog "DEBUG" "[DEBUG][SEND ENTRY] event=$EventType | (failed to capture TemplateData: $($_.Exception.Message))"
+        }
+    }
+    #endregion
     if (-not $script:NotifyConfig) { $script:NotifyConfig = Load-NotifyConfig }
 
     # If no raw Subject/Body provided, try loading from Chinese template
@@ -244,6 +389,17 @@ function Send-WatchdogNotification {
     if (-not (Should-Notify -EventType $EventType)) {
         Write-NotifyLog "WARN" "Event type '$EventType' muted by notifyOn config, skip email"
         return $false
+    }
+
+    # ---- Mail-spam prevention gate: URL_CHANGED / URL_CREATED dedup + 5min cooldown ----
+    # 放在 Should-Notify 之后、构造消息/SMTP 之前，尽早拒绝，避免消耗资源。
+    if ($EventType -eq "URL_CHANGED" -or $EventType -eq "URL_CREATED") {
+        $oldGuard = if ($TemplateData -and $TemplateData.ContainsKey("oldUrl")) { $TemplateData.oldUrl } else { "" }
+        $newGuard = if ($TemplateData -and $TemplateData.ContainsKey("newUrl")) { $TemplateData.newUrl } else { "" }
+        if (-not (Test-AllowSendUrlNotification -EventType $EventType -OldUrl $oldGuard -NewUrl $newGuard)) {
+            Write-NotifyLog "WARN" ("Event '$EventType' blocked by dedup/cooldown (old='$oldGuard' new='$newGuard'). NOT sending email.")
+            return $false
+        }
     }
 
     $smtp       = $script:NotifyConfig.smtp

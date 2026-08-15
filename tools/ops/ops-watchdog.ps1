@@ -1,4 +1,4 @@
-# EuriskoTax Service Watchdog (PowerShell)
+﻿# EuriskoTax Service Watchdog (PowerShell)
 # Monitors backend server on port 3000 and (optionally) cpolar tunnel.
 # Auto-restarts processes when they crash or stop responding.
 # Records detailed events to events.log and sends email notifications.
@@ -30,8 +30,16 @@ $NotifyModule = Join-Path $ScriptDir "ops-notify.ps1"
 $script:LastCpolarUrl = ""
 $CpolarLastUrlFile = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"  # 与启动脚本共享的持久化文件
 $script:LastCpolarUrlCreatedNotifiedUrl = $null   # 已经成功发送过 URL_CREATED 邮件的 URL（内存去重）
+$script:LastUrlChangedNotifiedPair     = $null    # 已经成功发送过 URL_CHANGED 邮件的有序对 "old => new"（内存去重，与 notify 入口 audit 对称）
 $RestartCount = 0
 $global:WatchdogRunning = $true
+
+# ====== Mail-spam prevention: Get-CpolarUrl stabilizer cache + validator ======
+# 避免 4040 短时不可用、旧日志残留多条导致"每轮 currentUrl 乱跳 -> URL_CHANGED 密集发邮件"。
+$script:__CpolarUrlCache = @{ Value = $null; Source = ""; Ticks = [DateTime]::MinValue }
+$script:__CpolarUrlCacheTtlSec = 10   # 10 秒内同一轮多次查询直接用缓存，保证结果一致
+$script:__CpolarUrlValidHostRegex = '^https://[a-z0-9\-]+\.(r\d+\.cpolar\.cn|cpolar\.(com|cn|io))(?::\d+)?(/.*)?$'
+$script:__CpolarUrlMinLen = 24  # "https://x.r3.cpolar.cn" 最短约 23
 
 # ====== 共享持久化 URL 文件读写 (v1.3 防止 URL_CREATED 重复发送) ======
 # 统一封装: 读取 + 带重试写入 + 失败日志，避免之前 SilentlyContinue 吞掉写入失败后每轮循环重复发邮件
@@ -242,18 +250,63 @@ function Restart-ServerService {
 function Get-CpolarUrl {
     param([string]$LogPath)
 
+    #region mail-spam-layer2-cache   # 10s 进程内缓存，保证主循环 + health-check + restart-loop 多次调用的一致性
+    $nowTicks = [DateTime]::Now
+    if ($script:__CpolarUrlCache.Value -and ($nowTicks - $script:__CpolarUrlCache.Ticks).TotalSeconds -lt $script:__CpolarUrlCacheTtlSec) {
+        Write-Log "DEBUG" ("Get-CpolarUrl use cache src=$($script:__CpolarUrlCache.Source) url=$($script:__CpolarUrlCache.Value)")
+        return $script:__CpolarUrlCache.Value
+    }
+    #endregion
+
+    #region mail-spam-layer2-validator  # 内联辅助：做 host/https/length 规范化校验，拒绝脏值
+    function Resolve-CandidateUrl([string]$Raw, [string]$SrcTag) {
+        if ([string]::IsNullOrWhiteSpace($Raw)) { return $null }
+        $u = $Raw.Trim()
+        # 只接受 https://（免费版 cpolar 提供 https，用 http 会让同一轮产生 https/http 两个值）
+        if (-not $u.StartsWith("https://", [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Log "DEBUG" ("Get-CpolarUrl candidate rejected (non-https) src=$SrcTag value=" + $u.Substring(0, [Math]::Min(40, $u.Length)))
+            return $null
+        }
+        if ($u.Length -lt $script:__CpolarUrlMinLen) {
+            Write-Log "DEBUG" ("Get-CpolarUrl candidate rejected (too short len=$($u.Length)) src=$SrcTag value=$u")
+            return $null
+        }
+        if ($u -notmatch $script:__CpolarUrlValidHostRegex) {
+            Write-Log "DEBUG" ("Get-CpolarUrl candidate rejected (host not whitelisted) src=$SrcTag value=$u")
+            return $null
+        }
+        # Normalize: 去尾斜杠，统一小写协议与 host（虽然 cpolar host 本身小写，这里兜底）
+        $u = $u.TrimEnd('/')
+        return $u
+    }
+    #endregion
+
+    $dbgSrc = "none"
+    $dbgVal = ""
+
     # 1) 优先调用 cpolar 本地管理 API：/api/tunnels 返回 JSON（最可靠）
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
         if ($resp -and $resp.Content) {
             $j = $resp.Content | ConvertFrom-Json -ErrorAction Stop
             if ($j -and $j.tunnels -and $j.tunnels.Count -gt 0) {
-                $best = $null
+                # 与之前保持一致：优先 https，其次 http 降级（Resolve-CandidateUrl 里只留 https，http 降级自动被过滤）
+                $bestRaw = $null
                 foreach ($t in $j.tunnels) {
-                    if ($t.public_url -match '^https://') { $best = $t.public_url; break }
-                    elseif (-not $best -and $t.public_url -match '^http://') { $best = $t.public_url }
+                    if ($t.public_url -match '^https://') { $bestRaw = $t.public_url; break }
+                    elseif (-not $bestRaw -and $t.public_url -match '^http://') { $bestRaw = $t.public_url }
                 }
-                if ($best) { return $best }
+                if ($bestRaw) {
+                    $resolved = Resolve-CandidateUrl -Raw $bestRaw -SrcTag "api"
+                    if ($resolved) {
+                        $dbgSrc = "api"; $dbgVal = $resolved
+                        #region mail-spam-layer2-cache
+                        $script:__CpolarUrlCache = @{ Value = $resolved; Source = "api"; Ticks = $nowTicks }
+                        #endregion
+                        Write-Log "DEBUG" ("Get-CpolarUrl src=api url=$resolved")
+                        return $resolved
+                    }
+                }
             }
         }
     } catch { }
@@ -261,22 +314,52 @@ function Get-CpolarUrl {
     # 2) 次级：访问 Dashboard HTML，用正则粗取 URL（兼容旧版 cpolar）
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4040" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-        if ($resp.Content -match 'https://[a-z0-9\-]+\.cpolar\.[a-z]+') { return $matches[0] }
-        if ($resp.Content -match 'https://[a-z0-9\-]+\.r\d+\.cpolar\.cn') { return $matches[0] }
+        $candidates = @()
+        if ($resp.Content -match 'https://[a-z0-9\-]+\.r\d+\.cpolar\.cn') { $candidates += $matches[0] }
+        if ($resp.Content -match 'https://[a-z0-9\-]+\.cpolar\.[a-z]+')   { $candidates += $matches[0] }
+        foreach ($raw in $candidates) {
+            $resolved = Resolve-CandidateUrl -Raw $raw -SrcTag "dash"
+            if ($resolved) {
+                $dbgSrc = "dash"; $dbgVal = $resolved
+                #region mail-spam-layer2-cache
+                $script:__CpolarUrlCache = @{ Value = $resolved; Source = "dash"; Ticks = $nowTicks }
+                #endregion
+                Write-Log "DEBUG" ("Get-CpolarUrl src=dash url=$resolved")
+                return $resolved
+            }
+        }
     } catch { }
 
-    # 3) Fallback: parse from log file
+    # 3) Fallback: parse from log file —— 倒序扫描，只取"最后一条"匹配（避免同一日志残留多段 Tunnel 历史）
     if ($LogPath -and (Test-Path $LogPath)) {
-        $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
-        if ($content) {
-            # 同时支持 "Tunnel established at <url>" 和 "Forwarding <url>" 两种格式
-            $m = [regex]::Match($content, '(?:Tunnel established at|Forwarding)\s+(https://[^\s"]+)')
-            if ($m.Success) { return $m.Groups[1].Value }
-            $m = [regex]::Match($content, '(?:Tunnel established at|Forwarding)\s+(http://[^\s"]+)')
-            if ($m.Success) { return $m.Groups[1].Value }
+        try {
+            $lines = Get-Content -Path $LogPath -Encoding UTF8 -ErrorAction Stop
+            if ($lines -and $lines.Count -gt 0) {
+                $last = $lines.Count - 1
+                for ($i = $last; $i -ge 0; $i--) {
+                    $line = $lines[$i]
+                    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+                    $m = [regex]::Match($line, '(?:Tunnel established at|Forwarding)\s+(https?://[^\s"]+)')
+                    if ($m.Success) {
+                        $resolved = Resolve-CandidateUrl -Raw $m.Groups[1].Value -SrcTag "log#$i"
+                        if ($resolved) {
+                            $dbgSrc = "log"; $dbgVal = $resolved
+                            #region mail-spam-layer2-cache
+                            $script:__CpolarUrlCache = @{ Value = $resolved; Source = "log"; Ticks = $nowTicks }
+                            #endregion
+                            Write-Log "DEBUG" ("Get-CpolarUrl src=log(line=$i) url=$resolved")
+                            return $resolved
+                        }
+                    }
+                }
+            }
+        } catch {
+            Write-Log "DEBUG" ("Get-CpolarUrl log parse error: " + $_.Exception.Message)
         }
     }
 
+    $dbgDisp = if ($dbgVal) { $dbgVal } else { "(null)" }
+    Write-Log "DEBUG" ("Get-CpolarUrl src=$dbgSrc url=$dbgDisp | logfile=$LogPath exists=$([bool](Test-Path $LogPath))")
     return $null
 }
 
@@ -383,16 +466,63 @@ function Restart-CpolarTunnel {
             $ts = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
             # If URL changed, also fire URL_CHANGED event + notification
             if ($oldUrl -and $newUrl -ne $oldUrl) {
+                # Mail-spam prevention: Restart 分支也走"调用方级内存+持久化去重"，
+                # 否则如果 S0 先通过 Restart-Cpolar 发了 A->B，主循环下一轮也可能再对同一对判定一次。
+                $pairKey = $oldUrl + " => " + $newUrl
+                $allowRestartNotify = $true
+                if ($script:LastUrlChangedNotifiedPair -and $script:LastUrlChangedNotifiedPair -eq $pairKey) {
+                    Write-Log "INFO" ("跳过 URL_CHANGED 邮件 (内存去重，Restart 分支): $pairKey")
+                    $allowRestartNotify = $false
+                }
+                if ($allowRestartNotify -and (Test-Path (Join-Path $env:TEMP "euriskotax-notif-dedup-audit.log"))) {
+                    try {
+                        $auditFile = Join-Path $env:TEMP "euriskotax-notif-dedup-audit.log"
+                        $lines = Get-Content -Path $auditFile -Encoding UTF8 -ErrorAction Stop
+                        $searchKey = "URL_CHANGED|$oldUrl|$newUrl"
+                        $now = [DateTime]::Now
+                        $count = [Math]::Min($lines.Count, 50)
+                        for ($i = $lines.Count - 1; $i -ge 0 -and $count -gt 0; $i--, $count--) {
+                            $m = [regex]::Match($lines[$i], '^\[([^\]]+)\]\s+(.+)$')
+                            if (-not $m.Success) { continue }
+                            try {
+                                $ts = [DateTime]::ParseExact($m.Groups[1].Value, "yyyy-MM-dd HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
+                                if (($now - $ts).TotalSeconds -lt 300 -and $m.Groups[2].Value -eq $searchKey) {
+                                    Write-Log "INFO" ("跳过 URL_CHANGED 邮件 (持久化去重，Restart 分支): pair=$pairKey ts=$($m.Groups[1].Value)")
+                                    $allowRestartNotify = $false
+                                    $script:LastUrlChangedNotifiedPair = $pairKey
+                                    break
+                                }
+                            } catch {}
+                        }
+                    } catch {
+                        Write-Log "DEBUG" ("URL_CHANGED(Restart) 持久化审计读取失败，忽略：" + $_.Exception.Message)
+                    }
+                }
+                #region debug-point mail-spam-H2-H3-H4-restartcpolar-urlchanged
+                $pNow = Get-PersistedLastUrl
+                Write-Log "DEBUG" ("[URL_CHANGED][Restart-Cpolar] oldUrl=$oldUrl newUrl=$newUrl persisted=$pNow createdNotified=$script:LastCpolarUrlCreatedNotifiedUrl allow=$allowRestartNotify")
+                #endregion
                 Write-EventLog -EventType "URL_CHANGED" -Reason "cpolar_restart_new_url" -NewUrl $newUrl -OldUrl $oldUrl
-                $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason="cpolar_restart_new_url"; recoveryMs=$recoveryMs; timestamp=$ts }
-                Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+                Write-Output "[GUI-EVENT] 公网分享地址变更: $oldUrl -> $newUrl"
+                if ($allowRestartNotify) {
+                    $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason="cpolar_restart_new_url"; recoveryMs=$recoveryMs; timestamp=$ts }
+                    Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+                    $script:LastUrlChangedNotifiedPair = $pairKey
+                }
             } elseif (-not $oldUrl) {
                 # Old URL 为空（首次启动场景）→ 发 URL_CREATED；但如果持久化/内存去重标记已记录过就不再重复发
                 # （例如: 进程重启时 Initial seed 取不到，但实际 URL 没变，这里又会走"oldUrl 为空"路径）
                 $alreadyNotified = ($script:LastCpolarUrlCreatedNotifiedUrl -and $script:LastCpolarUrlCreatedNotifiedUrl -eq $newUrl)
+                #region debug-point mail-spam-H2-H3-restartcpolar-urlcreated-entry
+                $pNow = Get-PersistedLastUrl
+                Write-Log "DEBUG" ("[URL_CREATED][Restart-Cpolar] ENTRY: newUrl=$newUrl oldUrl=(empty) persisted=$pNow memCreatedNotified=$script:LastCpolarUrlCreatedNotifiedUrl alreadyNotified(mem)=$alreadyNotified")
+                #endregion
                 if (-not $alreadyNotified) {
                     $persistedNow = Get-PersistedLastUrl
                     $alreadyNotified = ($persistedNow -and $persistedNow -eq $newUrl)
+                    #region debug-point mail-spam-H2-H3-restartcpolar-urlcreated-entry
+                    Write-Log "DEBUG" ("[URL_CREATED][Restart-Cpolar] persisted check: persistedNow=$persistedNow alreadyNotified(after persisted)=$alreadyNotified")
+                    #endregion
                 }
                 if (-not $alreadyNotified) {
                     Write-EventLog -EventType "URL_CREATED" -Reason "cpolar_restart_first_time" -NewUrl $newUrl
@@ -513,15 +643,75 @@ while ($global:WatchdogRunning) {
             $currentUrl = Get-CpolarUrl -LogPath $CpolarLog
             $persistedUrl = Get-PersistedLastUrl
 
-            if ($currentUrl -and $script:LastCpolarUrl -and $currentUrl -ne $script:LastCpolarUrl) {
+            #region debug-point mail-spam-H1-H3-mainloop-entry
+            Write-Log "DEBUG" ("[MAIN LOOP][URL] round=$loopCount currentUrl=$currentUrl scriptLastUrl=$script:LastCpolarUrl persistedUrl=$persistedUrl memCreatedNotified=$script:LastCpolarUrlCreatedNotifiedUrl memChangedNotifiedLast=$($script:LastUrlChangedNotifiedPair)")
+            #endregion
+
+            # ====== Mail-spam prevention Layer 3a: 空值不把 LastCpolarUrl 吞掉 ======
+            # 上一轮拿到 URL 后，本轮若 4040 短暂 503，currentUrl=$null。
+            # 若直接跳过 while（$null 分支不处理），LastCpolarUrl 还留着 → 下次恢复正常没问题。
+            # 但若有其他逻辑把它"清空"过，`-not $script:LastCpolarUrl` 会再次命中 URL_CREATED 分支。
+            # 防御：当前 currentUrl 为空 → 如果之前有持久化/内存值，不视为"消失了就是新的"，跳过本轮。
+            if (-not $currentUrl -and ($script:LastCpolarUrl -or $persistedUrl)) {
+                $lastDisp = if ($script:LastCpolarUrl) { $script:LastCpolarUrl } else { "(null)" }
+                $persDisp = if ($persistedUrl) { $persistedUrl } else { "(null)" }
+                Write-Log "DEBUG" ("[MAIN LOOP][URL] currentUrl 为空（API 短时不可用），保留上一轮 last=" + $lastDisp + " persisted=" + $persDisp + "。跳过变更/首次分支，避免回来时误触发。")
+            }
+            # ====== Mail-spam prevention Layer 3b: URL_CHANGED 调用方级去重 + 空值稳定窗口 ======
+            # 对称于 URL_CREATED 的内存/持久化去重。即便最后闸门被绕开，
+            # watchdog 内部也不会第二次对同一个 (old,new) 有序对发邮件（同一生命周期内）。
+            elseif ($currentUrl -and $script:LastCpolarUrl -and $currentUrl -ne $script:LastCpolarUrl) {
+                #region debug-point mail-spam-H1-H4-mainloop-urlchanged
+                Write-Log "DEBUG" ("[URL_CHANGED][MainLoop] TRIGGER: oldUrl=$script:LastCpolarUrl newUrl=$currentUrl persisted=$persistedUrl")
+                #endregion
                 $oldUrl = $script:LastCpolarUrl
-                $script:LastCpolarUrl = $currentUrl
-                Save-PersistedLastUrl -Url $currentUrl | Out-Null
-                Write-Log "INFO" ("cpolar URL changed (no restart): " + $oldUrl + " -> " + $currentUrl)
-                Write-Output "[GUI-EVENT] 公网分享地址变更: $oldUrl -> $currentUrl"
-                Write-EventLog -EventType "URL_CHANGED" -Reason "auto_reconnect_new_url" -NewUrl $currentUrl -OldUrl $oldUrl
-                $tplData = @{ oldUrl=$oldUrl; newUrl=$currentUrl; reason="auto_reconnect_new_url"; recoveryMs=0; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
-                Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+                $newUrl = $currentUrl
+                $pairKey = $oldUrl + " => " + $newUrl
+                $allowThisRound = $true
+                # Memory dedup (same pair -> drop)
+                if ($script:LastUrlChangedNotifiedPair -and $script:LastUrlChangedNotifiedPair -eq $pairKey) {
+                    Write-Log "INFO" ("跳过 URL_CHANGED 邮件 (内存去重，同一有序对): $pairKey")
+                    $allowThisRound = $false
+                }
+                # Persisted dedup: 持久化审计里最近 5 分钟有相同有序对 -> drop（即使 watchdog 重启也不会重复）
+                if ($allowThisRound -and (Test-Path (Join-Path $env:TEMP "euriskotax-notif-dedup-audit.log"))) {
+                    try {
+                        $auditFile = Join-Path $env:TEMP "euriskotax-notif-dedup-audit.log"
+                        $lines = Get-Content -Path $auditFile -Encoding UTF8 -ErrorAction Stop
+                        $searchKey = "URL_CHANGED|$oldUrl|$newUrl"
+                        $now = [DateTime]::Now
+                        $count = [Math]::Min($lines.Count, 50)
+                        for ($i = $lines.Count - 1; $i -ge 0 -and $count -gt 0; $i--, $count--) {
+                            $m = [regex]::Match($lines[$i], '^\[([^\]]+)\]\s+(.+)$')
+                            if (-not $m.Success) { continue }
+                            try {
+                                $ts = [DateTime]::ParseExact($m.Groups[1].Value, "yyyy-MM-dd HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
+                                if (($now - $ts).TotalSeconds -lt 300 -and $m.Groups[2].Value -eq $searchKey) {
+                                    Write-Log "INFO" ("跳过 URL_CHANGED 邮件 (持久化去重，5 分钟内已发送过): pair=$pairKey ts=$($m.Groups[1].Value)")
+                                    $allowThisRound = $false
+                                    $script:LastUrlChangedNotifiedPair = $pairKey
+                                    break
+                                }
+                            } catch {}
+                        }
+                    } catch {
+                        Write-Log "DEBUG" ("URL_CHANGED 持久化审计读取失败，忽略：" + $_.Exception.Message)
+                    }
+                }
+
+                # 无论是否发邮件，状态变量必须推进：old->new 已经被观测到（即便被去重，也不要再判定为 change）
+                $script:LastCpolarUrl = $newUrl
+                Save-PersistedLastUrl -Url $newUrl | Out-Null
+                Write-Log "INFO" ("cpolar URL changed (no restart): $oldUrl -> $newUrl | notify=$allowThisRound")
+                # GUI 事件永远发（GUI 自己还有 DedupPopup 180s 冷却），避免邮件被去重的同时，用户在 GUI 也看不到变化
+                Write-Output "[GUI-EVENT] 公网分享地址变更: $oldUrl -> $newUrl"
+                Write-EventLog -EventType "URL_CHANGED" -Reason "auto_reconnect_new_url" -NewUrl $newUrl -OldUrl $oldUrl
+
+                if ($allowThisRound) {
+                    $tplData = @{ oldUrl=$oldUrl; newUrl=$newUrl; reason="auto_reconnect_new_url"; recoveryMs=0; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
+                    Invoke-Notification -EventType "URL_CHANGED" -TemplateData $tplData
+                    $script:LastUrlChangedNotifiedPair = $pairKey
+                }
             } elseif ($currentUrl -and -not $script:LastCpolarUrl) {
                 # 注意: 显式写 $script: 作用域，防止"以为赋值了但实际改的是 while/函数局部变量"导致下次循环又空
                 $script:LastCpolarUrl = $currentUrl
@@ -543,6 +733,9 @@ while ($global:WatchdogRunning) {
                     # 顺便回填内存标记
                     $script:LastCpolarUrlCreatedNotifiedUrl = $currentUrl
                 }
+                #region debug-point mail-spam-H2-H3-mainloop-urlcreated-pre
+                Write-Log "DEBUG" ("[URL_CREATED][MainLoop] PRE: currentUrl=$currentUrl persistedUrl=$persistedUrl shouldNotify=$shouldNotify memCreatedNotified=$script:LastCpolarUrlCreatedNotifiedUrl")
+                #endregion
                 if ($shouldNotify -and $currentUrl -ne $persistedUrl) {
                     Write-EventLog -EventType "URL_CREATED" -Reason "watchdog_detected_new_url" -NewUrl $currentUrl
                     $tplData = @{ newUrl=$currentUrl; oldUrl="(无，首次发现)"; reason="watchdog 检测到新的公网地址首次出现"; timestamp=(Get-Date -Format "yyyy-MM-dd HH:mm:ss") }
