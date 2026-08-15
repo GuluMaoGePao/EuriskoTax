@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # EuriskoTax 开发控制台 v3.3 (统一启动中心)
 # 双击 EuriskoTax-Console.bat 即可运行，无需消耗 AI 积分
 #
@@ -256,7 +256,9 @@ if (-not $script:ScrollbarAnimTimer) {
             if ($dead.Count -gt 0) {
                 $script:ScrollbarOverlays = @($script:ScrollbarOverlays | Where-Object { $_ -notin $dead })
             }
-        } catch { }
+        } catch {
+            # 高频动画回调（~60fps），单帧异常跳过即可，记录日志会刷屏
+        }
     })
     $script:ScrollbarAnimTimer.Start()
 }
@@ -276,7 +278,9 @@ function New-ScrollbarOverlay {
     try {
         $w = [System.Windows.Forms.SystemInformation]::VerticalScrollBarWidth
         if ($w -ge 10 -and $w -le 50) { $NATIVE_W = $w }
-    } catch { }
+    } catch {
+        # 读取系统参数失败时使用默认值 17，这是合理的容错降级
+    }
     [int]$STRIP_W    = 5   # 视觉滑块常态宽（纤细）
     [int]$FAT_W      = 8   # 悬停/拖拽视觉滑块宽
     [int]$MIN_H      = 26  # 滑块最小高度
@@ -407,12 +411,16 @@ function New-ScrollbarOverlay {
                 if ($Target -and $Target.IsHandleCreated -and $Target.BackColor -ne [System.Drawing.Color]::Transparent) {
                     $scrollBgBrush = New-Object System.Drawing.SolidBrush($Target.BackColor)
                 }
-            } catch { }
+            } catch {
+                # 创建画刷失败时跳过背景填充，不影响后续绘制
+            }
         }
         if ($null -ne $scrollBgBrush) {
             try {
                 $g.FillRectangle($scrollBgBrush, 0, 0, $overlay.Width, $overlay.Height)
-            } catch { }
+            } catch {
+                # 单次绘制失败跳过即可，下一帧会重试
+            }
         }
 
         $info = & $getScrollInfo
@@ -514,7 +522,9 @@ function New-ScrollbarOverlay {
                 $gp2 = New-CapsulePath $gr2.X $gr2.Y $gr2.Width $gr2.Height
                 $b2  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($glowAlpha, 165, 175, 210))
                 $g.FillPath($b2, $gp2); $b2.Dispose(); $gp2.Dispose()
-            } catch { }
+            } catch {
+                # 光晕绘制失败跳过即可，不影响主滑块渲染
+            }
         }
 
         # 7. 主滑块（中性灰紫胶囊）
@@ -531,7 +541,9 @@ function New-ScrollbarOverlay {
             $mainBrush = New-Object System.Drawing.SolidBrush($mainColor)
             $g.FillPath($mainBrush, $capPath)
             $mainBrush.Dispose(); $capPath.Dispose()
-        } catch { }
+        } catch {
+            # 主滑块绘制失败跳过即可，下一帧会重试
+        }
 
     }.GetNewClosure())
 
@@ -956,7 +968,9 @@ function Update-PublicUrlCard {
         try {
             $url = (Get-Content $urlFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue).Trim()
             $fileTs = (Get-Item $urlFile -ErrorAction SilentlyContinue).LastWriteTime
-        } catch { }
+        } catch {
+            # 文件可能被 cpolar 进程占用导致读取失败，下方有 API fallback 兜底
+        }
     }
 
     # Fallback: 文件不存在或为空时查 cpolar API
@@ -977,11 +991,15 @@ function Update-PublicUrlCard {
                     if ($url) {
                         $url = $url.TrimEnd('/')
                         $urlSource = "api"
-                        try { Set-Content -Path $urlFile -Value $url -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+                        try { Set-Content -Path $urlFile -Value $url -Encoding UTF8 -ErrorAction SilentlyContinue } catch {
+                            # 缓存文件写入失败不影响功能，下次会重新从 API 获取
+                        }
                     }
                 }
             }
-        } catch { }
+        } catch {
+            # cpolar 未启动时 API 不可达，这是预期情况，不记录日志
+        }
     }
 
     $tsText = if ($fileTs) { $fileTs.ToString("yyyy-MM-dd HH:mm:ss") } else { "-" }
@@ -1021,7 +1039,9 @@ function Update-PublicUrlCard {
             try {
                 $curr = Get-Clipboard -ErrorAction SilentlyContinue
                 if ($curr -ne $url) { Set-Clipboard -Value $url -ErrorAction SilentlyContinue }
-            } catch { }
+            } catch {
+                # 剪贴板被其他进程占用时失败很常见，不影响主流程
+            }
             if (-not $script:UrlPopupMode) { $script:UrlPopupMode = "first-known" }
         }
         $script:PublicUrlLastSeen = $url
@@ -1098,7 +1118,9 @@ function Get-GitBranches {
             $result.DirtyFiles = @($dirty | ForEach-Object { $_.Trim() } | Where-Object { $_ })
             $result.IsClean = ($result.DirtyFiles.Count -eq 0)
         }
-    } catch {}
+    } catch {
+        Write-Log "[Git] 获取分支信息失败：$($_.Exception.Message)" "ERROR"
+    }
     return $result
 }
 
@@ -1602,7 +1624,9 @@ if (Test-Path $logoIcoPath) {
         } catch {
             $form.Icon = New-Object System.Drawing.Icon($logoIcoPath)
         }
-    } catch { }
+    } catch {
+        # .ico 文件损坏或格式不支持时使用默认图标，不影响启动
+    }
 }
 
 # 全局布局参数（硬编码坐标，彻底解决Dock遮挡问题）
