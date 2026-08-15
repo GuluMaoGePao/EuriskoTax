@@ -86,7 +86,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 ---
 
-## 三、6 大功能面板详解
+## 三、7 大功能面板详解
 
 ### 1. 🚀 启动管理
 
@@ -154,14 +154,102 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **📁 server 目录** | 资源管理器打开后端目录 |
 | **📁 src 前端目录** | 资源管理器打开前端代码目录 |
 | **📁 tools/ops 目录** | 资源管理器打开脚本目录 |
+| **📁 tests 测试目录** | 资源管理器打开 Jest 测试套件目录 |
+| **📁 docs 文档目录** | 资源管理器打开技术报告/文档目录 |
 | **💻 PowerShell (项目根)** | 在项目根打开新 PowerShell 窗口 |
 | **💻 PowerShell (server)** | 在 server 目录打开新 PowerShell 窗口 |
 | **🌐 打开前端** | 浏览器打开 http://localhost:3000/ |
-| **📚 打开 API 文档** | 浏览器打开 http://localhost:3000/api/docs |
-| **📊 Git 状态** | `git status` |
-| **📜 Git 日志** | `git log -n 10 --stat`（最近 10 条） |
-| **🔄 Git Pull** | `git pull` 拉取远程更新 |
-| **📤 Git Push** | `git push` 推送本地提交（需确认） |
+| **📚 打开 API 文档（自动）** | 自定义 Swagger + 一键取 Token 授权，直接 Try it out |
+
+### 7. 🔐 Git & 账号
+
+> 本面板包含 **3 个功能卡片**：① 分支管理与版本切换  ② Git 操作与项目文档  ③ 账号密码管理
+
+#### 7.1 分支管理 & 版本切换 ⭐新增
+
+**分支说明**：当前主分支为 `main`（全栈版本，日常开发用）；`archive/*` 为只读存档分支，用于查阅历史版本。
+
+**🎯 当前分支显示**：本卡片顶部有一个醒目的彩色大标签实时显示当前分支（颜色区分类型：main=绿 / feature=紫 / fix=红 / archive=灰 / 其他=蓝；脏状态会变橙色并标注未提交改动数）。切换分支后自动刷新；也可点【🔄 刷新当前分支显示】手动同步。
+
+| 按钮 | 执行命令 | 适用场景 |
+|------|---------|---------|
+| **🔍 查看所有分支** | `git branch -a` | ✅ **弹窗+输出区双通道显示**：弹窗分组展示本地/远程分支列表（当前分支 ⭐ 高亮），同时在下方输出区显示 `git branch -a` 详细结果 |
+| **📋 当前分支详情** | `git branch -vv` | 每个分支的跟踪远程分支 + 最后提交哈希 + 说明（输出在下方输出区） |
+| **🏷️ 查看所有标签** | `git tag -l -n5` | 显示所有版本标签（v1.0.0 静态版、v1.2.0 全栈版等，对应 GitHub Releases） |
+| **🔀 切换分支（下拉选择）** ⭐推荐 | `git checkout <分支名>` | ✅ **下拉框直接选择**，不再手动输入！列出所有本地+远程分支（当前分支 ✅ 标记），切换前自动脏检查保护代码 |
+| **🌿 快速切回 main 主分支** | `git checkout main` | ⭐ 一键回到日常开发主线（全栈版本），切换前自动脏检查 |
+| **🔄 刷新当前分支显示** | (内部刷新) | 手动同步卡片顶部当前分支大标签状态 |
+| **📦 查看 v1.0 存档版** | `git checkout archive/v1.0-static-frontend` | 只读历史版本：项目初期纯前端静态网页（无后端），切换前自动脏检查 |
+| **📦 查看 v1.2 存档版** | `git checkout archive/v1.2-fullstack-gui` | 只读历史版本：v1.2 全栈版永久存档快照，切换前自动脏检查 |
+| **➕ 新建功能分支** | `git checkout -b <分支名>` | 基于当前分支新建 `feature/xxx` 或 `fix/xxx` 分支（输入分支名），新建后自动出现在下拉选项中 |
+
+> 🛡️ **代码安全保护（三重防护）**：所有切换分支操作前会自动调用 `Assert-WorkingTreeClean` 脏检查，检测到未提交改动时弹窗三选一：
+> - 🛑 **取消操作（推荐）**：不切换，先去处理改动
+> - 📦 **自动暂存**：执行 `git stash push` 后切换，以后可用 `git stash pop` 恢复
+> - ⚠️ **强制尝试**：直接调用 `git checkout`，若有冲突 Git 自身会拒绝切换
+>
+> ✅ **下拉选项自动包含新建分支**：`Show-BranchPicker` 每次打开都会实时调用 `git for-each-ref` 读取最新分支列表，不缓存、不硬编码。无论是 GUI 中新建、命令行新建、还是 `git pull` 拉取的远程新分支，下次打开下拉框都会自动出现。
+>
+> ⚠️ **存档分支只读**：`archive/*` 分支仅供查阅代码，不要在此分支做修改或提交！看完记得点【🌿 快速切回 main 主分支】回到开发主线。
+
+##### 🔬 资源泄漏测试（开发自检）
+
+为确保对话框连续打开关闭不会泄漏 GDI 句柄，本工具附带自动化测试脚本：
+
+```bash
+# 在 PowerShell 中运行（默认 100 次迭代）
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dialog-resource-leak.ps1
+
+# 自定义迭代次数（建议 200 次以放大对比效果）
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dialog-resource-leak.ps1 -Iterations 200
+```
+
+**测试原理**：通过 Win32 API `GetGuiResources` 读取进程的 GDI Objects 计数，对比「旧实现（不 Dispose）」和「新实现（try/finally 保证 Dispose）」各迭代 N 次后的 GDI 增量。新实现增量应为 0（无泄漏）。
+
+**最近一次测试结果**（Iterations=100）：
+
+| 测试项 | 旧实现 ΔGDI | 新实现 ΔGDI | 结果 |
+|--------|-----------|-----------|------|
+| Show-BranchPicker (分支下拉对话框) | +6 | +0 | ✅ PASS |
+| SaveFileDialog (保存日志对话框) | +0 | +0 | ✅ PASS |
+| searchForm (Ctrl+K 搜索对话框) | +0 | +0 | ✅ PASS |
+
+测试覆盖的对话框与修复点：
+
+| 文件位置 | 对话框类型 | 修复方式 |
+|---------|----------|---------|
+| `Show-BranchPicker` 函数 | 自定义 Form | `try { ShowDialog; return } finally { Dispose }` |
+| 「💾 保存日志」按钮回调 | SaveFileDialog | `try { ShowDialog } finally { Dispose }` |
+| Ctrl+K 搜索快捷键回调 | 自定义 Form | `try { ShowDialog } finally { Dispose }` |
+
+#### 7.2 Git 操作 & 项目文档
+
+| 按钮 | 执行命令 | 适用场景 |
+|------|---------|---------|
+| **📊 Git 状态** | `git status` | 查看文件修改状态、当前分支名等 |
+| **📜 Git 日志** | `git log -n 10 --stat` | 最近 10 条提交记录（含变更文件统计） |
+| **🔄 Git Pull** | `git pull` | 从远程仓库拉取最新提交 |
+| **📤 Git Push** | `git push` | 推送本地提交（弹窗确认，防误操作） |
+| **📝 Git Diff** | `git diff` | 工作区代码 vs 上次提交的差异 |
+| **📄 CHANGELOG 变更日志** | 打开 `CHANGELOG.md` | 查看项目历史版本改动说明 |
+| **📄 开发计划文档** | 打开 `docs/development/development-plan.md` | 查阅开发计划与路线图 |
+| **📄 税务计算规则** | 打开 `docs/guides/tax-calculation-rules.md` | 计税规则详细参考手册 |
+
+#### 7.3 账号 & 密码管理
+
+> 所有账号密码统一列表，点击按钮可一键复制到剪贴板。生产环境请自行替换为强密码。
+
+| 按钮 | 账号 / 用途 | 默认值 |
+|------|-------------|--------|
+| **👤 项目登录账号** | 前端登录用邮箱 | `dev@example.com` |
+| **🔑 项目登录密码** | 前端登录密码（可重置） | `password` |
+| **📋 一键复制登录信息** | 邮箱 + 密码一次复制 | `dev@example.com / password` |
+| **🔐 JWT Secret Key** | 后端 JWT 签名密钥（server/.env） | `dev-secret-key-change-in-production` |
+| **📧 QQ邮箱授权码** | 看门狗邮件通知（tools/ops/notify.config.json） | 自行配置 |
+| **🌐 Cpolar Token** | 内网穿透授权 | 自行注册配置 |
+| **🔑 获取 Bearer Token** | 自动调用登录 API 获取 JWT（1小时有效） | 自动生成并复制到剪贴板 |
+| **🖥 部署 SSH 配置** | 生产服务器 SSH 账号（ops-deploy.config.json） | 自行配置 |
+| **🚀 一键查看 API 文档** | 全自动：登录 → 取 Token → 生成 Swagger → 自动授权 | 直接调试接口 |
 
 ---
 
@@ -269,6 +357,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | `tools/gui/EuriskoTax-创建桌面快捷方式.bat` | 一次性创建桌面快捷方式（含图标缓存刷新） |
 | `tools/gui/gui-dev-console.ps1` | GUI 主脚本（含覆盖式滚动条 v3.2） |
 | `tools/gui/_create_shortcut.ps1` | 桌面快捷方式创建脚本（含 ICO 自动重建） |
+| `tools/gui/tests/test-dialog-resource-leak.ps1` | 对话框 GDI 资源泄漏自动化测试（验证 try/finally Dispose 修复有效） |
 | `tools/gui/README.md` | 本说明文档 |
 
 ---
