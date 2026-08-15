@@ -218,139 +218,62 @@ $F_GUIDE_HEAD  = New-Object System.Drawing.Font("Microsoft YaHei UI", 12, [Syste
 $F_GUIDE_ITEM  = New-Object System.Drawing.Font("Microsoft YaHei UI", 9.5)
 
 # ==============================================================================
-# 覆盖式自定义滚动条（Overlay Scrollbar v2 - 绝对定位锚定）
-# 核心修复：v1 用 overlay.Dock = "Right" 会参与父容器布局，
-#           把 Dock=Fill 的滚动区挤掉 8px 右边 → 用户看到"滚动条改坏了"。
-# v2：overlay 使用绝对坐标 + 父控件 Layout 事件手动锚定，始终浮在 Target
-#     可见区域的右上角，不参与任何布局挤压。
-# ==============================================================================
-# ==============================================================================
-# 覆盖式自定义滚动条 v3.2（精致 macOS 风 + 白底修复 + DPI 自适应）
-#   - 超细：常态 5px（DPI 自适应原生条宽度，不再硬编码）
-#   - 高透明：Alpha 4 档（静止 0 / 滚动中 85 / 悬停 155 / 拖拽 210）
-#   - 精致：胶囊圆角 + 悬停双层柔光光晕 + 悬停宽度插值 5→8px
-#   - 智能隐藏：macOS 风静止 1.1s 淡出消失
-#   - 滚动效果优化：60FPS 全局定时器做位置/alpha/宽度三重插值
-#   - 白底覆盖：主动画 Target.BackColor 填满 overlay（彻底盖掉原生条白底）
-#   - 鼠标滚轮转发：overlay 捕获 Wheel 后通过 SendMessage 转发给 Target
-#   - DPI 自适应：使用 SystemInformation.VerticalScrollBarWidth 获取真实原生条宽度
-#   - 健壮性：TabStop=false 防止焦点夺取；定时器异常保护；数组自动清理
+# 覆盖式自定义滚动条（Overlay Scrollbar）
+# 在控件右侧覆盖一个极薄的自定义 Panel 作为视觉滚动条，替代丑陋的系统滚动条。
+# 原生滚动条仍处理鼠标滚轮等交互，覆盖层只负责视觉展示和拖拽。
 # ==============================================================================
 $script:ScrollbarOverlays = @()
-# 全局共享的 ~60FPS 动画/淡出定时器（所有 overlay 共用一个，省资源）
-if (-not $script:ScrollbarAnimTimer) {
-    $script:ScrollbarAnimTimer = New-Object System.Windows.Forms.Timer
-    $script:ScrollbarAnimTimer.Interval = 16
-    $script:ScrollbarAnimTimer.Add_Tick({
-        try {
-            $dead = @()
-            foreach ($ovl in $script:ScrollbarOverlays) {
-                if ($ovl -and $ovl.IsHandleCreated -and -not $ovl.IsDisposed) {
-                    $ovl.Invalidate()
-                } else {
-                    $dead += $ovl
-                }
-            }
-            # 清理已销毁的 overlay（防止数组无限增长）
-            if ($dead.Count -gt 0) {
-                $script:ScrollbarOverlays = @($script:ScrollbarOverlays | Where-Object { $_ -notin $dead })
-            }
-        } catch { }
-    })
-    $script:ScrollbarAnimTimer.Start()
-}
 
 function New-ScrollbarOverlay {
     <#
     .SYNOPSIS
-    为指定控件创建一个超细、高透明、macOS 风格的覆盖式滚动条。
+    为指定控件创建一个极薄的覆盖式滚动条。
+    .PARAMETER Target
+    要覆盖滚动条的控件（Panel 或 RichTextBox）。
+    .PARAMETER IsRichTextBox
+    如果 Target 是 RichTextBox 则为 $true（需要用 EM_GETSCROLLPOS 获取位置）。
     #>
     param($Target, [bool]$IsRichTextBox = $false)
 
-    # === 几何参数 ===
-    # V3.2 最终方案：overlay 宽度 = 原生滚动条完整宽度，
-    #   主动画 Target.BackColor 填满整个 overlay 区域（彻底覆盖原生条白底），
-    #   再在上面画 5/8px 视觉滑块。这是 Chromium/VSCode 等现代滚动条的通用做法。
-    [int]$NATIVE_W = 17  # 默认值
-    try {
-        $w = [System.Windows.Forms.SystemInformation]::VerticalScrollBarWidth
-        if ($w -ge 10 -and $w -le 50) { $NATIVE_W = $w }
-    } catch { }
-    [int]$STRIP_W    = 5   # 视觉滑块常态宽（纤细）
-    [int]$FAT_W      = 8   # 悬停/拖拽视觉滑块宽
-    [int]$MIN_H      = 26  # 滑块最小高度
-    [int]$STRIP_RPAD = 4   # 视觉滑块在 overlay 右边的留白（居中靠右）
-
-    # 创建覆盖层：宽度 = 原生条宽
+    # 创建覆盖层：8px 宽，Dock 到右侧
     $overlay = New-Object System.Windows.Forms.Panel
-    $overlay.Width = $NATIVE_W
-    $overlay.BackColor = [System.Drawing.Color]::Transparent
+    $overlay.Width = 8
+    $overlay.Dock = "Right"
+    $overlay.BackColor = [System.Drawing.Color]::Transparent  # 轨道透明
     $overlay.Margin = New-Object System.Windows.Forms.Padding(0)
     $overlay.Padding = New-Object System.Windows.Forms.Padding(0)
     $overlay.Cursor = "Hand"
-    $overlay.TabStop = $false
 
-    # 缓存 Target 的背景色（用来主动画覆盖白底）
-    $scrollBgBrush = $null
-
-    # 状态变量（动画 + 视觉）
+    # 状态变量：保存拖拽状态和滑块几何信息
     $state = @{
         Target = $Target
         IsRTB = $IsRichTextBox
         IsDragging = $false
         DragStartY = 0
-        DragStartThumbY = 0
-        IsHovering = $false
-        LastActiveAt = [DateTime]::UtcNow.AddDays(-1)
-        CurAlpha = 0
-        TargetAlpha = 0
-        AnimThumbY = -1
-        TargetThumbY = -1
-        ThumbH = -1
+        DragStartPos = 0
         ThumbRect = $null
-        RangeExceed = $false
-        CurThumbW = $STRIP_W
+        LastThumbY = -1
+        LastThumbH = -1
     }
 
-    # 标记用户有交互（触发"显示" + 重置淡出倒计时）
-    $markActive = {
-        $state.LastActiveAt = [DateTime]::UtcNow
-    }.GetNewClosure()
-
-    # 手动锚定：贴 Target 可见区域的最右边（overlay 宽度 = 原生条宽 17px）
-    $reanchorOverlay = {
-        if (-not $Target.Parent) { return }
-        if (-not $Target.IsHandleCreated) { return }
-        [System.Drawing.Rectangle]$tRect = $Target.Bounds
-        [int]$newX = $tRect.Right - $NATIVE_W
-        [int]$newY = $tRect.Top
-        [int]$newH = $tRect.Height
-        if ($overlay.Parent) {
-            if ($overlay.Location.X -ne $newX -or $overlay.Location.Y -ne $newY -or
-                $overlay.Height -ne $newH -or $overlay.Width -ne $NATIVE_W) {
-                $overlay.SuspendLayout()
-                $overlay.Location = New-Object System.Drawing.Point($newX, $newY)
-                $overlay.Size = New-Object System.Drawing.Size($NATIVE_W, $newH)
-                $overlay.ResumeLayout($false)
-            }
-        }
-    }.GetNewClosure()
-
-    # 获取当前滚动信息
+    # 获取当前滚动信息（用闭包捕获 $state 和 $Target，确保事件中调用时变量可见）
+    # 注意：返回值全部显式 [int] 强类型，避免 object[] 减法时报 op_Subtraction 找不到
     $getScrollInfo = {
-        if (-not $Target -or -not $Target.IsHandleCreated) {
-            return [ordered]@{ Min = 0; Max = 0; Page = 0; Pos = 0 }
-        }
         if ($state.IsRTB) {
+            # RichTextBox 用 EM_GETSCROLLPOS 获取像素级滚动位置
+            # 修复：PS5.1 中 Marshal.PtrToStructure(ptr, [Type]) 对 System.Drawing.Point 报"必须具有布局信息"
+            # 改用两次 ReadInt32 直接读 POINT(= x:int32 + y:int32 = 8 bytes)
             $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(8)
             try {
                 [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 0, 0)
                 [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 4, 0)
                 [Win32ScrollApi]::SendMessage($Target.Handle, [Win32ScrollApi]::EM_GETSCROLLPOS, [IntPtr]::Zero, $ptr) | Out-Null
+                $xPos = [System.Runtime.InteropServices.Marshal]::ReadInt32($ptr, 0)
                 $yPos = [System.Runtime.InteropServices.Marshal]::ReadInt32($ptr, 4)
             } finally {
                 [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)
             }
+            # 通过行数和行高估算可滚动范围
             [int]$lineCount = $Target.GetLineFromCharIndex($Target.TextLength) + 1
             [int]$lineHeight = [int]$Target.Font.GetHeight() + 2
             [int]$visibleLines = [int]($Target.ClientSize.Height / $lineHeight)
@@ -363,6 +286,7 @@ function New-ScrollbarOverlay {
                 Pos = [int]$yPos
             }
         } else {
+            # Panel 用 GetScrollInfo 读取原生滚动条状态
             $si = New-Object Win32ScrollApi+SCROLLINFO
             $si.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($si)
             $si.fMask = [Win32ScrollApi]::SIF_ALL
@@ -376,45 +300,13 @@ function New-ScrollbarOverlay {
         }
     }.GetNewClosure()
 
-    # 创建圆角胶囊路径（macOS 风两端半圆形）
-    function New-CapsulePath {
-        param([int]$X, [int]$Y, [int]$W, [int]$H)
-        if ($W -lt 2) { $W = 2 }
-        if ($H -lt 2) { $H = 2 }
-        [int]$r = [Math]::Min($W, $H) / 2
-        $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-        $path.AddArc($X, $Y, $r * 2, $r * 2, 180, 90)
-        $path.AddArc($X + $W - $r * 2, $Y, $r * 2, $r * 2, 270, 90)
-        $path.AddArc($X + $W - $r * 2, $Y + $H - $r * 2, $r * 2, $r * 2, 0, 90)
-        $path.AddArc($X, $Y + $H - $r * 2, $r * 2, $r * 2, 90, 90)
-        $path.CloseFigure()
-        return $path
-    }
-
-    # === 核心绘制 ===
-    # 第 0 步：覆盖原生滚动条白底 —— 用 Target 的背景色填满 overlay（17px 宽）
-    # 第 1 步：按 alpha 绘制胶囊滑块（5/8px 细条，居中靠右）
-    # 第 2 步：悬停/拖拽时画微发光
+    # 绘制覆盖层：半透明圆角滑块
     $overlay.Add_Paint({
         $g = $_.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-
-        # === 0. 用 Target 背景色填充 overlay 整个区域（彻底盖住原生条白底） ===
-        if ($null -eq $scrollBgBrush) {
-            try {
-                if ($Target -and $Target.IsHandleCreated -and $Target.BackColor -ne [System.Drawing.Color]::Transparent) {
-                    $scrollBgBrush = New-Object System.Drawing.SolidBrush($Target.BackColor)
-                }
-            } catch { }
-        }
-        if ($null -ne $scrollBgBrush) {
-            try {
-                $g.FillRectangle($scrollBgBrush, 0, 0, $overlay.Width, $overlay.Height)
-            } catch { }
-        }
-
         $info = & $getScrollInfo
+
+        # 修复：全部强制 [int]，避免值是 boxed object 时 op_Subtraction 报错
         [int]$iMin   = $info.Min
         [int]$iMax   = $info.Max
         [int]$iPage  = $info.Page
@@ -423,120 +315,52 @@ function New-ScrollbarOverlay {
         [int]$ovlW   = [int]$overlay.Width
 
         [int]$range = $iMax - $iMin + 1
-        $state.RangeExceed = ($range -gt $iPage -and $trackH -gt 0)
+        if ($range -le $iPage) { return }  # 内容不超出，不需要滚动条
 
-        if (-not $state.RangeExceed) {
-            $state.ThumbRect = $null
-            $state.AnimThumbY = -1
-            return
-        }
-
-        # 1. 目标滑块几何
+        # 滑块高度按比例，最小 30px
         [int]$thumbH = [int]($trackH * $iPage / $range)
-        if ($thumbH -lt $MIN_H) { $thumbH = $MIN_H }
+        if ($thumbH -lt 30) { $thumbH = 30 }
         if ($thumbH -gt $trackH) { $thumbH = $trackH }
+        # 滑块位置
         [int]$scrollRange = $range - $iPage
         [int]$trackAvail  = $trackH - $thumbH
         if ($trackAvail -lt 1) { $trackAvail = 1 }
-        [int]$tgtThumbY = [int]($trackAvail * $iPos / [Math]::Max(1, $scrollRange))
-        if ($tgtThumbY -lt 0) { $tgtThumbY = 0 }
-        if ($tgtThumbY -gt ($trackH - $thumbH)) { $tgtThumbY = $trackH - $thumbH }
-        $state.ThumbH = $thumbH
-        $state.TargetThumbY = $tgtThumbY
+        [int]$thumbY = [int]($trackAvail * $iPos / [Math]::Max(1, $scrollRange))
+        if ($thumbY -lt 0) { $thumbY = 0 }
+        if ($thumbY -gt ($trackH - $thumbH)) { $thumbY = $trackH - $thumbH }
 
-        # 2. 位置插值（45% 每帧收敛）
-        if ($state.AnimThumbY -lt 0) {
-            $state.AnimThumbY = $tgtThumbY
-        } else {
-            [double]$dY = $tgtThumbY - $state.AnimThumbY
-            if ([Math]::Abs($dY) -gt 0.5) {
-                $state.AnimThumbY = [int][Math]::Round($state.AnimThumbY + $dY * 0.45)
-            } else {
-                $state.AnimThumbY = $tgtThumbY
-            }
-        }
-
-        # 3. 目标 alpha
-        [TimeSpan]$idle = [DateTime]::UtcNow - $state.LastActiveAt
-        [bool]$justRolled = ($idle.TotalMilliseconds -lt 1100)
-        if ($state.IsDragging) {
-            $state.TargetAlpha = 210
-        } elseif ($state.IsHovering) {
-            $state.TargetAlpha = 155
-        } elseif ($justRolled) {
-            $state.TargetAlpha = 85
-        } else {
-            $state.TargetAlpha = 0
-        }
-
-        # alpha 插值
-        if ($state.CurAlpha -ne $state.TargetAlpha) {
-            [int]$dA = $state.TargetAlpha - $state.CurAlpha
-            if ([Math]::Abs($dA) -le 2) {
-                $state.CurAlpha = $state.TargetAlpha
-            } else {
-                $state.CurAlpha = [int][Math]::Round($state.CurAlpha + $dA * 0.35)
-            }
-        }
-        if ($state.CurAlpha -le 0) {
-            $state.ThumbRect = $null
-            return
-        }
-        if ($state.CurAlpha -gt 255) { $state.CurAlpha = 255 }
-
-        # 4. 宽度插值（5 → 8 悬停增粗）
-        [int]$targetThumbW = if ($state.IsDragging -or $state.IsHovering) { $FAT_W } else { $STRIP_W }
-        if (-not $state.CurThumbW) { $state.CurThumbW = $STRIP_W }
-        [int]$dW = $targetThumbW - $state.CurThumbW
-        if ([Math]::Abs($dW) -le 1) { $state.CurThumbW = $targetThumbW }
-        else { $state.CurThumbW = [int][Math]::Round($state.CurThumbW + $dW * 0.5) }
-        [int]$thumbW = $state.CurThumbW
+        [int]$thumbW = $ovlW - 2
         if ($thumbW -lt 1) { $thumbW = 1 }
+        $state.ThumbRect = New-Object System.Drawing.Rectangle(1, $thumbY, $thumbW, $thumbH)
 
-        # 5. 矩形：视觉条靠右居中（STRIP_RPAD 留白，让右侧留空更透气）
-        [int]$thumbX = $ovlW - $STRIP_RPAD - $thumbW
-        [int]$thumbY = $state.AnimThumbY
-        if ($thumbX -lt 0) { $thumbX = 0 }
-        if ($thumbX + $thumbW -gt $ovlW) { $thumbX = $ovlW - $thumbW }
-        $rect = New-Object System.Drawing.Rectangle($thumbX, $thumbY, $thumbW, $thumbH)
-        $state.ThumbRect = $rect
-
-        # 6. 悬停/拖拽光晕（外层柔光 + 内层光亮）
-        if ($state.CurAlpha -ge 80 -and ($state.IsHovering -or $state.IsDragging)) {
-            [int]$glowAlpha = [Math]::Min(110, [int]($state.CurAlpha * 0.45))
-            try {
-                [System.Drawing.Rectangle]$gr1 = [System.Drawing.Rectangle]::Inflate($rect, 3, 4)
-                [System.Drawing.Rectangle]$gr2 = [System.Drawing.Rectangle]::Inflate($rect, 1, 2)
-                $gp1 = New-CapsulePath $gr1.X $gr1.Y $gr1.Width $gr1.Height
-                $b1  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb([int]($glowAlpha * 0.35), 150, 160, 195))
-                $g.FillPath($b1, $gp1); $b1.Dispose(); $gp1.Dispose()
-                $gp2 = New-CapsulePath $gr2.X $gr2.Y $gr2.Width $gr2.Height
-                $b2  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($glowAlpha, 165, 175, 210))
-                $g.FillPath($b2, $gp2); $b2.Dispose(); $gp2.Dispose()
-            } catch { }
+        # 滑块颜色：拖拽时加深
+        $thumbColor = if ($state.IsDragging) {
+            [System.Drawing.Color]::FromArgb(200, 130, 135, 155)
+        } else {
+            [System.Drawing.Color]::FromArgb(150, 100, 105, 128)
         }
+        # 圆角矩形路径（半径 3px）
+        $thumbPath = New-Object System.Drawing.Drawing2D.GraphicsPath
+        $r = 3
+        $rect = $state.ThumbRect
+        $thumbPath.AddArc($rect.X, $rect.Y, $r * 2, $r * 2, 180, 90)
+        $thumbPath.AddArc($rect.Right - $r * 2, $rect.Y, $r * 2, $r * 2, 270, 90)
+        $thumbPath.AddArc($rect.Right - $r * 2, $rect.Bottom - $r * 2, $r * 2, $r * 2, 0, 90)
+        $thumbPath.AddArc($rect.X, $rect.Bottom - $r * 2, $r * 2, $r * 2, 90, 90)
+        $thumbPath.CloseFigure()
+        # PowerShell 没有 using 语句，手动 Dispose
+        $brush = New-Object System.Drawing.SolidBrush($thumbColor)
+        $g.FillPath($brush, $thumbPath)
+        $brush.Dispose()
+        $thumbPath.Dispose()
 
-        # 7. 主滑块（中性灰紫胶囊）
-        [int]$a = $state.CurAlpha
-        [int]$rBase = 125; [int]$gBase = 135; [int]$bBase = 165
-        if ($state.IsDragging) {
-            $rBase = 130; $gBase = 145; $bBase = 185
-        } elseif ($state.IsHovering) {
-            $rBase = 130; $gBase = 142; $bBase = 178
-        }
-        $mainColor = [System.Drawing.Color]::FromArgb($a, $rBase, $gBase, $bBase)
-        try {
-            $capPath = New-CapsulePath $rect.X $rect.Y $rect.Width $rect.Height
-            $mainBrush = New-Object System.Drawing.SolidBrush($mainColor)
-            $g.FillPath($mainBrush, $capPath)
-            $mainBrush.Dispose(); $capPath.Dispose()
-        } catch { }
-
+        $state.LastThumbY = $thumbY
+        $state.LastThumbH = $thumbH
     }.GetNewClosure())
 
+    # 统一设置滚动位置（修复：用 Read/Write Int32 代替 Point StructureToPtr/StructureToPtr）
     $setScrollY = {
         param([int]$newY)
-        if (-not $Target -or -not $Target.IsHandleCreated) { return }
         if ($state.IsRTB) {
             $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(8)
             try {
@@ -551,47 +375,43 @@ function New-ScrollbarOverlay {
         }
     }.GetNewClosure()
 
-    $hitTestThumb = {
-        param([int]$mouseY)
-        if (-not $state.ThumbRect) { return $false }
-        return ($mouseY -ge [int]$state.ThumbRect.Top -and $mouseY -le [int]$state.ThumbRect.Bottom)
-    }.GetNewClosure()
-
+    # 鼠标按下：点中滑块开始拖拽，点中轨道翻页
     $overlay.Add_MouseDown({
-        & $markActive
         [int]$my = [int]$_.Y
-        if (& $hitTestThumb $my) {
+        if ($state.ThumbRect -and $state.ThumbRect.Contains(1, $my)) {
+            # 点中滑块：开始拖拽
             $state.IsDragging = $true
             $state.DragStartY = $my
-            $state.DragStartThumbY = $state.AnimThumbY
+            $state.DragStartPos = [int]$state.LastThumbY
+            $overlay.Invalidate()
         } elseif ($state.ThumbRect) {
+            # 点中轨道：翻页
             $info = & $getScrollInfo
             [int]$iMin  = $info.Min
             [int]$iMax  = $info.Max
             [int]$iPage = $info.Page
             [int]$iPos  = $info.Pos
-            [int]$pageStep = [Math]::Max(1, [int]($iPage * 0.9))
-            if ($my -lt [int]$state.ThumbRect.Top) {
+            [int]$pageStep = $iPage
+            [int]$newPos
+            if ($my -lt [int]$state.ThumbRect.Y) {
                 $newPos = [Math]::Max($iMin, $iPos - $pageStep)
             } else {
                 $newPos = [Math]::Min($iMax - $iPage + 1, $iPos + $pageStep)
             }
             & $setScrollY $newPos
+            $overlay.Invalidate()
         }
     }.GetNewClosure())
 
+    # 鼠标移动：拖拽滑块
     $overlay.Add_MouseMove({
-        & $markActive
-        if (-not $state.IsDragging) {
-            if (-not $state.IsHovering) { $state.IsHovering = $true }
-            return
-        }
+        if (-not $state.IsDragging) { return }
         [int]$my     = [int]$_.Y
         [int]$trackH = [int]$overlay.Height
-        [int]$thumbH = [int]$state.ThumbH
+        [int]$thumbH = [int]$state.LastThumbH
         if ($thumbH -le 0) { return }
-        [int]$deltaY     = $my - [int]$state.DragStartY
-        [int]$newThumbY  = [int]$state.DragStartThumbY + $deltaY
+        [int]$deltaY = $my - [int]$state.DragStartY
+        [int]$newThumbY = [int]$state.DragStartPos + $deltaY
         [int]$trackAvail = $trackH - $thumbH
         if ($trackAvail -lt 1) { $trackAvail = 1 }
         if ($newThumbY -lt 0) { $newThumbY = 0 }
@@ -605,93 +425,57 @@ function New-ScrollbarOverlay {
         if ($scrollRange -le 0) { return }
         [int]$newPos = [int]($newThumbY * $scrollRange / $trackAvail)
         $newPos = [Math]::Max($iMin, [Math]::Min($newPos, $iMax - $iPage + 1))
+
         & $setScrollY $newPos
+        $overlay.Invalidate()
     }.GetNewClosure())
 
+    # 鼠标释放：结束拖拽
     $overlay.Add_MouseUp({
-        & $markActive
         $state.IsDragging = $false
+        $overlay.Invalidate()
     }.GetNewClosure())
 
-    $overlay.Add_MouseEnter({
-        & $markActive
-        $state.IsHovering = $true
-    }.GetNewClosure())
-
+    # 鼠标离开：结束拖拽
     $overlay.Add_MouseLeave({
-        & $markActive
-        $state.IsHovering = $false
-        if ($state.IsDragging) { $state.IsDragging = $false }
+        if ($state.IsDragging) {
+            $state.IsDragging = $false
+            $overlay.Invalidate()
+        }
     }.GetNewClosure())
 
-    # 关键：overlay 覆盖了 Target 的原生滚动条区域，鼠标滚轮事件被 overlay 吞掉
-    # 直接计算目标滚动位置（比 SendMessage 更可靠，跨 32/64 位无差异）
-    $overlay.Add_MouseWheel({
-        & $markActive
-        if (-not $Target -or -not $Target.IsHandleCreated) { return }
-        $delta = $_.Delta
-        $info = & $getScrollInfo
-        $iMin = $info.Min
-        $iMax = $info.Max
-        $iPos = $info.Pos
-        $iPage = $info.Page
-        [int]$range = $iMax - $iMin + 1
-        [int]$scrollRange = $range - $iPage
-        if ($scrollRange -le 0) { return }
-
-        # 标准：WHEEL_DELTA=120 为一格，每格滚动 page/8
-        [int]$steps = [Math]::Sign($delta) * [Math]::Max(1, [Math]::Abs([int][Math]::Round([double]$delta / 120.0)))
-        [int]$stepPx = [Math]::Max(1, [int]($iPage / 8))
-        [int]$newPos = $iPos + $steps * $stepPx
-        $newPos = [Math]::Max($iMin, [Math]::Min($newPos, $iMax - $iPage + 1))
-        & $setScrollY $newPos
-    }.GetNewClosure())
-
-    # === 锚定（绝对坐标，不参与布局） ===
+    # 将 overlay 添加到 Target 的父控件（避免被 Panel 的 AutoScroll 裁剪）
+    # 对于 Tab 内容区：$Target 是 scroll Panel，它的父控件是 tab panel
+    # 对于输出区：$Target 是 RichTextBox，它的父控件是 outputOuter panel
     $parent = $Target.Parent
     if ($parent) {
         $parent.Controls.Add($overlay)
+        $overlay.Dock = "Right"
+        $overlay.Height = $Target.Height
         $overlay.BringToFront()
-        & $reanchorOverlay
-
-        $parent.Add_Layout({
-            & $reanchorOverlay
-            & $markActive
-        }.GetNewClosure())
-
-        $Target.Add_Resize({
-            & $reanchorOverlay
-            & $markActive
-        }.GetNewClosure())
-
-        $Target.Add_Move({
-            & $reanchorOverlay
-        }.GetNewClosure())
-
-        $parent.Add_ControlAdded({
-            $overlay.BringToFront()
-            & $reanchorOverlay
-        }.GetNewClosure())
     }
 
-    # 滚动信号 → 显示滚动条
+    # 注册滚动同步：Target 滚动时刷新 overlay
     if ($IsRichTextBox) {
+        # RichTextBox 没有 Scroll 事件，用 VScroll 事件
         $Target.Add_VScroll({
-            & $markActive
+            $overlay.Invalidate()
         }.GetNewClosure())
     } else {
         $Target.Add_Scroll({
-            & $markActive
+            $overlay.Invalidate()
         }.GetNewClosure())
     }
 
-    $Target.Add_MouseWheel({
-        & $markActive
+    # 窗口大小变化时刷新
+    $Target.Add_Resize({
+        $overlay.Invalidate()
     }.GetNewClosure())
 
     $script:ScrollbarOverlays += $overlay
     return $overlay
 }
+
 # ==============================================================================
 # 辅助函数: Open-ApiDocsAuto（一键全自动查看API文档）
 #   流程：1.后端可达检查 2.自动登录取Token 3.生成自定义Swagger页面（
@@ -2653,8 +2437,8 @@ $outputBox.ForeColor = $C_FG
 $outputBox.Font = $F_LOG
 $outputBox.ReadOnly = $true
 $outputBox.BorderStyle = "None"
-# 保留原生垂直滚动条（滚轮/键盘需要它生成滚动信号/能滚到底，视觉上由 7px overlay 细条盖在它上面）
-$outputBox.ScrollBars = "ForcedVertical"
+# 隐藏原生滚动条，由覆盖式自定义滚动条接管视觉展示
+$outputBox.ScrollBars = "None"
 $script:OutputBox = $outputBox
 
 $outputBar = New-Object System.Windows.Forms.FlowLayoutPanel
