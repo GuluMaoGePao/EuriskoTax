@@ -416,12 +416,43 @@ function Update-PublicUrlCard {
     }
 
     $urlFile = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+
+    # ====== 数据源策略：文件优先（ops-start-dev / watchdog / outHandler 写入的权威值）======
+    # 文件不存在时才 fallback 查 cpolar API（首次启动、文件还没生成的场景）。
+    # 不用 API 优先是因为 cpolar 可能有多个隧道，API 返回的第一个不一定是实际共享的那个。
     $url = $null
+    $urlSource = "file"
     $fileTs = $null
+
     if (Test-Path $urlFile) {
         try {
             $url = (Get-Content $urlFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue).Trim()
             $fileTs = (Get-Item $urlFile -ErrorAction SilentlyContinue).LastWriteTime
+        } catch { }
+    }
+
+    # Fallback: 文件不存在或为空时查 cpolar API
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            if ($resp -and $resp.Content) {
+                $j = $resp.Content | ConvertFrom-Json -ErrorAction Stop
+                if ($j -and $j.tunnels -and $j.tunnels.Count -gt 0) {
+                    foreach ($t in $j.tunnels) {
+                        if ($t.public_url -match '^https://') { $url = $t.public_url; break }
+                    }
+                    if (-not $url) {
+                        foreach ($t in $j.tunnels) {
+                            if ($t.public_url -match '^http://') { $url = $t.public_url; break }
+                        }
+                    }
+                    if ($url) {
+                        $url = $url.TrimEnd('/')
+                        $urlSource = "api"
+                        try { Set-Content -Path $urlFile -Value $url -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+                    }
+                }
+            }
         } catch { }
     }
 
@@ -445,7 +476,7 @@ function Update-PublicUrlCard {
             $script:FontUrlCached = "display"
         }
         $script:PublicUrlCardLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
-        $script:PublicUrlCardHint.Text = "  ✅ 点击上面链接复制到剪贴板  |  打开 cpolar 仪表盘：http://127.0.0.1:4040/  |  地址来源：共享文件  |  最近更新：$tsText"
+        $script:PublicUrlCardHint.Text = "  ✅ 点击上面链接复制到剪贴板  |  打开 cpolar 仪表盘：http://127.0.0.1:4040/  |  地址来源：$urlSource  |  最近更新：$tsText"
 
         $isFirstTime = ([string]::IsNullOrWhiteSpace($script:PublicUrlLastSeen))
         $isChanged   = (-not $isFirstTime) -and ($script:PublicUrlLastSeen -ne $url)
@@ -571,6 +602,8 @@ function Invoke-AsyncCommand {
                 }
                 # 无论弹不弹窗，都要更新 LastSeen，避免 Update-PublicUrlCard 再判成"变化"
                 $script:PublicUrlLastSeen = $url
+                # 收到 URL 事件 → 立即刷新卡片显示
+                try { Update-PublicUrlCard -Force } catch { }
             }
             # 2) 输出： [OK] 公网地址邮件通知已发送给: xxx@qq.com
             if ($line -match '公网地址邮件通知已发送给') {
@@ -595,8 +628,13 @@ function Invoke-AsyncCommand {
                         [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
                 }
             }
-            # 4) outHandler 不再每行调 Update-PublicUrlCard（timer 3 秒刷一次足够）
-            #    URL 变化的弹窗由上面的 regex 匹配直接处理，不依赖 Update-PublicUrlCard
+            # 4) 看门狗输出的地址变更事件也触发卡片刷新
+            if ($line -match '公网分享地址变更:\s*\S+\s*->\s*(https?://\S+)') {
+                $newUrl = $matches[1].Trim()
+                $uf = Join-Path $env:TEMP "euriskotax-last-cpolar-url.txt"
+                try { Set-Content -Path $uf -Value $newUrl -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+                try { Update-PublicUrlCard -Force } catch { }
+            }
 
             $script:OutputBox.SelectionStart = $script:OutputBox.TextLength
             $script:OutputBox.SelectionLength = 0
@@ -2144,10 +2182,6 @@ $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 1000
 $timer.Add_Tick({
     Update-StatusBar
-    # 每 3 秒刷新一次公网地址卡片（看门狗变 URL 后不用手动点刷新）
-    if (([DateTime]::Now.Second % 3) -eq 0) {
-        try { Update-PublicUrlCard -Force } catch { }
-    }
 })
 $timer.Start()
 
