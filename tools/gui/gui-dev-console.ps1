@@ -22,6 +22,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName Microsoft.VisualBasic
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 
@@ -1046,6 +1047,299 @@ function Show-GuiAlert {
 }
 
 # ==============================================================================
+# 辅助函数: Show-InputBox（简单文本输入对话框，用于输入分支名等）
+# ==============================================================================
+function Show-InputBox {
+    param(
+        [string]$Title = "请输入",
+        [string]$Prompt = "请输入内容：",
+        [string]$DefaultValue = ""
+    )
+    $result = [Microsoft.VisualBasic.Interaction]::InputBox($Prompt, $Title, $DefaultValue)
+    if ([string]::IsNullOrWhiteSpace($result)) { return $null }
+    return $result.Trim()
+}
+
+# ==============================================================================
+# 辅助函数: Get-GitBranches（获取当前仓库的本地/远程分支列表和当前分支）
+# ==============================================================================
+function Get-GitBranches {
+    param([string]$RepoDir = $ProjectRoot)
+    $result = @{
+        CurrentBranch = ""
+        LocalBranches = @()
+        RemoteBranches = @()
+        AllBranches = @()
+        IsClean = $false
+        DirtyFiles = @()
+    }
+    try {
+        # 当前分支
+        $cur = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null)
+        if ($LASTEXITCODE -eq 0) { $result.CurrentBranch = ($cur -join "").Trim() }
+
+        # 本地分支（不含 HEAD -> 和远程）
+        $locals = (& git -C $RepoDir for-each-ref --format='%(refname:short)' refs/heads/ 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $result.LocalBranches = @($locals | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        }
+
+        # 远程分支（不含 origin/HEAD ->）
+        $remotes = (& git -C $RepoDir for-each-ref --format='%(refname:short)' refs/remotes/ 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $result.RemoteBranches = @($remotes | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '/HEAD$' })
+        }
+
+        $result.AllBranches = @($result.LocalBranches) + @($result.RemoteBranches)
+
+        # 工作区脏检查（仅文件名，不含详细diff）
+        $dirty = (& git -C $RepoDir status --porcelain 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $result.DirtyFiles = @($dirty | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            $result.IsClean = ($result.DirtyFiles.Count -eq 0)
+        }
+    } catch {}
+    return $result
+}
+
+# ==============================================================================
+# 辅助函数: Show-BranchPicker（分支下拉选择对话框，替代手动输入）
+# ==============================================================================
+function Show-BranchPicker {
+    param(
+        [string]$Title = "选择分支",
+        [string]$RepoDir = $ProjectRoot
+    )
+    $branches = Get-GitBranches -RepoDir $RepoDir
+    if ($branches.AllBranches.Count -eq 0) {
+        Show-GuiAlert -Title "未找到分支" -Message "当前仓库没有读取到任何分支信息，可能 Git 未初始化。" -Kind Warning
+        return $null
+    }
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = $Title
+    $form.Size = New-Object System.Drawing.Size(520, 280)
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.BackColor = [System.Drawing.Color]::FromArgb(28, 31, 42)
+    $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
+
+    # 说明标签
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = "选择要切换到的分支（本地 + 远程共 $($branches.AllBranches.Count) 个）："
+    $lbl.ForeColor = [System.Drawing.Color]::FromArgb(245, 245, 252)
+    $lbl.AutoSize = $false
+    $lbl.Location = New-Object System.Drawing.Point(20, 18)
+    $lbl.Size = New-Object System.Drawing.Size(460, 28)
+    $form.Controls.Add($lbl)
+
+    # 当前分支显示
+    $curLbl = New-Object System.Windows.Forms.Label
+    $curLbl.Text = "当前分支：$($branches.CurrentBranch)"
+    if ($branches.IsClean) {
+        $curLbl.ForeColor = [System.Drawing.Color]::FromArgb(88, 196, 124)
+        $curLbl.Text += " （工作区干净 ✅）"
+    } else {
+        $curLbl.ForeColor = [System.Drawing.Color]::FromArgb(235, 140, 85)
+        $curLbl.Text += " （有 $($branches.DirtyFiles.Count) 个未提交改动 ⚠️）"
+    }
+    $curLbl.AutoSize = $false
+    $curLbl.Location = New-Object System.Drawing.Point(20, 46)
+    $curLbl.Size = New-Object System.Drawing.Size(460, 24)
+    $form.Controls.Add($curLbl)
+
+    # 下拉框
+    $combo = New-Object System.Windows.Forms.ComboBox
+    $combo.DropDownStyle = "DropDownList"
+    $combo.Location = New-Object System.Drawing.Point(20, 78)
+    $combo.Size = New-Object System.Drawing.Size(460, 32)
+    $combo.BackColor = [System.Drawing.Color]::FromArgb(40, 44, 60)
+    $combo.ForeColor = [System.Drawing.Color]::FromArgb(245, 245, 252)
+    $combo.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+
+    # 填充下拉项（本地分支在前，远程分支在后，当前分支选中）
+    $idx = 0
+    $selectIdx = -1
+    foreach ($lb in $branches.LocalBranches) {
+        $disp = if ($lb -eq $branches.CurrentBranch) { "⭐ $lb  （当前·本地）" } else { "$lb  （本地）" }
+        [void]$combo.Items.Add(@{ Display = $disp; Value = $lb })
+        if ($lb -eq $branches.CurrentBranch) { $selectIdx = $idx }
+        $idx++
+    }
+    foreach ($rb in $branches.RemoteBranches) {
+        $disp = "🌐 $rb  （远程）"
+        [void]$combo.Items.Add(@{ Display = $disp; Value = $rb })
+        $idx++
+    }
+    $combo.DisplayMember = "Display"
+    $combo.ValueMember = "Value"
+    if ($selectIdx -ge 0) { $combo.SelectedIndex = $selectIdx } elseif ($combo.Items.Count -gt 0) { $combo.SelectedIndex = 0 }
+    $form.Controls.Add($combo)
+
+    # 提示信息
+    $hint = New-Object System.Windows.Forms.Label
+    $hint.Text = "提示：切换远程分支会创建本地跟踪分支。有未提交改动可能切换失败。"
+    $hint.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 170)
+    $hint.AutoSize = $false
+    $hint.Location = New-Object System.Drawing.Point(20, 122)
+    $hint.Size = New-Object System.Drawing.Size(460, 36)
+    $form.Controls.Add($hint)
+
+    # OK / Cancel 按钮
+    $btnW = 140; $btnH = 38
+    $okBtn = New-Object System.Windows.Forms.Button
+    $okBtn.Text = "✔ 确认切换"
+    $okBtn.Location = New-Object System.Drawing.Point(190, 180)
+    $okBtn.Size = New-Object System.Drawing.Size($btnW, $btnH)
+    $okBtn.BackColor = [System.Drawing.Color]::FromArgb(85, 155, 95)
+    $okBtn.ForeColor = [System.Drawing.Color]::FromArgb(245, 245, 252)
+    $okBtn.FlatStyle = "Flat"
+    $okBtn.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10, [System.Drawing.FontStyle]::Bold)
+    $okBtn.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $form.AcceptButton = $okBtn
+    $form.Controls.Add($okBtn)
+
+    $cancelBtn = New-Object System.Windows.Forms.Button
+    $cancelBtn.Text = "取消"
+    $cancelBtn.Location = New-Object System.Drawing.Point(340, 180)
+    $cancelBtn.Size = New-Object System.Drawing.Size($btnW, $btnH)
+    $cancelBtn.BackColor = [System.Drawing.Color]::FromArgb(120, 120, 140)
+    $cancelBtn.ForeColor = [System.Drawing.Color]::FromArgb(245, 245, 252)
+    $cancelBtn.FlatStyle = "Flat"
+    $cancelBtn.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+    $cancelBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $form.CancelButton = $cancelBtn
+    $form.Controls.Add($cancelBtn)
+
+    # 显示对话框
+    $result = $form.ShowDialog()
+    try {
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            if ($combo.SelectedItem -and $combo.SelectedItem.Value) {
+                return $combo.SelectedItem.Value
+            }
+        }
+        return $null
+    } finally {
+        $form.Dispose()
+    }
+}
+
+# ==============================================================================
+# 辅助函数: Assert-WorkingTreeClean（切换分支前的脏检查防护）
+# 检查工作区是否有未提交改动。有则弹窗让用户选：
+#   A. 取消切换 → 返回 $false
+#   B. 暂存改动(stash)后切换 → 返回 $true，并执行 stash
+#   C. 强制尝试切换（可能失败，但绝不会丢代码）→ 返回 $true
+# 工作区干净直接返回 $true
+# ==============================================================================
+function Assert-WorkingTreeClean {
+    param(
+        [string]$RepoDir = $ProjectRoot,
+        [string]$TargetBranch = "目标分支"
+    )
+    $gitState = Get-GitBranches -RepoDir $RepoDir
+    if ($gitState.IsClean) {
+        return $true
+    }
+
+    $dirtyCount = $gitState.DirtyFiles.Count
+    $dirtyPreview = if ($dirtyCount -le 8) {
+        ($gitState.DirtyFiles -join "`n  ")
+    } else {
+        ($gitState.DirtyFiles[0..7] -join "`n  ") + "`n  ...共 $dirtyCount 个文件"
+    }
+
+    $msg = @"
+⚠️ 检测到未提交的改动（$dirtyCount 个文件），直接切换分支可能失败！
+
+Git 保护机制：
+  • 有冲突的切换 → 直接报错失败，代码 100% 不会丢
+  • 无冲突的切换 → 改动会自动带到新分支（非丢失）
+
+当前改动文件：
+  $dirtyPreview
+
+请选择操作方式：
+
+  [否] = 取消本次切换（推荐）→ 先 commit 你的改动再切换
+  [是] = 自动暂存 (git stash) 后切换 → 切完可用 git stash pop 恢复
+  [取消] = 强制尝试切换（可能报错失败）
+"@
+    $choice = [System.Windows.Forms.MessageBox]::Show($msg,
+        "未提交改动 - 切换 '$TargetBranch'",
+        "YesNoCancel",
+        [System.Windows.Forms.MessageBoxIcon]::Warning)
+
+    switch ($choice) {
+        "No" {
+            Write-Log "[Git] ✋ 用户取消分支切换（因有未提交改动）" "WARN"
+            return $false
+        }
+        "Cancel" {
+            Write-Log "[Git] ⚠️ 用户选择强制尝试切换（可能失败）" "WARN"
+            return $true
+        }
+        "Yes" {
+            Write-Log "[Git] 📦 自动 git stash 暂存 $dirtyCount 个改动文件..." "INFO"
+            $stashMsg = "auto-stash-before-switch-to-$TargetBranch-$(Get-Date -Format 'yyyyMMddHHmmss')"
+            $out = (& git -C $RepoDir stash push -m $stashMsg 2>&1)
+            Write-Log ($out -join "`n") "GRAY"
+            return $true
+        }
+    }
+    return $false
+}
+
+# ==============================================================================
+# 辅助函数: Update-BranchCardLabel（刷新分支卡片顶部的当前分支显示）
+# ==============================================================================
+function Update-BranchCardLabel {
+    if (-not $script:BranchCardLabel) { return }
+    $state = Get-GitBranches -RepoDir $ProjectRoot
+    $cur = if ([string]::IsNullOrWhiteSpace($state.CurrentBranch)) { "（未检测到 Git 仓库）" } else { $state.CurrentBranch }
+
+    # 根据分支类型决定颜色和附加提示
+    if ($cur -eq "main") {
+        $labelText = "🌿  当前分支：main  （⭐ 主分支 · 日常开发主线）"
+        $bgColor = [System.Drawing.Color]::FromArgb(42, 78, 52)
+        $fgColor = [System.Drawing.Color]::FromArgb(130, 230, 158)
+        $borderColor = [System.Drawing.Color]::FromArgb(88, 196, 124)
+    } elseif ($cur -like "archive/*") {
+        $labelText = "📦  当前分支：$cur  （只读存档版本 · 看完记得切回 main）"
+        $bgColor = [System.Drawing.Color]::FromArgb(60, 55, 42)
+        $fgColor = [System.Drawing.Color]::FromArgb(245, 210, 140)
+        $borderColor = [System.Drawing.Color]::FromArgb(235, 180, 85)
+    } elseif ($cur -like "feature/*" -or $cur -like "fix/*" -or $cur -like "release/*" -or $cur -like "hotfix/*") {
+        $labelText = "🛠  当前分支：$cur  （功能/修复分支 · 开发进行中）"
+        $bgColor = [System.Drawing.Color]::FromArgb(55, 45, 75)
+        $fgColor = [System.Drawing.Color]::FromArgb(195, 150, 240)
+        $borderColor = [System.Drawing.Color]::FromArgb(175, 110, 220)
+    } else {
+        $labelText = "🔀  当前分支：$cur"
+        $bgColor = [System.Drawing.Color]::FromArgb(42, 55, 78)
+        $fgColor = [System.Drawing.Color]::FromArgb(130, 185, 250)
+        $borderColor = [System.Drawing.Color]::FromArgb(80, 150, 240)
+    }
+
+    # 脏状态追加显示
+    if ($state.IsClean) {
+        $labelText += "  ·  干净 ✅"
+    } else {
+        $labelText += "  ·  有 $($state.DirtyFiles.Count) 个未提交改动 ⚠️"
+    }
+
+    $script:BranchCardLabel.Text = $labelText
+    $script:BranchCardLabel.BackColor = $bgColor
+    $script:BranchCardLabel.ForeColor = $fgColor
+    if ($script:BranchCardLabel.Controls -and $script:BranchCardLabel.Controls.Count -gt 0) {
+        # 边框已经是 BorderStyle，设置外部 Panel 边框色（如果有包装）
+    }
+}
+
+# ==============================================================================
 # 辅助函数: Copy-PublicUrlToClipboard（公网地址标签点击时触发）
 # ==============================================================================
 function Copy-PublicUrlToClipboard {
@@ -1678,7 +1972,8 @@ function Add-SectionCard {
         [System.Drawing.Color]$AccentColor = $C_ACCENT,
         [int]$ButtonsPerRow = 0,
         [hashtable[]]$Buttons,
-        [switch]$IsGuide
+        [switch]$IsGuide,
+        [switch]$IsBranchCard
     )
     $cardInfo = @{
         Title          = $Title
@@ -1690,6 +1985,7 @@ function Add-SectionCard {
         Card           = $null
         Controls       = @{}
         IsGuide        = [bool]$IsGuide
+        IsBranchCard   = [bool]$IsBranchCard
     }
     $TabCtx.Cards += $cardInfo
 }
@@ -1942,6 +2238,31 @@ function Reflow-TabCards {
             $hintCtrl.Location = New-Object System.Drawing.Point(($cpad + 2), $actualTopOffset)
             $hintCtrl.Size = New-Object System.Drawing.Size(($innerW - 4), 26)
             $actualTopOffset += 26 + 8
+        }
+
+        # ===== 分支管理卡片专属：在 description 和按钮之间插入 "当前分支大标签" =====
+        if ($cardInfo.IsBranchCard) {
+            if (-not $cardInfo.Controls.ContainsKey('BranchBigLabel')) {
+                # 大标签：显示当前分支名 + 类型颜色标识 + 脏状态
+                $big = New-Object System.Windows.Forms.Label
+                $big.Text = "🔄  正在读取分支信息..."
+                $big.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10.5, [System.Drawing.FontStyle]::Bold)
+                $big.AutoSize = $false
+                $big.BackColor = [System.Drawing.Color]::FromArgb(42, 55, 78)
+                $big.ForeColor = [System.Drawing.Color]::FromArgb(130, 185, 250)
+                $big.Padding = "14, 14, 14, 14"
+                $big.BorderStyle = "FixedSingle"
+                $card.Controls.Add($big)
+                $cardInfo.Controls['BranchBigLabel'] = $big
+                $script:BranchCardLabel = $big
+            }
+            # 第一次创建后立即刷新（后续通过 Update-BranchCardLabel 手动刷新）
+            try { Update-BranchCardLabel } catch {}
+
+            $branchCtrl = $cardInfo.Controls['BranchBigLabel']
+            $branchCtrl.Location = New-Object System.Drawing.Point(($cpad + 2), $actualTopOffset)
+            $branchCtrl.Size = New-Object System.Drawing.Size(($innerW - 4), 58)
+            $actualTopOffset += 58 + 10
         }
 
         $actualCardH = $actualTopOffset + ($rows * $BTN_H) + ([Math]::Max(0, $rows - 1) * $gap) + $cpad
@@ -2524,10 +2845,161 @@ Add-SectionCard -TabCtx $tab6Ctx `
 # ==============================================================================
 # ============ 标签页 6b: Git & 账号 ============
 # ==============================================================================
-$tab6bCtx = New-TabPanel -HeaderText "🔐  Git & 账号" -HeaderTagline "Git 操作 · 账号密码管理" -HeaderDesc "本页包含 2 个功能区：① Git 操作和文档（status/log/pull/push/diff + 项目文档）  ② 账号密码管理（所有账号统一列表+一键复制）"
+$tab6bCtx = New-TabPanel -HeaderText "🔐  Git & 账号" -HeaderTagline "分支管理 · Git 操作 · 账号密码管理" -HeaderDesc "本页包含 3 个功能区：① 分支管理与版本切换（查看分支/切分支/快速跳转存档版本）  ② Git 操作和文档（status/log/pull/push/diff + 项目文档）  ③ 账号密码管理（所有账号统一列表+一键复制）"
+
+Add-SectionCard -TabCtx $tab6bCtx -IsBranchCard `
+    -Title "1. 分支管理 & 版本切换" `
+    -Subtitle "查看分支、下拉选择切换、一键跳转到存档版本" `
+    -Description "详细说明：当前主分支为 main（全栈版本，日常开发主线）；archive/v1.0-static-frontend 是纯前端静态网页存档；archive/v1.2-fullstack-gui 是 v1.2 全栈版存档快照。存档分支只读，看完记得切回 main。分支切换前会自动检查未提交改动，提供取消/stash暂存/强制尝试三选一，100% 不会丢失代码。" `
+    -AccentColor $C_CYAN -ButtonsPerRow 3 -Buttons @(
+    @{ Text = "🔍 查看所有分支`n弹窗+输出区双通道"; Desc = "✅ 推荐：弹窗清晰显示本地/远程分支列表 + 下方输出区详细展示。当前分支高亮。"; Color = "80, 195, 210"; Width = $BTN_SMALL_W;
+       OnClick = {
+            # 下方输出区显示详细
+            Invoke-AsyncCommand -Name "git" -Command "git branch -a" -WorkingDir $ProjectRoot
+            # 同时弹窗简洁显示
+            $b = Get-GitBranches -RepoDir $ProjectRoot
+            $locals = if ($b.LocalBranches.Count -gt 0) { ($b.LocalBranches | ForEach-Object { if ($_ -eq $b.CurrentBranch) { "⭐ $_  （当前）" } else { "  $_" } }) -join "`n" } else { "（无）" }
+            $remotes = if ($b.RemoteBranches.Count -gt 0) { ($b.RemoteBranches | ForEach-Object { "🌐 $_" }) -join "`n" } else { "（无）" }
+            $dirtyInfo = if ($b.IsClean) { "工作区干净 ✅" } else { "有 $($b.DirtyFiles.Count) 个未提交改动 ⚠️" }
+            Show-GuiAlert -Title "Git 分支列表" -Message "当前分支：$($b.CurrentBranch)  ·  $dirtyInfo`n`n【本地分支（共 $($b.LocalBranches.Count) 个）】`n$locals`n`n【远程分支（共 $($b.RemoteBranches.Count) 个）】`n$remotes"
+            try { Update-BranchCardLabel } catch {}
+       } },
+    @{ Text = "📋 当前分支详情`ngit branch -vv"; Desc = "查看每个分支的跟踪远程分支、最后提交哈希和说明。输出显示在下方输出区。"; Color = "80, 195, 210"; Width = $BTN_SMALL_W;
+       OnClick = { Invoke-AsyncCommand -Name "git" -Command "git branch -vv" -WorkingDir $ProjectRoot; try { Update-BranchCardLabel } catch {} } },
+    @{ Text = "🏷️ 查看所有标签版本`nGit Releases"; Desc = "显示所有历史版本标签（v1.0.0 静态版、v1.2.0 全栈版等），对应 GitHub Releases 页面。"; Color = "80, 195, 210"; Width = $BTN_SMALL_W;
+       OnClick = { Invoke-AsyncCommand -Name "git" -Command "git tag -l -n5" -WorkingDir $ProjectRoot } },
+
+    @{ Text = "🔀 切换分支（下拉选择）`n⭐推荐 · 不再手动输入"; Desc = "✅ 推荐方式：弹出下拉框，列出所有本地+远程分支直接选择。切换前自动检查未提交改动，3选1保护代码安全。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $branchName = Show-BranchPicker -Title "切换 Git 分支 - 下拉选择"
+            if ([string]::IsNullOrWhiteSpace($branchName)) { return }
+            $go = Assert-WorkingTreeClean -RepoDir $ProjectRoot -TargetBranch $branchName
+            if (-not $go) { return }
+            Write-Log "[Git] 🔀 切换分支 → $branchName" "CMD"
+            $out = (& git -C $ProjectRoot checkout $branchName 2>&1)
+            $exitCode = $LASTEXITCODE
+            Write-Log ($out -join "`n") "GRAY"
+            if ($exitCode -eq 0) {
+                Write-Log "[Git] ✅ 切换成功！当前分支：$branchName" "OK"
+                if ($branchName -like "archive/*") {
+                    Show-GuiAlert -Title "✅ 已切换到存档分支" -Message "已切换到：$branchName`n`n⚠️ 这是只读历史存档版本，仅供查阅代码。`n请不要在此分支做任何修改或提交！`n看完后请点击【快速切回 main 主分支】按钮回到开发主线。" -Kind Warning
+                } else {
+                    Show-GuiAlert -Title "✅ 分支切换成功" -Message "已成功切换到分支：$branchName"
+                }
+            } else {
+                Write-Log "[Git] ❌ 切换失败（退出码 $exitCode），请查看上方输出详情" "ERROR"
+                Show-GuiAlert -Title "❌ 切换失败" -Message "切换到 '$branchName' 失败！`n`n常见原因：`n  • 有冲突的未提交改动（用 stash 暂存或 commit 后再切）`n  • 远程分支格式错误`n  • 分支名不存在`n`n请查看下方输出区的详细 git 错误信息。" -Kind Error
+            }
+            try { Update-BranchCardLabel } catch {}
+       } },
+    @{ Text = "🌿 快速切回 main 主分支`n⭐日常开发主线"; Desc = "一键切换回 main 主分支（全栈版本）。切换前自动检查未提交改动，保护代码安全。"; Color = "88, 196, 124"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $b = Get-GitBranches -RepoDir $ProjectRoot
+            if ($b.CurrentBranch -eq "main") {
+                Show-GuiAlert -Title "已在 main 分支" -Message "您当前就处于 main 主分支，无需切换。`n`n当前状态：$(if ($b.IsClean) {'干净 ✅'} else {"有 $($b.DirtyFiles.Count) 个改动 ⚠️"})"
+                try { Update-BranchCardLabel } catch {}
+                return
+            }
+            $go = Assert-WorkingTreeClean -RepoDir $ProjectRoot -TargetBranch "main"
+            if (-not $go) { return }
+            $r = [System.Windows.Forms.MessageBox]::Show("确认切换回 main 主分支？", "确认切回 main", "YesNo", "Question")
+            if ($r -ne "Yes") { return }
+            Write-Log "[Git] 🌿 切回 main 主分支..." "CMD"
+            $out = (& git -C $ProjectRoot checkout main 2>&1)
+            $exitCode = $LASTEXITCODE
+            Write-Log ($out -join "`n") "GRAY"
+            if ($exitCode -eq 0) {
+                Write-Log "[Git] ✅ 已回到 main 主分支（日常开发主线）" "OK"
+                Show-GuiAlert -Title "✅ 已回到 main 主分支" -Message "成功切回 main（全栈版本·日常开发主线）。可以继续开发啦！"
+            } else {
+                Write-Log "[Git] ❌ 切换失败（退出码 $exitCode）" "ERROR"
+                Show-GuiAlert -Title "❌ 切回 main 失败" -Message "切换失败，请查看下方输出区的详细错误信息。" -Kind Error
+            }
+            try { Update-BranchCardLabel } catch {}
+       } },
+    @{ Text = "🔄 刷新当前分支显示`n同步卡片顶部标签"; Desc = "手动刷新本卡片顶部显眼的当前分支大标签（颜色区分分支类型、干净/脏状态）。切换分支后会自动刷新，此按钮用于手动同步。"; Color = "110, 170, 190"; Width = $BTN_SMALL_W;
+       OnClick = {
+            try {
+                Update-BranchCardLabel
+                Write-Log "[Git] 🔄 分支显示已刷新" "OK"
+                $b = Get-GitBranches
+                Show-GuiAlert -Title "已刷新" -Message "当前分支：$($b.CurrentBranch)`n状态：$(if ($b.IsClean) {'工作区干净 ✅'} else {"有 $($b.DirtyFiles.Count) 个未提交改动 ⚠️"})"
+            } catch {
+                Show-GuiAlert -Title "刷新失败" -Message "读取 Git 信息失败：$($_.Exception.Message)" -Kind Error
+            }
+       } },
+
+    @{ Text = "📦 查看 v1.0 存档版`n静态网页纯前端"; Desc = "切换到 archive/v1.0-static-frontend（只读历史存档）：项目初期纯前端静态网页，无后端、无GUI工具。切换前自动检查改动。看完记得切回 main。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = {
+            $target = "archive/v1.0-static-frontend"
+            $b = Get-GitBranches -RepoDir $ProjectRoot
+            if ($b.CurrentBranch -eq $target) { Show-GuiAlert -Title "已在该分支" -Message "您当前已经在 $target 分支。"; return }
+            $go = Assert-WorkingTreeClean -RepoDir $ProjectRoot -TargetBranch $target
+            if (-not $go) { return }
+            $r = [System.Windows.Forms.MessageBox]::Show("确认切换到存档分支 '$target'？`n`n这是只读历史版本：项目初期纯前端静态网页（无后端、无GUI工具）。`n⚠️ 不要在此分支提交代码！看完请切回 main。", "查看存档 v1.0 - 确认", "YesNo", "Warning")
+            if ($r -ne "Yes") { return }
+            Write-Log "[Git] 📦 切换到存档分支 $target" "CMD"
+            $out = (& git -C $ProjectRoot checkout $target 2>&1)
+            $exitCode = $LASTEXITCODE
+            Write-Log ($out -join "`n") "GRAY"
+            if ($exitCode -eq 0) {
+                Write-Log "[Git] ✅ 已切换到 v1.0 存档版（静态网页）" "OK"
+                Show-GuiAlert -Title "✅ 已切换到 v1.0 存档版" -Message "已切换到：archive/v1.0-static-frontend`n`n📌 这是只读历史存档版本：`n  • 项目初期纯前端静态网页`n  • 无后端服务、无 GUI 工具`n  • 不要在此分支做修改/提交`n`n看完后点【快速切回 main 主分支】回到开发主线。" -Kind Warning
+            } else {
+                Write-Log "[Git] ❌ 切换失败（退出码 $exitCode）" "ERROR"
+                Show-GuiAlert -Title "❌ 切换失败" -Message "切换失败，请查看下方输出区错误信息。" -Kind Error
+            }
+            try { Update-BranchCardLabel } catch {}
+       } },
+    @{ Text = "📦 查看 v1.2 存档版`n全栈版本快照"; Desc = "切换到 archive/v1.2-fullstack-gui（只读历史存档）：v1.2 全栈版本永久快照，含后端+GUI+运维工具链。切换前自动检查改动。看完记得切回 main。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = {
+            $target = "archive/v1.2-fullstack-gui"
+            $b = Get-GitBranches -RepoDir $ProjectRoot
+            if ($b.CurrentBranch -eq $target) { Show-GuiAlert -Title "已在该分支" -Message "您当前已经在 $target 分支。"; return }
+            $go = Assert-WorkingTreeClean -RepoDir $ProjectRoot -TargetBranch $target
+            if (-not $go) { return }
+            $r = [System.Windows.Forms.MessageBox]::Show("确认切换到存档分支 '$target'？`n`n这是只读历史版本：v1.2 全栈版永久存档快照（含后端+GUI+运维）。`n⚠️ 不要在此分支提交代码！看完请切回 main。", "查看存档 v1.2 - 确认", "YesNo", "Warning")
+            if ($r -ne "Yes") { return }
+            Write-Log "[Git] 📦 切换到存档分支 $target" "CMD"
+            $out = (& git -C $ProjectRoot checkout $target 2>&1)
+            $exitCode = $LASTEXITCODE
+            Write-Log ($out -join "`n") "GRAY"
+            if ($exitCode -eq 0) {
+                Write-Log "[Git] ✅ 已切换到 v1.2 存档版（全栈快照）" "OK"
+                Show-GuiAlert -Title "✅ 已切换到 v1.2 存档版" -Message "已切换到：archive/v1.2-fullstack-gui`n`n📌 这是只读历史存档版本：`n  • v1.2 全栈版本永久快照`n  • 含后端 API + GUI 控制台 + 运维工具链`n  • 不要在此分支做修改/提交`n`n看完后点【快速切回 main 主分支】回到开发主线。" -Kind Warning
+            } else {
+                Write-Log "[Git] ❌ 切换失败（退出码 $exitCode）" "ERROR"
+                Show-GuiAlert -Title "❌ 切换失败" -Message "切换失败，请查看下方输出区错误信息。" -Kind Error
+            }
+            try { Update-BranchCardLabel } catch {}
+       } },
+    @{ Text = "➕ 新建功能分支并切换`ngit checkout -b"; Desc = "基于当前分支新建 feature/xxx 或 fix/xxx 功能分支，并自动切换过去。切换前自动检查当前改动状态。"; Color = "175, 110, 220"; Width = $BTN_SMALL_W;
+       OnClick = {
+            $curBranch = (& git -C $ProjectRoot rev-parse --abbrev-ref HEAD 2>&1)
+            $defaultName = "feature/new-feature"
+            $branchName = Show-InputBox -Title "新建功能分支" -Prompt "基于当前分支 '$curBranch' 新建功能分支，`n请输入新分支名：`n（建议格式：feature/功能名  或  fix/修复描述）" -DefaultValue $defaultName
+            if ([string]::IsNullOrWhiteSpace($branchName)) { return }
+            $go = Assert-WorkingTreeClean -RepoDir $ProjectRoot -TargetBranch "(新建)$branchName"
+            if (-not $go) { return }
+            $r = [System.Windows.Forms.MessageBox]::Show("确认基于当前分支 '$curBranch'`n新建分支 '$branchName' 并切换过去？", "新建功能分支 - 确认", "YesNo", "Question")
+            if ($r -ne "Yes") { return }
+            Write-Log "[Git] ➕ 新建分支 $branchName 并切换" "CMD"
+            $out = (& git -C $ProjectRoot checkout -b $branchName 2>&1)
+            $exitCode = $LASTEXITCODE
+            Write-Log ($out -join "`n") "GRAY"
+            if ($exitCode -eq 0) {
+                Write-Log "[Git] ✅ 已创建并切换到新分支：$branchName" "OK"
+                Show-GuiAlert -Title "✅ 新分支创建成功" -Message "已成功创建并切换到：$branchName`n`n基于：$curBranch`n`n现在可以在这个分支上开发新功能啦！"
+            } else {
+                Write-Log "[Git] ❌ 创建失败（退出码 $exitCode）" "ERROR"
+                Show-GuiAlert -Title "❌ 新建分支失败" -Message "创建失败，可能分支名已存在或格式有误。请查看下方输出区详细错误。" -Kind Error
+            }
+            try { Update-BranchCardLabel } catch {}
+       } }
+)
 
 Add-SectionCard -TabCtx $tab6bCtx `
-    -Title "1. Git 操作 & 项目文档" `
+    -Title "2. Git 操作 & 项目文档" `
     -Subtitle "常用 Git 命令和关键文档" `
     -Description "详细说明：Git 命令在项目根目录执行，输出会显示在下方输出区。push 前会弹窗确认，避免误推送。" `
     -AccentColor $C_WARN -ButtonsPerRow 4 -Buttons @(
@@ -2553,7 +3025,7 @@ Add-SectionCard -TabCtx $tab6bCtx `
 )
 
 Add-SectionCard -TabCtx $tab6bCtx `
-    -Title "2. 账号 & 密码管理" `
+    -Title "3. 账号 & 密码管理" `
     -Subtitle "所有需要登录/认证的账号密码统一列表（点击按钮可复制到剪贴板）" `
     -Description "详细说明：本项目开发环境涉及多种账号和密码，统一整理在此方便查阅。生产环境请自行替换为强密码。所有密码仅限本人使用，请勿外传。" `
     -AccentColor $C_PURPLE -ButtonsPerRow 3 -Buttons @(
@@ -2701,9 +3173,13 @@ $obSave  = New-OutBtn -Text "💾 保存日志" -Color "85, 85, 105" -W 104 -OnC
     $sfd = New-Object System.Windows.Forms.SaveFileDialog
     $sfd.Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*"
     $sfd.FileName = "euriskotax-log-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt"
-    if ($sfd.ShowDialog() -eq "OK") {
-        $script:OutputBox.SaveFile($sfd.FileName, [System.Windows.Forms.RichTextBoxStreamType]::PlainText)
-        Write-Log "日志已保存到 $($sfd.FileName)" "OK"
+    try {
+        if ($sfd.ShowDialog() -eq "OK") {
+            $script:OutputBox.SaveFile($sfd.FileName, [System.Windows.Forms.RichTextBoxStreamType]::PlainText)
+            Write-Log "日志已保存到 $($sfd.FileName)" "OK"
+        }
+    } finally {
+        $sfd.Dispose()
     }
 }
 $obCopy  = New-OutBtn -Text "📋 复制输出" -Color "85, 85, 105" -W 104 -OnClick {
@@ -2920,25 +3396,29 @@ $form.Add_KeyDown({
 
         $searchForm.AcceptButton = $okBtn
         $searchForm.CancelButton = $cancelBtn
-        $searchForm.ShowDialog() | Out-Null
+        try {
+            $searchForm.ShowDialog() | Out-Null
 
-        # 用户确认后，搜索匹配的标签页
-        if ($searchResult.Confirmed -and $searchResult.Keyword) {
-            $kw = $searchResult.Keyword
-            $matched = $null
-            foreach ($b in $menuButtons) {
-                # -like 支持通配符且不区分大小写
-                if ($b.Text -like "*$kw*") { $matched = $b.Tag; break }
-            }
-            if ($matched) {
-                # 模拟点击该导航按钮 (会触发样式切换 + Switch-Tab)
+            # 用户确认后，搜索匹配的标签页
+            if ($searchResult.Confirmed -and $searchResult.Keyword) {
+                $kw = $searchResult.Keyword
+                $matched = $null
                 foreach ($b in $menuButtons) {
-                    if ($b.Tag -eq $matched) { $b.PerformClick(); break }
+                    # -like 支持通配符且不区分大小写
+                    if ($b.Text -like "*$kw*") { $matched = $b.Tag; break }
                 }
-                Write-Log "[Ctrl+K] 已切换到匹配的标签页：$matched" "OK"
-            } else {
-                Write-Log "[Ctrl+K] 未找到包含 '$kw' 的标签页。可用：启动管理/数据库/测试中心/运维监控/通知日志/部署/快捷入口/Git & 账号" "WARN"
+                if ($matched) {
+                    # 模拟点击该导航按钮 (会触发样式切换 + Switch-Tab)
+                    foreach ($b in $menuButtons) {
+                        if ($b.Tag -eq $matched) { $b.PerformClick(); break }
+                    }
+                    Write-Log "[Ctrl+K] 已切换到匹配的标签页：$matched" "OK"
+                } else {
+                    Write-Log "[Ctrl+K] 未找到包含 '$kw' 的标签页。可用：启动管理/数据库/测试中心/运维监控/通知日志/部署/快捷入口/Git & 账号" "WARN"
+                }
             }
+        } finally {
+            $searchForm.Dispose()
         }
         $e.SuppressKeyPress = $true
     }
