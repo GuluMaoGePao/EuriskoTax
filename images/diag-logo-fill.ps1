@@ -1,4 +1,4 @@
-# 诊断 logo.png 原始 & logo-zoomed.png 各尺寸实际内容占比
+﻿# 诊断 logo.png 原始 & logo-zoomed.png 各尺寸实际内容占比
 Add-Type -AssemblyName System.Drawing
 
 function Get-BboxRatio {

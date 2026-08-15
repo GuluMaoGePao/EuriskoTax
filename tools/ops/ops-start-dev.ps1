@@ -272,6 +272,10 @@ if ($Watchdog) {
         Write-Host "  [OK] 守护脚本已后台运行 (PID: $($watchdogProc.Id))" -ForegroundColor Green
         Write-Host "  - 检查间隔: 20秒 | 日志: $watchdogLog" -ForegroundColor Gray
         Write-Host "  - 会自动重启异常的后端服务和 cpolar 隧道" -ForegroundColor Gray
+        # ⚠️ GUI 事件：通知控制台看门狗已在外部进程启动，用于显示状态、停止联动
+        #        （ops-start-dev.ps1 自己用 Start-Process 启动 watchdog，GUI 无法跟踪进程，
+        #         必须通过 stdout 事件把 PID 交给 GUI，GUI 再绑定到 $script:WatchdogProcess）
+        Write-Output "[GUI-EVENT] [WATCHDOG-STARTED] PID=$($watchdogProc.Id)"
     } catch {
         Write-Host "  [WARN] 守护脚本启动失败: $_" -ForegroundColor Yellow
     }

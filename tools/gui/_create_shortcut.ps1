@@ -137,19 +137,25 @@ if (Test-Path -LiteralPath $shortcutPath) {
 $ws  = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut($shortcutPath)
 
-# 指向 cmd /c ""path\to\bat"""，保证中文路径和空格都正确，且图标能独立设置
-$lnk.TargetPath       = (Join-Path $env:SystemRoot "System32\cmd.exe")
-$lnk.Arguments        = '/c "' + $targetBat + '"'
+# 直接指向 powershell.exe，跳过 cmd.exe，避免控制台窗口出现
+# -WindowStyle Hidden: powershell 自身无窗口；GUI 日志统一走内部 OutputBox
+# -STA: WinForms 单元线程模型必需
+# -File: 保持 $PSScriptRoot 正常解析（脚本内 L80-83 依赖此变量定位 ScriptDir）
+$psExe = (Get-Command powershell.exe -ErrorAction Stop).Source
+$guiPs1 = Join-Path $projectRoot "tools\gui\gui-dev-console.ps1"
+$lnk.TargetPath       = $psExe
+$lnk.Arguments        = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + $guiPs1 + '"'
 $lnk.WorkingDirectory = $projectRoot
-$lnk.WindowStyle      = 7   # Minimized
+$lnk.WindowStyle      = 7   # Minimized (双保险，powershell 自身已 Hidden)
 $lnk.Description      = "EuriskoTax Dev Console - 统一启动中心"
 
 # 图标设置：优先使用 logo.ico（已由 Ensure-ZoomedIcoBuilt 保证是放大版）
 if (Test-Path -LiteralPath $iconFile) {
     $lnk.IconLocation = $iconFile
 } else {
-    $lnk.IconLocation = $targetBat + ",0"
-    Write-Warning "[WARN] logo.ico 不存在，已退化到 bat 默认图标"
+    # 快捷方式已直接指向 powershell.exe，退化到 powershell.exe 自带图标
+    $lnk.IconLocation = $psExe + ",0"
+    Write-Warning "[WARN] logo.ico 不存在，已退化到 powershell.exe 默认图标"
 }
 
 $lnk.Save()
