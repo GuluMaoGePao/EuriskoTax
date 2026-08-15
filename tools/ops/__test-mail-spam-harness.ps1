@@ -1,4 +1,4 @@
-# Synthetic regression harness for mail-spam prevention fix.
+﻿# Synthetic regression harness for mail-spam prevention fix.
 # NOTE: This file MUST stay ASCII-only (no CJK chars) to avoid PS5.1 encoding parsing errors.
 #   Part 1: re-runs pre-fix logic (mirrors old ops-watchdog MainLoop) on the same A-B-A / null blanks
 #           sequences to CONFIRM the structural bug is real (should FAIL — 证明修复前确实有病)

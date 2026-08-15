@@ -19,7 +19,7 @@ tools/ops/ops-deploy.config.json
 tools/ops/deploy.config.json
 
 # Account credentials doc (contains all passwords/tokens)
-docs/account-credentials.md
+docs/admin/account-credentials.md
 
 # Logs
 logs/

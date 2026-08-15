@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # EuriskoTax 开发控制台 v3.3 (统一启动中心)
 # 双击 EuriskoTax-Console.bat 即可运行，无需消耗 AI 积分
 #
@@ -1478,6 +1478,42 @@ function Invoke-AsyncCommand {
                 try { Set-Content -Path $uf -Value $newUrl -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
                 try { Update-PublicUrlCard -Force } catch { }
             }
+            # 5) ops-start-dev.ps1 内部用 Start-Process 启动看门狗后，会输出此事件把 PID 交回 GUI
+            #    否则 GUI 的 $script:WatchdogProcess 永远是 null（体检显示「看门狗未启动」，停止按钮也无效）
+            if ($line -match '\[WATCHDOG-STARTED\]\s*PID=(\d+)') {
+                $wdPid = [int]$matches[1]
+                try {
+                    $wdProc = [System.Diagnostics.Process]::GetProcessById($wdPid)
+                    if ($wdProc -and -not $wdProc.HasExited) {
+                        # 只有在 GUI 本身没通过 -IsWatchdog 启动时才接管，避免覆盖已绑定
+                        if (-not $script:RunningJobs.ContainsKey("watchdog")) {
+                            $script:WatchdogProcess = $wdProc
+                            # 同步登记到 RunningJobs（让 Stop-Job -Name watchdog / 体检 / 状态条 都能认出来）
+                            $script:RunningJobs["watchdog"] = $wdProc
+                            Write-Log "[OK] 看门狗已绑定 (外部启动, PID $wdPid)" "OK"
+                            # 注册 Exited 事件，进程退出时同步清变量 + 更新状态栏
+                            # 注意：Action scriptblock 无法直接闭包捕获 $wdPid，所以用 -MessageData 传入
+                            Register-ObjectEvent -InputObject $wdProc -EventName "Exited" `
+                                -MessageData $wdPid -Action {
+                                    $pidIn = $Event.MessageData
+                                    if ($script:WatchdogProcess -and $script:WatchdogProcess.Id -eq $pidIn) {
+                                        $script:WatchdogProcess = $null
+                                    }
+                                    if ($script:RunningJobs.ContainsKey("watchdog") -and $script:RunningJobs["watchdog"].Id -eq $pidIn) {
+                                        $script:RunningJobs.Remove("watchdog")
+                                    }
+                                    Write-Log "[END] 看门狗已退出 (外部 PID $pidIn)" "WARN"
+                                    try { Update-StatusBar } catch { }
+                                } | Out-Null
+                            try { Update-StatusBar } catch { }
+                        } else {
+                            Write-Log "[INFO] 检测到看门狗启动(PID $wdPid)，但 GUI 已通过 RunningJobs.watchdog 自行启动，忽略外部绑定" "GRAY"
+                        }
+                    }
+                } catch {
+                    Write-Log "[WARN] 看门狗绑定失败 PID=$wdPid：可能进程已退出：$($_.Exception.Message)" "WARN"
+                }
+            }
 
             $script:OutputBox.SelectionStart = $script:OutputBox.TextLength
             $script:OutputBox.SelectionLength = 0
@@ -1546,19 +1582,39 @@ function Invoke-AsyncCommand {
 # ==============================================================================
 function Stop-Job {
     param([string]$Name)
+    $killed = $false
+    # 标准路径：RunningJobs 中登记过的进程（含 Invoke-AsyncCommand 启动 / 外部看门狗绑定登记）
     if ($script:RunningJobs.ContainsKey($Name)) {
         $proc = $script:RunningJobs[$Name]
         if ($proc -and -not $proc.HasExited) {
             try {
                 taskkill /PID $proc.Id /T /F 2>&1 | Out-Null
                 Write-Log "[STOP] 已停止 '$Name' (PID: $($proc.Id))" "WARN"
+                $killed = $true
             } catch { Write-Log "停止失败: $_" "ERROR" }
         }
         $script:RunningJobs.Remove($Name)
-        if ($Name -eq "backend") { $script:BackendProcess = $null; $script:StartTime = $null }
-        if ($Name -eq "watchdog") { $script:WatchdogProcess = $null }
-        Update-StatusBar
-    } else { Write-Log "任务 '$Name' 未在运行" "GRAY" }
+    }
+    # Fallback：RunningJobs 没有，但脚本级变量仍挂着 Process 对象（比如启动途中的半绑定状态）
+    # 额外尝试通过 $script:WatchdogProcess / BackendProcess 杀一次，避免遗留孤儿
+    $fallbackProc = $null
+    if ($Name -eq "watchdog" -and $script:WatchdogProcess -and -not $script:WatchdogProcess.HasExited) {
+        $fallbackProc = $script:WatchdogProcess
+    }
+    if ($Name -eq "backend" -and $script:BackendProcess -and -not $script:BackendProcess.HasExited) {
+        $fallbackProc = $script:BackendProcess
+    }
+    if ($fallbackProc) {
+        try {
+            taskkill /PID $fallbackProc.Id /T /F 2>&1 | Out-Null
+            Write-Log "[STOP] fallback 停止 '$Name' (PID: $($fallbackProc.Id))" "WARN"
+            $killed = $true
+        } catch { Write-Log "fallback 停止失败: $_" "ERROR" }
+    }
+    if ($Name -eq "backend")  { $script:BackendProcess = $null; $script:StartTime = $null }
+    if ($Name -eq "watchdog") { $script:WatchdogProcess = $null }
+    if (-not $killed) { Write-Log "任务 '$Name' 未在运行" "GRAY" }
+    Update-StatusBar
 }
 function Stop-AllJobs {
     $names = @($script:RunningJobs.Keys)
@@ -2680,15 +2736,15 @@ Add-SectionCard -TabCtx $tab4Ctx `
     -Subtitle "程序：tools/cpolar/cpolar.exe" `
     -Description "详细说明：cpolar 将本地 3000 端口映射为可在公网访问的 URL，方便在其他电脑或手机上测试。也可以在启动管理直接用一键模式开启。" `
     -AccentColor $C_CYAN -Buttons @(
-    @{ Text = "启动 HTTP 隧道`n映射 3000 端口到公网"; Desc = "执行 cpolar http 3000，将本地 3000 端口映射为 cpolar 提供的公网地址。启动后在下方打开面板查看URL。"; Color = "75, 180, 190";
+    @{ Text = "启动 HTTP 隧道`n映射 3000 端口到公网"; Desc = "执行 cpolar http 3000 -region=cn（国内加速节点），将本地 3000 端口映射为 cpolar 提供的公网地址。启动后在下面打开面板查看URL。"; Color = "75, 180, 190";
        OnClick = {
             $cp = Join-Path $CpolarDir "cpolar.exe"
             if (-not (Test-Path $cp)) { Write-Log "未找到 cpolar.exe: $cp，请确认 cpolar 目录完整。" "ERROR"; return }
-            Invoke-AsyncCommand -Name "cpolar-http" -Command "http 3000" -FileName $cp -WorkingDir $CpolarDir
-            Write-Log "Cpolar HTTP 隧道已启动。点下面的 Cpolar 面板按钮查看公网 URL (http://localhost:9200/)" "INFO"
+            Invoke-AsyncCommand -Name "cpolar-http" -Command "http 3000 -region=cn" -FileName $cp -WorkingDir $CpolarDir
+            Write-Log "Cpolar HTTP 隧道已启动。点下面的 Cpolar 面板按钮查看公网 URL (http://localhost:4040/)" "INFO"
         } },
-    @{ Text = "打开 Cpolar 面板`n查看公网 URL"; Desc = "在浏览器打开 http://localhost:9200/，这是 cpolar 本地面板，可查看隧道状态和分配的公网链接。"; Color = "120, 120, 140";
-       OnClick = { Start-Process "http://localhost:9200/" } },
+    @{ Text = "打开 Cpolar 面板`n查看公网 URL"; Desc = "在浏览器打开 http://localhost:4040/，这是 cpolar 本地面板（cpolar 默认端口），可查看隧道状态和分配的公网链接。"; Color = "120, 120, 140";
+       OnClick = { Start-Process "http://localhost:4040/" } },
     @{ Text = "停止所有 Cpolar 隧道"; Desc = "停止所有 cpolar 相关的进程，关闭隧道。"; Color = "180, 95, 95";
        OnClick = { Stop-Job -Name "cpolar-http"; Stop-Job -Name "cpolar-other" } }
 )
@@ -3096,8 +3152,8 @@ Add-SectionCard -TabCtx $tab6bCtx `
        OnClick = { Open-ApiDocsAuto } },
     @{ Text = "🖥 部署 SSH 配置`n远程服务器"; Desc = "正式部署时的 SSH 账号密码，配置文件：tools/ops/ops-deploy.config.json。从 ops-deploy.config.example.json 复制模板后填写。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
        OnClick = { Start-Process (Join-Path $ToolsDir "ops\ops-deploy.config.example.json") } },
-    @{ Text = "📖 查看完整账号文档`n账号管理说明"; Desc = "打开 docs/account-credentials.md 查看所有账号的详细说明、获取方式、安全注意事项。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\account-credentials.md") } }
+    @{ Text = "📖 查看完整账号文档`n账号管理说明"; Desc = "打开 docs/admin/account-credentials.md 查看所有账号的详细说明、获取方式、安全注意事项。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\admin\account-credentials.md") } }
 )
 
 # ==============================================================================
@@ -3504,7 +3560,7 @@ $form.Add_Shown({
     Write-Log "【账号密码统一管理：】" "OK"
     Write-Log "  👉 左侧导航 → 【🔐 Git & 账号】 → 【2. 账号 & 密码管理】 查看所有账号" "INFO"
     Write-Log "  👉 一键复制登录邮箱 dev@example.com  /  密码 password" "GRAY"
-    Write-Log "  👉 账号文档: docs/account-credentials.md" "GRAY"
+    Write-Log "  👉 账号文档: docs/admin/account-credentials.md" "GRAY"
     Write-Log ""
     Write-Log "提示: 鼠标悬停任何按钮可查看详细说明。导航选中后左侧有蓝色指示条。" "INFO"
     Write-Log ""
