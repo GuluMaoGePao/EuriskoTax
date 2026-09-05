@@ -2,7 +2,7 @@ const authService = require('../services/authService');
 
 const register = async (req, res, next) => {
     try {
-        const { username, email, password, phone } = req.body;
+        const { username, email, password, phone, inviteCode } = req.body;
         
         if (!username || !email || !password) {
             return res.status(400).json({
@@ -10,6 +10,18 @@ const register = async (req, res, next) => {
                 error: {
                     message: 'Username, email and password are required',
                     statusCode: 400
+                }
+            });
+        }
+        
+        // 邀请码校验（公测期限制注册）
+        const VALID_INVITE_CODE = 'EURISKO2026BETA';
+        if (inviteCode !== VALID_INVITE_CODE) {
+            return res.status(403).json({
+                success: false,
+                error: {
+                    message: 'Invalid invite code. Public beta requires an invite code.',
+                    statusCode: 403
                 }
             });
         }
