@@ -1544,6 +1544,13 @@
         <i class="fa fa-wifi mr-2"></i>
         当前处于离线状态，计税功能可正常使用，数据将保存在本地，联网后自动同步。
     </div>
+    <!-- SW 更新提示条（发现新版本时提示刷新） -->
+    <div id="sw-update-banner" class="hidden fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white text-center py-2 px-4 text-sm shadow-md">
+        <i class="fa fa-refresh mr-2"></i>
+        发现新版本，
+        <button id="sw-update-refresh" class="underline font-bold hover:text-blue-200 ml-1">点击刷新</button>
+        以使用最新功能
+    </div>
     <!-- 登录页面 -->
     <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
         <div class="w-full max-w-md mx-4">
@@ -1704,6 +1711,9 @@
                     <span class="brand-name ml-2 hidden sm:inline">EuriskoTax</span>
                 </div>
                 <div class="flex items-center space-x-1">
+                    <button id="pwa-install-btn" class="nav-icon-btn hidden" title="安装到桌面">
+                        <i class="fa fa-download"></i>
+                    </button>
                     <button id="theme-toggle" class="nav-icon-btn" title="切换主题">
                         <i class="fa fa-moon-o"></i>
                     </button>
@@ -5748,9 +5758,9 @@
             <div id="assistant-qa-list" class="assistant-qa-list"></div>
         </div>
     </div>
-    <!-- Service Worker 注册 + 离线状态监听（PWA 离线支持） -->
+    <!-- Service Worker 注册 + 离线状态监听 + PWA 安装（PWA 离线支持） -->
     <script>
-        // 离线状态提示条控制
+        // ====== 离线状态提示条控制 ======
         function updateOfflineBanner() {
             var banner = document.getElementById('offline-banner');
             if (!banner) return;
@@ -5762,17 +5772,21 @@
             }
         }
 
-        // Service Worker 注册
+        // ====== Service Worker 注册与更新检测 ======
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function (reg) {
                         console.log('[PWA] Service Worker 注册成功，作用域:', reg.scope);
+                        // 检测到新 SW 安装完成时，提示用户刷新
                         reg.addEventListener('updatefound', function () {
                             var newWorker = reg.installing;
+                            if (!newWorker) return;
                             newWorker.addEventListener('statechange', function () {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('[PWA] 发现新版本，下次刷新生效');
+                                    console.log('[PWA] 发现新版本，提示用户刷新');
+                                    var banner = document.getElementById('sw-update-banner');
+                                    if (banner) banner.classList.remove('hidden');
                                 }
                             });
                         });
@@ -5781,7 +5795,51 @@
                         console.warn('[PWA] Service Worker 注册失败:', err);
                     });
             });
+
+            // SW 更新提示条的刷新按钮
+            document.addEventListener('DOMContentLoaded', function () {
+                var refreshBtn = document.getElementById('sw-update-refresh');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', function () {
+                        window.location.reload();
+                    });
+                }
+            });
         }
+
+        // ====== PWA 安装提示 ======
+        var deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            var installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) installBtn.classList.remove('hidden');
+            console.log('[PWA] 可安装到桌面');
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.addEventListener('click', function () {
+                    if (!deferredInstallPrompt) return;
+                    deferredInstallPrompt.prompt();
+                    deferredInstallPrompt.userChoice.then(function (choice) {
+                        if (choice.outcome === 'accepted') {
+                            console.log('[PWA] 用户接受安装');
+                        } else {
+                            console.log('[PWA] 用户取消安装');
+                        }
+                        deferredInstallPrompt = null;
+                        installBtn.classList.add('hidden');
+                    });
+                });
+            }
+            // 已安装后隐藏按钮
+            window.addEventListener('appinstalled', function () {
+                if (installBtn) installBtn.classList.add('hidden');
+                console.log('[PWA] 已安装到桌面');
+            });
+        });
 
         // 监听在线/离线状态
         window.addEventListener('online', updateOfflineBanner);
