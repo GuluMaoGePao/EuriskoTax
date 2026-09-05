@@ -9,5 +9,4 @@ server/.env
 tools
 docs
 tests
-images
 *.log
