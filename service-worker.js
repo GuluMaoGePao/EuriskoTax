@@ -9,7 +9,7 @@
  *
  * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
  */
-const CACHE_VERSION = 'euriskotax-v1';
+const CACHE_VERSION = 'euriskotax-v2';
 const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const CDN_CACHE = CACHE_VERSION + '-cdn';
@@ -36,6 +36,14 @@ const APP_SHELL = [
   '/src/js/app.js'
 ];
 
+// 核心 CDN 资源预缓存（离线兜底）：
+// Tailwind（样式）+ Font Awesome（图标）是页面渲染必需，离线时必须可用
+// Chart.js/jsPDF/html2canvas 仅在导出图表/PDF 时使用，不预缓存（运行时按需缓存）
+const CDN_SHELL = [
+  'https://cdn.tailwindcss.com',
+  'https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css'
+];
+
 // CDN 域名白名单：命中后走 cache-first 策略
 const CDN_HOSTS = [
   'cdn.tailwindcss.com',
@@ -43,14 +51,22 @@ const CDN_HOSTS = [
   'cdnjs.cloudflare.com'
 ];
 
+// 逐个缓存资源，单个失败不阻塞整体（CDN 可能因 CORS/网络波动失败）
+function cacheAll(cache, urls) {
+  return Promise.all(urls.map((url) =>
+    cache.add(url).catch((err) => console.warn('[SW] 预缓存跳过:', url, err))
+  ));
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cacheAll(cache, APP_SHELL))
+      .then(() => caches.open(CDN_CACHE))
+      .then((cache) => cacheAll(cache, CDN_SHELL))
       .then(() => self.skipWaiting())
       .catch((err) => {
-        console.error('[SW] 预缓存失败:', err);
-        // 即使部分资源失败也继续，避免阻塞 SW 激活
+        console.error('[SW] 预缓存阶段出错:', err);
         return self.skipWaiting();
       })
   );
