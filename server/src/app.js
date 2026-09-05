@@ -121,15 +121,24 @@ app.get('/health', (req, res) => {
 
 // 静态文件服务（生产环境）
 // 前端文件位于 server 目录的上一级
+// index.html 必须 no-cache：防止浏览器/CDN 缓存旧 HTML 导致与新版 JS 混搭
+// （典型故障：旧 HTML 无验证码输入框 + 新 JS 读取该元素 → 点击注册无反应）
 const staticPath = path.join(__dirname, '../../');
-app.use(express.static(staticPath));
+app.use(express.static(staticPath, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
+}));
 
-// SPA 回退：所有非 API 路由返回 index.html
+// SPA 回退：所有非 API 路由返回 index.html（同样 no-cache）
 app.get('*', (req, res, next) => {
     // 跳过 API 路由
     if (req.path.startsWith('/api/')) {
         return next();
     }
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(staticPath, 'index.html'));
 });
 
