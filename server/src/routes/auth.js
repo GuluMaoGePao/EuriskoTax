@@ -8,23 +8,25 @@ const { authenticateToken } = require('../middleware/auth');
  * /api/auth/register:
  *   post:
  *     tags: [认证 Auth]
- *     summary: 用户注册
- *     description: 注册新用户（开发环境开放，生产环境应关闭）
+ *     summary: 用户注册（需邀请码）
+ *     description: 注册新用户，公测期需提供有效邀请码
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [username, email, password]
+ *             required: [username, email, password, inviteCode]
  *             properties:
- *               username: { type: string, example: devuser }
- *               email:    { type: string, format: email, example: dev@example.com }
- *               password: { type: string, minLength: 6, example: password }
- *               phone:    { type: string, example: 13800138000 }
+ *               username:   { type: string, example: devuser }
+ *               email:      { type: string, format: email, example: dev@example.com }
+ *               password:   { type: string, minLength: 6, example: password }
+ *               phone:      { type: string, example: 13800138000 }
+ *               inviteCode: { type: string, example: EURISKO2026BETA, description: 公测期邀请码 }
  *     responses:
  *       '201': { description: 注册成功 }
  *       '400': { description: 参数错误或邮箱已存在 }
+ *       '403': { description: 邀请码无效 }
  */
 router.post('/register', authController.register);
 
