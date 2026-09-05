@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
+const rateLimit = require('express-rate-limit');
 
 const logger = require('./middleware/logger');
 const { errorHandler, notFound } = require('./middleware/error');
@@ -26,7 +27,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 速率限制（防止暴力枚举登录）
-const rateLimit = require('express-rate-limit');
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
