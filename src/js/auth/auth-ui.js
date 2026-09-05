@@ -111,6 +111,7 @@ async function handleRegister() {
     const phone = document.getElementById('register-phone').value;
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
+    const inviteCode = document.getElementById('register-invite-code').value;
     const btn = document.getElementById('register-submit');
     
     if (!username || !email || !password) {
@@ -127,10 +128,15 @@ async function handleRegister() {
         showAlert('密码长度至少6位');
         return;
     }
+
+    if (!inviteCode) {
+        showAlert('请填写邀请码');
+        return;
+    }
     
     try {
         setLoading(btn, true);
-        await apiClient.registerUser(username, email, password, phone || null);
+        await apiClient.registerUser(username, email, password, phone || null, inviteCode);
         showAlert('注册成功，请登录', 'success');
         document.getElementById('login-tab').click();
         document.getElementById('register-username').value = '';
@@ -138,6 +144,7 @@ async function handleRegister() {
         document.getElementById('register-phone').value = '';
         document.getElementById('register-password').value = '';
         document.getElementById('register-confirm-password').value = '';
+        document.getElementById('register-invite-code').value = '';
         document.getElementById('login-email').value = email;
     } catch (error) {
         showAlert('注册失败: ' + error.message);
