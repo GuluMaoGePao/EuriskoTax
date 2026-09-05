@@ -1,30 +1,5 @@
 import apiClient from '../api/api-client.js';
 
-function showLoginModal() {
-    openModal(document.getElementById('login-modal'));
-    closeModal(document.getElementById('register-modal'));
-}
-
-function hideLoginModal() {
-    closeModal(document.getElementById('login-modal'));
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-password').value = '';
-}
-
-function showRegisterModal() {
-    openModal(document.getElementById('register-modal'));
-    closeModal(document.getElementById('login-modal'));
-}
-
-function hideRegisterModal() {
-    closeModal(document.getElementById('register-modal'));
-    document.getElementById('register-username').value = '';
-    document.getElementById('register-email').value = '';
-    document.getElementById('register-phone').value = '';
-    document.getElementById('register-password').value = '';
-    document.getElementById('register-confirm-password').value = '';
-}
-
 function showApp() {
     document.getElementById('login-page').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
@@ -80,7 +55,6 @@ async function handleLogin() {
         await apiClient.loginUser(email, password);
         clearPageHistory();
         updateAuthUI();
-        hideLoginModal();
         showAlert('登录成功', 'success');
     } catch (error) {
         showAlert('登录失败: ' + error.message);
@@ -112,6 +86,7 @@ async function handleRegister() {
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
     const inviteCode = document.getElementById('register-invite-code').value;
+    const verificationCode = document.getElementById('register-code').value.trim();
     const btn = document.getElementById('register-submit');
     
     if (!username || !email || !password) {
@@ -133,10 +108,15 @@ async function handleRegister() {
         showAlert('请填写邀请码');
         return;
     }
+
+    if (!verificationCode) {
+        showAlert('请填写邮箱验证码');
+        return;
+    }
     
     try {
         setLoading(btn, true);
-        await apiClient.registerUser(username, email, password, phone || null, inviteCode);
+        await apiClient.registerUser(username, email, password, phone || null, inviteCode, verificationCode);
         showAlert('注册成功，请登录', 'success');
         document.getElementById('login-tab').click();
         document.getElementById('register-username').value = '';
@@ -145,11 +125,64 @@ async function handleRegister() {
         document.getElementById('register-password').value = '';
         document.getElementById('register-confirm-password').value = '';
         document.getElementById('register-invite-code').value = '';
+        document.getElementById('register-code').value = '';
         document.getElementById('login-email').value = email;
     } catch (error) {
         showAlert('注册失败: ' + error.message);
     } finally {
         setLoading(btn, false);
+    }
+}
+
+// 发送注册验证码：成功后进入 60 秒倒计时
+const SEND_CODE_COOLDOWN = 60;
+let sendCodeTimer = null;
+
+function startSendCodeCountdown(seconds) {
+    const btn = document.getElementById('send-code-btn');
+    let remaining = seconds;
+    btn.disabled = true;
+    btn.textContent = `${remaining}s 后重发`;
+    sendCodeTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(sendCodeTimer);
+            sendCodeTimer = null;
+            btn.textContent = '发送验证码';
+            // 冷却结束后仅在邮箱已填写时恢复可点击
+            const email = document.getElementById('register-email').value.trim();
+            btn.disabled = !email;
+        } else {
+            btn.textContent = `${remaining}s 后重发`;
+        }
+    }, 1000);
+}
+
+async function handleSendCode() {
+    const email = document.getElementById('register-email').value.trim();
+    const btn = document.getElementById('send-code-btn');
+
+    if (!email) {
+        showAlert('请先填写邮箱');
+        return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showAlert('邮箱格式不正确');
+        return;
+    }
+
+    try {
+        btn.disabled = true;
+        btn.textContent = '发送中...';
+        await apiClient.sendVerificationCode(email);
+        showAlert('验证码已发送，请查收邮箱（注意垃圾箱）', 'success');
+        startSendCodeCountdown(SEND_CODE_COOLDOWN);
+    } catch (error) {
+        // 发送失败不进入倒计时，允许用户直接重试
+        btn.textContent = '发送验证码';
+        btn.disabled = false;
+        showAlert('验证码发送失败: ' + error.message);
     }
 }
 
@@ -906,6 +939,13 @@ function setupAuthEventListeners() {
         document.getElementById('quick-login-btn').classList.add('hidden');
     }
     document.getElementById('register-submit').addEventListener('click', handleRegister);
+    document.getElementById('send-code-btn').addEventListener('click', handleSendCode);
+    // 邮箱填写后才允许点击"发送验证码"（倒计时期间由倒计时逻辑控制）
+    document.getElementById('register-email').addEventListener('input', (e) => {
+        if (!sendCodeTimer) {
+            document.getElementById('send-code-btn').disabled = !e.target.value.trim();
+        }
+    });
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
         const eventTime = Date.now();
@@ -1122,10 +1162,6 @@ function showConfirm(message, onConfirm, onCancel) {
 }
 
 window.showConfirm = showConfirm;
-window.showLoginModal = showLoginModal;
-window.hideLoginModal = hideLoginModal;
-window.showRegisterModal = showRegisterModal;
-window.hideRegisterModal = hideRegisterModal;
 
 const pageHistory = [];
 let isInitialNavigation = true;

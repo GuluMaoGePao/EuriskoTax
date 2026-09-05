@@ -39,6 +39,15 @@ const ERROR_MESSAGE_MAP = {
     'Username or email already exists': '用户名或邮箱已被注册',
     'Invalid email or password': '邮箱或密码错误',
     'Invalid invite code. Public beta requires an invite code.': '邀请码无效，公测期注册需要有效邀请码',
+    'Verification code is required': '请填写邮箱验证码',
+    'Email is required': '请填写邮箱',
+    'Invalid email format': '邮箱格式不正确',
+    'Code resend too frequent. Please wait a moment': '验证码发送过于频繁，请稍后再试',
+    'SMTP mail is not configured': '邮件服务未配置，请联系开发者',
+    'Verification code not found. Please request a new one': '请先获取验证码',
+    'Verification code expired. Please request a new one': '验证码已过期，请重新获取',
+    'Too many attempts. Please request a new code': '错误次数过多，验证码已失效，请重新获取',
+    'Invalid verification code': '验证码错误，请重新输入',
     'Feedback content is required': '请填写反馈内容',
     'Feedback content must be less than 5000 characters': '反馈内容不能超过5000字符',
     'Calculation not found': '计算记录不存在',
@@ -84,14 +93,20 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     return result.data;
 }
 
-async function registerUser(username, email, password, phone = null, inviteCode = null) {
+async function registerUser(username, email, password, phone = null, inviteCode = null, verificationCode = null) {
     return await apiRequest('/auth/register', 'POST', {
         username,
         email,
         password,
         phone,
-        inviteCode
+        inviteCode,
+        verificationCode
     });
+}
+
+// 发送注册验证码到邮箱
+async function sendVerificationCode(email) {
+    return await apiRequest('/auth/send-code', 'POST', { email });
 }
 
 async function loginUser(email, password) {
@@ -171,6 +186,7 @@ const apiClient = {
     setCurrentUser,
     removeCurrentUser,
     registerUser,
+    sendVerificationCode,
     loginUser,
     logoutUser,
     getProfile,

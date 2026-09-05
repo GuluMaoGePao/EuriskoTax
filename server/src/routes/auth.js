@@ -5,27 +5,51 @@ const { authenticateToken } = require('../middleware/auth');
 
 /**
  * @swagger
- * /api/auth/register:
+ * /api/auth/send-code:
  *   post:
  *     tags: [认证 Auth]
- *     summary: 用户注册（需邀请码）
- *     description: 注册新用户，公测期需提供有效邀请码
+ *     summary: 发送注册验证码到邮箱
+ *     description: 向指定邮箱发送 6 位数字验证码（10 分钟有效，60 秒重发冷却，同一 IP 15 分钟内最多 5 次）
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [username, email, password, inviteCode]
+ *             required: [email]
  *             properties:
- *               username:   { type: string, example: devuser }
- *               email:      { type: string, format: email, example: dev@example.com }
- *               password:   { type: string, minLength: 6, example: password }
- *               phone:      { type: string, example: 13800138000 }
- *               inviteCode: { type: string, example: EURISKO2026BETA, description: 公测期邀请码 }
+ *               email: { type: string, format: email, example: dev@example.com }
+ *     responses:
+ *       '200': { description: 发送成功 }
+ *       '400': { description: 邮箱格式错误 }
+ *       '429': { description: 发送过于频繁 }
+ */
+router.post('/send-code', authController.sendCode);
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     tags: [认证 Auth]
+ *     summary: 用户注册（需邮箱验证码 + 邀请码）
+ *     description: 注册新用户；需先调用 /api/auth/send-code 获取邮箱验证码，公测期还需提供有效邀请码
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, email, password, inviteCode, verificationCode]
+ *             properties:
+ *               username:         { type: string, example: devuser }
+ *               email:            { type: string, format: email, example: dev@example.com }
+ *               password:         { type: string, minLength: 6, example: password }
+ *               phone:            { type: string, example: 13800138000 }
+ *               inviteCode:       { type: string, example: EURISKO2026BETA, description: 公测期邀请码 }
+ *               verificationCode: { type: string, example: "123456", description: 邮箱验证码（6位数字） }
  *     responses:
  *       '201': { description: 注册成功 }
- *       '400': { description: 参数错误或邮箱已存在 }
+ *       '400': { description: 参数错误 / 验证码无效或过期 / 邮箱已存在 }
  *       '403': { description: 邀请码无效 }
  */
 router.post('/register', authController.register);

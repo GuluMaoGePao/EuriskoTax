@@ -1,9 +1,15 @@
+// 本地开发专用 schema（SQLite，零配置）
+// 生产环境使用 schema.prisma（PostgreSQL）；两者模型必须保持一致
+// 用法：在 server 目录执行
+//   npm run prisma:generate:dev
+//   npm run prisma:push:dev
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -15,7 +21,7 @@ model User {
   password_hash String
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
-  
+
   calculations Calculation[]
 }
 
@@ -26,7 +32,7 @@ model Calculation {
   input_data  String
   result_data String
   created_at  DateTime @default(now())
-  
+
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
