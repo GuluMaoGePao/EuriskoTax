@@ -11,6 +11,7 @@ const { errorHandler, notFound } = require('./middleware/error');
 const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
+const statsRoutes = require('./routes/stats');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -98,6 +99,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/calculations', calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {
