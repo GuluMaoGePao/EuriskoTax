@@ -33,10 +33,23 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 
 // 速率限制（防止暴力枚举登录）
+// send-code（验证码发送）单独走 codeLimiter，不占用此配额
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
+    skip: (req) => req.path === '/send-code',
     message: { error: '请求过于频繁，请 15 分钟后再试' }
+});
+
+// 验证码发送限流：5 次/15 分钟/IP（防邮件轰炸滥用）
+const codeLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    skip: (req) => req.path !== '/send-code',
+    message: {
+        success: false,
+        error: { message: '验证码发送过于频繁，请 15 分钟后再试', statusCode: 429 }
+    }
 });
 
 // 基础安全 HTTP 头部（不引入额外依赖）
@@ -96,7 +109,7 @@ app.get('/api/docs.json', (req, res) => {
     res.json(swaggerSpec);
 });
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
 app.use('/api/calculations', calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsRoutes);

@@ -1,9 +1,10 @@
 const authService = require('../services/authService');
+const verificationService = require('../services/verificationService');
 
 const register = async (req, res, next) => {
     try {
-        const { username, email, password, phone, inviteCode } = req.body;
-        
+        const { username, email, password, phone, inviteCode, verificationCode } = req.body;
+
         if (!username || !email || !password) {
             return res.status(400).json({
                 success: false,
@@ -13,7 +14,20 @@ const register = async (req, res, next) => {
                 }
             });
         }
-        
+
+        if (!verificationCode) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Verification code is required',
+                    statusCode: 400
+                }
+            });
+        }
+
+        // 邮箱验证码校验（一次性使用，校验通过即作废）
+        await verificationService.verifyRegisterCode(email, verificationCode);
+
         // 邀请码校验（公测期限制注册；码值由环境变量提供，未配置时一律拒绝）
         const VALID_INVITE_CODE = process.env.INVITE_CODE;
         if (!VALID_INVITE_CODE || inviteCode !== VALID_INVITE_CODE) {
@@ -25,12 +39,38 @@ const register = async (req, res, next) => {
                 }
             });
         }
-        
+
         const user = await authService.registerUser(username, email, password, phone);
-        
+
         res.status(201).json({
             success: true,
             data: user
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// 发送注册验证码到邮箱
+const sendCode = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Email is required',
+                    statusCode: 400
+                }
+            });
+        }
+
+        const result = await verificationService.sendRegisterCode(email);
+
+        res.status(200).json({
+            success: true,
+            data: result
         });
     } catch (err) {
         next(err);
@@ -141,6 +181,7 @@ const deleteProfile = async (req, res, next) => {
 
 module.exports = {
     register,
+    sendCode,
     login,
     profile,
     updateProfile,
