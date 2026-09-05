@@ -30,6 +30,34 @@
     // 模块级请求序号：跨实例递增，并发场景下用于追踪日志归属与发起顺序
     var reqSeq = 0;
 
+    // ====== 离线状态检测 ======
+    // PWA 离线化：计税引擎在前端本地运行，离线时完全可用；
+    // MockClient 用于模拟收藏/反馈等"云端同步"操作，离线时直接本地成功（无网络延迟）
+    function isOnline() {
+        try {
+            return typeof navigator !== 'undefined' && navigator.onLine !== false;
+        } catch (e) {
+            return true; // 非浏览器环境默认在线
+        }
+    }
+
+    // 暴露全局离线状态工具
+    window.EuriskoTaxNet = {
+        isOnline: isOnline,
+        // 监听在线/离线事件，回调接收 (isOnline)
+        onStatusChange: function (cb) {
+            if (typeof window === 'undefined') return function () {};
+            var online = function () { cb(true); };
+            var offline = function () { cb(false); };
+            window.addEventListener('online', online);
+            window.addEventListener('offline', offline);
+            return function () {
+                window.removeEventListener('online', online);
+                window.removeEventListener('offline', offline);
+            };
+        }
+    };
+
     // ====== Logger 工厂：可配置 tag 和 level 的轻量日志器 ======
     // level: 0=DEBUG, 1=INFO, 2=WARN(默认/生产), 3=ERROR
     // 生产默认 level=2 静默 INFO，仅保留 WARN/ERROR，消除高频日志开销
@@ -123,6 +151,12 @@
                 var self = this;
                 var reqId = ++reqSeq; // 发起即分配序号，日志中可对应发起顺序
                 var start = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+                // 离线模式：计税等核心功能本地可用，收藏/反馈等"同步"操作直接本地成功
+                // 不引入网络延迟，也不触发失败注入（离线时不应模拟服务端错误）
+                if (!isOnline()) {
+                    if (logger && logger.info) logger.info(tag, method + ' ' + url + ' [OFFLINE 本地成功]', { reqId: reqId, payload: payload });
+                    return Promise.resolve({ success: true, offline: true });
+                }
                 var shouldFail = this._shouldFail();
                 return new Promise(function (resolve, reject) {
                     setTimeout(function () {

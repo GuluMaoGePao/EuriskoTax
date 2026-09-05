@@ -1,0 +1,33 @@
+{
+  "name": "EuriskoTax - 个人所得税预算规划工具",
+  "short_name": "EuriskoTax",
+  "description": "专业的个人所得税预算规划工具，支持综合所得、经营所得、分类所得计算与反向倒算，离线可用。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1e40af",
+  "theme_color": "#1e40af",
+  "lang": "zh-CN",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

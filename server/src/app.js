@@ -121,13 +121,32 @@ app.get('/health', (req, res) => {
 
 // 静态文件服务（生产环境）
 // 前端文件位于 server 目录的上一级
-// index.html 必须 no-cache：防止浏览器/CDN 缓存旧 HTML 导致与新版 JS 混搭
-// （典型故障：旧 HTML 无验证码输入框 + 新 JS 读取该元素 → 点击注册无反应）
+// 差异化缓存策略：
+//   - index.html / manifest.json / service-worker.js → no-cache
+//     （每次需重新验证，确保新版本及时下发；SW 文件尤其不能被浏览器强缓存）
+//   - JS / CSS → public, max-age=31536000, immutable
+//     （强缓存 1 年，依靠 Service Worker 版本号 + 文件 ?v= 指纹失效）
+//   - 图片 / 字体 → public, max-age=604800（7 天）
+//   - 其他 → 不设，走浏览器默认
 const staticPath = path.join(__dirname, '../../');
 app.use(express.static(staticPath, {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
+        const ext = path.extname(filePath).toLowerCase();
+        const base = path.basename(filePath).toLowerCase();
+        // 必须 no-cache 的文件：HTML 入口、PWA 清单、Service Worker 本体
+        if (base === 'index.html' || base === 'manifest.json' || base === 'service-worker.js') {
             res.setHeader('Cache-Control', 'no-cache');
+            return;
+        }
+        // JS / CSS：强缓存 1 年（immutable 表示内容不会变，避免条件请求）
+        if (ext === '.js' || ext === '.css') {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        // 图片 / 字体 / 图标：缓存 7 天
+        if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot'].includes(ext)) {
+            res.setHeader('Cache-Control', 'public, max-age=604800');
+            return;
         }
     }
 }));

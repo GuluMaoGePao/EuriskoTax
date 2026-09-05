@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="description" content="EuriskoTax 个人所得税预算规划工具 - 综合所得、经营所得、分类所得计算与反向倒算，离线可用。">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
     <title>EuriskoTax - 个人所得税预算规划工具</title>
     <!-- Tailwind CSS v3 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1534,6 +1539,11 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- 离线状态提示条（PWA 离线模式） -->
+    <div id="offline-banner" class="hidden fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-white text-center py-2 px-4 text-sm shadow-md">
+        <i class="fa fa-wifi mr-2"></i>
+        当前处于离线状态，计税功能可正常使用，数据将保存在本地，联网后自动同步。
+    </div>
     <!-- 登录页面 -->
     <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
         <div class="w-full max-w-md mx-4">
@@ -5738,5 +5748,46 @@
             <div id="assistant-qa-list" class="assistant-qa-list"></div>
         </div>
     </div>
+    <!-- Service Worker 注册 + 离线状态监听（PWA 离线支持） -->
+    <script>
+        // 离线状态提示条控制
+        function updateOfflineBanner() {
+            var banner = document.getElementById('offline-banner');
+            if (!banner) return;
+            var online = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
+            if (online) {
+                banner.classList.add('hidden');
+            } else {
+                banner.classList.remove('hidden');
+            }
+        }
+
+        // Service Worker 注册
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function (reg) {
+                        console.log('[PWA] Service Worker 注册成功，作用域:', reg.scope);
+                        reg.addEventListener('updatefound', function () {
+                            var newWorker = reg.installing;
+                            newWorker.addEventListener('statechange', function () {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('[PWA] 发现新版本，下次刷新生效');
+                                }
+                            });
+                        });
+                    })
+                    .catch(function (err) {
+                        console.warn('[PWA] Service Worker 注册失败:', err);
+                    });
+            });
+        }
+
+        // 监听在线/离线状态
+        window.addEventListener('online', updateOfflineBanner);
+        window.addEventListener('offline', updateOfflineBanner);
+        // 初始化时检查一次
+        updateOfflineBanner();
+    </script>
 </body>
 </html>
