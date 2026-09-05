@@ -73,7 +73,7 @@
 
 ```powershell
 # 命令 1：查看错误日志
-Select-String -Path .\scripts\notify.log -Pattern "\[ERROR\]" | Select-Object -Last 5
+Select-String -Path .\tools\ops\notify.log -Pattern "\[ERROR\]" | Select-Object -Last 5
 
 # 命令 2：测试端口连通性
 Test-NetConnection -ComputerName smtp.qq.com -Port 587
@@ -120,7 +120,7 @@ Test-NetConnection -ComputerName smtp.qq.com -Port 587
 # 临时关闭防火墙
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 # 发送测试邮件验证
-. .\scripts\notify.ps1; Send-TestNotification
+. .\tools\ops\ops-notify.ps1; Send-TestNotification
 # 重新开启防火墙
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 ```

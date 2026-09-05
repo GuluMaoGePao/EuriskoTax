@@ -1,4 +1,4 @@
-# EuriskoTax Watchdog 监控与邮件通知系统部署指南
+﻿# EuriskoTax Watchdog 监控与邮件通知系统部署指南
 
 > 文档版本：v1.2 | 更新日期：2026-04-15
 > 适用范围：EuriskoTax 开发环境完整监控与通知系统部署
@@ -75,9 +75,9 @@ EuriskoTax Watchdog 是一套完整的开发环境守护系统，包含以下核
 
 | 文件 | 用途 | 查看命令 |
 |------|------|---------|
-| watchdog.log | 守护脚本运行日志（心跳+状态） | `Get-Content .\scripts\watchdog.log -Tail 20` |
-| events.log | 结构化重启事件日志 | `Get-Content .\scripts\events.log -Tail 20` |
-| notify.log | 邮件发送详细日志（排查用） | `Get-Content .\scripts\notify.log -Tail 30` |
+| watchdog.log | 守护脚本运行日志（心跳+状态） | `Get-Content .\tools\ops\watchdog.log -Tail 20` |
+| events.log | 结构化重启事件日志 | `Get-Content .\tools\ops\events.log -Tail 20` |
+| notify.log | 邮件发送详细日志（排查用） | `Get-Content .\tools\ops\notify.log -Tail 30` |
 | `%TEMP%\eurisko-server-watchdog.log` | 后端服务stdout | 按需查看 |
 | `%TEMP%\eurisko-server-watchdog.err` | 后端服务stderr | 按需查看 |
 | `%TEMP%\cpolar-euriskotax-watchdog.log` | cpolar stdout（watchdog启动时） | 按需查看 |
@@ -196,7 +196,7 @@ cd ..
 
 ```powershell
 # 发送测试邮件
-. .\scripts\notify.ps1
+. .\tools\ops\ops-notify.ps1
 Send-TestNotification
 ```
 
@@ -210,7 +210,7 @@ Send-TestNotification
 
 #### 方式 A：图形化（给"朋友联调"时最省事）—— GUI
 
-双击 `tools/gui/gui-启动.bat` 打开 EuriskoTax 开发控制台 → 进入「🚀 启动管理」Tab → 点击 **🔥 完整测试**（= `-Share -Watchdog`）。GUI 会：
+双击 `tools/gui/EuriskoTax-Console.bat` 打开 EuriskoTax 开发控制台 → 进入「🚀 启动管理」Tab → 点击 **🔥 完整测试**（= `-Share -Watchdog`）。GUI 会：
 - 捕获子进程的 `[GUI-EVENT]` 行；
 - 在 Tab 顶部显示「🌐 公网地址速览」卡片（点一下复制，每 3s 刷新）；
 - 对 4 类事件弹 1 次 MessageBox（180s 去重，不会重复弹）：URL 首次生成 / URL 变更 / 邮件成功 / 邮件失败。
@@ -268,8 +268,8 @@ Send-TestNotification
 
 查看命令：
 ```powershell
-Get-Content .\scripts\watchdog.log -Tail 20
-Get-Content .\scripts\watchdog.log -Wait -Tail 10  # 实时跟踪
+Get-Content .\tools\ops\watchdog.log -Tail 20
+Get-Content .\tools\ops\watchdog.log -Wait -Tail 10  # 实时跟踪
 ```
 
 #### events.log — 结构化事件日志
@@ -284,14 +284,14 @@ Get-Content .\scripts\watchdog.log -Wait -Tail 10  # 实时跟踪
 查看命令：
 ```powershell
 # 最近20条事件
-Get-Content .\scripts\events.log -Tail 20
+Get-Content .\tools\ops\events.log -Tail 20
 
 # 筛选特定类型
-Select-String -Path .\scripts\events.log -Pattern "URL_CHANGED"
-Select-String -Path .\scripts\events.log -Pattern "RESTART_FAILED"
+Select-String -Path .\tools\ops\events.log -Pattern "URL_CHANGED"
+Select-String -Path .\tools\ops\events.log -Pattern "RESTART_FAILED"
 
 # 筛选今天的日志
-Select-String -Path .\scripts\events.log -Pattern "2026-08-10"
+Select-String -Path .\tools\ops\events.log -Pattern "2026-08-10"
 ```
 
 #### notify.log — 邮件发送详细日志
@@ -311,13 +311,13 @@ Select-String -Path .\scripts\events.log -Pattern "2026-08-10"
 查看命令：
 ```powershell
 # 最近30条
-Get-Content .\scripts\notify.log -Tail 30
+Get-Content .\tools\ops\notify.log -Tail 30
 
 # 只看错误
-Select-String -Path .\scripts\notify.log -Pattern "\[ERROR\]"
+Select-String -Path .\tools\ops\notify.log -Pattern "\[ERROR\]"
 
 # 只看发送结果
-Select-String -Path .\scripts\notify.log -Pattern "Email sent OK|FAILED"
+Select-String -Path .\tools\ops\notify.log -Pattern "Email sent OK|FAILED"
 ```
 
 ### 6.2 日志级别
@@ -337,10 +337,10 @@ notify.log 使用4个级别：
 
 ```powershell
 # 清空所有日志（保留文件）
-Clear-Content .\scripts\watchdog.log, .\scripts\events.log, .\scripts\notify.log
+Clear-Content .\tools\ops\watchdog.log, .\tools\ops\events.log, .\tools\ops\notify.log
 
 # 只清空 notify.log
-Clear-Content .\scripts\notify.log
+Clear-Content .\tools\ops\notify.log
 ```
 
 ---
@@ -414,7 +414,7 @@ Clear-Content .\scripts\notify.log
 
 1. 查看 notify.log 最近的 ERROR 条目：
    ```powershell
-   Select-String -Path .\scripts\notify.log -Pattern "\[ERROR\]" | Select-Object -Last 5
+   Select-String -Path .\tools\ops\notify.log -Pattern "\[ERROR\]" | Select-Object -Last 5
    ```
 
 2. 根据错误信息对照下表：
@@ -430,7 +430,7 @@ Clear-Content .\scripts\notify.log
 
 3. 手动发送测试邮件验证：
    ```powershell
-   . .\scripts\notify.ps1
+   . .\tools\ops\ops-notify.ps1
    Send-TestNotification
    ```
 
@@ -445,7 +445,7 @@ Clear-Content .\scripts\notify.log
 
 2. 查看 watchdog.log 心跳：
    ```powershell
-   Get-Content .\scripts\watchdog.log -Tail 10
+   Get-Content .\tools\ops\watchdog.log -Tail 10
    ```
 
 3. 确认检查间隔（默认20秒），如果心跳间隔异常长，可能是有阻塞。
@@ -456,7 +456,7 @@ Clear-Content .\scripts\notify.log
 
 1. 查看 watchdog.log 中 `Initial cpolar URL` 和心跳中的 `url=` 字段：
    ```powershell
-   Select-String -Path .\scripts\watchdog.log -Pattern "url="
+   Select-String -Path .\tools\ops\watchdog.log -Pattern "url="
    ```
 
 2. 如果 `url=` 为空，说明 Get-CpolarUrl 函数无法获取URL：
@@ -474,7 +474,7 @@ Clear-Content .\scripts\notify.log
 
 1. 查看 events.log 中的 BACKEND_RESTART 频率：
    ```powershell
-   Select-String -Path .\scripts\events.log -Pattern "BACKEND_RESTART" | Select-Object -Last 10
+   Select-String -Path .\tools\ops\events.log -Pattern "BACKEND_RESTART" | Select-Object -Last 10
    ```
 
 2. 查看后端错误日志：
@@ -490,7 +490,7 @@ Clear-Content .\scripts\notify.log
 
 1. 查看 events.log 中的 CPOLAR_RESTART 频率：
    ```powershell
-   Select-String -Path .\scripts\events.log -Pattern "CPOLAR_RESTART" | Select-Object -Last 10
+   Select-String -Path .\tools\ops\events.log -Pattern "CPOLAR_RESTART" | Select-Object -Last 10
    ```
 
 2. 确认 cpolar authtoken 有效，网络稳定。
@@ -510,7 +510,7 @@ Clear-Content .\scripts\notify.log
 
 1. **查看 notify.log 错误详情**，确认是否为超时类错误：
    ```powershell
-   Select-String -Path .\scripts\notify.log -Pattern "timeout|timed out|transport connection" | Select-Object -Last 5
+   Select-String -Path .\tools\ops\notify.log -Pattern "timeout|timed out|transport connection" | Select-Object -Last 5
    ```
 
 2. **测试 SMTP 服务器连通性**（TCP 层面）：
@@ -538,7 +538,7 @@ Clear-Content .\scripts\notify.log
    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 
    # 发送测试邮件验证
-   . .\scripts\notify.ps1; Send-TestNotification
+   . .\tools\ops\ops-notify.ps1; Send-TestNotification
 
    # 确认后立即重新开启
    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
@@ -565,7 +565,7 @@ Clear-Content .\scripts\notify.log
    - 企业网络可能由网关防火墙拦截，需联系 IT 管理员放行 `smtp.qq.com:587`
 
 7. **尝试备用端口**：
-   - 如果 587 被拦截，可在 [notify.config.json](../../scripts/notify.config.json) 中改用 465（SSL）：
+   - 如果 587 被拦截，可在 [notify.config.json](../../tools/ops/notify.config.json) 中改用 465（SSL）：
      ```json
      "smtp": {
        "host": "smtp.qq.com",
@@ -594,21 +594,21 @@ Clear-Content .\scripts\notify.log
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match "watchdog.ps1" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 
 # 启动
-.\scripts\watchdog.ps1 -Share -IntervalSec 20
+.\tools\ops\ops-watchdog.ps1 -Share -IntervalSec 20
 ```
 
 或直接使用 start-dev.ps1：
 ```powershell
-.\scripts\start-dev.ps1 -Share -Watchdog -SkipInstall -SkipResetUser
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog -SkipInstall -SkipResetUser
 ```
 
 ### 9.2 修改邮件模板
 
-编辑 [notify-templates.json](../../scripts/notify-templates.json)，修改对应事件的 `subject` 或 `body`。**无需重启 watchdog**，下次触发事件时自动读取最新配置。
+编辑 [notify-templates.json](../../tools/ops/ops-notify-templates.json)，修改对应事件的 `subject` 或 `body`。**无需重启 watchdog**，下次触发事件时自动读取最新配置。
 
 ### 9.3 添加收件人
 
-编辑 [notify.config.json](../../scripts/notify.config.json) 的 `recipients` 数组：
+编辑 [notify.config.json](../../tools/ops/notify.config.json) 的 `recipients` 数组：
 
 ```json
 "recipients": [
@@ -621,7 +621,7 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 
 ### 9.4 添加 reason 中文映射
 
-编辑 [notify-reason-map.json](../../scripts/notify-reason-map.json)，添加新的键值对：
+编辑 [notify-reason-map.json](../../tools/ops/ops-notify-reason-map.json)，添加新的键值对：
 
 ```json
 {
@@ -633,7 +633,7 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 
 ### 9.5 临时启用所有事件通知
 
-编辑 [notify.config.json](../../scripts/notify.config.json)：
+编辑 [notify.config.json](../../tools/ops/notify.config.json)：
 
 ```json
 "notifyOn": {
@@ -650,11 +650,11 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 
 ```powershell
 # 清空所有日志
-Clear-Content .\scripts\watchdog.log, .\scripts\events.log, .\scripts\notify.log
+Clear-Content .\tools\ops\watchdog.log, .\tools\ops\events.log, .\tools\ops\notify.log
 
 # 删除7天前的日志行（示例）
 $ cutoff = (Get-Date).AddDays(-7).ToString("yyyy-MM-dd")
-Get-Content .\scripts\events.log | Where-Object { $_ -notmatch $cutoff } | Set-Content .\scripts\events.log
+Get-Content .\tools\ops\events.log | Where-Object { $_ -notmatch $cutoff } | Set-Content .\tools\ops\events.log
 ```
 
 ### 9.7 完全停止所有服务
@@ -689,25 +689,25 @@ Get-Process -Name "cpolar" -ErrorAction SilentlyContinue | Stop-Process -Force
 
 ```powershell
 # 一键启动
-.\scripts\start-dev.ps1 -Share -Watchdog
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 
 # 发送测试邮件
-. .\scripts\notify.ps1; Send-TestNotification
+. .\tools\ops\ops-notify.ps1; Send-TestNotification
 
 # 查看最近事件
-Get-Content .\scripts\events.log -Tail 20
+Get-Content .\tools\ops\events.log -Tail 20
 
 # 查看邮件发送日志
-Get-Content .\scripts\notify.log -Tail 30
+Get-Content .\tools\ops\notify.log -Tail 30
 
 # 查看 watchdog 心跳
-Get-Content .\scripts\watchdog.log -Tail 10
+Get-Content .\tools\ops\watchdog.log -Tail 10
 
 # 查看 URL 变更记录
-Select-String -Path .\scripts\events.log -Pattern "URL_CHANGED"
+Select-String -Path .\tools\ops\events.log -Pattern "URL_CHANGED"
 
 # 查看邮件错误
-Select-String -Path .\scripts\notify.log -Pattern "\[ERROR\]"
+Select-String -Path .\tools\ops\notify.log -Pattern "\[ERROR\]"
 
 # 停止所有服务
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match "watchdog.ps1" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
