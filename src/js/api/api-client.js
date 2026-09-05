@@ -32,6 +32,21 @@ function removeCurrentUser() {
     localStorage.removeItem('current_user');
 }
 
+// 后端英文错误消息 → 用户友好的中文提示（未匹配到的原样透出）
+const ERROR_MESSAGE_MAP = {
+    'Username, email and password are required': '请填写用户名、邮箱和密码',
+    'Email and password are required': '请填写邮箱和密码',
+    'Username or email already exists': '用户名或邮箱已被注册',
+    'Invalid email or password': '邮箱或密码错误',
+    'Invalid invite code. Public beta requires an invite code.': '邀请码无效，公测期注册需要有效邀请码',
+    'Feedback content is required': '请填写反馈内容',
+    'Feedback content must be less than 5000 characters': '反馈内容不能超过5000字符',
+    'Calculation not found': '计算记录不存在',
+    'Access denied': '无权访问该记录',
+    'User not found': '用户不存在',
+    'Authentication required': '请先登录'
+};
+
 async function apiRequest(url, method = 'GET', data = null, requiresAuth = false) {
     const options = {
         method: method,
@@ -63,7 +78,7 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
             removeCurrentUser();
             window.location.reload();
         }
-        throw new Error(errorMessage || '请求失败');
+        throw new Error(ERROR_MESSAGE_MAP[errorMessage] || errorMessage || '请求失败');
     }
 
     return result.data;

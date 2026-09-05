@@ -895,6 +895,10 @@ function setupAuthEventListeners() {
     });
     
     document.getElementById('login-submit').addEventListener('click', handleLogin);
+    document.getElementById('forgot-password').addEventListener('click', (e) => {
+        e.preventDefault();
+        showAlert('公测期暂不支持自助找回密码，请联系开发者重置');
+    });
     // 快速登录仅限本地开发使用，生产环境隐藏入口
     if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
         document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
