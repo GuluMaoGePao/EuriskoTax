@@ -224,19 +224,23 @@ EuriskoTax/
 | 阶段4：前端改造集成 | ✅ 已完成 | 1周 | 2026-05-28 |
 | 阶段5：部署与上线准备 | ✅ 已完成（方案调整为Zeabur托管） | 1周 | 2026-07-05 |
 | 阶段6：生产环境硬化（v1.4.0） | ✅ 已完成 | 2天 | 2026-09-05 |
-| 阶段7：云平台部署上线 | 🚧 进行中（服务器已购买，待部署服务） | 1天 | 预计 2026-09-06 |
-| 阶段8：首批测试用户运营 | ⏳ 待开始 | 2周 | 预计 2026-09-20 |
+| 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
+| 阶段8：首批测试用户运营 | 🚧 进行中（冷启动推广素材已备好） | 2周 | 预计 2026-09-20 |
 | 阶段9：PWA 离线化改造 | ⏳ 待开始 | 3天 | 预计 2026-09-23 |
 | 阶段10：免费/专业版体系 | ⏳ 待开始 | 1周 | 预计 2026-10 月初 |
 
 ### 当前状态
 
-**生产环境（2026-09-05 已购买服务器）**：
+**生产环境（2026-09-05 已上线运行）**：
 - 平台：Zeabur（zeabur.cn）
 - 服务器：Tencent - Tokyo，2 vCPU / 2 GB 内存 / 40 GB SSD / 0.5TB 流量（Max 30 Mbps）
-- 系统：ZeaburOS（托管模式，开箱即部署，自动 HTTPS）
+- 系统：ZeaburOS（托管模式，Dockerfile 构建部署，自动 HTTPS）
 - 费用：$3/月（促销价，原价 $4.20）
-- 待完成：部署 PostgreSQL 服务 → 从 GitHub 部署应用 → 配置 JWT_SECRET / CORS_ORIGIN → 绑定 `*.zeabur.app` 域名
+- 公网地址：https://euriskotax.zeabur.app（HTTPS 已生效）
+- 数据库：PostgreSQL（Zeabur 托管服务，Prisma migrate deploy 启动时自动迁移）
+- 环境变量：DATABASE_URL / JWT_SECRET / NODE_ENV=production / PORT / CORS_ORIGIN / INVITE_CODE / ADMIN_TOKEN 已全部配置
+- 2026-09-05 全链路验证通过：注册（邀请码校验）→ 登录 → JWT 受保护接口 → CORS 限制 → 安全响应头
+- 运营统计：GET /api/stats/overview（X-Admin-Token 认证），注册数/计算次数/近7日趋势
 
 **本地开发环境**：
 - 后端服务：http://localhost:3000
