@@ -12,7 +12,9 @@
     }
   },
   "env": {
-    "JWT_SECRET": "your-random-secret-key",
-    "DATABASE_URL": "file:./dev.db"
+    "JWT_SECRET": "${JWT_SECRET}",
+    "DATABASE_URL": "${DATABASE_URL}",
+    "CORS_ORIGIN": "${CORS_ORIGIN}",
+    "NODE_ENV": "production"
   }
 }

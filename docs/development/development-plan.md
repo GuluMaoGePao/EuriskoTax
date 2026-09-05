@@ -221,6 +221,9 @@ EuriskoTax/
 | 阶段3：计算逻辑迁移 | ✅ 已完成 | 1.5周 | 2026-05-27 |
 | 阶段4：前端改造集成 | ✅ 已完成 | 1周 | 2026-05-28 |
 | 阶段5：部署与上线准备 | ✅ 已完成 | 1周 | 2026-07-05 |
+| 阶段6：生产环境硬化（v1.4.0） | 🚧 进行中 | 2天 | 预计 2026-09-07 |
+| 阶段7：云平台部署上线 | ⏳ 待开始 | 1天 | 预计 2026-09-08 |
+| 阶段8：首批测试用户运营 | ⏳ 待开始 | 2周 | 预计 2026-09-22 |
 
 ### 当前状态
 
@@ -449,3 +452,109 @@ cpolar http 3000 -region=cn
 **计算公式**：
 - 投资者减除费用 = 5000 × 工作月数
 - 专项扣除年度金额 = 月度金额 × 工作月数
+
+---
+
+## 🚀 v1.4.0 上线计划（2026-09-05 制定）
+
+### 一、现状评估
+
+**✅ 已具备（生产就绪）**：后端 Express（0.0.0.0:3000）、静态服务+SPA回退、安全HTTP头5项、请求体1MB限制、JWT+bcrypt、`/health`、Swagger、Prisma、143单元测试、zeabur.json。
+
+**❌ 7 个关键阻塞点**：
+
+| # | 缺失项 | 严重度 | 影响 |
+|---|--------|--------|------|
+| 1 | 生产数据库用 SQLite | 🔴 致命 | 不支持并发写入，容器重启数据丢失 |
+| 2 | JWT_SECRET 占位符 | 🔴 致命 | 弱密钥硬编码，可伪造 token |
+| 3 | CORS_ORIGIN = `*` | 🟡 高 | 应限定为实际域名 |
+| 4 | 无前端构建步骤 | 🟡 中 | `npm build` 只是 echo |
+| 5 | 无速率限制 | 🟡 中 | 可被暴力枚举 |
+| 6 | 无 HTTPS 强制跳转 | 🟡 中 | 需在 app 层校验 |
+| 7 | 无日志持久化/告警 | 🟢 低 | 当前 console.log |
+
+### 二、MVP 形态
+
+**定位**：个人税务预算规划工具（个人纳税人 / 个体工商户 / 自由职业者）
+**架构**：前端SPA（Tailwind+原生JS） + Express API（REST+JWT） + PostgreSQL
+
+### 三、推荐平台：Zeabur（首选）
+
+**理由**：已有 [zeabur.json](../../zeabur.json) 零迁移；国内可访问；一键 Postgres；自动 HTTPS+Git 部署；有免费额度。
+
+**环境变量**：`JWT_SECRET=<openssl rand -hex 32>` / `DATABASE_URL=<Zeabur注入>` / `CORS_ORIGIN=<域名>` / `NODE_ENV=production`
+
+### 四、7 步上线流程
+
+#### 阶段 A：代码层修复（Day 1-2）
+
+**步骤 1**：迁移 Prisma 到 PostgreSQL
+- [server/prisma/schema.prisma](../../server/prisma/schema.prisma) 中 `provider = "sqlite"` → `"postgresql"`
+- 执行 `cd server && npx prisma migrate dev --name init-postgres`
+
+**步骤 2**：修复 zeabur.json 环境变量为 `${VAR}` 引用（不再硬编码）
+
+**步骤 3**：在 [app.js](../../server/src/app.js) L9 后增加生产校验 + rate-limit
+```javascript
+if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-random-secret-key') {
+        console.error('FATAL: JWT_SECRET must be set in production'); process.exit(1);
+    }
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) {
+        console.error('FATAL: DATABASE_URL must be PostgreSQL in production'); process.exit(1);
+    }
+}
+const rateLimit = require('express-rate-limit');
+app.use('/api/auth/', rateLimit({ windowMs: 15*60*1000, max: 10 }));
+```
+
+#### 阶段 B：部署上线（Day 3）
+
+**步骤 4**：GitHub 推送 + Zeabur 绑定 → 添加 PostgreSQL 服务 → 填 JWT_SECRET
+**步骤 5**：域名 + HTTPS（Zeabur 自动提供 `*.zeabur.app`）
+**步骤 6**：自检 → `/api/docs` 可见 + `/health` 返回 ok + dev 账号登录成功
+
+#### 阶段 C：首批测试用户运营（Day 4起）
+
+**步骤 7**：4 渠道冷启动
+- 即刻/V2EX/少数派发帖 → 30-80 人
+- 知乎税务话题 → 50-100 人
+- 小红书实测笔记 → 100-300 人
+- 微信社群裂变 → 50-200 人
+
+**邀请码机制**：`/api/auth/register` 校验 `inviteCode === 'EURISKO2026BETA'`
+**反馈闭环**：新增 `/api/feedback` 接口 + 复用 [ops-notify.ps1](../../tools/ops/ops-notify.ps1) 邮件转发
+
+### 五、Definition of Done
+
+**🔴 必做**：Prisma 迁 PostgreSQL / zeabur.json 改 `${VAR}` / JWT_SECRET 强密钥 / CORS 限定域名 / 删除 reset-dev-user.js 自动调用
+
+**🟡 建议**：express-rate-limit / 用户反馈接口 / 邀请码 / 错误日志聚合
+
+**🟢 后续（>100用户）**：Tailwind 本地构建 / 用户协议+隐私政策 / Cloudflare CDN / 数据库备份
+
+### 六、2 周时间表
+
+```
+Day 1-2：代码层修复（Prisma + 环境变量 + rate-limit + 自检）
+Day 3：  Zeabur 部署 + 自测 + 域名绑定
+Day 4：  邀请码机制 + 反馈接口 + 数据埋点
+Day 5：  内测 5-10 个种子用户 + 修紧急 bug
+Day 6-7：准备冷启动素材
+Day 8-9：即刻/V2EX 发帖 + 邀请码放开
+Day 10-11：观察数据 + 收集反馈
+Day 12-14：迭代修复 + 准备第二轮推广
+```
+
+### 七、关键决策点
+
+| 决策 | 推荐 | 理由 |
+|------|------|------|
+| 数据库 | PostgreSQL | SQLite 云上不适用 |
+| 部署平台 | Zeabur | 已配置，2天可上线 |
+| 上线节奏 | 内测→公测 | 先找 5-10 种子用户 |
+| 用户增长 | 邀请码裂变 | 控制规模+用户质量 |
+
+---
+
+*v1.4.0 上线计划制定时间：2026-09-05*
