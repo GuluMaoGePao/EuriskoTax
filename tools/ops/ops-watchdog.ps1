@@ -143,12 +143,14 @@ function Invoke-Notification {
     }
 }
 
-# ====== Server health check (port 3000 listening + HTTP 200/401 response) ======
+# ====== Server health check (port 3000 listening + HTTP 200 response) ======
+# 注意：必须探测 /health（无限流）。曾用 /api/auth/profile 会被 authLimiter（10次/15分钟）
+# 打爆导致 429 → watchdog 误判后端宕机 → 无限重启循环（2026-09-06 修复）
 function Test-ServerHealth {
     try {
         $conn = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
         if (-not $conn) { return $false }
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/auth/profile" `
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/health" `
             -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
         return $true
     } catch {
@@ -164,7 +166,7 @@ function Get-BackendFailureReason {
     $conn = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
     if (-not $conn) { return "port_3000_not_listening" }
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/auth/profile" `
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/health" `
             -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
         return "http_unexpected_status_" + $resp.StatusCode
     } catch {
@@ -370,7 +372,7 @@ function Get-CpolarFailureReason {
     if (-not $proc) { return "cpolar_process_dead" }
     if ($ExpectedUrl) {
         try {
-            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/api/auth/profile") `
+            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/health") `
                 -Method GET -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
             return "false_positive_ok"
         } catch {
@@ -397,7 +399,7 @@ function Test-CpolarHealth {
     if (-not $proc) { return $false }
     if ($ExpectedUrl) {
         try {
-            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/api/auth/profile") `
+            $resp = Invoke-WebRequest -Uri ($ExpectedUrl + "/health") `
                 -Method GET -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
             return $true
         } catch {
