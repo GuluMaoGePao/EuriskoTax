@@ -27,6 +27,10 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 信任 Zeabur 网关的一层反代，使 req.ip 为真实客户端IP
+// 否则限流会把所有用户算作同一个网关IP，10次/15分钟的配额被全站共享
+app.set('trust proxy', 1);
+
 // 速率限制（防止暴力枚举登录）
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
