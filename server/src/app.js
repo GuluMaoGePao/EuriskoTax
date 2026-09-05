@@ -10,8 +10,28 @@ const { errorHandler, notFound } = require('./middleware/error');
 const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 
+// 生产环境安全校验
+if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-random-secret-key') {
+        console.error('FATAL: JWT_SECRET must be set to a strong key in production');
+        process.exit(1);
+    }
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) {
+        console.error('FATAL: DATABASE_URL must point to PostgreSQL in production');
+        process.exit(1);
+    }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 速率限制（防止暴力枚举登录）
+const rateLimit = require('express-rate-limit');
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: '请求过于频繁，请 15 分钟后再试' }
+});
 
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
@@ -70,7 +90,7 @@ app.get('/api/docs.json', (req, res) => {
     res.json(swaggerSpec);
 });
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/calculations', calculationRoutes);
 
 // 健康检查端点（用于云平台健康检查）
