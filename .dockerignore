@@ -1,6 +1,8 @@
 node_modules
 server/node_modules
-server/dev.db
+*.db
+.env
+server/.env
 .git
 .trae
 .vscode

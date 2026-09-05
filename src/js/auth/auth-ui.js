@@ -895,7 +895,12 @@ function setupAuthEventListeners() {
     });
     
     document.getElementById('login-submit').addEventListener('click', handleLogin);
-    document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
+    // 快速登录仅限本地开发使用，生产环境隐藏入口
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
+    } else {
+        document.getElementById('quick-login-btn').classList.add('hidden');
+    }
     document.getElementById('register-submit').addEventListener('click', handleRegister);
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();

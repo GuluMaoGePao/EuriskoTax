@@ -14,9 +14,9 @@ const register = async (req, res, next) => {
             });
         }
         
-        // 邀请码校验（公测期限制注册）
-        const VALID_INVITE_CODE = 'EURISKO2026BETA';
-        if (inviteCode !== VALID_INVITE_CODE) {
+        // 邀请码校验（公测期限制注册；码值由环境变量提供，未配置时一律拒绝）
+        const VALID_INVITE_CODE = process.env.INVITE_CODE;
+        if (!VALID_INVITE_CODE || inviteCode !== VALID_INVITE_CODE) {
             return res.status(403).json({
                 success: false,
                 error: {
