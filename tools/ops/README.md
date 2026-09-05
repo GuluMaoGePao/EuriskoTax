@@ -33,12 +33,13 @@
 
 | 文件 | 用途 |
 |------|------|
-| `tools/gui/gui-启动.bat` | 双击启动器 |
-| `tools/gui/gui-创建快捷方式.bat` | 一次性创建桌面快捷方式 |
-| `tools/gui/gui-dev-console.ps1` | GUI 主脚本（WinForms） |
+| `tools/gui/EuriskoTax-Console.bat` | 双击启动器（含 UTF8 BOM 自动修复） |
+| `tools/gui/EuriskoTax-创建桌面快捷方式.bat` | 一次性创建桌面快捷方式 |
+| `tools/gui/_create_shortcut.ps1` | 快捷方式生成脚本 |
+| `tools/gui/gui-dev-console.ps1` | GUI 主脚本（WinForms，8 Tab） |
 | `tools/gui/README.md` | 详细使用说明 |
 
-GUI 内置 6 大功能面板（共 40+ 按钮），调用本目录下的 `ops-start-dev.ps1`、`ops-deploy.ps1`、`ops-notify.ps1` 等脚本：
+GUI 内置 8 大功能面板（共 110+ 按钮），调用本目录下的 `ops-start-dev.ps1`、`ops-deploy.ps1`、`ops-notify.ps1` 等脚本：
 - 🚀 启动管理（标准/快速/cpolar 临时隧道/守护/nodemon 等启动模式 + **🌐 公网地址速览卡片**：3 秒刷新、一键复制、180s 去重弹窗）
 - 🗄️ 数据库（重置用户/迁移/Prisma Studio/重置数据库）
 - 🧪 测试（全部测试/监听/性能/覆盖率）

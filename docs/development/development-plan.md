@@ -92,12 +92,12 @@
 **目标**：修改前端代码，对接后端API
 
 **任务清单**：
-- [ ] 添加登录/注册页面
-- [ ] 添加用户信息展示区域
-- [ ] 将前端计算调用改为API请求
-- [ ] 集成JWT token管理
-- [ ] 实现登录状态持久化
-- [ ] 对接历史记录API
+- [x] 添加登录/注册页面（src/js/auth/auth-ui.js + index.html 登录/注册模态框）
+- [x] 添加用户信息展示区域（个人中心仪表盘，含账户设置/税务档案/数据管理/税务日历）
+- [x] 将前端计算调用改为API请求（src/js/api/api-client.js → /api/calculations/*）
+- [x] 集成JWT token管理（getAuthToken/setAuthToken/removeAuthToken + Bearer 头注入）
+- [x] 实现登录状态持久化（localStorage.auth_token + localStorage.current_user）
+- [x] 对接历史记录API（src/js/auth/auth-ui.js loadHistoryToList + GET /api/calculations/history）
 
 **修改文件**：
 - `index.html` - 添加登录注册UI
@@ -235,7 +235,9 @@ EuriskoTax/
 
 - 用户名：devuser
 - 邮箱：dev@example.com
-- 密码：dev123456
+- 密码：password
+
+> 凭据以 [server/scripts/reset-dev-user.js](../../server/scripts/reset-dev-user.js) 为准，`ops-start-dev.ps1` 启动时会自动重置。
 
 ---
 
@@ -269,11 +271,13 @@ npm start
 
 ### cpolar内网穿透（测试用）
 ```bash
-cpolar http 3000 --region cn
+# 项目规范：必须带 -region=cn 走国内节点，否则默认路由到海外节点速度慢
+cpolar http 3000 -region=cn
 ```
 
-> **更优方案**：项目已配置 `cpolar.yml` 预设隧道（`eurisko`），可直接运行 `cpolar start eurisko`。
-> 配合 `scripts\start-dev.ps1 -Share -Watchdog` 可一键启动后端 + cpolar + 守护脚本，支持自动重启和邮件通知。
+> **推荐方案**：项目使用**临时隧道模式**，无需预设 `cpolar.yml`。运行 `cpolar http 3000 -region=cn` 即可获取临时公网地址（必须带 `-region=cn` 走国内节点）。
+> 配合 `tools\ops\ops-start-dev.ps1 -Share -Watchdog` 可一键启动后端 + cpolar + 守护脚本，支持自动重启和邮件通知。
+> GUI 控制台（[tools/gui/EuriskoTax-Console.bat](../../tools/gui/EuriskoTax-Console.bat)）提供「🔥完整测试」按钮一键开启全套。
 > 详见 [README.md](../../README.md) 和 [守护脚本邮件通知与事件日志规范](../tech-reports/watchdog-notification-and-event-log-spec.md)。
 
 ---
