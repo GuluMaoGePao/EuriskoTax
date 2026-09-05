@@ -8,15 +8,15 @@ const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
 /**
  * 获取北京时间某日 0 点对应的 UTC 时间
  * @param {number} daysAgo - 距今天的天数（0=今天）
- * @returns {{start: Date, end: Date}} 该日的 [start, end) UTC 边界
+ * @returns {{start: Date, end: Date, label: string}} 该日的 [start, end) UTC 边界及北京时间日期标签
  */
 const getCstDayRange = (daysAgo) => {
-    // 把当前时间平移到北京时间视角后取本地 0 点，再平移回 UTC
+    // 把当前时间平移到北京时间视角后取当日 0 点（用 Date.UTC 避免依赖服务器时区），再平移回 UTC
     const cstNow = new Date(Date.now() + CST_OFFSET_MS);
-    const cstMidnight = new Date(cstNow.getUTCFullYear(), cstNow.getUTCMonth(), cstNow.getUTCDate() - daysAgo);
+    const cstMidnight = new Date(Date.UTC(cstNow.getUTCFullYear(), cstNow.getUTCMonth(), cstNow.getUTCDate() - daysAgo));
     const start = new Date(cstMidnight.getTime() - CST_OFFSET_MS);
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    return { start, end };
+    return { start, end, label: cstMidnight.toISOString().slice(0, 10) };
 };
 
 /**
@@ -74,7 +74,7 @@ const getOverview = async (req, res, next) => {
                     prisma.user.count({ where: { created_at: { gte: range.start, lt: range.end } } }),
                     prisma.calculation.count({ where: { created_at: { gte: range.start, lt: range.end } } })
                 ]).then(([newUsers, calculations]) => ({
-                    date: range.start.toISOString().slice(0, 10),
+                    date: range.label,
                     newUsers,
                     calculations
                 }));
