@@ -1,0 +1,11 @@
+node_modules
+server/node_modules
+server/dev.db
+.git
+.trae
+.vscode
+tools
+docs
+tests
+images
+*.log
