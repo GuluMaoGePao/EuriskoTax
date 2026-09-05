@@ -8,10 +8,10 @@
 
 ```powershell
 # 标准启动（本地开发）
-.\scripts\start-dev.ps1
+.\tools\ops\ops-start-dev.ps1
 
 # 公网分享 + 守护脚本（给好友测试时推荐）
-.\scripts\start-dev.ps1 -Share -Watchdog
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
 启动后会自动：检查环境 → 安装依赖 → 重置 dev 用户 → 启动后端 → (可选)启动 cpolar 公网隧道 → (可选)启动守护脚本
@@ -29,14 +29,16 @@ EuriskoTax/
 ├── src/                # 前端源码（主项目）
 ├── server/             # 后端源码（主项目）
 ├── tests/              # 测试代码
-├── scripts/            # 运维脚本（watchdog/notify/start-dev + 通知配置）
+├── tools/              # 辅助工具集中目录
+│   ├── ops/            # 运维脚本（ops-start-dev / ops-watchdog / ops-notify / ops-deploy + 通知配置）
+│   ├── gui/            # GUI 开发控制台（WinForms，8 Tab / 110+ 按钮）
+│   └── cpolar/         # cpolar 内网穿透工具
 ├── docs/               # 项目文档（索引见 docs/README.md）
 ├── images/             # 项目图片资源
-├── cpolar/             # cpolar 内网穿透工具
 └── index.html          # 前端入口
 ```
 
-> 主项目代码、运维脚本、测试代码、文档职责分离。详见 [docs/README.md](docs/README.md)。
+> 主项目代码、运维脚本、GUI 工具、测试代码、文档职责分离。辅助工具统一收纳在 `tools/` 下，按类型加前缀（ops- 运维、gui- GUI）。详见 [docs/README.md](docs/README.md) 与 [tools/ops/README.md](tools/ops/README.md)。
 
 ---
 
@@ -46,13 +48,14 @@ EuriskoTax/
 
 | 文件 | 作用 |
 |------|------|
-| [scripts/start-dev.ps1](scripts/start-dev.ps1) | 一键启动脚本（环境检查+依赖安装+服务启动） |
-| [scripts/watchdog.ps1](scripts/watchdog.ps1) | 守护主脚本（每20秒监控+自动重启+事件记录） |
-| [scripts/notify.ps1](scripts/notify.ps1) | 邮件通知模块（SMTP发送+模板渲染） |
-| [scripts/notify.config.json](scripts/notify.config.json) | SMTP配置（邮箱+授权码+收件人，**已加入.gitignore**） |
-| [scripts/notify-templates.json](scripts/notify-templates.json) | 中文邮件模板（URL_CHANGED + TEST） |
-| scripts/watchdog.log | 守护运行日志 |
-| scripts/events.log | 重启事件日志（结构化） |
+| [tools/ops/ops-start-dev.ps1](tools/ops/ops-start-dev.ps1) | 一键启动脚本（环境检查+依赖安装+重置用户+服务启动+守护） |
+| [tools/ops/ops-watchdog.ps1](tools/ops/ops-watchdog.ps1) | 守护主脚本（每20秒监控+自动重启+事件记录） |
+| [tools/ops/ops-notify.ps1](tools/ops/ops-notify.ps1) | 邮件通知模块（SMTP发送+模板渲染+详细日志） |
+| [tools/ops/notify.config.json](tools/ops/notify.config.json) | SMTP配置（邮箱+授权码+收件人+notifyOn开关，**已加入.gitignore**） |
+| [tools/ops/ops-notify-templates.json](tools/ops/ops-notify-templates.json) | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） |
+| tools/ops/watchdog.log | 守护运行日志（运行时生成，*.log 已 gitignore） |
+| tools/ops/events.log | 重启事件日志（结构化，运行时生成） |
+| tools/ops/notify.log | 邮件发送详细日志（运行时生成） |
 
 ### 监控范围
 
@@ -67,12 +70,12 @@ EuriskoTax/
 
 ### 配置方法
 
-1. 编辑 [notify.config.json](scripts/notify.config.json)，填写QQ邮箱和授权码
+1. 编辑 [tools/ops/notify.config.json](tools/ops/notify.config.json)，填写QQ邮箱和授权码
 2. 将 `enabled` 设为 `true`
 3. 发送测试邮件验证：
 
 ```powershell
-. .\notify.ps1
+. .\tools\ops\ops-notify.ps1
 Send-TestNotification
 ```
 
@@ -94,11 +97,11 @@ Send-TestNotification
 | **邮件发送失败/未发送** | — | **✅ 1 次（180s 去重）** | ✅ notify.log | GUI 提示排查 notify.config.json |
 | 测试邮件 | ✅ 手动触发 | ❌ 不弹窗 | — | 验证 SMTP 配置 |
 
-> 如需启用其他事件的邮件通知，编辑 [notify.config.json](scripts/notify.config.json) 的 `notifyOn` 节点，将对应开关设为 `true`。
+> 如需启用其他事件的邮件通知，编辑 [tools/ops/notify.config.json](tools/ops/notify.config.json) 的 `notifyOn` 节点，将对应开关设为 `true`。
 
 ### 邮件模板
 
-中文邮件模板（v3.2），定义在 [notify-templates.json](scripts/notify-templates.json)，包含 3 种模板：
+中文邮件模板（v3.2），定义在 [tools/ops/ops-notify-templates.json](tools/ops/ops-notify-templates.json)，包含 3 种模板：
 
 - **URL_CREATED** — 首次生成公网地址通知（启动分享时立即发出）
 - **URL_CHANGED** — 公网地址变更通知
@@ -127,7 +130,7 @@ URL_CREATED / URL_CHANGED 模板均使用 `★★★ 新公网地址 ★★★` 
 
 ### 收件人配置
 
-在 [notify.config.json](scripts/notify.config.json) 的 `recipients` 数组中添加多个收件人：
+在 [tools/ops/notify.config.json](tools/ops/notify.config.json) 的 `recipients` 数组中添加多个收件人：
 
 ```json
 "recipients": [
@@ -147,13 +150,13 @@ URL_CREATED / URL_CHANGED 模板均使用 `★★★ 新公网地址 ★★★` 
 
 ```powershell
 # 查看最近20条重启事件
-Get-Content .\scripts\events.log -Tail 20
+Get-Content .\tools\ops\events.log -Tail 20
 
 # 筛选地址变更事件
-Select-String -Path .\scripts\events.log -Pattern "URL_CHANGED"
+Select-String -Path .\tools\ops\events.log -Pattern "URL_CHANGED"
 
 # 筛选重启失败事件
-Select-String -Path .\scripts\events.log -Pattern "RESTART_FAILED"
+Select-String -Path .\tools\ops\events.log -Pattern "RESTART_FAILED"
 ```
 
 ### 日志格式
@@ -187,22 +190,25 @@ Select-String -Path .\scripts\events.log -Pattern "RESTART_FAILED"
 
 ```powershell
 # 启动全套服务（本地）
-.\scripts\start-dev.ps1
+.\tools\ops\ops-start-dev.ps1
 
 # 启动全套服务 + 公网分享 + 守护
-.\scripts\start-dev.ps1 -Share -Watchdog
+.\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 
 # 单独启动守护脚本
-.\watchdog.ps1 -Share -IntervalSec 20
+.\tools\ops\ops-watchdog.ps1 -Share -IntervalSec 20
 
 # 发送测试邮件
-. .\notify.ps1; Send-TestNotification
+. .\tools\ops\ops-notify.ps1; Send-TestNotification
 
 # 查看事件日志
-Get-Content .\scripts\events.log -Tail 20
+Get-Content .\tools\ops\events.log -Tail 20
 
 # 查看守护心跳日志
-Get-Content .\scripts\watchdog.log -Tail 20
+Get-Content .\tools\ops\watchdog.log -Tail 20
+
+# 查看邮件发送日志
+Get-Content .\tools\ops\notify.log -Tail 20
 ```
 
 ---
