@@ -69,12 +69,13 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     return result.data;
 }
 
-async function registerUser(username, email, password, phone = null) {
+async function registerUser(username, email, password, phone = null, inviteCode = null) {
     return await apiRequest('/auth/register', 'POST', {
         username,
         email,
         password,
-        phone
+        phone,
+        inviteCode
     });
 }
 
