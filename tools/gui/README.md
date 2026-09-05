@@ -10,12 +10,12 @@
 ### 方式 1：双击启动（推荐）
 
 1. 打开项目根目录 `e:\WorkPrograms\Trae\EuriskoTax\`
-2. 双击 `tools/gui/gui-启动.bat`
+2. 双击 `tools/gui/EuriskoTax-Console.bat`
 3. 控制台窗口打开后即可使用
 
 ### 方式 2：创建桌面快捷方式（一劳永逸）
 
-1. 双击 `tools/gui/gui-创建快捷方式.bat`
+1. 双击 `tools/gui/EuriskoTax-创建桌面快捷方式.bat`
 2. 桌面会出现 `EuriskoTax 开发控制台` 快捷方式
 3. 之后每次直接双击桌面快捷方式即可打开
 
@@ -292,7 +292,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 ### 场景 1：日常调试启动
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「启动管理」Tab 点击 **⚡ 快速启动**（跳过依赖和用户重置）
 3. 等待输出区显示 `服务器运行在 http://localhost:3000`
 4. 点击 **🌐 打开浏览器** 或直接在浏览器访问 `http://localhost:3000/`
@@ -301,14 +301,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 ### 场景 2：改了后端代码后调试
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「启动管理」Tab 点击 **🔄 开发模式 (nodemon)**
 3. 修改 `server/src/` 下的代码，nodemon 会自动重启后端
 4. 输出区实时看到重启日志
 
 ### 场景 3：给好友远程测试
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「启动管理」Tab 点击 **🔥 一键完整测试**（后端 + cpolar 临时隧道 + 守护脚本）
 3. GUI 顶部会出现「🌐 公网地址速览」卡片，**首次生成公网地址时会弹出 MessageBox（仅 1 次，180s 内去重）**，同时地址自动写入剪贴板
 4. 卡片中也可随时点「复制」按钮 / 点卡片主体再次复制；点「📮 发邮件」按钮把新地址手动发给收件人
@@ -320,21 +320,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 ### 场景 4：跑测试
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「测试」Tab 点击 **🧪 运行所有测试**
 3. 输出区实时显示测试结果
 4. 测试完成后点击 **📊 打开覆盖率报告** 查看详细覆盖率
 
 ### 场景 5：修改了数据库 schema
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「数据库」Tab 点击 **📄 查看 schema.prisma** 编辑 schema
 3. 保存后点击 **🔧 运行迁移** 应用变更
 4. 再点击 **⚙️ 生成 Prisma Client** 更新 Client
 
 ### 场景 6：部署到生产服务器
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「部署」Tab 点击 **🧪 DryRun 预览部署** 检查打包
 3. 确认无误后点击 **🚀 正式部署**
 4. 弹窗确认后开始部署，输出区显示完整流程
@@ -342,7 +342,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 ### 场景 7：端口被占用
 
-1. 双击 `tools/gui/gui-启动.bat`
+1. 双击 `tools/gui/EuriskoTax-Console.bat`
 2. 在「启动管理」Tab 点击 **📊 查看端口占用** 看是谁占了 3000
 3. 确认后点击 **🔒 释放 3000 端口** 强制释放
 4. 重新启动服务
@@ -369,7 +369,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 **原因**：可能是 PowerShell 执行策略限制或脚本错误。
 
 **解决**：
-1. 右键 `tools/gui/gui-启动.bat` → 用 PowerShell 运行
+1. 右键 `tools/gui/EuriskoTax-Console.bat` → 用 PowerShell 运行
 2. 或打开 PowerShell 执行：
    ```powershell
    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass
@@ -548,6 +548,6 @@ $ServerDir = Join-Path $ProjectRoot "server"                   # server/
 如需新增功能按钮或修改行为：
 1. 编辑 `tools/gui/gui-dev-console.ps1`
 2. 参考第十一节「添加新按钮」
-3. 保存后重新双击 `tools/gui/gui-启动.bat` 即可生效
+3. 保存后重新双击 `tools/gui/EuriskoTax-Console.bat` 即可生效
 
 或者，把需求告诉 AI（一次性消耗积分），让 AI 帮你扩展功能后，后续使用就完全不消耗积分了。
