@@ -1202,9 +1202,11 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('education-deduction').addEventListener('input', updateDeductionCalculation);
     
     // 初始化认证系统
-    // 不带 ?v= 指纹：服务器已对 JS 启用 ETag 协商缓存，SW 升级会清旧缓存，
-    // 统一 URL 还避免「版本指纹残留导致浏览器缓存旧模块」的问题
-    import('/src/js/auth/auth-ui.js').then(({ initAuth }) => {
+    // 注意：这里带上 ?v= 指纹，是为了在版本升级时让 CDN 边缘节点 / 旧 SW 缓存
+    // 把 auth-ui 视为全新资源强制回源，避免「新 index.html 已删节点、而旧 auth-ui
+    // 仍引用该节点」导致的 Cannot read properties of null (classList) 崩溃。
+    // 发布新版本时请同步递增该版本号（并与 service-worker.js 的 CACHE_VERSION 一起升）。
+    import('/src/js/auth/auth-ui.js?v=1').then(({ initAuth }) => {
         initAuth();
     });
     
