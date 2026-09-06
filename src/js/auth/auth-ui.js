@@ -1,13 +1,17 @@
 import apiClient from '../api/api-client.js';
 
 function showApp() {
-    document.getElementById('login-page').classList.add('hidden');
-    document.getElementById('app-container').classList.remove('hidden');
+    const loginPage = document.getElementById('login-page');
+    if (loginPage) loginPage.classList.add('hidden');
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) appContainer.classList.remove('hidden');
 }
 
 function showLoginPage() {
-    document.getElementById('app-container').classList.add('hidden');
-    document.getElementById('login-page').classList.remove('hidden');
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) appContainer.classList.add('hidden');
+    const loginPage = document.getElementById('login-page');
+    if (loginPage) loginPage.classList.remove('hidden');
 }
 
 function updateAuthUI() {
@@ -16,13 +20,16 @@ function updateAuthUI() {
         const user = apiClient.getCurrentUser();
         const authSection = document.getElementById('auth-section');
         if (authSection) authSection.classList.add('hidden');
-        document.getElementById('user-menu').classList.remove('hidden');
-        document.getElementById('user-name').textContent = user?.username || '用户';
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu) userMenu.classList.remove('hidden');
+        const userName = document.getElementById('user-name');
+        if (userName) userName.textContent = user?.username || '用户';
     } else {
         showLoginPage();
         const authSection = document.getElementById('auth-section');
         if (authSection) authSection.classList.remove('hidden');
-        document.getElementById('user-menu').classList.add('hidden');
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu) userMenu.classList.add('hidden');
     }
 }
 
@@ -1205,17 +1212,25 @@ function setupDevLoginFill() {
 }
 
 function setupAuthEventListeners() {
-    document.getElementById('login-tab').addEventListener('click', () => switchAuthTab('login'));
-    document.getElementById('register-tab').addEventListener('click', () => switchAuthTab('register'));
+    const loginTab = document.getElementById('login-tab');
+    if (loginTab) loginTab.addEventListener('click', () => switchAuthTab('login'));
+    const registerTab = document.getElementById('register-tab');
+    if (registerTab) registerTab.addEventListener('click', () => switchAuthTab('register'));
 
-    document.getElementById('login-submit').addEventListener('click', handleLogin);
+    const loginSubmit = document.getElementById('login-submit');
+    if (loginSubmit) loginSubmit.addEventListener('click', handleLogin);
     // 忘记密码 → 打开重置密码面板（自助找回）
-    document.getElementById('forgot-password').addEventListener('click', (e) => {
-        e.preventDefault();
-        showResetPasswordPanel();
-    });
-    document.getElementById('register-submit').addEventListener('click', handleRegister);
-    document.getElementById('send-code-btn').addEventListener('click', handleSendCode);
+    const forgotPassword = document.getElementById('forgot-password');
+    if (forgotPassword) {
+        forgotPassword.addEventListener('click', (e) => {
+            e.preventDefault();
+            showResetPasswordPanel();
+        });
+    }
+    const registerSubmit = document.getElementById('register-submit');
+    if (registerSubmit) registerSubmit.addEventListener('click', handleRegister);
+    const sendCodeBtn = document.getElementById('send-code-btn');
+    if (sendCodeBtn) sendCodeBtn.addEventListener('click', handleSendCode);
     // Enter 键提交（按钮为 type=button，表单无隐式提交，需手动绑定）
     document.querySelectorAll('#login-form input').forEach(input => {
         input.addEventListener('keydown', (e) => {
