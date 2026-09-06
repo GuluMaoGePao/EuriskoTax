@@ -1,52 +1,26 @@
 /**
- * EuriskoTax Service Worker
- * 策略：
- *   - 应用壳（HTML/JS/图标/manifest）预缓存，保证离线打开
- *   - 同源 JS/CSS：network-first（确保代码更新即时生效）
- *   - 同源其他静态（图片/字体等）：stale-while-revalidate
- *   - CDN 第三方资源：cache-first（命中即返回，未命中走网络并缓存）
- *   - API 请求（/api/*）：network-only（不缓存，数据需实时且需认证）
- *   - HTML 导航请求：network-first，离线时回退到缓存的 index.html
+ * EuriskoTax Service Worker —— 「瘦缓存」网络优先策略（2026-09-06）
  *
- * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
+ * 背景：旧版在 install 阶段预缓存整个应用壳（含 index.html + 全部自有 JS），
+ * 使 SW 成为「某次发布的内容快照」：每次发版都要升 CACHE_VERSION，老用户
+ * 还得手动清缓存才能看到新版 —— 线上因此反复出现「旧 HTML/旧脚本残留」
+ * （如登录页协议弹不出、报错行号超出源码实际行数）。改造目标：根治该问题，
+ * 同时保住「离线也能算」的免费版卖点。
+ *
+ * 新策略（与服务器 ETag 协商缓存配套，自有 JS 不再带 ?v= 指纹）：
+ *   - 不做任何预缓存 → SW 不再锁定内容版本，代码更新即见即所得
+ *   - HTML 导航：network-first，成功即缓存最新页面；仅真正断网时回退缓存
+ *   - 同源 JS/CSS/图片：network-first，成功后覆写运行缓存（弱网/离线可回退）
+ *   - CDN 第三方资源：cache-first（离线必需：Tailwind / Font Awesome）
+ *   - API（/api/*）：永不缓存、永不拦截
+ *
+ * 结果：在线永远最新；访问过的资源断网后仍可用（离线计税保留）；
+ * 老用户无需手动清缓存，新 SW 激活时自动清理全部历史缓存。
+ *
+ * 维护提示：正常发版无需改动本文件版本号；仅当缓存策略本身变更时才需改名缓存键。
  */
-const CACHE_VERSION = 'euriskotax-v9';
-const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
-const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
-const CDN_CACHE = CACHE_VERSION + '-cdn';
-
-// 应用壳：首次安装时预缓存，确保离线可启动
-const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/images/logo.png',
-  '/images/icon-192.png',
-  '/images/icon-512.png',
-  '/src/js/data/data-management.js',
-  '/src/js/data/field-hints.js',
-  '/src/js/data/tax-assistant.js',
-  '/src/js/calculation/tax-calculator.js',
-  '/src/js/calculation/helper-functions.js',
-  '/src/js/calculation/utils.js',
-  '/src/js/ui/navigation-ui.js',
-  '/src/js/ui/home-ui.js',
-  '/src/js/ui/tax-assistant-ui.js',
-  '/src/js/export/export-utils.js',
-  '/src/js/utils/mock-client.js',
-  '/src/js/app.js',
-  // 登录/个人中心链路（app.js 在启动时动态 import 的 ES module），预缓存保证离线可登录
-  '/src/js/auth/auth-ui.js?v=3',
-  '/src/js/api/api-client.js'
-];
-
-// 核心 CDN 资源预缓存（离线兜底）：
-// Tailwind（样式）+ Font Awesome（图标）是页面渲染必需，离线时必须可用
-// Chart.js/jsPDF/html2canvas 仅在导出图表/PDF 时使用，不预缓存（运行时按需缓存）
-const CDN_SHELL = [
-  'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css'
-];
+const RUNTIME_CACHE = 'euriskotax-runtime-v1';
+const CDN_CACHE = 'euriskotax-cdn-v1';
 
 // CDN 域名白名单：命中后走 cache-first 策略
 const CDN_HOSTS = [
@@ -55,31 +29,15 @@ const CDN_HOSTS = [
   'cdnjs.cloudflare.com'
 ];
 
-// 逐个缓存资源，单个失败不阻塞整体（CDN 可能因 CORS/网络波动失败）
-function cacheAll(cache, urls) {
-  return Promise.all(urls.map((url) =>
-    cache.add(url).catch((err) => console.warn('[SW] 预缓存跳过:', url, err))
-  ));
-}
-
 // 安全写入运行缓存：SW 更新接管期间，同一请求可能被并发多次 put（如 HTML 与 JS），
 // 浏览器会抛 "Cache has already been updated"，此处静默忽略以避免控制台 Uncaught 报错。
 function putResult(cachePromise, request, response) {
   return cachePromise.then((cache) => cache.put(request, response)).catch(() => {});
 }
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(APP_SHELL_CACHE)
-      .then((cache) => cacheAll(cache, APP_SHELL))
-      .then(() => caches.open(CDN_CACHE))
-      .then((cache) => cacheAll(cache, CDN_SHELL))
-      .then(() => self.skipWaiting())
-      .catch((err) => {
-        console.error('[SW] 预缓存阶段出错:', err);
-        return self.skipWaiting();
-      })
-  );
+self.addEventListener('install', () => {
+  // 无预缓存：在线访问到的资源在 fetch 阶段自动落入运行缓存，安装期不再固定版本快照
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -87,7 +45,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => !key.startsWith(CACHE_VERSION))
+          .filter((key) => key !== RUNTIME_CACHE && key !== CDN_CACHE)
           .map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())
@@ -98,33 +56,17 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 只处理 http/https 请求，其余（chrome-extension://、chrome://、devtools:// 等）直接放行，
+  // 只处理 http/https 请求，其余（chrome-extension://、devtools:// 等）直接放行，
   // 否则 cache.put 会因不支持的 scheme 抛 "Request scheme 'chrome-extension' is not supported"
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
   // 只处理 GET 请求
   if (request.method !== 'GET') return;
 
-  // 1. API 请求：不缓存，始终走网络（数据实时 + 需认证）
-  if (url.pathname.startsWith('/api/')) {
-    return; // 不做响应拦截，交给网络
-  }
+  // 1. API 请求：不缓存、不拦截（数据实时 + 需认证）
+  if (url.pathname.startsWith('/api/')) return;
 
-  // 2. HTML 导航请求：network-first，离线回退缓存
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          putResult(caches.open(APP_SHELL_CACHE), request, copy);
-          return response;
-        })
-        .catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  // 3. CDN 第三方资源：cache-first（命中直接返回，未命中走网络并缓存）
+  // 2. CDN 第三方资源：cache-first（命中直接返回，离线必需；未命中走网络并缓存）
   if (CDN_HOSTS.includes(url.host)) {
     event.respondWith(
       caches.match(request)
@@ -144,8 +86,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. 同源 JS/CSS 资源：network-first（确保代码更新即时生效，不返回旧缓存）
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.mjs') || url.pathname.endsWith('.css')) {
+  // 3. HTML 导航请求：network-first；成功即缓存最新页面，仅真正断网时回退缓存。
+  //    在线绝不返回缓存的旧 HTML —— 这是根治「旧页面/旧脚本残留」的关键。
+  if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -155,29 +98,32 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        // 离线兜底：ignoreSearch 忽略查询串，使带 ?v= 指纹的旧请求也能命中预缓存的无版本文件
-        .catch(() =>
-          caches.match(request, { ignoreSearch: true })
-            .then((cached) => cached || Response.error())
-        )
+        .catch(async () => {
+          const cached = await caches.match(request, { ignoreSearch: true });
+          if (cached) return cached;
+          const home = await caches.match('/');
+          if (home) return home;
+          return caches.match('/index.html');
+        })
     );
     return;
   }
 
-  // 5. 其他同源静态资源（图片/字体等）：stale-while-revalidate
+  // 4. 同源静态资源（JS/CSS/图片/字体/manifest 等）：network-first，
+  //    成功后覆写运行缓存；弱网/离线时回退缓存副本
+  //    （ignoreSearch 兼容历史遗留的带 ?v= 指纹请求，命中同文件缓存）
   event.respondWith(
-    caches.match(request)
-      .then((cached) => {
-        const networkFetch = fetch(request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              const copy = response.clone();
-              putResult(caches.open(RUNTIME_CACHE), request, copy);
-            }
-            return response;
-          })
-          .catch(() => cached);
-        return cached || networkFetch;
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          putResult(caches.open(RUNTIME_CACHE), request, copy);
+        }
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request, { ignoreSearch: true });
+        return cached || Response.error();
       })
   );
 });
