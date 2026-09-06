@@ -160,7 +160,15 @@ async function handleRegister() {
             document.getElementById('login-email').focus();
         });
     } catch (error) {
-        showAlert(error.message);
+        // 已注册邮箱（后端 409）：给出明确提示并引导去登录，而不是让用户干等验证码
+        if (error && error.statusCode === 409) {
+            showAlert('该邮箱已注册，请直接登录', 'warning', function() {
+                switchAuthTab('login');
+                document.getElementById('login-email').value = email;
+            });
+        } else {
+            showAlert(error.message);
+        }
     } finally {
         setLoading(btn, false);
     }
@@ -220,15 +228,17 @@ async function handleSendCode() {
         // 发送失败不进入倒计时，允许用户直接重试
         btn.textContent = '发送验证码';
         btn.disabled = false;
-        // 已注册邮箱：后端返回 409，直接引导登录而非显示"发送失败"
-        const msg = error.message || '';
-        if (msg.includes('已注册') || msg.includes('already registered')) {
-            showAlert(msg + '，如忘记密码可点击「忘记密码」自助找回', 'warning', function() {
+        // 已注册邮箱：后端返回 409（以状态码为准，不依赖文案匹配），
+        // 直接引导登录而非显示"发送失败"
+        const isRegistered = (error && error.statusCode === 409) ||
+            /已注册|already registered/i.test(error.message || '');
+        if (isRegistered) {
+            showAlert('该邮箱已注册，请直接登录；如忘记密码可点击「忘记密码」自助找回', 'warning', function() {
                 document.getElementById('login-tab').click();
                 document.getElementById('login-email').value = email;
             });
         } else {
-            showAlert(msg);
+            showAlert(error.message);
         }
     }
 }

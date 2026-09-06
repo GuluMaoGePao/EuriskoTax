@@ -5340,33 +5340,39 @@
     </div>
 
     <script>
-    // 用户协议/隐私政策模态框公共控制函数
-    // 点击即显示、不依赖登录状态。
-    // 优先调用 auth-ui 提供的 openModal/closeModal（带背景滚动锁定、淡入淡出与 ESC 关闭），
-    // 若外部 JS 尚未加载则降级为直接切换 class，保证任何情况下点击都能打开。
+    // 用户协议/隐私政策模态框控制函数（自包含，不依赖任何外部 JS 的加载状态/时序）
+    // 背景：此前走 window.openModal（由 auth-ui.js 动态 import 后注入）。一旦该模块加载
+    // 失败或时序延后（旧 Service Worker 缓存/弱网/脚本错误），点击会出现"毫无反应/不显示内容"。
+    // 这里改为同步 class 切换：点击 → 立即显示内容，无动画等待、无外部依赖。
+    var _policyEscHandler = null;
     function openPolicyModal(e, id) {
         e.preventDefault();
         var m = document.getElementById(id);
         if (!m) return;
-        if (window.openModal && window.openModal !== undefined) {
-            window.openModal(m);
-        } else {
-            m.classList.remove('hidden');
-            m.classList.remove('opacity-0');
-            var d = m.querySelector('div');
-            if (d) d.classList.remove('scale-95');
-        }
+        // 同步移除 hidden/opacity-0/scale-95：同帧内内容立即可见
+        m.classList.remove('hidden');
+        m.classList.remove('opacity-0');
+        var d = m.querySelector('div');
+        if (d) d.classList.remove('scale-95');
+        document.body.style.overflow = 'hidden';
+        // ESC 关闭支持（自管理，避免依赖 auth-ui 的弹窗栈）
+        if (_policyEscHandler) window.removeEventListener('keydown', _policyEscHandler);
+        _policyEscHandler = function (ev) {
+            if (ev.key === 'Escape') closePolicyModal(id);
+        };
+        window.addEventListener('keydown', _policyEscHandler);
     }
     function closePolicyModal(id) {
         var m = document.getElementById(id);
         if (!m) return;
-        if (window.closeModal && window.closeModal !== undefined) {
-            window.closeModal(m);
-        } else {
-            m.classList.add('hidden');
-            m.classList.add('opacity-0');
-            var d = m.querySelector('div');
-            if (d) d.classList.add('scale-95');
+        m.classList.add('hidden');
+        m.classList.add('opacity-0');
+        var d = m.querySelector('div');
+        if (d) d.classList.add('scale-95');
+        document.body.style.overflow = '';
+        if (_policyEscHandler) {
+            window.removeEventListener('keydown', _policyEscHandler);
+            _policyEscHandler = null;
         }
     }
     function closePolicyModalIfBackdrop(e) {
