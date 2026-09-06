@@ -1703,24 +1703,86 @@
                         </div>
                         <p class="text-xs text-gray-500 mt-1">每个邀请码仅可注册一个账号，可向开发者获取</p>
                     </div>
+                    <div class="flex items-start">
+                        <input type="checkbox" id="register-agree" class="form-checkbox text-primary mt-0.5">
+                        <label for="register-agree" class="ml-2 text-xs text-gray-500 leading-relaxed">
+                            我已阅读并同意
+                            <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="text-primary hover:underline">《用户协议》</a>
+                            和
+                            <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
+                        </label>
+                    </div>
                     <button type="button" id="register-submit" class="btn btn-primary w-full py-3 text-lg">
                         注册
                     </button>
                 </form>
+
+                <!-- 重置密码面板（忘记密码自助找回：验证邮箱 → 设置新密码） -->
+                <div id="reset-password-form" class="space-y-4 hidden">
+                    <div class="flex items-center justify-between mb-1">
+                        <h3 class="text-base font-semibold text-gray-800">
+                            <i class="fa fa-key text-primary mr-2"></i>重置密码
+                        </h3>
+                        <button type="button" id="reset-back-to-login" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+                            <i class="fa fa-arrow-left mr-1"></i>返回登录
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">
+                        输入注册邮箱获取验证码，验证通过后即可设置新密码。验证码 10 分钟内有效。
+                    </p>
+                    <div>
+                        <label for="reset-email" class="label">注册邮箱</label>
+                        <div class="relative">
+                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="email" id="reset-email" class="input-field pl-10" placeholder="请输入注册邮箱">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="reset-code" class="label">邮箱验证码</label>
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6位验证码" maxlength="6" autocomplete="off">
+                            </div>
+                            <button type="button" id="reset-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
+                                发送验证码
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="reset-new-password" class="label">新密码</label>
+                        <div class="relative">
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少6位）">
+                            <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="reset-confirm-password" class="label">确认新密码</label>
+                        <div class="relative">
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码">
+                            <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                        </div>
+                    </div>
+                    <button type="button" id="reset-submit" class="btn btn-primary w-full py-3 text-lg">
+                        重置密码
+                    </button>
+                </div>
                 
                 <!-- 分隔线 -->
-                <div class="my-6 flex items-center">
+                <div id="auth-divider" class="my-6 flex items-center">
                     <div class="flex-1 border-t border-gray-200"></div>
                     <span class="px-4 text-sm text-gray-500">或</span>
                     <div class="flex-1 border-t border-gray-200"></div>
                 </div>
                 
                 <!-- 其他登录方式 -->
-                <div class="flex justify-center space-x-4">
-                    <button class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
+                <div id="auth-social-row" class="flex justify-center space-x-4">
+                    <button id="social-wechat-btn" title="微信登录暂未开放" class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
                         <i class="fa fa-weixin text-green-600 text-xl"></i>
                     </button>
-                    <button class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
+                    <button id="social-qq-btn" title="QQ 登录暂未开放" class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
                         <i class="fa fa-qq text-blue-500 text-xl"></i>
                     </button>
                 </div>
@@ -1728,8 +1790,8 @@
             
             <!-- 底部信息 -->
             <div class="text-center mt-6 space-y-2">
-                <p class="text-blue-200 text-sm">
-                    登录即表示同意 <a href="#" id="user-agreement-link" onclick="openPolicyModal(event, 'user-agreement-modal')" class="underline hover:text-white">用户协议</a> 和 <a href="#" id="privacy-policy-link" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="underline hover:text-white">隐私政策</a>
+                <p id="auth-agreement-text" class="text-blue-200 text-sm leading-relaxed">
+                    登录即表示同意 <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="underline hover:text-white">用户协议</a> 和 <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="underline hover:text-white">隐私政策</a>
                 </p>
                 <p class="text-blue-300 text-xs">
                     © 2026 EuriskoTax · 仅供参考，实际纳税请以税务部门核算为准
@@ -1758,10 +1820,6 @@
                     <button id="help-btn" class="nav-icon-btn" title="使用帮助">
                         <i class="fa fa-question-circle"></i>
                     </button>
-                    <div id="auth-section" class="hidden ml-2">
-                        <button id="login-btn" class="btn btn-secondary text-sm py-1.5">登录</button>
-                        <button id="register-btn" class="btn bg-white text-primary hover:bg-gray-100 text-sm py-1.5 ml-2">注册</button>
-                    </div>
                     <div id="user-menu" class="ml-2">
                         <div class="relative">
                             <button id="user-btn" class="flex items-center space-x-2 bg-primary/80 hover:bg-primary/60 rounded-full px-3 py-1.5">
@@ -5283,23 +5341,33 @@
 
     <script>
     // 用户协议/隐私政策模态框公共控制函数
-    // 内联于 HTML，不依赖外部 JS 加载，确保 SW 缓存旧 JS 时仍可工作
+    // 点击即显示、不依赖登录状态。
+    // 优先调用 auth-ui 提供的 openModal/closeModal（带背景滚动锁定、淡入淡出与 ESC 关闭），
+    // 若外部 JS 尚未加载则降级为直接切换 class，保证任何情况下点击都能打开。
     function openPolicyModal(e, id) {
         e.preventDefault();
         var m = document.getElementById(id);
         if (!m) return;
-        m.classList.remove('hidden');
-        m.classList.remove('opacity-0');
-        var d = m.querySelector('div');
-        if (d) d.classList.remove('scale-95');
+        if (window.openModal && window.openModal !== undefined) {
+            window.openModal(m);
+        } else {
+            m.classList.remove('hidden');
+            m.classList.remove('opacity-0');
+            var d = m.querySelector('div');
+            if (d) d.classList.remove('scale-95');
+        }
     }
     function closePolicyModal(id) {
         var m = document.getElementById(id);
         if (!m) return;
-        m.classList.add('hidden');
-        m.classList.add('opacity-0');
-        var d = m.querySelector('div');
-        if (d) d.classList.add('scale-95');
+        if (window.closeModal && window.closeModal !== undefined) {
+            window.closeModal(m);
+        } else {
+            m.classList.add('hidden');
+            m.classList.add('opacity-0');
+            var d = m.querySelector('div');
+            if (d) d.classList.add('scale-95');
+        }
     }
     function closePolicyModalIfBackdrop(e) {
         if (e.target === e.currentTarget) {
@@ -5340,10 +5408,15 @@
                 <p>2. 因网络故障、数据丢失等原因导致的任何损失，开发者不承担责任。</p>
                 <p>3. 本应用可能随时更新或停止服务，不另行通知。</p>
 
-                <p><strong>五、公测期说明</strong></p>
-                <p>本应用目前处于公测阶段，注册需要邀请码。每个邀请码仅可注册一个账号。公测期暂不支持自助找回密码，如需重置请联系开发者。</p>
+                <p><strong>五、账号安全与注销</strong></p>
+                <p>1. 若忘记密码，您可在登录页点击"忘记密码"，通过注册邮箱获取验证码后自助重置密码。</p>
+                <p>2. 修改手机号、修改密码等操作，可在登录后进入"个人中心 → 账户设置"完成。</p>
+                <p>3. 注销账号可在"个人中心 → 账户设置"自助操作，注销后账号及个人数据将被删除且不可恢复。</p>
 
-                <p><strong>六、协议变更</strong></p>
+                <p><strong>六、公测期说明</strong></p>
+                <p>本应用目前处于公测阶段，注册需要邀请码。每个邀请码仅可注册一个账号。如遇注册或登录问题，请联系开发者邮箱：2649719969@qq.com。</p>
+
+                <p><strong>七、协议变更</strong></p>
                 <p>开发者保留随时修改本协议的权利，修改后的协议自发布之日起生效。</p>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end">
@@ -5381,11 +5454,11 @@
                 <p>2. JWT Token 用于会话管理，有过期机制。</p>
                 <p>3. 数据库采用加密连接，部署在可信云平台。</p>
 
-                <p><strong>四、信息删除</strong></p>
-                <p>您有权随时要求删除您的账号和相关数据。如需删除账号，请联系开发者。</p>
+                <p><strong>四、信息删除与账号注销</strong></p>
+                <p>您有权删除您的账号及相关数据。登录后进入"个人中心 → 账户设置 → 注销账号"即可自助注销（需邮箱确认），注销后账号与数据将被永久删除。如需帮助，请联系开发者。</p>
 
                 <p><strong>五、Cookie 与本地存储</strong></p>
-                <p>本应用使用 localStorage 存储登录状态和用户偏好设置，不使用跟踪 Cookie。清除浏览器数据不会影响服务器端数据。</p>
+                <p>本应用使用 localStorage / sessionStorage 存储登录状态（是否勾选"记住我"决定会话周期）和税务档案等偏好设置，不使用跟踪 Cookie。清除浏览器数据不会影响服务器端数据。</p>
 
                 <p><strong>六、未成年人保护</strong></p>
                 <p>本应用面向个人税务计算需求，不建议未成年人使用。如发现未成年人注册账号，我们将予以注销。</p>
@@ -5443,7 +5516,12 @@
                         </p>
                     </div>
                     <div class="text-center pt-2 border-t border-gray-100">
-                        <p class="text-xs text-gray-500">版本 1.17.0</p>
+                        <div class="flex items-center justify-center space-x-4 text-xs text-gray-500">
+                            <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="text-primary hover:underline">《用户协议》</a>
+                            <span class="text-gray-300">|</span>
+                            <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.5.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                     </div>
                 </div>
@@ -5460,8 +5538,7 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
-    <script type="module" src="src/js/api/api-client.js"></script>
-    <script type="module" src="src/js/auth/auth-ui.js?v=4"></script>
+    <!-- auth-ui 由 app.js 在 DOMContentLoaded 后动态 import（统一 URL 避免双份加载与旧版本缓存） -->
     <script src="src/js/data/data-management.js"></script>
     <script src="src/js/data/field-hints.js"></script>
     <script src="src/js/data/tax-assistant.js"></script>
@@ -5473,7 +5550,7 @@
     <script src="src/js/ui/home-ui.js?v=20260803"></script>
     <script src="src/js/export/export-utils.js?v=202604130"></script>
     <script src="src/js/calculation/utils.js"></script>
-    <script src="src/js/app.js?v=3"></script>
+    <script src="src/js/app.js?v=4"></script>
     <script>
         // 反向倒算方式切换
         document.getElementById('reverse-type').addEventListener('change', function() {

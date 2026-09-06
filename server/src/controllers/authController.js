@@ -15,6 +15,16 @@ const register = async (req, res, next) => {
             });
         }
 
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Password must be at least 6 characters',
+                    statusCode: 400
+                }
+            });
+        }
+
         if (!inviteCode) {
             return res.status(400).json({
                 success: false,
@@ -126,6 +136,15 @@ const updateProfile = async (req, res, next) => {
         const userId = req.user.id;
         
         if (password) {
+            if (password.length < 6) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        message: 'Password must be at least 6 characters',
+                        statusCode: 400
+                    }
+                });
+            }
             const isValid = await authService.verifyPassword(userId, currentPassword);
             if (!isValid) {
                 return res.status(401).json({
@@ -184,6 +203,76 @@ const deleteProfile = async (req, res, next) => {
     }
 };
 
+// 忘记密码：向已注册邮箱发送重置验证码（未注册邮箱直接 404 提示，不发送邮件）
+const sendResetCode = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Email is required',
+                    statusCode: 400
+                }
+            });
+        }
+
+        // 仅已注册邮箱允许发送，避免对任意邮箱轰炸邮件
+        await authService.ensureEmailRegistered(email);
+
+        const result = await verificationService.sendResetCode(email);
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// 忘记密码：校验重置验证码后更新密码
+const resetPassword = async (req, res, next) => {
+    try {
+        const { email, verificationCode, newPassword } = req.body;
+
+        if (!email || !verificationCode || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Email, verification code and new password are required',
+                    statusCode: 400
+                }
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Password must be at least 6 characters',
+                    statusCode: 400
+                }
+            });
+        }
+
+        await authService.ensureEmailRegistered(email);
+
+        // 重置验证码校验（一次性使用，通过即作废）
+        await verificationService.verifyResetCode(email, verificationCode);
+
+        const result = await authService.resetPassword(email, newPassword);
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     register,
     sendCode,
@@ -191,5 +280,7 @@ module.exports = {
     profile,
     updateProfile,
     deleteProfile,
-    verifyPassword
+    verifyPassword,
+    sendResetCode,
+    resetPassword
 };

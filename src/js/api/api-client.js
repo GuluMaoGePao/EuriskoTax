@@ -7,29 +7,47 @@ const API_BASE_URL = (() => {
     return `${window.location.protocol}//${window.location.host}/api`;
 })();
 
+// 会话存储策略：
+//   - 登录时勾选「记住我」→ localStorage（跨浏览器会话保持登录）
+//   - 未勾选 → sessionStorage（关闭标签页/浏览器即失效）
+// 读取时两级都查，兼容历史版本只写 localStorage 的旧数据。
 function getAuthToken() {
-    return localStorage.getItem('auth_token');
+    return sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
 }
 
-function setAuthToken(token) {
-    localStorage.setItem('auth_token', token);
+function setAuthToken(token, persistent = true) {
+    if (persistent) {
+        localStorage.setItem('auth_token', token);
+        sessionStorage.removeItem('auth_token');
+    } else {
+        sessionStorage.setItem('auth_token', token);
+        localStorage.removeItem('auth_token');
+    }
 }
 
 function removeAuthToken() {
     localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
 }
 
 function getCurrentUser() {
-    const userStr = localStorage.getItem('current_user');
+    const userStr = sessionStorage.getItem('current_user') || localStorage.getItem('current_user');
     return userStr ? JSON.parse(userStr) : null;
 }
 
-function setCurrentUser(user) {
-    localStorage.setItem('current_user', JSON.stringify(user));
+function setCurrentUser(user, persistent = true) {
+    if (persistent) {
+        localStorage.setItem('current_user', JSON.stringify(user));
+        sessionStorage.removeItem('current_user');
+    } else {
+        sessionStorage.setItem('current_user', JSON.stringify(user));
+        localStorage.removeItem('current_user');
+    }
 }
 
 function removeCurrentUser() {
     localStorage.removeItem('current_user');
+    sessionStorage.removeItem('current_user');
 }
 
 // 后端英文错误消息 → 用户友好的中文提示（未匹配到的原样透出）
@@ -60,6 +78,9 @@ const ERROR_MESSAGE_MAP = {
     'User not found': '用户不存在',
     'Authentication required': '请先登录',
     '当前密码验证失败': '当前密码验证失败',
+    'Password must be at least 6 characters': '密码长度至少6位',
+    'User with this email was not found': '该邮箱未注册，请先注册',
+    'Email, verification code and new password are required': '请填写邮箱、验证码和新密码',
     'Count must be an integer between 1 and 100': '数量必须是 1 到 100 之间的整数',
     'Invalid admin token': '管理员令牌无效',
     'Stats endpoint is not configured. Set ADMIN_TOKEN environment variable first.': '统计接口未配置，请联系开发者',
@@ -120,14 +141,29 @@ async function sendVerificationCode(email) {
     return await apiRequest('/auth/send-code', 'POST', { email });
 }
 
-async function loginUser(email, password) {
+// 忘记密码：发送密码重置验证码到已注册邮箱
+async function sendResetCode(email) {
+    return await apiRequest('/auth/send-reset-code', 'POST', { email });
+}
+
+// 忘记密码：校验重置验证码后设置新密码
+async function resetPassword(email, verificationCode, newPassword) {
+    return await apiRequest('/auth/reset-password', 'POST', {
+        email,
+        verificationCode,
+        newPassword
+    });
+}
+
+// remember = true → token 存 localStorage（勾选"记住我"），false → sessionStorage（关浏览器即失效）
+async function loginUser(email, password, remember = true) {
     const result = await apiRequest('/auth/login', 'POST', {
         email,
         password
     });
     if (result.token) {
-        setAuthToken(result.token);
-        setCurrentUser(result.user);
+        setAuthToken(result.token, remember);
+        setCurrentUser(result.user, remember);
     }
     return result;
 }
@@ -198,6 +234,8 @@ const apiClient = {
     removeCurrentUser,
     registerUser,
     sendVerificationCode,
+    sendResetCode,
+    resetPassword,
     loginUser,
     logoutUser,
     getProfile,

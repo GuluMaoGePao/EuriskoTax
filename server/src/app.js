@@ -34,19 +34,19 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 
 // 速率限制（防止暴力枚举登录）
-// send-code（验证码发送）单独走 codeLimiter，不占用此配额
+// send-code / send-reset-code（验证码发送）单独走 codeLimiter，不占用此配额
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    skip: (req) => req.path === '/send-code',
+    skip: (req) => ['/send-code', '/send-reset-code'].includes(req.path),
     message: { error: '请求过于频繁，请 15 分钟后再试' }
 });
 
-// 验证码发送限流：5 次/15 分钟/IP（防邮件轰炸滥用）
+// 验证码发送限流：5 次/15 分钟/IP（防邮件轰炸滥用；注册码与重置码合并计数）
 const codeLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
-    skip: (req) => req.path !== '/send-code',
+    skip: (req) => !['/send-code', '/send-reset-code'].includes(req.path),
     message: {
         success: false,
         error: { message: '验证码发送过于频繁，请 15 分钟后再试', statusCode: 429 }

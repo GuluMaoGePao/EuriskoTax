@@ -5,10 +5,10 @@
 
 ---
 
-## 当前状态（v1.4.0 · 2026-09-06）
+## 当前状态（v1.5.0 · 2026-09-06）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：`package.json` / `CHANGELOG.md` = **1.4.0**（生产上线 + PWA 离线化 + 注册全流程闭环）
+- **主版本**：`package.json` / `CHANGELOG.md` = **1.5.0**（生产上线 + PWA 离线化 + 注册闭环 + 忘记密码自助找回 + 协议合规交互）
 - **测试**：6 套件 203 个单元测试全部通过（`npm test`，2026-09-06 实测）
 - **开发阶段**：阶段 8（测试用户运营）进行中 → 阶段 9（PWA）代码完成 → 阶段 10（免费/专业版）规划中
 

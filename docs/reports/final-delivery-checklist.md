@@ -1,10 +1,10 @@
 # EuriskoTax 最终项目交付清单
 
 **交付日期**: 2026-08-05（首次交付基线）
-**项目版本**: 1.1.0 → 已随迭代演进至 **1.4.0**（2026-09-06 更新：生产上线 + PWA + 注册闭环，变更明细见 [CHANGELOG.md](../../CHANGELOG.md) 与 [development-plan.md](../development/development-plan.md)）
+**项目版本**: 1.1.0 → 已随迭代演进至 **1.5.0**（2026-09-06 更新：生产上线 + PWA + 注册闭环 + 忘记密码自助找回 + 协议合规交互，变更明细见 [CHANGELOG.md](../../CHANGELOG.md) 与 [development-plan.md](../development/development-plan.md)）
 **交付范围**: 代码重构 + UI 重设计 + 悬浮税助手 + 工具封装 + 单元测试（203 个）+ 性能基准 + 交互测试 + 交付文档
 
-> 本文档为重构/质量交付记录。当前项目状态（生产部署、v1.4.0 功能）以 docs/README.md 索引下的文档为准。
+> 本文档为重构/质量交付记录。当前项目状态（生产部署、v1.5.0 功能）以 docs/README.md 索引下的文档为准。
 
 ---
 
