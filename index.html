@@ -1536,9 +1536,47 @@
         .dark .assistant-overlay {
             background: rgba(0, 0, 0, 0.6);
         }
+
+        /* 初始化遮罩：auth-ui 加载完成前隐藏登录页和应用容器，防止旧UI闪现 */
+        body:not(.auth-ready) #login-page,
+        body:not(.auth-ready) #app-container {
+            visibility: hidden !important;
+        }
+        body.auth-ready #init-splash {
+            display: none !important;
+        }
+        #init-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+        }
+        #init-splash .splash-content {
+            text-align: center;
+        }
+        #init-splash .splash-logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            animation: splash-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes splash-pulse {
+            0%, 100% { opacity: 0.7; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- 初始化遮罩：auth-ui 加载完成后自动隐藏，防止旧UI闪现 -->
+    <div id="init-splash">
+        <div class="splash-content">
+            <img class="splash-logo" src="images/logo.png" alt="EuriskoTax">
+            <p style="color: white; font-size: 14px; opacity: 0.8;">加载中...</p>
+        </div>
+    </div>
     <!-- 离线状态提示条（PWA 离线模式） -->
     <div id="offline-banner" class="hidden fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-white text-center py-2 px-4 text-sm shadow-md">
         <i class="fa fa-wifi mr-2"></i>
@@ -1691,7 +1729,7 @@
             <!-- 底部信息 -->
             <div class="text-center mt-6 space-y-2">
                 <p class="text-blue-200 text-sm">
-                    登录即表示同意 <a href="#" class="underline hover:text-white">用户协议</a> 和 <a href="#" class="underline hover:text-white">隐私政策</a>
+                    登录即表示同意 <a href="#" id="user-agreement-link" class="underline hover:text-white">用户协议</a> 和 <a href="#" id="privacy-policy-link" class="underline hover:text-white">隐私政策</a>
                 </p>
                 <p class="text-blue-300 text-xs">
                     © 2026 EuriskoTax · 仅供参考，实际纳税请以税务部门核算为准
@@ -5239,6 +5277,97 @@
                         确认
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户协议模态框 -->
+    <div id="user-agreement-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold">用户协议</h3>
+                    <button id="close-user-agreement-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times text-white"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-3" style="white-space: pre-line;">
+                <p><strong>欢迎使用 EuriskoTax 个人所得税预算规划工具（以下简称"本应用"）。</strong></p>
+
+                <p>使用本应用前，请仔细阅读以下协议。点击"注册"即视为您已阅读并同意本协议全部内容。</p>
+
+                <p><strong>一、服务内容</strong></p>
+                <p>本应用提供个人所得税计算参考功能，包括综合所得、经营所得、分类所得及反向倒算等计税模式。所有计算结果仅供参考，不构成专业税务建议。</p>
+
+                <p><strong>二、用户责任</strong></p>
+                <p>1. 用户应提供真实、准确的注册信息。</p>
+                <p>2. 用户不得将本应用用于任何违法用途。</p>
+                <p>3. 用户应妥善保管账号密码，因密码泄露导致的损失由用户自行承担。</p>
+
+                <p><strong>三、知识产权</strong></p>
+                <p>本应用的界面设计、图标、文案及源代码版权归开发者所有，未经授权不得复制、传播或用于商业用途。</p>
+
+                <p><strong>四、免责声明</strong></p>
+                <p>1. 本应用所有计算结果仅供参考，实际纳税请以税务部门核算为准。</p>
+                <p>2. 因网络故障、数据丢失等原因导致的任何损失，开发者不承担责任。</p>
+                <p>3. 本应用可能随时更新或停止服务，不另行通知。</p>
+
+                <p><strong>五、公测期说明</strong></p>
+                <p>本应用目前处于公测阶段，注册需要邀请码。每个邀请码仅可注册一个账号。公测期暂不支持自助找回密码，如需重置请联系开发者。</p>
+
+                <p><strong>六、协议变更</strong></p>
+                <p>开发者保留随时修改本协议的权利，修改后的协议自发布之日起生效。</p>
+            </div>
+            <div class="p-4 border-t border-gray-200 flex justify-end">
+                <button id="user-agreement-ok" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐私政策模态框 -->
+    <div id="privacy-policy-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold">隐私政策</h3>
+                    <button id="close-privacy-policy-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times text-white"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-3" style="white-space: pre-line;">
+                <p><strong>本应用高度重视您的个人隐私，遵循《中华人民共和国个人信息保护法》相关规定。</strong></p>
+
+                <p><strong>一、信息收集</strong></p>
+                <p>1. 注册信息：邮箱（用于登录和验证码）、用户名、密码（加密存储）、手机号（选填）。</p>
+                <p>2. 使用数据：您的计算记录会保存到服务器，方便历史查询和跨设备同步。</p>
+                <p>3. 本应用不收集您的位置信息、设备标识或其他敏感个人信息。</p>
+
+                <p><strong>二、信息使用</strong></p>
+                <p>1. 注册信息仅用于账号管理和身份验证。</p>
+                <p>2. 计算记录仅用于为用户提供历史查询功能。</p>
+                <p>3. 本应用不会将您的个人信息出售、出租或提供给任何第三方。</p>
+
+                <p><strong>三、信息存储与安全</strong></p>
+                <p>1. 密码使用 bcrypt 加密存储，不可逆向解密。</p>
+                <p>2. JWT Token 用于会话管理，有过期机制。</p>
+                <p>3. 数据库采用加密连接，部署在可信云平台。</p>
+
+                <p><strong>四、信息删除</strong></p>
+                <p>您有权随时要求删除您的账号和相关数据。如需删除账号，请联系开发者。</p>
+
+                <p><strong>五、Cookie 与本地存储</strong></p>
+                <p>本应用使用 localStorage 存储登录状态和用户偏好设置，不使用跟踪 Cookie。清除浏览器数据不会影响服务器端数据。</p>
+
+                <p><strong>六、未成年人保护</strong></p>
+                <p>本应用面向个人税务计算需求，不建议未成年人使用。如发现未成年人注册账号，我们将予以注销。</p>
+
+                <p><strong>七、联系我们</strong></p>
+                <p>如您对本隐私政策有任何疑问，请联系：2649719969@qq.com</p>
+            </div>
+            <div class="p-4 border-t border-gray-200 flex justify-end">
+                <button id="privacy-policy-ok" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
             </div>
         </div>
     </div>

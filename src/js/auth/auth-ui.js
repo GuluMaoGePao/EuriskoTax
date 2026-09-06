@@ -57,7 +57,7 @@ async function handleLogin() {
         updateAuthUI();
         showAlert('登录成功', 'success');
     } catch (error) {
-        showAlert('登录失败: ' + error.message);
+        showAlert(error.message);
     } finally {
         setLoading(btn, false);
     }
@@ -75,7 +75,7 @@ async function handleQuickLogin() {
         updateAuthUI();
         showAlert('快速登录成功', 'success');
     } catch (error) {
-        showAlert('快速登录失败: ' + error.message);
+        showAlert(error.message);
     }
 }
 
@@ -130,7 +130,7 @@ async function handleRegister() {
         document.getElementById('register-code').value = '';
         document.getElementById('login-email').value = email;
     } catch (error) {
-        showAlert('注册失败: ' + error.message);
+        showAlert(error.message);
     } finally {
         setLoading(btn, false);
     }
@@ -188,11 +188,10 @@ async function handleSendCode() {
         const msg = error.message || '';
         if (msg.includes('已注册') || msg.includes('already registered')) {
             showAlert(msg + '，如忘记密码请联系开发者重置', 'warning', function() {
-                // 点击确定后切换到登录页
                 document.getElementById('login-tab').click();
             });
         } else {
-            showAlert('验证码发送失败: ' + msg);
+            showAlert(msg);
         }
     }
 }
@@ -941,7 +940,10 @@ function setupAuthEventListeners() {
     document.getElementById('login-submit').addEventListener('click', handleLogin);
     document.getElementById('forgot-password').addEventListener('click', (e) => {
         e.preventDefault();
-        showAlert('公测期暂不支持自助找回密码，请联系开发者重置');
+        showAlert(
+            '公测期暂不支持自助找回密码。\n\n如需重置密码，请提供注册邮箱并联系开发者：\n• 邮箱：2649719969@qq.com\n• 说明您的注册邮箱，验证身份后为您重置\n\n重置后请及时修改为个人密码。',
+            'warning'
+        );
     });
     // 快速登录仅限本地开发使用，生产环境隐藏入口
     if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
@@ -973,6 +975,35 @@ function setupAuthEventListeners() {
         if (!sendCodeTimer) {
             document.getElementById('send-code-btn').disabled = !e.target.value.trim();
         }
+    });
+    // 用户协议和隐私政策弹窗
+    document.getElementById('user-agreement-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal(document.getElementById('user-agreement-modal'));
+    });
+    document.getElementById('close-user-agreement-modal').addEventListener('click', () => {
+        closeModal(document.getElementById('user-agreement-modal'));
+    });
+    document.getElementById('user-agreement-ok').addEventListener('click', () => {
+        closeModal(document.getElementById('user-agreement-modal'));
+    });
+    // 点击遮罩关闭用户协议
+    document.getElementById('user-agreement-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeModal(e.target);
+    });
+    document.getElementById('privacy-policy-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal(document.getElementById('privacy-policy-modal'));
+    });
+    document.getElementById('close-privacy-policy-modal').addEventListener('click', () => {
+        closeModal(document.getElementById('privacy-policy-modal'));
+    });
+    document.getElementById('privacy-policy-ok').addEventListener('click', () => {
+        closeModal(document.getElementById('privacy-policy-modal'));
+    });
+    // 点击遮罩关闭隐私政策
+    document.getElementById('privacy-policy-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeModal(e.target);
     });
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
@@ -1123,6 +1154,7 @@ function showAlert(message, type = 'error', callback) {
     iconI.className = `fa ${config.icon} ${config.color}`;
     title.textContent = config.title;
     msg.textContent = message;
+    msg.style.whiteSpace = 'pre-line';
     
     openModal(modal);
     
@@ -1341,6 +1373,8 @@ function clearPageHistory() {
 function initAuth() {
     updateAuthUI();
     setupAuthEventListeners();
+    // 标记认证初始化完成，隐藏初始化遮罩，显示真实UI
+    document.body.classList.add('auth-ready');
 }
 
 window.deleteHistoryItem = deleteHistoryItem;
