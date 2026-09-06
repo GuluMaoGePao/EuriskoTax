@@ -2,14 +2,15 @@
  * EuriskoTax Service Worker
  * 策略：
  *   - 应用壳（HTML/JS/图标/manifest）预缓存，保证离线打开
- *   - 同源静态资源：stale-while-revalidate（先回缓存，后台更新）
+ *   - 同源 JS/CSS：network-first（确保代码更新即时生效）
+ *   - 同源其他静态（图片/字体等）：stale-while-revalidate
  *   - CDN 第三方资源：cache-first（命中即返回，未命中走网络并缓存）
  *   - API 请求（/api/*）：network-only（不缓存，数据需实时且需认证）
  *   - HTML 导航请求：network-first，离线时回退到缓存的 index.html
  *
  * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
  */
-const CACHE_VERSION = 'euriskotax-v6';
+const CACHE_VERSION = 'euriskotax-v7';
 const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const CDN_CACHE = CACHE_VERSION + '-cdn';
@@ -61,6 +62,12 @@ function cacheAll(cache, urls) {
   ));
 }
 
+// 安全写入运行缓存：SW 更新接管期间，同一请求可能被并发多次 put（如 HTML 与 JS），
+// 浏览器会抛 "Cache has already been updated"，此处静默忽略以避免控制台 Uncaught 报错。
+function putResult(cachePromise, request, response) {
+  return cachePromise.then((cache) => cache.put(request, response)).catch(() => {});
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE)
@@ -105,7 +112,7 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(APP_SHELL_CACHE).then((cache) => cache.put(request, copy));
+          putResult(caches.open(APP_SHELL_CACHE), request, copy);
           return response;
         })
         .catch(() => caches.match('/index.html'))
@@ -123,7 +130,7 @@ self.addEventListener('fetch', (event) => {
             .then((response) => {
               if (response && response.status === 200) {
                 const copy = response.clone();
-                caches.open(CDN_CACHE).then((cache) => cache.put(request, copy));
+                putResult(caches.open(CDN_CACHE), request, copy);
               }
               return response;
             })
@@ -140,7 +147,7 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response && response.status === 200) {
             const copy = response.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+            putResult(caches.open(RUNTIME_CACHE), request, copy);
           }
           return response;
         })
@@ -161,7 +168,7 @@ self.addEventListener('fetch', (event) => {
           .then((response) => {
             if (response && response.status === 200) {
               const copy = response.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+              putResult(caches.open(RUNTIME_CACHE), request, copy);
             }
             return response;
           })
