@@ -1729,7 +1729,7 @@
             <!-- 底部信息 -->
             <div class="text-center mt-6 space-y-2">
                 <p class="text-blue-200 text-sm">
-                    登录即表示同意 <a href="#" id="user-agreement-link" class="underline hover:text-white">用户协议</a> 和 <a href="#" id="privacy-policy-link" class="underline hover:text-white">隐私政策</a>
+                    登录即表示同意 <a href="#" id="user-agreement-link" onclick="event.preventDefault(); var m=document.getElementById('user-agreement-modal'); if(m){m.classList.remove('hidden');m.classList.remove('opacity-0');var d=m.querySelector('div');if(d)d.classList.remove('scale-95');}" class="underline hover:text-white">用户协议</a> 和 <a href="#" id="privacy-policy-link" onclick="event.preventDefault(); var m=document.getElementById('privacy-policy-modal'); if(m){m.classList.remove('hidden');m.classList.remove('opacity-0');var d=m.querySelector('div');if(d)d.classList.remove('scale-95');}" class="underline hover:text-white">隐私政策</a>
                 </p>
                 <p class="text-blue-300 text-xs">
                     © 2026 EuriskoTax · 仅供参考，实际纳税请以税务部门核算为准
@@ -5282,12 +5282,12 @@
     </div>
 
     <!-- 用户协议模态框 -->
-    <div id="user-agreement-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="user-agreement-modal" onclick="if(event.target===event.currentTarget){var m=this;m.classList.add('hidden');m.classList.add('opacity-0');}" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-bold">用户协议</h3>
-                    <button id="close-user-agreement-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <button id="close-user-agreement-modal" onclick="var m=document.getElementById('user-agreement-modal');if(m){m.classList.add('hidden');m.classList.add('opacity-0');}" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times text-white"></i>
                     </button>
                 </div>
@@ -5320,18 +5320,18 @@
                 <p>开发者保留随时修改本协议的权利，修改后的协议自发布之日起生效。</p>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end">
-                <button id="user-agreement-ok" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
+                <button id="user-agreement-ok" onclick="var m=document.getElementById('user-agreement-modal');if(m){m.classList.add('hidden');m.classList.add('opacity-0');}" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
             </div>
         </div>
     </div>
 
     <!-- 隐私政策模态框 -->
-    <div id="privacy-policy-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="privacy-policy-modal" onclick="if(event.target===event.currentTarget){var m=this;m.classList.add('hidden');m.classList.add('opacity-0');}" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-bold">隐私政策</h3>
-                    <button id="close-privacy-policy-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <button id="close-privacy-policy-modal" onclick="var m=document.getElementById('privacy-policy-modal');if(m){m.classList.add('hidden');m.classList.add('opacity-0');}" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times text-white"></i>
                     </button>
                 </div>
@@ -5367,7 +5367,7 @@
                 <p>如您对本隐私政策有任何疑问，请联系：2649719969@qq.com</p>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end">
-                <button id="privacy-policy-ok" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
+                <button id="privacy-policy-ok" onclick="var m=document.getElementById('privacy-policy-modal');if(m){m.classList.add('hidden');m.classList.add('opacity-0');}" class="btn btn-primary px-6 py-2 rounded-lg">我已阅读</button>
             </div>
         </div>
     </div>
