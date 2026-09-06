@@ -48,7 +48,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 .\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
-> 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **🔥 完整测试** 一键开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md)。
+> 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **「第一次用：一键启动」**（新环境/刚拉代码）或 **「日常启动：快速启动」**（日常开发）开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md) 与 [开发工作流总览](docs/guides/development-workflow.md)。
 
 **本地测试账号**：`dev@example.com` / `password`（由启动脚本自动重置）；登录页在 localhost 下会自动出现「开发环境：填入本地测试账号」入口（生产不显示）
 
@@ -145,5 +145,6 @@ npm run verify:local        # 本地登录链路验证门禁（push 前必跑，
 
 - [API 接口文档](docs/api/api-reference.md) · [开发计划](docs/development/development-plan.md)
 - [计税规则手册](docs/guides/tax-calculation-rules.md) · [UI 组件复用指南](docs/guides/ui-component-reuse-guide.md)
+- [开发工作流总览](docs/guides/development-workflow.md)（启动/验证/发布/回滚/排障，GUI 按钮命名权威）
 - [冷启动推广素材](docs/marketing/cold-start-materials.md) · [测试报告](docs/reports/test-report.md)
 - 文档中心索引：[docs/README.md](docs/README.md)
