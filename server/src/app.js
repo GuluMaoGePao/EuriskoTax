@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');
+const inviteRoutes = require('./routes/invites');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -113,6 +114,7 @@ app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
 app.use('/api/calculations', calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/invites', inviteRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

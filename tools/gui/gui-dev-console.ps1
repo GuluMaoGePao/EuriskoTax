@@ -1081,6 +1081,67 @@ function Show-InputBox {
 }
 
 # ==============================================================================
+# 辅助函数: Get-AdminToken（获取管理员令牌：优先读 server\.env，无则弹窗输入并回存）
+# ==============================================================================
+function Get-AdminToken {
+    $envFile = Join-Path $ServerDir ".env"
+    if (Test-Path $envFile) {
+        $line = Get-Content $envFile | Where-Object { $_ -match '^ADMIN_TOKEN=' } | Select-Object -First 1
+        if ($line) {
+            $tok = ($line -replace '^ADMIN_TOKEN=', '').Trim()
+            if ($tok) { return $tok }
+        }
+    }
+    $tok = Show-InputBox -Title "管理员令牌" -Prompt "请输入 ADMIN_TOKEN（生产环境在 Zeabur 环境变量中查看；输入一次后自动保存到 server\.env，下次免输入）：" -DefaultValue ""
+    if (-not $tok) { return $null }
+    if (Test-Path $envFile) {
+        $content = Get-Content $envFile
+        if ($content | Where-Object { $_ -match '^ADMIN_TOKEN=' }) {
+            $content = $content | ForEach-Object { if ($_ -match '^ADMIN_TOKEN=') { "ADMIN_TOKEN=$tok" } else { $_ } }
+            Set-Content -Path $envFile -Value $content -Encoding UTF8
+        } else {
+            Add-Content -Path $envFile -Value "ADMIN_TOKEN=$tok" -Encoding UTF8
+        }
+        Write-Log "ADMIN_TOKEN 已保存到 server\.env" "OK"
+    }
+    return $tok
+}
+
+# ==============================================================================
+# 辅助函数: Invoke-InviteApi（调用邀请码管理 API，Target: prod / local）
+# ==============================================================================
+function Invoke-InviteApi {
+    param([string]$Method, [string]$Target, [object]$Body)
+    $base = if ($Target -eq "prod") { "https://euriskotax.zeabur.app" } else { "http://localhost:3000" }
+    $token = Get-AdminToken
+    if (-not $token) { return @{ Ok = $false; Error = "未提供管理员令牌（ADMIN_TOKEN），操作已取消" } }
+    try {
+        $params = @{
+            Uri         = "$base/api/invites"
+            Method      = $Method
+            Headers     = @{ "X-Admin-Token" = $token }
+            ContentType = "application/json"
+            TimeoutSec  = 20
+            UseBasicParsing = $true
+        }
+        if ($Body) { $params.Body = ($Body | ConvertTo-Json -Compress) }
+        $resp = Invoke-RestMethod @params
+        return @{ Ok = $true; Data = $resp.data }
+    } catch {
+        $msg = $_.Exception.Message
+        try {
+            # HTTP 错误响应：读取响应体里的 error.message 展示更友好
+            $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $errBody = $sr.ReadToEnd() | ConvertFrom-Json
+            if ($errBody.error.message) { $msg = $errBody.error.message }
+        } catch {
+            # 非 HTTP 错误（如网络不通、超时）或响应体不可读，保留原始异常消息即可
+        }
+        return @{ Ok = $false; Error = $msg }
+    }
+}
+
+# ==============================================================================
 # 辅助函数: Get-GitBranches（获取当前仓库的本地/远程分支列表和当前分支）
 # ==============================================================================
 function Get-GitBranches {
@@ -2637,7 +2698,7 @@ Add-SectionCard -TabCtx $tab1Ctx `
 # ==============================================================================
 # ============ 标签页 2: 数据库 ============
 # ==============================================================================
-$tab2Ctx = New-TabPanel -HeaderText "💾  数据库" -HeaderTagline "Prisma 数据库迁移 · 客户端生成 · 数据重置 · 可视化管理" -HeaderDesc "本页包含 2 个功能区：① Schema 管理（迁移/生成客户端/Prisma Studio/编辑schema）  ② 数据管理（重置账号/强制重建数据库）。所有命令在 server/ 目录执行。"
+$tab2Ctx = New-TabPanel -HeaderText "💾  数据库" -HeaderTagline "Prisma 数据库迁移 · 客户端生成 · 数据重置 · 可视化管理" -HeaderDesc "本页包含 3 个功能区：① Schema 管理（迁移/生成客户端/Prisma Studio/编辑schema）  ② 数据管理（重置账号/强制重建数据库）  ③ 邀请码管理（一机一码：生成/查看/复制，支持本地与生产）。所有命令在 server/ 目录执行。"
 
 Add-SectionCard -TabCtx $tab2Ctx `
     -Title "1. Schema 管理" `
@@ -2669,6 +2730,88 @@ Add-SectionCard -TabCtx $tab2Ctx `
        OnClick = {
             $r = [System.Windows.Forms.MessageBox]::Show("这将删除并重建数据库! 所有数据将永久丢失! 确定继续?", "危险操作", "YesNo", "Warning")
             if ($r -eq "Yes") { Invoke-AsyncCommand -Name "resetdb" -Command "npx prisma migrate reset --force" -WorkingDir $ServerDir }
+        } }
+)
+
+Add-SectionCard -TabCtx $tab2Ctx `
+    -Title "3. 邀请码管理（一机一码）" `
+    -Subtitle "注册邀请码：生成 · 查看 · 复制（生产 / 本地）" `
+    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证：优先读取 server\.env 中的 ADMIN_TOKEN，没有会弹窗输入一次并自动保存。生产目标 https://euriskotax.zeabur.app，本地 http://localhost:3000（需后端已启动）。" `
+    -AccentColor $C_PURPLE -Buttons @(
+    @{ Text = "生成邀请码到生产`n自动复制到剪贴板"; Desc = "输入数量（1-100）后调用生产环境邀请码接口生成，成功后自动复制到剪贴板并弹窗提示，明细写入下方日志区。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $cnt = Show-InputBox -Title "生成数量" -Prompt "要生成几个邀请码？（1-100）：" -DefaultValue "10"
+            if (-not $cnt) { return }
+            if ($cnt -notmatch '^\d+$' -or [int]$cnt -lt 1 -or [int]$cnt -gt 100) {
+                Show-GuiAlert -Title "数量无效" -Message "数量必须是 1-100 之间的整数。" -Kind "Warning"; return
+            }
+            $r = Invoke-InviteApi -Method "POST" -Target "prod" -Body @{ count = [int]$cnt }
+            if ($r.Ok) {
+                $codes = ($r.Data.codes -join "`r`n")
+                Set-Clipboard -Value $codes
+                Write-Log "✅ 生产环境已生成 $($r.Data.createdCount) 个邀请码（已复制到剪贴板）："
+                foreach ($c in $r.Data.codes) { Write-Log "    $c" }
+                Show-GuiAlert -Title "生成成功" -Message "已在生产环境生成 $($r.Data.createdCount) 个邀请码，已复制到剪贴板。明细见下方日志区。"
+            } else {
+                Write-Log "❌ 生产生成邀请码失败：$($r.Error)" "ERR"
+                Show-GuiAlert -Title "生成失败" -Message $r.Error -Kind "Error"
+            }
+        } },
+    @{ Text = "生成邀请码到本地`n写入本地开发库"; Desc = "同生成到生产，但写入本地开发数据库（需本地后端已启动，否则会提示连接失败）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $cnt = Show-InputBox -Title "生成数量" -Prompt "要生成几个邀请码？（1-100）：" -DefaultValue "10"
+            if (-not $cnt) { return }
+            if ($cnt -notmatch '^\d+$' -or [int]$cnt -lt 1 -or [int]$cnt -gt 100) {
+                Show-GuiAlert -Title "数量无效" -Message "数量必须是 1-100 之间的整数。" -Kind "Warning"; return
+            }
+            $r = Invoke-InviteApi -Method "POST" -Target "local" -Body @{ count = [int]$cnt }
+            if ($r.Ok) {
+                Write-Log "✅ 本地已生成 $($r.Data.createdCount) 个邀请码："
+                foreach ($c in $r.Data.codes) { Write-Log "    $c" }
+            } else {
+                Write-Log "❌ 本地生成邀请码失败：$($r.Error)" "ERR"
+                Show-GuiAlert -Title "生成失败" -Message $r.Error -Kind "Error"
+            }
+        } },
+    @{ Text = "查看生产邀请码`n未使用 / 已使用列表"; Desc = "拉取生产环境全部邀请码，按未使用/已使用分组显示在下方日志区，已使用项显示注册用户名和时间。"; Color = "75, 140, 230";
+       OnClick = {
+            $r = Invoke-InviteApi -Method "GET" -Target "prod"
+            if ($r.Ok) {
+                Write-Log "📋 生产邀请码：共 $($r.Data.total) 个 = 未使用 $($r.Data.availableCount) + 已使用 $($r.Data.usedCount)" "OK"
+                foreach ($c in $r.Data.available) { Write-Log "    [未使用] $($c.code)" }
+                foreach ($c in $r.Data.used) { Write-Log "    [已使用] $($c.code) → 用户 $($c.usedBy)（$($c.usedAt.ToString('yyyy-MM-dd HH:mm'))）" "WARN" }
+            } else {
+                Write-Log "❌ 拉取生产邀请码失败：$($r.Error)" "ERR"
+                Show-GuiAlert -Title "查看失败" -Message $r.Error -Kind "Error"
+            }
+        } },
+    @{ Text = "查看本地邀请码`n未使用 / 已使用列表"; Desc = "拉取本地开发库全部邀请码，分组显示在下方日志区（需本地后端已启动）。"; Color = "75, 140, 230";
+       OnClick = {
+            $r = Invoke-InviteApi -Method "GET" -Target "local"
+            if ($r.Ok) {
+                Write-Log "📋 本地邀请码：共 $($r.Data.total) 个 = 未使用 $($r.Data.availableCount) + 已使用 $($r.Data.usedCount)" "OK"
+                foreach ($c in $r.Data.available) { Write-Log "    [未使用] $($c.code)" }
+                foreach ($c in $r.Data.used) { Write-Log "    [已使用] $($c.code) → 用户 $($c.usedBy)（$($c.usedAt.ToString('yyyy-MM-dd HH:mm'))）" "WARN" }
+            } else {
+                Write-Log "❌ 拉取本地邀请码失败：$($r.Error)" "ERR"
+                Show-GuiAlert -Title "查看失败" -Message $r.Error -Kind "Error"
+            }
+        } },
+    @{ Text = "复制生产未使用邀请码`n一行一个，发用户用"; Desc = "拉取生产环境全部未使用邀请码并整批复制到剪贴板（一行一个），方便直接粘贴发给用户。无可用码时提示先生成。"; Color = "85, 180, 110";
+       OnClick = {
+            $r = Invoke-InviteApi -Method "GET" -Target "prod"
+            if ($r.Ok) {
+                if ($r.Data.availableCount -eq 0) {
+                    Show-GuiAlert -Title "无可用邀请码" -Message "生产环境没有未使用的邀请码，请先用【生成邀请码到生产】补充。" -Kind "Warning"; return
+                }
+                $codes = ($r.Data.available | ForEach-Object { $_.code }) -join "`r`n"
+                Set-Clipboard -Value $codes
+                Write-Log "✅ 已复制 $($r.Data.availableCount) 个生产未使用邀请码到剪贴板" "OK"
+                Show-GuiAlert -Title "复制成功" -Message "已复制 $($r.Data.availableCount) 个未使用邀请码到剪贴板（一行一个）。"
+            } else {
+                Write-Log "❌ 复制失败：$($r.Error)" "ERR"
+                Show-GuiAlert -Title "复制失败" -Message $r.Error -Kind "Error"
+            }
         } }
 )
 
