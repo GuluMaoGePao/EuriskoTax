@@ -15,6 +15,16 @@ const register = async (req, res, next) => {
             });
         }
 
+        if (!inviteCode) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Invite code is required',
+                    statusCode: 400
+                }
+            });
+        }
+
         if (!verificationCode) {
             return res.status(400).json({
                 success: false,
@@ -25,22 +35,14 @@ const register = async (req, res, next) => {
             });
         }
 
+        // 先查重（在消耗一次性验证码之前），已注册账号给出明确提示，避免浪费验证码
+        await authService.checkDuplicate(username, email);
+
         // 邮箱验证码校验（一次性使用，校验通过即作废）
         await verificationService.verifyRegisterCode(email, verificationCode);
 
-        // 邀请码校验（公测期限制注册；码值由环境变量提供，未配置时一律拒绝）
-        const VALID_INVITE_CODE = process.env.INVITE_CODE;
-        if (!VALID_INVITE_CODE || inviteCode !== VALID_INVITE_CODE) {
-            return res.status(403).json({
-                success: false,
-                error: {
-                    message: 'Invalid invite code. Public beta requires an invite code.',
-                    statusCode: 403
-                }
-            });
-        }
-
-        const user = await authService.registerUser(username, email, password, phone);
+        // 注册 + 一机一码邀请码在事务内原子消耗
+        const user = await authService.registerUser(username, email, password, phone, inviteCode);
 
         res.status(201).json({
             success: true,
@@ -65,6 +67,9 @@ const sendCode = async (req, res, next) => {
                 }
             });
         }
+
+        // 已注册邮箱直接拦截，引导登录，不浪费验证码邮件
+        await authService.checkDuplicate(null, email);
 
         const result = await verificationService.sendRegisterCode(email);
 

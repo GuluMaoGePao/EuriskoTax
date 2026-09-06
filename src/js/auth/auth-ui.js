@@ -41,7 +41,7 @@ function setLoading(btn, loading) {
 }
 
 async function handleLogin() {
-    const email = document.getElementById('login-email').value;
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const btn = document.getElementById('login-submit');
     
@@ -80,12 +80,12 @@ async function handleQuickLogin() {
 }
 
 async function handleRegister() {
-    const username = document.getElementById('register-username').value;
-    const email = document.getElementById('register-email').value;
-    const phone = document.getElementById('register-phone').value;
+    const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim().toLowerCase();
+    const phone = document.getElementById('register-phone').value.trim();
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
-    const inviteCode = document.getElementById('register-invite-code').value;
+    const inviteCode = document.getElementById('register-invite-code').value.trim().toUpperCase();
     const verificationCode = document.getElementById('register-code').value.trim();
     const btn = document.getElementById('register-submit');
     
@@ -117,7 +117,9 @@ async function handleRegister() {
     try {
         setLoading(btn, true);
         await apiClient.registerUser(username, email, password, phone || null, inviteCode, verificationCode);
-        showAlert('注册成功，请登录', 'success');
+        showAlert('注册成功，请登录（邮箱已自动填入）', 'success', () => {
+            document.getElementById('login-email').focus();
+        });
         document.getElementById('login-tab').click();
         document.getElementById('register-username').value = '';
         document.getElementById('register-email').value = '';
@@ -940,6 +942,23 @@ function setupAuthEventListeners() {
     }
     document.getElementById('register-submit').addEventListener('click', handleRegister);
     document.getElementById('send-code-btn').addEventListener('click', handleSendCode);
+    // Enter 键提交（按钮为 type=button，表单无隐式提交，需手动绑定）
+    document.querySelectorAll('#login-form input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLogin();
+            }
+        });
+    });
+    document.querySelectorAll('#register-form input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleRegister();
+            }
+        });
+    });
     // 邮箱填写后才允许点击"发送验证码"（倒计时期间由倒计时逻辑控制）
     document.getElementById('register-email').addEventListener('input', (e) => {
         if (!sendCodeTimer) {

@@ -36,6 +36,17 @@ model Calculation {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
+// 邀请码（一机一码）：每个码仅可被一个账号使用，注册事务内原子消耗
+model InviteCode {
+  id         Int       @id @default(autoincrement())
+  code       String    @unique
+  used_by    Int?
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([used_by])
+}
+
 // 邮箱验证码（注册等场景）：存哈希不存明文，带过期时间与错误尝试计数
 model VerificationCode {
   id         Int      @id @default(autoincrement())

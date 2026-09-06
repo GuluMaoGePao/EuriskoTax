@@ -167,4 +167,19 @@ app.use(errorHandler);
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
     console.log(`API文档地址: http://localhost:${PORT}/api/docs`);
+
+    // 首批邀请码自动兜底：仅当 InviteCode 表为空时生成并打印到日志
+    // 部署日志仅账号主人可见；手动补充用 scripts/generate-invite-codes.js
+    const authService = require('./services/authService');
+    authService.ensureInviteCodes(20)
+        .then((codes) => {
+            if (!codes || codes.length === 0) return;
+            console.log('\n========== 首批邀请码已生成（一机一码，每个仅可用一次，请妥善保管） ==========');
+            codes.forEach((code, idx) => console.log(`  ${idx + 1}. ${code}`));
+            console.log('==============================================================================\n');
+        })
+        .catch((err) => {
+            // 生成失败不阻塞服务启动，可稍后用脚本手动补
+            console.error('邀请码自动生成失败（可用 scripts/generate-invite-codes.js 手动补）:', err.message);
+        });
 });
