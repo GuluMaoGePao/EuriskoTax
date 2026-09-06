@@ -9,7 +9,7 @@
  *
  * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
  */
-const CACHE_VERSION = 'euriskotax-v3';
+const CACHE_VERSION = 'euriskotax-v4';
 const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const CDN_CACHE = CACHE_VERSION + '-cdn';
@@ -130,7 +130,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. 同源静态资源：stale-while-revalidate
+  // 4. 同源 JS/CSS 资源：network-first（确保代码更新即时生效，不返回旧缓存）
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.mjs') || url.pathname.endsWith('.css')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
+    );
+    return;
+  }
+
+  // 5. 其他同源静态资源（图片/字体等）：stale-while-revalidate
   event.respondWith(
     caches.match(request)
       .then((cached) => {
@@ -142,8 +158,7 @@ self.addEventListener('fetch', (event) => {
             }
             return response;
           })
-          .catch(() => cached); // 网络失败时回退缓存
-        // 有缓存立即返回，同时后台更新；无缓存则等待网络
+          .catch(() => cached);
         return cached || networkFetch;
       })
   );
