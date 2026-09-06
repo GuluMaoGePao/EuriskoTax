@@ -45,7 +45,7 @@ router.post('/send-code', authController.sendCode);
  *               email:            { type: string, format: email, example: dev@example.com }
  *               password:         { type: string, minLength: 6, example: password }
  *               phone:            { type: string, example: 13800138000 }
- *               inviteCode:       { type: string, example: EURISKO2026BETA, description: 公测期邀请码 }
+ *               inviteCode:       { type: string, example: EURISKO-ABCD-EFGH, description: 一机一码邀请码（向开发者获取，每码仅可注册一次） }
  *               verificationCode: { type: string, example: "123456", description: 邮箱验证码（6位数字） }
  *     responses:
  *       '201': { description: 注册成功 }

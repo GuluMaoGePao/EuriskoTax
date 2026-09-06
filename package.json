@@ -1,6 +1,6 @@
 {
   "name": "EuriskoTax",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build": "echo 'Build complete - all files ready to deploy'",

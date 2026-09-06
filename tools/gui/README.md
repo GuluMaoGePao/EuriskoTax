@@ -64,7 +64,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | 区域 | 位置 | 功能 |
 |------|------|------|
 | **顶部标题栏** | 上方 60px | 显示应用名称和标语 |
-| **左侧菜单** | 左侧 220px | 6 个功能 Tab 切换 + 紧急停止按钮 |
+| **左侧菜单** | 左侧 220px | 7 个功能 Tab（启动/数据库/测试/日志/部署/常用工具/Git&账号）+ 紧急停止按钮 |
 | **公网地址速览卡片** | 启动管理 Tab 顶部（仅 -Share 模式出现） | 显示最新 cpolar 公网地址 + 一键复制 + 一键发邮件 + 自动刷新（3s） |
 | **右侧操作区** | 右侧上半部 | 当前 Tab 对应的按钮组（每 Tab 6-9 个按钮） |
 | **右侧输出区** | 右侧下半部 | RichTextBox，实时显示命令输出（彩色）；通过 `[GUI-EVENT]` 前缀捕获关键事件触发弹窗 |
@@ -86,7 +86,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 ---
 
-## 三、7 大功能面板详解
+## 三、7 大功能面板详解（🚀 启动管理 · 🗄️ 数据库 · 🧪 测试 · 📋 日志查看 · 🚢 部署 · 🛠️ 常用工具 · 🔐 Git & 账号；另有左下角 ⏹ 紧急停止）
 
 ### 1. 🚀 启动管理
 
@@ -112,6 +112,17 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **⚙️ 生成 Prisma Client** | `npx prisma generate` | 修改 schema 后必须执行，重新生成 Client |
 | **📄 查看 schema.prisma** | `notepad schema.prisma` | 用记事本打开 schema 文件 |
 | **🔄 重置数据库** | `npx prisma migrate reset --force` | ⚠️ 危险：清空并重建数据库，会丢失所有数据 |
+
+> 数据库 Tab 自 v1.4.0 起含 **3 个功能区**：① Schema 管理（迁移/Studio/生成客户端/编辑 schema） ② 数据管理（重置 dev/强制重建） ③ **邀请码管理（一机一码，2026-09-06 新增）**：
+
+| 按钮 | 执行命令 | 适用场景 |
+|------|---------|---------|
+| **🟪 生成邀请码到生产** | `POST {prod}/api/invites`（X-Admin-Token） | 输入数量（1-100）生成到生产，自动复制到剪贴板 |
+| **🟪 生成邀请码到本地** | `POST {local}/api/invites` | 写入本地开发库（需本地后端已启动） |
+| **🔵 查看生产/本地邀请码** | `GET /api/invites` | 拉取列表，按未使用/已使用分组展示（已使用显示注册用户名+时间） |
+| **🟢 复制生产未使用邀请码** | `GET /api/invites` | 整批复制到剪贴板（一行一个），便于直接发给用户 |
+
+> 邀请码按钮通过管理员令牌认证：优先读 `server/.env` 的 `ADMIN_TOKEN`，缺失时弹窗输入一次并自动保存。生产地址 `https://euriskotax.zeabur.app`，本地 `http://localhost:3000`。
 
 ### 3. 🧪 测试
 
