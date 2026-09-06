@@ -5795,16 +5795,6 @@
                         console.warn('[PWA] Service Worker 注册失败:', err);
                     });
             });
-
-            // SW 更新提示条的刷新按钮
-            document.addEventListener('DOMContentLoaded', function () {
-                var refreshBtn = document.getElementById('sw-update-refresh');
-                if (refreshBtn) {
-                    refreshBtn.addEventListener('click', function () {
-                        window.location.reload();
-                    });
-                }
-            });
         }
 
         // ====== PWA 安装提示 ======
@@ -5818,6 +5808,14 @@
         });
 
         document.addEventListener('DOMContentLoaded', function () {
+            // SW 更新提示条的刷新按钮
+            var refreshBtn = document.getElementById('sw-update-refresh');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function () {
+                    window.location.reload();
+                });
+            }
+            // PWA 安装按钮
             var installBtn = document.getElementById('pwa-install-btn');
             if (installBtn) {
                 installBtn.addEventListener('click', function () {

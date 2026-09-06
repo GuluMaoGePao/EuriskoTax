@@ -226,7 +226,7 @@ EuriskoTax/
 | 阶段6：生产环境硬化（v1.4.0） | ✅ 已完成 | 2天 | 2026-09-05 |
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
 | 阶段8：首批测试用户运营 | 🚧 进行中（冷启动推广素材已备好） | 2周 | 预计 2026-09-20 |
-| 阶段9：PWA 离线化改造 | ⏳ 待开始 | 3天 | 预计 2026-09-23 |
+| 阶段9：PWA 离线化改造 | 🚧 进行中（本地验证通过，待生产部署） | 3天 | 2026-09-06 |
 | 阶段10：免费/专业版体系 | ⏳ 待开始 | 1周 | 预计 2026-10 月初 |
 
 ### 当前状态
@@ -366,10 +366,15 @@ cpolar http 3000 -region=cn
 
 ### 后续可持续开发方向（按商业模式定调重排）
 
-1. **PWA 离线化改造（阶段9，优先）**
-   - 新增 `manifest.json` + Service Worker（静态资源缓存策略）
-   - 改造 [mock-client.js](../../src/js/utils/mock-client.js) 为"离线历史记录客户端"（localStorage 存取），未登录用户也可保留本地历史
-   - 离线状态检测与 UI 提示（计算可用、同步暂缓）
+1. **PWA 离线化改造（阶段9，优先）** ✅ 核心已完成（2026-09-06）
+   - ✅ 新增 `manifest.json`（应用清单：standalone 模式、主题色 #1e40af、192/512 图标含 maskable）
+   - ✅ 新增 `service-worker.js`（应用壳预缓存 + CDN cache-first + 同源 stale-while-revalidate + API 不缓存）
+   - ✅ `index.html` 引入 manifest / theme-color / favicon / apple-touch-icon，注册 Service Worker
+   - ✅ 后端差异化缓存策略：index.html/manifest/sw.js → no-cache；JS/CSS → immutable 1年；图片 → 7天
+   - ✅ 改造 [mock-client.js](../../src/js/utils/mock-client.js) 为离线感知（`EuriskoTaxNet.isOnline()`，离线时同步直接本地成功）
+   - ✅ 离线状态检测与 UI 提示（顶部 amber 提示条，计税可用、数据本地保存）
+   - ✅ 本地验证通过：SW 激活、应用壳预缓存命中（index.html/manifest/app.js/logo 均 200）
+   - ⏳ 待部署到生产（Zeabur），部署后需清缓存验证
 
 2. **免费/专业版体系（阶段10）**
    - 未登录 = 免费版全功能；登录 = 解锁云端同步
