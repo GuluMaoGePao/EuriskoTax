@@ -286,6 +286,11 @@
         const container = document.getElementById('home-recent-list');
         if (!container) return;
 
+        // 每次渲染先从 localStorage 同步内存镜像（data-management.js 提供；测试环境可能未加载则跳过）
+        if (typeof syncCalculationHistoryFromStorage === 'function') {
+            syncCalculationHistoryFromStorage();
+        }
+
         // 优先用全局 calculationHistory（data-management.js 维护），兜底直接读 localStorage
         let history = [];
         if (typeof calculationHistory !== 'undefined' && Array.isArray(calculationHistory)) {

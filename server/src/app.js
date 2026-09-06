@@ -34,12 +34,17 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 
 // 速率限制（防止暴力枚举登录）
-// send-code / send-reset-code（验证码发送）单独走 codeLimiter，不占用此配额
+// send-code / send-reset-code（验证码发送）单独走 codeLimiter，不占用此配额；
+// /profile 读写需携带有效 JWT（无凭证即 401），且登录限流只应针对凭证猜测类动作，
+// 若对 /profile 计数会把活跃用户误锁进 10 次/15 分钟配额，故一并豁免
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    skip: (req) => ['/send-code', '/send-reset-code'].includes(req.path),
-    message: { error: '请求过于频繁，请 15 分钟后再试' }
+    skip: (req) => ['/send-code', '/send-reset-code', '/profile'].includes(req.path),
+    message: {
+        success: false,
+        error: { message: '请求过于频繁，请 15 分钟后再试', statusCode: 429 }
+    }
 });
 
 // 验证码发送限流：5 次/15 分钟/IP（防邮件轰炸滥用；注册码与重置码合并计数）
@@ -126,8 +131,11 @@ app.get('/health', (req, res) => {
 // 差异化缓存策略：
 //   - index.html / manifest.json / service-worker.js → no-cache
 //     （每次需重新验证，确保新版本及时下发；SW 文件尤其不能被浏览器强缓存）
-//   - JS / CSS → public, max-age=31536000, immutable
-//     （强缓存 1 年，依靠 Service Worker 版本号 + 文件 ?v= 指纹失效）
+//   - JS / CSS → public, max-age=0, must-revalidate
+//     （ETag 协商缓存：只要服务器内容变化即返回新文件，否则 304 零流量。
+//       替代旧的 "1 年 immutable + ?v= 指纹" 方案——该方案会锁死无 ?v= 的
+//       ES module import 链路（如 api-client.js），老用户长期拿不到新代码。
+//       新代码发放由 HTTP 协商 + SW network-first + ignoreSearch 兜底保证）
 //   - 图片 / 字体 → public, max-age=604800（7 天）
 //   - 其他 → 不设，走浏览器默认
 const staticPath = path.join(__dirname, '../../');
@@ -140,9 +148,9 @@ app.use(express.static(staticPath, {
             res.setHeader('Cache-Control', 'no-cache');
             return;
         }
-        // JS / CSS：强缓存 1 年（immutable 表示内容不会变，避免条件请求）
+        // JS / CSS：协商缓存，每次向服务器验证（304 时零下载，内容变更即刻拿到新文件）
         if (ext === '.js' || ext === '.css') {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
             return;
         }
         // 图片 / 字体 / 图标：缓存 7 天
