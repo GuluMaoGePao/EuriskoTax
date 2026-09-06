@@ -1371,10 +1371,15 @@ function clearPageHistory() {
 }
 
 function initAuth() {
-    updateAuthUI();
-    setupAuthEventListeners();
-    // 标记认证初始化完成，隐藏初始化遮罩，显示真实UI
-    document.body.classList.add('auth-ready');
+    try {
+        updateAuthUI();
+        setupAuthEventListeners();
+    } catch (e) {
+        console.error('[initAuth] 初始化异常:', e);
+    } finally {
+        // 无论是否出错，都必须移除初始化遮罩，否则页面永久白屏
+        document.body.classList.add('auth-ready');
+    }
 }
 
 window.deleteHistoryItem = deleteHistoryItem;
