@@ -6,12 +6,14 @@
 #   .\start-dev.ps1 -Watchdog    # 启动后自动拉起守护脚本（防止意外中断）
 #   .\start-dev.ps1 -Share -Watchdog        # 公网分享 + 守护（推荐给好友测试时使用）
 #   .\start-dev.ps1 -SkipInstall -SkipResetUser   # 跳过安装和重置，快速启动
+#   .\start-dev.ps1 -ForceKillPort            # 3000 端口被残留进程占用时自动强制释放再启动
 
 param(
     [switch]$SkipInstall,
     [switch]$SkipResetUser,
     [switch]$Share,
-    [switch]$Watchdog
+    [switch]$Watchdog,
+    [switch]$ForceKillPort
 )
 
 $ErrorActionPreference = "Stop"
@@ -80,6 +82,23 @@ if (-not $SkipInstall) {
     Write-Host "[2/4] 已跳过依赖安装（-SkipInstall）" -ForegroundColor Gray
 }
 
+# ====== 2.5 同步开发数据库 Prisma Client（SQLite，schema.dev.prisma） ======
+# npm install 的 postinstall 会用生产 schema（PostgreSQL）生成 @prisma/client，
+# 本地开发必须改用 SQLite schema 重新生成，否则连不上 server/prisma/dev.db
+Write-Host ""
+Write-Host "[2.5/4] 生成开发数据库 Client（SQLite）..." -ForegroundColor Yellow
+Push-Location $ServerDir
+try {
+    npx prisma generate --schema prisma/schema.dev.prisma 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [FAIL] prisma generate:dev 失败（请先确认依赖已安装：cd server; npm install）" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  [OK] Prisma Client 已指向本地 SQLite 开发库" -ForegroundColor Green
+} finally {
+    Pop-Location
+}
+
 # ====== 3. 重置 dev 用户 ======
 if (-not $SkipResetUser) {
     Write-Host ""
@@ -88,8 +107,8 @@ if (-not $SkipResetUser) {
     try {
         node scripts/reset-dev-user.js 2>&1 | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  [WARN] 重置用户失败，可能数据库未迁移，尝试 prisma migrate..." -ForegroundColor Yellow
-            npx prisma migrate dev 2>&1 | Out-Host
+            Write-Host "  [WARN] 重置用户失败，可能开发库未建表，尝试 prisma db push（SQLite）..." -ForegroundColor Yellow
+            npx prisma db push --schema prisma/schema.dev.prisma 2>&1 | Out-Host
             node scripts/reset-dev-user.js 2>&1 | Out-Host
         }
         Write-Host "  [OK] dev 用户已就绪 (dev@example.com / password)" -ForegroundColor Green
@@ -228,6 +247,31 @@ if ($Share) {
 } else {
     Write-Host ""
     Write-Host "  (未启用 cpolar 公网分享，加 -Share 参数可生成公网地址并自动邮件通知)" -ForegroundColor Gray
+}
+
+# ====== 4.8 端口占用检查（避免"页面能开但登录无响应/新旧混跑"的残留进程陷阱） ======
+# 3000 端口被旧 node / 其他进程占用时，浏览器仍可能从 Service Worker 缓存看到旧页面，
+# 但 /api 已不可用 → 登录必然失败。启动前必须先确认端口干净。
+$Listeners = netstat -ano | Select-String "TCP\s+.*:3000\s+.*LISTENING"
+if ($Listeners) {
+    $fields = $Listeners[0].ToString().Trim() -split '\s+'
+    $usedPid = $fields[$fields.Count - 1]
+    $procName = "未知"
+    try { $procName = (Get-Process -Id $usedPid -ErrorAction Stop).ProcessName } catch { }
+    Write-Host ""
+    Write-Host "[警告] 3000 端口已被占用 (PID $usedPid, 进程: $procName)" -ForegroundColor Red
+    if ($ForceKillPort) {
+        Write-Host "  正在强制释放占用进程..." -ForegroundColor Yellow
+        taskkill /PID $usedPid /T /F 2>&1 | Out-Null
+        Start-Sleep -Seconds 1
+        Write-Host "  [OK] 已释放 3000 端口" -ForegroundColor Green
+    } else {
+        Write-Host "  为避免新旧服务混跑导致登录异常，请先处理占用进程，再重新启动：" -ForegroundColor Yellow
+        Write-Host "    方案 A: 重新运行并加参数 -ForceKillPort（自动释放残留进程）" -ForegroundColor Gray
+        Write-Host "    方案 B: GUI 控制台 → 启动管理 → 🔒 释放 3000 端口，然后再启动" -ForegroundColor Gray
+        Write-Host "    方案 C: 手动结束该进程后重试" -ForegroundColor Gray
+        exit 1
+    }
 }
 
 # ====== 5. 启动后端服务 ======

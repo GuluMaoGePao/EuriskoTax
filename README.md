@@ -50,9 +50,17 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 
 > 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **🔥 完整测试** 一键开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md)。
 
-**本地测试账号**：`dev@example.com` / `password`（由启动脚本自动重置）
+**本地测试账号**：`dev@example.com` / `password`（由启动脚本自动重置）；登录页在 localhost 下会自动出现「开发环境：填入本地测试账号」入口（生产不显示）
 
-> ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。
+> ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
+
+**发布纪律（先本地验证，再部署）**：
+1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e：登录 dev 账号 / 邀请码+验证码注册新号 / 登录新号 / 前端资源冒烟）。
+2. **上线只走安全发布流水线**（本地门禁不过就物理上推不出去）：
+   - 命令行：`.\tools\ops\ops-publish.ps1`（内部 = verify:local 全绿 → git commit → push origin main → 自动轮询核对线上指纹）；
+   - GUI：控制台「🔐 Git & 账号」→「🚀 安全发布」（或先点「🧪 安全发布试运行」零风险预演一次）。
+3. 线上核对项由 `.\tools\ops\ops-check-prod.ps1` 完成（无快速登录按钮、SW v8+协议守卫、auth-ui 含 dev 入口指纹、`?v=2` 版本戳等）。
+4. 老用户浏览器若仍显示旧版：`Application → Service Workers → Unregister` + `Clear site data` 后刷新。
 
 ---
 
@@ -117,6 +125,7 @@ Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 npm test                    # 运行全部单元测试（6 套件 203 个，含覆盖率报告）
 npm run test:watch          # 监听模式
 npm run test:performance    # 计税性能基准
+npm run verify:local        # 本地登录链路验证门禁（push 前必跑，见上文"发布纪律"）
 ```
 
 测试报告见 [docs/reports/test-report.md](docs/reports/test-report.md)。

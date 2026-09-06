@@ -36,7 +36,7 @@ const APP_SHELL = [
   '/src/js/utils/mock-client.js',
   '/src/js/app.js',
   // 登录/个人中心链路（app.js 在启动时动态 import 的 ES module），预缓存保证离线可登录
-  '/src/js/auth/auth-ui.js?v=1',
+  '/src/js/auth/auth-ui.js?v=2',
   '/src/js/api/api-client.js'
 ];
 

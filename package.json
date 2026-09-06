@@ -6,7 +6,8 @@
     "build": "echo 'Build complete - all files ready to deploy'",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:performance": "node tests/performance/benchmark.js"
+    "test:performance": "node tests/performance/benchmark.js",
+    "verify:local": "node server/scripts/verify-local-auth.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",

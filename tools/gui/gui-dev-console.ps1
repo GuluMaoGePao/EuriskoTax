@@ -2884,6 +2884,15 @@ Add-SectionCard -TabCtx $tab3Ctx `
        OnClick = { Invoke-AsyncCommand -Name "perftest" -Command "npx jest tests/tax-assistant-perf.test.js" -WorkingDir $ProjectRoot } }
 )
 
+Add-SectionCard -TabCtx $tab3Ctx `
+    -Title "3. 发布门禁（上线前必跑）" `
+    -Subtitle "脚本：server/scripts/verify-local-auth.js" `
+    -Description "详细说明：部署前的端到端门禁 —— 真实启动本地后端，验证 登录 dev@example.com → 用邀请码+邮箱验证码注册新号 → 新号登录 全链路，并核对前端/SW 版本指纹。失败显示红字，禁止 push。" `
+    -AccentColor $C_SUCCESS -Buttons @(
+    @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } }
+)
+
 # ==============================================================================
 # ============ 标签页 4: 运维监控 ============
 # ==============================================================================
@@ -3325,6 +3334,23 @@ Add-SectionCard -TabCtx $tab6bCtx `
        OnClick = { Start-Process (Join-Path $ToolsDir "ops\ops-deploy.config.example.json") } },
     @{ Text = "📖 查看完整账号文档`n账号管理说明"; Desc = "打开 docs/admin/account-credentials.md 查看所有账号的详细说明、获取方式、安全注意事项。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\admin\account-credentials.md") } }
+)
+
+Add-SectionCard -TabCtx $tab6bCtx `
+    -Title "4. 🚀 安全发布（Zeabur 云端 · 唯一上线入口）" `
+    -Subtitle "流程：本地 verify:local 门禁 → 自动 commit → push → 线上指纹核对" `
+    -Description "详细说明：正式上线只走这里。先跑本地登录链路门禁（全绿才继续），然后自动提交、推送远程 main 触发 Zeabur 构建，并轮询线上资源直至核对为新版本。本地不过 → 不会 push → 不会部署坏代码。推荐先用下面的 试运行 预演一次。" `
+    -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🚀 安全发布`n本地验证→commit→push→线上核对`n⭐上线专用"; Desc = "受控上线：本地 verify:local 全绿 → 自动 commit → push origin main → 自动核对线上指纹直至部署完成。执行前会弹窗让你确认提交说明。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $msg = Show-InputBox -Title "🚀 安全发布" -Prompt "将执行：`n  ① 本地登录链路门禁 verify:local（必须全绿）`n  ② git add -A + commit`n  ③ git push origin main（触发 Zeabur 构建部署）`n  ④ 轮询线上核对，直到部署完成`n`n请输入本次提交说明（留空则自动生成）：" -DefaultValue ""
+            if ($null -eq $msg) { Write-Log "[发布] 已取消" "WARN"; return }
+            $msg = $msg -replace "['`r`n]", " "
+            $msg = $msg -replace "'", "''"
+            Invoke-AsyncCommand -Name "publish" -Command "& '$OpsDir\ops-publish.ps1' -CommitMsg '$msg'" -WorkingDir $ProjectRoot
+        } },
+    @{ Text = "🧪 安全发布试运行`nDry-Run · 只验证不推送"; Desc = "安全预演：只跑本地 verify:local 门禁，确认能全绿；不 commit、不 push，零风险。正式发布前建议先点这个。"; Color = "120, 165, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "publish-dry" -Command "& '$OpsDir\ops-publish.ps1' -DryRun" -WorkingDir $ProjectRoot } }
 )
 
 # ==============================================================================
