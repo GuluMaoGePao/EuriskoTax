@@ -4,6 +4,7 @@
 //   - 10 分钟有效期，60 秒重发冷却（防邮件轰炸）
 //   - 最多 5 次错误尝试后作废（防暴力猜码）
 //   - 每个邮箱+用途只保留最新一条，旧码自动失效
+// 用途（purpose）：register=注册，reset=重置密码，共用一套安全机制与数据库表
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const mailService = require('./mailService');
@@ -22,8 +23,9 @@ function generateCode() {
     return String(bytes % 1000000).padStart(6, '0');
 }
 
-// 发送注册验证码；返回 { cooldownMs } 供前端倒计时
-const sendRegisterCode = async (rawEmail) => {
+// 发送指定用途的验证码；返回 { cooldownMs } 供前端倒计时
+// 调用方负责业务前置校验（如注册查重、重置时邮箱必须已注册）
+const sendCode = async (rawEmail, purpose = 'register') => {
     const email = String(rawEmail || '').trim().toLowerCase();
 
     if (!EMAIL_REGEX.test(email)) {
@@ -32,9 +34,9 @@ const sendRegisterCode = async (rawEmail) => {
         throw error;
     }
 
-    // 60 秒重发冷却：按该邮箱最近一条记录的创建时间判断
+    // 60 秒重发冷却：按该邮箱最近一条该用途记录的创建时间判断
     const latest = await prisma.verificationCode.findFirst({
-        where: { email, purpose: 'register' },
+        where: { email, purpose },
         orderBy: { created_at: 'desc' }
     });
     if (latest) {
@@ -51,22 +53,22 @@ const sendRegisterCode = async (rawEmail) => {
     const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
 
     // 只保留最新一条：先删旧记录再写入（幂等，避免历史码残留）
-    await prisma.verificationCode.deleteMany({ where: { email, purpose: 'register' } });
+    await prisma.verificationCode.deleteMany({ where: { email, purpose } });
     await prisma.verificationCode.create({
-        data: { email, code_hash: codeHash, purpose: 'register', expires_at: expiresAt }
+        data: { email, code_hash: codeHash, purpose, expires_at: expiresAt }
     });
 
-    await mailService.sendVerificationCode(email, code, CODE_TTL_MINUTES);
+    await mailService.sendVerificationCode(email, code, CODE_TTL_MINUTES, purpose);
 
     return { cooldownMs: RESEND_COOLDOWN_MS };
 };
 
-// 校验验证码：成功后立即作废；失败递增尝试次数
-const verifyRegisterCode = async (rawEmail, code) => {
+// 校验指定用途的验证码：成功后立即作废；失败递增尝试次数
+const verifyCode = async (rawEmail, code, purpose = 'register') => {
     const email = String(rawEmail || '').trim().toLowerCase();
 
     const record = await prisma.verificationCode.findFirst({
-        where: { email, purpose: 'register' },
+        where: { email, purpose },
         orderBy: { created_at: 'desc' }
     });
 
@@ -104,7 +106,19 @@ const verifyRegisterCode = async (rawEmail, code) => {
     return true;
 };
 
+// 便捷包装：注册用途（兼容既有调用方）
+const sendRegisterCode = (email) => sendCode(email, 'register');
+const verifyRegisterCode = (email, code) => verifyCode(email, code, 'register');
+
+// 便捷包装：密码重置用途
+const sendResetCode = (email) => sendCode(email, 'reset');
+const verifyResetCode = (email, code) => verifyCode(email, code, 'reset');
+
 module.exports = {
+    sendCode,
+    verifyCode,
     sendRegisterCode,
-    verifyRegisterCode
+    verifyRegisterCode,
+    sendResetCode,
+    verifyResetCode
 };

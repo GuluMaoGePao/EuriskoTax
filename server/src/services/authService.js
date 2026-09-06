@@ -212,6 +212,43 @@ const deleteUser = async (userId) => {
     return { message: 'User deleted successfully' };
 };
 
+// 校验邮箱是否已注册（忘记密码：未注册邮箱不发送重置码，直接提示）
+const ensureEmailRegistered = async (rawEmail) => {
+    const email = normalizeEmail(rawEmail);
+    const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true }
+    });
+
+    if (!user) {
+        const error = new Error('User with this email was not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return user;
+};
+
+// 重置密码（忘记密码自助找回）：校验通过后更新密码哈希
+const resetPassword = async (rawEmail, newPassword) => {
+    const email = normalizeEmail(rawEmail);
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+        const error = new Error('User with this email was not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS) || 10);
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { password_hash: passwordHash }
+    });
+
+    return { message: 'Password reset successfully' };
+};
+
 // 邀请码字符集：排除易混淆字符 0/O、1/I/L、U/V
 const INVITE_CHARSET = 'ABCDEFGHJKMNPQRSTWXYZ23456789';
 
@@ -256,5 +293,7 @@ module.exports = {
     verifyPassword,
     updateUser,
     deleteUser,
+    ensureEmailRegistered,
+    resetPassword,
     ensureInviteCodes
 };

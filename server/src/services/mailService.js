@@ -33,7 +33,8 @@ function isMailConfigured() {
 }
 
 // 发送 6 位数字验证码邮件
-async function sendVerificationCode(email, code, expireMinutes = 10) {
+// purpose：register=注册账号，reset=重置密码（控制标题与正文引导文案）
+async function sendVerificationCode(email, code, expireMinutes = 10, purpose = 'register') {
     const client = getTransporter();
     if (!client) {
         const error = new Error('SMTP mail is not configured');
@@ -43,8 +44,12 @@ async function sendVerificationCode(email, code, expireMinutes = 10) {
 
     const fromName = process.env.SMTP_FROM_NAME || 'EuriskoTax';
     const from = process.env.SMTP_USER;
+    const isReset = purpose === 'reset';
 
-    const subject = `【${fromName}】邮箱验证码：${code}`;
+    const subject = isReset
+        ? `【${fromName}】密码重置验证码：${code}`
+        : `【${fromName}】邮箱验证码：${code}`;
+    const actionHint = isReset ? '你正在重置 <strong>' + fromName + '</strong> 账号密码' : '你正在注册 <strong>' + fromName + '</strong> 账号';
     const html = `
 <div style="max-width:520px;margin:0 auto;font-family:'Microsoft YaHei',Arial,sans-serif;color:#333;">
     <div style="background:#1d4ed8;border-radius:12px 12px 0 0;padding:24px;text-align:center;">
@@ -52,12 +57,12 @@ async function sendVerificationCode(email, code, expireMinutes = 10) {
     </div>
     <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:28px 32px;">
         <p style="margin:0 0 12px;">你好！</p>
-        <p style="margin:0 0 20px;">你正在注册 <strong>${fromName}</strong> 账号，本次验证码为：</p>
+        <p style="margin:0 0 20px;">${actionHint}，本次验证码为：</p>
         <div style="background:#f3f4f6;border-radius:8px;padding:16px;text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#1d4ed8;">
             ${code}
         </div>
         <p style="margin:20px 0 8px;color:#6b7280;font-size:13px;">
-            验证码 <strong>${expireMinutes} 分钟内有效</strong>，请尽快完成注册。
+            验证码 <strong>${expireMinutes} 分钟内有效</strong>，${isReset ? '请尽快完成密码重置，重置后原密码立即失效。' : '请尽快完成注册。'}
         </p>
         <p style="margin:0;color:#ef4444;font-size:13px;">
             如果这不是你本人的操作，请忽略本邮件，切勿将验证码告诉任何人。

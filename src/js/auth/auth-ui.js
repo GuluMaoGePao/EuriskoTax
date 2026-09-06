@@ -14,14 +14,22 @@ function updateAuthUI() {
     if (apiClient.isLoggedIn()) {
         showApp();
         const user = apiClient.getCurrentUser();
-        document.getElementById('auth-section').classList.add('hidden');
+        const authSection = document.getElementById('auth-section');
+        if (authSection) authSection.classList.add('hidden');
         document.getElementById('user-menu').classList.remove('hidden');
         document.getElementById('user-name').textContent = user?.username || '用户';
     } else {
         showLoginPage();
-        document.getElementById('auth-section').classList.remove('hidden');
+        const authSection = document.getElementById('auth-section');
+        if (authSection) authSection.classList.remove('hidden');
         document.getElementById('user-menu').classList.add('hidden');
     }
+}
+
+// 退出/注销时清理本地残留的用户数据，避免换号共用浏览器导致数据串号
+function clearLocalUserData() {
+    localStorage.removeItem('calculation_history');
+    localStorage.removeItem('tax_profile');
 }
 
 function setLoading(btn, loading) {
@@ -50,9 +58,13 @@ async function handleLogin() {
         return;
     }
     
+    // 「记住我」：勾选 → token 存 localStorage（跨会话保持）；未勾选 → sessionStorage（关浏览器即失效）
+    // 元素不存在（如单元测试环境）时默认记住（保持历史行为）
+    const rememberMe = document.getElementById('remember-me')?.checked !== false;
+
     try {
         setLoading(btn, true);
-        await apiClient.loginUser(email, password);
+        await apiClient.loginUser(email, password, rememberMe);
         clearPageHistory();
         updateAuthUI();
         showAlert('登录成功', 'success');
@@ -104,6 +116,17 @@ async function handleRegister() {
         return;
     }
 
+    if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+        showAlert('请输入有效的手机号');
+        return;
+    }
+
+    const agreeEl = document.getElementById('register-agree');
+    if (agreeEl && !agreeEl.checked) {
+        showAlert('请先勾选已阅读并同意《用户协议》和《隐私政策》');
+        return;
+    }
+
     if (!inviteCode) {
         showAlert('请填写邀请码');
         return;
@@ -117,10 +140,9 @@ async function handleRegister() {
     try {
         setLoading(btn, true);
         await apiClient.registerUser(username, email, password, phone || null, inviteCode, verificationCode);
-        showAlert('注册成功，请登录（邮箱已自动填入）', 'success', () => {
-            document.getElementById('login-email').focus();
-        });
-        document.getElementById('login-tab').click();
+        // 回到登录并预填邮箱
+        switchAuthTab('login');
+        document.getElementById('login-email').value = email;
         document.getElementById('register-username').value = '';
         document.getElementById('register-email').value = '';
         document.getElementById('register-phone').value = '';
@@ -128,7 +150,11 @@ async function handleRegister() {
         document.getElementById('register-confirm-password').value = '';
         document.getElementById('register-invite-code').value = '';
         document.getElementById('register-code').value = '';
-        document.getElementById('login-email').value = email;
+        registerCodeSentEmail = '';
+        if (agreeEl) agreeEl.checked = false;
+        showAlert('注册成功，请登录（邮箱已自动填入）', 'success', () => {
+            document.getElementById('login-email').focus();
+        });
     } catch (error) {
         showAlert(error.message);
     } finally {
@@ -139,6 +165,8 @@ async function handleRegister() {
 // 发送注册验证码：成功后进入 60 秒倒计时
 const SEND_CODE_COOLDOWN = 60;
 let sendCodeTimer = null;
+// 记录最近一次发送注册验证码的邮箱：用户改邮箱后旧验证码自动作废
+let registerCodeSentEmail = '';
 
 function startSendCodeCountdown(seconds) {
     const btn = document.getElementById('send-code-btn');
@@ -178,6 +206,10 @@ async function handleSendCode() {
         btn.disabled = true;
         btn.textContent = '发送中...';
         await apiClient.sendVerificationCode(email);
+        registerCodeSentEmail = email;
+        // 邮箱变更后重新发送：清空旧验证码，避免用旧码注册时报"验证码无效"造成困惑
+        const codeInput = document.getElementById('register-code');
+        if (codeInput) codeInput.value = '';
         showAlert('验证码已发送，请查收邮箱（注意垃圾箱）', 'success');
         startSendCodeCountdown(SEND_CODE_COOLDOWN);
     } catch (error) {
@@ -187,8 +219,9 @@ async function handleSendCode() {
         // 已注册邮箱：后端返回 409，直接引导登录而非显示"发送失败"
         const msg = error.message || '';
         if (msg.includes('已注册') || msg.includes('already registered')) {
-            showAlert(msg + '，如忘记密码请联系开发者重置', 'warning', function() {
+            showAlert(msg + '，如忘记密码可点击「忘记密码」自助找回', 'warning', function() {
                 document.getElementById('login-tab').click();
+                document.getElementById('login-email').value = email;
             });
         } else {
             showAlert(msg);
@@ -196,11 +229,217 @@ async function handleSendCode() {
     }
 }
 
+// === 登录/注册 Tab 与底部协议文案联动 ===
+function setActiveTab(mode) {
+    const loginTab = document.getElementById('login-tab');
+    const registerTab = document.getElementById('register-tab');
+    if (!loginTab || !registerTab) return;
+    const loginActive = mode === 'login';
+    loginTab.classList.toggle('border-primary', loginActive);
+    loginTab.classList.toggle('text-primary', loginActive);
+    loginTab.classList.toggle('border-transparent', !loginActive);
+    loginTab.classList.toggle('text-gray-500', !loginActive);
+    registerTab.classList.toggle('border-primary', !loginActive);
+    registerTab.classList.toggle('text-primary', !loginActive);
+    registerTab.classList.toggle('border-transparent', loginActive);
+    registerTab.classList.toggle('text-gray-500', loginActive);
+}
+
+function updateAuthAgreementText(mode) {
+    const el = document.getElementById('auth-agreement-text');
+    if (!el) return;
+    const links =
+        '<a href="#" onclick="openPolicyModal(event, \'user-agreement-modal\')" class="underline hover:text-white">用户协议</a>' +
+        ' 和 ' +
+        '<a href="#" onclick="openPolicyModal(event, \'privacy-policy-modal\')" class="underline hover:text-white">隐私政策</a>';
+    if (mode === 'register') {
+        el.innerHTML = '点击「注册」按钮即表示已阅读并同意' + links;
+    } else if (mode === 'reset') {
+        el.innerHTML = '仅已注册邮箱可获取重置验证码；若收不到邮件请检查垃圾箱，或<a href="mailto:2649719969@qq.com" class="underline hover:text-white">联系开发者</a>';
+    } else {
+        el.innerHTML = '登录即表示同意' + links;
+    }
+}
+
+// === 忘记密码：重置密码面板 ===
+function isResetPanelOpen() {
+    const panel = document.getElementById('reset-password-form');
+    return panel && !panel.classList.contains('hidden');
+}
+
+function showResetPasswordPanel() {
+    const panel = document.getElementById('reset-password-form');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const divider = document.getElementById('auth-divider');
+    const socialRow = document.getElementById('auth-social-row');
+    if (!panel || !loginForm) return;
+
+    // 复制当前登录邮箱到重置面板，减少输入
+    const loginEmailValue = document.getElementById('login-email')?.value.trim() || '';
+    const resetEmail = document.getElementById('reset-email');
+    if (resetEmail && loginEmailValue) resetEmail.value = loginEmailValue;
+
+    loginForm.classList.add('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    panel.classList.remove('hidden');
+    if (divider) divider.classList.add('hidden');
+    if (socialRow) socialRow.classList.add('hidden');
+    updateAuthAgreementText('reset');
+    setActiveTab('login');
+    setTimeout(() => resetEmail && resetEmail.focus(), 50);
+}
+
+// 隐藏重置面板并回到登录 Tab（同时恢复分隔线与第三方登录入口）
+function closeResetPasswordPanel() {
+    const panel = document.getElementById('reset-password-form');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const divider = document.getElementById('auth-divider');
+    const socialRow = document.getElementById('auth-social-row');
+    if (!panel || !loginForm) return;
+
+    panel.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    if (divider) divider.classList.remove('hidden');
+    if (socialRow) socialRow.classList.remove('hidden');
+    updateAuthAgreementText('login');
+    setActiveTab('login');
+}
+
+// 切换登录/注册 Tab（若重置面板打开则自动回到对应表单）
+function switchAuthTab(mode) {
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const panel = document.getElementById('reset-password-form');
+    if (!loginForm || !registerForm) return;
+
+    if (panel && !panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        const divider = document.getElementById('auth-divider');
+        const socialRow = document.getElementById('auth-social-row');
+        if (divider) divider.classList.remove('hidden');
+        if (socialRow) socialRow.classList.remove('hidden');
+    }
+
+    if (mode === 'register') {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        updateAuthAgreementText('register');
+        setActiveTab('register');
+    } else {
+        registerForm.classList.add('hidden');
+        loginForm.classList.remove('hidden');
+        updateAuthAgreementText('login');
+        setActiveTab('login');
+    }
+}
+
+// === 发送密码重置验证码 ===
+const RESET_CODE_COOLDOWN = 60;
+let resetSendTimer = null;
+
+function startResetCodeCountdown(seconds) {
+    const btn = document.getElementById('reset-send-code-btn');
+    if (!btn) return;
+    let remaining = seconds;
+    btn.disabled = true;
+    btn.textContent = `${remaining}s 后重发`;
+    if (resetSendTimer) clearInterval(resetSendTimer);
+    resetSendTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(resetSendTimer);
+            resetSendTimer = null;
+            btn.textContent = '发送验证码';
+            const email = document.getElementById('reset-email')?.value.trim() || '';
+            btn.disabled = !email;
+        } else {
+            btn.textContent = `${remaining}s 后重发`;
+        }
+    }, 1000);
+}
+
+async function handleResetSendCode() {
+    const email = document.getElementById('reset-email').value.trim();
+    const btn = document.getElementById('reset-send-code-btn');
+    const codeInput = document.getElementById('reset-code');
+
+    if (!email) {
+        showAlert('请先填写注册邮箱');
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showAlert('邮箱格式不正确');
+        return;
+    }
+
+    try {
+        btn.disabled = true;
+        btn.textContent = '发送中...';
+        await apiClient.sendResetCode(email);
+        if (codeInput) codeInput.value = '';
+        showAlert('验证码已发送，请查收邮箱（注意垃圾箱）', 'success');
+        startResetCodeCountdown(RESET_CODE_COOLDOWN);
+    } catch (error) {
+        btn.textContent = '发送验证码';
+        btn.disabled = false;
+        showAlert(error.message);
+    }
+}
+
+async function handleResetPassword() {
+    const email = document.getElementById('reset-email').value.trim().toLowerCase();
+    const code = document.getElementById('reset-code').value.trim();
+    const newPassword = document.getElementById('reset-new-password').value;
+    const confirmPassword = document.getElementById('reset-confirm-password').value;
+    const btn = document.getElementById('reset-submit');
+
+    if (!email) {
+        showAlert('请填写注册邮箱');
+        return;
+    }
+    if (!code) {
+        showAlert('请填写邮箱验证码');
+        return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+        showAlert('新密码长度至少6位');
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        showAlert('两次输入的新密码不一致');
+        return;
+    }
+
+    try {
+        setLoading(btn, true);
+        await apiClient.resetPassword(email, code, newPassword);
+        // 清理重置面板
+        document.getElementById('reset-code').value = '';
+        document.getElementById('reset-new-password').value = '';
+        document.getElementById('reset-confirm-password').value = '';
+        // 回到登录并自动填入邮箱
+        switchAuthTab('login');
+        document.getElementById('login-email').value = email;
+        document.getElementById('login-email').focus();
+        showAlert('密码重置成功，请使用新密码登录', 'success');
+    } catch (error) {
+        showAlert(error.message);
+    } finally {
+        setLoading(btn, false);
+    }
+}
+
 async function handleLogout() {
     apiClient.logoutUser();
+    clearLocalUserData();
+    historyCache = { data: null, timestamp: 0 };
+    clearPageHistory();
+    // updateAuthUI 会自动回到登录页
     updateAuthUI();
     showAlert('已退出登录', 'success');
-    showPage('mode-selection-page');
 }
 
 // === 个人中心性能日志工具 ===
@@ -797,8 +1036,11 @@ async function deleteAccount() {
 
     try {
         await apiClient.deleteProfile();
-        showAlert('账号已注销', 'success');
+        clearLocalUserData();
+        historyCache = { data: null, timestamp: 0 };
+        clearPageHistory();
         updateAuthUI();
+        showAlert('账号已注销，感谢您的使用', 'success');
     } catch (error) {
         showAlert('注销失败: ' + error.message);
     }
@@ -919,31 +1161,14 @@ function togglePasswordVisibility(inputId, toggleId) {
 }
 
 function setupAuthEventListeners() {
-    document.getElementById('login-tab').addEventListener('click', () => {
-        document.getElementById('login-tab').classList.add('border-primary', 'text-primary');
-        document.getElementById('login-tab').classList.remove('border-transparent', 'text-gray-500');
-        document.getElementById('register-tab').classList.add('border-transparent', 'text-gray-500');
-        document.getElementById('register-tab').classList.remove('border-primary', 'text-primary');
-        document.getElementById('login-form').classList.remove('hidden');
-        document.getElementById('register-form').classList.add('hidden');
-    });
-    
-    document.getElementById('register-tab').addEventListener('click', () => {
-        document.getElementById('register-tab').classList.add('border-primary', 'text-primary');
-        document.getElementById('register-tab').classList.remove('border-transparent', 'text-gray-500');
-        document.getElementById('login-tab').classList.add('border-transparent', 'text-gray-500');
-        document.getElementById('login-tab').classList.remove('border-primary', 'text-primary');
-        document.getElementById('register-form').classList.remove('hidden');
-        document.getElementById('login-form').classList.add('hidden');
-    });
-    
+    document.getElementById('login-tab').addEventListener('click', () => switchAuthTab('login'));
+    document.getElementById('register-tab').addEventListener('click', () => switchAuthTab('register'));
+
     document.getElementById('login-submit').addEventListener('click', handleLogin);
+    // 忘记密码 → 打开重置密码面板（自助找回）
     document.getElementById('forgot-password').addEventListener('click', (e) => {
         e.preventDefault();
-        showAlert(
-            '公测期暂不支持自助找回密码。\n\n如需重置密码，请提供注册邮箱并联系开发者：\n• 邮箱：2649719969@qq.com\n• 说明您的注册邮箱，验证身份后为您重置\n\n重置后请及时修改为个人密码。',
-            'warning'
-        );
+        showResetPasswordPanel();
     });
     // 快速登录仅限本地开发使用，生产环境隐藏入口
     if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
@@ -976,6 +1201,63 @@ function setupAuthEventListeners() {
             document.getElementById('send-code-btn').disabled = !e.target.value.trim();
         }
     });
+    // 修改注册邮箱后，旧邮箱的验证码作废：清空并提醒重新获取
+    document.getElementById('register-email').addEventListener('change', (e) => {
+        const codeInput = document.getElementById('register-code');
+        const newEmail = e.target.value.trim().toLowerCase();
+        if (registerCodeSentEmail && newEmail !== registerCodeSentEmail && codeInput && codeInput.value.trim()) {
+            codeInput.value = '';
+            showAlert('邮箱已变更，原验证码已失效，请重新获取验证码', 'info');
+        }
+    });
+
+    // === 忘记密码：重置密码面板事件 ===
+    const resetBackBtn = document.getElementById('reset-back-to-login');
+    if (resetBackBtn) {
+        resetBackBtn.addEventListener('click', () => closeResetPasswordPanel());
+    }
+    const resetEmailInput = document.getElementById('reset-email');
+    const resetSendBtn = document.getElementById('reset-send-code-btn');
+    if (resetEmailInput) {
+        resetEmailInput.addEventListener('input', (e) => {
+            if (resetSendBtn && !resetSendTimer) {
+                resetSendBtn.disabled = !e.target.value.trim();
+            }
+        });
+        // 修改重置邮箱后清空已填验证码，避免提交到错误邮箱
+        resetEmailInput.addEventListener('change', (e) => {
+            const codeInput = document.getElementById('reset-code');
+            if (codeInput && codeInput.value.trim()) {
+                codeInput.value = '';
+                showAlert('邮箱已变更，请重新获取验证码', 'info');
+            }
+        });
+    }
+    if (resetSendBtn) resetSendBtn.addEventListener('click', handleResetSendCode);
+    const resetSubmit = document.getElementById('reset-submit');
+    if (resetSubmit) resetSubmit.addEventListener('click', handleResetPassword);
+    document.querySelectorAll('#reset-password-form input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleResetPassword();
+            }
+        });
+    });
+
+    // 微信/QQ 登录：当前未开放，点击给出提示而非无反应
+    const socialWechat = document.getElementById('social-wechat-btn');
+    if (socialWechat) {
+        socialWechat.addEventListener('click', () => {
+            showAlert('微信登录暂未开放，请使用邮箱登录', 'info');
+        });
+    }
+    const socialQq = document.getElementById('social-qq-btn');
+    if (socialQq) {
+        socialQq.addEventListener('click', () => {
+            showAlert('QQ 登录暂未开放，请使用邮箱登录', 'info');
+        });
+    }
     // 用户协议和隐私政策弹窗：显示/隐藏逻辑已由 index.html 中的 inline onclick 直接处理，
     // 此处不再重复绑定 addEventListener，避免与 inline onclick 冲突或元素缺失时抛错中断后续绑定
     document.getElementById('profile-link').addEventListener('click', (e) => {
@@ -1032,14 +1314,7 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-tax', pageId: 'profile-tax-page', loadFn: loadProfileTax },
         { cardId: 'profile-card-data', pageId: 'profile-data-page' },
         { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
-        { cardId: 'profile-card-help', specialFn: () => {
-            const modal = document.getElementById('help-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modal.querySelector('div').classList.remove('scale-95');
-            }, 10);
-        }},
+        { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) }
     ];
 
@@ -1094,13 +1369,35 @@ function setupAuthEventListeners() {
         { input: 'register-confirm-password', toggle: 'register-confirm-password-toggle' },
         { input: 'profile-current-password', toggle: 'profile-current-password-toggle' },
         { input: 'profile-password', toggle: 'profile-password-toggle' },
-        { input: 'profile-confirm-password', toggle: 'profile-confirm-password-toggle' }
+        { input: 'profile-confirm-password', toggle: 'profile-confirm-password-toggle' },
+        { input: 'reset-new-password', toggle: 'reset-new-password-toggle' },
+        { input: 'reset-confirm-password', toggle: 'reset-confirm-password-toggle' }
     ];
     
     passwordToggleIds.forEach(({ input, toggle }) => {
         const toggleEl = document.getElementById(toggle);
         if (toggleEl) {
             toggleEl.addEventListener('click', () => togglePasswordVisibility(input, toggle));
+        }
+    });
+
+    // 帮助/关于弹窗的右上角关闭按钮
+    const bindCloseBtn = (btnId, modalId) => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                const modal = document.getElementById(modalId);
+                if (modal) closeModal(modal);
+            });
+        }
+    };
+    bindCloseBtn('close-help-modal', 'help-modal');
+    bindCloseBtn('close-about-modal', 'about-modal');
+
+    // ESC 关闭当前最上层弹窗（协议/隐私/帮助/关于/alert/confirm 统一处理）
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && openModalSet.size > 0) {
+            closeModal([...openModalSet][openModalSet.size - 1]);
         }
     });
 }
@@ -1131,28 +1428,42 @@ function showAlert(message, type = 'error', callback) {
     
     openModal(modal);
     
+    // 直接赋值 onclick，天然去重：同一按钮连点或重复 showAlert 不会累积多个回调
     function handleOk() {
         closeModal(modal);
         if (callback) callback();
-        okButton.removeEventListener('click', handleOk);
-        closeButton.removeEventListener('click', handleOk);
+        okButton.onclick = null;
+        closeButton.onclick = null;
     }
     
-    okButton.addEventListener('click', handleOk);
-    closeButton.addEventListener('click', handleOk);
+    okButton.onclick = handleOk;
+    closeButton.onclick = handleOk;
 }
 
+// 当前打开中的弹窗集合：用于多弹窗时的背景滚动锁定与 ESC 关闭最上层弹窗
+const openModalSet = new Set();
+
 function openModal(modal) {
+    if (!modal) return;
     modal.classList.remove('hidden');
+    openModalSet.add(modal);
+    document.body.style.overflow = 'hidden';
     setTimeout(() => {
         modal.classList.remove('opacity-0');
-        modal.querySelector('div').classList.remove('scale-95');
+        const inner = modal.querySelector('div');
+        if (inner) inner.classList.remove('scale-95');
     }, 10);
 }
 
 function closeModal(modal) {
+    if (!modal) return;
     modal.classList.add('opacity-0');
-    modal.querySelector('div').classList.add('scale-95');
+    const inner = modal.querySelector('div');
+    if (inner) inner.classList.add('scale-95');
+    openModalSet.delete(modal);
+    if (openModalSet.size === 0) {
+        document.body.style.overflow = '';
+    }
     setTimeout(() => {
         modal.classList.add('hidden');
     }, 300);

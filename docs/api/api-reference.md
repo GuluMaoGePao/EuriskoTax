@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.0
-> **最后更新**: 2026年9月6日（同步 v1.4.0：注册改为邮箱验证码 + 一机一码邀请码，新增反馈/运营统计/邀请码管理端点）
+> **版本**: v2.1
+> **最后更新**: 2026年9月6日（同步 v1.5.0：新增忘记密码自助找回 `send-reset-code` / `reset-password`，登录支持"记住我"会话策略，注册增加协议勾选）
 
 ---
 
@@ -57,8 +57,8 @@
 ### 1.4 通用限制
 
 - 请求体上限 1MB
-- `/api/auth/*` 全局限流：同 IP 15 分钟 10 次（`authLimiter`）
-- `/api/auth/send-code` 额外限流：同 IP 15 分钟 5 次（`codeLimiter`）；同一邮箱 60 秒重发冷却（接口层 429）
+- `/api/auth/*` 全局限流：同 IP 15 分钟 10 次（`authLimiter`；`send-code` / `send-reset-code` 不计入）
+- `/api/auth/send-code` 与 `/api/auth/send-reset-code` 合并限流：同 IP 15 分钟 5 次（`codeLimiter`）；同一邮箱 60 秒重发冷却（接口层 429）
 - 邮箱统一小写化存储与匹配
 
 ---
@@ -93,7 +93,7 @@
 |------|------|------|------|
 | username | string | 是 | 用户名（唯一） |
 | email | string | 是 | 邮箱（唯一，小写归一化） |
-| password | string | 是 | 密码（服务端不强制复杂度，建议 ≥6 位） |
+| password | string | 是 | 密码（**至少 6 位**，服务端强制校验；注册/重置/改密一致） |
 | phone | string | 否 | 手机号 |
 | inviteCode | string | 是 | **一机一码邀请码**（`EURISKO-XXXX-XXXX`，需向开发者获取） |
 | verificationCode | string | 是 | 邮箱验证码（先调 2.1 发送） |
@@ -161,6 +161,37 @@
 **POST** `/api/auth/verify-password`
 
 认证：JWT。请求体：`{ currentPassword }`。响应：`{ valid: boolean }`（用于个人中心"修改密码前验证当前密码"）。
+
+### 2.8 发送密码重置验证码（忘记密码）
+
+**POST** `/api/auth/send-reset-code`（无需认证）
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| email | string | 是 | 注册邮箱 |
+
+行为：仅对**已注册邮箱**发送 6 位数字重置验证码（10 分钟有效、60 秒重发冷却、同 IP 15 分钟最多 5 次，与注册验证码合并限流）。未注册邮箱返回 404 且**不发送邮件**（避免邮件轰炸）。
+用途区分：验证码按 `register` / `reset` 两种用途独立存储，互不干扰。
+
+典型错误：邮箱格式错误（400）、该邮箱未注册（404）、发送过于频繁（429）。
+
+### 2.9 重置密码（忘记密码）
+
+**POST** `/api/auth/reset-password`（无需认证）
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| email | string | 是 | 注册邮箱 |
+| verificationCode | string | 是 | 2.8 发送的 6 位验证码（通过即作废） |
+| newPassword | string | 是 | 新密码（**至少 6 位**，与注册校验一致） |
+
+行为：校验邮箱已注册 → 校验重置验证码（一次性使用）→ 更新密码哈希。重置后原密码立即失效。
+
+典型错误：参数缺失 / 密码过短 / 验证码无效或过期（400/429）、该邮箱未注册（404）。
 
 ---
 
@@ -336,7 +367,28 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
   -d '{"email":"user@example.com","password":"secret123"}'
 ```
 
-### 6.2 综合所得计算示例
+### 6.2 忘记密码自助重置示例
+
+```bash
+# ① 向已注册邮箱发送重置验证码（未注册邮箱返回 404，不发送邮件）
+curl -X POST https://euriskotax.zeabur.app/api/auth/send-reset-code \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+# → { "success": true, "data": { "cooldownMs": 60000 } }
+
+# ② 提交新密码（verificationCode 为邮件中的 6 位数字）
+curl -X POST https://euriskotax.zeabur.app/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","verificationCode":"123456","newPassword":"newsecret123"}'
+# → { "success": true, "data": { "message": "Password reset successfully" } }
+
+# ③ 用新密码登录
+curl -X POST https://euriskotax.zeabur.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"newsecret123"}'
+```
+
+### 6.3 综合所得计算示例
 
 请求：
 
@@ -375,9 +427,11 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 | 验证码未请求 / 已过期 / 错误 | 400 | register / send-code |
 | 邀请码不存在 | 403 | register |
 | 邀请码已被使用 | 403 | register（一机一码） |
-| 重发验证码过快 | 429 | 同一邮箱 60 秒冷却 |
+| 重发验证码过快 | 429 | 同一邮箱 60 秒冷却（注册/重置共用） |
 | 验证码尝试超限 | 429 | 同一码最多 5 次错误尝试 |
-| 登录/验证码限流 | 429 | 15 分钟配额（10 次/5 次） |
+| 登录/验证码限流 | 429 | 15 分钟配额（10 次/5 次，两个发码端点合并计数） |
+| 该邮箱未注册 | 404 | send-reset-code / reset-password（不发送邮件，防轰炸） |
+| 密码少于 6 位 | 400 | register / reset-password / updateProfile 改密 |
 | 邮箱或密码错误 | 401 | login |
 | 当前密码错误 | 401 | verify-password / 改密 |
 | 记录不存在 / 非本人 | 404 / 403 | calculations/:id |
