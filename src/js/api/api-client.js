@@ -119,7 +119,11 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
             removeCurrentUser();
             window.location.reload();
         }
-        throw new Error(ERROR_MESSAGE_MAP[errorMessage] || errorMessage || '请求失败');
+        // 携带状态码：调用方可据 statusCode 判定业务类型（如 409 邮箱已注册），
+        // 不依赖中/英文提示文案匹配（后端改文案也不受影响）
+        const error = new Error(ERROR_MESSAGE_MAP[errorMessage] || errorMessage || '请求失败');
+        error.statusCode = result.error?.statusCode || response.status;
+        throw error;
     }
 
     return result.data;
