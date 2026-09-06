@@ -242,7 +242,7 @@ function extractCodeFromLog(log, email) {
         record('auth-ui.js 含本地填充入口(dev-login-fill)', authJs.status === 200 && authJs.raw.includes('dev-login-fill'), `HTTP ${authJs.status}`);
         record('auth-ui.js 已无 quick-login 残留', authJs.status === 200 && !authJs.raw.includes('quick-login'), '');
         const sw = await request(PORT, 'GET', '/service-worker.js');
-        record('service-worker.js 为 v8（网络优先）', sw.status === 200 && sw.raw.includes('euriskotax-v8'), `HTTP ${sw.status}`);
+        record('service-worker.js 为 v9（网络优先）', sw.status === 200 && sw.raw.includes('euriskotax-v9'), `HTTP ${sw.status}`);
         record('service-worker.js 含 http/https 协议守卫', sw.status === 200 && sw.raw.includes("url.protocol !== 'http:'"), `HTTP ${sw.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);

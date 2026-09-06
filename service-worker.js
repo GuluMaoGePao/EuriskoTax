@@ -10,7 +10,7 @@
  *
  * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
  */
-const CACHE_VERSION = 'euriskotax-v8';
+const CACHE_VERSION = 'euriskotax-v9';
 const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const CDN_CACHE = CACHE_VERSION + '-cdn';
@@ -36,7 +36,7 @@ const APP_SHELL = [
   '/src/js/utils/mock-client.js',
   '/src/js/app.js',
   // 登录/个人中心链路（app.js 在启动时动态 import 的 ES module），预缓存保证离线可登录
-  '/src/js/auth/auth-ui.js?v=2',
+  '/src/js/auth/auth-ui.js?v=3',
   '/src/js/api/api-client.js'
 ];
 

@@ -1206,7 +1206,7 @@ window.addEventListener('DOMContentLoaded', function() {
     // 把 auth-ui 视为全新资源强制回源，避免「新 index.html 已删节点、而旧 auth-ui
     // 仍引用该节点」导致的 Cannot read properties of null (classList) 崩溃。
     // 发布新版本时请同步递增该版本号（并与 service-worker.js 的 CACHE_VERSION 一起升）。
-    import('/src/js/auth/auth-ui.js?v=2').then(({ initAuth }) => {
+    import('/src/js/auth/auth-ui.js?v=3').then(({ initAuth }) => {
         initAuth();
     });
     
