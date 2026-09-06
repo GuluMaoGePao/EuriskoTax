@@ -7,6 +7,54 @@
 
 ---
 
+## [1.4.0] - 2026-09-06
+
+### 新增
+
+- **生产环境上线（v1.4.0 上线计划完成）**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS 正式对外，公网地址 `https://euriskotax.zeabur.app`
+  - Prisma 迁移 PostgreSQL（迁移文件 `20260905_init_postgres`），生产 schema 与本地 `schema.dev.prisma`（SQLite）分离
+  - 生产环境启动校验：`JWT_SECRET` 必须为强密钥、`DATABASE_URL` 必须指向 PostgreSQL，否则拒绝启动
+  - Docker 部署链路：`Dockerfile`（node:22-slim + OpenSSL 修复 Prisma 引擎崩溃）、构建不再排除 images（修复线上 logo 丢失）、迁移锁 provider 修正为 postgresql（修复 P3019）、`index.html` 返回 no-cache（防新旧混搭）
+  - 反向代理信任：`trust proxy` 修复 Zeabur 网关后限流把全站算作同一 IP 的问题
+- **邀请码系统（一机一码）**：注册邀请码改为 `EURISKO-XXXX-XXXX` 格式（crypto 级随机），每个码仅可注册一个账号、事务内原子消耗
+  - 服务启动时若 `InviteCode` 表为空自动兜底生成 20 个（幂等，重启不重复生成）
+  - 管理员 API：`GET/POST /api/invites`（`X-Admin-Token` 认证，count 1-100）
+  - GUI 开发控制台新增「一键邀请码管理」；生产令牌与本地令牌分离存储
+- **注册邮箱验证码**：`POST /api/auth/send-code` 发送 6 位数字验证码（10 分钟有效、60 秒重发冷却、同 IP 15 分钟最多 5 次限流），数据库存哈希；注册需同时提供邮箱验证码 + 邀请码
+- **运营统计概览**：`GET /api/stats/overview`（`X-Admin-Token` 认证）：注册数 / 计算次数 / 类型分布 / 近 7 日趋势
+- **用户反馈接口**：`POST/GET /api/feedback`（登录后提交 bug/建议/评分）
+- **PWA 离线化（阶段 9）**：`manifest.json`（standalone、192/512 + maskable 图标）+ `service-worker.js` v4
+  - 应用壳预缓存（离线可打开）、CDN 资源 cache-first、同源 JS/CSS network-first、API 永不缓存
+  - 离线检测顶部提示条；SW 更新提示 + 一键刷新；CDN 失败兜底
+- **登录注册全流程完善**：用户协议与隐私政策弹窗（inline onclick）、UI 闪现修复、已注册邮箱发验证码时正确提示并引导登录、密码可见性切换图标、初始化遮罩修复
+- **单元测试扩充**：新增 `home-page.test.js`（22）+ `profile-page.test.js`（38），总套件 6、总测试 203
+
+### 修复
+
+- fix(deploy): 限流在 Zeabur 反向代理下失效（全站共享配额）——`app.set('trust proxy', 1)`
+- fix(deploy): `node:20` 镜像缺 OpenSSL 导致 Prisma 引擎崩溃——基础镜像换 `node:22-slim` + 安装 openssl
+- fix(deploy): `.dockerignore` 排除 images 导致线上 logo/图标丢失
+- fix(deploy): 迁移锁文件 provider 仍为 sqlite 触发 P3019
+- fix(sw): JS/CSS 改为 network-first 策略，彻底解决强缓存导致的加载旧代码问题
+- fix(auth): 初始化遮罩不消失、注册 UI 闪现、协议弹窗与事件重复绑定冲突
+- fix(stats): 近 7 日趋势日期标签偏移一天
+- fix(ops): 健康检查改用 `/health` 端点，避免被登录限流误判为宕机
+- fix(gui): 邀请码生产令牌与本地令牌分离存储
+- fix(test): `profile-page.test.js` fixture 缺少 auth 重构新增元素（forgot-password/send-code-btn/register-code/register-invite-code/user-name）导致 `setupAuthEventListeners` 抛错——补齐 fixture，203/203 恢复全绿
+
+### 变更
+
+- 注册入口不再接受固定邀请码，全部改为「向开发者获取一机一码」
+- 健康检查端点从 `/api/health` 调整语义为根路径 `/health`（非 API，不受限流影响）
+- 计算类 API（comprehensive/business/classification/reverse）当前未强制 JWT，历史记录类接口（history/:id）需 JWT
+
+### 文档
+
+- 全量文档同步至 v1.4.0 状态（2026-09-06）：README / docs 索引 / 开发计划 / API 参考 / 测试报告 / 交付清单 / 冷启动素材
+- 修正营销素材邀请码文案（固定码 → 一机一码）
+
+---
+
 ## [1.3.0] - 2026-08-15
 
 ### 新增

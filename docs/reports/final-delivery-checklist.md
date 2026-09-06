@@ -1,8 +1,10 @@
 # EuriskoTax 最终项目交付清单
 
-**交付日期**: 2026-08-05
-**项目版本**: 1.1.0（含三批重构 + 个人中心 UI 重设计 + 悬浮税助手 + MockClient 工具封装 + 完整测试体系）
-**交付范围**: 代码重构 + UI 重设计 + 悬浮税助手 + 工具封装 + 单元测试 + 性能基准 + 交互测试 + 交付文档
+**交付日期**: 2026-08-05（首次交付基线）
+**项目版本**: 1.1.0 → 已随迭代演进至 **1.4.0**（2026-09-06 更新：生产上线 + PWA + 注册闭环，变更明细见 [CHANGELOG.md](../../CHANGELOG.md) 与 [development-plan.md](../development/development-plan.md)）
+**交付范围**: 代码重构 + UI 重设计 + 悬浮税助手 + 工具封装 + 单元测试（203 个）+ 性能基准 + 交互测试 + 交付文档
+
+> 本文档为重构/质量交付记录。当前项目状态（生产部署、v1.4.0 功能）以 docs/README.md 索引下的文档为准。
 
 ---
 
@@ -84,7 +86,7 @@
 | 环境初始化 | tests/setup.js |
 | 源码加载器 | tests/helpers/load-source.js |
 
-### 3.2 测试文件
+### 3.2 测试文件（2026-09-06 更新：6 套件 203 个全通过）
 
 | 文件 | 测试数 | 覆盖范围 |
 |------|--------|---------|
@@ -92,7 +94,9 @@
 | tests/interaction.test.js | 45 | 步骤导航、保存历史、扣除项切换、分类所得、参数提示 tooltip |
 | tests/tax-assistant.test.js | 35 | 税助手初始化/渲染/搜索/分类/收藏/反馈/失败回滚 |
 | tests/tax-assistant-perf.test.js | 12 | logger 性能、MockClient 工具复用、并发 reqId、延迟边界、搜索联想同步性 |
-| **合计** | **143** | **全部通过** |
+| tests/home-page.test.js | 22 | 首页渲染与交互（v1.4.0 新增） |
+| tests/profile-page.test.js | 38 | 个人中心/路由栈/税务档案/密码可见性（v1.4.0 新增） |
+| **合计** | **203** | **全部通过** |
 
 ### 3.3 性能基准测试
 
@@ -200,23 +204,25 @@ npm run test:performance    # 性能基准测试
 
 ### 6.4 文档结构（整理后）
 
+> 文档中心已统一归档到 [docs/README.md](../README.md)（完整索引 + 目录结构 + 维护规范）。交付类文档分类如下：
+
 ```
 docs/
-├── final-delivery-checklist.md      # 最终交付清单（本文档，总入口）
-├── refactor-summary-report.md       # 重构成果汇总报告（三批次 + Phase 4）
-├── test-report.md                   # 单元测试 + 浏览器交互测试报告
-├── ui-component-reuse-guide.md      # UI 组件复用指南
-├── api/
-│   └── api-reference.md             # API 接口参考文档
-├── development/
-│   └── development-plan.md          # 后端化开发方案
-└── guides/
-    └── tax-calculation-rules.md     # 个人所得税计算规则手册
+├── README.md                          # 文档中心索引（唯一入口）
+├── api/api-reference.md               # API 接口参考文档
+├── development/development-plan.md    # 开发计划 / 阶段状态 / 技术选型
+├── guides/*                           # 计税规则 / UI 复用 / 响应式 / GUI 按钮速查
+├── marketing/cold-start-materials.md  # 冷启动推广素材
+├── reports/
+│   ├── final-delivery-checklist.md    # 本文档（交付总览）
+│   ├── refactor-summary-report.md     # 重构成果汇总（三批次 + Phase 4）
+│   └── test-report.md                 # 单元测试 + 浏览器交互测试报告
+└── tech-reports/*                     # watchdog 部署/规范、SOP 模板等
 ```
 
 > 已合并：refactor-comparison-report.md + profile-refactor-report.md → refactor-summary-report.md
-> 已清理：旧版交付清单、Phase2 测试报告、delivery 临时目录、2 个旧 zip 包。
-> 旧版交付打包 zip 已纳入 .gitignore，不再列入文档结构。
+> 已清理：旧版交付清单、Phase2 测试报告、delivery 临时目录。
+> 旧版交付打包 zip 已纳入 .gitignore，不再作为交付物引用。
 
 ### 6.5 备份文件
 
@@ -234,7 +240,7 @@ docs/
 
 | 验收项 | 标准 | 实际 | 结论 |
 |--------|------|------|------|
-| 单元测试通过率 | 100% | 143/143 (100%) | 通过 |
+| 单元测试通过率 | 100% | 203/203 (100%) | 通过 |
 | 意外警告/错误 | 0 | 0 | 通过 |
 | 核心函数性能 | < 100ms | < 3.1 μs | 通过 |
 | 个人中心加载性能 | < 200ms | ~80ms | 通过 |
@@ -279,9 +285,24 @@ docs/
 | 代码重构 | 已完成（3 批次） |
 | UI 重设计 | 已完成（个人中心子导航栏） |
 | Phase 4 悬浮税助手 | 已完成（数据 + UI + MockClient 工具封装 + 并发 reqId 修复） |
-| 单元测试 | 已通过（143/143） |
+| 单元测试 | 已通过（203/203，2026-09-06 复测） |
 | 性能基准 | 已达标（核心 < 3.1μs，个人中心 ~80ms，联想高频 < 200ms） |
 | 交互测试 | 已通过（浅色/深色/移动端 + 税助手抽屉/联想/收藏/回滚/日志） |
-| 文档 | 已生成（4 份报告 + 本清单 + 3 份既有文档） |
+| 文档 | 已生成并同步至 v1.4.0 |
 
-**交付结论**: 全部重构、Phase 4 悬浮税助手与工具封装、测试和文档工作已完成，所有质量验收标准满足，可交付。
+**交付结论（v1.1.0 基线）**: 全部重构、Phase 4 悬浮税助手与工具封装、测试和文档工作已完成，所有质量验收标准满足，可交付。
+
+---
+
+## 附：v1.4.0 增量交付（2026-09-06）
+
+在 v1.1.0 交付基线之上，随 v1.4.0 上线新增/变更的交付物：
+
+| 类别 | 内容 | 说明 |
+|------|------|------|
+| 部署 | Zeabur 生产上线 + PostgreSQL + Dockerfile | 见 development-plan 阶段 5/6/7 |
+| 认证 | 注册邮箱验证码 + 邀请码一机一码 | 前端 + 后端 + GUI 管理 |
+| PWA | manifest + service-worker v4 | 可安装、离线应用壳 |
+| 运营 | 反馈/统计概览/邀请码管理 API + 冷启动素材 | 见 marketing 与 api-reference |
+| 测试 | 新增 home-page / profile-page 两套件 | 203 全通过 |
+| 文档 | 全量同步至 v1.4.0（2026-09-06） | 见 CHANGELOG 与 docs/README |

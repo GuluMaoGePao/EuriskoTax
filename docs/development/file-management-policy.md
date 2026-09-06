@@ -1,4 +1,4 @@
-# EuriskoTax 文件管理规范（2026-08-16 v1.0）
+# EuriskoTax 文件管理规范（2026-08-16 v1.0 · 2026-09-06 v1.1）
 
 > 本规范覆盖 EuriskoTax 项目**所有文件**的存放位置、命名规则、编码要求、修改流程、验证步骤。**任何文件新增 / 移动 / 删除 / 重命名 / 格式调整，必须先查阅本规范并严格按流程执行**。
 
@@ -11,8 +11,9 @@ EuriskoTax/
 ├─ README.md                          ← 项目主说明（仅根目录保留一份 README.md）
 ├─ CHANGELOG.md                       ← 版本变更记录（仅根目录保留）
 ├─ index.html                         ← 前端入口
-├─ package.json / package-lock.json   ← 前端依赖
-├─ zeabur.json                        ← PaaS 部署配置
+├─ package.json / package-lock.json   ← 依赖清单（含测试脚本）
+├─ Dockerfile                         ← Zeabur 生产部署入口（启动前 prisma migrate deploy）
+├─ manifest.json / service-worker.js  ← PWA 应用清单与离线缓存（v1.4.0）
 ├─ .gitignore                         ← Git 忽略规则（路径变更必须同步改）
 │
 ├─ docs/                              ← 📚 全部 .md 文档（本规范核心目录）
@@ -30,6 +31,9 @@ EuriskoTax/
 │   ├─ development/                   ← 🟡 开发规范 / 计划 / 工程决策
 │   │   ├─ development-plan.md
 │   │   └─ file-management-policy.md  ← ⭐ 本文档（你正在看的这个）
+│   │
+│   ├─ marketing/                     ← 🟢 推广运营素材
+│   │   └─ cold-start-materials.md    ← 冷启动多渠道文案（注册引导随版本同步）
 │   │
 │   ├─ reports/                       ← 测试报告 / 交付清单 / 性能
 │   │   ├─ test-report.md
@@ -51,7 +55,7 @@ EuriskoTax/
 ├─ logs/                              ← 📋 全部 .log 日志（git 忽略）
 │   └─ README.md                      ← 日志目录说明 & 历史遗留说明
 │
-├─ server/                            ← 后端（Koa + Prisma）
+├─ server/                            ← 后端（Express + Prisma；生产 PostgreSQL、本地 SQLite）
 ├─ src/                               ← 前端 JS 源码（模块化按功能分子目录）
 ├─ tests/                             ← Jest 测试（performance/ helpers/ 子目录）
 ├─ images/                            ← 图片 / 图标 / ICO + 构建辅助 PS1
@@ -267,3 +271,4 @@ logs/
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
 | 2026-08-16 | 1.0 | 首次发布。固化目录结构；修复 4 份零散文件位置（`account-credentials.md → docs/admin/`、`debug-mail-spam.md → docs/tech-reports/`、清理根目录冗余 3 个 .log、建立 `logs/` 目录说明）；新增 `.ps1` BOM 验证 SOP；新增 GUI 按钮路径联动清单 |
+| 2026-09-06 | 1.1 | 目录树同步 v1.4.0 事实：~~`zeabur.json`~~ → `Dockerfile`（Zeabur 部署入口）、新增 `manifest.json` / `service-worker.js`（PWA）、新增 `docs/marketing/`、后端描述 Koa → Express |

@@ -87,7 +87,7 @@
 
 ---
 
-### 阶段4：前端改造与集成（预计1周）
+### 阶段4：前端改造与集成（预计1周）✅ **已完成**
 
 **目标**：修改前端代码，对接后端API
 
@@ -113,7 +113,7 @@
 > **方案调整说明（2026-09-05）**：原 PM2 + Nginx + Let's Encrypt 的自建运维路线已被 **Zeabur 托管部署**替代（ZeaburOS 自动提供进程管理、反向代理与 HTTPS 证书），无需自行配置。
 
 **任务清单**：
-- [x] 配置生产环境变量（zeabur.json 改为 `${VAR}` 引用）
+- [x] 配置生产环境变量（早期 zeabur.json `${VAR}` 引用，后统一为 Zeabur 面板环境变量 + Dockerfile 部署）
 - [x] 添加Swagger API文档（/api/docs + /api/docs.json）
 - [x] 生产数据库迁移 PostgreSQL（迁移文件 `20260905_init_postgres` 已生成）
 - ~~安装PM2进程管理器~~ → 由 ZeaburOS 托管替代
@@ -122,7 +122,8 @@
 - ~~编写部署脚本~~ → 由 Git 推送自动部署替代
 
 **输出文件**：
-- `zeabur.json` - Zeabur 部署配置（构建命令含 `prisma migrate deploy`）
+- `Dockerfile` - Zeabur 生产部署入口（构建阶段安装 OpenSSL 保证 Prisma 引擎可用；运行阶段 `CMD` 先执行 `prisma migrate deploy` 再 `node src/app.js`）
+- ~~`zeabur.json`~~ - 早期产物，仓库中已移除；Zeabur 直接识别根目录 `Dockerfile` 构建部署
 - `server/src/app.js` - 新增生产环境校验（JWT_SECRET/DATABASE_URL）与 express-rate-limit
 
 ---
@@ -181,30 +182,50 @@ EuriskoTax/
 
 ---
 
-## 🔄 数据库表设计
+## 🔄 数据库表设计（当前生产 schema · Prisma / PostgreSQL）
 
-### users 表（用户表）
+> 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **4 张表**：
 
-| 字段名 | 类型 | 约束 | 说明 |
-|--------|------|------|------|
-| id | INT | PRIMARY KEY, AUTO_INCREMENT | 用户ID |
-| username | VARCHAR(50) | UNIQUE, NOT NULL | 用户名 |
-| email | VARCHAR(100) | UNIQUE, NOT NULL | 邮箱 |
-| phone | VARCHAR(20) | - | 手机号 |
-| password_hash | VARCHAR(255) | NOT NULL | 密码哈希 |
-| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
-| updated_at | TIMESTAMP | ON UPDATE CURRENT_TIMESTAMP | 更新时间 |
+### users（用户）
 
-### calculations 表（计算记录表）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | 用户ID |
+| username | STRING UNIQUE | 用户名 |
+| email | STRING UNIQUE | 邮箱（唯一，登录标识） |
+| phone | STRING? 可空 | 手机号 |
+| password_hash | STRING | bcrypt 密码哈希 |
+| created_at / updated_at | DateTime | 时间戳 |
 
-| 字段名 | 类型 | 约束 | 说明 |
-|--------|------|------|------|
-| id | INT | PRIMARY KEY, AUTO_INCREMENT | 记录ID |
-| user_id | INT | FOREIGN KEY | 用户ID |
-| type | VARCHAR(20) | NOT NULL | 计算类型（comprehensive/business/classification/reverse） |
-| input_data | JSON | NOT NULL | 输入数据 |
-| result_data | JSON | NOT NULL | 计算结果 |
-| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+### calculations（计算记录）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | 记录ID |
+| user_id | INT FK（用户级联删除） | 归属用户 |
+| type | STRING | comprehensive / business / classification / reverse |
+| input_data / result_data | STRING(JSON) | 输入与结果快照 |
+| created_at | DateTime | 时间戳 |
+
+### invite_codes（邀请码 · 一机一码）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | ID |
+| code | STRING UNIQUE | 邀请码（EURISKO-XXXX-XXXX） |
+| used_by / used_at | INT? / DateTime? | 已使用用户与时间（一次性） |
+| created_at | DateTime | 时间戳 |
+
+### verification_codes（邮箱验证码）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | ID |
+| email | STRING | 目标邮箱 |
+| code_hash | STRING | 验证码哈希（不存明文） |
+| purpose | STRING（默认 register） | 用途 |
+| attempts | INT（默认 0） | 错误尝试计数 |
+| expires_at / created_at | DateTime | 过期与创建时间 |
 
 ---
 
@@ -226,21 +247,24 @@ EuriskoTax/
 | 阶段6：生产环境硬化（v1.4.0） | ✅ 已完成 | 2天 | 2026-09-05 |
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
 | 阶段8：首批测试用户运营 | 🚧 进行中（冷启动推广素材已备好） | 2周 | 预计 2026-09-20 |
-| 阶段9：PWA 离线化改造 | 🚧 进行中（本地验证通过，待生产部署） | 3天 | 2026-09-06 |
+| 阶段9：PWA 离线化改造 | ✅ 代码完成（2026-09-06 本地验证通过；随 Git 推送部署生产后需清缓存终验） | 3天 | 2026-09-06 |
 | 阶段10：免费/专业版体系 | ⏳ 待开始 | 1周 | 预计 2026-10 月初 |
 
 ### 当前状态
 
 **生产环境（2026-09-05 已上线运行）**：
-- 平台：Zeabur（zeabur.cn）
+- 平台：Zeabur
 - 服务器：Tencent - Tokyo，2 vCPU / 2 GB 内存 / 40 GB SSD / 0.5TB 流量（Max 30 Mbps）
-- 系统：ZeaburOS（托管模式，Dockerfile 构建部署，自动 HTTPS）
+- 系统：ZeaburOS（托管模式，根目录 `Dockerfile` 构建部署，自动 HTTPS）
 - 费用：$3/月（促销价，原价 $4.20）
 - 公网地址：https://euriskotax.zeabur.app（HTTPS 已生效）
-- 数据库：PostgreSQL（Zeabur 托管服务，Prisma migrate deploy 启动时自动迁移）
-- 环境变量：DATABASE_URL / JWT_SECRET / NODE_ENV=production / PORT / CORS_ORIGIN / INVITE_CODE / ADMIN_TOKEN 已全部配置
-- 2026-09-05 全链路验证通过：注册（邀请码校验）→ 登录 → JWT 受保护接口 → CORS 限制 → 安全响应头
+- 数据库：PostgreSQL（Zeabur 托管服务；Dockerfile 内 `prisma migrate deploy` 启动时自动迁移）
+- 环境变量：DATABASE_URL / JWT_SECRET / NODE_ENV=production / PORT / CORS_ORIGIN / ADMIN_TOKEN 已全部配置（注：早期 `INVITE_CODE` 固定邀请码环境变量已随「一机一码」机制废弃）
+- 邮件配置（注册邮箱验证码依赖，缺配置则注册不可用）：SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_PORT（465 或 587）/ SMTP_SECURE / SMTP_FROM_NAME —— 已在 Zeabur 面板配置，见 [api-reference 8.2](../api/api-reference.md)
+- 2026-09-05 全链路验证通过：注册（邮箱验证码 + 一机一码邀请码）→ 登录 → JWT 受保护接口 → CORS 限制 → 安全响应头
+- 注册机制（2026-09-06）：**邮箱验证码 + 一机一码邀请码**（`EURISKO-XXXX-XXXX`，表内校验、一次性、事务原子消耗；服务启动表空时自动兜底生成 20 个）。固定码 `EURISKO2026BETA` 已不再接受
 - 运营统计：GET /api/stats/overview（X-Admin-Token 认证），注册数/计算次数/近7日趋势
+- PWA（阶段 9）：manifest + service-worker v4 已随代码就绪，离线应用壳本地验证通过（2026-09-06）
 
 **本地开发环境**：
 - 后端服务：http://localhost:3000
@@ -274,12 +298,12 @@ npm start
 > **2026-09-05 已购买**：Tencent - Tokyo 服务器（2 vCPU / 2GB / 40GB / ZeaburOS，$3/月）。
 > 选型结论：比香港 $6 档便宜一半且带宽更大（30 vs 20 Mbps）；ZeaburOS 托管免去自装 Docker/Nginx；PostgreSQL 作为服务部署到同一台机器不额外收费。
 
-**部署流程（阶段7剩余步骤）**：
-1. 项目内部署 PostgreSQL 服务（选择已购服务器）
-2. 从 GitHub 仓库部署应用（自动读取 [zeabur.json](../../zeabur.json)，构建时执行 `prisma migrate deploy`）
-3. 手动设置环境变量：`JWT_SECRET`（强随机密钥）、`CORS_ORIGIN`（Zeabur 分配的域名）
+**部署流程（阶段 6/7 已完成，实际执行记录）**：
+1. 在 Zeabur 创建 PostgreSQL 服务（绑定已购服务器）
+2. 从 GitHub 仓库部署应用：Zeabur 自动识别根目录 `Dockerfile` 构建（无需 `zeabur.json`），镜像运行时 `CMD` 自动执行 `prisma migrate deploy` 后启动服务
+3. 在 Zeabur 面板设置环境变量：`JWT_SECRET`（强随机密钥）、`DATABASE_URL`、`CORS_ORIGIN`（分配域名）、`NODE_ENV=production`、`ADMIN_TOKEN`（运营统计/邀请码管理用）
 4. 绑定 `*.zeabur.app` 免费域名（自动 HTTPS）
-5. 自检：`/health` 返回 ok → Swagger 可见 → 注册接口带邀请码 `EURISKO2026BETA` 测试通过
+5. 自检：`/health` 返回 ok → `/api/docs`（Swagger）可见 → 发送邮箱验证码注册（管理员通过 GUI/API 生成一机一码）测试通过
 
 ### cpolar内网穿透（本地开发联调用）
 ```bash
@@ -305,7 +329,7 @@ cpolar http 3000 -region=cn
 
 ---
 
-## � 商业模式与产品路线（2026-09-05 定调）
+## 💼 商业模式与产品路线（2026-09-05 定调）
 
 ### 核心架构原则
 
@@ -366,15 +390,15 @@ cpolar http 3000 -region=cn
 
 ### 后续可持续开发方向（按商业模式定调重排）
 
-1. **PWA 离线化改造（阶段9，优先）** ✅ 核心已完成（2026-09-06）
+1. **PWA 离线化改造（阶段9）** ✅ 代码完成（2026-09-06 本地验证通过）
    - ✅ 新增 `manifest.json`（应用清单：standalone 模式、主题色 #1e40af、192/512 图标含 maskable）
-   - ✅ 新增 `service-worker.js`（应用壳预缓存 + CDN cache-first + 同源 stale-while-revalidate + API 不缓存）
+   - ✅ 新增 `service-worker.js` v4（应用壳预缓存 + CDN cache-first + 同源 JS/CSS network-first 确保新代码即时生效 + API 永不缓存）
    - ✅ `index.html` 引入 manifest / theme-color / favicon / apple-touch-icon，注册 Service Worker
-   - ✅ 后端差异化缓存策略：index.html/manifest/sw.js → no-cache；JS/CSS → immutable 1年；图片 → 7天
-   - ✅ 改造 [mock-client.js](../../src/js/utils/mock-client.js) 为离线感知（`EuriskoTaxNet.isOnline()`，离线时同步直接本地成功）
+   - ✅ 后端差异化缓存策略：index.html/manifest/sw.js → no-cache；JS/CSS → immutable 1年（配合 SW network-first 覆盖失效）；图片 → 7天
+   - ✅ 离线体验：更新提示条 + 安装按钮 + CDN 资源失败兜底
    - ✅ 离线状态检测与 UI 提示（顶部 amber 提示条，计税可用、数据本地保存）
    - ✅ 本地验证通过：SW 激活、应用壳预缓存命中（index.html/manifest/app.js/logo 均 200）
-   - ⏳ 待部署到生产（Zeabur），部署后需清缓存验证
+   - ⏳ 随 Git 推送部署到生产后，需清缓存终验（该步骤以 Zeabur 线上部署结果为准）
 
 2. **免费/专业版体系（阶段10）**
    - 未登录 = 免费版全功能；登录 = 解锁云端同步
@@ -400,12 +424,12 @@ cpolar http 3000 -region=cn
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-09-05（服务器购买完成、商业模式定调、新增阶段9/10）*
-*版本：v1.20.0*
+*最后更新：2026-09-06（v1.4.0 上线完成、PWA 代码完成、全量文档同步）*
+*对应项目版本：v1.4.0*
 
 ---
 
-## ✨ 新增功能与优化（v1.19.0）
+## 📜 前端功能演进记录（历史 · 对应发布版本 v1.1.0 → v1.3.0 期间，详见 CHANGELOG.md）
 
 ### 个人中心仪表盘化
 
@@ -466,7 +490,7 @@ cpolar http 3000 -region=cn
 - 修复JWT中间件未区分token过期和无效
 - 添加个人中心加载状态10秒超时机制
 
-### v1.18.0 优化内容
+### 历史：社保与倒算优化（原内部版本 v1.18.0 记录）
 
 ### 社保缴费基数优化
 
@@ -507,23 +531,25 @@ cpolar http 3000 -region=cn
 
 ---
 
-## 🚀 v1.4.0 上线计划（2026-09-05 制定）
+## 🚀 v1.4.0 上线执行记录（计划制定于 2026-09-05，已于 2026-09-05/06 全部执行完成）
+
+> 本节保留为上线计划存档。当前项目版本 1.4.0 已上线，变更明细见 [CHANGELOG.md](../../CHANGELOG.md)。
 
 ### 一、现状评估
 
-**✅ 已具备（生产就绪）**：后端 Express（0.0.0.0:3000）、静态服务+SPA回退、安全HTTP头5项、请求体1MB限制、JWT+bcrypt、`/health`、Swagger、Prisma、143单元测试、zeabur.json。
+**✅ 已具备（生产就绪）**：后端 Express（0.0.0.0:3000）、静态服务+SPA回退、安全HTTP头5项、请求体1MB限制、JWT+bcrypt、`/health`、Swagger、Prisma、203 单元测试、Dockerfile。
 
-**❌ 7 个关键阻塞点（2026-09-05 更新状态）**：
+**7 个关键阻塞点（2026-09-06 全部闭环）**：
 
 | # | 缺失项 | 严重度 | 状态 |
 |---|--------|--------|------|
-| 1 | 生产数据库用 SQLite | 🔴 致命 | ✅ 已解决（PostgreSQL 迁移文件已生成） |
-| 2 | JWT_SECRET 占位符 | 🔴 致命 | ⏳ Zeabur 部署时设置强随机密钥 |
-| 3 | CORS_ORIGIN = `*` | 🟡 高 | ⏳ 域名分配后填入实际值 |
+| 1 | 生产数据库用 SQLite | 🔴 致命 | ✅ 已解决（PostgreSQL 迁移 `20260905_init_postgres`，Dockerfile 启动自动 migrate deploy） |
+| 2 | JWT_SECRET 占位符 | 🔴 致命 | ✅ 已解决（Zeabur 环境变量强随机密钥，生产校验拒绝弱密钥） |
+| 3 | CORS_ORIGIN = `*` | 🟡 高 | ✅ 已解决（Zeabur 面板配置 CORS_ORIGIN 限定域名） |
 | 4 | 无前端构建步骤 | 🟡 中 | ⏳ 暂缓（原生JS可直接部署，>100用户后再本地构建 Tailwind） |
-| 5 | 无速率限制 | 🟡 中 | ✅ 已解决（express-rate-limit 已加入 app.js） |
+| 5 | 无速率限制 | 🟡 中 | ✅ 已解决（express-rate-limit：登录 10 次/15分、验证码 5 次/15分/IP） |
 | 6 | 无 HTTPS 强制跳转 | 🟡 中 | ✅ 由 Zeabur 平台自动提供 |
-| 7 | 无日志持久化/告警 | 🟢 低 | ⏳ 后续（复用 ops-notify.ps1 邮件通知思路） |
+| 7 | 无日志持久化/告警 | 🟢 低 | ⏳ 后续（复用 ops-notify.ps1 邮件通知思路；Zeabur 面板已有运行日志） |
 
 ### 二、MVP 形态
 
@@ -532,68 +558,65 @@ cpolar http 3000 -region=cn
 
 ### 三、推荐平台：Zeabur（首选）
 
-**理由**：已有 [zeabur.json](../../zeabur.json) 零迁移；国内可访问；一键 Postgres；自动 HTTPS+Git 部署；有免费额度。
+**理由**：原生 Node 服务零改动即可部署（根目录 `Dockerfile` 构建）；国内可访问；一键 Postgres；自动 HTTPS+Git 部署。
 
-**环境变量**：`JWT_SECRET=<openssl rand -hex 32>` / `DATABASE_URL=<Zeabur注入>` / `CORS_ORIGIN=<域名>` / `NODE_ENV=production`
+**环境变量（已全部配置）**：`JWT_SECRET=<强随机>` / `DATABASE_URL=<Zeabur 注入>` / `CORS_ORIGIN=<分配域名>` / `NODE_ENV=production` / `ADMIN_TOKEN=<运营后台令牌>`
 
-### 四、7 步上线流程
+### 四、7 步上线流程（执行记录）
 
-#### 阶段 A：代码层修复（Day 1-2）
+#### 阶段 A：代码层修复 ✅ 已完成
 
-**步骤 1**：迁移 Prisma 到 PostgreSQL
-- [server/prisma/schema.prisma](../../server/prisma/schema.prisma) 中 `provider = "sqlite"` → `"postgresql"`
-- 执行 `cd server && npx prisma migrate dev --name init-postgres`
+**步骤 1**：迁移 Prisma 到 PostgreSQL ✅
+- [server/prisma/schema.prisma](../../server/prisma/schema.prisma) 生产 `provider = "postgresql"`；本地开发保留 `schema.dev.prisma`（SQLite）
+- 生产迁移文件 `20260905_init_postgres` 已入库，Dockerfile 运行时自动 `prisma migrate deploy`
 
-**步骤 2**：修复 zeabur.json 环境变量为 `${VAR}` 引用（不再硬编码）
+**步骤 2**：部署入口 ✅ —— 早期 `zeabur.json`（`${VAR}` 引用）已废弃并从仓库移除，改为根目录 `Dockerfile`（Zeabur 自动识别）
 
-**步骤 3**：在 [app.js](../../server/src/app.js) L9 后增加生产校验 + rate-limit
+**步骤 3**：生产校验 + rate-limit ✅（已落地于 [app.js](../../server/src/app.js)）
 ```javascript
 if (process.env.NODE_ENV === 'production') {
-    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-random-secret-key') {
-        console.error('FATAL: JWT_SECRET must be set in production'); process.exit(1);
-    }
-    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) {
-        console.error('FATAL: DATABASE_URL must be PostgreSQL in production'); process.exit(1);
-    }
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-random-secret-key') { ... exit(1); }
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) { ... exit(1); }
 }
-const rateLimit = require('express-rate-limit');
-app.use('/api/auth/', rateLimit({ windowMs: 15*60*1000, max: 10 }));
+app.use('/api/auth/send-code', codeLimiter);   // 5 次/15分/IP
+app.use('/api/auth/', authLimiter);            // 10 次/15分
 ```
 
-#### 阶段 B：部署上线（Day 3）
+#### 阶段 B：部署上线 ✅ 已完成（2026-09-05）
 
-**步骤 4**：GitHub 推送 + Zeabur 绑定 → 添加 PostgreSQL 服务 → 填 JWT_SECRET
-**步骤 5**：域名 + HTTPS（Zeabur 自动提供 `*.zeabur.app`）
-**步骤 6**：自检 → `/api/docs` 可见 + `/health` 返回 ok + dev 账号登录成功
+**步骤 4**：GitHub 推送 + Zeabur 绑定 → 添加 PostgreSQL 服务 → 填 JWT_SECRET ✅
+**步骤 5**：域名 + HTTPS（`https://euriskotax.zeabur.app` 已生效）✅
+**步骤 6**：自检 → `/api/docs` 可见 + `/health` 返回 ok + 注册/登录/受保护接口全链路通过 ✅
 
-#### 阶段 C：首批测试用户运营（Day 4起）
+#### 阶段 C：首批测试用户运营（进行中，阶段 8）
 
-**步骤 7**：4 渠道冷启动
+**步骤 7**：4 渠道冷启动（素材已备，见 [marketing/cold-start-materials.md](../marketing/cold-start-materials.md)）
 - 即刻/V2EX/少数派发帖 → 30-80 人
 - 知乎税务话题 → 50-100 人
 - 小红书实测笔记 → 100-300 人
 - 微信社群裂变 → 50-200 人
 
-**邀请码机制**：`/api/auth/register` 校验 `inviteCode === 'EURISKO2026BETA'`
-**反馈闭环**：新增 `/api/feedback` 接口 + 复用 [ops-notify.ps1](../../tools/ops/ops-notify.ps1) 邮件转发
+**邀请码机制（2026-09-06 升级为「一机一码」）**：~~固定码 `EURISKO2026BETA`~~ → `EURISKO-XXXX-XXXX` 随机码，表内校验、一次性使用、事务原子消耗；服务启动表空自动生成 20 个兜底
+**反馈闭环** ✅：`POST/GET /api/feedback` + 管理员经统计概览跟进；GUI 一键邀请码管理
 
 ### 五、Definition of Done
 
-**🔴 必做**：~~Prisma 迁 PostgreSQL~~ ✅ / ~~zeabur.json 改 `${VAR}`~~ ✅ / JWT_SECRET 强密钥 ⏳部署时 / CORS 限定域名 ⏳部署时 / 删除 reset-dev-user.js 自动调用 ⏳
+**🔴 必做**：~~Prisma 迁 PostgreSQL~~ ✅ / ~~部署入口（Dockerfile 替代 zeabur.json）~~ ✅ / JWT_SECRET 强密钥 ✅（Zeabur 环境变量已配）/ CORS 限定域名 ✅ / 生产不触发 reset-dev-user.js ✅（生产走 Dockerfile `CMD`，reset 仅本地启动脚本使用）
 
-**🟡 建议**：~~express-rate-limit~~ ✅ / ~~用户反馈接口~~ ✅ / ~~邀请码~~ ✅ / 错误日志聚合 ⏳
+**🟡 建议**：~~express-rate-limit~~ ✅ / ~~用户反馈接口~~ ✅ / ~~邀请码~~ ✅（一机一码）/ ~~用户协议 + 隐私政策~~ ✅（2026-09-06 注册弹窗已实现）/ 错误日志聚合 ⏳ 后续
 
-**🟢 后续（>100用户）**：Tailwind 本地构建 / 用户协议+隐私政策 / Cloudflare CDN / 数据库备份
+**🟢 后续（>100用户）**：Tailwind 本地构建 / Cloudflare CDN / 数据库备份
 
-### 六、2 周时间表（2026-09-05 更新）
+### 六、2 周时间表（执行进度 2026-09-06）
 
 ```
-Day 1-2：代码层修复（Prisma + 环境变量 + rate-limit + 自检）✅ 已完成
-Day 3：  Zeabur 服务器购买 ✅ 已完成（Tencent Tokyo $3/月）→ 剩余：部署 PostgreSQL + 应用 + 环境变量 + 域名
-Day 4：  邀请码机制 ✅ 已实现 + 反馈接口 ✅ 已实现 → 剩余：数据埋点
-Day 5：  内测 5-10 个种子用户 + 修紧急 bug
-Day 6-7：准备冷启动素材
-Day 8-9：即刻/V2EX 发帖 + 邀请码放开
+Day 1-2：代码层修复（Prisma + 部署入口 + rate-limit + 自检）✅ 已完成
+Day 3：  Zeabur 服务器购买 + 部署 PostgreSQL + 应用 + 环境变量 + 域名 ✅ 已完成
+Day 4：  邀请码机制 ✅ + 反馈接口 ✅ → 剩余：数据埋点（阶段8 收尾项）
+Day 5：  注册全流程完善（邮箱验证码 + 一机一码）✅ 已完成（2026-09-06）
+Day 5-6：PWA 离线化改造（阶段9）✅ 代码完成，本地验证通过
+Day 6-7：准备冷启动素材 ✅ 已备（marketing/cold-start-materials.md）
+Day 8-9：内测 5-10 种子用户 → 即刻/V2EX 发帖 + 放开邀请码发放  （阶段8 进行中）
 Day 10-11：观察数据 + 收集反馈
 Day 12-14：迭代修复 + 准备第二轮推广
 ```
@@ -602,12 +625,12 @@ Day 12-14：迭代修复 + 准备第二轮推广
 
 | 决策 | 结论 | 状态 |
 |------|------|------|
-| 数据库 | PostgreSQL | ✅ 已迁移（迁移文件已生成） |
-| 部署平台 | Zeabur（Tencent Tokyo，$3/月，ZeaburOS） | ✅ 服务器已购买（2026-09-05） |
+| 数据库 | PostgreSQL（本地开发 SQLite） | ✅ 已上线（迁移文件已入库） |
+| 部署平台 | Zeabur（Tencent Tokyo，$3/月，ZeaburOS，Dockerfile） | ✅ 已上线（2026-09-05） |
 | 商业模式 | 前端离线计算免费 + 云端专业版 + B端API | ✅ 已定调（见商业模式章节） |
-| 上线节奏 | 内测→公测 | 先找 5-10 种子用户 |
-| 用户增长 | 邀请码裂变（EURISKO2026BETA） | ✅ 机制已实现 |
+| 上线节奏 | 内测→公测 | 进行中（阶段8） |
+| 用户增长 | 邀请码裂变（一机一码） | ✅ 机制已实现（2026-09-06） |
 
 ---
 
-*v1.4.0 上线计划制定时间：2026-09-05*
+*v1.4.0 上线计划制定时间：2026-09-05 · 执行完成：2026-09-06*

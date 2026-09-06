@@ -42,7 +42,7 @@ function buildProfileDOM() {
     document.body.innerHTML = `
         <div id="app-container">
             <div id="user-menu" class="hidden">
-                <button id="user-btn"></button>
+                <button id="user-btn"><span id="user-name" class="text-sm"></span></button>
                 <div id="user-dropdown" class="hidden"></div>
             </div>
             <div id="auth-section" class="hidden"></div>
@@ -62,7 +62,11 @@ function buildProfileDOM() {
             <i id="register-password-toggle" class="fa fa-eye"></i>
             <input id="register-confirm-password" type="password" />
             <i id="register-confirm-password-toggle" class="fa fa-eye"></i>
+            <input id="register-code" type="text" />
+            <button id="send-code-btn" disabled></button>
+            <input id="register-invite-code" type="text" />
             <button id="login-submit"></button>
+            <a href="#" id="forgot-password"></a>
             <button id="quick-login-btn"></button>
             <button id="register-submit"></button>
         </div>
