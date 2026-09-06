@@ -4,46 +4,107 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const registerUser = async (username, email, password, phone = null) => {
-    const existingUser = await prisma.user.findFirst({
-        where: {
-            OR: [
-                { username: username },
-                { email: email }
-            ]
+// 邮箱归一化：去首尾空格 + 转小写，避免大小写差异绕过查重、登录时精确匹配失败
+const normalizeEmail = (rawEmail) => String(rawEmail || '').trim().toLowerCase();
+
+// 查重（区分用户名/邮箱，注册前拦截，避免浪费一次性验证码）
+const checkDuplicate = async (username, rawEmail) => {
+    const email = normalizeEmail(rawEmail);
+
+    if (username) {
+        const existingName = await prisma.user.findUnique({ where: { username } });
+        if (existingName) {
+            const error = new Error('Username already taken');
+            error.statusCode = 400;
+            throw error;
         }
-    });
-    
-    if (existingUser) {
-        const error = new Error('Username or email already exists');
-        error.statusCode = 400;
-        throw error;
     }
-    
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
-    
-    const user = await prisma.user.create({
-        data: {
-            username,
-            email,
-            password_hash: passwordHash,
-            phone
-        },
-        select: {
-            id: true,
-            username: true,
-            email: true,
-            phone: true,
-            created_at: true
+
+    if (email) {
+        const existingEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingEmail) {
+            const error = new Error('Email already registered. Please login directly');
+            error.statusCode = 409;
+            throw error;
         }
-    });
-    
-    return user;
+    }
+};
+
+const registerUser = async (username, email, password, phone = null, inviteCode = null) => {
+    const normalizedEmail = normalizeEmail(email);
+    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
+
+    try {
+        // 事务保证原子性：用户创建与邀请码消耗要么同时成功，要么整体回滚
+        const user = await prisma.$transaction(async (tx) => {
+            // 并发兜底：事务内再查一次重（两个请求同时到达时前置检查会双双通过）
+            const existingUser = await tx.user.findFirst({
+                where: {
+                    OR: [
+                        { username: username },
+                        { email: normalizedEmail }
+                    ]
+                }
+            });
+            if (existingUser) {
+                const error = new Error('Username or email already exists');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            // 一机一码：码不存在或已被使用均拒绝注册
+            const code = String(inviteCode || '').trim();
+            const invite = await tx.inviteCode.findUnique({ where: { code } });
+            if (!invite) {
+                const error = new Error('Invite code not found');
+                error.statusCode = 403;
+                throw error;
+            }
+            if (invite.used_by !== null) {
+                const error = new Error('Invite code already used');
+                error.statusCode = 403;
+                throw error;
+            }
+
+            const created = await tx.user.create({
+                data: {
+                    username,
+                    email: normalizedEmail,
+                    password_hash: passwordHash,
+                    phone
+                },
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    phone: true,
+                    created_at: true
+                }
+            });
+
+            await tx.inviteCode.update({
+                where: { id: invite.id },
+                data: { used_by: created.id, used_at: new Date() }
+            });
+
+            return created;
+        });
+
+        return user;
+    } catch (err) {
+        // Prisma 唯一约束冲突兜底（并发写入绕过前置检查时），转友好提示而非英文裸报错
+        if (err && err.code === 'P2002') {
+            const error = new Error('Username or email already exists');
+            error.statusCode = 400;
+            throw error;
+        }
+        throw err;
+    }
 };
 
 const loginUser = async (email, password) => {
     const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email: normalizeEmail(email) }
     });
     
     if (!user) {
@@ -151,11 +212,49 @@ const deleteUser = async (userId) => {
     return { message: 'User deleted successfully' };
 };
 
+// 邀请码字符集：排除易混淆字符 0/O、1/I/L、U/V
+const INVITE_CHARSET = 'ABCDEFGHJKMNPQRSTWXYZ23456789';
+
+// 生成 EURISKO-XXXX-XXXX 格式邀请码（crypto 级随机）
+const generateInviteCode = () => {
+    const bytes = require('crypto').randomBytes(8);
+    const pick = (offset) => Array.from(
+        { length: 4 },
+        (_, i) => INVITE_CHARSET[bytes[offset * 4 + i] % INVITE_CHARSET.length]
+    ).join('');
+    return `EURISKO-${pick(0)}-${pick(1)}`;
+};
+
+// 首批邀请码自动兜底：仅当表为空时生成 count 个（幂等，重启不会重复生成）
+// 返回生成的码数组；表非空返回 null
+const ensureInviteCodes = async (count = 20) => {
+    const existing = await prisma.inviteCode.count();
+    if (existing > 0) return null;
+
+    const created = [];
+    for (let i = 0; i < count; i++) {
+        // 碰撞重试：unique 冲突时重新生成
+        for (let retry = 0; retry < 5; retry++) {
+            try {
+                const code = generateInviteCode();
+                await prisma.inviteCode.create({ data: { code } });
+                created.push(code);
+                break;
+            } catch (err) {
+                if (err.code !== 'P2002') throw err;
+            }
+        }
+    }
+    return created;
+};
+
 module.exports = {
+    checkDuplicate,
     registerUser,
     loginUser,
     getUserById,
     verifyPassword,
     updateUser,
-    deleteUser
+    deleteUser,
+    ensureInviteCodes
 };
