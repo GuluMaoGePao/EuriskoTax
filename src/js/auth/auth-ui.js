@@ -976,35 +976,8 @@ function setupAuthEventListeners() {
             document.getElementById('send-code-btn').disabled = !e.target.value.trim();
         }
     });
-    // 用户协议和隐私政策弹窗
-    document.getElementById('user-agreement-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal(document.getElementById('user-agreement-modal'));
-    });
-    document.getElementById('close-user-agreement-modal').addEventListener('click', () => {
-        closeModal(document.getElementById('user-agreement-modal'));
-    });
-    document.getElementById('user-agreement-ok').addEventListener('click', () => {
-        closeModal(document.getElementById('user-agreement-modal'));
-    });
-    // 点击遮罩关闭用户协议
-    document.getElementById('user-agreement-modal').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) closeModal(e.target);
-    });
-    document.getElementById('privacy-policy-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal(document.getElementById('privacy-policy-modal'));
-    });
-    document.getElementById('close-privacy-policy-modal').addEventListener('click', () => {
-        closeModal(document.getElementById('privacy-policy-modal'));
-    });
-    document.getElementById('privacy-policy-ok').addEventListener('click', () => {
-        closeModal(document.getElementById('privacy-policy-modal'));
-    });
-    // 点击遮罩关闭隐私政策
-    document.getElementById('privacy-policy-modal').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) closeModal(e.target);
-    });
+    // 用户协议和隐私政策弹窗：显示/隐藏逻辑已由 index.html 中的 inline onclick 直接处理，
+    // 此处不再重复绑定 addEventListener，避免与 inline onclick 冲突或元素缺失时抛错中断后续绑定
     document.getElementById('profile-link').addEventListener('click', (e) => {
         e.preventDefault();
         const eventTime = Date.now();
