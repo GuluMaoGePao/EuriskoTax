@@ -1084,25 +1084,34 @@ function Show-InputBox {
 # 辅助函数: Get-AdminToken（获取管理员令牌：优先读 server\.env，无则弹窗输入并回存）
 # ==============================================================================
 function Get-AdminToken {
+    param([string]$Target = "local")
+    # 本地与生产使用各自独立的令牌：本地读 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD
+    # （生产令牌在 Zeabur 控制台单独配置，可能与本地不同，不能混用）
     $envFile = Join-Path $ServerDir ".env"
+    $key = if ($Target -eq "prod") { "ADMIN_TOKEN_PROD" } else { "ADMIN_TOKEN" }
+    $hint = if ($Target -eq "prod") {
+        "请输入生产环境 ADMIN_TOKEN（在 Zeabur 控制台 → 项目 → Variables 中查看；输入一次后自动保存到 server\.env，下次免输入）："
+    } else {
+        "请输入 ADMIN_TOKEN（本地环境；输入一次后自动保存到 server\.env，下次免输入）："
+    }
     if (Test-Path $envFile) {
-        $line = Get-Content $envFile | Where-Object { $_ -match '^ADMIN_TOKEN=' } | Select-Object -First 1
+        $line = Get-Content $envFile | Where-Object { $_ -match "^$key=" } | Select-Object -First 1
         if ($line) {
-            $tok = ($line -replace '^ADMIN_TOKEN=', '').Trim()
+            $tok = ($line -replace "^$key=", '').Trim()
             if ($tok) { return $tok }
         }
     }
-    $tok = Show-InputBox -Title "管理员令牌" -Prompt "请输入 ADMIN_TOKEN（生产环境在 Zeabur 环境变量中查看；输入一次后自动保存到 server\.env，下次免输入）：" -DefaultValue ""
+    $tok = Show-InputBox -Title "管理员令牌" -Prompt $hint -DefaultValue ""
     if (-not $tok) { return $null }
     if (Test-Path $envFile) {
         $content = Get-Content $envFile
-        if ($content | Where-Object { $_ -match '^ADMIN_TOKEN=' }) {
-            $content = $content | ForEach-Object { if ($_ -match '^ADMIN_TOKEN=') { "ADMIN_TOKEN=$tok" } else { $_ } }
+        if ($content | Where-Object { $_ -match "^$key=" }) {
+            $content = $content | ForEach-Object { if ($_ -match "^$key=") { "$key=$tok" } else { $_ } }
             Set-Content -Path $envFile -Value $content -Encoding UTF8
         } else {
-            Add-Content -Path $envFile -Value "ADMIN_TOKEN=$tok" -Encoding UTF8
+            Add-Content -Path $envFile -Value "$key=$tok" -Encoding UTF8
         }
-        Write-Log "ADMIN_TOKEN 已保存到 server\.env" "OK"
+        Write-Log "$key 已保存到 server\.env" "OK"
     }
     return $tok
 }
@@ -1113,7 +1122,7 @@ function Get-AdminToken {
 function Invoke-InviteApi {
     param([string]$Method, [string]$Target, [object]$Body)
     $base = if ($Target -eq "prod") { "https://euriskotax.zeabur.app" } else { "http://localhost:3000" }
-    $token = Get-AdminToken
+    $token = Get-AdminToken -Target $Target
     if (-not $token) { return @{ Ok = $false; Error = "未提供管理员令牌（ADMIN_TOKEN），操作已取消" } }
     try {
         $params = @{
@@ -1129,6 +1138,12 @@ function Invoke-InviteApi {
         return @{ Ok = $true; Data = $resp.data }
     } catch {
         $msg = $_.Exception.Message
+        $is401 = $false
+        try {
+            $is401 = ($_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::Unauthorized)
+        } catch {
+            # 无 Response 的异常（网络不通/超时等），视为非 401
+        }
         try {
             # HTTP 错误响应：读取响应体里的 error.message 展示更友好
             $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
@@ -1136,6 +1151,19 @@ function Invoke-InviteApi {
             if ($errBody.error.message) { $msg = $errBody.error.message }
         } catch {
             # 非 HTTP 错误（如网络不通、超时）或响应体不可读，保留原始异常消息即可
+        }
+        if ($is401) {
+            if ($Target -eq "prod") {
+                # 生产令牌无效：清除本地缓存的生产令牌，下次点击重新弹窗输入，避免一直 401
+                $envFile = Join-Path $ServerDir ".env"
+                if (Test-Path $envFile) {
+                    $kept = Get-Content $envFile | Where-Object { $_ -notmatch '^ADMIN_TOKEN_PROD=' }
+                    Set-Content -Path $envFile -Value $kept -Encoding UTF8
+                }
+                $msg = "生产环境管理员令牌无效（401）。已清除本地保存的生产令牌，请再次点击按钮，在弹窗中输入 Zeabur 控制台配置的 ADMIN_TOKEN"
+            } else {
+                $msg = "本地管理员令牌无效（401）。请核对 server\.env 中的 ADMIN_TOKEN 是否与本地服务启动时加载的一致，重启服务后重试"
+            }
         }
         return @{ Ok = $false; Error = $msg }
     }
