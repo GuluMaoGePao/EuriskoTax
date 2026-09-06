@@ -181,8 +181,23 @@ function getNetIncomeValue(item) {
     }
 }
 
+// 从 localStorage 刷新内存镜像：
+// 个人中心（auth-ui.js 为独立 ES module，无法直接读写本文件的全局数组）等入口直接写 localStorage，
+// 主页渲染前先调用此函数同步镜像，避免双份缓存导致展示不一致
+function syncCalculationHistoryFromStorage() {
+    try {
+        calculationHistory = JSON.parse(localStorage.getItem('taxCalculationHistory') || '[]');
+    } catch (e) {
+        calculationHistory = [];
+    }
+    return calculationHistory;
+}
+
 // 加载历史记录
 function loadHistoryRecords() {
+    // 渲染前统一从 localStorage 刷新，保证与个人中心删除/主页新增等操作后的一致
+    syncCalculationHistoryFromStorage();
+
     const historyList = document.getElementById('history-list');
     if (!historyList) return;
     

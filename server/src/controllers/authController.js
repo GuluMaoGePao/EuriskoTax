@@ -134,13 +134,58 @@ const updateProfile = async (req, res, next) => {
     try {
         const { username, email, phone, password, currentPassword } = req.body;
         const userId = req.user.id;
-        
+
+        // 仅校验实际提交的字段（部分更新语义：未提交的字段不校验不修改）
+        if (username !== undefined && !String(username).trim()) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: '用户名不能为空',
+                    statusCode: 400
+                }
+            });
+        }
+        if (email !== undefined && String(email).trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(String(email).trim())) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        message: '邮箱格式不正确',
+                        statusCode: 400
+                    }
+                });
+            }
+        }
+        if (phone !== undefined && phone !== null && String(phone).trim()) {
+            // 大陆 11 位手机号；为空字符串/null 表示清除手机号
+            const phoneRegex = /^1[3-9]\d{9}$/;
+            if (!phoneRegex.test(String(phone).trim())) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        message: '手机号格式不正确（需为 11 位大陆手机号）',
+                        statusCode: 400
+                    }
+                });
+            }
+        }
+
         if (password) {
             if (password.length < 6) {
                 return res.status(400).json({
                     success: false,
                     error: {
                         message: 'Password must be at least 6 characters',
+                        statusCode: 400
+                    }
+                });
+            }
+            if (!currentPassword) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        message: '修改密码需验证当前密码',
                         statusCode: 400
                     }
                 });
@@ -156,14 +201,14 @@ const updateProfile = async (req, res, next) => {
                 });
             }
         }
-        
+
         const updatedUser = await authService.updateUser(userId, {
             username,
             email,
             phone,
             password
         });
-        
+
         res.status(200).json({
             success: true,
             data: updatedUser
@@ -177,7 +222,17 @@ const verifyPassword = async (req, res, next) => {
     try {
         const { currentPassword } = req.body;
         const userId = req.user.id;
-        
+
+        if (!currentPassword) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: '请输入当前密码',
+                    statusCode: 400
+                }
+            });
+        }
+
         const isValid = await authService.verifyPassword(userId, currentPassword);
         
         res.status(200).json({

@@ -7,17 +7,11 @@ const calculateComprehensive = async (req, res, next) => {
     try {
         const inputData = req.body;
         const result = taxCalculator.calculateComprehensiveTax(inputData);
-        
-        if (req.user) {
-            await prisma.calculation.create({
-                data: {
-                    user_id: req.user.id,
-                    type: 'comprehensive',
-                    input_data: JSON.stringify(inputData),
-                    result_data: JSON.stringify(result)
-                }
-            });
-        }
+
+        // 注：产品主链路为「前端本地计算 + localStorage 历史」，
+        // 计算路由不挂 authenticateToken，req.user 恒为 undefined，
+        // 此前的 if (req.user) 落库块是永不触发的死代码，已移除。
+        // 将来做「账号历史同步」时，应给本路由挂可选认证中间件后再恢复 prisma 保存。
         
         res.status(200).json({
             success: true,
@@ -32,17 +26,8 @@ const calculateReverse = async (req, res, next) => {
     try {
         const inputData = req.body;
         const result = taxCalculator.calculateReverseTax(inputData);
-        
-        if (req.user) {
-            await prisma.calculation.create({
-                data: {
-                    user_id: req.user.id,
-                    type: 'reverse',
-                    input_data: JSON.stringify(inputData),
-                    result_data: JSON.stringify(result)
-                }
-            });
-        }
+
+        // 与 comprehensive 一致：不落库（见 calculateComprehensive 注释）
         
         res.status(200).json({
             success: true,
@@ -57,17 +42,8 @@ const calculateBusiness = async (req, res, next) => {
     try {
         const inputData = req.body;
         const result = taxCalculator.calculateBusinessTax(inputData);
-        
-        if (req.user) {
-            await prisma.calculation.create({
-                data: {
-                    user_id: req.user.id,
-                    type: 'business',
-                    input_data: JSON.stringify(inputData),
-                    result_data: JSON.stringify(result)
-                }
-            });
-        }
+
+        // 与 comprehensive 一致：不落库（见 calculateComprehensive 注释）
         
         res.status(200).json({
             success: true,
@@ -82,17 +58,8 @@ const calculateClassification = async (req, res, next) => {
     try {
         const inputData = req.body;
         const result = taxCalculator.calculateClassificationTax(inputData);
-        
-        if (req.user) {
-            await prisma.calculation.create({
-                data: {
-                    user_id: req.user.id,
-                    type: 'classification',
-                    input_data: JSON.stringify(inputData),
-                    result_data: JSON.stringify(result)
-                }
-            });
-        }
+
+        // 与 comprehensive 一致：不落库（见 calculateComprehensive 注释）
         
         res.status(200).json({
             success: true,

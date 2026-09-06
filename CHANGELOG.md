@@ -7,6 +7,24 @@
 
 ---
 
+## [1.5.1] - 2026-09-06
+
+### 修复
+- **历史记录双轨不一致**：个人中心统计/历史列表原读空的服务端历史（统计恒 0、列表恒空），现与主页统一读本地 `taxCalculationHistory`（唯一数据源）；删除改为本地删除并尽力同步服务器残留；JSON/CSV 导出同源
+- 登出/注销清理补 `taxCalculationHistory`（本地历史属当前会话，防换号共用浏览器串数据）；主页各历史视图渲染前统一从 localStorage 同步内存镜像，消除双份缓存展示不一致
+- 登录限流仅针对凭证动作：`/profile` 等 JWT 接口豁免（防活跃用户被 10 次/15 分钟配额误锁 429）；限流响应结构与其余错误统一为 `success:false` + `error{message,statusCode}`
+- 更新资料（username/email/phone）服务端补格式校验与查重（排除自身），冲突返回明确 400/409 中文提示而非 Prisma P2002→500；邮箱更新与注册一致做归一化存储
+- 生产环境 500 不再裸透内部错误详情（日志仍保留堆栈），统一提示"服务器内部错误，请稍后重试"
+- Swagger 修正 `verify-password` 请求字段名（`password` → `currentPassword`）
+- 清理 `calculationController` 中永不触发的 `if(req.user)` 落库死代码（计算路由无认证中间件，历史数据源在前端本地）
+
+### 变更
+- **发布缓存策略根治**：自有 JS/CSS 去掉 1 年 `immutable` 强缓存，改为 ETag 协商缓存；`index.html`/`app.js` 全部脚本移除 `?v=` 指纹，修复无指纹的 ES module import 链路（如 `api-client.js`）被强缓存锁死、老用户长期拿不到新代码的问题（离线兜底由 SW 负责）
+- Service Worker 升级 `euriskotax-v6`：同源 JS/CSS 离线回退改为 `ignoreSearch` 兜底（兼容旧带指纹请求）；`auth-ui.js`/`api-client.js` 纳入应用壳预缓存（保证离线可进入登录/个人中心）
+- "关于"弹窗与 `package.json` 版本号同步为 1.5.1
+
+---
+
 ## [1.5.0] - 2026-09-06
 
 ### 新增

@@ -9,7 +9,7 @@
  *
  * 升级方式：修改 CACHE_VERSION 即可触发浏览器重新安装并清理旧缓存
  */
-const CACHE_VERSION = 'euriskotax-v5';
+const CACHE_VERSION = 'euriskotax-v6';
 const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 const CDN_CACHE = CACHE_VERSION + '-cdn';
@@ -33,7 +33,10 @@ const APP_SHELL = [
   '/src/js/ui/tax-assistant-ui.js',
   '/src/js/export/export-utils.js',
   '/src/js/utils/mock-client.js',
-  '/src/js/app.js'
+  '/src/js/app.js',
+  // 登录/个人中心链路（app.js 在启动时动态 import 的 ES module），预缓存保证离线可登录
+  '/src/js/auth/auth-ui.js',
+  '/src/js/api/api-client.js'
 ];
 
 // 核心 CDN 资源预缓存（离线兜底）：
@@ -141,7 +144,11 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
+        // 离线兜底：ignoreSearch 忽略查询串，使带 ?v= 指纹的旧请求也能命中预缓存的无版本文件
+        .catch(() =>
+          caches.match(request, { ignoreSearch: true })
+            .then((cached) => cached || Response.error())
+        )
     );
     return;
   }

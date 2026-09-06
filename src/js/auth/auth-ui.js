@@ -26,10 +26,14 @@ function updateAuthUI() {
     }
 }
 
-// 退出/注销时清理本地残留的用户数据，避免换号共用浏览器导致数据串号
+// 退出/注销时清理本地残留的用户数据，避免换号共用浏览器导致数据串号。
+// 计算历史（taxCalculationHistory）为浏览器本地唯一数据源、随账号会话在本机产生，
+// 登出即清空，防止换账号登录共用浏览器时看到他人计算记录（游客阶段不受影响）
 function clearLocalUserData() {
-    localStorage.removeItem('calculation_history');
+    localStorage.removeItem('calculation_history');      // 旧遗留 key
+    localStorage.removeItem('taxCalculationHistory');    // 主页/个人中心共用 key
     localStorage.removeItem('tax_profile');
+    refreshHomeHistoryViews();
 }
 
 function setLoading(btn, loading) {
@@ -435,7 +439,6 @@ async function handleResetPassword() {
 async function handleLogout() {
     apiClient.logoutUser();
     clearLocalUserData();
-    historyCache = { data: null, timestamp: 0 };
     clearPageHistory();
     // updateAuthUI 会自动回到登录页
     updateAuthUI();
@@ -684,7 +687,8 @@ function renderProfileCards() {
 }
 
 function updateProfileStats() {
-    const history = JSON.parse(localStorage.getItem('calculation_history') || '[]');
+    // 与主页统一读 taxCalculationHistory（本地唯一数据源），修复此前读空服务端历史导致统计恒 0
+    const history = getLocalHistory();
     const taxProfile = localStorage.getItem('tax_profile');
 
     document.getElementById('profile-stats-calculations').textContent = history.length;
@@ -876,23 +880,43 @@ function renderTaxCalendar() {
     `).join('');
 }
 
-let historyCache = {
-    data: null,
-    timestamp: 0
-};
+// ====== 计算历史：本地唯一数据源（与主页共用 taxCalculationHistory） ======
+// 计算主流程为「前端本地计算 + localStorage 保存」，服务器没有落库链路，
+// 原个人中心读 apiClient.getCalculationHistory() 恒为空数组（与主页双轨不一致）。
+// 此处统一：统计 / 历史列表 / 导出 / 删除全部读本地，删除时尽力同步服务器残留即可。
+const LOCAL_HISTORY_KEY = 'taxCalculationHistory';
 
-async function getHistoryData(forceRefresh = false) {
-    const cacheExpire = 5 * 60 * 1000;
-    if (!forceRefresh && historyCache.data && Date.now() - historyCache.timestamp < cacheExpire) {
-        return historyCache.data;
+function getLocalHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || '[]');
+    } catch (e) {
+        return [];
     }
-    
-    const history = await apiClient.getCalculationHistory();
-    historyCache = {
-        data: history,
-        timestamp: Date.now()
-    };
-    return history;
+}
+
+function persistLocalHistory(history) {
+    try {
+        localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+        console.error('[EuriskoTax] 本地历史写入失败:', e);
+    }
+}
+
+function removeLocalHistoryRecord(id) {
+    const history = getLocalHistory();
+    const next = history.filter((item) => item.id !== id);
+    if (next.length === history.length) return false;
+    persistLocalHistory(next);
+    return true;
+}
+
+// 通知主页各视图刷新（主页渲染函数内部会先从 localStorage 同步内存镜像）
+function refreshHomeHistoryViews() {
+    if (typeof window === 'undefined') return;
+    try {
+        if (typeof window.loadHistoryRecords === 'function') window.loadHistoryRecords();
+        if (typeof window.renderRecentCalculations === 'function') window.renderRecentCalculations();
+    } catch (e) { /* 主页容器不可用时忽略 */ }
 }
 
 async function exportData(format) {
@@ -900,8 +924,8 @@ async function exportData(format) {
     
     try {
         setLoading(btn, true);
-        const history = await getHistoryData(true);
-        
+        const history = getLocalHistory();
+
         if (history.length === 0) {
             showAlert('暂无计算历史可导出');
             return;
@@ -913,34 +937,38 @@ async function exportData(format) {
         if (format === 'json') {
             content = JSON.stringify({
                 exported_at: new Date().toISOString(),
-                user: apiClient.getCurrentUser(),
+                // 导出为浏览器本地数据，不依赖登录态（未登录时 user 为 null）
+                user: apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null,
                 records: history
             }, null, 2);
             mimeType = 'application/json';
             extension = 'json';
         } else if (format === 'csv') {
-            const rows = [['ID', '类型', '创建时间', '税额合计', '税前收入', '税后收入']];
+            const rows = [['ID', '类型', '保存时间', '税额合计', '税前收入', '税后收入']];
             const typeNames = {
-                comprehensive: '综合所得',
-                business: '经营所得',
-                classification: '分类所得',
+                forward: '综合所得计税',
+                comprehensive: '综合所得计税',
+                business: '经营所得计税',
+                classification: '分类所得计税',
                 reverse: '反向倒算'
             };
-            
+
             history.forEach(item => {
-                const tax = item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0;
-                const income = item.result_data?.taxDetails?.totalIncome || item.result_data?.totalIncome || 0;
-                const netIncome = item.result_data?.taxDetails?.netIncome || item.result_data?.netIncome || 0;
+                // 兼容本地记录（results）与旧服务器结构（result_data）
+                const result = item.results || item.result_data || {};
+                const tax = result?.taxDetails?.totalTax ?? result?.totalTax ?? 0;
+                const income = result?.taxDetails?.totalIncome ?? result?.incomeDetails?.total ?? result?.totalIncome ?? 0;
+                const netIncome = result?.taxDetails?.netIncome ?? result?.netIncome ?? Math.max(0, income - tax);
                 rows.push([
                     item.id,
                     `"${typeNames[item.type] || item.type}"`,
-                    `"${new Date(item.created_at).toLocaleString('zh-CN')}"`,
+                    `"${new Date(item.date || item.created_at).toLocaleString('zh-CN')}"`,
                     tax,
                     income,
                     netIncome
                 ].join(','));
             });
-            
+
             content = '\uFEFF' + rows.join('\n');
             mimeType = 'text/csv;charset=utf-8';
             extension = 'csv';
@@ -1037,7 +1065,6 @@ async function deleteAccount() {
     try {
         await apiClient.deleteProfile();
         clearLocalUserData();
-        historyCache = { data: null, timestamp: 0 };
         clearPageHistory();
         updateAuthUI();
         showAlert('账号已注销，感谢您的使用', 'success');
@@ -1055,52 +1082,48 @@ function resetProfileForm() {
 }
 
 function renderHistoryItems(history, listElement) {
+    if (!listElement) return;
     const fragment = document.createDocumentFragment();
-    
+
     history.forEach(item => {
+        // 兼容本地记录（results/date/title）与旧服务器结构（result_data/created_at）
+        const result = item.results || item.result_data || {};
+        const tax = result?.taxDetails?.totalTax ?? result?.totalTax ?? 0;
         const card = document.createElement('div');
         card.className = 'card profile-card-hover';
         card.innerHTML = `
             <div class="flex justify-between items-start">
                 <div>
-                    <div class="font-medium text-gray-800">${getCalculationTypeName(item.type)}</div>
-                    <div class="text-sm text-gray-500">${formatDate(item.created_at)}</div>
+                    <div class="font-medium text-gray-800">${item.title || getCalculationTypeName(item.type)}</div>
+                    <div class="text-sm text-gray-500">${formatDate(item.date || item.created_at)}</div>
                 </div>
                 <div class="text-right">
-                    <div class="font-bold text-primary">¥${formatAmount(item.result_data?.taxDetails?.totalTax || item.result_data?.totalTax || 0)}</div>
+                    <div class="font-bold text-primary">¥${formatAmount(tax)}</div>
                 </div>
             </div>
-            <button onclick="deleteHistoryItem(${item.id})" class="mt-3 text-sm text-danger hover:underline">删除</button>
+            <button onclick="deleteHistoryItem('${item.id}')" class="mt-3 text-sm text-danger hover:underline">删除</button>
         `;
         fragment.appendChild(card);
     });
-    
+
     listElement.innerHTML = '';
     listElement.appendChild(fragment);
 }
 
-// 通用历史记录加载函数（合并原 loadHistory 和 loadProfileHistory）
-async function loadHistoryToList(listId, emptyId) {
+// 个人中心历史列表：统一读本地 taxCalculationHistory（同步读取，无需服务器往返）
+function loadHistoryToList(listId, emptyId) {
     const historyList = document.getElementById(listId);
     const historyEmpty = document.getElementById(emptyId);
+    const history = getLocalHistory();
 
-    try {
-        const history = await getHistoryData();
-
-        if (history.length === 0) {
-            if (historyEmpty) historyEmpty.classList.remove('hidden');
-            return;
-        }
-
-        if (historyEmpty) historyEmpty.classList.add('hidden');
-        renderHistoryItems(history, historyList);
-    } catch (error) {
-        showAlert('加载失败: ' + error.message);
+    if (history.length === 0) {
+        if (historyList) historyList.innerHTML = '';
+        if (historyEmpty) historyEmpty.classList.remove('hidden');
+        return;
     }
-}
 
-async function loadHistory() {
-    return loadHistoryToList('history-list', 'history-empty');
+    if (historyEmpty) historyEmpty.classList.add('hidden');
+    renderHistoryItems(history, historyList);
 }
 
 async function loadProfileHistory() {
@@ -1109,6 +1132,7 @@ async function loadProfileHistory() {
 
 function getCalculationTypeName(type) {
     const types = {
+        forward: '综合所得计税',
         comprehensive: '综合所得计税',
         business: '经营所得计税',
         classification: '分类所得计税',
@@ -1131,18 +1155,20 @@ function formatAmount(amount) {
     return num.toFixed(2);
 }
 
-async function deleteHistoryItem(id) {
+function deleteHistoryItem(id) {
     if (!confirm('确定要删除这条记录吗？')) return;
-    
-    try {
-        await apiClient.deleteCalculation(id);
-        historyCache = { data: null, timestamp: 0 };
-        loadHistory();
-        loadProfileHistory();
-        showAlert('删除成功', 'success');
-    } catch (error) {
-        showAlert('删除失败: ' + error.message);
+
+    // 本地统一源删除；本地找不到时尝试删除服务端残留（若曾同步过），失败静默
+    const removed = removeLocalHistoryRecord(id);
+    if (!removed && apiClient && typeof apiClient.deleteCalculation === 'function') {
+        apiClient.deleteCalculation(id).catch(() => {});
     }
+
+    // 同步刷新主页与个人中心各视图（主页渲染前会先从 localStorage 刷新镜像）
+    refreshHomeHistoryViews();
+    loadProfileHistory();
+    updateProfileStats();
+    showAlert('删除成功', 'success');
 }
 
 function togglePasswordVisibility(inputId, toggleId) {

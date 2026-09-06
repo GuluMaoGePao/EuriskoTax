@@ -191,11 +191,12 @@ router.delete('/profile', authenticateToken, authController.deleteProfile);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [password]
+ *             required: [currentPassword]
  *             properties:
- *               password: { type: string, example: password }
+ *               currentPassword: { type: string, example: password, description: 当前登录密码 }
  *     responses:
- *       '200': { description: 密码正确 }
+ *       '200': { description: 密码正确，data.valid 为 true }
+ *       '400': { description: 未提供当前密码 }
  *       '401': { description: Token 无效或密码错误 }
  */
 router.post('/verify-password', authenticateToken, authController.verifyPassword);

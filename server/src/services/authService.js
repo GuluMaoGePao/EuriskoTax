@@ -174,15 +174,45 @@ const verifyPassword = async (userId, password) => {
 
 const updateUser = async (userId, data) => {
     const updateData = {};
-    
-    if (data.username) updateData.username = data.username;
-    if (data.email) updateData.email = data.email;
+
+    if (data.username !== undefined && String(data.username).trim()) {
+        updateData.username = String(data.username).trim();
+    }
+    if (data.email !== undefined && String(data.email).trim()) {
+        // 与注册一致：归一化后存储，避免大小写差异造成"改了个寂寞"或重复数据
+        updateData.email = normalizeEmail(data.email);
+    }
     if (data.phone !== undefined) updateData.phone = data.phone;
-    
+
+    // 查重（排除自身）：username/email 冲突在更新前返回明确 400/409，
+    // 而不是撞 Prisma 唯一约束 P2002 → 500 英文裸错
+    const current = await prisma.user.findUnique({ where: { id: userId } });
+    if (!current) {
+        const error = new Error('User not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    if (updateData.username && updateData.username !== current.username) {
+        const conflict = await prisma.user.findUnique({ where: { username: updateData.username } });
+        if (conflict) {
+            const error = new Error('该用户名已被占用');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+    if (updateData.email && updateData.email !== current.email) {
+        const conflict = await prisma.user.findUnique({ where: { email: updateData.email } });
+        if (conflict) {
+            const error = new Error('该邮箱已被其他账号使用');
+            error.statusCode = 409;
+            throw error;
+        }
+    }
+
     if (data.password) {
         updateData.password_hash = await bcrypt.hash(data.password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
     }
-    
+
     const user = await prisma.user.update({
         where: { id: userId },
         data: updateData,
@@ -194,7 +224,7 @@ const updateUser = async (userId, data) => {
             updated_at: true
         }
     });
-    
+
     return user;
 };
 

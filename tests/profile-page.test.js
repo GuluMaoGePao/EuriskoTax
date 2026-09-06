@@ -228,8 +228,8 @@ describe('个人中心 - 渲染逻辑', () => {
     });
 
     test('updateProfileStats 应更新统计数字', () => {
-        // 准备数据
-        localStorage.setItem('calculation_history', JSON.stringify([1, 2, 3]));
+        // 准备数据（历史 key 与主页一致：taxCalculationHistory，本地唯一数据源）
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([1, 2, 3]));
         localStorage.setItem('tax_profile', JSON.stringify({ socialBase: 4250 }));
 
         renderProfileStats(); // 先渲染 DOM
@@ -241,7 +241,7 @@ describe('个人中心 - 渲染逻辑', () => {
     });
 
     test('updateProfileStats 无税务档案时档案数为 0', () => {
-        localStorage.setItem('calculation_history', JSON.stringify([1]));
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([1]));
         renderProfileStats();
         updateProfileStats();
         expect(document.getElementById('profile-stats-profiles').textContent).toBe('0');

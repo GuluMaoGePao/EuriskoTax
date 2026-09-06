@@ -1202,7 +1202,9 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('education-deduction').addEventListener('input', updateDeductionCalculation);
     
     // 初始化认证系统
-    import('/src/js/auth/auth-ui.js?v=4').then(({ initAuth }) => {
+    // 不带 ?v= 指纹：服务器已对 JS 启用 ETag 协商缓存，SW 升级会清旧缓存，
+    // 统一 URL 还避免「版本指纹残留导致浏览器缓存旧模块」的问题
+    import('/src/js/auth/auth-ui.js').then(({ initAuth }) => {
         initAuth();
     });
     
