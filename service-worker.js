@@ -98,6 +98,10 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // 只处理 http/https 请求，其余（chrome-extension://、chrome://、devtools:// 等）直接放行，
+  // 否则 cache.put 会因不支持的 scheme 抛 "Request scheme 'chrome-extension' is not supported"
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
   // 只处理 GET 请求
   if (request.method !== 'GET') return;
 
