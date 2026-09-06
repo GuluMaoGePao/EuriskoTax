@@ -184,7 +184,16 @@ async function handleSendCode() {
         // 发送失败不进入倒计时，允许用户直接重试
         btn.textContent = '发送验证码';
         btn.disabled = false;
-        showAlert('验证码发送失败: ' + error.message);
+        // 已注册邮箱：后端返回 409，直接引导登录而非显示"发送失败"
+        const msg = error.message || '';
+        if (msg.includes('已注册') || msg.includes('already registered')) {
+            showAlert(msg + '，如忘记密码请联系开发者重置', 'warning', function() {
+                // 点击确定后切换到登录页
+                document.getElementById('login-tab').click();
+            });
+        } else {
+            showAlert('验证码发送失败: ' + msg);
+        }
     }
 }
 
