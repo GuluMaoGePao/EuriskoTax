@@ -4,6 +4,7 @@
  *
  * 用法（项目根目录）：
  *   npm run verify:local
+ *   VERIFY_SKIP_GENERATE=1 npm run verify:local   // :3000 后端运行中占用引擎 DLL 时的逃生门（schema 未变更）
  *
  * 它会把「本地完整应用」真的跑起来做端到端验证：
  *   1. 数据库准备（prisma generate:dev + db push 到 server/prisma/dev.db，幂等）
@@ -29,6 +30,19 @@ const envFile = path.join(serverDir, '.env');
 require('dotenv').config({ path: envFile });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 探测某端口是否已被监听（用于检测运行中的本地后端占用 Prisma 引擎 DLL）
+function portOpen(port, timeoutMs) {
+    return new Promise((resolve) => {
+        const sock = new net.Socket();
+        const done = (ok) => { sock.destroy(); resolve(ok); };
+        sock.setTimeout(timeoutMs);
+        sock.once('connect', () => done(true));
+        sock.once('timeout', () => done(false));
+        sock.once('error', () => done(false));
+        sock.connect(port, '127.0.0.1');
+    });
+}
 
 function logLine() {
     process.stdout.write(`  [${new Date().toISOString().slice(11, 19)}] `);
@@ -126,16 +140,35 @@ function extractCodeFromLog(log, email) {
         process.exit(1);
     }
 
+    // ---- 0.5 引擎占用自检：运行中的本地后端(:3000)会锁定 Prisma 引擎 DLL，generate 会 EPERM ----
+    if (await portOpen(3000, 400)) {
+        console.warn('  [WARN] 检测到本地后端仍在运行（http://localhost:3000）。');
+        console.warn('         Windows 下运行中的后端会锁定 Prisma 引擎 DLL，');
+        console.warn('         generate 覆盖 .prisma/client 时大概率报 EPERM。');
+        console.warn('         ▶ schema 未变更：可设 VERIFY_SKIP_GENERATE=1 跳过 generate，直接跑 db push；');
+        console.warn('         ▶ 有 schema 变更：请先停止该后端（其控制台 Ctrl+C）再重跑本命令。');
+    }
+
     // ---- 1. 数据库准备：固定顺序 generate:dev → db push（SQLite 开发库，幂等） ----
     console.log('\n[1/5] 数据库准备（SQLite dev.db）...');
     // npm install 的 postinstall 会用生产 schema(PostgreSQL) 生成 Prisma Client，
     // 必须先按本地 SQLite schema 重新 generate，否则 PrismaClient 与 dev.db 引擎不匹配
-    const gen = spawnSync('npx prisma generate --schema prisma/schema.dev.prisma',
-        { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
-    if (gen.status !== 0) {
-        console.error('  [FAIL] prisma generate:dev 失败。请先 cd server && npm install');
-        console.error((gen.stderr || '').slice(-1200));
-        process.exit(1);
+    const skipGenerate = process.env.VERIFY_SKIP_GENERATE === '1';
+    if (skipGenerate) {
+        console.log('  [SKIP] VERIFY_SKIP_GENERATE=1：跳过 prisma generate（沿用现有 Prisma Client）');
+    } else {
+        const gen = spawnSync('npx prisma generate --schema prisma/schema.dev.prisma',
+            { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
+        if (gen.status !== 0) {
+            console.error('  [FAIL] prisma generate:dev 失败。请先 cd server && npm install');
+            const genTail = (gen.stderr || '').slice(-600);
+            if (/EPERM|EBUSY/.test(genTail)) {
+                console.error('        疑似引擎 DLL 被运行中的后端占用：请先停止 :3000 后端后重跑，');
+                console.error('        或 schema 未变更时设 VERIFY_SKIP_GENERATE=1 跳过 generate。');
+            }
+            console.error(genTail);
+            process.exit(1);
+        }
     }
     const pushResult = spawnSync('npx prisma db push --schema prisma/schema.dev.prisma',
         { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
