@@ -58,7 +58,13 @@ const ERROR_MESSAGE_MAP = {
     'Calculation not found': '计算记录不存在',
     'Access denied': '无权访问该记录',
     'User not found': '用户不存在',
-    'Authentication required': '请先登录'
+    'Authentication required': '请先登录',
+    '当前密码验证失败': '当前密码验证失败',
+    'Count must be an integer between 1 and 100': '数量必须是 1 到 100 之间的整数',
+    'Invalid admin token': '管理员令牌无效',
+    'Stats endpoint is not configured. Set ADMIN_TOKEN environment variable first.': '统计接口未配置，请联系开发者',
+    '请求过于频繁，请 15 分钟后再试': '请求过于频繁，请 15 分钟后再试',
+    '验证码发送过于频繁，请 15 分钟后再试': '验证码发送过于频繁，请 15 分钟后再试'
 };
 
 async function apiRequest(url, method = 'GET', data = null, requiresAuth = false) {
