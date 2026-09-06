@@ -1,4 +1,4 @@
-# EuriskoTax 线上部署校验脚本
+﻿# EuriskoTax 线上部署校验脚本
 # 用法: .\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]
 # 作用: push 后轮询线上资源，确认 Zeabur 已部署到最新版本（认证/按钮/SW 版本指纹）
 #       任一检查不过时退出码非 0，用于发布门禁或人工核对。
@@ -45,7 +45,7 @@ Add-Check "页面可访问" ($null -ne $resources["index"]) "HTTP 资源抓取�
 
 if ($resources["index"]) {
     Add-Check "index.html 已无快速登录按钮" (-not $resources["index"].Contains("quick-login-btn"))
-    Add-Check "index.html 含登录表单" ($resources["index"].Contains("id=\"login-form\""))
+    Add-Check "index.html 含登录表单" ($resources["index"].Contains('id="login-form"'))
 }
 
 if ($resources["auth_ui"]) {
