@@ -67,7 +67,6 @@ function buildProfileDOM() {
             <input id="register-invite-code" type="text" />
             <button id="login-submit"></button>
             <a href="#" id="forgot-password"></a>
-            <button id="quick-login-btn"></button>
             <button id="register-submit"></button>
         </div>
         <div id="mode-selection-page" class="page active"></div>

@@ -79,22 +79,6 @@ async function handleLogin() {
     }
 }
 
-async function handleQuickLogin() {
-    const email = 'dev@example.com';
-    const password = 'password';
-    
-    document.getElementById('login-email').value = email;
-    document.getElementById('login-password').value = password;
-    
-    try {
-        await apiClient.loginUser(email, password);
-        updateAuthUI();
-        showAlert('快速登录成功', 'success');
-    } catch (error) {
-        showAlert(error.message);
-    }
-}
-
 async function handleRegister() {
     const username = document.getElementById('register-username').value.trim();
     const email = document.getElementById('register-email').value.trim().toLowerCase();
@@ -1206,12 +1190,6 @@ function setupAuthEventListeners() {
         e.preventDefault();
         showResetPasswordPanel();
     });
-    // 快速登录仅限本地开发使用，生产环境隐藏入口
-    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-        document.getElementById('quick-login-btn').addEventListener('click', handleQuickLogin);
-    } else {
-        document.getElementById('quick-login-btn').classList.add('hidden');
-    }
     document.getElementById('register-submit').addEventListener('click', handleRegister);
     document.getElementById('send-code-btn').addEventListener('click', handleSendCode);
     // Enter 键提交（按钮为 type=button，表单无隐式提交，需手动绑定）
