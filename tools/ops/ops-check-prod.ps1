@@ -55,12 +55,13 @@ if ($resources["auth_ui"]) {
 }
 
 if ($resources["sw"]) {
-    Add-Check "service-worker.js 为 v8（network-first）" ($resources["sw"].Contains("euriskotax-v8"))
+    Add-Check "service-worker.js 已无应用壳预缓存(APP_SHELL)" (-not $resources["sw"].Contains("APP_SHELL"))
     Add-Check "service-worker.js 含 http/https 协议守卫" ($resources["sw"].Contains("chrome-extension"))
+    Add-Check "service-worker.js HTML 导航 network-first" ($resources["sw"].Contains("request.mode === 'navigate'"))
 }
 
 if ($resources["app"]) {
-    Add-Check "app.js 以 ?v=2 引入 auth-ui（指纹锁定）" ($resources["app"].Contains("auth-ui.js?v=2"))
+    Add-Check "app.js 无 ?v= 指纹（ETag + SW network-first 保证更新）" (-not $resources["app"].Contains("auth-ui.js?v="))
 }
 
 $fail = @($checks | Where-Object { -not $_.Ok })

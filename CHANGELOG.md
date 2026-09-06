@@ -7,6 +7,19 @@
 
 ---
 
+## [1.5.2] - 2026-09-06
+
+### 变更
+- **SW 缓存策略重构为「网络优先瘦缓存」**（根治旧代码残留 / 需反复手动清缓存）：
+  - 移除 install 阶段的应用壳预缓存（`index.html` + 全部自有 JS 不再被快照锁定），SW 不再是某次发布的内容快照
+  - HTML 导航 network-first：在线一律返回服务器最新页面，仅真正断网时回退最近缓存的页面 → 解决「登录页点协议/隐私不弹、登录后才弹」等旧页面残留问题
+  - 同源 JS/CSS/图片 network-first 并覆写运行缓存（弱网/离线兜底，`ignoreSearch` 兼容历史 `?v=` 请求）；CDN 资源 cache-first；`/api/*` 永不缓存
+  - 发版不再需要递增 `CACHE_VERSION`；新 SW 激活时自动清理全部历史版本缓存（老用户无需手动 Unregister + Clear site data）
+- `app.js` 动态 import 的 `auth-ui.js` 移除 `?v=3` 指纹：自有 JS 统一走服务器 ETag 协商缓存 + SW network-first（与 index.html 其余脚本一致）
+- 发布门禁同步：`verify:local` 与 `ops-check-prod.ps1` 的 SW 断言由「版本号匹配」改为「新策略特征」（无 APP_SHELL 预缓存 / 导航 network-first / 协议守卫）
+
+---
+
 ## [1.5.1] - 2026-09-06
 
 ### 修复

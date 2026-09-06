@@ -247,7 +247,7 @@ EuriskoTax/
 | 阶段6：生产环境硬化（v1.4.0） | ✅ 已完成 | 2天 | 2026-09-05 |
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
 | 阶段8：首批测试用户运营 | 🚧 进行中（冷启动推广素材已备好） | 2周 | 预计 2026-09-20 |
-| 阶段9：PWA 离线化改造 | ✅ 代码完成（2026-09-06 本地验证通过；随 Git 推送部署生产后需清缓存终验） | 3天 | 2026-09-06 |
+| 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
 | 阶段10：免费/专业版体系 | ⏳ 待开始 | 1周 | 预计 2026-10 月初 |
 
 ### 当前状态
@@ -264,7 +264,7 @@ EuriskoTax/
 - 2026-09-05 全链路验证通过：注册（邮箱验证码 + 一机一码邀请码）→ 登录 → JWT 受保护接口 → CORS 限制 → 安全响应头
 - 注册机制（2026-09-06）：**邮箱验证码 + 一机一码邀请码**（`EURISKO-XXXX-XXXX`，表内校验、一次性、事务原子消耗；服务启动表空时自动兜底生成 20 个）。固定码 `EURISKO2026BETA` 已不再接受
 - 运营统计：GET /api/stats/overview（X-Admin-Token 认证），注册数/计算次数/近7日趋势
-- PWA（阶段 9）：manifest + service-worker v4 已随代码就绪，离线应用壳本地验证通过（2026-09-06）
+- PWA（阶段 9）：manifest + service-worker 已上线；SW 为网络优先「瘦缓存」策略（不预缓存整壳、在线永远最新、访问过后离线可算、发版无需手动清缓存），详见 CHANGELOG 1.5.2
 
 **本地开发环境**：
 - 后端服务：http://localhost:3000
@@ -390,15 +390,15 @@ cpolar http 3000 -region=cn
 
 ### 后续可持续开发方向（按商业模式定调重排）
 
-1. **PWA 离线化改造（阶段9）** ✅ 代码完成（2026-09-06 本地验证通过）
+1. **PWA 离线化改造（阶段9）** ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存）
    - ✅ 新增 `manifest.json`（应用清单：standalone 模式、主题色 #1e40af、192/512 图标含 maskable）
-   - ✅ 新增 `service-worker.js` v4（应用壳预缓存 + CDN cache-first + 同源 JS/CSS network-first 确保新代码即时生效 + API 永不缓存）
+   - ✅ 新增 `service-worker.js`：网络优先「瘦缓存」策略 —— 不预缓存应用壳，HTML/JS/CSS 在线一律走网络拿最新，仅断网时回退最近缓存（离线计税可用）；CDN 资源 cache-first；`/api/*` 永不缓存
    - ✅ `index.html` 引入 manifest / theme-color / favicon / apple-touch-icon，注册 Service Worker
-   - ✅ 后端差异化缓存策略：index.html/manifest/sw.js → no-cache；JS/CSS → immutable 1年（配合 SW network-first 覆盖失效）；图片 → 7天
+   - ✅ 后端差异化缓存策略：index.html/manifest/service-worker.js → no-cache；JS/CSS → ETag 协商缓存（max-age=0, must-revalidate）；图片/字体 → 7 天
    - ✅ 离线体验：更新提示条 + 安装按钮 + CDN 资源失败兜底
    - ✅ 离线状态检测与 UI 提示（顶部 amber 提示条，计税可用、数据本地保存）
-   - ✅ 本地验证通过：SW 激活、应用壳预缓存命中（index.html/manifest/app.js/logo 均 200）
-   - ⏳ 随 Git 推送部署到生产后，需清缓存终验（该步骤以 Zeabur 线上部署结果为准）
+   - ✅ 本地验证通过：SW 激活、在线导航始终网络返回、断网回退缓存命中
+   - ✅ 发版不再需要递增缓存版本号、用户无需手动清缓存（2026-09-06 重构，根治旧 HTML/旧脚本残留）
 
 2. **免费/专业版体系（阶段10）**
    - 未登录 = 免费版全功能；登录 = 解锁云端同步
