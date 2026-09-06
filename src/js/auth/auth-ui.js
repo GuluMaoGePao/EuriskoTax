@@ -1180,6 +1180,30 @@ function togglePasswordVisibility(inputId, toggleId) {
     }
 }
 
+// 本地开发专用入口：仅 localhost / 127.0.0.1 显示"填入本地测试账号"。
+// 生产环境不注入该节点（开发/测试入口绝不泄漏到公网）；点击只填表不自动登录。
+function setupDevLoginFill() {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') return;
+    const form = document.getElementById('login-form');
+    // 仅当真实登录表单包含登录按钮时才注入（单元测试的空 fixture 自动跳过）
+    if (!form || !form.querySelector('#login-submit')) return;
+    if (form.querySelector('.dev-login-fill')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dev-login-fill mt-1 w-full text-center text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2';
+    btn.textContent = '开发环境：填入本地测试账号';
+    btn.title = '自动填入 dev@example.com / password，仍需手动点击「登录」';
+    btn.addEventListener('click', () => {
+        const emailInput = document.getElementById('login-email');
+        const pwdInput = document.getElementById('login-password');
+        if (emailInput) emailInput.value = 'dev@example.com';
+        if (pwdInput) pwdInput.value = 'password';
+        showAlert('已填入本地测试账号，请点击「登录」', 'info');
+    });
+    form.appendChild(btn);
+}
+
 function setupAuthEventListeners() {
     document.getElementById('login-tab').addEventListener('click', () => switchAuthTab('login'));
     document.getElementById('register-tab').addEventListener('click', () => switchAuthTab('register'));
@@ -1414,6 +1438,9 @@ function setupAuthEventListeners() {
             closeModal([...openModalSet][openModalSet.size - 1]);
         }
     });
+
+    // 本地开发登录入口（仅 localhost 注入，见函数内 hostname 判断）
+    setupDevLoginFill();
 }
 
 function showAlert(message, type = 'error', callback) {
