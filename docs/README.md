@@ -74,6 +74,7 @@ EuriskoTax/
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（22 项规则+性能数据+验证方法） | 2026-08-11 |
+| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-06 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
 
 ### 项目报告
@@ -118,6 +119,7 @@ EuriskoTax/
 - 前端复用：[UI 组件复用指南](guides/ui-component-reuse-guide.md)
 - 响应式适配：[响应式规则维护手册](guides/responsive-rules-reference.md)
 - GUI 按钮：[GUI 按钮速查](guides/gui-button-reference.md)
+- 全流程：[开发工作流总览](guides/development-workflow.md)（启动/验证/发布/回滚/排障）
 - 接口联调：[API 接口文档](api/api-reference.md)
 
 ### 部署

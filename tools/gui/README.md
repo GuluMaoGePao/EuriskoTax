@@ -38,15 +38,15 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 │ 🧪 测试    │  │ 🌐 公网地址速览（仅 -Share 启动后显示）        │  │ ← 公网卡片
 │ 📋 日志查看│  │  https://xxx.cpolar.cn   [复制] [发邮件]  │  │
 │ 🚢 部署    │  └────────────────────────────────────────────┘  │
-│ 🛠️ 常用工具│  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│            │  │ ▶ 标准启动│ │⚡快速启动│ │🌐公网分享│         │
-│            │  └──────────┘ └──────────┘ └──────────┘         │
-│            │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│            │  │🛡️启动+守护│ │🔥完整测试│ │🔄开发模式│         │ ← 操作按钮区
-│            │  └──────────┘ └──────────┘ └──────────┘         │
-│            │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│            │  │🛑停止后端│ │🔒释放端口│ │📊查看端口│         │
-│            │  └──────────┘ └──────────┘ └──────────┘         │
+│ 🛠️ 常用工具│  ┌──────────────┐ ┌──────────────┐               │
+│            │  │① 第一次用一键 │ │② 日常启动快速 │               │
+│            │  └──────────────┘ └──────────────┘               │
+│            │  ┌──────────────┐ ┌──────────────┐               │
+│            │  │ 启动+公网分享 │ │ 启动+崩溃重启 │               │ ← 操作按钮区
+│            │  └──────────────┘ └──────────────┘               │
+│            │  ┌──────────────┐ ┌──────────────┐               │
+│            │  │ 启动+分享+重启│ │ Nodemon开发  │               │
+│            │  └──────────────┘ └──────────────┘               │
 │            │  ─────────────────────────────────────────────  │
 │ ⏹ 紧急停止│  │ 实时输出                                       │
 │   所有任务 │  │ [12:30:00] ▶ 执行: ...                         │ ← 输出区
@@ -92,15 +92,18 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 | 按钮 | 执行命令 | 适用场景 |
 |------|---------|---------|
-| **▶ 标准启动** | `ops-start-dev.ps1` | 首次启动、改动较大后启动（含环境检查、依赖、重置用户） |
-| **⚡ 快速启动** | `ops-start-dev.ps1 -SkipInstall -SkipResetUser` | 日常调试，跳过依赖和用户重置，启动最快 |
-| **🌐 公网分享启动** | `ops-start-dev.ps1 -Share` | 启动 + cpolar 公网隧道（临时 `http 3000 -region=cn`，无需预设命名隧道），给好友远程测试 |
-| **🛡️ 启动 + 守护脚本** | `ops-start-dev.ps1 -Watchdog` | 启动 + watchdog 守护，进程异常自动重启 |
-| **🔥 一键完整测试** | `ops-start-dev.ps1 -Share -Watchdog` | 后端 + cpolar 临时隧道 + watchdog，长期给好友测试时推荐（GUI 会显示公网卡片并弹窗通知） |
-| **🔄 开发模式 (nodemon)** | `npm run dev` (server/) | 后端开发时使用，改后端代码自动重启 |
-| **🛑 停止后端服务** | `Stop-Job backend` | 停止当前后端服务（含子进程） |
-| **🔒 释放 3000 端口** | `Stop-Process` | 端口被占用时强制释放（找到并杀掉占用进程） |
-| **📊 查看端口占用** | `Get-NetTCPConnection` | 查看 3000 端口的占用详情（PID、进程名、路径） |
+| **① 第一次用：一键启动** | `ops-start-dev.ps1` | 新环境 / 刚 pull 代码 / 依赖有变时启动（环境检查+依赖安装+重置 dev 用户） |
+| **② 日常启动：快速启动** | `ops-start-dev.ps1 -SkipInstall -SkipResetUser` | 日常调试，跳过依赖和用户重置，启动最快 |
+| **启动 + 公网分享** | `ops-start-dev.ps1 -Share` | 启动 + cpolar 公网隧道（临时 `http 3000 -region=cn`，无需预设命名隧道），给好友远程测试，URL 自动发邮件 |
+| **启动 + 崩溃自动重启** | `ops-start-dev.ps1 -Watchdog` | 启动 + watchdog 守护，进程异常自动重启 |
+| **启动 + 分享 + 自动重启** | `ops-start-dev.ps1 -Share -Watchdog` | 分享 + 守护三件套，长期给好友测试时推荐（GUI 会显示公网卡片并弹窗通知） |
+| **Nodemon 开发模式** | `npm run dev` (server/) | 后端开发时使用，改后端代码自动重启 |
+| **停止后端服务** | `Stop-Job backend` | 停止当前后端服务 + 看门狗 |
+| **强制释放 3000 端口** | `Stop-Process` | 端口被占用时强制释放（找到并杀掉占用进程） |
+| **查看 3000 端口状态** | `Get-NetTCPConnection` | 查看 3000 端口的占用详情（PID、进程名、路径） |
+
+> 按钮名于 2026-09 统一（旧名「标准启动 / 快速启动 / 一键完整测试 / 开发模式」已废弃）。
+> 命名对照与完整工作流见 [docs/guides/development-workflow.md](../../docs/guides/development-workflow.md)。
 
 ### 2. 🗄️ 数据库
 
@@ -318,7 +321,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 ### 场景 1：日常调试启动
 
 1. 双击 `tools/gui/EuriskoTax-Console.bat`
-2. 在「启动管理」Tab 点击 **⚡ 快速启动**（跳过依赖和用户重置）
+2. 在「启动管理」Tab 点击 **日常启动：快速启动**（跳过依赖和用户重置）
 3. 等待输出区显示 `服务器运行在 http://localhost:3000`
 4. 点击 **🌐 打开浏览器** 或直接在浏览器访问 `http://localhost:3000/`
 5. 用 `dev@example.com / password` 登录
@@ -327,14 +330,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 ### 场景 2：改了后端代码后调试
 
 1. 双击 `tools/gui/EuriskoTax-Console.bat`
-2. 在「启动管理」Tab 点击 **🔄 开发模式 (nodemon)**
+2. 在「启动管理」Tab 点击 **Nodemon 开发模式**
 3. 修改 `server/src/` 下的代码，nodemon 会自动重启后端
 4. 输出区实时看到重启日志
 
 ### 场景 3：给好友远程测试
 
 1. 双击 `tools/gui/EuriskoTax-Console.bat`
-2. 在「启动管理」Tab 点击 **🔥 一键完整测试**（后端 + cpolar 临时隧道 + 守护脚本）
+2. 在「启动管理」Tab 点击 **启动 + 分享 + 自动重启**（后端 + cpolar 临时隧道 + 守护脚本）
 3. GUI 顶部会出现「🌐 公网地址速览」卡片，**首次生成公网地址时会弹出 MessageBox（仅 1 次，180s 内去重）**，同时地址自动写入剪贴板
 4. 卡片中也可随时点「复制」按钮 / 点卡片主体再次复制；点「📮 发邮件」按钮把新地址手动发给收件人
 5. 邮件**成功发送** / **失败/未发送**也会分别弹 1 个 MessageBox（各带 180s 去重）
@@ -408,7 +411,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 ### Q3：按钮点击没反应
 
-**原因**：可能有同名任务正在运行（如多次点击「标准启动」）。
+**原因**：可能有同名任务正在运行（如多次点击「日常启动：快速启动」）。
 
 **解决**：
 - 查看输出区是否有「任务 'xxx' 已在运行，请先停止」提示
@@ -436,7 +439,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 1. 打开终端执行 `.\tools\cpolar\cpolar.exe authtoken <你的token>`（只需一次）
 2. 确认无需配置 `~/.cpolar/cpolar.yml` 的 named tunnels，直接使用临时命令即可
 3. 或访问 cpolar 仪表盘 `http://127.0.0.1:4040/` 手动查看
-4. 如 watchdog 之前仍在用旧脚本，重启 GUI 后重新点击 **🔥 一键完整测试**
+4. 如 watchdog 之前仍在用旧脚本，重启 GUI 后重新点击 **启动 + 分享 + 自动重启**
 
 ---
 
