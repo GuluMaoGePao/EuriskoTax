@@ -1711,11 +1711,18 @@ function clearPageHistory() {
 }
 
 function initAuth() {
+    // UI 刷新与事件绑定分别隔离：即使 updateAuthUI 因页面 DOM 未就绪而异常，
+    // 也绝不影响登录/注册按钮的事件绑定（此前一处 null.classList 异常会被
+    // try/catch 吞掉，导致 setupAuthEventListeners 从未执行 → 点击登录无反应）。
     try {
         updateAuthUI();
+    } catch (e) {
+        console.error('[initAuth] updateAuthUI 异常:', e);
+    }
+    try {
         setupAuthEventListeners();
     } catch (e) {
-        console.error('[initAuth] 初始化异常:', e);
+        console.error('[initAuth] 事件绑定异常:', e);
     } finally {
         // 无论是否出错，都必须移除初始化遮罩，否则页面永久白屏
         document.body.classList.add('auth-ready');
