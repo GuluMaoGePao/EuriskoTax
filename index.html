@@ -6012,7 +6012,26 @@
         }
 
         // ====== Service Worker 注册与更新检测 ======
-        if ('serviceWorker' in navigator) {
+        // 本地开发（localhost/127.0.0.1）不接管缓存：改代码即见即所得；
+        // 并主动注销历史 SW + 清理旧缓存，根治「本地被缓存坑」的问题。
+        var isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (isLocalDev) {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    if (regs.length) {
+                        regs.forEach(function (r) { r.unregister(); });
+                        console.log('[PWA] 本地开发模式：已注销历史 Service Worker ' + regs.length + ' 个');
+                    }
+                });
+                if (window.caches && window.caches.keys) {
+                    window.caches.keys().then(function (keys) {
+                        keys.forEach(function (k) {
+                            if (k.indexOf('euriskotax-') === 0) window.caches.delete(k);
+                        });
+                    });
+                }
+            }
+        } else if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function (reg) {

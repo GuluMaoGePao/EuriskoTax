@@ -8,12 +8,17 @@
 #   .\tools\ops\ops-publish.ps1                         # 交互确认后发布（自动生成提交说明）
 #   .\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"  # 指定提交说明
 #   .\tools\ops\ops-publish.ps1 -DryRun                 # 只跑本地验证门禁，不 commit/push
+#   .\tools\ops\ops-publish.ps1 -SkipVerifyGenerate     # :3000 后端运行中占用引擎 DLL 时跳过 prisma generate
+#   .\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"  # push 走代理（仅本次生效，不改 git 全局配置）
 # =============================================================================
 param(
     [string]$CommitMsg = "",
     [string]$BaseUrl = "https://euriskotax.zeabur.app",
     [switch]$DryRun,
-    [int]$PollMaxSeconds = 600
+    [int]$PollMaxSeconds = 600,
+    [switch]$SkipVerifyGenerate,
+    [string]$Proxy = "",
+    [int]$PushRetries = 3
 )
 
 $ScriptPath = $MyInvocation.MyCommand.Path
@@ -58,6 +63,10 @@ if ($branch -ne "main") {
 Write-Host ""
 Write-Host "[1/4] 本地验证门禁 verify:local ..." -ForegroundColor Yellow
 Write-Host "      （启动真实后端，跑 登录 dev 号 / 注册新号 / 新号登录 全链路）" -ForegroundColor Gray
+if ($SkipVerifyGenerate) {
+    Write-Host "      （-SkipVerifyGenerate：跳过 prisma generate，用于 :3000 后端运行中的场景）" -ForegroundColor Gray
+    $env:VERIFY_SKIP_GENERATE = "1"
+}
 & node $VerifyScript
 if ($LASTEXITCODE -ne 0) {
     Exit-Fail "本地登录链路验证未通过（verify:local 退出码 $LASTEXITCODE）。"
@@ -95,11 +104,26 @@ if ([string]::IsNullOrWhiteSpace($dirty)) {
     Write-Host "  [OK] 已提交" -ForegroundColor Green
 }
 
-# ---- [3/4] 推送 ----
+# ---- [3/4] 推送（带重试；可选 -Proxy 仅本次生效，不改 git 全局配置） ----
 Write-Host ""
 Write-Host "[3/4] 推送到远程 main ..." -ForegroundColor Yellow
-& git -C $ProjectRoot push origin main
-if ($LASTEXITCODE -ne 0) { Exit-Fail "git push 失败（远程可能有新提交，请先 git pull 合并后重试）" }
+$pushArgs = @("-C", $ProjectRoot)
+if ($Proxy) {
+    $pushArgs += @("-c", "http.proxy=$Proxy", "-c", "https.proxy=$Proxy")
+    Write-Host "  使用代理: $Proxy（仅本次 push 生效）" -ForegroundColor Gray
+}
+$pushed = $false
+for ($i = 1; $i -le $PushRetries; $i++) {
+    if ($i -gt 1) { Write-Host "  [重试 $($i - 1)/$($PushRetries - 1)] push 失败，5s 后重试 ..." -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
+    & git @pushArgs push origin main
+    if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+}
+if (-not $pushed) {
+    Write-Host ""
+    Write-Host "  [诊断] 网络不通或远程有冲突：先试 git ls-remote origin main 确认连通性。" -ForegroundColor Gray
+    Write-Host "        远程有新提交时请先 git pull --rebase；网络受限时可加 -Proxy \"http://127.0.0.1:7890\" 重试。" -ForegroundColor Gray
+    Exit-Fail "git push 失败（已重试 ${PushRetries} 次）。请检查网络/代理后重试。"
+}
 Write-Host "  [OK] 已推送" -ForegroundColor Green
 
 # ---- [4/4] 线上核对（轮询直到部署指纹全绿或超时） ----
