@@ -1,6 +1,6 @@
 # EuriskoTax 开发工作流总览（WORKFLOW）
 
-> 最后更新：2026-09-07
+> 最后更新：2026-09-08
 > 面向对象：所有在本仓库开发/上线的人。
 > 一句话原则：**本地起服务 → 改代码 → 本地门禁全绿 → 唯一入口发布 → 线上核对**。
 > 本文档是「按钮名 / 命令 / 流程」的唯一权威定义。遇到与本文不符的描述，以本文为准。
@@ -46,7 +46,8 @@
 | 场景 | GUI 按钮（官方名） | 等价命令 | 说明 |
 |------|-------------------|---------|------|
 | 上线前零风险预演 | **「安全发布试运行」** | `.\tools\ops\ops-publish.ps1 -DryRun` | 只跑本地门禁，不 commit 不 push |
-| **正式上线（唯一入口）** | **「安全发布」** | `.\tools\ops\ops-publish.ps1` | verify → git add+commit → push origin main → 自动轮询线上核对 |
+| **正式上线（唯一入口）** | **「安全发布」** | `.\tools\ops\ops-publish.ps1` | verify → git add+commit → push origin main → 自动轮询线上核对 → 成功后自动打并推送 `v<package.json版本>` 标签（幂等） |
+| 跳过发布后自动打标签 | — | `.\tools\ops\ops-publish.ps1 -NoAutoTag` | 版本号未变/不需要新标签时使用（默认自动打，已存在则跳过） |
 | 指定提交说明 | — | `.\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"` | 弹窗输入即传此参数 |
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
@@ -111,7 +112,8 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 ### ④ 发布（只走安全发布）
 
 正式上线**只有一条路**：GUI「🔐 Git & 账号」→「🚀 安全发布」或命令行 `ops-publish.ps1`。
-它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 10 项指纹（全绿即完成）。
+它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 10 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
+> 版本号请在发布前同步三处：`package.json` / 关于弹窗 `版本 x.y.z` / `CHANGELOG.md` 最新条目。详见 [分支与版本发布策略](branch-release-strategy.md)。
 
 小技巧：重要发布先点「🧪 安全发布试运行」零风险预演一遍，确认门禁能绿再正式发。
 
@@ -119,7 +121,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 
 ## 3. 发布后：如何确认真的上线了
 
-- 发布脚本 `[4/4]` 会自动轮询直到 `ops-check-prod` 全绿；
+- 发布脚本 `[4/4]` 会自动轮询直到 `ops-check-prod` 全绿；`[5/5]` 成功后自动打并推送版本标签；
 - 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（10 项：页面可访问 / 无快速登录按钮 / 登录表单 / auth-ui dev 入口指纹 / 无 quick-login / 409 提示 / SW 无应用壳预缓存 / 协议守卫 / HTML 导航 network-first / app.js 无 `?v=` 指纹）；
 - 只改了 tools/docs 等非前端资源时，线上指纹不变，核对**会很快通过**——属正常现象。
 
@@ -133,6 +135,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 | 旧自建服务器模式（`ops-deploy.ps1`，已非主要） | GUI「📦 部署」→「回滚到上一个版本」或 `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接） |
 
 > 判断该回滚哪个 commit：`git --no-pager log --oneline -10`，revert 那个 SHA 即可。
+> 定位版本/发布/标签纪律见 [分支与版本发布策略 §6 回滚](branch-release-strategy.md#6-回滚策略)。
 
 ---
 
@@ -158,3 +161,4 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 - GUI 按钮速查：[gui-button-reference.md](gui-button-reference.md)
 - 运维脚本说明：[tools/ops/README.md](../../tools/ops/README.md)
 - 单元测试与发布纪律说明：[根 README 发布纪律](../../README.md)
+- 分支与版本发布策略：[branch-release-strategy.md](branch-release-strategy.md)
