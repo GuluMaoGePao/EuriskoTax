@@ -1,14 +1,14 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-07
+> 最后更新：2026-09-08
 > 维护原则：按用途分类存放，本文件为统一入口索引
 
 ---
 
-## 当前状态（v1.6.0 · 2026-09-07）
+## 当前状态（v1.6.1 · 2026-09-08）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.6.0**（意见反馈落库闭环 + 匿名计算埋点 + overview 读聚合表 + 管理员反馈接口；`package.json` 版本戳 1.5.1 未随 1.5.2/1.6.0 同步，待发布时处理）
+- **主版本**：CHANGELOG 最新 **1.6.1**（一键缓存清洗页 + 弹窗健壮性 + 登录/注册表单文案与校验优化 + 邮箱更正；`package.json` 版本戳 1.6.1 已同步）
 - **测试**：6 套件 203 个单元测试全部通过（`npm test`，2026-09-07 复跑）；发布门禁 `verify:local` 20 项全绿
 - **开发阶段**：阶段 8（首批测试用户运营）进行中（数据埋点 + 反馈落库收尾 ✅ 2026-09-07）→ 阶段 9（PWA）✅ 已上线 → 阶段 10（免费/专业版）方案已确认待命，见 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
 
@@ -76,7 +76,8 @@ EuriskoTax/
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-07 |
-| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-07 |
+| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-08 |
+| [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本三落点/自动打 tag/回滚） | 2026-09-08 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
 
 ### 项目报告
@@ -121,6 +122,7 @@ EuriskoTax/
 - 响应式适配：[响应式规则维护手册](guides/responsive-rules-reference.md)
 - GUI 按钮：[GUI 按钮速查](guides/gui-button-reference.md)
 - 全流程：[开发工作流总览](guides/development-workflow.md)（启动/验证/发布/回滚/排障）
+- 分支/版本/回滚：[分支与版本发布策略](guides/branch-release-strategy.md)
 - 接口联调：[API 接口文档](api/api-reference.md)
 
 ### 部署

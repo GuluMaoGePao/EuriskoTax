@@ -10,6 +10,7 @@
 #   .\tools\ops\ops-publish.ps1 -DryRun                 # 只跑本地验证门禁，不 commit/push
 #   .\tools\ops\ops-publish.ps1 -SkipVerifyGenerate     # :3000 后端运行中占用引擎 DLL 时跳过 prisma generate
 #   .\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"  # push 走代理（仅本次生效，不改 git 全局配置）
+#   .\tools\ops\ops-publish.ps1 -NoAutoTag              # 跳过发布后自动打版本标签（默认按 package.json version 打 vX.Y.Z）
 # =============================================================================
 param(
     [string]$CommitMsg = "",
@@ -18,7 +19,8 @@ param(
     [int]$PollMaxSeconds = 600,
     [switch]$SkipVerifyGenerate,
     [string]$Proxy = "",
-    [int]$PushRetries = 3
+    [int]$PushRetries = 3,
+    [switch]$NoAutoTag
 )
 
 $ScriptPath = $MyInvocation.MyCommand.Path
@@ -128,8 +130,7 @@ Write-Host "  [OK] 已推送" -ForegroundColor Green
 
 # ---- [4/4] 线上核对（轮询直到部署指纹全绿或超时） ----
 Write-Host ""
-Write-Host "[4/4] 核对线上部署指纹: $BaseUrl" -ForegroundColor Yellow
-Write-Host "  Zeabur 收到 push 后会重新构建（通常 2~6 分钟），将持续轮询直至通过或超时 ..." -ForegroundColor Gray
+Write-Host "[4/4] 核对线上部署指纹: $BaseUrl" -ForegroundColor YellowWrite-Host "  Zeabur 收到 push 后会重新构建（通常 2~6 分钟），将持续轮询直至通过或超时 ..." -ForegroundColor Gray
 $interval = 20
 $elapsed  = 0
 $ok = $false
@@ -142,6 +143,44 @@ while ($elapsed -lt $PollMaxSeconds) {
 }
 if (-not $ok) {
     Exit-Fail "等待 ${PollMaxSeconds}s 后线上仍未就绪。请稍后手动执行 .\tools\ops\ops-check-prod.ps1 复核，或查看 Zeabur 构建日志。"
+}
+
+# ---- [5/5] 发布后自动打版本标签（幂等：标签已存在则跳过；-NoAutoTag 关闭） ----
+if ($NoAutoTag) {
+    Write-Host ""
+    Write-Host "[5/5] 跳过自动打标签（-NoAutoTag）" -ForegroundColor Gray
+} else {
+    Write-Host ""
+    Write-Host "[5/5] 自动打版本标签 ..." -ForegroundColor Yellow
+    $version = (& node -p "require('$ProjectRoot/package.json').version" 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+        Write-Host "  [警告] 读取 package.json version 失败，跳过打标签（后续可手动执行 git tag）" -ForegroundColor Yellow
+    } else {
+        $tagName = "v$version"
+        $existing = (& git -C $ProjectRoot tag -l $tagName | Out-String).Trim()
+        if ($existing) {
+            Write-Host "  标签 $tagName 已存在，跳过（幂等）。" -ForegroundColor Gray
+        } else {
+            & git -C $ProjectRoot tag -a $tagName -m "release $tagName"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  [警告] 创建标签 $tagName 失败，可手动执行: git tag -a $tagName" -ForegroundColor Yellow
+            } else {
+                $tagPushArgs = @("-C", $ProjectRoot)
+                if ($Proxy) { $tagPushArgs += @("-c", "http.proxy=$Proxy", "-c", "https.proxy=$Proxy") }
+                $tagPushed = $false
+                for ($i = 1; $i -le $PushRetries; $i++) {
+                    if ($i -gt 1) { Write-Host "  [重试 $($i - 1)/$($PushRetries - 1)] 推送标签失败，5s 后重试 ..." -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
+                    & git @tagPushArgs push origin $tagName
+                    if ($LASTEXITCODE -eq 0) { $tagPushed = $true; break }
+                }
+                if ($tagPushed) {
+                    Write-Host "  [OK] 已创建并推送标签 $tagName" -ForegroundColor Green
+                } else {
+                    Write-Host "  [警告] 标签 $tagName 已创建但推送失败，稍后手动执行: git push origin $tagName" -ForegroundColor Yellow
+                }
+            }
+        }
+    }
 }
 
 Write-Host ""
