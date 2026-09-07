@@ -5444,6 +5444,11 @@
     var _genericEscBound = false;
     function openModal(modal) {
         if (!modal) return;
+        // 弹窗若嵌套在隐藏容器（如登录页时 #app-container 为 hidden）内，
+        // fixed 定位会随祖先隐藏而不可见。打开前挂到 body 顶层，保证任何场景都能弹出。
+        if (modal.parentNode && modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
         if (_genericModalStack.indexOf(modal) === -1) _genericModalStack.push(modal);
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';

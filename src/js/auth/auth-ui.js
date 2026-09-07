@@ -1528,6 +1528,11 @@ const openModalSet = new Set();
 function openModal(modal) {
     if (!modal) return;
     modal.classList.remove('hidden');
+    // 弹窗若嵌套在隐藏容器（如登录页时 #app-container 为 hidden）内，
+    // fixed 定位会随祖先隐藏而不可见。打开前挂到 body 顶层，保证任何场景都能弹出。
+    if (modal.parentNode && modal.parentNode !== document.body) {
+        document.body.appendChild(modal);
+    }
     openModalSet.add(modal);
     document.body.style.overflow = 'hidden';
     setTimeout(() => {
