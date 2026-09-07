@@ -1,6 +1,6 @@
 # EuriskoTax 开发工作流总览（WORKFLOW）
 
-> 最后更新：2026-09-06
+> 最后更新：2026-09-07
 > 面向对象：所有在本仓库开发/上线的人。
 > 一句话原则：**本地起服务 → 改代码 → 本地门禁全绿 → 唯一入口发布 → 线上核对**。
 > 本文档是「按钮名 / 命令 / 流程」的唯一权威定义。遇到与本文不符的描述，以本文为准。
@@ -37,7 +37,7 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 13 项：登录 dev 号 → 邀请码+验证码注册新号 → 新号登录 → 前端/SW 指纹，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 20 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
 | 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 6 套件 203 例 |
 
@@ -51,7 +51,7 @@
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 9 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 10 项线上指纹，全绿退出码 0 |
 
 ---
 
@@ -67,7 +67,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（13 项 e2e 门禁）                            │
+│    + verify:local（20 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环
@@ -111,7 +111,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 ### ④ 发布（只走安全发布）
 
 正式上线**只有一条路**：GUI「🔐 Git & 账号」→「🚀 安全发布」或命令行 `ops-publish.ps1`。
-它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 9 项指纹（全绿即完成）。
+它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 10 项指纹（全绿即完成）。
 
 小技巧：重要发布先点「🧪 安全发布试运行」零风险预演一遍，确认门禁能绿再正式发。
 
@@ -120,7 +120,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 ## 3. 发布后：如何确认真的上线了
 
 - 发布脚本 `[4/4]` 会自动轮询直到 `ops-check-prod` 全绿；
-- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（9 项：页面可访问 / 无快速登录按钮 / 登录表单 / auth-ui dev 入口指纹 / 无 quick-login / 409 提示 / SW v8 / 协议守卫 / app.js `?v=2`）；
+- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（10 项：页面可访问 / 无快速登录按钮 / 登录表单 / auth-ui dev 入口指纹 / 无 quick-login / 409 提示 / SW 无应用壳预缓存 / 协议守卫 / HTML 导航 network-first / app.js 无 `?v=` 指纹）；
 - 只改了 tools/docs 等非前端资源时，线上指纹不变，核对**会很快通过**——属正常现象。
 
 ---
@@ -141,7 +141,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 | 现象 | 原因 | 处理 |
 |------|------|------|
 | 本地改代码不生效 / 还是旧页面 | 浏览器还挂着历史 SW 缓存 | 本地新页面会自动注销 SW；极端情况 `Ctrl+F5` 硬刷一次。若仍旧：F12 → Application → Service Workers → Unregister + Clear site data |
-| 登录页 JS 报 `Cannot read properties of null (reading "classList")` / 栈里有 `updateUIBtn` | **浏览器加载的是旧版 auth-ui**（老缓存） | 这是「旧版」特征函数名。`?v=2` 版本指纹已生效，清一次缓存 / 无痕窗口验证即可；新版无此函数 |
+| 登录页 JS 报 `Cannot read properties of null (reading "classList")` / 栈里有 `updateUIBtn` | **浏览器加载的是旧版 auth-ui**（v1.5.1 之前的老缓存） | `updateUIBtn` 是旧版特征函数名。v1.5.2 起已移除 `?v=` 版本指纹并改为 SW 网络优先瘦缓存，正常刷新即拉新版；仍旧则清一次缓存 / 无痕窗口验证 |
 | verify 卡在 `prisma generate ... EPERM` | `:3000` 后端锁着引擎 DLL | 停后端，或 `VERIFY_SKIP_GENERATE=1`（schema 未变更时）；发布用 `-SkipVerifyGenerate` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |
 | 发布 `[4/4]` 一直显示「仍在构建」直到超时 | Zeabur 构建慢，或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；真慢就 `-PollMaxSeconds 900` 再来一次 |

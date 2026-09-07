@@ -58,6 +58,18 @@ const codeLimiter = rateLimit({
     }
 });
 
+// 匿名埋点限流：300 次/10 分钟/IP，仅作用于 /stats/events
+// 正常用户保存计算的频率远低于此，宽松上限只为挡批量脚本刷计数
+const statsEventLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 300,
+    skip: (req) => req.path !== '/events',
+    message: {
+        success: false,
+        error: { message: '操作过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -118,7 +130,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
 app.use('/api/calculations', calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
-app.use('/api/stats', statsRoutes);
+app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 
 // 健康检查端点（用于云平台健康检查）

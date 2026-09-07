@@ -1,7 +1,8 @@
 ﻿# EuriskoTax Watchdog 监控与邮件通知系统部署指南
 
-> 文档版本：v1.2 | 更新日期：2026-04-15
+> 文档版本：v1.3 | 更新日期：2026-09-07
 > 适用范围：EuriskoTax 开发环境完整监控与通知系统部署
+> 配套文档：通知策略 / 邮件模板 / 事件日志格式的唯一真源见 [watchdog-notification-and-event-log-spec.md](watchdog-notification-and-event-log-spec.md)（v4.0）。v1.3 起通知策略与规范同步：URL_CREATED 与 URL_CHANGED 均发送邮件（默认开关均开启）。
 
 ---
 
@@ -17,6 +18,8 @@ EuriskoTax Watchdog 是一套完整的开发环境守护系统，包含以下核
 6. **GUI 可视化与主动弹窗** — EuriskoTax 开发控制台（WinForms GUI）提供「🌐 公网地址速览」卡片，并对 URL 首次生成 / URL 变更 / 邮件成功 / 邮件失败 4 类事件弹 MessageBox；所有弹窗均带 180s 全局去重，不会重复弹出
 
 ### 架构图
+
+> **v1.3 更正**：下图中"仅 URL_CHANGED"为旧版示意；按通知与事件日志规范（v3.2+），**URL_CREATED（首次生成）与 URL_CHANGED（地址变更）均发送邮件**（`notifyOn` 默认均开启）。事件链路与正确架构详见配套规范 [watchdog-notification-and-event-log-spec.md](watchdog-notification-and-event-log-spec.md) 第一章 / 第二章，正文以本文档 7.2 通知策略为准。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -639,6 +642,7 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 "notifyOn": {
     "backendRestart": true,
     "cpolarRestart": true,
+    "urlCreated": true,
     "urlChanged": true,
     "restartFailed": true
 }
@@ -729,5 +733,5 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 | SMTP超时 | 15秒 |
 | 最大重启次数 | 0（无限） |
 | SMTP服务器 | smtp.qq.com:587 |
-| 通知策略 | 仅URL_CHANGED发邮件 |
+| 通知策略 | URL_CREATED / URL_CHANGED 发邮件（notifyOn 开关控制） |
 | 日志级别 | INFO+WARN+ERROR（DEBUG也记录） |

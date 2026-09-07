@@ -1,8 +1,8 @@
 # EuriskoTax 响应式规则维护手册
 
-**版本**: 1.2.0
+**版本**: 1.3.0
 **创建**: 2026-08-10
-**更新**: 2026-08-11
+**更新**: 2026-09-07
 **适用**: 主页、个人中心、税务助手三大模块的响应式布局维护与扩展
 
 ---
@@ -411,7 +411,7 @@
 
 | 检查项 | 结果 | 说明 |
 |--------|------|------|
-| 卡片 ID 匹配 | ✅ 通过 | 6 个卡片 ID 与 `profileCardConfigs` 事件绑定完全对应 |
+| 卡片 ID 匹配 | ✅ 通过 | 7 个卡片 ID 与 `profileCardConfigs` 事件绑定完全对应（v1.6.0 新增"意见反馈"卡，见规则 3.5 变更记录） |
 | 统计 ID 匹配 | ✅ 通过 | 4 个统计 ID 与 `updateProfileStats()` 中 `getElementById` 完全对应 |
 | 事件委托 | ✅ 通过 | `profileCardsGrid` 上的 click 事件委托正常工作 |
 | localStorage 操作 | ✅ 通过 | CSS 修改不影响数据读写 |
@@ -490,3 +490,4 @@ document.body.style.overflowX = 'hidden';
 | 2026-08-10 | 1.0.0 | 初始版本，收录 22 项响应式规则 + 性能实测数据 |
 | 2026-08-11 | 1.1.0 | 税务助手新增 7 项移动端适配（规则 4.7-4.13），含 iOS Safari 搜索框缩放修复、5 个触摸区增大；规则 4.5 新增 max-height 适配。总计 29 项规则 |
 | 2026-08-11 | 1.2.0 | 修复税务助手 3 个快捷功能 Bug（非响应式规则变更，但影响移动端交互可用性）：<br>**Bug1 — showHelpModal 未定义**：在 `tax-assistant-ui.js#L456-L461` 新增 `showHelpModal()` 函数，调用 `window.openModal(document.getElementById('help-modal'))`，并暴露到 `window.showHelpModal`。修复前"税率表速查"和"使用帮助"点击后静默失败。<br>**Bug2 — goToStep 参数类型错误**：`handleShortcutAction` 的 `goBonusCalc` 分支从 `goToStep('forward')` 改为 `showPage('forward-calculation-page') + goToStep(1)`。`goToStep` 期望数字参数（1/2/3/4），原字符串 `'forward'` 导致所有步骤被隐藏但无一步显示。<br>**Bug3 — 税率表速查无 UI**：在 `tax-assistant-ui.js#L464-L571` 新增 `buildRateTableModalHTML()` 和 `showRateTable()` 函数，动态生成含综合所得(7级)、年终奖(7级)、经营所得(5级)三张税率表 + 分类所得 20% 比例税率说明的模态框。模态框动态创建到 body，含关闭按钮和遮罩点击关闭。税率表数据与 `tax-calculator.js#L7-L43` 保持同步。 |
+| 2026-09-07 | 1.3.0 | 个人中心模块卡片 6 → 7 张：新增 `profile-card-feedback`「意见反馈」（点击开反馈弹窗）。卡片复用 `#profile-cards-grid` 网格（规则 3.5，1/2/3 列），无需新增响应式规则；§5.3 卡片 ID 匹配核查同步为 7 个。弹窗复用通用 `openModal` 组件（桌面居中、移动端全宽安全区），随通用弹窗样式自适应 |

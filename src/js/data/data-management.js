@@ -125,6 +125,14 @@ function saveCalculationResult() {
 
         // 保存到本地存储
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+
+        // 阶段8：匿名埋点信号（综合所得），由 index.html 监听器统一上报
+        try {
+            if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+                document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type: 'forward' } }));
+            }
+        } catch (e) { /* 埋点失败静默 */ }
+
         console.log('%c[EuriskoTax] SAVE → 保存成功，历史记录共 ' + calculationHistory.length + ' 条', 'color: #16a34a; font-weight: bold;');
 
         // 显示保存成功提示

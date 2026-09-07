@@ -138,7 +138,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🛑 停止监听模式** | `Stop-Job testwatch` | 停止 test:watch 任务 |
 | **📁 打开 tests 目录** | 资源管理器 | 在文件管理器中打开 tests 目录 |
 
-> **发布门禁卡片**：本面板底部还含 **✅ 本地登录链路验证（verify:local）** = `npm run verify:local`（`server/scripts/verify-local-auth.js`）。部署前**必须跑绿**：真实起本地后端验证 登录 dev 账号 → 邀请码+验证码注册新号 → 新号登录 全链路，并核对前端/SW 指纹。失败显示红字，此时**禁止发布**。
+> **发布门禁卡片**：本面板底部还含 **✅ 本地登录链路验证（verify:local）** = `npm run verify:local`（`server/scripts/verify-local-auth.js`）。部署前**必须跑绿**（共 20 项断言）：真实起本地后端验证 前端与 SW 网络优先特征冒烟 → 登录 dev 账号 → 反馈落库 + 用户/管理员列表 + 状态跟进 → 匿名埋点 + 聚合统计 → 邀请码+验证码注册新号 → 新号登录身份。失败显示红字，此时**禁止发布**。
 
 ### 4. 📋 日志查看
 

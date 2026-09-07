@@ -225,6 +225,52 @@ async function deleteCalculation(id) {
     return await apiRequest(`/calculations/${id}`, 'DELETE', null, true);
 }
 
+// 提交意见反馈（登录用户，落库）
+async function submitFeedback(data) {
+    return await apiRequest('/feedback', 'POST', {
+        category: data.category || 'general',
+        content: data.content,
+        rating: data.rating || null
+    }, true);
+}
+
+// 获取当前用户提交过的反馈列表
+async function getMyFeedback() {
+    return await apiRequest('/feedback', 'GET', null, true);
+}
+
+// 匿名计算埋点（阶段8）：登录用户在保存计算后上报"计算类型"，供运营观察功能使用分布。
+// 关键设计：
+//   - 仅上报 type，绝不携带任何收入/扣除等输入数据（守住"收入不出浏览器"的隐私承诺）；
+//   - 不走 apiRequest：token 过期时静默忽略，避免触发整页刷新打断用户；
+//   - 失败静默、不重试、离线不积压。
+const CALC_TYPE_MAP = {
+    forward: 'comprehensive',          // 综合所得（历史记录中的 type）
+    comprehensive: 'comprehensive',
+    business: 'business',              // 经营所得
+    classification: 'classification',  // 分类所得
+    reverse: 'reverse'                 // 反向倒算
+};
+
+async function trackCalculation(type) {
+    const token = getAuthToken();
+    if (!token) return;
+    const normalized = CALC_TYPE_MAP[type];
+    if (!normalized) return;
+    try {
+        await fetch(`${API_BASE_URL}/stats/events`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ type: normalized })
+        });
+    } catch (err) {
+        // 埋点失败静默：统计属辅助数据，不影响用户主流程
+    }
+}
+
 function isLoggedIn() {
     return !!getAuthToken();
 }
@@ -253,6 +299,9 @@ const apiClient = {
     getCalculationHistory,
     getCalculationById,
     deleteCalculation,
+    submitFeedback,
+    getMyFeedback,
+    trackCalculation,
     isLoggedIn
 };
 

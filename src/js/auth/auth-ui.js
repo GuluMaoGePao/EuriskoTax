@@ -666,6 +666,14 @@ const PROFILE_CARDS_CONFIG = [
         desc: '了解更多信息',
         iconWrapClass: 'w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center mb-4',
         iconClass: 'fa fa-info-circle text-2xl text-indigo-600'
+    },
+    {
+        id: 'profile-card-feedback',
+        icon: 'fa-comments-o',
+        title: '意见反馈',
+        desc: '提交 Bug、建议或评分，被采纳有奶茶奖励',
+        iconWrapClass: 'w-12 h-12 rounded-lg bg-rose-100 flex items-center justify-center mb-4',
+        iconClass: 'fa fa-comments-o text-2xl text-rose-600'
     }
 ];
 
@@ -1368,7 +1376,8 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-data', pageId: 'profile-data-page' },
         { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
-        { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) }
+        { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
+        { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) }
     ];
 
     const profileCardsGrid = document.getElementById('profile-cards-grid');
@@ -1446,6 +1455,23 @@ function setupAuthEventListeners() {
     };
     bindCloseBtn('close-help-modal', 'help-modal');
     bindCloseBtn('close-about-modal', 'about-modal');
+    bindCloseBtn('close-feedback-modal', 'feedback-modal');
+
+    // 意见反馈弹窗：取消 / 内容字数统计 / 提交
+    const feedbackModalEl = document.getElementById('feedback-modal');
+    const feedbackCancelBtn = document.getElementById('feedback-cancel-btn');
+    if (feedbackCancelBtn) {
+        feedbackCancelBtn.addEventListener('click', () => closeModal(feedbackModalEl));
+    }
+    const feedbackContentInput = document.getElementById('feedback-content');
+    if (feedbackContentInput) {
+        feedbackContentInput.addEventListener('input', () => {
+            const countEl = document.getElementById('feedback-content-count');
+            if (countEl) countEl.textContent = String(feedbackContentInput.value.length);
+        });
+    }
+    const feedbackSubmitBtn = document.getElementById('feedback-submit-btn');
+    if (feedbackSubmitBtn) feedbackSubmitBtn.addEventListener('click', handleSubmitFeedback);
 
     // ESC 关闭当前最上层弹窗（协议/隐私/帮助/关于/alert/confirm 统一处理）
     document.addEventListener('keydown', (e) => {
@@ -1733,5 +1759,31 @@ window.deleteHistoryItem = deleteHistoryItem;
 window.showPage = showPage;
 window.goBack = goBack;
 window.showAlert = showAlert;
+
+// === 意见反馈提交（个人中心"意见反馈"卡片入口） ===
+// 提交后落库，供开发者跟进；被采纳的建议将获得奶茶奖励
+async function handleSubmitFeedback() {
+    const modal = document.getElementById('feedback-modal');
+    const contentInput = document.getElementById('feedback-content');
+    const content = contentInput ? contentInput.value.trim() : '';
+    if (!content) {
+        showAlert('请填写反馈内容');
+        return;
+    }
+    const category = document.getElementById('feedback-category')?.value || 'general';
+    const ratingRaw = document.getElementById('feedback-rating')?.value || '';
+    const rating = ratingRaw ? Number(ratingRaw) : null;
+
+    try {
+        await apiClient.submitFeedback({ category, content, rating });
+        if (contentInput) contentInput.value = '';
+        const countEl = document.getElementById('feedback-content-count');
+        if (countEl) countEl.textContent = '0';
+        closeModal(modal);
+        showAlert('感谢您的反馈！被采纳的建议我们将送上奶茶奖励', 'success');
+    } catch (err) {
+        showAlert(err.message || '提交失败，请稍后重试');
+    }
+}
 
 export { initAuth, updateAuthUI, apiClient, showAlert };
