@@ -713,6 +713,21 @@
                 transform: scale(0.97);
                 transition: transform 0.1s ease;
             }
+
+            /* 注册表单：必填星号与字段校验错误提示 */
+            .req-star {
+                font-style: normal;
+                margin-left: 2px;
+                color: inherit;
+            }
+            .label-danger,
+            .label-danger .req-star {
+                color: #dc2626 !important;
+            }
+            .field-error {
+                color: #dc2626;
+                @apply text-xs mt-1.5;
+            }
         }
 
         /* 暗色模式基础样式 */
@@ -1629,9 +1644,9 @@
                         </div>
                     </div>
                     <div class="flex items-center justify-between">
-                        <label class="inline-flex items-center">
+                        <label class="inline-flex items-center cursor-pointer select-none" title="勾选后，登录状态将在本机保持；未勾选则关闭浏览器后自动退出登录">
                             <input type="checkbox" id="remember-me" class="form-checkbox text-primary">
-                            <span class="ml-2 text-sm text-gray-600">记住我</span>
+                            <span class="ml-2 text-sm text-gray-600">保持登录状态</span>
                         </label>
                         <a href="#" id="forgot-password" class="text-sm text-primary hover:underline">忘记密码？</a>
                     </div>
@@ -1642,32 +1657,38 @@
                 
                 <!-- 注册表单 -->
                 <form id="register-form" class="space-y-4 hidden">
+                    <div class="text-right -mb-1">
+                        <span class="text-xs text-gray-400">带 <i class="req-star" aria-hidden="true">*</i> 的为必填项，请如实填写</span>
+                    </div>
                     <div>
-                        <label for="register-username" class="label">用户名</label>
+                        <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                             <input type="text" id="register-username" class="input-field pl-10" placeholder="请输入用户名">
                         </div>
+                        <p id="register-username-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
-                        <label for="register-email" class="label">邮箱</label>
+                        <label for="register-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                             <input type="email" id="register-email" class="input-field pl-10" placeholder="请输入邮箱">
                         </div>
+                        <p id="register-email-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
-                        <label for="register-code" class="label">邮箱验证码</label>
+                        <label for="register-code" class="label">邮箱验证码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6位验证码" maxlength="6" autocomplete="off">
+                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
                             </div>
                             <button type="button" id="send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
                                 发送验证码
                             </button>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">验证码将发送到上方邮箱，10分钟内有效</p>
+                        <p id="register-code-error" class="field-error hidden" role="alert"></p>
+                        <p class="text-xs text-gray-500 mt-1">验证码将发送至您填写的邮箱，请在 10 分钟内完成输入</p>
                     </div>
                     <div>
                         <label for="register-phone" class="label">手机号（选填）</label>
@@ -1675,39 +1696,46 @@
                             <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                             <input type="tel" id="register-phone" class="input-field pl-10" placeholder="请输入手机号">
                         </div>
+                        <p id="register-phone-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
-                        <label for="register-password" class="label">密码</label>
+                        <label for="register-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="请输入密码（至少6位）">
+                            <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="请输入密码（至少 6 位）">
                             <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
+                        <p id="register-password-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
-                        <label for="register-confirm-password" class="label">确认密码</label>
+                        <label for="register-confirm-password" class="label">确认密码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                             <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码">
                             <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
+                        <p id="register-confirm-password-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
-                        <label for="register-invite-code" class="label">邀请码</label>
+                        <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                             <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="公测期邀请码（一码一用）" autocomplete="off">
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">每个邀请码仅可注册一个账号，可向开发者获取</p>
+                        <p id="register-invite-code-error" class="field-error hidden" role="alert"></p>
+                        <p class="text-xs text-gray-500 mt-1">每个邀请码仅限注册一个账号，请通过开发者获取</p>
                     </div>
-                    <div class="flex items-start">
-                        <input type="checkbox" id="register-agree" class="form-checkbox text-primary mt-0.5">
-                        <label for="register-agree" class="ml-2 text-xs text-gray-500 leading-relaxed">
-                            我已阅读并同意
-                            <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="text-primary hover:underline">《用户协议》</a>
-                            和
-                            <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
-                        </label>
+                    <div>
+                        <div class="flex items-start">
+                            <input type="checkbox" id="register-agree" class="form-checkbox text-primary mt-0.5">
+                            <label for="register-agree" class="ml-2 text-xs text-gray-500 leading-relaxed">
+                                我已阅读并同意
+                                <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="text-primary hover:underline">《用户协议》</a>
+                                和
+                                <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
+                            </label>
+                        </div>
+                        <p id="register-agree-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <button type="button" id="register-submit" class="btn btn-primary w-full py-3 text-lg">
                         注册
@@ -1739,7 +1767,7 @@
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6位验证码" maxlength="6" autocomplete="off">
+                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
                             </div>
                             <button type="button" id="reset-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
                                 发送验证码
@@ -1750,7 +1778,7 @@
                         <label for="reset-new-password" class="label">新密码</label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少6位）">
+                            <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少 6 位）">
                             <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
                     </div>
@@ -1767,22 +1795,6 @@
                     </button>
                 </div>
                 
-                <!-- 分隔线 -->
-                <div id="auth-divider" class="my-6 flex items-center">
-                    <div class="flex-1 border-t border-gray-200"></div>
-                    <span class="px-4 text-sm text-gray-500">或</span>
-                    <div class="flex-1 border-t border-gray-200"></div>
-                </div>
-                
-                <!-- 其他登录方式 -->
-                <div id="auth-social-row" class="flex justify-center space-x-4">
-                    <button id="social-wechat-btn" title="微信登录暂未开放" class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-                        <i class="fa fa-weixin text-green-600 text-xl"></i>
-                    </button>
-                    <button id="social-qq-btn" title="QQ 登录暂未开放" class="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-                        <i class="fa fa-qq text-blue-500 text-xl"></i>
-                    </button>
-                </div>
             </div>
             
             <!-- 底部信息 -->
@@ -5563,7 +5575,7 @@
                 <p>您有权删除您的账号及相关数据。登录后进入"个人中心 → 账户设置 → 注销账号"即可自助注销（需邮箱确认），注销后账号与数据将被永久删除。如需帮助，请联系开发者。</p>
 
                 <p><strong>五、Cookie 与本地存储</strong></p>
-                <p>本应用使用 localStorage / sessionStorage 存储登录状态（是否勾选"记住我"决定会话周期）和税务档案等偏好设置，不使用跟踪 Cookie。清除浏览器数据不会影响服务器端数据。</p>
+                <p>本应用使用 localStorage / sessionStorage 存储登录状态（是否勾选"保持登录状态"决定登录有效期）和税务档案等偏好设置，不使用跟踪 Cookie。清除浏览器数据不会影响服务器端数据。</p>
 
                 <p><strong>六、未成年人保护</strong></p>
                 <p>本应用面向个人税务计算需求，不建议未成年人使用。如发现未成年人注册账号，我们将予以注销。</p>
@@ -5844,7 +5856,7 @@
                         <div class="form-group">
                             <label class="label">新密码</label>
                             <div class="relative">
-                                <input type="password" id="profile-password" class="input-field pr-10" placeholder="请输入新密码（至少6位）">
+                                <input type="password" id="profile-password" class="input-field pr-10" placeholder="请输入新密码（至少 6 位）">
                                 <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                             </div>
                         </div>

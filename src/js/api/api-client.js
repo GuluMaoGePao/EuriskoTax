@@ -8,7 +8,7 @@ const API_BASE_URL = (() => {
 })();
 
 // 会话存储策略：
-//   - 登录时勾选「记住我」→ localStorage（跨浏览器会话保持登录）
+//   - 登录时勾选「保持登录状态」→ localStorage（跨浏览器会话保持登录）
 //   - 未勾选 → sessionStorage（关闭标签页/浏览器即失效）
 // 读取时两级都查，兼容历史版本只写 localStorage 的旧数据。
 function getAuthToken() {
@@ -159,7 +159,7 @@ async function resetPassword(email, verificationCode, newPassword) {
     });
 }
 
-// remember = true → token 存 localStorage（勾选"记住我"），false → sessionStorage（关浏览器即失效）
+// remember = true → token 存 localStorage（勾选"保持登录状态"），false → sessionStorage（关闭浏览器即失效）
 async function loginUser(email, password, remember = true) {
     const result = await apiRequest('/auth/login', 'POST', {
         email,
