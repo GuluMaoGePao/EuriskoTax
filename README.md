@@ -9,7 +9,7 @@
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | CHANGELOG 最新 **1.6.0**（详见 [CHANGELOG.md](CHANGELOG.md)；`package.json` 版本戳 1.5.1 尚未随 1.5.2/1.6.0 同步，下次发布一并处理） |
+| 版本 | CHANGELOG 最新 **1.6.0**（详见 [CHANGELOG.md](CHANGELOG.md)；`package.json` 已同步为 1.6.0） |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |
 | 登录/找回 | 邮箱登录（支持"记住我"）、注册勾选协议、忘记密码**邮箱验证码自助找回** |

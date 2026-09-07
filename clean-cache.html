@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>EuriskoTax · 一键重置缓存</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8, #3730a3);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        padding: 16px;
+    }
+    .card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.3);
+        max-width: 460px;
+        width: 100%;
+        padding: 32px 28px;
+        text-align: center;
+    }
+    .icon { font-size: 44px; line-height: 1; margin-bottom: 12px; }
+    h1 { font-size: 20px; color: #1f2937; margin-bottom: 8px; }
+    .desc { font-size: 13px; color: #6b7280; line-height: 1.8; margin-bottom: 20px; }
+    .status {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 13px;
+        color: #475569;
+        min-height: 60px;
+        max-height: 200px;
+        overflow-y: auto;
+        line-height: 1.9;
+        margin-bottom: 20px;
+        white-space: pre-wrap;
+    }
+    .status.done { border-color: #86efac; background: #f0fdf4; color: #166534; }
+    .btn {
+        display: inline-block;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 28px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { font-size: 12px; color: #9ca3af; margin-top: 12px; }
+</style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">🧹</div>
+        <h1>一键重置缓存</h1>
+        <p class="desc">
+            当页面行为与最新版不符（如登录/注册点不动、协议弹窗异常、功能未更新）时，<br>
+            点击下方按钮清除本站点的 <strong>Service Worker 与离线缓存</strong>。
+            本操作<b>不会</b>删除账号登录状态与本地计算历史。
+        </p>
+        <div id="status" class="status">准备就绪。点击「开始重置」执行。</div>
+        <button id="run-btn" class="btn btn-primary">开始重置</button>
+        <p class="hint">重置完成后将自动返回首页；如未跳转请手动刷新。</p>
+    </div>
+
+    <script>
+    // 独立清洗页：即使旧版 Service Worker 死锁缓存了首页，
+    // 本页（全新 URL）也会被旧 SW 的 miss→网络 流程拉到，从而解锁清理能力。
+    (function () {
+        var statusEl = document.getElementById('status');
+        var btn = document.getElementById('run-btn');
+        var running = false;
+
+        function log(text, isDone) {
+            statusEl.textContent = (statusEl.textContent ? statusEl.textContent + '\n' : '') + text;
+            if (isDone) statusEl.classList.add('done');
+        }
+
+        function nuke() {
+            if (running) return;
+            running = true;
+            btn.disabled = true;
+            statusEl.classList.remove('done');
+            log('开始清理本站点缓存与 Service Worker…');
+
+            var tasks = [];
+            var swCount = 0;
+
+            // 1) 注销全部 Service Worker
+            if ('serviceWorker' in navigator) {
+                tasks.push(
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        swCount = regs.length;
+                        return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                    }).then(function () {
+                        log('✔ 已注销 Service Worker ' + swCount + ' 个');
+                    }).catch(function (e) {
+                        log('⚠ Service Worker 注销失败：' + (e && e.message || e));
+                    })
+                );
+            } else {
+                log('· 当前环境不支持 Service Worker');
+            }
+
+            // 2) 清除全部 Cache Storage
+            if (window.caches && window.caches.keys) {
+                tasks.push(
+                    window.caches.keys().then(function (keys) {
+                        return Promise.all(keys.map(function (k) {
+                            return window.caches.delete(k);
+                        })).then(function () {
+                            log('✔ 已清除离线缓存 ' + keys.length + ' 项');
+                        });
+                    }).catch(function (e) {
+                        log('⚠ 缓存清除失败：' + (e && e.message || e));
+                    })
+                );
+            } else {
+                log('· 当前环境无可清除缓存');
+            }
+
+            Promise.all(tasks).then(function () {
+                log('✅ 全部完成！即将返回首页…', true);
+                setTimeout(function () {
+                    // 尽量绕过残余 HTTP 缓存再取首页
+                    location.replace('./index.html');
+                }, 900);
+            });
+        }
+
+        btn.addEventListener('click', nuke);
+        // 支持 ?auto=1：入口链接直达即自动清洗（测试/联调场景）
+        if (location.search.indexOf('auto') !== -1) {
+            nuke();
+        }
+    })();
+    </script>
+</body>
+</html>

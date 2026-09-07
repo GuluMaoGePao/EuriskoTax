@@ -1793,6 +1793,9 @@
                 <p class="text-blue-300 text-xs">
                     © 2026 EuriskoTax · 仅供参考，实际纳税请以税务部门核算为准
                 </p>
+                <p class="text-blue-200/90 text-xs mt-1">
+                    <a href="clean-cache.html?auto=1" class="underline hover:text-white">遇到旧版页面？点此一键重置缓存</a>
+                </p>
             </div>
         </div>
     </div>
@@ -5068,7 +5071,7 @@
     </div>
 
     <!-- 帮助模态框 -->
-    <div id="help-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="help-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -5081,7 +5084,7 @@
                             <p class="text-white/80 text-sm">了解如何使用本工具</p>
                         </div>
                     </div>
-                    <button id="close-help-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <button id="close-help-modal" onclick="closeModal(document.getElementById('help-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
@@ -5286,7 +5289,7 @@
     </div>
 
     <!-- 意见反馈模态框（个人中心入口，登录后提交；内容落库供开发者跟进） -->
-    <div id="feedback-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="feedback-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] overflow-hidden flex flex-col">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -5299,7 +5302,7 @@
                             <p class="text-white/80 text-xs">Bug、建议或评分，被采纳的反馈有奶茶奖励</p>
                         </div>
                     </div>
-                    <button id="close-feedback-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <button id="close-feedback-modal" onclick="closeModal(document.getElementById('feedback-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
@@ -5430,6 +5433,46 @@
             closePolicyModal(e.currentTarget.id);
         }
     }
+
+    // ===== 通用弹窗自包含兜底（与协议弹窗同一思路）=====
+    // help/about/feedback/alert/confirm 及动态弹窗原依赖 auth-ui 动态 import 成功后注入的
+    // window.openModal/closeModal。若该模块加载失败或时序延后，早期点击会"毫无反应"。
+    // 此处提前注册同语义版本（幂等、自管栈）；auth-ui 加载成功后会以等价实现覆盖
+    // window 引用，两个版本各管各的打开记录，互不冲突，行为一致。
+    var _genericModalStack = [];
+    var _genericEscBound = false;
+    function openModal(modal) {
+        if (!modal) return;
+        if (_genericModalStack.indexOf(modal) === -1) _genericModalStack.push(modal);
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () {
+            modal.classList.remove('opacity-0');
+            var inner = modal.firstElementChild;
+            if (inner) inner.classList.remove('scale-95');
+        }, 10);
+        if (!_genericEscBound) {
+            _genericEscBound = true;
+            document.addEventListener('keydown', function (ev) {
+                if (ev.key !== 'Escape' || _genericModalStack.length === 0) return;
+                closeModal(_genericModalStack[_genericModalStack.length - 1]);
+            });
+        }
+    }
+    function closeModal(modal) {
+        if (!modal) return;
+        var idx = _genericModalStack.indexOf(modal);
+        if (idx !== -1) _genericModalStack.splice(idx, 1);
+        modal.classList.add('opacity-0');
+        var inner = modal.firstElementChild;
+        if (inner) inner.classList.add('scale-95');
+        if (_genericModalStack.length === 0) document.body.style.overflow = '';
+        setTimeout(function () {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+    window.openModal = openModal;
+    window.closeModal = closeModal;
     </script>
 
     <!-- 用户协议模态框 -->
@@ -5529,12 +5572,12 @@
     </div>
 
     <!-- 关于模态框 -->
-    <div id="about-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="about-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-bold">关于本程序</h3>
-                    <button id="close-about-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <button id="close-about-modal" onclick="closeModal(document.getElementById('about-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
@@ -5577,8 +5620,11 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.5.1</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.6.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
+                        <p class="text-xs mt-2">
+                            <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
+                        </p>
                     </div>
                 </div>
             </div>
