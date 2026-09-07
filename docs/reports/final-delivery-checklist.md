@@ -1,10 +1,10 @@
 # EuriskoTax 最终项目交付清单
 
 **交付日期**: 2026-08-05（首次交付基线）
-**项目版本**: 1.1.0 → 已随迭代演进至 **1.5.0**（2026-09-06 更新：生产上线 + PWA + 注册闭环 + 忘记密码自助找回 + 协议合规交互，变更明细见 [CHANGELOG.md](../../CHANGELOG.md) 与 [development-plan.md](../development/development-plan.md)）
+**项目版本**: 1.1.0 → 已随迭代演进至 **1.6.0**（2026-09-07 更新：意见反馈落库闭环 + 匿名计算埋点 + 管理员反馈接口，变更明细见 [CHANGELOG.md](../../CHANGELOG.md) 与 [development-plan.md](../development/development-plan.md)）
 **交付范围**: 代码重构 + UI 重设计 + 悬浮税助手 + 工具封装 + 单元测试（203 个）+ 性能基准 + 交互测试 + 交付文档
 
-> 本文档为重构/质量交付记录。当前项目状态（生产部署、v1.5.0 功能）以 docs/README.md 索引下的文档为准。
+> 本文档为重构/质量交付记录。当前项目状态（生产部署、v1.6.0 功能）以 docs/README.md 索引下的文档为准。
 
 ---
 
@@ -86,7 +86,7 @@
 | 环境初始化 | tests/setup.js |
 | 源码加载器 | tests/helpers/load-source.js |
 
-### 3.2 测试文件（2026-09-06 更新：6 套件 203 个全通过）
+### 3.2 测试文件（2026-09-07 复跑：6 套件 203 个全通过）
 
 | 文件 | 测试数 | 覆盖范围 |
 |------|--------|---------|
@@ -210,8 +210,11 @@ npm run test:performance    # 性能基准测试
 docs/
 ├── README.md                          # 文档中心索引（唯一入口）
 ├── api/api-reference.md               # API 接口参考文档
-├── development/development-plan.md    # 开发计划 / 阶段状态 / 技术选型
-├── guides/*                           # 计税规则 / UI 复用 / 响应式 / GUI 按钮速查
+├── development/
+│   ├── development-plan.md            # 开发计划 / 阶段状态 / 技术选型
+│   ├── file-management-policy.md      # 文件管理规范
+│   └── stage10-free-pro-plan.md       # 阶段10 免费/专业版实施方案
+├── guides/*                           # 计税规则 / UI 复用 / 响应式 / GUI 按钮速查 / 开发工作流
 ├── marketing/cold-start-materials.md  # 冷启动推广素材
 ├── reports/
 │   ├── final-delivery-checklist.md    # 本文档（交付总览）
@@ -285,10 +288,10 @@ docs/
 | 代码重构 | 已完成（3 批次） |
 | UI 重设计 | 已完成（个人中心子导航栏） |
 | Phase 4 悬浮税助手 | 已完成（数据 + UI + MockClient 工具封装 + 并发 reqId 修复） |
-| 单元测试 | 已通过（203/203，2026-09-06 复测） |
+| 单元测试 | 已通过（203/203，2026-09-07 复测） |
 | 性能基准 | 已达标（核心 < 3.1μs，个人中心 ~80ms，联想高频 < 200ms） |
 | 交互测试 | 已通过（浅色/深色/移动端 + 税助手抽屉/联想/收藏/回滚/日志） |
-| 文档 | 已生成并同步至 v1.4.0 |
+| 文档 | 已生成并同步至 v1.6.0 |
 
 **交付结论（v1.1.0 基线）**: 全部重构、Phase 4 悬浮税助手与工具封装、测试和文档工作已完成，所有质量验收标准满足，可交付。
 
@@ -306,3 +309,18 @@ docs/
 | 运营 | 反馈/统计概览/邀请码管理 API + 冷启动素材 | 见 marketing 与 api-reference |
 | 测试 | 新增 home-page / profile-page 两套件 | 203 全通过 |
 | 文档 | 全量同步至 v1.4.0（2026-09-06） | 见 CHANGELOG 与 docs/README |
+
+---
+
+## 附：v1.6.0 增量交付（2026-09-07）
+
+在 v1.1.0 交付基线 + v1.4.0 增量之上，随 v1.6.0 收尾新增的交付物：
+
+| 类别 | 内容 | 说明 |
+|------|------|------|
+| 数据层 | Prisma `Feedback` / `CalcEvent` 模型 + 生产迁移 `20260907_add_feedback_and_calcevent` | 双 schema（生产/本地 SQLite）同构 |
+| 反馈闭环 | `POST/GET /api/feedback` 落库 + 个人中心"意见反馈"卡片 | Bug/建议/评分，状态 open/resolved/closed |
+| 管理员接口 | `GET/PATCH /api/feedback/admin` 反馈列表与状态跟进 | `X-Admin-Token`；`requireAdmin` 抽为 `middleware/adminAuth.js` |
+| 匿名埋点 | `POST /api/stats/events` + `CalcEvent` 日聚合 | 仅计算类型，不含收入/扣除等输入；`overview` 计算指标改读聚合表 |
+| 测试 | profile-page fixture 同步 7 张模块卡片；`verify:local` 扩至 20 项断言 | 单测 203/203 + 门禁 20/20 全绿 |
+| 文档 | 全量同步至 v1.6.0（2026-09-07） | 见 CHANGELOG 与 docs/README |

@@ -15,8 +15,9 @@ model User {
   password_hash String
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
-  
+
   calculations Calculation[]
+  feedbacks     Feedback[]
 }
 
 model Calculation {
@@ -52,4 +53,31 @@ model VerificationCode {
   created_at DateTime @default(now())
 
   @@index([email, purpose])
+}
+
+// 用户意见反馈：种子期收集 Bug/建议/评分，管理员跟进状态（open/resolved/closed）
+model Feedback {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  category   String   @default("general") // bug / suggestion / other / general
+  rating     Int?     // 评分 1-5，选填
+  content    String
+  status     String   @default("open")
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+// 匿名计算埋点聚合表：登录用户保存计算时上报，仅记录计算类型，不含任何收入/扣除等输入数据
+// date 存北京时间当日 0 点的 UTC 时刻，同一 (date, type) 按日聚合计数
+model CalcEvent {
+  id   Int      @id @default(autoincrement())
+  date DateTime
+  type String // comprehensive / business / classification / reverse
+  count Int      @default(0)
+
+  @@unique([date, type])
+  @@index([date])
 }

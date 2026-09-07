@@ -184,7 +184,7 @@ EuriskoTax/
 
 ## 🔄 数据库表设计（当前生产 schema · Prisma / PostgreSQL）
 
-> 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **4 张表**：
+> 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **6 张表**（阶段8 新增 feedbacks / calc_events，迁移 `20260907_add_feedback_and_calcevent`）：
 
 ### users（用户）
 
@@ -227,6 +227,29 @@ EuriskoTax/
 | attempts | INT（默认 0） | 错误尝试计数 |
 | expires_at / created_at | DateTime | 过期与创建时间 |
 
+### feedbacks（用户意见反馈 · 阶段8 新增）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | ID |
+| user_id | INT FK（用户级联删除） | 提交用户 |
+| category | STRING（默认 general） | bug / suggestion / other / general |
+| rating | INT? | 评分 1-5，选填 |
+| content | STRING | 内容（≤5000 字符） |
+| status | STRING（默认 open） | open / resolved / closed |
+| created_at | DateTime | 提交时间 |
+
+### calc_events（匿名计算埋点聚合 · 阶段8 新增）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | ID |
+| date | DateTime | 北京时间当日 0 点对应 UTC 时刻 |
+| type | STRING | comprehensive / business / classification / reverse |
+| count | INT（默认 0） | 当日该类计算次数 |
+
+> 说明：`(date, type)` 唯一，按日聚合。仅记录计算类型，**不含任何收入/扣除输入数据**；数据供运营统计 `overview` 使用。
+
 ---
 
 ## 🔌 API接口设计
@@ -246,9 +269,9 @@ EuriskoTax/
 | 阶段5：部署与上线准备 | ✅ 已完成（方案调整为Zeabur托管） | 1周 | 2026-07-05 |
 | 阶段6：生产环境硬化（v1.4.0） | ✅ 已完成 | 2天 | 2026-09-05 |
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
-| 阶段8：首批测试用户运营 | 🚧 进行中（冷启动推广素材已备好） | 2周 | 预计 2026-09-20 |
+| 阶段8：首批测试用户运营 | 🚧 进行中（素材已备好；匿名埋点 + 反馈落库 + 管理员跟进收尾 ✅ 2026-09-07） | 2周 | 预计 2026-09-20 |
 | 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
-| 阶段10：免费/专业版体系 | ⏳ 待开始 | 1周 | 预计 2026-10 月初 |
+| 阶段10：免费/专业版体系 | ⏳ 待开始（实施方案已确认待命，见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)） | 1周 | 预计 2026-10 月初 |
 
 ### 当前状态
 
@@ -263,7 +286,8 @@ EuriskoTax/
 - 邮件配置（注册邮箱验证码依赖，缺配置则注册不可用）：SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_PORT（465 或 587）/ SMTP_SECURE / SMTP_FROM_NAME —— 已在 Zeabur 面板配置，见 [api-reference 8.2](../api/api-reference.md)
 - 2026-09-05 全链路验证通过：注册（邮箱验证码 + 一机一码邀请码）→ 登录 → JWT 受保护接口 → CORS 限制 → 安全响应头
 - 注册机制（2026-09-06）：**邮箱验证码 + 一机一码邀请码**（`EURISKO-XXXX-XXXX`，表内校验、一次性、事务原子消耗；服务启动表空时自动兜底生成 20 个）。固定码 `EURISKO2026BETA` 已不再接受
-- 运营统计：GET /api/stats/overview（X-Admin-Token 认证），注册数/计算次数/近7日趋势
+- 运营统计（v1.6.0）：GET /api/stats/overview（X-Admin-Token 认证）计算指标改读 `CalcEvent` 聚合表；计算次数由登录用户保存计算时的匿名埋点（POST /api/stats/events，仅上报类型）驱动，冷启动即可观察（2026-09-07 起不再恒 0）
+- 反馈闭环（v1.6.0）：POST/GET /api/feedback 提交落库（`Feedback` 表）+ 个人中心"意见反馈"卡片；管理员 GET/PATCH /api/feedback/admin 列表与状态跟进（X-Admin-Token，`middleware/adminAuth.js` 共享校验）
 - PWA（阶段 9）：manifest + service-worker 已上线；SW 为网络优先「瘦缓存」策略（不预缓存整壳、在线永远最新、访问过后离线可算、发版无需手动清缓存），详见 CHANGELOG 1.5.2
 
 **本地开发环境**：
@@ -400,10 +424,10 @@ cpolar http 3000 -region=cn
    - ✅ 本地验证通过：SW 激活、在线导航始终网络返回、断网回退缓存命中
    - ✅ 发版不再需要递增缓存版本号、用户无需手动清缓存（2026-09-06 重构，根治旧 HTML/旧脚本残留）
 
-2. **免费/专业版体系（阶段10）**
+2. **免费/专业版体系（阶段10）** —— 实施方案已确认待命，详见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)
    - 未登录 = 免费版全功能；登录 = 解锁云端同步
    - 历史记录"本地 ↔ 云端"合并策略（登录后上传本地记录）
-   - PDF 报告导出（专业版）、反馈入口复用 `/api/feedback`
+   - PDF 报告导出（专业版）、反馈入口复用 `/api/feedback`（已落库闭环）
 
 3. **B端 API 开放（中长期）**
    - 将服务端计税能力封装为独立版本化端点（如 `/api/v1/calc/*`）
@@ -424,8 +448,8 @@ cpolar http 3000 -region=cn
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-09-06（v1.5.0：忘记密码自助找回、协议合规交互、会话记忆化，详见 CHANGELOG.md）*
-*对应项目版本：v1.5.0*
+*最后更新：2026-09-07（v1.6.0：意见反馈落库闭环、匿名计算埋点、overview 读聚合表、管理员反馈接口，详见 CHANGELOG.md）*
+*对应项目版本：v1.6.0*
 
 ---
 
@@ -533,7 +557,7 @@ cpolar http 3000 -region=cn
 
 ## 🚀 v1.4.0 上线执行记录（计划制定于 2026-09-05，已于 2026-09-05/06 全部执行完成）
 
-> 本节保留为上线计划存档。当前项目版本 **1.5.0**（2026-09-06：忘记密码自助找回、注册协议勾选、登录记住我、协议/隐私弹窗交互重构），变更明细见 [CHANGELOG.md](../../CHANGELOG.md)。
+> 本节保留为上线计划存档。存档快照版本 **1.5.0**（2026-09-06：忘记密码自助找回、注册协议勾选、登录记住我、协议/隐私弹窗交互重构）；截至 2026-09-07 已演进至 **v1.6.0**（1.5.2 SW 瘦缓存 + 1.6.0 反馈/埋点/管理员接口），全量变更见 [CHANGELOG.md](../../CHANGELOG.md)。
 
 ### 一、现状评估
 
@@ -597,7 +621,7 @@ app.use('/api/auth/', authLimiter);            // 10 次/15分
 - 微信社群裂变 → 50-200 人
 
 **邀请码机制（2026-09-06 升级为「一机一码」）**：~~固定码 `EURISKO2026BETA`~~ → `EURISKO-XXXX-XXXX` 随机码，表内校验、一次性使用、事务原子消耗；服务启动表空自动生成 20 个兜底
-**反馈闭环** ✅：`POST/GET /api/feedback` + 管理员经统计概览跟进；GUI 一键邀请码管理
+**反馈闭环** ✅（v1.6.0）：`POST/GET /api/feedback` 落库 + 个人中心"意见反馈"卡片；管理员 `GET/PATCH /api/feedback/admin` 列表与状态跟进（X-Admin-Token）；GUI 一键邀请码管理
 
 ### 五、Definition of Done
 
@@ -612,7 +636,7 @@ app.use('/api/auth/', authLimiter);            // 10 次/15分
 ```
 Day 1-2：代码层修复（Prisma + 部署入口 + rate-limit + 自检）✅ 已完成
 Day 3：  Zeabur 服务器购买 + 部署 PostgreSQL + 应用 + 环境变量 + 域名 ✅ 已完成
-Day 4：  邀请码机制 ✅ + 反馈接口 ✅ → 剩余：数据埋点（阶段8 收尾项）
+Day 4：  邀请码机制 ✅ + 反馈接口 ✅ → 数据埋点 ✅（2026-09-07：匿名计算埋点 + 反馈落库 + overview 改读聚合表 + 管理员反馈跟进接口）
 Day 5：  注册全流程完善（邮箱验证码 + 一机一码）✅ 已完成（2026-09-06）
 Day 5-6：PWA 离线化改造（阶段9）✅ 代码完成，本地验证通过
 Day 6-7：准备冷启动素材 ✅ 已备（marketing/cold-start-materials.md）

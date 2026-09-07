@@ -4,16 +4,17 @@
 
 ---
 
-## 当前状态（v1.5.0 · 2026-09-06）
+## 当前状态（v1.6.0 · 2026-09-07）
 
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | `1.5.0`（详见 [CHANGELOG.md](CHANGELOG.md)） |
-| PWA | ✅ 可安装、离线可打开应用壳 |
+| 版本 | CHANGELOG 最新 **1.6.0**（详见 [CHANGELOG.md](CHANGELOG.md)；`package.json` 版本戳 1.5.1 尚未随 1.5.2/1.6.0 同步，下次发布一并处理） |
+| PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |
 | 登录/找回 | 邮箱登录（支持"记住我"）、注册勾选协议、忘记密码**邮箱验证码自助找回** |
-| 测试 | ✅ 6 套件 203 个单元测试全通过（`npm test`） |
+| 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
+| 测试 | ✅ 6 套件 203 个单元测试全通过（`npm test`，2026-09-07 复跑）；发布门禁 `verify:local` 20 项全绿 |
 
 ---
 
@@ -55,11 +56,11 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 > ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
 
 **发布纪律（先本地验证，再部署）**：
-1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e：登录 dev 账号 / 邀请码+验证码注册新号 / 登录新号 / 前端资源冒烟）。
+1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 20 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 邀请码+验证码注册新号登录）。
 2. **上线只走安全发布流水线**（本地门禁不过就物理上推不出去）：
    - 命令行：`.\tools\ops\ops-publish.ps1`（内部 = verify:local 全绿 → git commit → push origin main → 自动轮询核对线上指纹）；
    - GUI：控制台「🔐 Git & 账号」→「🚀 安全发布」（或先点「🧪 安全发布试运行」零风险预演一次）。
-3. 线上核对项由 `.\tools\ops\ops-check-prod.ps1` 完成（无快速登录按钮、SW v8+协议守卫、auth-ui 含 dev 入口指纹、`?v=2` 版本戳等）。
+3. 线上核对项由 `.\tools\ops\ops-check-prod.ps1` 完成（10 项指纹：页面/登录表单、无 quick-login 残留、auth-ui 含 dev 入口与 409 提示、SW 无应用壳预缓存 + 协议守卫 + HTML 导航 network-first、app.js 无 `?v=` 指纹）。
 4. 老用户浏览器若仍显示旧版：`Application → Service Workers → Unregister` + `Clear site data` 后刷新。
 
 ---
@@ -70,6 +71,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 - **悬浮税助手**：28 条常见税务问答 + 搜索联想 + 收藏 + 反馈（本地优先、离线可用）
 - **云端账号**：注册/登录（邮箱验证码）、个人中心、计算历史同步（云端保存 + 本地兜底）
 - **PWA**：可安装、离线打开应用壳、更新提示
+- **运营闭环（v1.6.0）**：个人中心「意见反馈」落库（Bug/建议 + 评分，管理员可列表跟进）；登录用户保存计算仅上报"计算类型"的匿名埋点（不含任何收入/扣除输入），支撑运营统计
 - **响应式**：桌面 / 平板 / 移动端全覆盖（22 项规则）
 
 架构核心原则：**计算永远在前端，云端只做增值**（免费版离线可用；云端为账号、同步、反馈运营与未来 B 端 API 服务）。
@@ -125,7 +127,7 @@ Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 npm test                    # 运行全部单元测试（6 套件 203 个，含覆盖率报告）
 npm run test:watch          # 监听模式
 npm run test:performance    # 计税性能基准
-npm run verify:local        # 本地登录链路验证门禁（push 前必跑，见上文"发布纪律"）
+npm run verify:local        # 本地登录链路验证门禁（20 项断言，push 前必跑，见上文"发布纪律"）
 ```
 
 测试报告见 [docs/reports/test-report.md](docs/reports/test-report.md)。

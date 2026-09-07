@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.1
-> **最后更新**: 2026年9月6日（同步 v1.5.0：新增忘记密码自助找回 `send-reset-code` / `reset-password`，登录支持"记住我"会话策略，注册增加协议勾选）
+> **版本**: v2.2
+> **最后更新**: 2026年9月7日（同步 v1.6.0：反馈提交落库闭环 + 管理员反馈列表/状态跟进 + 匿名计算埋点 `POST /api/stats/events` + `overview` 计算统计改读 `CalcEvent` 聚合表 + `requireAdmin` 抽为 `middleware/adminAuth.js`）
 
 ---
 
@@ -37,7 +37,7 @@
 | 方式 | 使用位置 | 说明 |
 |------|---------|------|
 | **JWT Bearer** | 用户接口 | 请求头 `Authorization: Bearer <token>`；登录返回，默认 7 天有效（`JWT_EXPIRES_IN` 可调） |
-| **X-Admin-Token** | 管理员接口 | 请求头 `X-Admin-Token: <ADMIN_TOKEN 环境变量值>`；用于 `/api/stats`、`/api/invites` |
+| **X-Admin-Token** | 管理员接口 | 请求头 `X-Admin-Token: <ADMIN_TOKEN 环境变量值>`；用于 `/api/stats/overview`、`/api/invites`、`/api/feedback/admin`；未配置 `ADMIN_TOKEN` 返回 503 |
 | 无认证 | 计算类 / 健康检查 | 见各接口标注 |
 
 ### 1.3 通用响应格式
@@ -288,6 +288,15 @@
 
 认证：JWT。仅可访问/删除自己的记录；不存在或非本人返回 404/403。
 
+### 3.8 匿名计算埋点
+
+**POST** `/api/stats/events`
+
+认证：JWT。登录用户保存计算结果后，前端自动上报本次使用的计算类型（**匿名**，仅类型、不含任何收入/扣除等输入数据）：
+body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
+
+服务端按"北京时间日期 + 类型"日粒度聚合（`CalcEvent` 表），失败静默、不阻塞用户主流程。数据供 `GET /api/stats/overview` 计算统计使用；正常场景由前端自动触发，无需手动调用。
+
 ---
 
 ## 4. 用户反馈
@@ -304,13 +313,13 @@
 | content | string | 是 | 内容（≤5000 字符） |
 | rating | number | 否 | 评分 |
 
-> 当前实现：反馈记录到服务端日志（`[FEEDBACK]` 前缀，生产可用 Zeabur 日志/邮件转发跟进）。**尚未落库**（代码留 TODO：schema 新增 Feedback 模型后持久化）。GET 当前返回空列表。
+> 实现（v1.6.0）：反馈持久化到 `Feedback` 表，同时保留 `[FEEDBACK]` 日志便于实时提醒。category 白名单 bug/suggestion/other/general（非法值回退 general）；rating 仅接受 1-5 整数（非法传 null）；content ≤5000 字符。
 
 ### 4.2 获取我的反馈列表
 
 **GET** `/api/feedback`
 
-认证：JWT。响应：`data: []`（待持久化后返回真实列表）。
+认证：JWT。响应：`data: [{ id, category, rating, content, status, created_at }]`，按提交时间倒序。status 取值：open（待处理）/ resolved（已采纳）/ closed（已关闭）。
 
 ---
 
@@ -328,7 +337,7 @@
 |------|------|
 | generatedAt | 生成时间 |
 | users.total / newToday | 注册总数 / 今日新增（按北京时间划分日期） |
-| calculations.total / today / byType | 计算总数 / 今日 / 按类型分布 `{type: count}` |
+| calculations.total / today / byType | 计算总数 / 今日 / 按类型分布（读匿名埋点聚合表 CalcEvent；键 comprehensive/business/classification/reverse） |
 | dailyTrend | 近 7 日趋势 `[{ date, newUsers, calculations }]` |
 
 ### 5.2 邀请码列表
@@ -342,6 +351,18 @@
 **POST** `/api/invites`
 
 请求体：`{ "count": 1-100 }`（默认生成 20 个兜底码见 9.3）。响应（201）：`{ createdCount, codes: ["EURISKO-XXXX-XXXX", ...] }`。
+
+### 5.4 反馈列表（管理员）
+
+**GET** `/api/feedback/admin?status=open`
+
+`status` 可选 open/resolved/closed（缺省返回全部）。响应：`data: [{ id, category, rating, content, status, created_at, user: { id, username, email } }]`，按提交时间倒序取最近 200 条。
+
+### 5.5 更新反馈状态（管理员）
+
+**PATCH** `/api/feedback/admin/:id`
+
+请求体：`{ "status": "resolved" }`（open/resolved/closed）。用于跟进采纳状态与发放奶茶奖励。
 
 ---
 

@@ -1,4 +1,4 @@
-# EuriskoTax 文件管理规范（2026-08-16 v1.0 · 2026-09-06 v1.1）
+# EuriskoTax 文件管理规范（2026-08-16 v1.0 · 2026-09-06 v1.1 · 2026-09-07 v1.2 · 2026-09-07 v1.3）
 
 > 本规范覆盖 EuriskoTax 项目**所有文件**的存放位置、命名规则、编码要求、修改流程、验证步骤。**任何文件新增 / 移动 / 删除 / 重命名 / 格式调整，必须先查阅本规范并严格按流程执行**。
 
@@ -26,10 +26,12 @@ EuriskoTax/
 │   │   ├─ gui-button-reference.md    ← GUI 110 按钮功能参考（2026-08-16 审计基线）
 │   │   ├─ tax-calculation-rules.md
 │   │   ├─ responsive-rules-reference.md
-│   │   └─ ui-component-reuse-guide.md
+│   │   ├─ ui-component-reuse-guide.md
+│   │   └─ development-workflow.md    ← 开发工作流 / 按钮命名权威定义
 │   │
 │   ├─ development/                   ← 🟡 开发规范 / 计划 / 工程决策
 │   │   ├─ development-plan.md
+│   │   ├─ stage10-free-pro-plan.md   ← 阶段10 免费/专业版实施方案（2026-09-07 新增）
 │   │   └─ file-management-policy.md  ← ⭐ 本文档（你正在看的这个）
 │   │
 │   ├─ marketing/                     ← 🟢 推广运营素材
@@ -46,8 +48,7 @@ EuriskoTax/
 │   │   ├─ mock-client-concurrent-logging-retrospective.md
 │   │   ├─ troubleshooting-sop-template.md
 │   │   ├─ watchdog-deployment-guide.md
-│   │   ├─ watchdog-notification-and-event-log-spec.md
-│   │   └─ debug-mail-spam.md         ← 邮件密集发送问题排查
+│   │   └─ watchdog-notification-and-event-log-spec.md   ← 通知/日志规范（含 URL 邮件密集去重排查 §8）
 │   │
 │   └─ admin/                         ← 🔴 敏感文档（含密码/密钥，必须 .gitignore）
 │       └─ account-credentials.md     ← 所有账号密码统一管理
@@ -91,7 +92,7 @@ EuriskoTax/
 | 操作指南 / 手册 / 参考 | `docs/guides/` | `<主题>-guide.md` / `<主题>-reference.md` / `<主题>-rules.md` | `gui-button-reference.md` |
 | 开发计划 / 规范 / 工程决策 | `docs/development/` | `<主题>-plan.md` / `<主题>-policy.md` | `file-management-policy.md` |
 | 测试 / 交付 / 性能**报告** | `docs/reports/` | `<主题>-report.md` / `<主题>-checklist.md` | `test-report.md`、`final-delivery-checklist.md` |
-| 技术专题 / 排查记录 / SOP | `docs/tech-reports/` | `<主题>-guide.md` / `<主题>-spec.md` / `debug-<主题>.md` | `debug-mail-spam.md`、`watchdog-deployment-guide.md` |
+| 技术专题 / 排查记录 / SOP | `docs/tech-reports/` | `<主题>-guide.md` / `<主题>-spec.md` / `debug-<主题>.md` | `watchdog-deployment-guide.md`、`watchdog-notification-and-event-log-spec.md` |
 | 账号密码 / 密钥 / 部署凭证 | `docs/admin/` | `<主题>-credentials.md` | `account-credentials.md` |
 
 ### 2.2 允许的例外（.md 不在 docs/ 下的白名单）
@@ -272,3 +273,5 @@ logs/
 |------|------|---------|
 | 2026-08-16 | 1.0 | 首次发布。固化目录结构；修复 4 份零散文件位置（`account-credentials.md → docs/admin/`、`debug-mail-spam.md → docs/tech-reports/`、清理根目录冗余 3 个 .log、建立 `logs/` 目录说明）；新增 `.ps1` BOM 验证 SOP；新增 GUI 按钮路径联动清单 |
 | 2026-09-06 | 1.1 | 目录树同步 v1.4.0 事实：~~`zeabur.json`~~ → `Dockerfile`（Zeabur 部署入口）、新增 `manifest.json` / `service-worker.js`（PWA）、新增 `docs/marketing/`、后端描述 Koa → Express |
+| 2026-09-07 | 1.2 | 目录树登记新文件：`docs/development/stage10-free-pro-plan.md`（阶段10 方案，属 `development/` 规划类）、`docs/guides/development-workflow.md`（guides 漏登记的历史遗漏一并补录）；`index.html` / `service-worker.js` 注释由"v1.4.0 PWA"更新为 v1.5.2+ 网络优先瘦缓存策略 |
+| 2026-09-07 | 1.3 | 文档去重合并：`debug-mail-spam.md` 内容并入 `docs/tech-reports/watchdog-notification-and-event-log-spec.md` §8（已知问题与排查，会话 OPEN），原文件删除；目录树与 §2.1 分类表示例同步；`watchdog-notification-and-event-log-spec.md` 升 v4.0、`watchdog-deployment-guide.md` 升 v1.3（通知策略与规范对齐为 URL_CREATED + URL_CHANGED 双事件） |

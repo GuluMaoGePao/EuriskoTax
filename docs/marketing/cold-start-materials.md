@@ -1,6 +1,6 @@
 # EuriskoTax 冷启动推广素材包
 
-> 更新日期：2026-09-06 ｜ 注册机制：邮箱验证码 + **一机一码邀请码**（`EURISKO-XXXX-XXXX`）
+> 更新日期：2026-09-07 ｜ 注册机制：邮箱验证码 + **一机一码邀请码**（`EURISKO-XXXX-XXXX`）
 > 产物地址：https://euriskotax.zeabur.app
 
 > ⚠️ 2026-09-06 起固定邀请码 `EURISKO2026BETA` 已废弃，每码仅可注册一个账号。发帖前请先用本地 GUI「邀请码管理」或管理员接口生成一批码，再按本文各渠道的"领取话术"投放。
@@ -154,9 +154,15 @@
 
 ## 七、反馈收集与数据观察
 
-**反馈渠道**：产品内已内置反馈入口（登录后提交，带分类和评分），后台通过日志 `[FEEDBACK]` 前缀查看；Zeabur 控制台 → 日志 面板过滤 `FEEDBACK` 即可。
+**反馈渠道**：登录后 → 个人中心 → 「意见反馈」卡片（Bug/建议分类 + 1-5 星评分 + 详细描述）。反馈已落库（2026-09-07 起不再只写日志）：
+- 实时提醒：Zeabur 控制台 → 日志面板过滤 `[FEEDBACK]`
+- 列表拉取（含提交人邮箱，便于回访送奶茶）：
+  ```powershell
+  curl.exe -s "https://euriskotax.zeabur.app/api/feedback/admin?status=open" -H "X-Admin-Token: <你的ADMIN_TOKEN>"
+  ```
+- 跟进采纳：`PATCH /api/feedback/admin/<id>`，body `{"status":"resolved"}`（或 `"closed"`）
 
-**增长数据观察**（发帖后每天看一次）：
+**增长数据观察**（发帖后每天看一次；计算统计为登录用户保存计算时的匿名聚合，仅含类型，不含任何输入数据）：
 
 ```powershell
 curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: <你的ADMIN_TOKEN>"
@@ -164,8 +170,8 @@ curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: 
 
 关注指标：
 - `users.newToday`：每日新增注册（即刻/V2EX 发帖当天应有明显脉冲）
-- `calculations.byType`：哪类计算用得多 → 决定下个迭代方向
-- `dailyTrend`：发帖后 7 日留存趋势
+- `calculations.byType`：哪类计算用得多 → 决定下个迭代方向（键：comprehensive 综合所得 / business 经营所得 / classification 分类所得 / reverse 反向倒算）
+- `dailyTrend`：发帖后 7 日留存趋势（`calculations` 为当日聚合计算次数）
 
 **发帖节奏建议**：
 1. 第 1 天：邀请种子用户（私聊话术），收集首批反馈

@@ -7,6 +7,22 @@
 
 ---
 
+## [1.6.0] - 2026-09-07
+
+### 新增
+- **意见反馈落库闭环**：新增 `Feedback` 表，`POST /api/feedback` 真正持久化（此前仅打日志）；个人中心新增"意见反馈"卡片（登录后可见）：Bug/建议分类 + 1-5 星评分 + 5000 字内容
+- **管理员反馈跟进**：`GET /api/feedback/admin?status=` 列出反馈（含提交人信息）、`PATCH /api/feedback/admin/:id` 标记 open/resolved/closed，均走 `X-Admin-Token`
+- **匿名计算埋点**：登录用户在保存计算后仅上报"计算类型"（comprehensive/business/classification/reverse），日粒度聚合入 `CalcEvent` 表；不含任何收入/扣除输入数据，失败静默不阻塞、离线不积压
+- `GET /api/stats/overview` 的计算次数/今日/类型分布/近7日改读 `CalcEvent` 聚合表（v1.5.1 清理落库死代码后原恒 0），响应结构不变，冷启动每日 curl 观察即刻可用
+
+### 变更
+- `requireAdmin`（X-Admin-Token 校验）抽为独立中间件 `middleware/adminAuth.js`，统计/邀请码/反馈管理共用，避免从控制器互相引用
+- 埋点接口 `POST /api/stats/events` 单独限流（300 次/10 分钟/IP）
+- 隐私政策更正"使用数据"表述：计算记录本地优先、不自动上传；登录后仅匿名统计计算类型/次数（不含具体输入）
+- 发布门禁 `verify:local` 扩展 6 项 e2e 断言：反馈落库、用户列表、管理员列表/状态跟进、埋点上报、聚合统计可读
+
+---
+
 ## [1.5.2] - 2026-09-06
 
 ### 变更

@@ -5284,6 +5284,59 @@
             </div>
         </div>
     </div>
+
+    <!-- 意见反馈模态框（个人中心入口，登录后提交；内容落库供开发者跟进） -->
+    <div id="feedback-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <div class="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-comments text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold">意见反馈</h3>
+                            <p class="text-white/80 text-xs">Bug、建议或评分，被采纳的反馈有奶茶奖励</p>
+                        </div>
+                    </div>
+                    <button id="close-feedback-modal" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">反馈类型</label>
+                    <select id="feedback-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="bug">Bug 问题反馈</option>
+                        <option value="suggestion">功能建议</option>
+                        <option value="other">其他意见</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">整体评分（选填）</label>
+                    <select id="feedback-rating" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">不评分</option>
+                        <option value="5">5 星 · 非常满意</option>
+                        <option value="4">4 星 · 满意</option>
+                        <option value="3">3 星 · 一般</option>
+                        <option value="2">2 星 · 不太满意</option>
+                        <option value="1">1 星 · 很不满意</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">反馈内容 <span class="text-red-500">*</span></label>
+                    <textarea id="feedback-content" rows="5" maxlength="5000" placeholder="请描述您遇到的问题或想要的功能建议…" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                    <p class="text-right text-xs text-gray-400 mt-1"><span id="feedback-content-count">0</span>/5000</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="feedback-cancel-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-5 py-2 rounded-lg text-sm">取消</button>
+                <button id="feedback-submit-btn" class="btn btn-primary px-6 py-2 rounded-lg text-sm">提交反馈</button>
+            </div>
+        </div>
+    </div>
+
     <div id="alert-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
             <div class="p-6">
@@ -5444,12 +5497,12 @@
 
                 <p><strong>一、信息收集</strong></p>
                 <p>1. 注册信息：邮箱（用于登录和验证码）、用户名、密码（加密存储）、手机号（选填）。</p>
-                <p>2. 使用数据：您的计算记录会保存到服务器，方便历史查询和跨设备同步。</p>
+                <p>2. 使用数据：您的计算记录默认仅保存在浏览器本地（localStorage），支持离线使用与本地历史查询，本应用不会自动将计算记录上传至服务器。登录状态下，为改进产品体验，我们会匿名记录您使用的计算功能类型与次数（例如"综合所得 / 经营所得 / 反向倒算"），不含任何收入、扣除额等具体输入数据，且不与您的账号画像关联。</p>
                 <p>3. 本应用不收集您的位置信息、设备标识或其他敏感个人信息。</p>
 
                 <p><strong>二、信息使用</strong></p>
                 <p>1. 注册信息仅用于账号管理和身份验证。</p>
-                <p>2. 计算记录仅用于为用户提供历史查询功能。</p>
+                <p>2. 计算记录仅用于在本地为您提供历史查询功能；匿名使用统计（计算类型/次数）仅用于产品功能优化，不涉及您的具体计税输入内容。</p>
                 <p>3. 本应用不会将您的个人信息出售、出租或提供给任何第三方。</p>
 
                 <p><strong>三、信息存储与安全</strong></p>
@@ -5557,6 +5610,17 @@
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
     <script src="src/js/app.js"></script>
+
+    <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；
+         独立 type=module，与 app.js 加载顺序解耦；监听加载失败或离线时静默跳过，不影响主流程 -->
+    <script type="module">
+        import apiClient from './src/js/api/api-client.js';
+        document.addEventListener('euriskotax:calc-saved', (e) => {
+            if (!apiClient.isLoggedIn() || !e.detail || !e.detail.type) return;
+            apiClient.trackCalculation(e.detail.type);
+        });
+    </script>
+
     <script>
         // 反向倒算方式切换
         document.getElementById('reverse-type').addEventListener('change', function() {

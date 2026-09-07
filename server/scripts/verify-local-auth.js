@@ -50,7 +50,7 @@ function logLine() {
 }
 
 // ====== 轻量 HTTP 客户端（只打 127.0.0.1） ======
-function request(port, method, urlPath, { json, token, timeout = 10000 } = {}) {
+function request(port, method, urlPath, { json, token, headers = {}, timeout = 10000 } = {}) {
     return new Promise((resolve, reject) => {
         const body = json ? JSON.stringify(json) : null;
         const req = http.request({
@@ -62,6 +62,7 @@ function request(port, method, urlPath, { json, token, timeout = 10000 } = {}) {
             headers: {
                 ...(body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}),
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                ...headers,
             },
         }, (res) => {
             let data = '';
@@ -218,7 +219,13 @@ function extractCodeFromLog(log, email) {
     const PORT = await getFreePort();
     const child = spawn(process.execPath, ['src/app.js'], {
         cwd: serverDir,
-        env: { ...process.env, PORT: String(PORT), NODE_ENV: 'development' },
+        env: {
+            ...process.env,
+            PORT: String(PORT),
+            NODE_ENV: 'development',
+            // 保证 X-Admin-Token 类管理接口（统计概览/邀请码/反馈跟进）本地可测
+            ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'local-verify-admin-token',
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     let serverLog = '';
@@ -263,6 +270,60 @@ function extractCodeFromLog(log, email) {
         }
     } catch (e) {
         record('登录 dev 账号', false, e.message);
+    }
+
+    console.log('\n[4/5 续] 反馈落库 + 匿名埋点链路（dev 账号，阶段8）...');
+    const stamp2 = Date.now();
+    const adminToken = process.env.ADMIN_TOKEN || 'local-verify-admin-token';
+    try {
+        if (!devToken) {
+            record('阶段8端点冒烟', false, '前置登录失败，跳过');
+        } else {
+            // 8.1 匿名埋点：登录用户保存计算后上报计算类型（仅 type，不含输入数据）
+            const ev = await request(PORT, 'POST', '/api/stats/events', {
+                json: { type: 'comprehensive' }, token: devToken,
+            });
+            record('POST /stats/events 匿名埋点', ev.status === 201 && ev.body && ev.body.success === true, `HTTP ${ev.status}`);
+
+            // 8.2 反馈提交落库（content 带 [verify] 标记便于收尾清理）
+            const fb = await request(PORT, 'POST', '/api/feedback', {
+                json: { category: 'bug', content: `[verify] e2e feedback ${stamp2}`, rating: 5 }, token: devToken,
+            });
+            const verifyFeedbackId = fb.body && fb.body.data && fb.body.data.id || null;
+            record('POST /feedback 反馈落库', fb.status === 201 && !!verifyFeedbackId, `HTTP ${fb.status}, id=${verifyFeedbackId || 'N/A'}`);
+
+            // 8.3 当前用户反馈列表能查到该条
+            const myList = await request(PORT, 'GET', '/api/feedback', { token: devToken });
+            const mine = myList.body && myList.body.data || [];
+            record('GET /feedback 用户列表', myList.status === 200 && mine.some((x) => x.id === verifyFeedbackId), `HTTP ${myList.status}`);
+
+            // 8.4 管理员列表与状态跟进（X-Admin-Token）
+            const adminH = { 'X-Admin-Token': adminToken };
+            const adminList = await request(PORT, 'GET', '/api/feedback/admin?status=open', { headers: adminH });
+            const adminItems = adminList.body && adminList.body.data || [];
+            record('GET /feedback/admin 管理员列表', adminList.status === 200 && adminItems.some((x) => x.id === verifyFeedbackId), `HTTP ${adminList.status}`);
+
+            if (verifyFeedbackId) {
+                const patch = await request(PORT, 'PATCH', `/api/feedback/admin/${verifyFeedbackId}`, {
+                    json: { status: 'resolved' }, headers: adminH,
+                });
+                record('PATCH /feedback/admin/:id 状态跟进', patch.status === 200 && patch.body && patch.body.data && patch.body.data.status === 'resolved', `HTTP ${patch.status}`);
+            }
+
+            // 8.5 运营统计概览：计算统计改读 CalcEvent 聚合表后应能看到 8.1 的埋点
+            const ov = await request(PORT, 'GET', '/api/stats/overview', { headers: adminH });
+            const ovData = ov.body && ov.body.data || {};
+            const ovTotal = ovData.calculations && ovData.calculations.total;
+            const ovComp = ovData.calculations && ovData.calculations.byType && ovData.calculations.byType.comprehensive;
+            record('GET /stats/overview 读聚合统计', ov.status === 200 && ovTotal >= 1 && ovComp >= 1, `HTTP ${ov.status}, total=${ovTotal}, comprehensive=${ovComp}`);
+        }
+    } catch (e) {
+        record('反馈/埋点链路', false, e.message);
+    } finally {
+        // 清理本次验证产生的反馈（埋点聚合计数保留，overview 断言用下限不受影响）
+        try {
+            await prisma.feedback.deleteMany({ where: { content: { contains: '[verify]' } } });
+        } catch { /* 清理失败不阻塞判定 */ }
     }
 
     console.log('\n[5/5] 注册链路（邀请码 + 邮箱验证码 → 登录新号）...');

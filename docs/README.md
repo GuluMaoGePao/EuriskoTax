@@ -1,16 +1,16 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-06
+> 最后更新：2026-09-07
 > 维护原则：按用途分类存放，本文件为统一入口索引
 
 ---
 
-## 当前状态（v1.5.0 · 2026-09-06）
+## 当前状态（v1.6.0 · 2026-09-07）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：`package.json` / `CHANGELOG.md` = **1.5.0**（生产上线 + PWA 离线化 + 注册闭环 + 忘记密码自助找回 + 协议合规交互）
-- **测试**：6 套件 203 个单元测试全部通过（`npm test`，2026-09-06 实测）
-- **开发阶段**：阶段 8（测试用户运营）进行中 → 阶段 9（PWA）代码完成 → 阶段 10（免费/专业版）规划中
+- **主版本**：CHANGELOG 最新 **1.6.0**（意见反馈落库闭环 + 匿名计算埋点 + overview 读聚合表 + 管理员反馈接口；`package.json` 版本戳 1.5.1 未随 1.5.2/1.6.0 同步，待发布时处理）
+- **测试**：6 套件 203 个单元测试全部通过（`npm test`，2026-09-07 复跑）；发布门禁 `verify:local` 20 项全绿
+- **开发阶段**：阶段 8（首批测试用户运营）进行中（数据埋点 + 反馈落库收尾 ✅ 2026-09-07）→ 阶段 9（PWA）✅ 已上线 → 阶段 10（免费/专业版）方案已确认待命，见 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
 
 ---
 
@@ -59,13 +59,15 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范（认证含邮箱验证码/邀请码、计税、历史记录、反馈、运营统计、管理员） | 2026-09-06 |
+| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范（认证含邮箱验证码/邀请码、计税、历史记录、反馈、管理员、运营统计） | 2026-09-07 |
 
 ### 开发规划
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-06 |
+| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-07 |
+| [development/file-management-policy.md](development/file-management-policy.md) | 文件管理规范（目录归属/命名/编码/变更流程） | 2026-09-07 |
+| [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 阶段10 免费/专业版实施方案（已确认 · 待命执行） | 2026-09-07 |
 
 ### 使用与开发指南
 
@@ -73,34 +75,33 @@ EuriskoTax/
 |------|------|---------|
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
-| [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（22 项规则+性能数据+验证方法） | 2026-08-11 |
-| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-06 |
+| [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-07 |
+| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-07 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
 
 ### 项目报告
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [reports/final-delivery-checklist.md](reports/final-delivery-checklist.md) | 最终交付清单（交付物总览/质量验收） | 2026-09-06 |
+| [reports/final-delivery-checklist.md](reports/final-delivery-checklist.md) | 最终交付清单（交付物总览/质量验收） | 2026-09-07 |
 | [reports/refactor-summary-report.md](reports/refactor-summary-report.md) | 重构成果汇总报告（三批次+Phase 4） | 2026-08-05 |
-| [reports/test-report.md](reports/test-report.md) | 测试报告（单元测试 203/203 全通过） | 2026-09-06 |
+| [reports/test-report.md](reports/test-report.md) | 测试报告（单元测试 203/203 全通过） | 2026-09-07 |
 
 ### 市场推广
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引） | 2026-09-06 |
+| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-07 |
 
 ### 技术报告
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [tech-reports/watchdog-deployment-guide.md](tech-reports/watchdog-deployment-guide.md) | Watchdog 监控与邮件通知系统部署指南 v1.2（本地运维） | 2026-04-15 |
-| [tech-reports/watchdog-notification-and-event-log-spec.md](tech-reports/watchdog-notification-and-event-log-spec.md) | 守护脚本邮件通知与事件日志规范 v3.2 | 2026-04-15 |
+| [tech-reports/watchdog-deployment-guide.md](tech-reports/watchdog-deployment-guide.md) | Watchdog 监控与邮件通知系统部署指南 v1.3（本地运维） | 2026-09-07 |
+| [tech-reports/watchdog-notification-and-event-log-spec.md](tech-reports/watchdog-notification-and-event-log-spec.md) | 守护脚本邮件通知与事件日志规范 v4.0（通知/日志唯一真源；§8 含 URL 邮件密集发送排查会话，OPEN） | 2026-09-07 |
 | [tech-reports/troubleshooting-sop-template.md](tech-reports/troubleshooting-sop-template.md) | 故障排查 SOP 标准模板 v1.0（复用模板） | 2026-08-10 |
 | [tech-reports/health-check-report-template.md](tech-reports/health-check-report-template.md) | 部署后健康检查报告模板 v1.0（含一键检查脚本） | 2026-08-10 |
 | [tech-reports/mock-client-concurrent-logging-retrospective.md](tech-reports/mock-client-concurrent-logging-retrospective.md) | MockClient 并发日志乱序问题技术复盘 | 2026-08-05 |
-| [tech-reports/debug-mail-spam.md](tech-reports/debug-mail-spam.md) | 公网 URL 邮件密集发送排查会话记录（含 __test-mail-spam-harness.ps1 说明） | 2026-08-15 |
 
 ---
 
@@ -157,7 +158,7 @@ EuriskoTax/
 
 | 日期 | 故障名称 | 等级 | 状态 | 归档文档 |
 |------|---------|------|------|---------|
-| 2026-08-15 | 公网 URL_CREATED/URL_CHANGED 邮件密集发送 | 中 | 会话记录（详见文档） | [debug-mail-spam.md](tech-reports/debug-mail-spam.md) |
+| 2026-08-15 | 公网 URL_CREATED/URL_CHANGED 邮件密集发送 | 中 | 会话记录 OPEN（并入规范 §8） | [通知与事件日志规范 §8](tech-reports/watchdog-notification-and-event-log-spec.md#八已知问题与排查记录) |
 
 > 归档文档命名规范：`troubleshooting-<故障简称>-<YYYYMMDD>.md`，基于 [SOP 模板](tech-reports/troubleshooting-sop-template.md) 填写。
 

@@ -2512,6 +2512,12 @@ function saveToHistory(results, type, titlePrefix) {
             calculationHistory = calculationHistory.slice(0, 50);
         }
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        // 阶段8：匿名埋点信号（仅计算类型，不含任何输入数据），由 index.html 监听器统一上报
+        try {
+            if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+                document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type } }));
+            }
+        } catch (e) { /* 埋点失败静默 */ }
         showSaveSuccessMessage();
         return true;
     } catch (error) {

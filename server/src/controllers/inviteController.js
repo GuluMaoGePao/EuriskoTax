@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { requireAdmin } = require('./statsController');
+const { requireAdmin } = require('../middleware/adminAuth');
 
 const prisma = new PrismaClient();
 
