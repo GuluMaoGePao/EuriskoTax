@@ -325,7 +325,7 @@ function updateAuthAgreementText(mode) {
     if (mode === 'register') {
         el.innerHTML = '点击「注册」按钮即表示已阅读并同意' + links;
     } else if (mode === 'reset') {
-        el.innerHTML = '仅已注册邮箱可获取重置验证码；若收不到邮件请检查垃圾箱，或<a href="mailto:2649719969@qq.com" class="underline hover:text-white">联系开发者</a>';
+        el.innerHTML = '仅已注册邮箱可获取重置验证码；若收不到邮件请检查垃圾箱，或<a href="mailto:2044781167@qq.com" class="underline hover:text-white">联系开发者</a>';
     } else {
         el.innerHTML = '登录即表示同意' + links;
     }
