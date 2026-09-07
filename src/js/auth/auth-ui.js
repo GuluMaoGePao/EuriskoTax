@@ -65,12 +65,12 @@ async function handleLogin() {
     const btn = document.getElementById('login-submit');
     
     if (!email || !password) {
-        showAlert('请填写邮箱和密码');
+        showAlert('请输入邮箱和密码');
         return;
     }
     
-    // 「记住我」：勾选 → token 存 localStorage（跨会话保持）；未勾选 → sessionStorage（关浏览器即失效）
-    // 元素不存在（如单元测试环境）时默认记住（保持历史行为）
+    // 「保持登录状态」：勾选 → token 存 localStorage（跨会话保持）；未勾选 → sessionStorage（关闭浏览器即失效）
+    // 元素不存在（如单元测试环境）时默认保持登录（维持历史行为）
     const rememberMe = document.getElementById('remember-me')?.checked !== false;
 
     try {
@@ -86,6 +86,49 @@ async function handleLogin() {
     }
 }
 
+// === 注册表单字段级校验：必填项未填写时红字标注，填写后自动消除 ===
+function showRegisterFieldError(fieldId, message) {
+    const errorEl = document.getElementById(fieldId + '-error');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    }
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.add('input-error');
+    if (fieldId !== 'register-agree') {
+        const label = document.querySelector(`label[for="${fieldId}"]`);
+        if (label) label.classList.add('label-danger');
+    }
+    return !!errorEl;
+}
+
+function clearRegisterFieldError(fieldId) {
+    const errorEl = document.getElementById(fieldId + '-error');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.remove('input-error');
+    if (fieldId !== 'register-agree') {
+        const label = document.querySelector(`label[for="${fieldId}"]`);
+        if (label) label.classList.remove('label-danger');
+    }
+}
+
+function clearAllRegisterFieldErrors() {
+    [
+        'register-username',
+        'register-email',
+        'register-code',
+        'register-phone',
+        'register-password',
+        'register-confirm-password',
+        'register-invite-code',
+        'register-agree'
+    ].forEach(clearRegisterFieldError);
+}
+
 async function handleRegister() {
     const username = document.getElementById('register-username').value.trim();
     const email = document.getElementById('register-email').value.trim().toLowerCase();
@@ -95,43 +138,62 @@ async function handleRegister() {
     const inviteCode = document.getElementById('register-invite-code').value.trim().toUpperCase();
     const verificationCode = document.getElementById('register-code').value.trim();
     const btn = document.getElementById('register-submit');
-    
-    if (!username || !email || !password) {
-        showAlert('请填写用户名、邮箱和密码');
+    const agreeEl = document.getElementById('register-agree');
+
+    clearAllRegisterFieldErrors();
+
+    // 必填项未填写：就地红字标注对应字段，填写后自动消除
+    const requiredChecks = [
+        { fieldId: 'register-username', filled: !!username, message: '请输入用户名' },
+        { fieldId: 'register-email', filled: !!email, message: '请输入邮箱' },
+        { fieldId: 'register-code', filled: !!verificationCode, message: '请输入邮箱验证码' },
+        { fieldId: 'register-password', filled: !!password, message: '请输入密码' },
+        { fieldId: 'register-confirm-password', filled: !!confirmPassword, message: '请再次输入密码' },
+        { fieldId: 'register-invite-code', filled: !!inviteCode, message: '请输入邀请码' }
+    ];
+    let firstInvalidId = null;
+    const fallbackMessages = [];
+    requiredChecks.forEach(({ fieldId, filled, message }) => {
+        if (filled) return;
+        if (!showRegisterFieldError(fieldId, message)) fallbackMessages.push(message);
+        if (!firstInvalidId) firstInvalidId = fieldId;
+    });
+
+    if (agreeEl && !agreeEl.checked) {
+        if (!showRegisterFieldError('register-agree', '请先阅读并勾选同意《用户协议》与《隐私政策》')) {
+            fallbackMessages.push('请先阅读并勾选同意《用户协议》与《隐私政策》');
+        }
+        if (!firstInvalidId) firstInvalidId = 'register-agree';
+    }
+
+    if (firstInvalidId) {
+        // 兼容无内联提示节点的旧版页面：给出弹窗兜底提示
+        if (fallbackMessages.length > 0) showAlert(fallbackMessages[0]);
+        const target = document.getElementById(firstInvalidId);
+        if (target) target.focus();
         return;
     }
-    
+
     if (password !== confirmPassword) {
-        showAlert('两次输入的密码不一致');
+        const message = '两次输入的密码不一致，请重新输入';
+        showRegisterFieldError('register-password', message);
+        showRegisterFieldError('register-confirm-password', message);
+        document.getElementById('register-confirm-password').focus();
         return;
     }
-    
+
     if (password.length < 6) {
-        showAlert('密码长度至少6位');
+        showRegisterFieldError('register-password', '密码长度不能少于 6 位');
+        document.getElementById('register-password').focus();
         return;
     }
 
     if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
-        showAlert('请输入有效的手机号');
+        showRegisterFieldError('register-phone', '请输入正确的手机号（11 位数字）');
+        document.getElementById('register-phone').focus();
         return;
     }
 
-    const agreeEl = document.getElementById('register-agree');
-    if (agreeEl && !agreeEl.checked) {
-        showAlert('请先勾选已阅读并同意《用户协议》和《隐私政策》');
-        return;
-    }
-
-    if (!inviteCode) {
-        showAlert('请填写邀请码');
-        return;
-    }
-
-    if (!verificationCode) {
-        showAlert('请填写邮箱验证码');
-        return;
-    }
-    
     try {
         setLoading(btn, true);
         await apiClient.registerUser(username, email, password, phone || null, inviteCode, verificationCode);
@@ -147,7 +209,8 @@ async function handleRegister() {
         document.getElementById('register-code').value = '';
         registerCodeSentEmail = '';
         if (agreeEl) agreeEl.checked = false;
-        showAlert('注册成功，请登录（邮箱已自动填入）', 'success', () => {
+        clearAllRegisterFieldErrors();
+        showAlert('注册成功，请登录（注册邮箱已自动填入）', 'success', () => {
             document.getElementById('login-email').focus();
         });
     } catch (error) {
@@ -196,12 +259,14 @@ async function handleSendCode() {
     const btn = document.getElementById('send-code-btn');
 
     if (!email) {
-        showAlert('请先填写邮箱');
+        if (!showRegisterFieldError('register-email', '请先输入注册邮箱')) showAlert('请先输入注册邮箱');
+        document.getElementById('register-email').focus();
         return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showAlert('邮箱格式不正确');
+        if (!showRegisterFieldError('register-email', '请输入正确的邮箱格式')) showAlert('请输入正确的邮箱格式');
+        document.getElementById('register-email').focus();
         return;
     }
 
@@ -213,7 +278,7 @@ async function handleSendCode() {
         // 邮箱变更后重新发送：清空旧验证码，避免用旧码注册时报"验证码无效"造成困惑
         const codeInput = document.getElementById('register-code');
         if (codeInput) codeInput.value = '';
-        showAlert('验证码已发送，请查收邮箱（注意垃圾箱）', 'success');
+        showAlert('验证码已发送至您的邮箱，请查收；若未收到，请查看垃圾邮件箱', 'success');
         startSendCodeCountdown(SEND_CODE_COOLDOWN);
     } catch (error) {
         // 发送失败不进入倒计时，允许用户直接重试
@@ -224,7 +289,7 @@ async function handleSendCode() {
         const isRegistered = (error && error.statusCode === 409) ||
             /已注册|already registered/i.test(error.message || '');
         if (isRegistered) {
-            showAlert('该邮箱已注册，请直接登录；如忘记密码可点击「忘记密码」自助找回', 'warning', function() {
+            showAlert('该邮箱已注册，请直接登录；如忘记密码，可通过「忘记密码」功能自助重置', 'warning', function() {
                 document.getElementById('login-tab').click();
                 document.getElementById('login-email').value = email;
             });
@@ -276,9 +341,8 @@ function showResetPasswordPanel() {
     const panel = document.getElementById('reset-password-form');
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
-    const divider = document.getElementById('auth-divider');
-    const socialRow = document.getElementById('auth-social-row');
     if (!panel || !loginForm) return;
+    clearAllRegisterFieldErrors();
 
     // 复制当前登录邮箱到重置面板，减少输入
     const loginEmailValue = document.getElementById('login-email')?.value.trim() || '';
@@ -288,27 +352,22 @@ function showResetPasswordPanel() {
     loginForm.classList.add('hidden');
     if (registerForm) registerForm.classList.add('hidden');
     panel.classList.remove('hidden');
-    if (divider) divider.classList.add('hidden');
-    if (socialRow) socialRow.classList.add('hidden');
     updateAuthAgreementText('reset');
     setActiveTab('login');
     setTimeout(() => resetEmail && resetEmail.focus(), 50);
 }
 
-// 隐藏重置面板并回到登录 Tab（同时恢复分隔线与第三方登录入口）
+// 隐藏重置面板并回到登录 Tab
 function closeResetPasswordPanel() {
     const panel = document.getElementById('reset-password-form');
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
-    const divider = document.getElementById('auth-divider');
-    const socialRow = document.getElementById('auth-social-row');
     if (!panel || !loginForm) return;
+    clearAllRegisterFieldErrors();
 
     panel.classList.add('hidden');
     loginForm.classList.remove('hidden');
     if (registerForm) registerForm.classList.add('hidden');
-    if (divider) divider.classList.remove('hidden');
-    if (socialRow) socialRow.classList.remove('hidden');
     updateAuthAgreementText('login');
     setActiveTab('login');
 }
@@ -319,13 +378,10 @@ function switchAuthTab(mode) {
     const registerForm = document.getElementById('register-form');
     const panel = document.getElementById('reset-password-form');
     if (!loginForm || !registerForm) return;
+    clearAllRegisterFieldErrors();
 
     if (panel && !panel.classList.contains('hidden')) {
         panel.classList.add('hidden');
-        const divider = document.getElementById('auth-divider');
-        const socialRow = document.getElementById('auth-social-row');
-        if (divider) divider.classList.remove('hidden');
-        if (socialRow) socialRow.classList.remove('hidden');
     }
 
     if (mode === 'register') {
@@ -372,11 +428,11 @@ async function handleResetSendCode() {
     const codeInput = document.getElementById('reset-code');
 
     if (!email) {
-        showAlert('请先填写注册邮箱');
+        showAlert('请先输入注册邮箱');
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showAlert('邮箱格式不正确');
+        showAlert('请输入正确的邮箱格式');
         return;
     }
 
@@ -385,7 +441,7 @@ async function handleResetSendCode() {
         btn.textContent = '发送中...';
         await apiClient.sendResetCode(email);
         if (codeInput) codeInput.value = '';
-        showAlert('验证码已发送，请查收邮箱（注意垃圾箱）', 'success');
+        showAlert('验证码已发送至您的邮箱，请查收；若未收到，请查看垃圾邮件箱', 'success');
         startResetCodeCountdown(RESET_CODE_COOLDOWN);
     } catch (error) {
         btn.textContent = '发送验证码';
@@ -402,19 +458,19 @@ async function handleResetPassword() {
     const btn = document.getElementById('reset-submit');
 
     if (!email) {
-        showAlert('请填写注册邮箱');
+        showAlert('请先输入注册邮箱');
         return;
     }
     if (!code) {
-        showAlert('请填写邮箱验证码');
+        showAlert('请输入邮箱验证码');
         return;
     }
     if (!newPassword || newPassword.length < 6) {
-        showAlert('新密码长度至少6位');
+        showAlert('新密码长度不能少于 6 位');
         return;
     }
     if (newPassword !== confirmPassword) {
-        showAlert('两次输入的新密码不一致');
+        showAlert('两次输入的新密码不一致，请重新输入');
         return;
     }
 
@@ -1016,18 +1072,18 @@ async function saveProfile() {
         }
         
         if (password !== confirmPassword) {
-            showAlert('两次输入的新密码不一致');
+            showAlert('两次输入的新密码不一致，请重新输入');
             return;
         }
         
         if (password.length < 6) {
-            showAlert('新密码长度至少6位');
+            showAlert('新密码长度不能少于 6 位');
             return;
         }
     }
     
     if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
-        showAlert('请输入有效的手机号');
+        showAlert('请输入正确的手机号（11 位数字）');
         return;
     }
     
@@ -1256,6 +1312,39 @@ function setupAuthEventListeners() {
             }
         });
     });
+    // === 注册表单必填红字提示：填写即消除、空值失焦即标注 ===
+    const REGISTER_BLUR_ERROR_MESSAGES = {
+        'register-username': '请输入用户名',
+        'register-email': '请输入邮箱',
+        'register-code': '请输入邮箱验证码',
+        'register-password': '请输入密码',
+        'register-confirm-password': '请再次输入密码',
+        'register-invite-code': '请输入邀请码'
+    };
+    Object.keys(REGISTER_BLUR_ERROR_MESSAGES).forEach(id => {
+        const fieldEl = document.getElementById(id);
+        if (!fieldEl) return;
+        fieldEl.addEventListener('input', () => clearRegisterFieldError(id));
+        // 离开空必填项时红字标注；重新填写后自动消除
+        fieldEl.addEventListener('blur', () => {
+            if (!fieldEl.value.trim()) {
+                showRegisterFieldError(id, REGISTER_BLUR_ERROR_MESSAGES[id]);
+            }
+        });
+    });
+    // 密码与确认密码任一改动，均解除两者的一致性报错
+    ['register-password', 'register-confirm-password'].forEach(id => {
+        const fieldEl = document.getElementById(id);
+        if (!fieldEl) return;
+        fieldEl.addEventListener('input', () => {
+            clearRegisterFieldError('register-password');
+            clearRegisterFieldError('register-confirm-password');
+        });
+    });
+    const registerAgreeCheckbox = document.getElementById('register-agree');
+    if (registerAgreeCheckbox) {
+        registerAgreeCheckbox.addEventListener('change', () => clearRegisterFieldError('register-agree'));
+    }
     // 邮箱填写后才允许点击"发送验证码"（倒计时期间由倒计时逻辑控制）
     document.getElementById('register-email').addEventListener('input', (e) => {
         if (!sendCodeTimer) {
@@ -1306,19 +1395,6 @@ function setupAuthEventListeners() {
         });
     });
 
-    // 微信/QQ 登录：当前未开放，点击给出提示而非无反应
-    const socialWechat = document.getElementById('social-wechat-btn');
-    if (socialWechat) {
-        socialWechat.addEventListener('click', () => {
-            showAlert('微信登录暂未开放，请使用邮箱登录', 'info');
-        });
-    }
-    const socialQq = document.getElementById('social-qq-btn');
-    if (socialQq) {
-        socialQq.addEventListener('click', () => {
-            showAlert('QQ 登录暂未开放，请使用邮箱登录', 'info');
-        });
-    }
     // 用户协议和隐私政策弹窗：显示/隐藏逻辑已由 index.html 中的 inline onclick 直接处理，
     // 此处不再重复绑定 addEventListener，避免与 inline onclick 冲突或元素缺失时抛错中断后续绑定
     document.getElementById('profile-link').addEventListener('click', (e) => {
@@ -1495,8 +1571,8 @@ function showAlert(message, type = 'error', callback) {
     
     const typeConfig = {
         success: { icon: 'fa-check-circle', bg: 'bg-green-100', color: 'text-green-600', title: '操作成功' },
-        warning: { icon: 'fa-exclamation-triangle', bg: 'bg-amber-100', color: 'text-amber-600', title: '警告' },
-        error: { icon: 'fa-times-circle', bg: 'bg-red-100', color: 'text-red-600', title: '操作失败' },
+        warning: { icon: 'fa-exclamation-triangle', bg: 'bg-amber-100', color: 'text-amber-600', title: '提示' },
+        error: { icon: 'fa-times-circle', bg: 'bg-red-100', color: 'text-red-600', title: '提示' },
         info: { icon: 'fa-info-circle', bg: 'bg-blue-100', color: 'text-blue-600', title: '提示' }
     };
     
@@ -1772,7 +1848,7 @@ async function handleSubmitFeedback() {
     const contentInput = document.getElementById('feedback-content');
     const content = contentInput ? contentInput.value.trim() : '';
     if (!content) {
-        showAlert('请填写反馈内容');
+        showAlert('请输入反馈内容');
         return;
     }
     const category = document.getElementById('feedback-category')?.value || 'general';
