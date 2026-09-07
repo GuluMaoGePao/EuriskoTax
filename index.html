@@ -5402,6 +5402,7 @@
         e.preventDefault();
         var m = document.getElementById(id);
         if (!m) return;
+        if (m.parentNode && m.parentNode !== document.body) document.body.appendChild(m);
         // 同步移除 hidden/opacity-0/scale-95：同帧内内容立即可见
         m.classList.remove('hidden');
         m.classList.remove('opacity-0');
