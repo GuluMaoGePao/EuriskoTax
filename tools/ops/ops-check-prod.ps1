@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$checks = @()
+$checks = New-Object System.Collections.ArrayList
 
 function Fetch-Text {
     param([string]$Url)
@@ -16,7 +16,7 @@ function Fetch-Text {
 
 function Add-Check {
     param([string]$Name, [bool]$Ok, [string]$Detail = "")
-    $script:checks += @{ Name = $Name; Ok = $Ok; Detail = $Detail }
+    [void]$checks.Add(@{ Name = $Name; Ok = $Ok; Detail = $Detail })
 }
 
 Write-Host ""
