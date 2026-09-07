@@ -2712,6 +2712,8 @@ Add-SectionCard -TabCtx $tab1Ctx `
     -AccentColor $C_ACCENT -Buttons @(
     @{ Text = "打开前端首页`nhttp://localhost:3000/"; Desc = "在默认浏览器打开 EuriskoTax 的前端主页面。启动成功后一定要点这个去看！"; Color = "85, 180, 110";
        OnClick = { Start-Process "http://localhost:3000/"; Write-Log "已打开前端: http://localhost:3000/" "INFO" } },
+    @{ Text = "打开 缓存清洗页`n遇到旧页面时一键重置"; Desc = "在浏览器打开 http://localhost:3000/clean-cache.html（auto=1 自动执行）：注销全部 Service Worker + 清空 Cache Storage 后跳回首页。当页面行为与最新代码对不上、怀疑是旧缓存残留时点这个。"; Color = "230, 160, 70";
+       OnClick = { Start-Process "http://localhost:3000/clean-cache.html"; Write-Log "已打开缓存清洗页: http://localhost:3000/clean-cache.html" "INFO" } },
     @{ Text = "📚 一键查看API文档`n自动取Token+全自动授权"; Desc = "⭐一键全自动：检查后端→自动登录取JWT→生成带Token的Swagger页面→浏览器打开。打开后无需手动点Authorize，直接点Try it out就能调用所有接口（后端重启时首次使用建议点启动管理）。"; Color = "85, 180, 110";
        OnClick = { Open-ApiDocsAuto } },
     @{ Text = "打开 Prisma Studio`n可视化管理数据库"; Desc = "启动 Prisma Studio 并打开 localhost:5555，可以像 Excel 一样增删改查数据库。"; Color = "165, 105, 210";
