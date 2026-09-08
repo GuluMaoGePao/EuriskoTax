@@ -85,6 +85,15 @@ function showSaveErrorMessage() {
 
 
 
+// 阶段10：本地历史变更 → 通知云同步引擎（history-sync.js 监听，登录+PRO 时防抖自动上传；游客/免费不受影响）
+function notifyHistoryMutated() {
+    try {
+        if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+            document.dispatchEvent(new CustomEvent('euriskotax:history-mutated', { detail: { at: Date.now() } }));
+        }
+    } catch (e) { /* 同步信号失败静默 */ }
+}
+
 // 保存计算结果
 function saveCalculationResult() {
     console.log('%c[EuriskoTax] SAVE → 开始保存计算结果', 'color: #1e40af; font-weight: bold;');
@@ -104,7 +113,8 @@ function saveCalculationResult() {
             type: 'forward',
             title: `综合所得计税 - ${new Date().toLocaleDateString()}`,
             results: calculationResults,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            updatedAt: new Date().toISOString()  // 阶段10：云同步冲突判定时间戳（旧数据缺省时回退 date）
         };
 
         console.log('[EuriskoTax] SAVE → 保存数据:', {
@@ -132,6 +142,9 @@ function saveCalculationResult() {
                 document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type: 'forward' } }));
             }
         } catch (e) { /* 埋点失败静默 */ }
+
+        // 阶段10：通知云同步引擎（登录+PRO 时自动上传本端增量）
+        notifyHistoryMutated();
 
         console.log('%c[EuriskoTax] SAVE → 保存成功，历史记录共 ' + calculationHistory.length + ' 条', 'color: #16a34a; font-weight: bold;');
 
@@ -483,6 +496,13 @@ function deleteHistoryRecord(id) {
     showConfirm('确定要删除这条记录吗？', function() {
         calculationHistory = calculationHistory.filter(item => item.id !== id);
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        // 阶段10：已同步过的记录删除 → 云端墓碑广播（未同步过则忽略）；再通知引擎上传
+        try {
+            if (window.EuriskoSync && typeof window.EuriskoSync.recordLocalDelete === 'function') {
+                window.EuriskoSync.recordLocalDelete(id);
+            }
+        } catch (e) { /* 墓碑记录失败静默 */ }
+        notifyHistoryMutated();
         loadHistoryRecords();
     });
 }

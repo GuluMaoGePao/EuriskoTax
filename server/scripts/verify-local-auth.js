@@ -256,6 +256,21 @@ function extractCodeFromLog(log, email) {
         record('service-worker.js 已无应用壳预缓存(APP_SHELL)', sw.status === 200 && !sw.raw.includes('APP_SHELL'), `HTTP ${sw.status}`);
         record('service-worker.js 含 http/https 协议守卫', sw.status === 200 && sw.raw.includes("url.protocol !== 'http:'"), `HTTP ${sw.status}`);
         record('service-worker.js HTML 导航 network-first', sw.status === 200 && sw.raw.includes("request.mode === 'navigate'"), `HTTP ${sw.status}`);
+
+        // ---- 阶段10 前端云同步链路静态断言 ----
+        const planJs = await request(PORT, 'GET', '/src/js/auth/plan.js');
+        record('plan.js 含 isPro/PLAN_PRO', planJs.status === 200 && planJs.raw.includes('function isPro') && planJs.raw.includes('EuriskoPlan'), `HTTP ${planJs.status}`);
+        const syncJs = await request(PORT, 'GET', '/src/js/data/history-sync.js');
+        record('history-sync.js 含 mergeCloud/EuriskoSync', syncJs.status === 200 && syncJs.raw.includes('mergeCloud') && syncJs.raw.includes('window.EuriskoSync'), `HTTP ${syncJs.status}`);
+        record('index.html 加载 plan/history-sync 脚本与云同步 DOM',
+            page.status === 200 && page.raw.includes('src/js/auth/plan.js') && page.raw.includes('src/js/data/history-sync.js')
+            && page.raw.includes('cloud-sync-now-btn') && page.raw.includes('topbar-plan-badge') && page.raw.includes('profile-plan-badge'),
+            '');
+        record('auth-ui.js 集成云同步引擎', authJs.status === 200 && authJs.raw.includes('EuriskoSync') && authJs.raw.includes('afterLogin'), `HTTP ${authJs.status}`);
+        const dmJs = await request(PORT, 'GET', '/src/js/data/data-management.js');
+        const calcJs = await request(PORT, 'GET', '/src/js/calculation/tax-calculator.js');
+        record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
+        record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }
@@ -395,6 +410,22 @@ function extractCodeFromLog(log, email) {
             const d4 = (s4.body && s4.body.data) || {};
             const tombOk = (d4.deletedClientIds || []).includes(recA) && !(d4.records || []).some((r) => r.clientId === recA);
             record('sync 墓碑删除广播', s4.status === 200 && !!tombOk, `HTTP ${s4.status}`);
+
+            // 10A.5B 前端同步引擎 × 真实服务端：沙箱 A 设备上传 → 沙箱 B 设备空本地拉回（换机/重装场景）
+            const engRes = spawnSync(process.execPath, [path.join(serverDir, 'scripts', 'verify-cloud-sync-engine.js')], {
+                env: { ...process.env, PORT: String(PORT), SYNC_TOKEN: devToken || '', SYNC_EMAIL: DEV_EMAIL, SYNC_PREFIX: syncPrefix },
+                encoding: 'utf8',
+                timeout: 30000,
+            });
+            const engOut = (engRes.stdout || '') + (engRes.stderr || '');
+            record('sync 引擎·A设备本端上传', engRes.status === 0 && engOut.includes('ENG-A-UPLOAD-PASS'),
+                engRes.status === 0 ? 'sandbox engine ok' : `code=${engRes.status} ${engOut.slice(-260)}`);
+            record('sync 引擎·B设备空本地拉回', engRes.status === 0 && engOut.includes('ENG-B-PULL-PASS'),
+                engRes.status === 0 ? 'sandbox engine ok' : engOut.slice(-260));
+            // 清理引擎联测行，保证 10A.6 上限断言基数仍为「仅 recB 活跃」
+            try {
+                await prisma.calculation.deleteMany({ where: { user_id: devUserId, client_id: { startsWith: syncPrefix + 'ENG' } } });
+            } catch { /* 清理失败不阻塞判定 */ }
 
             // 10A.6 上限：SYNC_MAX_RECORDS=3，第 4 条新记录被拒（409 HISTORY_LIMIT_REACHED）
             await request(PORT, 'POST', '/api/calculations/sync', { token: devToken, json: { push: [toRec(recC, 'classification', 'C'), toRec(recE, 'reverse', 'E')] } });

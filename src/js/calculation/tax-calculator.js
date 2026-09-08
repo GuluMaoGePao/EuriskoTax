@@ -2505,7 +2505,8 @@ function saveToHistory(results, type, titlePrefix) {
             type: type,
             title: titlePrefix + ' - ' + new Date().toLocaleDateString(),
             results: results,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            updatedAt: new Date().toISOString()  // 阶段10：云同步冲突判定时间戳（旧数据缺省时回退 date）
         };
         calculationHistory.unshift(savedData);
         if (calculationHistory.length > 50) {
@@ -2518,6 +2519,12 @@ function saveToHistory(results, type, titlePrefix) {
                 document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type } }));
             }
         } catch (e) { /* 埋点失败静默 */ }
+        // 阶段10：通知云同步引擎（登录+PRO 时自动上传本端增量）
+        try {
+            if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+                document.dispatchEvent(new CustomEvent('euriskotax:history-mutated', { detail: { at: Date.now() } }));
+            }
+        } catch (e) { /* 同步信号失败静默 */ }
         showSaveSuccessMessage();
         return true;
     } catch (error) {
