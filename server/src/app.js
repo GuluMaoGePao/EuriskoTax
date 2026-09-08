@@ -70,6 +70,18 @@ const statsEventLimiter = rateLimit({
     }
 });
 
+// 云端同步限流：20 次/分钟/IP（阶段10A 专业版历史同步端点）。
+// 计算主链路在前端本地，正常用户仅登录/联网/离线恢复时触发一次全量同步，频率远低于此
+const syncLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    skip: (req) => req.path !== '/sync',
+    message: {
+        success: false,
+        error: { message: '同步请求过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -128,7 +140,7 @@ app.get('/api/docs.json', (req, res) => {
 });
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
-app.use('/api/calculations', calculationRoutes);
+app.use('/api/calculations', syncLimiter, calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);

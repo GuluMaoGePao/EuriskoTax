@@ -13,7 +13,9 @@ const errorHandler = (err, req, res, next) => {
         success: false,
         error: {
             message: message,
-            statusCode: statusCode
+            statusCode: statusCode,
+            // 业务码（如 PRO_REQUIRED / HISTORY_LIMIT_REACHED）供前端分支处理，无则省略
+            ...(err.code ? { code: err.code } : {})
         }
     });
 };

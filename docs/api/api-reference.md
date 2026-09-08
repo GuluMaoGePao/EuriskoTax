@@ -3,7 +3,7 @@
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
 > **版本**: v2.2
-> **最后更新**: 2026年9月7日（同步 v1.6.0：反馈提交落库闭环 + 管理员反馈列表/状态跟进 + 匿名计算埋点 `POST /api/stats/events` + `overview` 计算统计改读 `CalcEvent` 聚合表 + `requireAdmin` 抽为 `middleware/adminAuth.js`）
+> **最后更新**: 2026年9月8日（同步 v1.6.1 + 阶段10A 后端地基：`User` 账户分层 `plan` 字段、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；v1.6.0：反馈提交落库闭环 + 管理员反馈列表/状态跟进 + 匿名计算埋点 `POST /api/stats/events` + `overview` 计算统计改读 `CalcEvent` 聚合表 + `requireAdmin` 抽为 `middleware/adminAuth.js`）
 
 ---
 
@@ -134,7 +134,9 @@
 
 **GET** `/api/auth/profile`
 
-认证：JWT。响应：`{ id, username, email, phone }`。
+认证：JWT。响应：`{ id, username, email, phone, plan, plan_expires_at, pro_granted_by }`。
+
+> 阶段10（v1.6.1+ 后端）：`plan` 为 `"free" | "pro"`；`plan_expires_at` 为 null 表示永久；`pro_granted_by` 标记授权来源（seed/invite/admin/purchase）。`SEED_GRANT_PRO=true` 时注册/登录即 pro（granted_by=seed）。
 
 ### 2.5 更新用户信息
 
@@ -288,7 +290,37 @@
 
 认证：JWT。仅可访问/删除自己的记录；不存在或非本人返回 404/403。
 
-### 3.8 匿名计算埋点
+### 3.8 计算历史云端同步（阶段10A · 专业版）
+
+**POST** `/api/calculations/sync`
+
+认证：JWT；**专业版**（`plan=pro`，`SEED_GRANT_PRO=true` 种子期注册/登录即 pro）。免费账号返回 403 `PRO_REQUIRED`（计税能力永不锁定，锁的仅是云端增值同步）。
+
+设计：写主在本端（浏览器 localStorage），云端只是镜像。本端将增量 push 到云端，服务端按 `(user_id, client_id)` 幂等 upsert（`updatedAt` 新者胜，冲突不乱序），随后返回该账号全量活跃列表 + 已删 `clientId` 集合供本端 merge。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| push | array | 是 | 本地增量条目，可为空数组（仅拉取） |
+
+`push[]` 条目：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| clientId | string | 是 | 本地记录 id（幂等键，≤64 字符） |
+| type | string | 是 | comprehensive / business / classification / reverse |
+| data | object | 是* | 业务快照 `{ title, date, income, tax, results, ... }`（墓碑时可不填） |
+| updatedAt | string | 是 | ISO 时间，本地最近变更时间（冲突新者胜依据） |
+| deletedAt | string | 否 | 墓碑：非空表示该 clientId 已在本端删除 |
+
+限制：单请求 ≤200 条、单条 ≤50KB、云端活跃历史 **500 条/账号**（超限 409 `HISTORY_LIMIT_REACHED`）、限流 20 次/分。
+
+响应 `data`：`{ records: [{ clientId, type, data, updatedAt }], deletedClientIds: [...] }`
+
+> 行为语义：幂等（同 clientId 重复推送不产生重复行）；冲突按 `updatedAt` 新者胜；删除先软删（墓碑）并广播 `deletedClientIds`，其它设备据此清除本地条目；墓碑 30 天后物理清理。
+
+### 3.9 匿名计算埋点
 
 **POST** `/api/stats/events`
 
@@ -457,6 +489,10 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 | 当前密码错误 | 401 | verify-password / 改密 |
 | 记录不存在 / 非本人 | 404 / 403 | calculations/:id |
 | 参数校验失败 | 400 | 计算/反馈/邀请码 count 非法 |
+| 免费版无云同步（code=PRO_REQUIRED） | 403 | calculations/sync |
+| 云端历史上限 500 条（code=HISTORY_LIMIT_REACHED） | 409 | calculations/sync |
+| 同步条目校验失败（code=INVALID_SYNC_ITEM） | 400 | calculations/sync |
+| 同步请求过频 | 429 | calculations/sync（20 次/分） |
 | 管理员令牌缺失/错误 | 401 / 503 | stats、invites |
 
 ---

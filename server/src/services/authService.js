@@ -7,6 +7,10 @@ const prisma = new PrismaClient();
 // 邮箱归一化：去首尾空格 + 转小写，避免大小写差异绕过查重、登录时精确匹配失败
 const normalizeEmail = (rawEmail) => String(rawEmail || '').trim().toLowerCase();
 
+// 种子期授权开关：SEED_GRANT_PRO=true 时，注册/登录即授予 pro（pro_granted_by="seed"，永久）
+// 生产正式收费时置 false，改由兑换码/支付渠道（阶段11）授权
+const seedGrantEnabled = () => process.env.SEED_GRANT_PRO === 'true';
+
 // 查重（区分用户名/邮箱，注册前拦截，避免浪费一次性验证码）
 const checkDuplicate = async (username, rawEmail) => {
     const email = normalizeEmail(rawEmail);
@@ -66,18 +70,27 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
                 throw error;
             }
 
+            // 种子期：注册即授予 pro（granted_by="seed"，永久）；收费期该开关关闭后为默认 free
+            const seedGrant = seedGrantEnabled()
+                ? { plan: 'pro', pro_granted_by: 'seed' }
+                : {};
+
             const created = await tx.user.create({
                 data: {
                     username,
                     email: normalizedEmail,
                     password_hash: passwordHash,
-                    phone
+                    phone,
+                    ...seedGrant
                 },
                 select: {
                     id: true,
                     username: true,
                     email: true,
                     phone: true,
+                    plan: true,
+                    plan_expires_at: true,
+                    pro_granted_by: true,
                     created_at: true
                 }
             });
@@ -121,6 +134,16 @@ const loginUser = async (email, password) => {
         throw error;
     }
     
+    // 种子期：存量 free 账号登录时自动升级为 pro（granted_by="seed"），幂等（已是 pro 不再改写）
+    if (seedGrantEnabled() && user.plan !== 'pro') {
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { plan: 'pro', pro_granted_by: 'seed' }
+        });
+        user.plan = 'pro';
+        user.pro_granted_by = 'seed';
+    }
+    
     const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET,
@@ -133,7 +156,10 @@ const loginUser = async (email, password) => {
             id: user.id,
             username: user.username,
             email: user.email,
-            phone: user.phone
+            phone: user.phone,
+            plan: user.plan,
+            plan_expires_at: user.plan_expires_at,
+            pro_granted_by: user.pro_granted_by
         }
     };
 };
@@ -146,6 +172,9 @@ const getUserById = async (userId) => {
             username: true,
             email: true,
             phone: true,
+            plan: true,
+            plan_expires_at: true,
+            pro_granted_by: true,
             created_at: true,
             updated_at: true
         }

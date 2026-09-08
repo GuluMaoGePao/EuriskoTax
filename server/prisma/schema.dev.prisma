@@ -14,13 +14,17 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  username      String   @unique
-  email         String   @unique
-  phone         String?
-  password_hash String
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id              Int       @id @default(autoincrement())
+  username        String    @unique
+  email           String    @unique
+  phone           String?
+  password_hash   String
+  // 账户分层（阶段10）：plan = "free" | "pro"
+  plan            String    @default("free")
+  plan_expires_at DateTime? // null = 永久
+  pro_granted_by  String?   // 授权来源："seed" | "invite" | "admin" | "purchase"
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
 
   calculations Calculation[]
   feedbacks     Feedback[]
@@ -30,11 +34,17 @@ model Calculation {
   id          Int      @id @default(autoincrement())
   user_id     Int
   type        String
+  client_id   String?  // 云端同步幂等键 = 本地记录 id；null 为历史 CRUD 期旧数据
   input_data  String
   result_data String
+  updated_at  DateTime @default(now()) @updatedAt
+  deleted_at  DateTime? // 软删墓碑：一端删除后同步给其它设备
   created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, client_id])
+  @@index([user_id, updated_at])
 }
 
 // 邀请码（一机一码）：每个码仅可被一个账号使用，注册事务内原子消耗
