@@ -7,6 +7,21 @@
 
 ---
 
+## [Unreleased] - 阶段10A 云端同步（后端地基）
+
+> 分支 `feature/10a-cloud-sync` 开发中，未合入 main、未发布。计税能力永不锁定，锁的是云端增值（历史同步）。
+
+### 新增
+- **账户分层模型（阶段10）**：`User` 增 `plan`（free/pro，默认 free）、`plan_expires_at`（null=永久）、`pro_granted_by`（seed/invite/admin/purchase）；生产 PostgreSQL 与开发 SQLite 双迁移
+- **种子期专业版授权 `SEED_GRANT_PRO`**：开启后注册/登录即授予 `pro`（`pro_granted_by="seed"`），存量 free 账号登录自动升级；`GET /auth/profile` 返回 plan 相关字段
+- **云端历史同步端点 `POST /api/calculations/sync`（专业版）**：按 `(user_id, client_id)` 幂等 upsert + 全量拉取；`updatedAt` 新者胜解决多端冲突；删除以墓碑（`deleted_at` 软删）广播到其它设备，30 天自动清理；云端活跃历史 500 条上限（超限 409 `HISTORY_LIMIT_REACHED`）；免费账号 403 `PRO_REQUIRED`（计税不锁）
+- 同步端点限流（20 次/分/IP）、Swagger 文档注释、错误响应带业务 `code` 字段
+
+### 变更
+- `verify:local` 升级为 6 步门禁，新增阶段10A 同步 e2e 断言 7 项（种子授权/上传/幂等/冲突/墓碑/上限/free 拒绝），本地 27/27 通过
+
+---
+
 ## [1.6.1] - 2026-09-08
 
 ### 新增

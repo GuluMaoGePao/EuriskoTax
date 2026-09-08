@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const calculationController = require('../controllers/calculationController');
+const syncController = require('../controllers/calcSyncController');
 const { authenticateToken } = require('../middleware/auth');
 
 /**
@@ -97,6 +98,43 @@ router.post('/business', calculationController.calculateBusiness);
  *       '401': { description: 未认证 }
  */
 router.post('/classification', calculationController.calculateClassification);
+
+/**
+ * @swagger
+ * /api/calculations/sync:
+ *   post:
+ *     tags: [计算 Calculations]
+ *     summary: 计算历史云端同步（专业版）——批量推送 + 全量拉取
+ *     description: >
+ *       将本端增量（含墓碑）push 到云端，按 (user_id, clientId) 幂等 upsert、updatedAt 新者胜；
+ *       返回该账号全量活跃记录与已删 clientId 集合，供本端 merge。免费版返回 403 PRO_REQUIRED。
+ *       云端活跃历史上限 500 条，超出返回 409 HISTORY_LIMIT_REACHED。单请求 ≤200 条、单条 ≤50KB。
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             example:
+ *               push:
+ *                 - clientId: "1715000000000_ab12cd"
+ *                   type: comprehensive
+ *                   data: { title: "2026年1月", date: "2026-01-15", income: 30000, tax: 3210, results: {} }
+ *                   updatedAt: "2026-09-08T10:00:00.000Z"
+ *                 - clientId: "1715000000123_ef34"
+ *                   type: comprehensive
+ *                   updatedAt: "2026-09-08T10:05:00.000Z"
+ *                   deletedAt: "2026-09-08T10:05:00.000Z"
+ *     responses:
+ *       '200':
+ *         description: 同步成功，返回 records + deletedClientIds
+ *       '400': { description: 同步条目校验失败 }
+ *       '401': { description: 未认证 }
+ *       '403': { description: 免费版无云同步（code=PRO_REQUIRED） }
+ *       '409': { description: 云端历史上限（code=HISTORY_LIMIT_REACHED） }
+ */
+router.post('/sync', authenticateToken, syncController.syncHistory);
 
 /**
  * @swagger
