@@ -31,6 +31,7 @@ function updateAuthUI() {
         const userMenu = document.getElementById('user-menu');
         if (userMenu) userMenu.classList.add('hidden');
     }
+    renderPlanBadges(); // 阶段10：顶栏 PRO 徽标随登录态刷新
 }
 
 // 退出/注销时清理本地残留的用户数据，避免换号共用浏览器导致数据串号。
@@ -40,6 +41,7 @@ function clearLocalUserData() {
     localStorage.removeItem('calculation_history');      // 旧遗留 key
     localStorage.removeItem('taxCalculationHistory');    // 主页/个人中心共用 key
     localStorage.removeItem('tax_profile');
+    localStorage.removeItem('taxSyncMeta');              // 阶段10：云同步元数据（墓碑/cloudIds）随会话清理，防换号残留
     refreshHomeHistoryViews();
 }
 
@@ -78,6 +80,10 @@ async function handleLogin() {
         await apiClient.loginUser(email, password, rememberMe);
         clearPageHistory();
         updateAuthUI();
+        // 阶段10：登录即自动开启云同步（PRO 后台拉取云端/上传本端增量，不阻塞登录流程）
+        if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
+            window.EuriskoSync.afterLogin(apiClient.getCurrentUser());
+        }
         showAlert('登录成功', 'success');
     } catch (error) {
         showAlert(error.message);
@@ -496,6 +502,10 @@ async function handleResetPassword() {
 async function handleLogout() {
     apiClient.logoutUser();
     clearLocalUserData();
+    // 阶段10：云同步引擎登出（停防抖表、清本地同步元数据）
+    if (window.EuriskoSync && typeof window.EuriskoSync.afterLogout === 'function') {
+        window.EuriskoSync.afterLogout();
+    }
     clearPageHistory();
     // updateAuthUI 会自动回到登录页
     updateAuthUI();
@@ -564,6 +574,11 @@ async function loadProfile() {
         document.getElementById('profile-phone').value = user.phone || '';
         document.getElementById('profile-display-name').textContent = user.username;
         document.getElementById('profile-display-email').textContent = user.email;
+        // 阶段10：profile 返回最新 plan/过期时间 → 刷新 PRO 徽标与同步引擎授权（种子期登录即自动升级 pro）
+        renderPlanBadges(user);
+        if (window.EuriskoSync && typeof window.EuriskoSync.updateUser === 'function') {
+            window.EuriskoSync.updateUser(user);
+        }
         syncDuration = performance.now() - syncStart;
         ProfilePerf.log('loadProfile → 阶段2完成-同步更新顶栏', syncDuration, { fields: 5 });
 
@@ -1130,6 +1145,10 @@ async function deleteAccount() {
     try {
         await apiClient.deleteProfile();
         clearLocalUserData();
+        // 阶段10：注销账号同步重置云同步引擎（防已删账号状态残留触发无效同步）
+        if (window.EuriskoSync && typeof window.EuriskoSync.afterLogout === 'function') {
+            window.EuriskoSync.afterLogout();
+        }
         clearPageHistory();
         updateAuthUI();
         showAlert('账号已注销，感谢您的使用', 'success');
@@ -1229,11 +1248,84 @@ function deleteHistoryItem(id) {
         apiClient.deleteCalculation(id).catch(() => {});
     }
 
+    // 阶段10：已同步过的记录删除 → 云端墓碑广播（同步引擎下次上传携带）；未同步过则忽略
+    if (window.EuriskoSync && typeof window.EuriskoSync.recordLocalDelete === 'function') {
+        window.EuriskoSync.recordLocalDelete(id);
+    }
+    dispatchHistoryMutated();
+
     // 同步刷新主页与个人中心各视图（主页渲染前会先从 localStorage 刷新镜像）
     refreshHomeHistoryViews();
     loadProfileHistory();
     updateProfileStats();
     showAlert('删除成功', 'success');
+}
+
+// === 阶段10：账户分层（PRO）徽标 + 云同步面板 ===
+function renderPlanBadges(userArg) {
+    const user = userArg || (apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null);
+    const planLib = (typeof window !== 'undefined' && window.EuriskoPlan) ? window.EuriskoPlan : null;
+    const isPro = planLib ? planLib.isPro(user && user.plan, user && user.plan_expires_at) : false;
+    const topbarBadge = document.getElementById('topbar-plan-badge');
+    if (topbarBadge) topbarBadge.classList.toggle('hidden', !isPro);
+    const profileBadge = document.getElementById('profile-plan-badge');
+    if (profileBadge) profileBadge.classList.toggle('hidden', !isPro);
+}
+
+// 本地历史被保存/删除时向云同步引擎广播变更信号（引擎防抖后自动同步，仅登录+PRO 生效）
+function dispatchHistoryMutated() {
+    if (typeof document === 'undefined' || typeof CustomEvent === 'undefined') return;
+    try {
+        document.dispatchEvent(new CustomEvent('euriskotax:history-mutated', { detail: { at: Date.now() } }));
+    } catch (e) { /* 广播失败不影响主流程 */ }
+}
+
+// 「数据管理」页云同步面板：展示登录态 / PRO gate / 同步状态，未登录或免费版展示引导文案
+function renderCloudSyncPanel() {
+    const engine = (typeof window !== 'undefined' && window.EuriskoSync) ? window.EuriskoSync : null;
+    const planLib = (typeof window !== 'undefined' && window.EuriskoPlan) ? window.EuriskoPlan : null;
+    if (!engine || !planLib) return;
+    const statusEl = document.getElementById('cloud-sync-status');
+    const noteEl = document.getElementById('cloud-sync-note');
+    const btn = document.getElementById('cloud-sync-now-btn');
+    const accountEl = document.getElementById('cloud-sync-account');
+    const user = apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
+    const state = engine.getState();
+    const proActive = planLib.isPro(user && user.plan, user && user.plan_expires_at);
+
+    if (!user) {
+        if (statusEl) { statusEl.textContent = '未登录'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
+        if (noteEl) noteEl.textContent = '登录后即可把本机计算历史备份到云端，换设备/重装后登录同一账号自动找回。' + planLib.PRO_FEATURE_HINT;
+        if (btn) btn.disabled = true;
+        if (accountEl) accountEl.textContent = '';
+        return;
+    }
+    if (!proActive) {
+        if (statusEl) { statusEl.textContent = '免费版'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
+        if (noteEl) noteEl.textContent = planLib.PRO_FEATURE_HINT;
+        if (btn) btn.disabled = true;
+        if (accountEl) accountEl.textContent = `当前账号：${user.email}（免费版）`;
+        return;
+    }
+    const statusTexts = { idle: '待同步', syncing: '同步中…', synced: '已同步', error: '同步异常' };
+    if (statusEl) {
+        statusEl.textContent = statusTexts[state.status] || '待同步';
+        statusEl.classList.toggle('text-green-600', state.status === 'synced');
+        statusEl.classList.toggle('text-red-600', state.status === 'error');
+    }
+    if (noteEl) noteEl.textContent = state.message || '登录后自动同步；可点「立即同步」手动触发。';
+    if (btn) btn.disabled = state.status === 'syncing';
+    if (accountEl) accountEl.textContent = `当前账号：${user.email}`;
+}
+
+// 云同步完成 → 统一刷新以 localStorage 为唯一数据源的各历史视图（避免 UI 与本地镜像脱节）
+function refreshAfterCloudSync() {
+    refreshHomeHistoryViews();
+    updateProfileStats();
+    const historyPage = document.getElementById('profile-history-page');
+    if (historyPage && !historyPage.classList.contains('hidden')) {
+        loadProfileHistory();
+    }
 }
 
 function togglePasswordVisibility(inputId, toggleId) {
@@ -1444,12 +1536,33 @@ function setupAuthEventListeners() {
     document.getElementById('export-json-btn').addEventListener('click', () => exportData('json'));
     document.getElementById('export-csv-btn').addEventListener('click', () => exportData('csv'));
 
+    // === 阶段10：云同步手动触发 + 状态/完成事件 ===
+    const cloudSyncBtn = document.getElementById('cloud-sync-now-btn');
+    if (cloudSyncBtn) {
+        cloudSyncBtn.addEventListener('click', async () => {
+            const engine = window.EuriskoSync;
+            if (!engine) { showAlert('云同步模块未加载，请刷新页面重试'); return; }
+            const state = await engine.syncNow();
+            renderCloudSyncPanel();
+            if (state && state.status === 'error') {
+                showAlert(state.message || '同步失败，请稍后重试');
+            }
+        });
+    }
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('euriskotax:sync-status', () => {
+            // 面板元素不在 DOM（尚未进入数据管理页）时静默跳过，进入时由 loadFn 兜底刷新
+            if (document.getElementById('cloud-sync-status')) renderCloudSyncPanel();
+        });
+        document.addEventListener('euriskotax:history-synced', refreshAfterCloudSync);
+    }
+
     // === 通用个人中心卡片点击处理（事件委托，支持动态生成的卡片） ===
     // 配置: { 卡片ID, 目标页面ID, 加载函数(可选), 特殊处理(可选) }
     const profileCardConfigs = [
         { cardId: 'profile-card-history', pageId: 'profile-history-page', loadFn: loadProfileHistory },
         { cardId: 'profile-card-tax', pageId: 'profile-tax-page', loadFn: loadProfileTax },
-        { cardId: 'profile-card-data', pageId: 'profile-data-page' },
+        { cardId: 'profile-card-data', pageId: 'profile-data-page', loadFn: renderCloudSyncPanel },
         { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
@@ -1825,6 +1938,16 @@ function initAuth() {
         updateAuthUI();
     } catch (e) {
         console.error('[initAuth] updateAuthUI 异常:', e);
+    }
+    // 阶段10：恢复会话后启动云同步引擎（attach 变更监听；已登录则防抖自动同步，未登录仅清引擎态）
+    try {
+        const syncEngine = window.EuriskoSync;
+        const currentUser = apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
+        if (syncEngine && typeof syncEngine.restore === 'function') {
+            syncEngine.restore(currentUser || null);
+        }
+    } catch (e) {
+        console.error('[initAuth] 云同步初始化异常:', e);
     }
     try {
         setupAuthEventListeners();

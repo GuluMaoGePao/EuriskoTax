@@ -1837,6 +1837,7 @@
                             <button id="user-btn" class="flex items-center space-x-2 bg-primary/80 hover:bg-primary/60 rounded-full px-3 py-1.5">
                                 <i class="fa fa-user"></i>
                                 <span id="user-name" class="text-sm hidden sm:inline">用户</span>
+                                <span id="topbar-plan-badge" class="hidden ml-1 px-1.5 py-0.5 rounded text-[10px] leading-none font-bold bg-amber-300 text-amber-900">PRO</span>
                                 <i class="fa fa-chevron-down text-xs"></i>
                             </button>
                             <div id="user-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden">
@@ -5673,6 +5674,9 @@
     <script src="src/js/ui/home-ui.js"></script>
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
+    <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
+    <script src="src/js/auth/plan.js"></script>
+    <script src="src/js/data/history-sync.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；
@@ -5774,7 +5778,10 @@
                         <i class="fa fa-user text-3xl text-primary"></i>
                     </div>
                     <div class="profile-user-info">
-                        <h3 id="profile-display-name" class="text-xl font-bold text-gray-800">用户名</h3>
+                        <h3 class="text-xl font-bold text-gray-800 flex items-center flex-wrap gap-2">
+                            <span id="profile-display-name">用户名</span>
+                            <span id="profile-plan-badge" class="hidden px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">专业版</span>
+                        </h3>
                         <p id="profile-display-email" class="text-gray-500 break-all">email@example.com</p>
                     </div>
                     <div class="profile-user-action">
@@ -6012,6 +6019,24 @@
                 </div>
             </div>
             
+            <!-- 阶段10：专业版云同步卡片（登录 + 专业版自动同步；免费/未登录在此展示 PRO gate） -->
+            <div class="card mb-6">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center">
+                        <i class="fa fa-cloud-upload mr-2 text-primary"></i>
+                        <h3 class="text-lg font-bold text-gray-800">专业版云同步</h3>
+                    </div>
+                    <span id="cloud-sync-status" class="text-xs font-medium text-gray-500">未开启</span>
+                </div>
+                <p id="cloud-sync-note" class="text-sm text-gray-500 mb-4 leading-relaxed">登录后自动把本机计算历史安全同步到云端；换设备或重新安装后登录同一账号即可找回。</p>
+                <div class="flex items-center space-x-3">
+                    <button id="cloud-sync-now-btn" class="btn btn-primary flex items-center justify-center" disabled>
+                        <i class="fa fa-refresh mr-2"></i>立即同步
+                    </button>
+                    <span id="cloud-sync-account" class="text-xs text-gray-400"></span>
+                </div>
+            </div>
+
             <div class="card">
                 <h3 class="text-xl font-bold text-gray-800 mb-6">数据管理</h3>
                 
