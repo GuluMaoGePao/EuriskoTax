@@ -55,7 +55,11 @@
             if (typeof window !== 'undefined' && window.apiClient && typeof window.apiClient.getCurrentUser === 'function') {
                 return window.apiClient.getCurrentUser() || null;
             }
-            return readStore('current_user', null);
+            // fallback（apiClient 未暴露到 window 时）：与 api-client.js 语义一致双级读取——
+            // 「保持登录状态」勾选写 localStorage，未勾选写 sessionStorage
+            var raw = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('current_user') : null)
+                || (typeof localStorage !== 'undefined' ? localStorage.getItem('current_user') : null);
+            return raw ? JSON.parse(raw) : null;
         } catch (e) {
             return null;
         }

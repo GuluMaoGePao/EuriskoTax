@@ -13,6 +13,7 @@ const freeUser = { email: 'free@example.com', plan: 'free' };
 
 beforeEach(() => {
     try { localStorage.clear(); } catch (e) { /* ignore */ }
+    try { sessionStorage.clear(); } catch (e) { /* ignore */ }
     if (window.TaxPolicy) window.TaxPolicy.clearState();
     window.apiClient = { getCurrentUser: () => freeUser };
 });
@@ -59,6 +60,27 @@ describe('isProActive / 免费不请求', () => {
         const spy = jest.fn();
         global.fetch = spy;
         await policy().syncNow();
+        expect(spy).not.toHaveBeenCalled();
+    });
+});
+
+describe('apiClient 未挂 window 时（ES module 场景，普通脚本需存储回退）', () => {
+    test('sessionStorage 有 pro 用户（未勾选「保持登录」）→ 仍发起拉取并落缓存', async () => {
+        delete window.apiClient; // 真实浏览器：api-client.js 为 type=module，window.apiClient 缺失
+        sessionStorage.setItem('current_user', JSON.stringify(proUser()));
+        mockFetchOk({ version: 'V2', notice: '更新说明', items: [] });
+        await policy().syncNow();
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        expect(policy().getCache()).not.toBeNull();
+        expect(policy().getCache().version).toBe('V2');
+    });
+
+    test('storage 亦无用户 → 视为非 pro，不请求', async () => {
+        delete window.apiClient;
+        const spy = jest.fn();
+        global.fetch = spy;
+        const out = await policy().syncNow();
+        expect(out).toEqual({ updated: false, reason: 'free' });
         expect(spy).not.toHaveBeenCalled();
     });
 });
