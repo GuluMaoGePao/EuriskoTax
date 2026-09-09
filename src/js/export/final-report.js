@@ -61,10 +61,11 @@
             if (typeof window !== 'undefined' && window.apiClient && typeof window.apiClient.getCurrentUser === 'function') {
                 return window.apiClient.getCurrentUser() || null;
             }
-            if (typeof localStorage !== 'undefined') {
-                const raw = localStorage.getItem('current_user');
-                return raw ? JSON.parse(raw) : null;
-            }
+            // fallback（apiClient 未暴露到 window 时）：双级读取——「保持登录状态」
+            // 勾选写 localStorage，未勾选写 sessionStorage
+            const raw = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('current_user') : null)
+                || (typeof localStorage !== 'undefined' ? localStorage.getItem('current_user') : null);
+            return raw ? JSON.parse(raw) : null;
         } catch (e) { /* ignore */ }
         return null;
     }

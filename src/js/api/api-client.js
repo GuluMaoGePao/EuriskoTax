@@ -305,4 +305,10 @@ const apiClient = {
     isLoggedIn
 };
 
+// 同时暴露到 window：tax-policy.js / final-report.js 等普通（非 module）脚本依赖
+// window.apiClient 读取当前登录用户，模块内的 ES import 不受影响。
+if (typeof window !== 'undefined') {
+    window.apiClient = apiClient;
+}
+
 export default apiClient;
