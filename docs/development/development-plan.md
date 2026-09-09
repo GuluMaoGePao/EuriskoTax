@@ -271,7 +271,7 @@ EuriskoTax/
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
 | 阶段8：首批测试用户运营 | 🚧 进行中（素材已备好；匿名埋点 + 反馈落库 + 管理员跟进收尾 ✅ 2026-09-07） | 2周 | 预计 2026-09-20 |
 | 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
-| 阶段10：免费/专业版体系 | 🚧 进行中（分支 `feature/10a-cloud-sync`：后端地基 ✅ 2026-09-08 —— 账户分层模型+迁移、SEED_GRANT_PRO、`POST /calculations/sync`，`verify:local` 27/27；前端同步链路 10A-2 待续，见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)） | 1周+ | 预计 2026-10 月初 |
+| 阶段10：免费/专业版体系 | 🚧 进行中（分支 `feature/10a-cloud-sync`：**10A 全部完成 2026-09-09** —— 后端地基 a29bd12 + 前端同步链路 8f3195a（`plan.js` PRO gate、`history-sync.js` 同步引擎、保存/删除挂钩、plan 徽标/云同步卡片 UI），`verify:local` 35/35、Jest 220/220 全绿，待合入 main/发布；10B PDF 汇算报告/政策推送待排期，见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)） | 1周+ | 预计 2026-10 月初 |
 
 ### 当前状态
 

@@ -26,14 +26,16 @@ Write-Host "==========================================" -ForegroundColor Cyan
 
 # 抓取关键资源（允许单个失败继续，统一汇总）
 $resources = @{}
-foreach ($key in @("index", "auth_ui", "api_client", "app", "sw")) {
+foreach ($key in @("index", "auth_ui", "api_client", "app", "sw", "plan_js", "history_sync")) {
     try {
         $url = switch ($key) {
-            "index"     { "$BaseUrl/" }
-            "auth_ui"   { "$BaseUrl/src/js/auth/auth-ui.js" }
-            "api_client"{ "$BaseUrl/src/js/api/api-client.js" }
-            "app"       { "$BaseUrl/src/js/app.js" }
-            "sw"        { "$BaseUrl/service-worker.js" }
+            "index"        { "$BaseUrl/" }
+            "auth_ui"      { "$BaseUrl/src/js/auth/auth-ui.js" }
+            "api_client"   { "$BaseUrl/src/js/api/api-client.js" }
+            "app"          { "$BaseUrl/src/js/app.js" }
+            "sw"           { "$BaseUrl/service-worker.js" }
+            "plan_js"      { "$BaseUrl/src/js/auth/plan.js" }
+            "history_sync" { "$BaseUrl/src/js/data/history-sync.js" }
         }
         $resources[$key] = Fetch-Text $url
     } catch {
@@ -46,12 +48,26 @@ Add-Check "页面可访问" ($null -ne $resources["index"]) "HTTP 资源抓取�
 if ($resources["index"]) {
     Add-Check "index.html 已无快速登录按钮" (-not $resources["index"].Contains("quick-login-btn"))
     Add-Check "index.html 含登录表单" ($resources["index"].Contains('id="login-form"'))
+    # 阶段10A：云同步脚本与 UI（plan 徽标 + 同步卡片）
+    Add-Check "index.html 加载 plan/history-sync 脚本" ($resources["index"].Contains("src/js/auth/plan.js") -and $resources["index"].Contains("src/js/data/history-sync.js"))
+    Add-Check "index.html 含云同步入口 DOM(cloud-sync-now-btn)" ($resources["index"].Contains("cloud-sync-now-btn"))
+    Add-Check "index.html 含 plan 徽标 DOM(topbar/profile)" ($resources["index"].Contains("topbar-plan-badge") -and $resources["index"].Contains("profile-plan-badge"))
 }
 
 if ($resources["auth_ui"]) {
     Add-Check "auth-ui.js 含本地开发填充入口(dev-login-fill)" ($resources["auth_ui"].Contains("dev-login-fill"))
     Add-Check "auth-ui.js 无 quick-login 残留" (-not $resources["auth_ui"].Contains("quick-login"))
     Add-Check "auth-ui.js 含 409 已注册提示" ($resources["auth_ui"].Contains("statusCode === 409"))
+    Add-Check "auth-ui.js 集成云同步引擎(login/logout/render)" ($resources["auth_ui"].Contains("EuriskoSync") -and $resources["auth_ui"].Contains("renderCloudSyncPanel"))
+}
+
+# 阶段10A：前端同步链路静态指纹
+if ($resources["plan_js"]) {
+    Add-Check "plan.js 含 PRO 判定(isPro/EuriskoPlan)" ($resources["plan_js"].Contains("function isPro") -and $resources["plan_js"].Contains("EuriskoPlan"))
+}
+if ($resources["history_sync"]) {
+    Add-Check "history-sync.js 含同步引擎(mergeCloud/EuriskoSync)" ($resources["history_sync"].Contains("mergeCloud") -and $resources["history_sync"].Contains("window.EuriskoSync"))
+    Add-Check "history-sync.js 含同步事件信号(history-synced)" ($resources["history_sync"].Contains("euriskotax:history-synced"))
 }
 
 if ($resources["sw"]) {
