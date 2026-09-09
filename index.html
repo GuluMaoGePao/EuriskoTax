@@ -1075,6 +1075,51 @@
             flex-wrap: wrap;
             margin-bottom: 12px;
         }
+        /* 阶段10B：政策要点更新提示条 */
+        .assistant-policy-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .assistant-policy-banner > i {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner > span {
+            flex: 1;
+        }
+        .assistant-policy-banner-close {
+            background: none;
+            border: none;
+            color: #60a5fa;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 4px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner-close:hover {
+            color: #1e40af;
+        }
+        .dark .assistant-policy-banner {
+            background: #172554;
+            border-color: #1e3a8a;
+            color: #bfdbfe;
+        }
+        .dark .assistant-policy-banner-close {
+            color: #93c5fd;
+        }
+        .dark .assistant-policy-banner-close:hover {
+            color: #dbeafe;
+        }
+
         .assistant-cat {
             padding: 5px 12px;
             border-radius: 16px;
@@ -5677,6 +5722,10 @@
     <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
     <script src="src/js/auth/plan.js"></script>
     <script src="src/js/data/history-sync.js"></script>
+    <!-- 阶段10B：政策要点更新同步（专业版登录后增量拉取并提示） -->
+    <script src="src/js/data/tax-policy.js"></script>
+    <!-- 阶段10B：专业版汇算清缴报告 PDF（免费/专业分流导出入口） -->
+    <script src="src/js/export/final-report.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；

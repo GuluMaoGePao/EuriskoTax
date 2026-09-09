@@ -26,7 +26,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 
 # 抓取关键资源（允许单个失败继续，统一汇总）
 $resources = @{}
-foreach ($key in @("index", "auth_ui", "api_client", "app", "sw", "plan_js", "history_sync")) {
+foreach ($key in @("index", "auth_ui", "api_client", "app", "sw", "plan_js", "history_sync", "policy_js", "final_report")) {
     try {
         $url = switch ($key) {
             "index"        { "$BaseUrl/" }
@@ -36,6 +36,8 @@ foreach ($key in @("index", "auth_ui", "api_client", "app", "sw", "plan_js", "hi
             "sw"           { "$BaseUrl/service-worker.js" }
             "plan_js"      { "$BaseUrl/src/js/auth/plan.js" }
             "history_sync" { "$BaseUrl/src/js/data/history-sync.js" }
+            "policy_js"    { "$BaseUrl/src/js/data/tax-policy.js" }
+            "final_report" { "$BaseUrl/src/js/export/final-report.js" }
         }
         $resources[$key] = Fetch-Text $url
     } catch {
@@ -52,6 +54,8 @@ if ($resources["index"]) {
     Add-Check "index.html 加载 plan/history-sync 脚本" ($resources["index"].Contains("src/js/auth/plan.js") -and $resources["index"].Contains("src/js/data/history-sync.js"))
     Add-Check "index.html 含云同步入口 DOM(cloud-sync-now-btn)" ($resources["index"].Contains("cloud-sync-now-btn"))
     Add-Check "index.html 含 plan 徽标 DOM(topbar/profile)" ($resources["index"].Contains("topbar-plan-badge") -and $resources["index"].Contains("profile-plan-badge"))
+    # 阶段10B：政策同步 + 专业版汇算报告脚本
+    Add-Check "index.html 加载 tax-policy/final-report 脚本" ($resources["index"].Contains("src/js/data/tax-policy.js") -and $resources["index"].Contains("src/js/export/final-report.js"))
 }
 
 if ($resources["auth_ui"]) {
@@ -59,6 +63,7 @@ if ($resources["auth_ui"]) {
     Add-Check "auth-ui.js 无 quick-login 残留" (-not $resources["auth_ui"].Contains("quick-login"))
     Add-Check "auth-ui.js 含 409 已注册提示" ($resources["auth_ui"].Contains("statusCode === 409"))
     Add-Check "auth-ui.js 集成云同步引擎(login/logout/render)" ($resources["auth_ui"].Contains("EuriskoSync") -and $resources["auth_ui"].Contains("renderCloudSyncPanel"))
+    Add-Check "auth-ui.js 集成政策同步(triggerPolicySyncIfPro/TaxPolicy)" ($resources["auth_ui"].Contains("triggerPolicySyncIfPro") -and $resources["auth_ui"].Contains("TaxPolicy"))
 }
 
 # 阶段10A：前端同步链路静态指纹
@@ -68,6 +73,24 @@ if ($resources["plan_js"]) {
 if ($resources["history_sync"]) {
     Add-Check "history-sync.js 含同步引擎(mergeCloud/EuriskoSync)" ($resources["history_sync"].Contains("mergeCloud") -and $resources["history_sync"].Contains("window.EuriskoSync"))
     Add-Check "history-sync.js 含同步事件信号(history-synced)" ($resources["history_sync"].Contains("euriskotax:history-synced"))
+}
+
+# 阶段10B：政策同步 + 专业版汇算清缴报告指纹
+if ($resources["policy_js"]) {
+    Add-Check "tax-policy.js 含政策同步(TaxPolicy/applyUpdates/syncNow)" ($resources["policy_js"].Contains("window.TaxPolicy") -and $resources["policy_js"].Contains("applyUpdates") -and $resources["policy_js"].Contains("syncNow"))
+}
+if ($resources["final_report"]) {
+    Add-Check "final-report.js 含汇算报告编排(EuriskoReport/exportFinalReport)" ($resources["final_report"].Contains("window.EuriskoReport") -and $resources["final_report"].Contains("exportFinalReport"))
+}
+
+# 阶段10B：政策内容公开端点（只读、无需登录）
+try {
+    $policyRaw = Fetch-Text "$BaseUrl/api/content/tax-policy"
+    $policy = $policyRaw | ConvertFrom-Json
+    $policyOk = ($null -ne $policy.data.version) -and ($policy.data.items | Measure-Object).Count -gt 0
+    Add-Check "政策内容端点 /api/content/tax-policy(version+items)" $policyOk "version=$($policy.data.version), items=$($policy.data.items.Count)"
+} catch {
+    Add-Check "政策内容端点 /api/content/tax-policy(version+items)" $false $_.Exception.Message
 }
 
 if ($resources["sw"]) {
