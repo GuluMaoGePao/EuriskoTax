@@ -42,6 +42,10 @@ function clearLocalUserData() {
     localStorage.removeItem('taxCalculationHistory');    // 主页/个人中心共用 key
     localStorage.removeItem('tax_profile');
     localStorage.removeItem('taxSyncMeta');              // 阶段10：云同步元数据（墓碑/cloudIds）随会话清理，防换号残留
+    // 阶段10B：政策更新缓存与横幅 seen 状态随会话清理（退出/注销后不残留他人更新提示）
+    if (window.TaxPolicy && typeof window.TaxPolicy.clearState === 'function') {
+        window.TaxPolicy.clearState();
+    }
     refreshHomeHistoryViews();
 }
 
@@ -58,6 +62,21 @@ function setLoading(btn, loading) {
     } else {
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+}
+
+// 阶段10B：专业版登录/恢复会话后静默拉取「政策要点」增量（免费版仅用内置快照，不发起请求）
+function triggerPolicySyncIfPro() {
+    try {
+        const tp = window.TaxPolicy;
+        if (!tp || typeof tp.syncNow !== 'function') return;
+        const user = apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
+        if (!user) return;
+        const planLib = window.EuriskoPlan;
+        if (!planLib || typeof planLib.isPro !== 'function' || !planLib.isPro(user.plan, user.plan_expires_at)) return;
+        tp.syncNow();
+    } catch (e) {
+        console.error('[policy] 政策同步异常:', e);
     }
 }
 
@@ -84,6 +103,8 @@ async function handleLogin() {
         if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
             window.EuriskoSync.afterLogin(apiClient.getCurrentUser());
         }
+        // 阶段10B：专业版静默拉取政策要点增量（免费版仅内置快照）
+        triggerPolicySyncIfPro();
         showAlert('登录成功', 'success');
     } catch (error) {
         showAlert(error.message);
@@ -1948,6 +1969,12 @@ function initAuth() {
         }
     } catch (e) {
         console.error('[initAuth] 云同步初始化异常:', e);
+    }
+    // 阶段10B：恢复会话（已登录专业版）后静默拉取政策要点增量
+    try {
+        triggerPolicySyncIfPro();
+    } catch (e) {
+        console.error('[initAuth] 政策同步初始化异常:', e);
     }
     try {
         setupAuthEventListeners();

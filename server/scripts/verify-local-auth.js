@@ -271,8 +271,39 @@ function extractCodeFromLog(log, email) {
         const calcJs = await request(PORT, 'GET', '/src/js/calculation/tax-calculator.js');
         record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
         record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
+
+        // ---- 阶段10B 前端资源静态断言（政策同步 + 专业版汇算清缴报告） ----
+        const taxPolicyJs = await request(PORT, 'GET', '/src/js/data/tax-policy.js');
+        record('tax-policy.js 含政策同步(TaxPolicy/applyUpdates/syncNow)',
+            taxPolicyJs.status === 200 && taxPolicyJs.raw.includes('window.TaxPolicy') && taxPolicyJs.raw.includes('applyUpdates') && taxPolicyJs.raw.includes('syncNow'), `HTTP ${taxPolicyJs.status}`);
+        const finalReportJs = await request(PORT, 'GET', '/src/js/export/final-report.js');
+        record('final-report.js 含汇算报告编排与分流(EuriskoReport/exportFinalReport)',
+            finalReportJs.status === 200 && finalReportJs.raw.includes('window.EuriskoReport') && finalReportJs.raw.includes('exportFinalReport') && finalReportJs.raw.includes('buildProDocHtml'), `HTTP ${finalReportJs.status}`);
+        record('index.html 加载 tax-policy/final-report 脚本',
+            page.status === 200 && page.raw.includes('src/js/data/tax-policy.js') && page.raw.includes('src/js/export/final-report.js'), '');
+        record('auth-ui.js 集成政策同步(triggerPolicySyncIfPro/TaxPolicy)',
+            authJs.status === 200 && authJs.raw.includes('triggerPolicySyncIfPro') && authJs.raw.includes('TaxPolicy'), `HTTP ${authJs.status}`);
+        const taxAssistantJs = await request(PORT, 'GET', '/src/js/data/tax-assistant.js');
+        record('tax-assistant.js 暴露内置快照(window.TAX_ASSISTANT_QA)',
+            taxAssistantJs.status === 200 && taxAssistantJs.raw.includes('window.TAX_ASSISTANT_QA'), `HTTP ${taxAssistantJs.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
+    }
+
+    console.log('\n[3/6·政策] 政策内容公开端点（阶段10B，无需登录）...');
+    try {
+        const policy = await request(PORT, 'GET', '/api/content/tax-policy');
+        const polData = policy.body && policy.body.data || {};
+        const items = Array.isArray(polData.items) ? polData.items : [];
+        const itemsWellFormed = items.length > 0 && items.every((x) => x && x.id && x.question && x.answer);
+        record('GET /content/tax-policy 公开内容(version+items)',
+            policy.status === 200 && !!polData.version && itemsWellFormed, `HTTP ${policy.status}, version=${polData.version || 'N/A'}, items=${items.length}`);
+        const policySame = await request(PORT, 'GET', '/api/content/tax-policy?since=' + encodeURIComponent(polData.version || ''));
+        const sameData = policySame.body && policySame.body.data || {};
+        record('since=当前版本 → items 空（无更新增量语义）',
+            policySame.status === 200 && Array.isArray(sameData.items) && sameData.items.length === 0 && sameData.version === polData.version, `HTTP ${policySame.status}, items=${sameData.items.length}`);
+    } catch (e) {
+        record('政策内容端点', false, e.message);
     }
 
     console.log('\n[4/6] 登录链路（dev 账号）...');

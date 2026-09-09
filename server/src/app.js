@@ -13,6 +13,7 @@ const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');
 const inviteRoutes = require('./routes/invites');
+const contentRoutes = require('./routes/content');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -82,6 +83,18 @@ const syncLimiter = rateLimit({
     }
 });
 
+// 政策内容限流：120 次/分钟/IP（阶段10B 公开只读端点）。
+// 专业版仅在登录后静默拉取一次，宽松上限只挡批量刷取
+const contentLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 120,
+    skip: (req) => req.path !== '/tax-policy',
+    message: {
+        success: false,
+        error: { message: '请求过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -144,6 +157,7 @@ app.use('/api/calculations', syncLimiter, calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/content', contentLimiter, contentRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

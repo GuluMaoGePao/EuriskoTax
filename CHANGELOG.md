@@ -32,6 +32,18 @@
 ### 修复
 - `verify-cloud-sync-engine.js` 在 Windows 退出崩溃（退出码 3221226505）：沙箱内改用原生 `http` 轻量 fetch（`agent:false` 连接即用即关），规避 undici keep-alive socket 在 `process.exit` 时触发 libuv `UV_HANDLE_CLOSING` abort
 
+### 新增 · 政策要点更新（阶段10B）
+- **政策内容公开端点 `GET /api/content/tax-policy`**：只读静态数据、无需登录、不占业务限流配额（独立宽松 120 次/分限流）；内容源为仓库内 `server/data/content/tax-policy.json`（运维改文件随发布上线、免重启热更新）；`?since=<version>` 版本一致返回空 items（增量语义）；支持 5 分钟内容缓存
+- **`src/js/data/tax-policy.js`（政策更新同步）**：专业版登录/恢复会话后静默拉取增量；内置 `window.TAX_ASSISTANT_QA` 快照仍为免费离线全量基准；按 id upsert 合并（覆盖更新 / 新增 / `deleted:true` 撤回），写 `taxPolicyCache` 缓存版本与通知文案；免费版不发起任何请求；触发 `euriskotax:policy-updated` 事件；`window.__EURISKO_SYNC_API_BASE__` 可覆盖 API 地址
+- **UI 提示**：tax-assistant 悬浮抽屉顶部「政策要点已更新」提示条（版本前进且未读才显示，可手动关闭、登出/注销随会话清理），登录/恢复钩子（auth-ui `triggerPolicySyncIfPro`）
+
+### 新增 · 专业版汇算清缴报告 PDF（阶段10B）
+- **`src/js/export/final-report.js`（`EuriskoReport`）**：专业版报告编排 = 品牌封面（报告标题 + 期间 + 报告对象）→ 收入与税前扣除明细（复用现预算表明细核心）→ 税负对比图（Chart.js 柱状 + 柱顶数值标注，html2canvas 截图前绘制）→ 政策要点/注意事项（从政策库按计算类型挑选）→ 免责声明页；输出 `汇算清缴报告_YYYY-MM.pdf`
+- **免费/专业分流**（同一导出按钮）：综合所得与经营所得「导出PDF报告」按钮经 `EuriskoReport.exportFinalReport` 分流——免费/未登录原样保留既有预算表 PDF（无能力倒退），专业版出汇算清缴报告；反向倒算/分类所得按钮保持原样
+- `exportToPDF` 支持可选 `opts`（`contentBuilder/beforeCapture/filename`），默认行为完全不变
+- `verify:local` 升级到 **42/42 通过**：新增 10B 前端静态断言（tax-policy/final-report 资源与脚本、auth-ui 钩子、tax-assistant 快照）与政策内容端点 e2e（公开内容 + since 增量语义）
+- `npm test` 新增 `tests/tax-policy.test.js`、`tests/final-report.test.js`（免费不请求 / pro 增量 / 合并撤回 / 横幅状态 / 文件名规则 / 税负结构 / 政策挑选 / 报告编排冒烟），全套 **242/242 通过（10 套件）**
+
 ---
 
 ## [1.6.1] - 2026-09-08
