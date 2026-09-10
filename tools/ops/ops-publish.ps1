@@ -130,7 +130,8 @@ Write-Host "  [OK] 已推送" -ForegroundColor Green
 
 # ---- [4/4] 线上核对（轮询直到部署指纹全绿或超时） ----
 Write-Host ""
-Write-Host "[4/4] 核对线上部署指纹: $BaseUrl" -ForegroundColor YellowWrite-Host "  Zeabur 收到 push 后会重新构建（通常 2~6 分钟），将持续轮询直至通过或超时 ..." -ForegroundColor Gray
+Write-Host "[4/4] 核对线上部署指纹: $BaseUrl" -ForegroundColor Yellow
+Write-Host "  Zeabur 收到 push 后会重新构建（通常 2~6 分钟），将持续轮询直至通过或超时 ..." -ForegroundColor Gray
 $interval = 20
 $elapsed  = 0
 $ok = $false
@@ -152,8 +153,17 @@ if ($NoAutoTag) {
 } else {
     Write-Host ""
     Write-Host "[5/5] 自动打版本标签 ..." -ForegroundColor Yellow
-    $version = (& node -p "require('$ProjectRoot/package.json').version" 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+    # 用 PowerShell 直接解析：Windows 反斜杠路径放进 `node -p` 的 JS 字符串会被当作转义，
+    # 导致 require 路径失效、version 读取失败，自动打标签永远被跳过
+    # 注意必须显式 -Encoding UTF8：PS5.1 默认按 ANSI 读 UTF-8 文件，
+    # 中文会被误解码并吞掉后面的引号，导致 ConvertFrom-Json 解析失败、version 读不到
+    $pkgFile = Join-Path $ProjectRoot "package.json"
+    $version = ""
+    if (Test-Path $pkgFile) {
+        $pkgRaw = Get-Content -Raw -Encoding UTF8 -LiteralPath $pkgFile
+        if ($pkgRaw -match '"version"\s*:\s*"([^"]+)"') { $version = $Matches[1] }
+    }
+    if ([string]::IsNullOrWhiteSpace($version)) {
         Write-Host "  [警告] 读取 package.json version 失败，跳过打标签（后续可手动执行 git tag）" -ForegroundColor Yellow
     } else {
         $tagName = "v$version"
