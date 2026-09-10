@@ -10,7 +10,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *   post:
  *     tags: [反馈 Feedback]
  *     summary: 提交用户反馈
- *     description: 用户提交意见反馈，需登录认证。反馈会持久化到数据库，供管理员跟进（采纳建议有奶茶奖励）
+ *     description: 用户提交意见反馈，需登录认证。反馈会持久化到数据库，供开发者逐条跟进（采纳的改进会记录在更新日志并致谢）
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -23,6 +23,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *               category: { type: string, example: bug, description: 反馈类型（bug/suggestion/other/general） }
  *               content:  { type: string, example: 计算综合所得时结果不准确, description: 反馈内容（最多5000字符） }
  *               rating:   { type: integer, minimum: 1, maximum: 5, example: 4, description: 评分1-5（选填） }
+ *               attachments: { type: array, items: { type: string }, maxItems: 3, description: 附图（选填）：前端压缩后的图片 dataURL（png/jpeg/webp，单张 ≤900K 字符） }
  *     responses:
  *       '201': { description: 反馈已收到（data.id 为落库ID） }
  *       '400': { description: 内容为空或超长 }

@@ -67,13 +67,15 @@ model VerificationCode {
 
 // 用户意见反馈：种子期收集 Bug/建议/评分，管理员跟进状态（open/resolved/closed）
 model Feedback {
-  id         Int      @id @default(autoincrement())
-  user_id    Int
-  category   String   @default("general") // bug / suggestion / other / general
-  rating     Int?     // 评分 1-5，选填
-  content    String
-  status     String   @default("open")
-  created_at DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  category    String   @default("general") // bug / suggestion / other / general
+  rating      Int?     // 评分 1-5，选填
+  content     String
+  // 附图（选填）：JSON 字符串数组，存前端压缩后的图片 data URL（限 3 张，服务端校验大小/类型）
+  attachments String   @default("[]")
+  status      String   @default("open")
+  created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
