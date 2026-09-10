@@ -2766,7 +2766,7 @@ Add-SectionCard -TabCtx $tab2Ctx `
 Add-SectionCard -TabCtx $tab2Ctx `
     -Title "3. 邀请码管理（一机一码）" `
     -Subtitle "注册邀请码：生成 · 查看 · 复制（生产 / 本地）" `
-    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证：优先读取 server\.env 中的 ADMIN_TOKEN，没有会弹窗输入一次并自动保存。生产目标 https://euriskotax.zeabur.app，本地 http://localhost:3000（需后端已启动）。" `
+    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证，本地与生产各用独立令牌：本地读 server\.env 的 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD（Zeabur 控制台 → Variables 查看），缺失会弹窗输入一次并回存 server\.env。生产目标 https://euriskotax.zeabur.app，本地 http://localhost:3000（需后端已启动）。" `
     -AccentColor $C_PURPLE -Buttons @(
     @{ Text = "生成邀请码到生产`n自动复制到剪贴板"; Desc = "输入数量（1-100）后调用生产环境邀请码接口生成，成功后自动复制到剪贴板并弹窗提示，明细写入下方日志区。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = {

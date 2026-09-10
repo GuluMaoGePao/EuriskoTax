@@ -58,6 +58,21 @@ if ($resources["index"]) {
     Add-Check "index.html 加载 tax-policy/final-report 脚本" ($resources["index"].Contains("src/js/data/tax-policy.js") -and $resources["index"].Contains("src/js/export/final-report.js"))
 }
 
+# 版本指纹：与本地 package.json 的 version 比对。
+# 必要性：上面全是「功能指纹」，只证明能力存在，证明不了本次构建已上线 ——
+# 纯文档 / 版本戳类发布（如 v1.7.1）功能指纹天然全绿，会假阳性判定"线上已是最新"。
+$localVersion = ""
+$pkgFile = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "package.json"
+if (Test-Path $pkgFile) {
+    $pkgRaw = Get-Content -Raw -Encoding UTF8 -LiteralPath $pkgFile
+    if ($pkgRaw -match '"version"\s*:\s*"([^"]+)"') { $localVersion = $Matches[1] }
+}
+if ($resources["index"]) {
+    Add-Check "index.html 版本号已更新为本地版本($localVersion)" `
+        ($localVersion -ne "" -and $resources["index"].Contains("版本 $localVersion")) `
+        "本地 package.json=$localVersion"
+}
+
 if ($resources["auth_ui"]) {
     Add-Check "auth-ui.js 含本地开发填充入口(dev-login-fill)" ($resources["auth_ui"].Contains("dev-login-fill"))
     Add-Check "auth-ui.js 无 quick-login 残留" (-not $resources["auth_ui"].Contains("quick-login"))

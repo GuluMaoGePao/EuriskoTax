@@ -125,7 +125,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🔵 查看生产/本地邀请码** | `GET /api/invites` | 拉取列表，按未使用/已使用分组展示（已使用显示注册用户名+时间） |
 | **🟢 复制生产未使用邀请码** | `GET /api/invites` | 整批复制到剪贴板（一行一个），便于直接发给用户 |
 
-> 邀请码按钮通过管理员令牌认证：优先读 `server/.env` 的 `ADMIN_TOKEN`，缺失时弹窗输入一次并自动保存。生产地址 `https://euriskotax.zeabur.app`，本地 `http://localhost:3000`。
+> 邀请码按钮通过管理员令牌认证，**本地与生产使用各自独立的令牌**：本地读 `server/.env` 的 `ADMIN_TOKEN`，生产读 `ADMIN_TOKEN_PROD`（在 Zeabur 控制台 → 项目 → Variables 中查看）；缺失时弹窗输入一次并回存到 `server/.env`，下次免输入。生产令牌失效（401）会自动清除本地缓存并要求重新输入。生产地址 `https://euriskotax.zeabur.app`，本地 `http://localhost:3000`。
 
 ### 3. 🧪 测试
 
