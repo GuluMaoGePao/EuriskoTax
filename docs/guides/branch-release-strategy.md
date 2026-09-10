@@ -119,10 +119,20 @@ git push origin v1.6.1
 | v1.5.1 | `2e2c8b5aabc3b145facdc8f61ac51242ab007483` | CHANGELOG [1.5.1] 归档 commit |
 | v1.5.2 | `e9b90c962c9f1468f5fa4b118d00b46ade90a4b2` | CHANGELOG [1.5.2] 归档 commit |
 | v1.6.0 | `e1e9bab68fca04607df41465a6a126316c8cedf4` | CHANGELOG [1.6.0] 归档 commit |
-| v1.6.1 | 本次发布 commit | 见 CHANGELOG [1.6.1] |
+| v1.6.1 | `af9860f` | 见 CHANGELOG [1.6.1] |
 
 > 说明：v1.3.0 / v1.4.0 因历史上多次 rebase、commit 时间与 CHANGELOG 日期无法一一对应，
 > 刻意**不强行补 tag**，避免误导；旧版可继续用 `archive/*` 分支查看。
+
+### 5.3 正式发布标签记录（`ops-publish` 自动打标）
+
+> `ops-publish.ps1` 发布成功后按 `package.json` 的 `version` 自动创建并推送 `vX.Y.Z`（已存在则跳过，幂等）。
+> **注意：必须先把 `package.json` 版本号递增再发布**，否则脚本会因标签已存在而跳过，导致线上代码没有对应版本可回溯。
+
+| 标签 | 锚点 commit | 说明 |
+|------|------------|------|
+| v1.7.0 | `f33d694` | 阶段10 免费/专业版体系 + 运维后台 + 反馈附图（合入 main 的 merge commit） |
+| v1.7.1 | 本次发布 commit | 本地 SQLite 运维后台用户搜索修复 + 门禁 52/52 + 文档口径收口 |
 
 ---
 
