@@ -12,7 +12,9 @@
  *   3. 随机空闲端口启动后端（node src/app.js，同源托管前端+API）
  *   4. HTTP 级 e2e：
  *      - 前端资源冒烟：/ 含登录表单、auth-ui.js 含 dev-login-fill 且无 quick-login、SW 为 v8
- *      - 登录本地测试账号 → 拿 JWT → GET /profile 校验
+ *      - 登录本地测试账号 → 拿 JWT → GET /profile 校验（含种子授权 plan=pro）
+ *      - 阶段10A 云端同步链路：上传/全量拉取、幂等、冲突新者胜、墓碑广播、
+ *        SYNC_MAX_RECORDS 上限拒绝、free 账号 403 PRO_REQUIRED
  *      - 完整注册链路：申请邀请码(写库) → send-code(读后端控制台验证码) → register → 登录新号 → profile
  *   5. 清理（删临时账号/邀请码/关后端），输出 PASS/FAIL，失败时退出码非 0
  *
@@ -151,7 +153,7 @@ function extractCodeFromLog(log, email) {
     }
 
     // ---- 1. 数据库准备：固定顺序 generate:dev → db push（SQLite 开发库，幂等） ----
-    console.log('\n[1/5] 数据库准备（SQLite dev.db）...');
+    console.log('\n[1/6] 数据库准备（SQLite dev.db）...');
     // npm install 的 postinstall 会用生产 schema(PostgreSQL) 生成 Prisma Client，
     // 必须先按本地 SQLite schema 重新 generate，否则 PrismaClient 与 dev.db 引擎不匹配
     const skipGenerate = process.env.VERIFY_SKIP_GENERATE === '1';
@@ -215,7 +217,7 @@ function extractCodeFromLog(log, email) {
     }
 
     // ---- 3. 启动后端（随机端口） ----
-    console.log('\n[2/5] 启动本地后端...');
+    console.log('\n[2/6] 启动本地后端...');
     const PORT = await getFreePort();
     const child = spawn(process.execPath, ['src/app.js'], {
         cwd: serverDir,
@@ -225,6 +227,8 @@ function extractCodeFromLog(log, email) {
             NODE_ENV: 'development',
             // 保证 X-Admin-Token 类管理接口（统计概览/邀请码/反馈跟进）本地可测
             ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'local-verify-admin-token',
+            // 阶段10A：云端历史上限调小（3 条），用于 e2e 断言「超限拒绝」而无需真的造 500 条
+            SYNC_MAX_RECORDS: '3',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -241,7 +245,7 @@ function extractCodeFromLog(log, email) {
     console.log(`  [OK] 后端已就绪 → http://127.0.0.1:${PORT}`);
 
     // ---- 4. 端到端断言 ----
-    console.log('\n[3/5] 前端资源冒烟...');
+    console.log('\n[3/6] 前端资源冒烟...');
     try {
         const page = await request(PORT, 'GET', '/');
         record('GET / 返回登录表单', page.status === 200 && page.raw.includes('id="login-form"'), `HTTP ${page.status}`);
@@ -252,11 +256,57 @@ function extractCodeFromLog(log, email) {
         record('service-worker.js 已无应用壳预缓存(APP_SHELL)', sw.status === 200 && !sw.raw.includes('APP_SHELL'), `HTTP ${sw.status}`);
         record('service-worker.js 含 http/https 协议守卫', sw.status === 200 && sw.raw.includes("url.protocol !== 'http:'"), `HTTP ${sw.status}`);
         record('service-worker.js HTML 导航 network-first', sw.status === 200 && sw.raw.includes("request.mode === 'navigate'"), `HTTP ${sw.status}`);
+
+        // ---- 阶段10 前端云同步链路静态断言 ----
+        const planJs = await request(PORT, 'GET', '/src/js/auth/plan.js');
+        record('plan.js 含 isPro/PLAN_PRO', planJs.status === 200 && planJs.raw.includes('function isPro') && planJs.raw.includes('EuriskoPlan'), `HTTP ${planJs.status}`);
+        const syncJs = await request(PORT, 'GET', '/src/js/data/history-sync.js');
+        record('history-sync.js 含 mergeCloud/EuriskoSync', syncJs.status === 200 && syncJs.raw.includes('mergeCloud') && syncJs.raw.includes('window.EuriskoSync'), `HTTP ${syncJs.status}`);
+        record('index.html 加载 plan/history-sync 脚本与云同步 DOM',
+            page.status === 200 && page.raw.includes('src/js/auth/plan.js') && page.raw.includes('src/js/data/history-sync.js')
+            && page.raw.includes('cloud-sync-now-btn') && page.raw.includes('topbar-plan-badge') && page.raw.includes('profile-plan-badge'),
+            '');
+        record('auth-ui.js 集成云同步引擎', authJs.status === 200 && authJs.raw.includes('EuriskoSync') && authJs.raw.includes('afterLogin'), `HTTP ${authJs.status}`);
+        const dmJs = await request(PORT, 'GET', '/src/js/data/data-management.js');
+        const calcJs = await request(PORT, 'GET', '/src/js/calculation/tax-calculator.js');
+        record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
+        record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
+
+        // ---- 阶段10B 前端资源静态断言（政策同步 + 专业版汇算清缴报告） ----
+        const taxPolicyJs = await request(PORT, 'GET', '/src/js/data/tax-policy.js');
+        record('tax-policy.js 含政策同步(TaxPolicy/applyUpdates/syncNow)',
+            taxPolicyJs.status === 200 && taxPolicyJs.raw.includes('window.TaxPolicy') && taxPolicyJs.raw.includes('applyUpdates') && taxPolicyJs.raw.includes('syncNow'), `HTTP ${taxPolicyJs.status}`);
+        const finalReportJs = await request(PORT, 'GET', '/src/js/export/final-report.js');
+        record('final-report.js 含汇算报告编排与分流(EuriskoReport/exportFinalReport)',
+            finalReportJs.status === 200 && finalReportJs.raw.includes('window.EuriskoReport') && finalReportJs.raw.includes('exportFinalReport') && finalReportJs.raw.includes('buildProDocHtml'), `HTTP ${finalReportJs.status}`);
+        record('index.html 加载 tax-policy/final-report 脚本',
+            page.status === 200 && page.raw.includes('src/js/data/tax-policy.js') && page.raw.includes('src/js/export/final-report.js'), '');
+        record('auth-ui.js 集成政策同步(triggerPolicySyncIfPro/TaxPolicy)',
+            authJs.status === 200 && authJs.raw.includes('triggerPolicySyncIfPro') && authJs.raw.includes('TaxPolicy'), `HTTP ${authJs.status}`);
+        const taxAssistantJs = await request(PORT, 'GET', '/src/js/data/tax-assistant.js');
+        record('tax-assistant.js 暴露内置快照(window.TAX_ASSISTANT_QA)',
+            taxAssistantJs.status === 200 && taxAssistantJs.raw.includes('window.TAX_ASSISTANT_QA'), `HTTP ${taxAssistantJs.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }
 
-    console.log('\n[4/5] 登录链路（dev 账号）...');
+    console.log('\n[3/6·政策] 政策内容公开端点（阶段10B，无需登录）...');
+    try {
+        const policy = await request(PORT, 'GET', '/api/content/tax-policy');
+        const polData = policy.body && policy.body.data || {};
+        const items = Array.isArray(polData.items) ? polData.items : [];
+        const itemsWellFormed = items.length > 0 && items.every((x) => x && x.id && x.question && x.answer);
+        record('GET /content/tax-policy 公开内容(version+items)',
+            policy.status === 200 && !!polData.version && itemsWellFormed, `HTTP ${policy.status}, version=${polData.version || 'N/A'}, items=${items.length}`);
+        const policySame = await request(PORT, 'GET', '/api/content/tax-policy?since=' + encodeURIComponent(polData.version || ''));
+        const sameData = policySame.body && policySame.body.data || {};
+        record('since=当前版本 → items 空（无更新增量语义）',
+            policySame.status === 200 && Array.isArray(sameData.items) && sameData.items.length === 0 && sameData.version === polData.version, `HTTP ${policySame.status}, items=${sameData.items.length}`);
+    } catch (e) {
+        record('政策内容端点', false, e.message);
+    }
+
+    console.log('\n[4/6] 登录链路（dev 账号）...');
     let devToken = null;
     try {
         const login = await request(PORT, 'POST', '/api/auth/login', { json: { email: DEV_EMAIL, password: DEV_PASSWORD } });
@@ -272,7 +322,7 @@ function extractCodeFromLog(log, email) {
         record('登录 dev 账号', false, e.message);
     }
 
-    console.log('\n[4/5 续] 反馈落库 + 匿名埋点链路（dev 账号，阶段8）...');
+    console.log('\n[4/6 续] 反馈落库 + 匿名埋点链路（dev 账号，阶段8）...');
     const stamp2 = Date.now();
     const adminToken = process.env.ADMIN_TOKEN || 'local-verify-admin-token';
     try {
@@ -326,7 +376,114 @@ function extractCodeFromLog(log, email) {
         } catch { /* 清理失败不阻塞判定 */ }
     }
 
-    console.log('\n[5/5] 注册链路（邀请码 + 邮箱验证码 → 登录新号）...');
+    console.log('\n[5/6] 云端历史同步链路（dev 账号，阶段10A）...');
+    const syncStamp = Date.now();
+    const syncPrefix = `verify-sync-${syncStamp}-`;
+    try {
+        if (!devToken) {
+            record('阶段10A 同步冒烟', false, '前置登录失败，跳过');
+        } else {
+            const devUser = await prisma.user.findUnique({ where: { email: DEV_EMAIL } });
+            const devUserId = devUser.id;
+            // 清空该账号此前云端同步行，保证上限断言基数可预期（上限被 SYNC_MAX_RECORDS=3 覆盖）
+            await prisma.calculation.deleteMany({ where: { user_id: devUserId, client_id: { not: null } } });
+
+            const tOld = '2026-01-01T00:00:00.000Z';
+            const tNew = '2026-09-01T00:00:00.000Z';
+            const recA = `${syncPrefix}A`;
+            const recB = `${syncPrefix}B`;
+            const recC = `${syncPrefix}C`;
+            const recE = `${syncPrefix}E`;
+            const recD = `${syncPrefix}D`;
+            const toRec = (id, type, title) => ({ clientId: id, type, data: { title, seed: syncStamp }, updatedAt: tOld });
+
+            // 10A.1 种子授权：种子模式下 dev 账号登录即 pro（granted_by=seed）
+            const p0 = await request(PORT, 'GET', '/api/auth/profile', { token: devToken });
+            const p0data = (p0.body && p0.body.data) || {};
+            record('种子授权 profile.plan=pro', p0.status === 200 && p0data.plan === 'pro' && p0data.pro_granted_by === 'seed',
+                `HTTP ${p0.status}, plan=${p0data.plan}, granted_by=${p0data.pro_granted_by}`);
+
+            // 10A.2 首轮上传 A/B + 全量拉取
+            const s1 = await request(PORT, 'POST', '/api/calculations/sync', {
+                token: devToken,
+                json: { push: [toRec(recA, 'comprehensive', '一月份'), toRec(recB, 'business', '经营B')] },
+            });
+            const d1 = (s1.body && s1.body.data) || {};
+            const pull1 = (d1.records || []).filter((r) => r.clientId === recA || r.clientId === recB);
+            record('sync 上传+全量拉取', s1.status === 200 && pull1.length === 2 && pull1.every((r) => r.data && r.data.seed === syncStamp),
+                `HTTP ${s1.status}, pulled=${pull1.length}`);
+
+            // 10A.3 幂等重放：同 clientId 再推不产生重复
+            const s2 = await request(PORT, 'POST', '/api/calculations/sync', { token: devToken, json: { push: [toRec(recA, 'comprehensive', '一月份')] } });
+            const d2 = (s2.body && s2.body.data) || {};
+            const aCnt = (d2.records || []).filter((r) => r.clientId === recA).length;
+            record('sync 幂等（无重复条）', s2.status === 200 && aCnt === 1, `HTTP ${s2.status}, recA count=${aCnt}`);
+
+            // 10A.4 冲突新者胜：旧时间回传不覆盖云端新版本
+            await request(PORT, 'POST', '/api/calculations/sync', {
+                token: devToken,
+                json: { push: [{ clientId: recA, type: 'comprehensive', data: { title: '一月份v2', seed: syncStamp }, updatedAt: tNew }] },
+            });
+            const s3 = await request(PORT, 'POST', '/api/calculations/sync', {
+                token: devToken,
+                json: { push: [{ clientId: recA, type: 'comprehensive', data: { title: '旧设备覆盖', seed: syncStamp }, updatedAt: '2020-01-01T00:00:00.000Z' }] },
+            });
+            const d3 = (s3.body && s3.body.data) || {};
+            const recANow = (d3.records || []).find((r) => r.clientId === recA);
+            record('sync 冲突 updatedAt 新者胜', s3.status === 200 && recANow && recANow.data && recANow.data.title === '一月份v2',
+                `HTTP ${s3.status}, cloud=${recANow && recANow.data && recANow.data.title}`);
+
+            // 10A.5 墓碑：删除 recA → deletedClientIds 广播、records 中消失
+            const s4 = await request(PORT, 'POST', '/api/calculations/sync', {
+                token: devToken,
+                json: { push: [{ clientId: recA, type: 'comprehensive', data: {}, updatedAt: tNew, deletedAt: tNew }] },
+            });
+            const d4 = (s4.body && s4.body.data) || {};
+            const tombOk = (d4.deletedClientIds || []).includes(recA) && !(d4.records || []).some((r) => r.clientId === recA);
+            record('sync 墓碑删除广播', s4.status === 200 && !!tombOk, `HTTP ${s4.status}`);
+
+            // 10A.5B 前端同步引擎 × 真实服务端：沙箱 A 设备上传 → 沙箱 B 设备空本地拉回（换机/重装场景）
+            const engRes = spawnSync(process.execPath, [path.join(serverDir, 'scripts', 'verify-cloud-sync-engine.js')], {
+                env: { ...process.env, PORT: String(PORT), SYNC_TOKEN: devToken || '', SYNC_EMAIL: DEV_EMAIL, SYNC_PREFIX: syncPrefix },
+                encoding: 'utf8',
+                timeout: 30000,
+            });
+            const engOut = (engRes.stdout || '') + (engRes.stderr || '');
+            record('sync 引擎·A设备本端上传', engRes.status === 0 && engOut.includes('ENG-A-UPLOAD-PASS'),
+                engRes.status === 0 ? 'sandbox engine ok' : `code=${engRes.status} ${engOut.slice(-260)}`);
+            record('sync 引擎·B设备空本地拉回', engRes.status === 0 && engOut.includes('ENG-B-PULL-PASS'),
+                engRes.status === 0 ? 'sandbox engine ok' : engOut.slice(-260));
+            // 清理引擎联测行，保证 10A.6 上限断言基数仍为「仅 recB 活跃」
+            try {
+                await prisma.calculation.deleteMany({ where: { user_id: devUserId, client_id: { startsWith: syncPrefix + 'ENG' } } });
+            } catch { /* 清理失败不阻塞判定 */ }
+
+            // 10A.6 上限：SYNC_MAX_RECORDS=3，第 4 条新记录被拒（409 HISTORY_LIMIT_REACHED）
+            await request(PORT, 'POST', '/api/calculations/sync', { token: devToken, json: { push: [toRec(recC, 'classification', 'C'), toRec(recE, 'reverse', 'E')] } });
+            const s5 = await request(PORT, 'POST', '/api/calculations/sync', { token: devToken, json: { push: [toRec(recD, 'comprehensive', 'D')] } });
+            const limitOk = s5.status === 409 && s5.body && s5.body.error && s5.body.error.code === 'HISTORY_LIMIT_REACHED';
+            record('sync 超过上限被拒(500条)', !!limitOk, `HTTP ${s5.status}, code=${s5.body && s5.body.error && s5.body.error.code}`);
+
+            // 10A.7 free 拒绝：临时降级为 free → 403 PRO_REQUIRED
+            await prisma.user.update({ where: { id: devUserId }, data: { plan: 'free', pro_granted_by: null } });
+            const sf = await request(PORT, 'POST', '/api/calculations/sync', { token: devToken, json: { push: [toRec(recB, 'business', '经营B2')] } });
+            const freeOk = sf.status === 403 && sf.body && sf.body.error && sf.body.error.code === 'PRO_REQUIRED';
+            record('sync free 账号被拒(PRO_REQUIRED)', !!freeOk, `HTTP ${sf.status}, code=${sf.body && sf.body.error && sf.body.error.code}`);
+        }
+    } catch (e) {
+        record('阶段10A 同步链路', false, e.message);
+    } finally {
+        // 清理本次同步测试数据 + 恢复 dev 账号种子 pro 授权
+        try {
+            const devUser = await prisma.user.findUnique({ where: { email: DEV_EMAIL } });
+            if (devUser) {
+                await prisma.calculation.deleteMany({ where: { user_id: devUser.id, client_id: { startsWith: syncPrefix } } });
+                await prisma.user.update({ where: { id: devUser.id }, data: { plan: 'pro', pro_granted_by: 'seed' } });
+            }
+        } catch { /* 清理失败不阻塞判定 */ }
+    }
+
+    console.log('\n[6/6] 注册链路（邀请码 + 邮箱验证码 → 登录新号）...');
     let tmpInviteId = null;
     let tmpUserId = null;
     const stamp = Date.now();

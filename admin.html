@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>EuriskoTax 管理台</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        .mono { font-family: Consolas, Menlo, Monaco, monospace; }
+        .tab-btn { @apply px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors whitespace-nowrap; }
+        .tab-btn.active { @apply text-primary bg-blue-50; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+    <!-- 顶栏 -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-blue-500 text-white flex items-center justify-center">
+                    <i class="fa fa-crown text-sm"></i>
+                </div>
+                <div class="leading-tight">
+                    <div class="font-bold text-gray-800 text-sm">EuriskoTax 管理台</div>
+                    <div class="text-[10px] text-gray-400 hidden sm:block">内部运维 · 权益发放 / 反馈跟进 / 数据观察</div>
+                </div>
+            </div>
+            <nav id="main-nav" class="ml-6 hidden md:flex items-center gap-1">
+                <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
+                <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
+                <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
+                <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
+            </nav>
+            <div class="ml-auto flex items-center gap-3">
+                <span id="connection-state" class="hidden text-xs text-gray-400"></span>
+                <button id="logout-btn" class="hidden px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    <i class="fa fa-sign-out mr-1"></i>退出
+                </button>
+            </div>
+        </div>
+        <!-- 移动端导航 -->
+        <nav id="main-nav-mobile" class="md:hidden border-t border-gray-100 px-2 py-1.5 flex gap-1 overflow-x-auto">
+            <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
+            <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
+            <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
+            <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
+        </nav>
+    </header>
+
+    <!-- 登录视图 -->
+    <main id="login-view" class="max-w-md mx-auto px-4 pt-16 pb-10">
+        <div class="bg-white rounded-2xl shadow-lg p-7">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary to-blue-500 text-white flex items-center justify-center mb-3">
+                    <i class="fa fa-lock text-2xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">管理员登录</h1>
+                <p class="text-xs text-gray-400 mt-1">输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
+            </div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">访问令牌</label>
+            <input id="login-token-input" type="password" autocomplete="off" spellcheck="false"
+                placeholder="粘贴 ADMIN_TOKEN" class="mono w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <label class="flex items-center gap-2 mt-3 text-xs text-gray-500 cursor-pointer select-none">
+                <input id="login-remember" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                在本机记住令牌（下次免输，存 localStorage）
+            </label>
+            <button id="login-btn" class="mt-5 w-full bg-primary hover:bg-blue-800 text-white font-semibold rounded-lg py-2.5 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                <i class="fa fa-sign-in"></i>进入管理台
+            </button>
+            <p id="login-error" class="hidden mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"></p>
+            <p class="text-[11px] text-gray-400 mt-4 text-center leading-relaxed">令牌仅用于请求管理接口的 <span class="mono">X-Admin-Token</span> 请求头，不发送到其它域名。</p>
+        </div>
+    </main>
+
+    <!-- 主工作区 -->
+    <main id="app-view" class="hidden max-w-7xl mx-auto px-4 py-6 pb-16">
+
+        <!-- 总览 -->
+        <section id="view-overview" class="view-section">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-tachometer text-primary mr-2"></i>运营总览</h2>
+                <button data-act="refresh-overview" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-1.5"><i class="fa fa-refresh mr-1"></i>刷新</button>
+            </div>
+            <div id="overview-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-bold text-gray-600 mb-4"><i class="fa fa-bar-chart text-primary mr-2"></i>计算类型分布（累计）</h3>
+                    <div id="overview-types"></div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-bold text-gray-600 mb-4"><i class="fa fa-line-chart text-primary mr-2"></i>近 7 日趋势（注册 / 计算）</h3>
+                    <div id="overview-trend"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 反馈 -->
+        <section id="view-feedback" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-comments-o text-primary mr-2"></i>用户反馈</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="feedback-status-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部状态</option>
+                        <option value="open">待处理 open</option>
+                        <option value="resolved">已解决 resolved</option>
+                        <option value="closed">已关闭 closed</option>
+                    </select>
+                    <select id="feedback-category-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部分类</option>
+                        <option value="bug">Bug</option>
+                        <option value="suggestion">建议</option>
+                        <option value="other">其他</option>
+                        <option value="general">一般</option>
+                    </select>
+                    <button data-act="refresh-feedback" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">最近 200 条按提交时间倒序；附图已随反馈入库，仅管理员可见。改状态后点「处理」即保存。</p>
+            <div id="feedback-list" class="space-y-3"></div>
+        </section>
+
+        <!-- 用户 -->
+        <section id="view-users" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-users text-primary mr-2"></i>用户与权益</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input id="users-query" type="search" placeholder="用户名或邮箱" class="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="users-plan-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部计划</option>
+                        <option value="pro">专业版 pro</option>
+                        <option value="free">基础版 free</option>
+                    </select>
+                    <button data-act="search-users" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-search mr-1"></i>查询</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">授予专业版：14 天体验补发 / 永久授权 / 自定义天数；也可回落基础版。操作记录在服务器日志。正式对外授权建议走下方兑换码。</p>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold">ID</th>
+                                <th class="px-4 py-3 font-semibold">用户</th>
+                                <th class="px-4 py-3 font-semibold">邮箱</th>
+                                <th class="px-4 py-3 font-semibold">计划</th>
+                                <th class="px-4 py-3 font-semibold">有效期 / 来源</th>
+                                <th class="px-4 py-3 font-semibold">注册</th>
+                                <th class="px-4 py-3 font-semibold">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                    <span id="users-total"></span>
+                    <div class="flex items-center gap-2">
+                        <button data-act="users-prev" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">上一页</button>
+                        <span id="users-page" class="text-xs"></span>
+                        <button data-act="users-next" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">下一页</button>
+                    </div>
+                </div>
+            </div>
+            <div id="user-detail" class="hidden mt-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+        </section>
+
+        <!-- 兑换码 -->
+        <section id="view-invites" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-ticket text-primary mr-2"></i>兑换码（一机一码 · 专业版授权）</h2>
+                <div class="flex items-center gap-2">
+                    <input id="invite-count" type="number" min="1" max="100" value="5" class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button data-act="gen-invites" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-plus mr-1"></i>生成</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">把生成的兑换码发给用户，注册/兑换时输入即开通专业版；已使用列表用于核对发放去向。</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-gift text-success mr-2"></i>可用兑换码
+                        <span id="invite-available-badge" class="ml-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5"></span>
+                    </h3>
+                    <div id="invite-available" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-check-circle-o text-warning mr-2"></i>已使用
+                        <span id="invite-used-badge" class="ml-2 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5"></span>
+                    </h3>
+                    <div id="invite-used" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-10 text-center text-[11px] text-gray-400">
+            EuriskoTax Admin Console · 请求均携带 X-Admin-Token
+        </footer>
+    </main>
+
+    <!-- 图片预览 lightbox -->
+    <div id="lightbox" class="hidden fixed inset-0 z-50 bg-black/85 items-center justify-center p-4" onclick="if(event.target===this)window.__closeLightbox&&window.__closeLightbox()">
+        <div class="relative max-w-4xl w-full max-h-full flex flex-col">
+            <img id="lightbox-img" src="" alt="反馈附图预览" class="max-h-[78vh] w-auto mx-auto rounded-lg shadow-2xl object-contain">
+            <p id="lightbox-caption" class="text-center text-white/70 text-sm mt-3"></p>
+            <button type="button" onclick="window.__closeLightbox&&window.__closeLightbox()" class="absolute -top-2 -right-2 w-9 h-9 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center"><i class="fa fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- 提示条 -->
+    <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl shadow-xl text-sm text-white max-w-md"></div>
+
+    <script type="module" src="/src/js/admin/admin.js"></script>
+</body>
+</html>

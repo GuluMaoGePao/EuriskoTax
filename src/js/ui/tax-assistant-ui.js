@@ -193,6 +193,43 @@
         return false;
     }
 
+    // ====== 渲染：政策更新提示条（阶段10B：专业版登录后增量更新） ======
+    // 数据与横幅状态由 window.TaxPolicy 管理；banner 挂在分类标签上方，打开抽屉即渲染
+    function renderPolicyBanner() {
+        var tp = (typeof window !== 'undefined') ? window.TaxPolicy : null;
+        var wrap = document.getElementById('assistant-policy-banner');
+        if (!wrap) {
+            var categories = document.getElementById('assistant-categories');
+            if (!categories) return;
+            wrap = document.createElement('div');
+            wrap.id = 'assistant-policy-banner';
+            categories.parentNode.insertBefore(wrap, categories);
+        }
+        if (!tp || typeof tp.needsBanner !== 'function' || !tp.needsBanner()) {
+            wrap.innerHTML = '';
+            return;
+        }
+        var cache = tp.getCache() || {};
+        var text = (cache.notice && cache.notice.trim())
+            ? cache.notice
+            : '政策要点已更新至 ' + (cache.version || '');
+        wrap.innerHTML =
+            '<div class="assistant-policy-banner">' +
+            '<i class="fa fa-bell"></i>' +
+            '<span>' + escapeHtml(text) + '</span>' +
+            '<button class="assistant-policy-banner-close" title="我知道了" aria-label="我知道了">' +
+            '<i class="fa fa-times"></i></button>' +
+            '</div>';
+        var closeBtn = wrap.querySelector('.assistant-policy-banner-close');
+        if (closeBtn && typeof tp.setBannerSeen === 'function') {
+            closeBtn.addEventListener('click', function () {
+                tp.setBannerSeen();
+                wrap.innerHTML = '';
+                logger.info('POLICY', '关闭政策更新提示', { version: cache.version });
+            });
+        }
+    }
+
     // ====== 渲染：分类标签（含"我的收藏"筛选） ======
     function renderCategories() {
         const container = document.getElementById('assistant-categories');
@@ -790,13 +827,14 @@
         hideSuggest();
         toggleClearBtn('');
 
-        // 渲染 4 个区块并测量耗时（与个人中心 ProfilePerf 风格对齐）
+        // 渲染 5 个区块并测量耗时（政策更新提示条 / 分类 / 热门 / 问答 / 快捷功能）
         var renderStart = performance.now();
+        AssistantPerf.measure('openAssistant → 渲染政策更新提示', renderPolicyBanner);
         AssistantPerf.measure('openAssistant → 渲染分类标签', renderCategories);
         AssistantPerf.measure('openAssistant → 渲染热门问答', renderHot);
         AssistantPerf.measure('openAssistant → 渲染问答列表', renderQAList);
         AssistantPerf.measure('openAssistant → 渲染快捷功能', renderShortcuts);
-        AssistantPerf.log('openAssistant → 渲染总耗时', performance.now() - renderStart, { steps: 4 });
+        AssistantPerf.log('openAssistant → 渲染总耗时', performance.now() - renderStart, { steps: 5 });
 
         logger.info('CLICK_OPEN', '渲染完成（分类 / 热门 / 问答 / 快捷功能）', {
             category: currentCategory,

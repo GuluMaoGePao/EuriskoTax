@@ -13,6 +13,8 @@ const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');
 const inviteRoutes = require('./routes/invites');
+const contentRoutes = require('./routes/content');
+const adminUserRoutes = require('./routes/adminUsers');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -70,6 +72,30 @@ const statsEventLimiter = rateLimit({
     }
 });
 
+// 云端同步限流：20 次/分钟/IP（阶段10A 专业版历史同步端点）。
+// 计算主链路在前端本地，正常用户仅登录/联网/离线恢复时触发一次全量同步，频率远低于此
+const syncLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    skip: (req) => req.path !== '/sync',
+    message: {
+        success: false,
+        error: { message: '同步请求过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
+// 政策内容限流：120 次/分钟/IP（阶段10B 公开只读端点）。
+// 专业版仅在登录后静默拉取一次，宽松上限只挡批量刷取
+const contentLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 120,
+    skip: (req) => req.path !== '/tax-policy',
+    message: {
+        success: false,
+        error: { message: '请求过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -117,8 +143,9 @@ app.use(cors({
     credentials: true
 }));
 // 请求体大小限制（防止过大请求导致 DoS）
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// 3mb：意见反馈支持 1~3 张前端压缩图片的 base64（单张 ≤900K 字符），其余接口为纯 JSON 远小于此
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 app.use(logger);
 
 // API 路由
@@ -128,10 +155,12 @@ app.get('/api/docs.json', (req, res) => {
 });
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
-app.use('/api/calculations', calculationRoutes);
+app.use('/api/calculations', syncLimiter, calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/content', contentLimiter, contentRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {
