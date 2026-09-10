@@ -7,10 +7,10 @@
 
 ---
 
-## [Unreleased] - 阶段10A 云端同步（后端地基 + 前端同步链路）
+## [1.7.0] - 2026-09-10（阶段10：免费/专业版体系 + 运维后台）
 
-> 分支 `feature/10a-cloud-sync` 开发中，未合入 main、未发布。计税能力永不锁定，锁的是云端增值（历史同步）。
-> 里程碑：M1 后端地基（a29bd12）→ M2 前端同步链路（本段）。
+> 里程碑：M1 后端地基（a29bd12）→ M2 前端同步链路（8f3195a）→ 10B 政策要点与汇算清缴报告 → 运维管理后台 + 反馈附图。
+> 核心原则：计税能力永不锁定，锁的是云端增值（历史同步）。
 
 ### 新增
 - **账户分层模型（阶段10）**：`User` 增 `plan`（free/pro，默认 free）、`plan_expires_at`（null=永久）、`pro_granted_by`（seed/invite/admin/purchase）；生产 PostgreSQL 与开发 SQLite 双迁移
@@ -42,7 +42,23 @@
 - **免费/专业分流**（同一导出按钮）：综合所得与经营所得「导出PDF报告」按钮经 `EuriskoReport.exportFinalReport` 分流——免费/未登录原样保留既有预算表 PDF（无能力倒退），专业版出汇算清缴报告；反向倒算/分类所得按钮保持原样
 - `exportToPDF` 支持可选 `opts`（`contentBuilder/beforeCapture/filename`），默认行为完全不变
 - `verify:local` 升级到 **42/42 通过**：新增 10B 前端静态断言（tax-policy/final-report 资源与脚本、auth-ui 钩子、tax-assistant 快照）与政策内容端点 e2e（公开内容 + since 增量语义）
-- `npm test` 新增 `tests/tax-policy.test.js`、`tests/final-report.test.js`（免费不请求 / pro 增量 / 合并撤回 / 横幅状态 / 文件名规则 / 税负结构 / 政策挑选 / 报告编排冒烟），全套 **242/242 通过（10 套件）**
+- `npm test` 新增 `tests/tax-policy.test.js`、`tests/final-report.test.js`（免费不请求 / pro 增量 / 合并撤回 / 横幅状态 / 文件名规则 / 税负结构 / 政策挑选 / 报告编排冒烟），全套 **252/252 通过（10 套件）**
+
+### 新增 · 账户设置改密改走邮箱验证码
+
+- **账户设置页交互重构**：手机号改为「独立保存」即时生效（部分更新语义，不再依赖页面级提交）；修改密码不再输入「当前密码」，改为复用登录邮箱验证码链路（`POST /auth/send-reset-code` + `POST /auth/reset-password`，60 秒冷却、验证码一次性），与注册/找回密码体验统一
+- 移除旧「手机号 + 密码统一提交」遗留的页面底部「取消 / 保存修改」全局条
+- 登录成功、退出登录不再弹模态确认框（顶栏用户名/版本徽标、登录页重现即为反馈），减少无意义打断
+
+### 新增 · 运维管理后台（`admin.html`）
+
+- **`admin.html` + `src/js/admin/admin.js`**：独立运维后台页，全请求带 `X-Admin-Token`（= 环境变量 `ADMIN_TOKEN`）；四个 Tab：运营总览 / 反馈处理（含附图预览与状态跟进）/ 用户权益 / 兑换码
+- **用户管理端点**：`GET /api/admin/users`（关键词 `q` 匹配用户名/邮箱 + `plan` 过滤 + 分页）、`GET /api/admin/users/:id`（含反馈/计算条数与最近动态）、`PATCH /api/admin/users/:id/plan`（补发 14 天体验 / 按天开通 / 授予永久 / 回落基础版，`grantedBy` 默认 `admin`）
+
+### 新增 · 意见反馈支持附图
+
+- **`Feedback.attachments`**（迁移 `20260909_add_feedback_attachments`）：存前端压缩后的图片 data URL（最多 3 张、仅 png/jpeg/webp、单张 ≤900K 字符），默认 `'[]'` 自动兼容旧数据行
+- 提交侧强校验（数量超限 / 类型不符 / 过大一律 400，防脏数据与库容滥用）；反馈日志追加附图张数；管理员反馈列表返回该字段
 
 ---
 
