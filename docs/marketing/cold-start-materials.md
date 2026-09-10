@@ -140,13 +140,14 @@
 
 > 最近我做了一个个税计算的小工具，想请你帮忙体验下😊
 > 地址：https://euriskotax.zeabur.app
-> 注册需要邀请码，我发你一个专属的一机一码
+> 注册需要邀请码，我发你一个专属的一机一码（一人一个，用完即废）
 >
-> 主要看两点：
+> 主要看三点：
 > 1. 计算结果和你实际工资单对不对得上（用你最近一个月真实数据试试）
 > 2. 界面有没有看不懂的地方
+> 3. 算完顺手点一下「保存」——登录后才会记录，也方便我知道哪些功能真有人用
 >
-> 有任何问题直接跟我说，截图发我就行。反馈被采纳的话请你喝奶茶🧋
+> 有任何问题直接跟我说，截图发我就行。也可以在「个人中心 → 意见反馈」里提（支持贴截图），会直接进我的后台，处理更快。反馈被采纳的话请你喝奶茶🧋
 
 **种子用户选择建议**：优先邀请最近半年内跳槽/谈过薪资的朋友（痛点最强），其次是有副业经营所得、租金收入的朋友（覆盖经营所得/分类所得模块）。
 
@@ -154,19 +155,24 @@
 
 ## 七、反馈收集与数据观察
 
-**反馈渠道**：登录后 → 个人中心 → 「意见反馈」卡片（Bug/建议分类 + 1-5 星评分 + 详细描述）。反馈已落库（2026-09-07 起不再只写日志）：
+**用户侧入口**：登录后 → 个人中心 → 「意见反馈」卡片（Bug/建议分类 + 1-5 星评分 + 详细描述 + 最多 3 张截图）。反馈已落库（2026-09-07 起不再只写日志）。
+
+**管理侧查看（推荐）**：浏览器打开 `https://euriskotax.zeabur.app/admin.html` → 粘贴令牌（生产用 Zeabur 变量里的 `ADMIN_TOKEN_PROD`，勾选「在本机记住令牌」后免输）→ **「反馈」Tab**。可按状态（open / resolved / closed）与分类（bug / 建议 / 其他）筛选，点附图看大图，改状态后点「处理」即保存；列表为最近 200 条按提交时间倒序。同页还有「总览 / 用户 / 兑换码」三个 Tab（用户 Tab 可搜索并授予限时专业版，兑换码 Tab 管理一机一码）。
+
 - 实时提醒：Zeabur 控制台 → 日志面板过滤 `[FEEDBACK]`
-- 列表拉取（含提交人邮箱，便于回访送奶茶）：
+- 命令行拉取（含提交人邮箱，便于回访送奶茶）：
   ```powershell
-  curl.exe -s "https://euriskotax.zeabur.app/api/feedback/admin?status=open" -H "X-Admin-Token: <你的ADMIN_TOKEN>"
+  curl.exe -s "https://euriskotax.zeabur.app/api/feedback/admin?status=open" -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
   ```
 - 跟进采纳：`PATCH /api/feedback/admin/<id>`，body `{"status":"resolved"}`（或 `"closed"`）
 
 **增长数据观察**（发帖后每天看一次；计算统计为登录用户保存计算时的匿名聚合，仅含类型，不含任何输入数据）：
 
 ```powershell
-curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: <你的ADMIN_TOKEN>"
+curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
 ```
+
+> 注意：埋点与计算统计**只在登录用户点击「保存」时触发**，注册后只浏览不保存不会产生 `calculations` 数据——这是 `calculations` 长期为 0 的常见原因，不代表没人访问。
 
 关注指标：
 - `users.newToday`：每日新增注册（即刻/V2EX 发帖当天应有明显脉冲）
