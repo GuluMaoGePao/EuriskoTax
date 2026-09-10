@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.2
-> **最后更新**: 2026年9月8日（同步 v1.6.1 + 阶段10A 后端地基：`User` 账户分层 `plan` 字段、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；v1.6.0：反馈提交落库闭环 + 管理员反馈列表/状态跟进 + 匿名计算埋点 `POST /api/stats/events` + `overview` 计算统计改读 `CalcEvent` 聚合表 + `requireAdmin` 抽为 `middleware/adminAuth.js`）
+> **版本**: v2.3
+> **最后更新**: 2026年9月11日（同步 v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`、政策内容端点 `GET /api/content/tax-policy`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
