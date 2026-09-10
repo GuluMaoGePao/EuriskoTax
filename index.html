@@ -318,7 +318,7 @@
                 padding: 0.625rem 1rem;
             }
             .profile-sub-nav-inner {
-                @apply flex items-center max-w-4xl mx-auto;
+                @apply flex items-center relative max-w-4xl mx-auto;
             }
             .profile-sub-nav-back {
                 @apply flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-150 font-medium text-sm py-1.5 px-3 rounded-lg hover:bg-primary/5 cursor-pointer;
@@ -327,7 +327,11 @@
                 @apply scale-95;
             }
             .profile-sub-nav-title {
-                @apply ml-auto mr-auto text-gray-700 font-semibold text-sm pointer-events-none;
+                @apply absolute left-1/2 -translate-x-1/2 text-gray-700 font-semibold text-sm pointer-events-none;
+                max-width: 70%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .dark .profile-sub-nav {
                 @apply bg-gray-800/95 border-gray-700;
@@ -336,39 +340,26 @@
                 @apply text-gray-200;
             }
 
-            /* === 个人中心用户信息卡片自适应 === */
-            /* 小屏：头像、信息、按钮垂直堆叠；大屏：横向排列 */
-            .profile-user-card {
-                @apply flex flex-col items-center text-center gap-3 py-2;
-            }
-            .profile-user-card .profile-user-avatar {
-                @apply mr-0;
-            }
-            .profile-user-card .profile-user-info {
-                @apply w-full;
-            }
-            .profile-user-card .profile-user-action {
-                @apply w-full;
-            }
-            .profile-user-card .profile-user-action .btn {
-                @apply w-full;
-            }
-            @media (min-width: 640px) {
-                .profile-user-card {
-                    @apply flex-row items-center text-left gap-0;
+            /* 个人中心子页面顶栏：手机窄屏适配（加大返回热区、收紧留白） */
+            @media (max-width: 640px) {
+                .profile-sub-nav {
+                    padding: 0.5rem 0.5rem;
                 }
-                .profile-user-card .profile-user-avatar {
-                    @apply mr-6;
+                .profile-sub-nav-back {
+                    min-height: 40px;
+                    min-width: 40px;
+                    padding: 0.375rem 0.75rem;
                 }
-                .profile-user-card .profile-user-info {
-                    @apply w-auto flex-1 min-w-0;
+                .profile-sub-nav-back span {
+                    display: none;
                 }
-                .profile-user-card .profile-user-action {
-                    @apply w-auto ml-auto;
-                }
-                .profile-user-card .profile-user-action .btn {
-                    @apply w-auto;
-                }
+            }
+
+            /* === 个人中心主页（banner 与模块卡片用内联 Tailwind 工具类，避免维护重复 CSS） === */
+            /* 用户信息横幅上的头像圆角大块 */
+            .profile-avatar-tile {
+                @apply w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0;
+                box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
             }
 
             /* 页面切换过渡动画 */
@@ -381,6 +372,15 @@
             }
             .animate-fade-in {
                 animation: fadeIn 0.2s ease-out;
+            }
+
+            /* 用户下拉菜单入场右对齐（从右上角展开） */
+            @keyframes dropdownIn {
+                from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .animate-dropdown {
+                animation: dropdownIn 0.16s ease-out;
             }
 
             /* === 阶段1：紧凑顶栏 + 首页卡片流 === */
@@ -1075,6 +1075,51 @@
             flex-wrap: wrap;
             margin-bottom: 12px;
         }
+        /* 阶段10B：政策要点更新提示条 */
+        .assistant-policy-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .assistant-policy-banner > i {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner > span {
+            flex: 1;
+        }
+        .assistant-policy-banner-close {
+            background: none;
+            border: none;
+            color: #60a5fa;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 4px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner-close:hover {
+            color: #1e40af;
+        }
+        .dark .assistant-policy-banner {
+            background: #172554;
+            border-color: #1e3a8a;
+            color: #bfdbfe;
+        }
+        .dark .assistant-policy-banner-close {
+            color: #93c5fd;
+        }
+        .dark .assistant-policy-banner-close:hover {
+            color: #dbeafe;
+        }
+
         .assistant-cat {
             padding: 5px 12px;
             border-radius: 16px;
@@ -1833,15 +1878,24 @@
                         <i class="fa fa-question-circle"></i>
                     </button>
                     <div id="user-menu" class="ml-2">
-                        <div class="relative">
+                        <div class="relative flex items-center gap-1.5">
+                            <button id="topbar-plan-badge" type="button" title="查看版本与权益" class="hidden items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold leading-none"></button>
                             <button id="user-btn" class="flex items-center space-x-2 bg-primary/80 hover:bg-primary/60 rounded-full px-3 py-1.5">
                                 <i class="fa fa-user"></i>
                                 <span id="user-name" class="text-sm hidden sm:inline">用户</span>
                                 <i class="fa fa-chevron-down text-xs"></i>
                             </button>
-                            <div id="user-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden">
-                                <a href="#" id="profile-link" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">个人中心</a>
-                                <a href="#" id="logout-link" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">退出登录</a>
+                            <div id="user-dropdown" class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 hidden z-50 origin-top-right animate-dropdown">
+                                <a href="#" id="topbar-plan-entry" class="flex items-center gap-2 px-4 py-2.5 text-violet-700 hover:bg-violet-50 font-medium text-sm">
+                                    <i class="fa fa-crown text-amber-500"></i>版本与权益
+                                </a>
+                                <div class="border-t border-gray-100 my-1"></div>
+                                <a href="#" id="profile-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
+                                    <i class="fa fa-user-circle text-gray-400"></i>个人中心
+                                </a>
+                                <a href="#" id="logout-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
+                                    <i class="fa fa-sign-out text-gray-400"></i>退出登录
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -5311,7 +5365,7 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-bold">意见反馈</h3>
-                            <p class="text-white/80 text-xs">Bug、建议或评分，被采纳的反馈有奶茶奖励</p>
+                            <p class="text-white/80 text-xs">发现 Bug、想要新功能或有任何建议都可以告诉我们——每条反馈我们都会认真查看，采纳的改进会记录在更新日志并致谢</p>
                         </div>
                     </div>
                     <button id="close-feedback-modal" onclick="closeModal(document.getElementById('feedback-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
@@ -5344,10 +5398,91 @@
                     <textarea id="feedback-content" rows="5" maxlength="5000" placeholder="请描述您遇到的问题或想要的功能建议…" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
                     <p class="text-right text-xs text-gray-400 mt-1"><span id="feedback-content-count">0</span>/5000</p>
                 </div>
+                <!-- 附图（选填）：自动压缩为小图后随反馈提交，仅开发者与账号本人可见 -->
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">附图（选填）</label>
+                    <div id="feedback-attachment-grid" class="flex flex-wrap gap-2 mb-2"></div>
+                    <button type="button" id="feedback-add-attachment" class="inline-flex items-center gap-2 border border-dashed border-gray-300 hover:border-blue-400 hover:text-blue-600 text-gray-500 rounded-lg px-3 py-2 text-sm transition-colors">
+                        <i class="fa fa-camera"></i>添加截图或图片（最多 3 张）
+                    </button>
+                    <input type="file" id="feedback-file-input" accept="image/*" multiple class="hidden">
+                    <p class="text-xs text-gray-400 mt-2"><i class="fa fa-info-circle mr-1"></i>支持 png / jpg / webp，图片将自动压缩后再提交，仅用于协助定位问题</p>
+                </div>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end space-x-3">
                 <button id="feedback-cancel-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-5 py-2 rounded-lg text-sm">取消</button>
                 <button id="feedback-submit-btn" class="btn btn-primary px-6 py-2 rounded-lg text-sm">提交反馈</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 版本权益模态框（三档体系：基础版 / 体验版 / 专业版；顶栏徽标与数据管理页均进入此弹窗） -->
+    <div id="upgrade-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[88vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-violet-600 to-purple-700 text-white p-5 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fa fa-crown text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold">版本与权益</h3>
+                            <p class="text-white/80 text-xs">计税能力始终免费 · 云增值服务解锁专业体验</p>
+                        </div>
+                    </div>
+                    <button id="close-upgrade-modal" onclick="closeModal(document.getElementById('upgrade-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <!-- 当前版本状态 + 领取 CTA（按档位动态填充：基础版/体验版/专业版） -->
+                <div id="upgrade-hero" class="rounded-xl border border-violet-200 bg-violet-50 p-4 mb-5"></div>
+
+                <!-- 权益对比 -->
+                <h4 class="text-sm font-bold text-gray-500 mb-3">基础版 vs 专业版</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="rounded-xl border border-gray-200 p-4">
+                        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 mb-3">基础版 · 免费</span>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <li><i class="fa fa-check text-green-500 mr-2"></i>综合 / 经营 / 分类所得全功能计算</li>
+                            <li><i class="fa fa-check text-green-500 mr-2"></i>反向倒算、本地历史与税务档案</li>
+                            <li><i class="fa fa-check text-green-500 mr-2"></i>JSON / CSV 数据导出</li>
+                            <li><i class="fa fa-check text-green-500 mr-2"></i>预算结果 PDF（基础截图导出）</li>
+                        </ul>
+                    </div>
+                    <div class="relative rounded-xl border-2 border-amber-300 bg-amber-50/60 p-4">
+                        <span class="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-amber-950">PRO</span>
+                        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 mb-3">专业版</span>
+                        <ul class="space-y-2 text-sm text-gray-700">
+                            <li><i class="fa fa-cloud-upload text-violet-500 mr-2"></i>云端同步 · 多设备自动漫游</li>
+                            <li><i class="fa fa-file-pdf-o text-violet-500 mr-2"></i>汇算清缴 PDF 完整报告</li>
+                            <li><i class="fa fa-bullhorn text-violet-500 mr-2"></i>政策要点增量更新推送</li>
+                            <li><i class="fa fa-database text-violet-500 mr-2"></i>优先问题跟进与数据保障</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- FAQ -->
+                <h4 class="text-sm font-bold text-gray-500 mb-3">常见问题</h4>
+                <div class="space-y-2 text-sm text-gray-600">
+                    <details class="rounded-lg border border-gray-200 p-3">
+                        <summary class="cursor-pointer font-medium text-gray-700">体验版和专业版有什么区别？</summary>
+                        <p class="mt-2 text-gray-500">体验版即限时（14 天）专业版，功能完全一致。正式专业版后续将开放订阅购买与兑换码开通两种方式，体验期间同步的数据会完整保留。</p>
+                    </details>
+                    <details class="rounded-lg border border-gray-200 p-3">
+                        <summary class="cursor-pointer font-medium text-gray-700">体验到期后，我的数据会丢失吗？</summary>
+                        <p class="mt-2 text-gray-500">不会。云同步记录按账号归属云端，到期仅是停用同步能力；本地历史不受影响，再次领取体验或升级正式版后即可继续同步取回。</p>
+                    </details>
+                    <details class="rounded-lg border border-gray-200 p-3">
+                        <summary class="cursor-pointer font-medium text-gray-700">如何升级到正式专业版？</summary>
+                        <p class="mt-2 text-gray-500">目前处于公测期，正式购买通道即将上线。如需提前开通专业版，可联系开发者获取兑换码进行授权，每个兑换码仅限一次使用，请妥善保管。</p>
+                    </details>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-200 flex justify-between items-center">
+                <p class="text-xs text-gray-400">公测期领取体验不限次数 · 到期后可再次领取</p>
+                <button id="upgrade-cancel-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-5 py-2 rounded-lg text-sm">关闭</button>
             </div>
         </div>
     </div>
@@ -5638,7 +5773,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.6.1</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.7.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -5673,6 +5808,13 @@
     <script src="src/js/ui/home-ui.js"></script>
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
+    <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
+    <script src="src/js/auth/plan.js"></script>
+    <script src="src/js/data/history-sync.js"></script>
+    <!-- 阶段10B：政策要点更新同步（专业版登录后增量拉取并提示） -->
+    <script src="src/js/data/tax-policy.js"></script>
+    <!-- 阶段10B：专业版汇算清缴报告 PDF（免费/专业分流导出入口） -->
+    <script src="src/js/export/final-report.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；
@@ -5757,7 +5899,7 @@
 
     <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
-        <div class="max-w-4xl mx-auto px-4">
+        <div class="max-w-4xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile" class="profile-sub-nav-back">
@@ -5767,42 +5909,61 @@
                 </div>
             </div>
             
-            <!-- 用户信息卡片 -->
-            <div class="card mb-6">
-                <div class="profile-user-card">
-                    <div class="profile-user-avatar w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <i class="fa fa-user text-3xl text-primary"></i>
-                    </div>
-                    <div class="profile-user-info">
-                        <h3 id="profile-display-name" class="text-xl font-bold text-gray-800">用户名</h3>
-                        <p id="profile-display-email" class="text-gray-500 break-all">email@example.com</p>
-                    </div>
-                    <div class="profile-user-action">
-                        <a href="#" id="profile-nav-settings" class="btn btn-primary">
-                            <i class="fa fa-cog mr-2"></i><span>账户设置</span>
-                        </a>
+            <!-- 用户信息横幅卡（版本徽标与说明由 renderPlanBadges 动态填充） -->
+            <div class="card mb-6 overflow-hidden">
+                <div class="bg-gradient-to-r from-primary via-blue-600 to-blue-700 px-5 py-6 sm:px-7 sm:py-7">
+                    <div class="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left gap-4 sm:gap-6">
+                        <div class="profile-avatar-tile">
+                            <i class="fa fa-user text-3xl sm:text-4xl text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                                <h3 id="profile-display-name" class="text-xl sm:text-2xl font-bold text-white truncate max-w-full min-w-0">用户名</h3>
+                                <span id="profile-plan-badge" class="hidden shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-white/25 text-white border border-white/30">专业版</span>
+                            </div>
+                            <p id="profile-display-email" class="text-white/75 break-all text-sm mt-1 leading-relaxed">email@example.com</p>
+                            <p id="profile-plan-note" class="text-white/80 text-xs mt-1 leading-relaxed hidden"></p>
+                        </div>
+                        <div class="shrink-0 w-full sm:w-auto flex justify-center">
+                            <a href="#" id="profile-nav-settings" class="inline-flex items-center justify-center w-full sm:w-auto bg-white text-primary hover:bg-blue-50 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
+                                <i class="fa fa-cog mr-2"></i><span>账户设置</span>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- 数据统计卡片（由 JS 动态生成） -->
-            <div id="profile-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
-            
-            <!-- 功能模块卡片网格（由 JS 动态生成） -->
-            <div id="profile-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-            
+
+            <!-- 数据概览（统计卡由 JS 动态生成） -->
+            <div class="flex items-center gap-2 mb-3 mt-1 px-1">
+                <span class="w-1 h-4 rounded-full bg-primary"></span>
+                <h4 class="text-sm font-bold text-gray-700">数据概览</h4>
+            </div>
+            <div id="profile-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6"></div>
+
+            <!-- 功能与服务（模块卡片由 JS 动态生成，横向紧凑式） -->
+            <div class="flex items-center gap-2 mb-3 mt-1 px-1">
+                <span class="w-1 h-4 rounded-full bg-primary"></span>
+                <h4 class="text-sm font-bold text-gray-700">功能与服务</h4>
+            </div>
+            <div id="profile-cards-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"></div>
+
             <!-- 底部操作 -->
-            <div class="mt-6 flex justify-center space-x-4">
-                <button id="profile-logout-link" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                    <i class="fa fa-sign-out mr-2"></i>退出登录
-                </button>
+            <div class="card mt-6 p-4 sm:p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p class="text-xs text-gray-400 flex items-center justify-center sm:justify-start">
+                        <i class="fa fa-shield mr-2 text-gray-300"></i>当前为本地登录会话，可在「账户设置」中管理密码与账号安全
+                    </p>
+                    <button id="profile-logout-link" class="btn bg-gray-100 text-gray-600 hover:bg-gray-200 w-full sm:w-auto">
+                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                    </button>
+                </div>
             </div>
         </div>
     </div>
     
     <!-- 账户设置页面 -->
     <div id="profile-settings-page" class="page hidden">
-        <div class="max-w-2xl mx-auto px-4">
+        <div class="max-w-2xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-settings" class="profile-sub-nav-back">
@@ -5812,89 +5973,111 @@
                 </div>
             </div>
             
-            <div class="card">
-                <h3 class="text-xl font-bold text-gray-800 mb-6">账户设置</h3>
-                
-                <!-- 基本信息 -->
-                <div class="mb-8">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">基本信息</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label class="label">用户名</label>
-                            <input type="text" id="profile-username" class="input-field" readonly>
+            <!-- 账号信息 -->
+            <div class="card mb-5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-primary">
+                        <i class="fa fa-id-card"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">账号信息</h3>
+                        <p class="text-xs text-gray-400">登录账号与联系方式</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="label">用户名</label>
+                        <input type="text" id="profile-username" class="input-field !pl-3" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="label">邮箱</label>
+                        <input type="email" id="profile-email" class="input-field !pl-3" readonly>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label class="label">手机号</label>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input type="tel" id="profile-phone" class="input-field !pl-3 flex-1" placeholder="请输入手机号">
+                            <button type="button" id="profile-phone-save" class="btn bg-gray-100 text-primary hover:bg-blue-50 w-full sm:w-auto sm:shrink-0">
+                                <i class="fa fa-save mr-1"></i>保存
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <label class="label">邮箱</label>
-                            <input type="email" id="profile-email" class="input-field" readonly>
+                        <p class="text-xs text-gray-400 mt-1.5">保存后立即生效，无需提交整个页面</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 账号安全：修改密码 -->
+            <div class="card mb-5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">
+                        <i class="fa fa-shield"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">账号安全</h3>
+                        <p class="text-xs text-gray-400">通过邮箱验证码验证身份后设置新密码</p>
+                    </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
+                    <div class="flex items-start">
+                        <i class="fa fa-envelope-o text-blue-500 mt-0.5 mr-3"></i>
+                        <p class="text-sm text-blue-700">修改密码需验证绑定邮箱 <span id="profile-verify-email" class="font-medium break-all">...</span>，验证码将发送至该邮箱</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group md:col-span-2">
+                        <label class="label">邮箱验证码</label>
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="profile-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
+                            </div>
+                            <button type="button" id="profile-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm shrink-0" disabled>
+                                发送验证码
+                            </button>
                         </div>
-                        <div class="form-group md:col-span-2">
-                            <label class="label">手机号</label>
-                            <input type="tel" id="profile-phone" class="input-field" placeholder="请输入手机号">
+                    </div>
+                    <div class="form-group">
+                        <label class="label">新密码</label>
+                        <div class="relative">
+                            <input type="password" id="profile-password" class="input-field pr-10 !pl-3" placeholder="请输入新密码（至少 6 位）">
+                            <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="label">确认新密码</label>
+                        <div class="relative">
+                            <input type="password" id="profile-confirm-password" class="input-field pr-10 !pl-3" placeholder="请再次输入新密码">
+                            <i id="profile-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
                         </div>
                     </div>
                 </div>
-                
-                <hr class="my-6">
-                
-                <!-- 修改密码 -->
-                <div class="mb-6">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">修改密码</h4>
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                        <div class="flex items-start">
-                            <i class="fa fa-exclamation-triangle text-yellow-500 mt-0.5 mr-3"></i>
-                            <p class="text-sm text-yellow-700">修改密码前请先验证您的当前密码</p>
-                        </div>
+                <button type="button" id="profile-password-submit" class="btn btn-primary w-full mt-5 py-3">
+                    <i class="fa fa-check mr-1"></i>确认修改密码
+                </button>
+            </div>
+
+            <!-- 危险区域 -->
+            <div class="card mb-5 border border-red-200">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
+                        <i class="fa fa-exclamation-triangle"></i>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label class="label">当前密码</label>
-                            <div class="relative">
-                                <input type="password" id="profile-current-password" class="input-field pr-10" placeholder="请输入当前密码">
-                                <i id="profile-current-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="label">新密码</label>
-                            <div class="relative">
-                                <input type="password" id="profile-password" class="input-field pr-10" placeholder="请输入新密码（至少 6 位）">
-                                <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="label">确认新密码</label>
-                            <div class="relative">
-                                <input type="password" id="profile-confirm-password" class="input-field pr-10" placeholder="请再次输入新密码">
-                                <i id="profile-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
-                            </div>
-                        </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">危险区域</h3>
+                        <p class="text-xs text-gray-400">以下操作不可恢复，请谨慎执行</p>
                     </div>
                 </div>
-                
-                <hr class="my-6">
-                
-                <!-- 注销账号 -->
-                <div class="mb-6">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">账号安全</h4>
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div class="flex items-start">
-                            <i class="fa fa-warning text-red-500 mt-0.5 mr-3"></i>
-                            <div>
-                                <p class="text-sm text-red-700 font-medium mb-2">注销账号</p>
-                                <p class="text-xs text-red-600">注销账号将永久删除您的账户及所有计算历史记录，且无法恢复！</p>
-                                <button id="profile-delete-account" class="mt-3 text-red-600 hover:text-red-700 text-sm font-medium">
-                                    <i class="fa fa-trash-o mr-1"></i>确认注销账号
-                                </button>
-                            </div>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fa fa-warning text-red-500 mt-0.5 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-red-700 font-medium mb-2">注销账号</p>
+                            <p class="text-xs text-red-600">注销账号将永久删除您的账户及所有计算历史记录，且无法恢复！</p>
+                            <button id="profile-delete-account" class="mt-3 inline-flex items-center gap-1.5 text-red-600 hover:text-red-700 text-sm font-medium">
+                                <i class="fa fa-trash-o"></i>确认注销账号
+                            </button>
                         </div>
                     </div>
-                </div>
-                
-                <!-- 保存按钮 -->
-                <div class="flex justify-end space-x-3">
-                    <button id="profile-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
-                        取消
-                    </button>
-                    <button id="profile-save" class="btn btn-primary">保存修改</button>
                 </div>
             </div>
         </div>
@@ -5902,7 +6085,7 @@
     
     <!-- 税务档案页面 -->
     <div id="profile-tax-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-4">
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-tax" class="profile-sub-nav-back">
@@ -5926,11 +6109,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="form-group">
                             <label class="label">默认社保缴费基数（元/月）</label>
-                            <input type="number" id="tax-profile-social-base" class="input-field" placeholder="4250" min="0">
+                            <input type="number" id="tax-profile-social-base" class="input-field !pl-3" placeholder="4250" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">默认公积金基数（元/月）</label>
-                            <input type="number" id="tax-profile-housing-base" class="input-field" placeholder="4250" min="0">
+                            <input type="number" id="tax-profile-housing-base" class="input-field !pl-3" placeholder="4250" min="0">
                         </div>
                     </div>
                 </div>
@@ -5943,27 +6126,27 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="form-group">
                             <label class="label">子女教育/3岁以下婴幼儿照护</label>
-                            <input type="number" id="tax-profile-children" class="input-field" placeholder="0" min="0">
+                            <input type="number" id="tax-profile-children" class="input-field !pl-3" placeholder="0" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">赡养老人</label>
-                            <input type="number" id="tax-profile-elderly" class="input-field" placeholder="0" min="0">
+                            <input type="number" id="tax-profile-elderly" class="input-field !pl-3" placeholder="0" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">住房租金</label>
-                            <input type="number" id="tax-profile-rent" class="input-field" placeholder="0" min="0">
+                            <input type="number" id="tax-profile-rent" class="input-field !pl-3" placeholder="0" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">住房贷款利息</label>
-                            <input type="number" id="tax-profile-housing-loan" class="input-field" placeholder="0" min="0">
+                            <input type="number" id="tax-profile-housing-loan" class="input-field !pl-3" placeholder="0" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">继续教育</label>
-                            <input type="number" id="tax-profile-education" class="input-field" placeholder="0" min="0">
+                            <input type="number" id="tax-profile-education" class="input-field !pl-3" placeholder="0" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">个人养老金（元/年）</label>
-                            <input type="number" id="tax-profile-pension" class="input-field" placeholder="0" min="0" max="12000">
+                            <input type="number" id="tax-profile-pension" class="input-field !pl-3" placeholder="0" min="0" max="12000">
                         </div>
                     </div>
                 </div>
@@ -5976,11 +6159,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="form-group">
                             <label class="label">默认工作月数</label>
-                            <input type="number" id="tax-profile-work-months" class="input-field" placeholder="12" min="1" max="12">
+                            <input type="number" id="tax-profile-work-months" class="input-field !pl-3" placeholder="12" min="1" max="12">
                         </div>
                         <div class="form-group">
                             <label class="label">用户身份类型</label>
-                            <select id="tax-profile-user-type" class="input-field">
+                            <select id="tax-profile-user-type" class="input-field !pl-3">
                                 <option value="employee">企业员工（综合所得）</option>
                                 <option value="self-employed">个体工商户（经营所得）</option>
                                 <option value="freelancer">自由职业者（劳务报酬为主）</option>
@@ -6002,7 +6185,7 @@
 
     <!-- 数据管理页面 -->
     <div id="profile-data-page" class="page hidden">
-        <div class="max-w-2xl mx-auto px-4">
+        <div class="max-w-2xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-data" class="profile-sub-nav-back">
@@ -6012,6 +6195,27 @@
                 </div>
             </div>
             
+            <!-- 版本/云同步卡片（三档体系：基础版 gate · 体验版 · 专业版，由 renderCloudSyncPanel 按档位填充） -->
+            <div class="card mb-6">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center">
+                        <i class="fa fa-cloud-upload mr-2 text-primary"></i>
+                        <h3 class="text-lg font-bold text-gray-800">云同步</h3>
+                        <span id="cloud-sync-tier-badge" class="hidden ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold leading-none"></span>
+                    </div>
+                    <span id="cloud-sync-status" class="text-xs font-medium text-gray-500">未开启</span>
+                </div>
+                <p id="cloud-sync-note" class="text-sm text-gray-500 mb-4 leading-relaxed">登录后自动把本机计算历史安全同步到云端；换设备或重新安装后登录同一账号即可找回。</p>
+                <!-- 免费/游客：领取专业版体验 CTA（JS 填充） -->
+                <div id="cloud-sync-cta" class="hidden mb-4 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm"></div>
+                <div class="flex items-center space-x-3">
+                    <button id="cloud-sync-now-btn" class="btn btn-primary flex items-center justify-center" disabled>
+                        <i class="fa fa-refresh mr-2"></i>立即同步
+                    </button>
+                    <span id="cloud-sync-account" class="text-xs text-gray-400"></span>
+                </div>
+            </div>
+
             <div class="card">
                 <h3 class="text-xl font-bold text-gray-800 mb-6">数据管理</h3>
                 
@@ -6036,7 +6240,7 @@
     
     <!-- 税务日历页面 -->
     <div id="profile-calendar-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-4">
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-calendar" class="profile-sub-nav-back">
@@ -6057,7 +6261,7 @@
 
     <!-- 计算历史页面（个人中心内） -->
     <div id="profile-history-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-4">
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile-history" class="profile-sub-nav-back">

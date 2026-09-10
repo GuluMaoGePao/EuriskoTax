@@ -131,6 +131,21 @@ router.post('/login', authController.login);
 
 /**
  * @swagger
+ * /api/auth/claim-trial:
+ *   post:
+ *     tags: [认证 Auth]
+ *     summary: 领取 14 天专业版体验（登录，三档体系：基础版 → 体验版）
+ *     description: 基础版/已过期体验账号领取后立即开通 14 天专业版（plan=pro + plan_expires_at，granted_by=trial），到期自动回落基础版；公测期不限次数。已处于有效专业版/体验（seed 永久、正式授权或体验进行中）时幂等返回当前状态，不叠加时长。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200':
+ *         description: 领取成功/当前状态，data 返回更新后的用户信息（含 plan/plan_expires_at/pro_granted_by）
+ *       '401': { description: 未认证或 Token 无效/过期 }
+ */
+router.post('/claim-trial', authenticateToken, authController.claimTrial);
+
+/**
+ * @swagger
  * /api/auth/profile:
  *   get:
  *     tags: [认证 Auth]

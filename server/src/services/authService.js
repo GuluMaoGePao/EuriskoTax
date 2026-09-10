@@ -7,6 +7,48 @@ const prisma = new PrismaClient();
 // 邮箱归一化：去首尾空格 + 转小写，避免大小写差异绕过查重、登录时精确匹配失败
 const normalizeEmail = (rawEmail) => String(rawEmail || '').trim().toLowerCase();
 
+// 种子期授权开关：SEED_GRANT_PRO=true 时，注册/登录即授予 pro（pro_granted_by="seed"，永久）
+// 生产正式收费时置 false，改由兑换码/支付渠道（阶段11）授权
+const seedGrantEnabled = () => process.env.SEED_GRANT_PRO === 'true';
+
+// 体验版规则（三档体系）：基础版用户可免费领取 14 天专业版体验
+// 实现复用现有模型：plan=pro + plan_expires_at=+14天 + pro_granted_by='trial'；
+// isPro 到期自动回落基础版。公测期不限次数：到期后随时可再次领取（进行中不叠加）。
+const TRIAL_DAYS = 14;
+const TRIAL_DAYS_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+
+// 领取专业版体验（幂等语义）：
+//   - 已是有效 pro（seed 永久 / 正式授权 / 体验进行中）→ 原样返回不重复发放（already_pro=true）
+//   - 免费 或 过期 trial → 重新授予 14 天体验（granted_by='trial'）
+const claimTrial = async (userId) => {
+    const user = await getUserById(userId);
+    const now = Date.now();
+    const exp = user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null;
+    const proActive = user.plan === 'pro' && (!exp || !Number.isFinite(exp) || exp > now);
+    if (proActive) {
+        return user; // 已拥有有效专业版/体验，不叠加
+    }
+    return await prisma.user.update({
+        where: { id: userId },
+        data: {
+            plan: 'pro',
+            plan_expires_at: new Date(now + TRIAL_DAYS_MS),
+            pro_granted_by: 'trial'
+        },
+        select: {
+            id: true,
+            username: true,
+            email: true,
+            phone: true,
+            plan: true,
+            plan_expires_at: true,
+            pro_granted_by: true,
+            created_at: true,
+            updated_at: true
+        }
+    });
+};
+
 // 查重（区分用户名/邮箱，注册前拦截，避免浪费一次性验证码）
 const checkDuplicate = async (username, rawEmail) => {
     const email = normalizeEmail(rawEmail);
@@ -66,18 +108,27 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
                 throw error;
             }
 
+            // 种子期：注册即授予 pro（granted_by="seed"，永久）；收费期该开关关闭后为默认 free
+            const seedGrant = seedGrantEnabled()
+                ? { plan: 'pro', pro_granted_by: 'seed' }
+                : {};
+
             const created = await tx.user.create({
                 data: {
                     username,
                     email: normalizedEmail,
                     password_hash: passwordHash,
-                    phone
+                    phone,
+                    ...seedGrant
                 },
                 select: {
                     id: true,
                     username: true,
                     email: true,
                     phone: true,
+                    plan: true,
+                    plan_expires_at: true,
+                    pro_granted_by: true,
                     created_at: true
                 }
             });
@@ -121,6 +172,16 @@ const loginUser = async (email, password) => {
         throw error;
     }
     
+    // 种子期：存量 free 账号登录时自动升级为 pro（granted_by="seed"），幂等（已是 pro 不再改写）
+    if (seedGrantEnabled() && user.plan !== 'pro') {
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { plan: 'pro', pro_granted_by: 'seed' }
+        });
+        user.plan = 'pro';
+        user.pro_granted_by = 'seed';
+    }
+    
     const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET,
@@ -133,7 +194,10 @@ const loginUser = async (email, password) => {
             id: user.id,
             username: user.username,
             email: user.email,
-            phone: user.phone
+            phone: user.phone,
+            plan: user.plan,
+            plan_expires_at: user.plan_expires_at,
+            pro_granted_by: user.pro_granted_by
         }
     };
 };
@@ -146,6 +210,9 @@ const getUserById = async (userId) => {
             username: true,
             email: true,
             phone: true,
+            plan: true,
+            plan_expires_at: true,
+            pro_granted_by: true,
             created_at: true,
             updated_at: true
         }
@@ -319,6 +386,7 @@ module.exports = {
     checkDuplicate,
     registerUser,
     loginUser,
+    claimTrial,
     getUserById,
     verifyPassword,
     updateUser,

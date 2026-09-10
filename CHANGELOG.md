@@ -7,6 +7,61 @@
 
 ---
 
+## [1.7.0] - 2026-09-10（阶段10：免费/专业版体系 + 运维后台）
+
+> 里程碑：M1 后端地基（a29bd12）→ M2 前端同步链路（8f3195a）→ 10B 政策要点与汇算清缴报告 → 运维管理后台 + 反馈附图。
+> 核心原则：计税能力永不锁定，锁的是云端增值（历史同步）。
+
+### 新增
+- **账户分层模型（阶段10）**：`User` 增 `plan`（free/pro，默认 free）、`plan_expires_at`（null=永久）、`pro_granted_by`（seed/invite/admin/purchase）；生产 PostgreSQL 与开发 SQLite 双迁移
+- **种子期专业版授权 `SEED_GRANT_PRO`**：开启后注册/登录即授予 `pro`（`pro_granted_by="seed"`），存量 free 账号登录自动升级；`GET /auth/profile` 返回 plan 相关字段
+- **云端历史同步端点 `POST /api/calculations/sync`（专业版）**：按 `(user_id, client_id)` 幂等 upsert + 全量拉取；`updatedAt` 新者胜解决多端冲突；删除以墓碑（`deleted_at` 软删）广播到其它设备，30 天自动清理；云端活跃历史 500 条上限（超限 409 `HISTORY_LIMIT_REACHED`）；免费账号 403 `PRO_REQUIRED`（计税不锁）
+- 同步端点限流（20 次/分/IP）、Swagger 文档注释、错误响应带业务 `code` 字段
+
+### 新增 · 前端同步链路（里程碑 2/2）
+- **`src/js/auth/plan.js`（PRO 判定模块）**：`window.EuriskoPlan.isPro(plan, planExpiresAt)`——`pro` 且未过期判定，`plan_expires_at` 为 null/畸形值按永久授权容错（种子期 `granted_by=seed`）
+- **`src/js/data/history-sync.js`（云同步引擎）**：挂 `window.EuriskoSync`，提供 `restore/afterLogin/afterLogout/updateUser/syncNow/getState`；保存/删除后防抖（1.5s）自动同步；本地 `taxCalculationHistory` 仍为唯一数据源，云端仅镜像；`pure` 子对象暴露纯函数 `normalize/toPayload/mergeCloud`（单测）；墓碑仅对「云端已知 clientId」广播；401 自动登出回登录页、PRO_REQUIRED/HISTORY_LIMIT_REACHED 中文提示、离线失败保留本地自动重试；事件信号 `euriskotax:history-mutated/synced/sync-status`
+- **保存/删除挂钩**：`data-management.js` 与 `tax-calculator.js` 保存时写入 `updatedAt` 并派发 `euriskotax:history-mutated`；删除时调 `EuriskoSync.recordLocalDelete`
+- **UI 分层呈现（auth-ui.js / index.html）**：顶栏与个人中心 plan 徽标（专业版/免费版）、个人中心云同步状态卡片（免费 gate 提示 / 同步中 / 已同步 / 错误）+「立即同步」按钮；登录成功自动触发同步、登出清理同步元数据、页面恢复防抖拉取（换机/重装找回）；`current_user` 解析 `plan/plan_expires_at`，profile 刷新后更新引擎
+- **可测性**：`window.__EURISKO_SYNC_API_BASE__` 覆盖同步 API 地址（沙箱/联调用）；引擎不依赖 DOM 的纯逻辑全部抽到 `pure`，Jest 直接单测
+
+### 变更
+- `verify:local` 升级为 6 步门禁：新增前端静态断言（plan/history-sync 脚本、云同步 DOM、保存信号）与**引擎沙箱 e2e**（`server/scripts/verify-cloud-sync-engine.js`：A 设备本端上传 → B 设备空本地拉回），本地 **35/35 通过**
+- `npm test` 新增 `tests/plan.test.js`、`tests/history-sync.test.js` 单测套件（幂等/冲突/墓碑/合并/永久授权边界），全套 220/220 通过
+
+### 修复
+- `verify-cloud-sync-engine.js` 在 Windows 退出崩溃（退出码 3221226505）：沙箱内改用原生 `http` 轻量 fetch（`agent:false` 连接即用即关），规避 undici keep-alive socket 在 `process.exit` 时触发 libuv `UV_HANDLE_CLOSING` abort
+
+### 新增 · 政策要点更新（阶段10B）
+- **政策内容公开端点 `GET /api/content/tax-policy`**：只读静态数据、无需登录、不占业务限流配额（独立宽松 120 次/分限流）；内容源为仓库内 `server/data/content/tax-policy.json`（运维改文件随发布上线、免重启热更新）；`?since=<version>` 版本一致返回空 items（增量语义）；支持 5 分钟内容缓存
+- **`src/js/data/tax-policy.js`（政策更新同步）**：专业版登录/恢复会话后静默拉取增量；内置 `window.TAX_ASSISTANT_QA` 快照仍为免费离线全量基准；按 id upsert 合并（覆盖更新 / 新增 / `deleted:true` 撤回），写 `taxPolicyCache` 缓存版本与通知文案；免费版不发起任何请求；触发 `euriskotax:policy-updated` 事件；`window.__EURISKO_SYNC_API_BASE__` 可覆盖 API 地址
+- **UI 提示**：tax-assistant 悬浮抽屉顶部「政策要点已更新」提示条（版本前进且未读才显示，可手动关闭、登出/注销随会话清理），登录/恢复钩子（auth-ui `triggerPolicySyncIfPro`）
+
+### 新增 · 专业版汇算清缴报告 PDF（阶段10B）
+- **`src/js/export/final-report.js`（`EuriskoReport`）**：专业版报告编排 = 品牌封面（报告标题 + 期间 + 报告对象）→ 收入与税前扣除明细（复用现预算表明细核心）→ 税负对比图（Chart.js 柱状 + 柱顶数值标注，html2canvas 截图前绘制）→ 政策要点/注意事项（从政策库按计算类型挑选）→ 免责声明页；输出 `汇算清缴报告_YYYY-MM.pdf`
+- **免费/专业分流**（同一导出按钮）：综合所得与经营所得「导出PDF报告」按钮经 `EuriskoReport.exportFinalReport` 分流——免费/未登录原样保留既有预算表 PDF（无能力倒退），专业版出汇算清缴报告；反向倒算/分类所得按钮保持原样
+- `exportToPDF` 支持可选 `opts`（`contentBuilder/beforeCapture/filename`），默认行为完全不变
+- `verify:local` 升级到 **42/42 通过**：新增 10B 前端静态断言（tax-policy/final-report 资源与脚本、auth-ui 钩子、tax-assistant 快照）与政策内容端点 e2e（公开内容 + since 增量语义）
+- `npm test` 新增 `tests/tax-policy.test.js`、`tests/final-report.test.js`（免费不请求 / pro 增量 / 合并撤回 / 横幅状态 / 文件名规则 / 税负结构 / 政策挑选 / 报告编排冒烟），全套 **252/252 通过（10 套件）**
+
+### 新增 · 账户设置改密改走邮箱验证码
+
+- **账户设置页交互重构**：手机号改为「独立保存」即时生效（部分更新语义，不再依赖页面级提交）；修改密码不再输入「当前密码」，改为复用登录邮箱验证码链路（`POST /auth/send-reset-code` + `POST /auth/reset-password`，60 秒冷却、验证码一次性），与注册/找回密码体验统一
+- 移除旧「手机号 + 密码统一提交」遗留的页面底部「取消 / 保存修改」全局条
+- 登录成功、退出登录不再弹模态确认框（顶栏用户名/版本徽标、登录页重现即为反馈），减少无意义打断
+
+### 新增 · 运维管理后台（`admin.html`）
+
+- **`admin.html` + `src/js/admin/admin.js`**：独立运维后台页，全请求带 `X-Admin-Token`（= 环境变量 `ADMIN_TOKEN`）；四个 Tab：运营总览 / 反馈处理（含附图预览与状态跟进）/ 用户权益 / 兑换码
+- **用户管理端点**：`GET /api/admin/users`（关键词 `q` 匹配用户名/邮箱 + `plan` 过滤 + 分页）、`GET /api/admin/users/:id`（含反馈/计算条数与最近动态）、`PATCH /api/admin/users/:id/plan`（补发 14 天体验 / 按天开通 / 授予永久 / 回落基础版，`grantedBy` 默认 `admin`）
+
+### 新增 · 意见反馈支持附图
+
+- **`Feedback.attachments`**（迁移 `20260909_add_feedback_attachments`）：存前端压缩后的图片 data URL（最多 3 张、仅 png/jpeg/webp、单张 ≤900K 字符），默认 `'[]'` 自动兼容旧数据行
+- 提交侧强校验（数量超限 / 类型不符 / 过大一律 400，防脏数据与库容滥用）；反馈日志追加附图张数；管理员反馈列表返回该字段
+
+---
+
 ## [1.6.1] - 2026-09-08
 
 ### 新增

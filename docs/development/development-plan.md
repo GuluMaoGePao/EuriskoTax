@@ -184,7 +184,7 @@ EuriskoTax/
 
 ## 🔄 数据库表设计（当前生产 schema · Prisma / PostgreSQL）
 
-> 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **6 张表**（阶段8 新增 feedbacks / calc_events，迁移 `20260907_add_feedback_and_calcevent`）：
+> 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **6 张表**（阶段8 新增 feedbacks / calc_events，迁移 `20260907_add_feedback_and_calcevent`；阶段10A 为 users 增 plan 分层与 calculations 增同步字段，迁移 `20260908_add_plan_tier_and_calc_sync`；阶段10A-补 为 feedbacks 增 attachments，迁移 `20260909_add_feedback_attachments`）：
 
 ### users（用户）
 
@@ -195,6 +195,9 @@ EuriskoTax/
 | email | STRING UNIQUE | 邮箱（唯一，登录标识） |
 | phone | STRING? 可空 | 手机号 |
 | password_hash | STRING | bcrypt 密码哈希 |
+| plan | STRING（默认 free） | 账号分层：free / pro（迁移 `20260908_add_plan_tier_and_calc_sync`） |
+| plan_expires_at | DateTime? 可空 | null = 永久授权 |
+| pro_granted_by | STRING? 可空 | 授权来源：seed / invite / admin / purchase |
 | created_at / updated_at | DateTime | 时间戳 |
 
 ### calculations（计算记录）
@@ -236,6 +239,7 @@ EuriskoTax/
 | category | STRING（默认 general） | bug / suggestion / other / general |
 | rating | INT? | 评分 1-5，选填 |
 | content | STRING | 内容（≤5000 字符） |
+| attachments | STRING（JSON 数组，默认 `[]`） | 反馈附图（≤3 张压缩图 data URL，迁移 `20260909_add_feedback_attachments`） |
 | status | STRING（默认 open） | open / resolved / closed |
 | created_at | DateTime | 提交时间 |
 
@@ -271,7 +275,7 @@ EuriskoTax/
 | 阶段7：云平台部署上线 | ✅ 已完成 | 1天 | 2026-09-05 |
 | 阶段8：首批测试用户运营 | 🚧 进行中（素材已备好；匿名埋点 + 反馈落库 + 管理员跟进收尾 ✅ 2026-09-07） | 2周 | 预计 2026-09-20 |
 | 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
-| 阶段10：免费/专业版体系 | ⏳ 待开始（实施方案已确认待命，见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)） | 1周 | 预计 2026-10 月初 |
+| 阶段10：免费/专业版体系 | ✅ 已完成（v1.7.0 已发布 2026-09-10 —— 10A 后端地基 a29bd12 + 前端同步链路 8f3195a；10B 政策要点更新（`GET /api/content/tax-policy` + `tax-policy.js` 增量合并/提示）与专业版汇算清缴报告（`final-report.js`）；同批上线运维管理后台（`admin.html` + `/api/admin/users`）与反馈附图；`verify:local` + Jest 全绿；支付单列阶段11，见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)） | 1周+ | 2026-09-10 |
 
 ### 当前状态
 
@@ -424,10 +428,11 @@ cpolar http 3000 -region=cn
    - ✅ 本地验证通过：SW 激活、在线导航始终网络返回、断网回退缓存命中
    - ✅ 发版不再需要递增缓存版本号、用户无需手动清缓存（2026-09-06 重构，根治旧 HTML/旧脚本残留）
 
-2. **免费/专业版体系（阶段10）** —— 实施方案已确认待命，详见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)
-   - 未登录 = 免费版全功能；登录 = 解锁云端同步
-   - 历史记录"本地 ↔ 云端"合并策略（登录后上传本地记录）
-   - PDF 报告导出（专业版）、反馈入口复用 `/api/feedback`（已落库闭环）
+2. **免费/专业版体系（阶段10）** ✅ 已完成并随 v1.7.0 上线（2026-09-10）；后续支付单列阶段11，详见 [stage10-free-pro-plan.md](stage10-free-pro-plan.md)
+   - ✅ 未登录 = 免费版全功能；登录 = 解锁云端同步（10A：`/api/calculations/sync` + `history-sync.js`）
+   - ✅ 历史记录"本地 ↔ 云端"合并策略（登录后上传本地记录，多端冲突以 updatedAt 新者胜）
+   - ✅ PDF 报告导出（专业版汇算清缴报告）、政策要点增量推送（10B）
+   - ✅ 运维管理后台（用户权益调整 / 反馈跟进 / 兑换码）与意见反馈附图
 
 3. **B端 API 开放（中长期）**
    - 将服务端计税能力封装为独立版本化端点（如 `/api/v1/calc/*`）

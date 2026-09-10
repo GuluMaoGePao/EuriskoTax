@@ -397,7 +397,13 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 }
 
 // 导出PDF
-function exportToPDF(elementId, title) {
+// opts（可选，阶段10B 专业版汇算清缴报告复用）：
+//   { contentBuilder, beforeCapture, filename }
+//     contentBuilder  () => HTML 字符串，覆盖默认的 generateWordDocumentContent(title) 内容
+//     beforeCapture   (tempContainer) => void，html2canvas 截图前回调（如绘制 Chart 图表后等待就绪）
+//     filename        自定义保存文件名（不含扩展名差异，直接作为 doc.save 参数）
+function exportToPDF(elementId, title, opts) {
+    opts = opts || {};
     // 获取计算结果数据
     if (Object.keys(calculationResults).length === 0 &&
         Object.keys(reverseCalculationResults).length === 0 &&
@@ -406,8 +412,10 @@ function exportToPDF(elementId, title) {
         return;
     }
 
-    // 构建Word文档内容
-    const docContent = generateWordDocumentContent(title);
+    // 构建报告内容（支持自定义 contentBuilder）
+    const docContent = (typeof opts.contentBuilder === 'function')
+        ? opts.contentBuilder()
+        : generateWordDocumentContent(title);
     
     // 创建临时HTML文件
     const tempContainer = document.createElement('div');
@@ -422,6 +430,15 @@ function exportToPDF(elementId, title) {
     
     // 等待内容加载完成
     setTimeout(() => {
+        // 阶段10B：截图前回调（绘制税负对比图等），异常不回滚主流程
+        if (typeof opts.beforeCapture === 'function') {
+            try {
+                opts.beforeCapture(tempContainer);
+            } catch (err) {
+                console.error('截图前渲染（图表）失败，继续导出:', err);
+            }
+        }
+
         // 使用html2canvas生成图片
         html2canvas(tempContainer, {
             scale: 2, // 提高清晰度
@@ -504,8 +521,11 @@ function exportToPDF(elementId, title) {
                 doc.addImage(canvas, 'PNG', SIDE_MARGIN, currentY, imgWidth, adjustedImgHeight);
             }
             
-            // 保存PDF
-            doc.save(`${title}_${new Date().toISOString().split('T')[0]}.pdf`);
+            // 保存PDF（专业版报告可使用自定义文件名，如「汇算清缴报告_2026-09.pdf」）
+            const fileName = (typeof opts.filename === 'string' && opts.filename.trim())
+                ? opts.filename
+                : `${title}_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
         }).catch(error => {
             console.error('生成PDF时出错:', error);
             

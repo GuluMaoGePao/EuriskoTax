@@ -897,9 +897,13 @@ window.addEventListener('DOMContentLoaded', function() {
     bindCalcActionBtns({ modeName: '经营所得', saveBtnId: 'business-save-btn', resetBtnId: 'business-reset-btn', saveFn: saveBusinessCalculation, resetFn: resetBusinessCalculation, stepFn: showBusinessStep });
     bindCalcActionBtns({ modeName: '分类所得', saveBtnId: 'classification-save-btn', resetBtnId: 'classification-reset-btn', saveFn: saveClassificationCalculation, resetFn: resetClassificationCalculation, stepFn: showClassificationStep });
 
-    // 导出PDF按钮
+    // 导出PDF按钮（阶段10B：专业版出汇算清缴报告，免费版保留现导出——分流在 EuriskoReport 内完成）
     document.getElementById('export-pdf-btn').addEventListener('click', function() {
-        exportToPDF('step-result', '个人年度个税预算表');
+        if (window.EuriskoReport && typeof window.EuriskoReport.exportFinalReport === 'function') {
+            window.EuriskoReport.exportFinalReport('comprehensive');
+        } else {
+            exportToPDF('step-result', '个人年度个税预算表');
+        }
     });
     
     // 导出Word按钮
@@ -946,9 +950,13 @@ window.addEventListener('DOMContentLoaded', function() {
         exportToWord('reverse-result', '个人年度个税预算表（反向倒算）');
     });
     
-    // 经营所得页面导出PDF按钮
+    // 经营所得页面导出PDF按钮（阶段10B：专业版出汇算清缴报告，免费版保留现导出）
     document.getElementById('export-business-pdf-btn').addEventListener('click', function() {
-        exportToPDF('business-result', '经营所得年度预算表');
+        if (window.EuriskoReport && typeof window.EuriskoReport.exportFinalReport === 'function') {
+            window.EuriskoReport.exportFinalReport('business');
+        } else {
+            exportToPDF('business-result', '经营所得年度预算表');
+        }
     });
     
     // 经营所得页面导出Word按钮
