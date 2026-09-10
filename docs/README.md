@@ -9,7 +9,7 @@
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
 - **主版本**：CHANGELOG 最新 **1.6.1**（一键缓存清洗页 + 弹窗健壮性 + 登录/注册表单文案与校验优化 + 邮箱更正；`package.json` 版本戳 1.6.1 已同步）
-- **测试**：6 套件 203 个单元测试全部通过（`npm test`，2026-09-07 复跑）；发布门禁 `verify:local` 20 项全绿
+- **测试**：10 套件 252 个单元测试全部通过（`npm test`，2026-09-10 复跑）；发布门禁 `verify:local` 52 项全绿
 - **开发阶段**：阶段 8（首批测试用户运营）进行中（数据埋点 + 反馈落库收尾 ✅ 2026-09-07）→ 阶段 9（PWA）✅ 已上线 → 阶段 10（免费/专业版）方案已确认待命，见 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
 
 ---

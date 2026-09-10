@@ -37,9 +37,9 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 20 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 52 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 6 套件 203 例 |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 10 套件 252 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
 
@@ -52,7 +52,7 @@
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 10 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 22 项线上指纹，全绿退出码 0 |
 
 ---
 
@@ -68,7 +68,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（20 项 e2e 门禁）                            │
+│    + verify:local（52 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环

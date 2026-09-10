@@ -13,6 +13,8 @@
  *   4. HTTP 级 e2e：
  *      - 前端资源冒烟：/ 含登录表单、auth-ui.js 含 dev-login-fill 且无 quick-login、SW 为 v8
  *      - 登录本地测试账号 → 拿 JWT → GET /profile 校验（含种子授权 plan=pro）
+ *      - 阶段8 反馈链路：落库/用户列表/管理员跟进 + 附图（合法 data URL 落库、非图片与超 3 张 400）
+ *      - 阶段10 运维后台（admin.html 后端）：用户列表搜索、详情计数、权益调档 pro↔free、无令牌 401
  *      - 阶段10A 云端同步链路：上传/全量拉取、幂等、冲突新者胜、墓碑广播、
  *        SYNC_MAX_RECORDS 上限拒绝、free 账号 403 PRO_REQUIRED
  *      - 完整注册链路：申请邀请码(写库) → send-code(读后端控制台验证码) → register → 登录新号 → profile
@@ -112,6 +114,22 @@ function extractCodeFromLog(log, email) {
     const m = log.slice(idx).match(/验证码\s*:\s*(\d{6})/);
     return m ? m[1] : null;
 }
+
+// Feedback.attachments 在库中是 JSON 字符串（服务端写入时 JSON.stringify），
+// 用户端 / 管理员端接口按库中原样返回，断言前统一解析成数组
+function parseAttachments(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : null;
+        } catch { return null; }
+    }
+    return null;
+}
+
+// 1x1 透明 PNG 的 Data URL：与前端压缩上传格式一致，用于附图链路断言
+const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 (async () => {
     let exitCode = 0;
@@ -325,6 +343,9 @@ function extractCodeFromLog(log, email) {
     console.log('\n[4/6 续] 反馈落库 + 匿名埋点链路（dev 账号，阶段8）...');
     const stamp2 = Date.now();
     const adminToken = process.env.ADMIN_TOKEN || 'local-verify-admin-token';
+    // 提在外层声明：后面的「运维后台用户端点」小节要引用本次产生的反馈 id
+    let verifyFeedbackId = null;
+    let verifyImageFeedbackId = null;
     try {
         if (!devToken) {
             record('阶段8端点冒烟', false, '前置登录失败，跳过');
@@ -339,19 +360,49 @@ function extractCodeFromLog(log, email) {
             const fb = await request(PORT, 'POST', '/api/feedback', {
                 json: { category: 'bug', content: `[verify] e2e feedback ${stamp2}`, rating: 5 }, token: devToken,
             });
-            const verifyFeedbackId = fb.body && fb.body.data && fb.body.data.id || null;
+            verifyFeedbackId = fb.body && fb.body.data && fb.body.data.id || null;
             record('POST /feedback 反馈落库', fb.status === 201 && !!verifyFeedbackId, `HTTP ${fb.status}, id=${verifyFeedbackId || 'N/A'}`);
+
+            // 8.2b 附图：合法压缩图 data URL 正常落库（与前端压缩上传格式一致）
+            const fbImg = await request(PORT, 'POST', '/api/feedback', {
+                json: { category: 'bug', content: `[verify] e2e feedback with image ${stamp2}`, attachments: [PNG_DATA_URL] }, token: devToken,
+            });
+            verifyImageFeedbackId = fbImg.body && fbImg.body.data && fbImg.body.data.id || null;
+            record('POST /feedback 附图落库(data URL)', fbImg.status === 201 && !!verifyImageFeedbackId,
+                `HTTP ${fbImg.status}, id=${verifyImageFeedbackId || 'N/A'}`);
+
+            // 8.2c 附图非法必须 400：非图片 data URL / 超过 3 张（防脏数据与库容滥用）
+            const badAtt = await request(PORT, 'POST', '/api/feedback', {
+                json: { category: 'bug', content: `[verify] bad attachment ${stamp2}`, attachments: ['not-a-data-url'] }, token: devToken,
+            });
+            record('POST /feedback 非图片附图被拒(400)', badAtt.status === 400, `HTTP ${badAtt.status}`);
+            const tooManyAtt = await request(PORT, 'POST', '/api/feedback', {
+                json: { category: 'bug', content: `[verify] too many attachments ${stamp2}`, attachments: [PNG_DATA_URL, PNG_DATA_URL, PNG_DATA_URL, PNG_DATA_URL] }, token: devToken,
+            });
+            record('POST /feedback 附图超 3 张被拒(400)', tooManyAtt.status === 400, `HTTP ${tooManyAtt.status}`);
 
             // 8.3 当前用户反馈列表能查到该条
             const myList = await request(PORT, 'GET', '/api/feedback', { token: devToken });
             const mine = myList.body && myList.body.data || [];
             record('GET /feedback 用户列表', myList.status === 200 && mine.some((x) => x.id === verifyFeedbackId), `HTTP ${myList.status}`);
 
+            // 8.3b 用户端列表回传附图（库中 JSON 字符串 → 解析后应还原为原 data URL）
+            const mineImg = mine.find((x) => x.id === verifyImageFeedbackId);
+            const mineAtts = parseAttachments(mineImg && mineImg.attachments);
+            record('GET /feedback 用户端返回附图', myList.status === 200 && !!mineAtts && mineAtts.length === 1 && mineAtts[0] === PNG_DATA_URL,
+                mineAtts ? `attachments=${mineAtts.length}` : 'attachments 无法解析为数组');
+
             // 8.4 管理员列表与状态跟进（X-Admin-Token）
             const adminH = { 'X-Admin-Token': adminToken };
             const adminList = await request(PORT, 'GET', '/api/feedback/admin?status=open', { headers: adminH });
             const adminItems = adminList.body && adminList.body.data || [];
             record('GET /feedback/admin 管理员列表', adminList.status === 200 && adminItems.some((x) => x.id === verifyFeedbackId), `HTTP ${adminList.status}`);
+
+            // 8.4b 运维后台拿到附图才算闭环（admin.html 反馈 Tab 附图预览依赖此字段）
+            const adminImgItem = adminItems.find((x) => x.id === verifyImageFeedbackId);
+            const adminAtts = parseAttachments(adminImgItem && adminImgItem.attachments);
+            record('GET /feedback/admin 运维后台可见附图', adminList.status === 200 && !!adminAtts && adminAtts.length === 1,
+                adminAtts ? `attachments=${adminAtts.length}` : 'attachments 无法解析为数组');
 
             if (verifyFeedbackId) {
                 const patch = await request(PORT, 'PATCH', `/api/feedback/admin/${verifyFeedbackId}`, {
@@ -366,6 +417,66 @@ function extractCodeFromLog(log, email) {
             const ovTotal = ovData.calculations && ovData.calculations.total;
             const ovComp = ovData.calculations && ovData.calculations.byType && ovData.calculations.byType.comprehensive;
             record('GET /stats/overview 读聚合统计', ov.status === 200 && ovTotal >= 1 && ovComp >= 1, `HTTP ${ov.status}, total=${ovTotal}, comprehensive=${ovComp}`);
+
+            // ---- 8.6 阶段10 运维后台（admin.html 后端）：用户列表/详情/权益调档 ----
+            console.log('\n[4/6 续·运维] 运维后台用户端点（阶段10 运维后台）...');
+            const devRow = await prisma.user.findUnique({ where: { email: DEV_EMAIL } });
+            try {
+                if (!devRow) {
+                    record('运维后台用户端点', false, '未找到 dev 账号，跳过');
+                } else {
+                    // 8.6.1 无令牌必须被拒，防管理接口裸奔
+                    const noTok = await request(PORT, 'GET', '/api/admin/users');
+                    record('GET /admin/users 无令牌被拒(401)', noTok.status === 401, `HTTP ${noTok.status}`);
+
+                    // 8.6.2 列表 + 关键词搜索（故意用大写关键词，锁住「大小写不敏感」语义）；
+                    //       同时确认响应不含任何密码字段
+                    const uList = await request(PORT, 'GET', '/api/admin/users?q=' + encodeURIComponent(DEV_EMAIL.toUpperCase()), { headers: adminH });
+                    const uData = (uList.body && uList.body.data) || {};
+                    const uItems = Array.isArray(uData.items) ? uData.items : [];
+                    const uHit = uItems.find((u) => u.email === DEV_EMAIL);
+                    record('GET /admin/users 列表+搜索(大小写不敏感/无密码字段)',
+                        uList.status === 200 && uData.total >= 1 && !!uHit
+                        && uHit.password_hash === undefined && uHit.passwordHash === undefined,
+                        `HTTP ${uList.status}, total=${uData.total}`);
+
+                    // 8.6.3 详情：数据规模计数（反馈/计算）+ 最近动态，供运维判断后调权益
+                    const uDetail = await request(PORT, 'GET', `/api/admin/users/${devRow.id}`, { headers: adminH });
+                    const uDet = (uDetail.body && uDetail.body.data) || {};
+                    const uCounts = uDet.counts || {};
+                    const uRecentFb = Array.isArray(uDet.recentFeedback) ? uDet.recentFeedback : [];
+                    record('GET /admin/users/:id 详情(计数+最近动态)',
+                        uDetail.status === 200 && !!uDet.user && uDet.user.id === devRow.id
+                        && uCounts.feedback >= 1 && uRecentFb.some((f) => f.id === verifyFeedbackId),
+                        `HTTP ${uDetail.status}, feedback=${uCounts.feedback}, calcs=${uCounts.calculations}`);
+
+                    // 8.6.4 权益调档：授予 14 天专业版 → 回落基础版（真实写库，前端 plan 徽标依赖此结果）
+                    const expIso = new Date(Date.now() + 14 * 86400000).toISOString();
+                    const grant = await request(PORT, 'PATCH', `/api/admin/users/${devRow.id}/plan`, {
+                        json: { plan: 'pro', expiresAt: expIso, grantedBy: 'admin' }, headers: adminH,
+                    });
+                    const gData = (grant.body && grant.body.data) || {};
+                    record('PATCH /admin/users/:id/plan 授予限时专业版',
+                        grant.status === 200 && gData.plan === 'pro' && gData.pro_granted_by === 'admin' && !!gData.plan_expires_at,
+                        `HTTP ${grant.status}, plan=${gData.plan}, granted_by=${gData.pro_granted_by}`);
+
+                    const revoke = await request(PORT, 'PATCH', `/api/admin/users/${devRow.id}/plan`, {
+                        json: { plan: 'free' }, headers: adminH,
+                    });
+                    const rData = (revoke.body && revoke.body.data) || {};
+                    record('PATCH /admin/users/:id/plan 回落基础版',
+                        revoke.status === 200 && rData.plan === 'free' && !rData.plan_expires_at && !rData.pro_granted_by,
+                        `HTTP ${revoke.status}, plan=${rData.plan}, granted_by=${rData.pro_granted_by || 'null'}`);
+                }
+            } finally {
+                // 恢复 dev 账号的种子 pro 授权：门禁不得给开发账号残留权益改动
+                try {
+                    await prisma.user.update({
+                        where: { email: DEV_EMAIL },
+                        data: { plan: 'pro', pro_granted_by: 'seed', plan_expires_at: null },
+                    });
+                } catch { /* 恢复失败不阻塞判定 */ }
+            }
         }
     } catch (e) {
         record('反馈/埋点链路', false, e.message);

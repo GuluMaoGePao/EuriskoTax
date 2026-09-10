@@ -7,6 +7,13 @@ const GRANT_SOURCES = ['seed', 'invite', 'admin', 'purchase'];
 // 计划白名单
 const PLANS = ['free', 'pro'];
 
+// 关键词包含匹配：Prisma 的 `mode: 'insensitive'` 仅 PostgreSQL / MongoDB 等连接器支持，
+// 本地 SQLite（file: 协议）传该参数会被直接判为非法查询而 500；
+// 而 SQLite 的 LIKE 对 ASCII 本身就不区分大小写，故按数据源协议分别构造，保证两端语义一致。
+const DB_URL = process.env.DATABASE_URL || '';
+const SUPPORTS_INSENSITIVE = DB_URL !== '' && !/^file:/i.test(DB_URL);
+const kwContains = (kw) => (SUPPORTS_INSENSITIVE ? { contains: kw, mode: 'insensitive' } : { contains: kw });
+
 // 公开字段（绝不外泄 password_hash）
 const USER_SELECT = {
     id: true,
@@ -39,8 +46,8 @@ const listUsers = async (req, res, next) => {
         if (q && q.trim()) {
             const kw = q.trim();
             where.OR = [
-                { username: { contains: kw, mode: 'insensitive' } },
-                { email: { contains: kw, mode: 'insensitive' } }
+                { username: kwContains(kw) },
+                { email: kwContains(kw) }
             ];
         }
         if (plan === 'free' || plan === 'pro') {
