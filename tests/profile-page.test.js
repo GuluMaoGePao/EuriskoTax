@@ -33,6 +33,8 @@ function createMockApiClient(user) {
         getCurrentUser: jest.fn().mockReturnValue(mockUser),
         loginUser: jest.fn().mockResolvedValue(mockUser),
         registerUser: jest.fn().mockResolvedValue(mockUser),
+        sendResetCode: jest.fn().mockResolvedValue({ success: true }),
+        resetPassword: jest.fn().mockResolvedValue({ success: true }),
         logoutUser: jest.fn()
     };
 }
@@ -91,14 +93,15 @@ function buildProfileDOM() {
             <input id="profile-username" type="text" readonly />
             <input id="profile-email" type="email" readonly />
             <input id="profile-phone" type="tel" />
-            <input id="profile-current-password" type="password" />
-            <i id="profile-current-password-toggle" class="fa fa-eye"></i>
+            <button id="profile-phone-save"></button>
+            <span id="profile-verify-email"></span>
+            <input id="profile-code" type="text" />
+            <button id="profile-send-code-btn" disabled></button>
             <input id="profile-password" type="password" />
             <i id="profile-password-toggle" class="fa fa-eye"></i>
             <input id="profile-confirm-password" type="password" />
             <i id="profile-confirm-password-toggle" class="fa fa-eye"></i>
-            <button id="profile-save"></button>
-            <button id="profile-cancel"></button>
+            <button id="profile-password-submit"></button>
             <button id="profile-logout-link"></button>
             <button id="profile-delete-account"></button>
         </div>
@@ -655,7 +658,7 @@ describe('个人中心 - 密码可见性切换', () => {
     });
 
     test('切换图标应正确增删 fa-eye / fa-eye-slash 类', () => {
-        const toggle = document.getElementById('profile-current-password-toggle');
+        const toggle = document.getElementById('profile-confirm-password-toggle');
         expect(toggle.classList.contains('fa-eye')).toBe(true);
 
         toggle.click();

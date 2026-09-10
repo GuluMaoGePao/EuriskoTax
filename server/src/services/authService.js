@@ -11,6 +11,44 @@ const normalizeEmail = (rawEmail) => String(rawEmail || '').trim().toLowerCase()
 // 生产正式收费时置 false，改由兑换码/支付渠道（阶段11）授权
 const seedGrantEnabled = () => process.env.SEED_GRANT_PRO === 'true';
 
+// 体验版规则（三档体系）：基础版用户可免费领取 14 天专业版体验
+// 实现复用现有模型：plan=pro + plan_expires_at=+14天 + pro_granted_by='trial'；
+// isPro 到期自动回落基础版。公测期不限次数：到期后随时可再次领取（进行中不叠加）。
+const TRIAL_DAYS = 14;
+const TRIAL_DAYS_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+
+// 领取专业版体验（幂等语义）：
+//   - 已是有效 pro（seed 永久 / 正式授权 / 体验进行中）→ 原样返回不重复发放（already_pro=true）
+//   - 免费 或 过期 trial → 重新授予 14 天体验（granted_by='trial'）
+const claimTrial = async (userId) => {
+    const user = await getUserById(userId);
+    const now = Date.now();
+    const exp = user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : null;
+    const proActive = user.plan === 'pro' && (!exp || !Number.isFinite(exp) || exp > now);
+    if (proActive) {
+        return user; // 已拥有有效专业版/体验，不叠加
+    }
+    return await prisma.user.update({
+        where: { id: userId },
+        data: {
+            plan: 'pro',
+            plan_expires_at: new Date(now + TRIAL_DAYS_MS),
+            pro_granted_by: 'trial'
+        },
+        select: {
+            id: true,
+            username: true,
+            email: true,
+            phone: true,
+            plan: true,
+            plan_expires_at: true,
+            pro_granted_by: true,
+            created_at: true,
+            updated_at: true
+        }
+    });
+};
+
 // 查重（区分用户名/邮箱，注册前拦截，避免浪费一次性验证码）
 const checkDuplicate = async (username, rawEmail) => {
     const email = normalizeEmail(rawEmail);
@@ -348,6 +386,7 @@ module.exports = {
     checkDuplicate,
     registerUser,
     loginUser,
+    claimTrial,
     getUserById,
     verifyPassword,
     updateUser,
