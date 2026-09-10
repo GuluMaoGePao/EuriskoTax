@@ -82,6 +82,7 @@ const ERROR_MESSAGE_MAP = {
     'User with this email was not found': '该邮箱未注册，请先注册',
     'Email, verification code and new password are required': '请填写邮箱、验证码和新密码',
     'Count must be an integer between 1 and 100': '数量必须是 1 到 100 之间的整数',
+    'Invalid attachments. At most 3 compressed images (png/jpeg/webp, <= 900K each)': '附图数量或格式不正确（最多 3 张 png/jpeg/webp 图片）',
     'Invalid admin token': '管理员令牌无效',
     'Stats endpoint is not configured. Set ADMIN_TOKEN environment variable first.': '统计接口未配置，请联系开发者',
     '请求过于频繁，请 15 分钟后再试': '请求过于频繁，请 15 分钟后再试',
@@ -177,13 +178,23 @@ async function logoutUser() {
     removeCurrentUser();
 }
 
+// 领取专业版体验（登录、基础版可领；体验期 14 天，公测期到期后可再次领取）
+// 服务端返回更新后的账户信息（含 plan / plan_expires_at / pro_granted_by），直接刷新本地会话
+async function claimTrial() {
+    const result = await apiRequest('/auth/claim-trial', 'POST', {}, true);
+    setCurrentUser(result);
+    return result;
+}
+
 async function getProfile() {
     return await apiRequest('/auth/profile', 'GET', null, true);
 }
 
 async function updateProfile(data) {
     const result = await apiRequest('/auth/profile', 'PUT', data, true);
-    setCurrentUser(result);
+    // PUT 返回体不含 plan 等版本字段：整包覆盖会丢失本地会话的档位信息，改为字段合并保留
+    const prev = getCurrentUser() || {};
+    setCurrentUser({ ...prev, ...result });
     return result;
 }
 
@@ -225,12 +236,13 @@ async function deleteCalculation(id) {
     return await apiRequest(`/calculations/${id}`, 'DELETE', null, true);
 }
 
-// 提交意见反馈（登录用户，落库）
+// 提交意见反馈（登录用户，落库；attachments 为前端压缩后的图片 dataURL 数组，最多 3 张）
 async function submitFeedback(data) {
     return await apiRequest('/feedback', 'POST', {
         category: data.category || 'general',
         content: data.content,
-        rating: data.rating || null
+        rating: data.rating || null,
+        attachments: Array.isArray(data.attachments) ? data.attachments : []
     }, true);
 }
 
@@ -288,6 +300,7 @@ const apiClient = {
     resetPassword,
     loginUser,
     logoutUser,
+    claimTrial,
     getProfile,
     updateProfile,
     verifyPassword,

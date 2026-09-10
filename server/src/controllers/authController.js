@@ -130,6 +130,20 @@ const profile = async (req, res, next) => {
     }
 };
 
+// 领取专业版体验（登录；免费/过期体验 → 14 天 pro；已有效 pro 幂等返回不叠加）
+const claimTrial = async (req, res, next) => {
+    try {
+        const user = await authService.claimTrial(req.user.id);
+
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 const updateProfile = async (req, res, next) => {
     try {
         const { username, email, phone, password, currentPassword } = req.body;
@@ -333,6 +347,7 @@ module.exports = {
     sendCode,
     login,
     profile,
+    claimTrial,
     updateProfile,
     deleteProfile,
     verifyPassword,
