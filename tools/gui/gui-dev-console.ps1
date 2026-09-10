@@ -1857,7 +1857,7 @@ $leftPanel.BackColor = $C_BG_L1
 
 $menuButtons = @()
 $tabs = @(
-    @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 · 健康检查";   Color = $C_SUCCESS },
+    @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 · 线上站点/管理台 · 健康检查";   Color = $C_SUCCESS },
     @{ Name = "数据库";   Icon = "💾"; Desc = "迁移 · 生成 · 重置账号 · 可视化管理 (6个功能)";     Color = $C_ACCENT   },
     @{ Name = "测试中心"; Icon = "🧪"; Desc = "单元测试 · 覆盖率 · 性能基准 (9个功能)";           Color = $C_PURPLE   },
     @{ Name = "运维监控"; Icon = "🛠"; Desc = "看门狗守护 · cpolar 内网穿透 (6个功能)";           Color = $C_WARN     },
@@ -2457,7 +2457,7 @@ function Reflow-TabCards {
 # ==============================================================================
 # ============ 标签页 1: 启动管理 ============
 # ==============================================================================
-$tab1Ctx = New-TabPanel -HeaderText "🚀  启动管理" -HeaderTagline "后端服务器启动 · 公网共享 · 端口管理 · 快速访问" -HeaderDesc "本页包含 3 个功能区：① 启动后端（6种模式：一键/快速/分享/看门狗/全开/Nodemon）  ② 停止与端口管理（停止/释放端口/查看状态）  ③ 快速访问（前端/API文档/Prisma Studio）"
+$tab1Ctx = New-TabPanel -HeaderText "🚀  启动管理" -HeaderTagline "后端服务器启动 · 公网共享 · 端口管理 · 快速访问 · 线上入口" -HeaderDesc "本页包含 4 个功能区：① 启动后端（6种模式：一键/快速/分享/看门狗/全开/Nodemon）  ② 停止与端口管理（停止/释放端口/查看状态）  ③ 快速访问（前端/API文档/Prisma Studio）  ④ 线上环境（生产站点/管理台/缓存清洗）"
 
 # --- 快速开始指引 (醒目) ---
 Add-SectionCard -TabCtx $tab1Ctx -IsGuide `
@@ -2723,6 +2723,20 @@ Add-SectionCard -TabCtx $tab1Ctx `
             Start-Process "http://localhost:5555"
             Write-Log "Prisma Studio 应在 localhost:5555 打开" "INFO"
         } }
+)
+
+# --- 线上环境（生产站点）---
+Add-SectionCard -TabCtx $tab1Ctx `
+    -Title "4. 线上环境（生产站点）" `
+    -Subtitle "直接打开生产页面：站点 · 管理台 · 缓存清洗（不需要本地后端）" `
+    -Description "详细说明：三个链接都指向已部署的生产环境 https://euriskotax.zeabur.app。管理台用于看用户反馈（反馈 Tab）、用户列表与兑换码，登录令牌填 Zeabur 控制台 Variables 里的 ADMIN_TOKEN_PROD（勾选「在本机记住令牌」后免输）；线上缓存清洗页用于用户反馈「页面还是旧的」时一键重置。" `
+    -AccentColor $C_SUCCESS -Buttons @(
+    @{ Text = "🌐 打开线上站点`neuriskotax.zeabur.app"; Desc = "在默认浏览器打开生产环境首页，也就是发给用户的正式地址。"; Color = "85, 180, 110";
+       OnClick = { Start-Process "https://euriskotax.zeabur.app"; Write-Log "已打开线上站点: https://euriskotax.zeabur.app" "INFO" } },
+    @{ Text = "🛠 打开管理台`n用户反馈 / 用户 / 兑换码"; Desc = "打开 https://euriskotax.zeabur.app/admin.html，粘贴 ADMIN_TOKEN_PROD 后进入：「反馈」Tab 看用户提交的 Bug/建议（含附图，可改状态并保存），「用户」Tab 可搜索用户、授予限时专业版，「兑换码」Tab 管理一机一码。"; Color = "100, 150, 240";
+       OnClick = { Start-Process "https://euriskotax.zeabur.app/admin.html"; Write-Log "已打开线上管理台: https://euriskotax.zeabur.app/admin.html（令牌用 ADMIN_TOKEN_PROD）" "INFO" } },
+    @{ Text = "🧹 线上缓存清洗页`n用户说「页面还是旧的」时给他"; Desc = "打开 https://euriskotax.zeabur.app/clean-cache.html：注销全部 Service Worker + 清空缓存后跳回首页。发新版后用户仍看到旧页面时，把这条链接发给他。"; Color = "230, 160, 70";
+       OnClick = { Start-Process "https://euriskotax.zeabur.app/clean-cache.html"; Write-Log "已打开线上缓存清洗页: https://euriskotax.zeabur.app/clean-cache.html" "INFO" } }
 )
 
 # ==============================================================================
