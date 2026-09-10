@@ -344,14 +344,15 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 | category | string | 否 | 分类（general/bug/suggestion） |
 | content | string | 是 | 内容（≤5000 字符） |
 | rating | number | 否 | 评分 |
+| attachments | string[] | 否 | 附图（选填）：前端压缩后的图片 data URL（png/jpeg/webp），最多 3 张、单张 ≤900K 字符 |
 
-> 实现（v1.6.0）：反馈持久化到 `Feedback` 表，同时保留 `[FEEDBACK]` 日志便于实时提醒。category 白名单 bug/suggestion/other/general（非法值回退 general）；rating 仅接受 1-5 整数（非法传 null）；content ≤5000 字符。
+> 实现（v1.7.0）：反馈持久化到 `Feedback` 表（含附图），同时保留 `[FEEDBACK]` 日志便于实时提醒。category 白名单 bug/suggestion/other/general（非法值回退 general）；rating 仅接受 1-5 整数（非法传 null）；content ≤5000 字符；attachments 数量/类型/大小非法一律 400。
 
 ### 4.2 获取我的反馈列表
 
 **GET** `/api/feedback`
 
-认证：JWT。响应：`data: [{ id, category, rating, content, status, created_at }]`，按提交时间倒序。status 取值：open（待处理）/ resolved（已采纳）/ closed（已关闭）。
+认证：JWT。响应：`data: [{ id, category, rating, content, attachments, status, created_at }]`，按提交时间倒序。status 取值：open（待处理）/ resolved（已采纳）/ closed（已关闭）。
 
 ---
 
@@ -395,6 +396,26 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 **PATCH** `/api/feedback/admin/:id`
 
 请求体：`{ "status": "resolved" }`（open/resolved/closed）。用于跟进采纳状态与发放奶茶奖励。
+
+### 5.6 用户列表（管理员）
+
+**GET** `/api/admin/users?q=关键词&plan=free|pro&offset=0&limit=50`
+
+`q` 匹配用户名或邮箱（子串、忽略大小写）；`plan` 可选 free/pro；`limit` 上限 100。响应：`{ total, offset, limit, items: [{ id, username, email, phone, plan, plan_expires_at, pro_granted_by, created_at, updated_at }] }`。
+
+### 5.7 用户详情（管理员）
+
+**GET** `/api/admin/users/:id`
+
+响应：`{ user, counts: { feedback, calculations }, recentFeedback: [...], recentCalculations: [...] }`，用于判断数据规模与最近动态后调整权益。用户不存在返回 404。
+
+### 5.8 调整用户计划（管理员）
+
+**PATCH** `/api/admin/users/:id/plan`
+
+请求体：`{ "plan": "pro" | "free", "expiresAt": "2026-10-01T00:00:00.000Z" | null, "grantedBy": "admin" }`
+
+语义：`pro` + `expiresAt` 为空 → 永久专业版；`pro` + 未来时间 → 限时专业版（如补发 14 天体验）；`free` → 回落基础版（清空到期时间与来源）。`grantedBy` 默认 `admin`，取值范围 seed/invite/admin/purchase。响应返回更新后的用户信息。
 
 ---
 
