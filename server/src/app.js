@@ -14,6 +14,7 @@ const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');
 const inviteRoutes = require('./routes/invites');
 const contentRoutes = require('./routes/content');
+const adminUserRoutes = require('./routes/adminUsers');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -142,8 +143,9 @@ app.use(cors({
     credentials: true
 }));
 // 请求体大小限制（防止过大请求导致 DoS）
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// 3mb：意见反馈支持 1~3 张前端压缩图片的 base64（单张 ≤900K 字符），其余接口为纯 JSON 远小于此
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 app.use(logger);
 
 // API 路由
@@ -158,6 +160,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {
