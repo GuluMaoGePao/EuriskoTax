@@ -443,7 +443,7 @@ function viewHistoryRecord(id) {
         
         // 基本参数
         document.getElementById('work-months').value = results?.workMonths || 12;
-        document.getElementById('prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
+        document.getElementById('prepaid-tax').value = '';
         
         // 收入明细
         document.getElementById('salary-income').value = results?.incomeDetails?.salary || 0;
