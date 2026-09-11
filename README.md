@@ -9,13 +9,13 @@
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | CHANGELOG 最新 **1.7.1**（详见 [CHANGELOG.md](CHANGELOG.md)；`package.json` / 关于弹窗已同步为 1.7.1） |
+| 版本 | CHANGELOG 最新 **1.10.0**（详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
 | 免费/专业版 | ✅ 阶段10 已上线（v1.7.0）：计税能力永不锁定，登录仅解锁云端历史同步；运维后台（`admin.html`）可调用户权益 |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |
 | 登录/找回 | 邮箱登录（可勾选"保持登录状态"）、注册勾选协议、忘记密码**邮箱验证码自助找回** |
 | 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
-| 测试 | ✅ 10 套件 252 个单元测试全通过（`npm test`，2026-09-10 复跑）；发布门禁 `verify:local` 52 项全绿 |
+| 测试 | ✅ 12 套件 303 个单元测试全通过（`npm test`，2026-09-12 复跑）；发布门禁 `verify:local` 59 项全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
 
 ---
 
@@ -57,11 +57,11 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 > ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
 
 **发布纪律（先本地验证，再部署）**：
-1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 52 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 邀请码+验证码注册新号登录）。
+1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 59 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 邀请码+验证码注册新号登录）。**动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 时，还必须加跑 `npm run verify:pg`**——用本地 PostgreSQL 演练同一套断言（`generate` → `migrate deploy` → 起服务，与线上容器同序），专门拦「本地 SQLite 全绿、线上迁移才炸」的问题（需 Docker Desktop，未装则优雅跳过）。
 2. **上线只走安全发布流水线**（本地门禁不过就物理上推不出去）：
    - 命令行：`.\tools\ops\ops-publish.ps1`（内部 = verify:local 全绿 → git commit → push origin main → 自动轮询核对线上指纹）；
    - GUI：控制台「🔐 Git & 账号」→「🚀 安全发布」（或先点「🧪 安全发布试运行」零风险预演一次）。
-3. 线上核对项由 `.\tools\ops\ops-check-prod.ps1` 完成（22 项指纹：页面/登录表单、无 quick-login 残留、auth-ui 含 dev 入口与 409 提示、SW 无应用壳预缓存 + 协议守卫 + HTML 导航 network-first、app.js 无 `?v=` 指纹等）。
+3. 线上核对项由 `.\tools\ops\ops-check-prod.ps1` 完成（**35 项**指纹：页面/登录表单、无 quick-login 残留、auth-ui 含 dev 入口与 409 提示、SW 无应用壳预缓存 + 协议守卫 + HTML 导航 network-first、app.js 无 `?v=` 指纹、版本三处线上比对、排障短链 `/reset`、内容端点等）。
 4. 老用户浏览器若仍显示旧版：`Application → Service Workers → Unregister` + `Clear site data` 后刷新。
 
 ---
@@ -125,10 +125,11 @@ Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 ## 测试
 
 ```bash
-npm test                    # 运行全部单元测试（6 套件 203 个，含覆盖率报告）
+npm test                    # 运行全部单元测试（12 套件 303 个，含覆盖率报告）
 npm run test:watch          # 监听模式
 npm run test:performance    # 计税性能基准
-npm run verify:local        # 本地登录链路验证门禁（52 项断言，push 前必跑，见上文"发布纪律"）
+npm run verify:local        # 本地登录链路验证门禁（59 项断言，push 前必跑，见上文"发布纪律"）
+npm run verify:pg           # 生产等价演练：同一套断言跑在本地 PostgreSQL（改了 schema/迁移后必跑）
 ```
 
 测试报告见 [docs/reports/test-report.md](docs/reports/test-report.md)。

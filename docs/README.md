@@ -1,16 +1,16 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-11
+> 最后更新：2026-09-12
 > 维护原则：按用途分类存放，本文件为统一入口索引
 
 ---
 
-## 当前状态（v1.8.0 · 2026-09-11）
+## 当前状态（v1.10.0 · 2026-09-12）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.8.0**（阶段11 内容/公告中心：分层投放 + 定时上线 + 运维后台内容管理；上一版 1.7.2 = 汇算清缴口径修正 + 社保基数默认值 7546 + 反向倒算 0 元；`package.json` 版本戳 1.8.0 已同步，本地已归档、待推送上线）
-- **测试**：11 套件 274 个单元测试全部通过（`npm test`，2026-09-11 复跑）；发布门禁 `verify:local` 全绿
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已归档，待推送上线）均已收官 → 当前工作：**阶段12 支付体系与 B 端 API**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
+- **主版本**：CHANGELOG 最新 **1.10.0**（悬浮税助手悬浮球重做：品牌图形圆球 + 默认半隐 + 可完全隐藏 + 边缘热区唤回；上一版 1.9.0 = 防旧版残留加固（版本哨兵自愈 + `/reset` 排障短链）+ 公积金/汇算口径修正）。1.10.0 已上线并打标签 `v1.10.0`
+- **测试**：12 套件 303 个单元测试全部通过（`npm test`，2026-09-12 复跑）；发布门禁 `verify:local` **59/59** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）均已收官 → 当前工作：**阶段12 支付体系与 B 端 API**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
 
 ---
 

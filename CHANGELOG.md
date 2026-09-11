@@ -7,12 +7,20 @@
 
 ---
 
-## [未发布] 清理悬浮球遗留状态红点
+## [未发布] 发布流程加固：本地 PostgreSQL 演练门禁 + 回退 SOP 固化
 
 > 走 `ops-publish.ps1` 安全发布；不递增版本号（补丁推进，标签 `v1.10.0` 已存在因此自动跳过）。
 
+### 新增
+- **本地 PostgreSQL 演练门禁 `npm run verify:pg`**：新增根目录 `docker-compose.postgres.yml`（临时 PostgreSQL，端口 55432 / 独立数据卷）与 `tools/ops/ops-verify-pg.ps1`。按线上容器同序（`prisma generate` → `prisma migrate deploy` → 内容种子 → 起服务）把同一套 **59 项 e2e** 再跑一遍，专门拦截「本地 SQLite 全绿、线上迁移/字段才炸」的一类问题；`npm run verify:pg:fresh` 为全新库首部署场景；未装 Docker 时优雅退出（退出码 2）不影响日常门禁
+- `server/scripts/verify-local-auth.js` 支持 **`VERIFY_PG=1` 双模式**：迁移改为 `migrate deploy`（与线上同命令）、内容自动幂等种子化（内容端点断言依赖）、收尾自动恢复 SQLite Prisma Client；非 PG 模式行为与原先完全一致
+
 ### 变更
 - **移除未接线的状态红点**：`.assistant-fab-pulse` 自 1.10.0 起固定 `display:none`，且没有任何代码路径（含 `tax-assistant-ui.js`）会将其显示 —— 注释所述「有待办内容时显示」的数据源从未实现；已连同 `.assistant-fab.dock-left .assistant-fab-pulse` 定位规则和对应 `<span>` 元素一并删除，避免后续误判悬浮球具备未读提示能力
+- **回退 SOP 固化为两级流程**（`docs/guides/development-workflow.md` §4、`docs/guides/branch-release-strategy.md` §6.1）：明确「tag = 稳定锚点」语义，先止血（Zeabur 部署历史重部署上一正常构建，约 1 分钟）→ 再修根（`git revert` → 安全发布），并给出可直接抄的命令（含 `git revert --no-commit vX.Y.Z..main` 批量回退）
+- **排障速查表补 3 条新现象**：`verify:pg` 无 Docker（码 2）/ `migrate deploy` 失败（这正是上线会炸的点）/ 演练后 Client provider 不匹配如何恢复
+- `tools/ops/README.md` 补 `ops-verify-pg.ps1` 文件清单与「PostgreSQL 生产等价演练」用法段落
+- **文档口径收口**：README（版本 1.7.1 → **1.10.0**、单测 10 套件 252 → **12 套件 303**、门禁 52 → **59 项**、线上指纹 22 → **35 项**）、`docs/README.md` 当前状态（v1.8.0 → **v1.10.0**）、`tools/gui/README.md` 门禁断言数（52 → 59）同步修正，并统一补上 `verify:pg` 的触发时机说明
 
 ---
 
