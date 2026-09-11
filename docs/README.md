@@ -5,12 +5,12 @@
 
 ---
 
-## 当前状态（v1.7.1 · 2026-09-11）
+## 当前状态（v1.7.2 · 2026-09-11）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.7.1**（本地 SQLite 下运维后台用户搜索 500 修复 + 门禁扩至 52/52；上一版 1.7.0 = 阶段10 免费/专业版体系 + 运维后台 + 反馈附图；`package.json` 版本戳 1.7.1 已同步）
-- **测试**：10 套件 252 个单元测试全部通过（`npm test`，2026-09-10 复跑）；发布门禁 `verify:local` 52 项全绿
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）均已收官 → 下一阶段：支付体系（阶段11），见 [development/development-plan.md](development/development-plan.md) 与 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
+- **主版本**：CHANGELOG 最新 **1.7.2**（汇算清缴口径修正 + 社保基数默认值 7546 + 反向倒算 0 元；上一版 1.7.0 = 阶段10 免费/专业版体系 + 运维后台 + 反馈附图；`package.json` 版本戳 1.7.2 已同步）
+- **测试**：11 套件 274 个单元测试全部通过（`npm test`，2026-09-11 复跑）；发布门禁 `verify:local` 全绿
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）均已收官 → 当前阶段：**阶段11 内容/公告中心**（分层投放 + 定时上线 + 运维后台内容管理）；支付体系顺延至阶段12，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md)
 
 ---
 

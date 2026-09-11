@@ -74,7 +74,7 @@ function request(port, method, urlPath, { json, token, headers = {}, timeout = 1
             res.on('end', () => {
                 let parsed = null;
                 try { parsed = JSON.parse(data); } catch { /* 非 JSON */ }
-                resolve({ status: res.statusCode, body: parsed, raw: data });
+                resolve({ status: res.statusCode, body: parsed, raw: data, headers: res.headers });
             });
         });
         req.on('timeout', () => req.destroy(new Error('request timeout')));
@@ -290,17 +290,29 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
         record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
 
-        // ---- 阶段10B 前端资源静态断言（政策同步 + 专业版汇算清缴报告） ----
+        // ---- 阶段11 内容中心前端资源静态断言（政策要点 + 公告/运营内容） ----
         const taxPolicyJs = await request(PORT, 'GET', '/src/js/data/tax-policy.js');
-        record('tax-policy.js 含政策同步(TaxPolicy/applyUpdates/syncNow)',
-            taxPolicyJs.status === 200 && taxPolicyJs.raw.includes('window.TaxPolicy') && taxPolicyJs.raw.includes('applyUpdates') && taxPolicyJs.raw.includes('syncNow'), `HTTP ${taxPolicyJs.status}`);
+        record('tax-policy.js 含内容中心同步(TaxPolicy/applyUpdates/syncNow/syncFeed)',
+            taxPolicyJs.status === 200 && taxPolicyJs.raw.includes('window.TaxPolicy') && taxPolicyJs.raw.includes('applyUpdates')
+            && taxPolicyJs.raw.includes('syncNow') && taxPolicyJs.raw.includes('syncFeed') && taxPolicyJs.raw.includes('triggerSync'), `HTTP ${taxPolicyJs.status}`);
+        const contentUiJs = await request(PORT, 'GET', '/src/js/ui/content-center-ui.js');
+        record('content-center-ui.js 含三展示位(首页公告条/公告弹窗/个人中心列表)',
+            contentUiJs.status === 200 && contentUiJs.raw.includes('window.ContentCenterUI') && contentUiJs.raw.includes('renderHomeBanner')
+            && contentUiJs.raw.includes('openNoticeList') && contentUiJs.raw.includes('openNoticeModal'), `HTTP ${contentUiJs.status}`);
         const finalReportJs = await request(PORT, 'GET', '/src/js/export/final-report.js');
         record('final-report.js 含汇算报告编排与分流(EuriskoReport/exportFinalReport)',
             finalReportJs.status === 200 && finalReportJs.raw.includes('window.EuriskoReport') && finalReportJs.raw.includes('exportFinalReport') && finalReportJs.raw.includes('buildProDocHtml'), `HTTP ${finalReportJs.status}`);
-        record('index.html 加载 tax-policy/final-report 脚本',
-            page.status === 200 && page.raw.includes('src/js/data/tax-policy.js') && page.raw.includes('src/js/export/final-report.js'), '');
-        record('auth-ui.js 集成政策同步(triggerPolicySyncIfPro/TaxPolicy)',
-            authJs.status === 200 && authJs.raw.includes('triggerPolicySyncIfPro') && authJs.raw.includes('TaxPolicy'), `HTTP ${authJs.status}`);
+        record('index.html 加载 tax-policy/content-center-ui/final-report 脚本',
+            page.status === 200 && page.raw.includes('src/js/data/tax-policy.js') && page.raw.includes('src/js/ui/content-center-ui.js')
+            && page.raw.includes('src/js/export/final-report.js'), '');
+        record('index.html 含内容中心 DOM(首页公告条 + 公告弹窗)',
+            page.status === 200 && page.raw.includes('content-home-banner') && page.raw.includes('content-notice-modal'), '');
+        record('auth-ui.js 集成内容同步(triggerContentSync/TaxPolicy)',
+            authJs.status === 200 && authJs.raw.includes('triggerContentSync') && authJs.raw.includes('TaxPolicy'), `HTTP ${authJs.status}`);
+        record('auth-ui.js 含「公告与更新」入口(profile-card-notices)',
+            authJs.status === 200 && authJs.raw.includes('profile-card-notices'), `HTTP ${authJs.status}`);
+        record('plan.js 已移除「政策更新为专业版功能」表述（政策对全体开放）',
+            authJs.status === 200 && !authJs.raw.includes('政策更新为专业版'), '');
         const taxAssistantJs = await request(PORT, 'GET', '/src/js/data/tax-assistant.js');
         record('tax-assistant.js 暴露内置快照(window.TAX_ASSISTANT_QA)',
             taxAssistantJs.status === 200 && taxAssistantJs.raw.includes('window.TAX_ASSISTANT_QA'), `HTTP ${taxAssistantJs.status}`);
@@ -308,20 +320,36 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('前端资源冒烟', false, e.message);
     }
 
-    console.log('\n[3/6·政策] 政策内容公开端点（阶段10B，无需登录）...');
+    console.log('\n[3/6·内容] 内容中心公开端点（阶段11：政策要点 + 公告/运营内容，无需登录）...');
     try {
         const policy = await request(PORT, 'GET', '/api/content/tax-policy');
         const polData = policy.body && policy.body.data || {};
         const items = Array.isArray(polData.items) ? polData.items : [];
         const itemsWellFormed = items.length > 0 && items.every((x) => x && x.id && x.question && x.answer);
-        record('GET /content/tax-policy 公开内容(version+items)',
-            policy.status === 200 && !!polData.version && itemsWellFormed, `HTTP ${policy.status}, version=${polData.version || 'N/A'}, items=${items.length}`);
-        const policySame = await request(PORT, 'GET', '/api/content/tax-policy?since=' + encodeURIComponent(polData.version || ''));
+        record('GET /content/tax-policy 公开内容(version+revision+items)',
+            policy.status === 200 && !!polData.version && !!polData.revision && itemsWellFormed,
+            `HTTP ${policy.status}, version=${polData.version || 'N/A'}, items=${items.length}`);
+        const policySame = await request(PORT, 'GET', '/api/content/tax-policy?since=' + encodeURIComponent(polData.revision || ''));
         const sameData = policySame.body && policySame.body.data || {};
-        record('since=当前版本 → items 空（无更新增量语义）',
-            policySame.status === 200 && Array.isArray(sameData.items) && sameData.items.length === 0 && sameData.version === polData.version, `HTTP ${policySame.status}, items=${sameData.items.length}`);
+        record('since=当前指纹 → items 空（无更新增量语义）',
+            policySame.status === 200 && Array.isArray(sameData.items) && sameData.items.length === 0 && sameData.revision === polData.revision,
+            `HTTP ${policySame.status}, items=${sameData.items.length}`);
+        record('内容端点响应禁止共享缓存(private/no-store + Vary: Authorization)',
+            String(policy.headers && policy.headers['cache-control'] || '').includes('no-store')
+            && String(policy.headers && policy.headers.vary || '').toLowerCase().includes('authorization'),
+            `cache-control=${policy.headers && policy.headers['cache-control']}, vary=${policy.headers && policy.headers.vary}`);
+
+        const feed = await request(PORT, 'GET', '/api/content/feed');
+        const feedData = feed.body && feed.body.data || {};
+        record('GET /content/feed 公告/运营内容端点',
+            feed.status === 200 && Array.isArray(feedData.items), `HTTP ${feed.status}, items=${(feedData.items || []).length}`);
+        const feedModal = await request(PORT, 'GET', '/api/content/feed?placement=modal');
+        const modalData = feedModal.body && feedModal.body.data || {};
+        const modalFiltered = (modalData.items || []).every((x) => Array.isArray(x.placements) && x.placements.includes('modal'));
+        record('GET /content/feed 支持 placement 过滤',
+            feedModal.status === 200 && modalFiltered, `HTTP ${feedModal.status}, items=${(modalData.items || []).length}`);
     } catch (e) {
-        record('政策内容端点', false, e.message);
+        record('内容中心公开端点', false, e.message);
     }
 
     console.log('\n[4/6] 登录链路（dev 账号）...');

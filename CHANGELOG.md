@@ -7,6 +7,40 @@
 
 ---
 
+## [未发布] 阶段11：内容/公告中心（分层投放 + 定时上线）
+
+> 分支：`feature/stage11-content-center`。后端地基提交 `5a52776`。
+
+### 新增
+- **内容/公告中心模型**：新增 `ContentItem`（`item_id` 幂等键、`type` = policy/announcement/operation、`audience` = all/free/pro、`placements` 展示位 JSON、`status` = draft/published/revoked、`publish_at`/`expire_at` 时间窗、`priority` 排序、`hot`、`link_url`/`link_text`、policy 专用 `question`/`answer`/`category`/`keywords`）与 `ContentRelease`（`version` 唯一、`notice` 端上提示文案）；生产 PostgreSQL 与本地 SQLite 双 schema 同步，迁移 `20260911_add_content_center`
+- **内容分层投放（audience）**：游客仅 `all`；基础版 `all + free`；专业版/体验版 `all + free + pro`。**政策要点（policy）默认面向全体用户（含游客）**，运营内容（operation）/更新公告（announcement）按需逐条选择档位
+- **生命周期（定时上线/自动过期）**：条目可预约 `publish_at`（未到时间自动隐藏）与 `expire_at`（到期自动下架），无需定时任务——由端上可见性判定实时生效
+- **公开只读端点**：
+  - `GET /api/content/tax-policy?since=<revision>`——政策要点（内置 QA 快照之上的增量覆盖层），返回可见条目 + 不可见条目的 `deleted` 墓碑供客户端摘除；`since` 与当前载荷指纹一致时返回空 `items`（增量语义）
+  - `GET /api/content/feed?placement=home_banner|modal|notice_list|assistant_qa`——公告/运营内容，按展示位 + 登录态分层返回
+  - 两端点均公开只读、可携带 `Authorization` 分层；响应 `revision` 为内容载荷指纹（md5 前 12 位），内容有实质变动才变化
+- **`optionalAuth` 中间件**：有 token 挂 `req.user`，无/invalid token 静默放行，供公开但分层的端点使用
+- **`contentService`**：audience 解析、时间窗可见性、policy/feed 载荷构建、`revision` 指纹
+- **运维后台内容管理**：`admin.html` 新增「内容」Tab（筛选/列表/编辑器：类型、档位、展示位多选、时间窗、优先级、正文）；`admin.js` 提供 `loadContent/saveContent/deleteContentItem/publishContentItems`；管理端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（全部要求 `X-Admin-Token`）
+- **前端内容中心 UI**：新增 `src/js/ui/content-center-ui.js`（`window.ContentCenterUI`）——启动弹窗（`modal` 展示位，本地记已读）、首页公告条（`home_banner`，可关闭、按 `priority` 降序）、个人中心「公告与更新」列表（`notice_list`）
+- **`seed-content.js`**：将仓库内 `server/data/content/tax-policy.json` 幂等导入 `ContentItem`，该 JSON 退役为纯种子源（运行时不再读盘）
+- **测试**：新增 `tests/content-admin.test.js`（13 项）；重写 `tests/tax-policy.test.js` 为阶段11 语义；`tests/profile-page.test.js` 个人中心卡片 7 → 8（新增「公告与更新」）
+
+### 变更
+- **政策要点由「专业版功能」改为「全体用户（含游客）」可见**：`tax-policy.js` 取消免费版短路、游客也发起请求；`plan.js` 的 `PRO_FEATURE_HINT` 与 `auth-ui.js` 多处分层 CTA 文案移除「政策更新」表述
+- **`tax-policy.js` 重写为内容中心同步模块**：新增 `syncFeed/getFeed/pendingModalNotices/markModalSeen/homeBannerItem/dismissHomeBanner/noticeList/triggerSync`；`auth-ui.js` 钩子 `triggerPolicySyncIfPro` → `triggerContentSync`（登录/恢复后无条件触发）
+- **缓存头安全**：内容端点响应 `Cache-Control: private, no-store` + `Vary: Authorization`，避免 CDN/共享缓存把专业版内容串给游客
+- 内容端点不占业务限流配额（`contentLimiter.skip` 覆盖 `/tax-policy`、`/feed`）
+
+### 修复
+- **阶段10B 内容缓存丢数据**：旧实现只把 `version`/`notice` 写入 `taxPolicyCache`，刷新后覆盖层内容丢失，且 `since` 恒等于缓存版本导致永不再拉。现改为持久化 `overrides` 并在启动时 `replay()` 重放，配合 `revision` 增量与新鲜期后强制全量，保证撤回/过期即时生效
+
+### 文档 / 门禁
+- `verify-local-auth.js` 更新阶段11 前端资源静态断言（内容中心 UI、DOM、auth-ui 钩子、plan.js 去专业版表述）与内容端点断言（`version+revision`、`since` 增量、`private/no-store` + `Vary`、feed、展示位过滤），`request()` 增加响应头回传
+- `tools/ops/ops-check-prod.ps1` 线上指纹同步至阶段11（内容中心脚本/DOM、auth-ui `triggerContentSync` + `profile-card-notices`、`tax-policy.js` `syncFeed/triggerSync`、admin 内容 CRUD、`tax-policy` 端点 `revision` + `feed` 端点）
+
+---
+
 ## [1.7.2] - 2026-09-11（汇算清缴口径修正 + 社保基数默认值 + 反向倒算 0 元）
 
 ### 修复
