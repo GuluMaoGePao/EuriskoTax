@@ -218,12 +218,13 @@
     }
 
     // ---------- 个人中心公告列表 ----------
-    function openNoticeList() {
+    function openNoticeList(retried) {
         var api = tp();
         var items = api && api.noticeList ? api.noticeList() : [];
-        if (!items.length && api && typeof api.syncFeed === 'function') {
-            // 尚未同步过（如刚登录）→ 先拉一次再展示
-            api.syncFeed().then(function () { openNoticeList(); });
+        if (!items.length && !retried && api && typeof api.syncFeed === 'function') {
+            // 尚未同步过（如刚登录）→ 先拉一次再展示；只重试一次，
+            // 否则服务端确实无内容时会无限递归发起 /content/feed 请求
+            api.syncFeed().then(function () { openNoticeList(true); });
             return;
         }
         openNoticeModal(items, { title: '公告与更新', markSeen: false });

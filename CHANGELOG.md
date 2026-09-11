@@ -7,19 +7,24 @@
 
 ---
 
-## [未发布] 公积金默认基数对齐社保 + 综合所得汇算「税前收入」口径修正
+## [未发布] 公积金默认基数对齐社保 + 综合所得汇算「税前收入」口径修正 + 个人中心/管理台样式修复
 
-> 直接提交 main（纯前端口径/文案调整，单点小改动）。
+> 直接提交 main（纯前端口径/文案调整/样式修复，单点小改动）。
 
 ### 变更
 - **住房公积金默认基数 4250 → 7546**：与社保默认基数保持一致，同步正向计税、反向倒算、经营所得三处表单默认值与重置逻辑，以及税务档案默认公积金基数；派生公积金金额随基数联动为 377.30（7546 × 5%）。最低基数校验常量 `MIN_HOUSING_FUND_BASE = 4250` 不变（仍作低于标准的提示阈值）
 - **预算表汇总行「全年收入额」更名为「税前收入」**：正向汇算、反向单模式、反向多模式三处表格统一标签
 
 ### 修复
+- **计算历史空态不显示**：`loadHistoryToList` 无记录时先清空列表容器，而 `#profile-history-empty` 是其子节点被一并移除，「暂无计算记录」永不显示；现改为清空后按需挂回
+- **个人中心卡片样式统一**：用户横幅卡、底部操作卡、功能模块卡片不再混用 `.card` 自定义类，统一改为内联 Tailwind 工具类（`bg-white rounded-lg shadow-card`），消除 `.card` 自带 padding/flex 在个人中心造成的白边与对齐问题（`index.html`、`src/js/auth/auth-ui.js`）
+- **「公告与更新」点击无响应 + 无限请求**：`ContentCenterUI.openNoticeList` 在内容为空时递归调用自身且条件恒成立，导致无限请求 `/content/feed`（实测 429）；现只重试一次，弹窗正常显示「暂无公告内容」
+- **管理台 Tab 样式修复**：`admin.html` 中 `.tab-btn` 使用 `@apply` 但 `<style>` 未声明 `type="text/tailwindcss"`，导致 Tailwind Play CDN 未处理，Tab 按钮失去 padding/radius/font 等样式；已修正为 `<style type="text/tailwindcss">`
 - **综合所得汇算汇总行「名称与真实计算不一致」**（`src/js/calculation/utils.js` `updateBudgetTable`）：
   - 「税前收入」原取 `incomeDetails.total`（即综合所得**收入额**——劳务报酬/稿酬/特许权使用费已按 80%/70% 折算），名不副实；现改为 `incomeDetails.preTaxTotal`（工资薪金 + 劳务报酬 + 稿酬 + 特许权使用费 + 年终奖的税前收入合计），与结果页「税前年收入」口径一致
   - 「应纳税所得额合计」原由「税前收入 − 年度扣除合计」反推，存在 20% 费用扣除时不成立；现直接取 `taxDetails.taxableIncome`
   - 「累计预缴税额」「应退/补税额」原自行重算（且把年终奖单独计税税额计入综合所得预缴），与结果区口径不符；现直接取 `taxDetails.prepaidTax` / `taxDetails.refundTax`，与结果区一致，并支持用户手动填写的预缴税额
+- **计算器步骤按钮移动端排版拥挤**：综合所得（3 步）、反向倒算（2 步）、经营所得（2 步）、分类所得（1 步）共 8 处步骤操作按钮组原用 `flex justify-between`，窄屏下按钮相互挤压、文字换行、主次操作错位；现统一为响应式布局（`flex-col md:flex-row` + `gap-3` + `whitespace-nowrap` + `w-full md:w-auto`），小屏垂直堆叠全宽、中大屏水平排列（`index.html`）
 
 ### 测试
 - 单元测试 274/274 通过（`tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546）

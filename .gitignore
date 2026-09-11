@@ -46,3 +46,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Playwright CLI 本地快照 / UI 走查产物
+.playwright-cli/
