@@ -955,21 +955,6 @@
             pointer-events: none;
             transform: translateX(var(--peek-x)) scale(0.6);
         }
-        .assistant-fab.dock-left .assistant-fab-pulse {
-            right: auto;
-            left: -2px;
-        }
-        /* 状态点：静态，仅在有待办内容时显示，不再无限脉动抢视线 */
-        .assistant-fab-pulse {
-            position: absolute;
-            top: -1px;
-            right: -1px;
-            width: 10px;
-            height: 10px;
-            background: #ef4444;
-            border-radius: 50%;
-            border: 2px solid white;
-        }
         /* 恢复热区：完全隐藏后仅此处可唤出悬浮球，位置与停靠边对齐 */
         .assistant-fab-hotzone {
             position: fixed;
@@ -6392,7 +6377,6 @@
     <!-- ====== 悬浮税助手 ====== -->
     <button id="tax-assistant-fab" class="assistant-fab" title="税务助手" aria-label="打开税务助手">
         <img class="assistant-fab-logo" src="images/EuriskoTaxLogo-zoomed.png" alt="税务助手">
-        <span class="assistant-fab-pulse" style="display:none;"></span>
     </button>
     <!-- 完全隐藏后用于唤回悬浮球的透明热区 -->
     <div id="tax-assistant-hotzone" class="assistant-fab-hotzone" title="唤出税务助手" role="button" aria-label="唤出税务助手"></div>
