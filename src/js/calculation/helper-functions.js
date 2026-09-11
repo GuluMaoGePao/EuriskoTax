@@ -609,8 +609,8 @@ function resetDeductionData() {
     document.getElementById('pension-insurance').value = 603.68;
     document.getElementById('medical-insurance').value = 150.92;
     document.getElementById('unemployment-insurance').value = 37.73;
-    document.getElementById('housing-fund').value = 212.5;
-    document.getElementById('housing-fund-base').value = 4250;
+    document.getElementById('housing-fund').value = 377.3;
+    document.getElementById('housing-fund-base').value = 7546;
     document.getElementById('pension-rate').value = 8;
     document.getElementById('medical-rate').value = 2;
     document.getElementById('unemployment-rate').value = 0.5;
@@ -728,7 +728,7 @@ function resetReverseCalculation() {
     
     // 5. 重置专项扣除数据
     document.getElementById('reverse-social-security-base').value = 7546;
-    document.getElementById('reverse-housing-fund-base').value = 4250;
+    document.getElementById('reverse-housing-fund-base').value = 7546;
     document.getElementById('reverse-pension-rate').value = 8;
     document.getElementById('reverse-medical-rate').value = 2;
     document.getElementById('reverse-unemployment-rate').value = 0.5;
@@ -822,7 +822,7 @@ function resetBusinessCalculation() {
     document.getElementById('business-medical-rate').value = 2;
     document.getElementById('business-unemployment-insurance').value = 0;
     document.getElementById('business-unemployment-rate').value = 0.5;
-    document.getElementById('business-housing-fund-base').value = 4250;
+    document.getElementById('business-housing-fund-base').value = 7546;
     document.getElementById('business-housing-fund-rate').value = '5';
     document.getElementById('business-housing-fund').value = 0;
 

@@ -283,7 +283,7 @@ describe('个人中心 - 税务档案', () => {
     test('loadTaxProfile 无保存数据时应加载默认值', () => {
         loadTaxProfile();
         expect(document.getElementById('tax-profile-social-base').value).toBe('7546');
-        expect(document.getElementById('tax-profile-housing-base').value).toBe('4250');
+        expect(document.getElementById('tax-profile-housing-base').value).toBe('7546');
         expect(document.getElementById('tax-profile-children').value).toBe('0');
         expect(document.getElementById('tax-profile-work-months').value).toBe('12');
         expect(document.getElementById('tax-profile-user-type').value).toBe('employee');
