@@ -180,19 +180,16 @@ function updateBudgetTable() {
     }
     
     // 5. 添加综合所得汇算表格
-    const annualIncome = calculationResults.incomeDetails.total || 0;
+    // 税前收入 = 收入总额（工资+劳务+稿酬+特许权+年终奖），与结果区「税前年收入」口径一致
+    const preTaxIncome = calculationResults.incomeDetails.preTaxTotal || 0;
     const annualDeduction = calculationResults.deductionDetails.total || 0;
-    const annualTaxableIncome = Math.max(0, annualIncome - annualDeduction);
+    // 应纳税所得额以税务引擎结果为准（劳务/稿酬/特许权使用费已按 20%/减 800 等规则扣除费用）
+    const annualTaxableIncome = calculationResults.taxDetails.taxableIncome || 0;
     const annualTaxRate = calculationResults.taxDetails.applicableRate || 0;
     const annualTax = calculationResults.taxDetails.totalTax || 0;
-    
-    // 已纳税额 = 工资薪金累计预缴税额 + 劳务报酬税额 + 稿酬税额 + 特许权使用费税额 + 年终奖税额
-    const prepaidTax = cumulativeTax + 
-        (calculationResults.incomeDetails.laborTax || 0) + 
-        (calculationResults.incomeDetails.authorTax || 0) + 
-        (calculationResults.incomeDetails.royaltyTax || 0) + 
-        (calculationResults.incomeDetails.bonusTax || 0);
-    const refundTax = annualTax - prepaidTax;
+    // 累计预缴税额、应退/补税额与结果区保持一致（支持用户手动填写的预缴税额）
+    const prepaidTax = calculationResults.taxDetails.prepaidTax || 0;
+    const refundTax = calculationResults.taxDetails.refundTax || 0;
     
     const finalRow1 = document.createElement('tr');
     finalRow1.innerHTML = `<td class="section-title" colspan="7">综合所得汇算</td>`;
@@ -200,7 +197,7 @@ function updateBudgetTable() {
     
     const finalRow2 = document.createElement('tr');
     finalRow2.innerHTML = `
-        <td>全年收入额</td>
+        <td>税前收入</td>
         <td>年度扣除合计</td>
         <td>应纳税所得额合计</td>
         <td>税率</td>
@@ -212,7 +209,7 @@ function updateBudgetTable() {
     
     const finalRow3 = document.createElement('tr');
     finalRow3.innerHTML = `
-        <td>${annualIncome.toFixed(2)}</td>
+        <td>${preTaxIncome.toFixed(2)}</td>
         <td>${annualDeduction.toFixed(2)}</td>
         <td>${annualTaxableIncome.toFixed(2)}</td>
         <td>${(annualTaxRate * 100).toFixed(0)}%</td>
@@ -380,7 +377,7 @@ function updateSingleModeBudgetTable() {
     
     const finalRow2 = document.createElement('tr');
     finalRow2.innerHTML = `
-        <td>全年收入额</td>
+        <td>税前收入</td>
         <td>年度扣除合计</td>
         <td>应纳税所得额合计</td>
         <td>税率</td>
@@ -535,7 +532,7 @@ function updateMultiModeBudgetTables() {
         
         const finalRow2 = document.createElement('tr');
         finalRow2.innerHTML = `
-            <td>全年收入额</td>
+            <td>税前收入</td>
             <td>年度扣除合计</td>
             <td>应纳税所得额合计</td>
             <td>税率</td>
