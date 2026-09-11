@@ -4,12 +4,12 @@
 
 ---
 
-## 当前状态（v1.11.0 · 2026-09-12）
+## 当前状态（v1.11.1 · 2026-09-12）
 
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | CHANGELOG 最新 **1.11.0**（详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
+| 版本 | CHANGELOG 最新 **1.11.1**（详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
 | 免费/专业版 | ✅ 阶段10 已上线（v1.7.0）：计税能力永不锁定，登录仅解锁云端历史同步；运维后台（`admin.html`）可调用户权益 |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |

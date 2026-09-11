@@ -53,8 +53,9 @@ const DEFAULT_TAX_RATES = {
         transfer: { rate: 0.20, name: '财产转让所得' },
         accidental: { rate: 0.20, name: '偶然所得' }
     },
-    MIN_SOCIAL_SECURITY_BASE: 4250,
-    MIN_HOUSING_FUND_BASE: 4250
+    // 与前端 tax-constants.js 及表单初始默认基数一致：7546 元/月（默认值即最低标准）
+    MIN_SOCIAL_SECURITY_BASE: 7546,
+    MIN_HOUSING_FUND_BASE: 7546
 };
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);

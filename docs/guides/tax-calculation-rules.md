@@ -417,13 +417,16 @@ updateTaxResultsUI()       → 界面更新层
 
 ### 8.1 最低基数标准
 
-**国家规定**: 根据国家相关规定，各城市社保缴费基数存在最低标准，本系统使用全国平均值4250元/月。
+**国家规定**: 根据国家相关规定，各城市社保缴费基数存在最低标准，本系统使用全国平均值 7546 元/月。
 
 **常量定义**:
-- `MIN_SOCIAL_SECURITY_BASE = 4250`：社保缴费基数最低标准
-- `MIN_HOUSING_FUND_BASE = 4250`：住房公积金基数最低标准
+- `MIN_SOCIAL_SECURITY_BASE = 7546`：社保缴费基数最低标准
+- `MIN_HOUSING_FUND_BASE = 7546`：住房公积金基数最低标准
 
-**代码实现**: `src/js/calculation/helper-functions.js` 第3-5行
+> 该取值与 §8.2 的表单初始默认基数一致（**默认值即最低标准**）：输入等于 7546 不提示，低于 7546 才提示。
+> 管理台「税率」Tab 的「社保/公积金缴费基数下限」即这两个值，可改后热发布，端上由 `tax-rates-sync.js` 覆盖常量。
+
+**代码实现**: `src/js/calculation/tax-constants.js` 第62-65行（后端出厂基线见 `server/src/services/taxRateService.js`）
 
 ### 8.2 默认值设置
 
@@ -459,7 +462,7 @@ updateTaxResultsUI()       → 界面更新层
 **参数说明**:
 - `prefix`: 前缀，用于区分正向计算（空）和反向倒算（`reverse`）
 
-**警告提示**: `⚠️ 当前基数低于最低标准 4250 元/月`
+**警告提示**: `⚠️ 当前基数低于最低标准 7546 元/月`
 
 **代码实现**: `src/js/calculation/helper-functions.js` 第7-39行
 

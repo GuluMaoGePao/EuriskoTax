@@ -482,8 +482,8 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
     "bonusMonthlyTaxRates": [{ "max": 3000, "rate": 0.03, "deduction": 0 }],
     "businessTaxRates": [{ "max": 30000, "rate": 0.05, "deduction": 0 }],
     "classificationTaxRates": { "interest": { "rate": 0.2, "name": "利息、股息、红利所得" } },
-    "MIN_SOCIAL_SECURITY_BASE": 4250,
-    "MIN_HOUSING_FUND_BASE": 4250
+    "MIN_SOCIAL_SECURITY_BASE": 7546,
+    "MIN_HOUSING_FUND_BASE": 7546
   },
   "notify": { "enabled": true, "title": "计税参数已更新", "placements": ["modal", "notice_list"] }
 }
@@ -730,8 +730,8 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
       "bonusMonthlyTaxRates": [{ "max": 3000, "rate": 0.03, "deduction": 0 }],
       "businessTaxRates": [{ "max": 30000, "rate": 0.05, "deduction": 0 }],
       "classificationTaxRates": { "interest": { "rate": 0.2, "name": "利息、股息、红利所得" } },
-      "MIN_SOCIAL_SECURITY_BASE": 4250,
-      "MIN_HOUSING_FUND_BASE": 4250
+      "MIN_SOCIAL_SECURITY_BASE": 7546,
+      "MIN_HOUSING_FUND_BASE": 7546
     }
   }
 }
