@@ -32,11 +32,12 @@ describe('阶段11 内容中心 - 后台 DOM 契约', () => {
         expect(SECTION_START).toBeGreaterThan(-1);
         expect(SECTION_END).toBeGreaterThan(SECTION_START);
 
-        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* 字段）
+        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* / support-f-* 字段，
+        // 它们分别由 renderContentEditor / openSupportEditor 在运行时产出，不属于静态节点）
         const ids = new Set(
             [...CONTENT_SECTION.matchAll(/\$\('#([A-Za-z0-9_-]+)'\)/g)]
                 .map((m) => m[1])
-                .filter((id) => !id.startsWith('content-f-'))
+                .filter((id) => !id.startsWith('content-f-') && !id.startsWith('support-f-'))
         );
         expect(ids.size).toBeGreaterThan(0);
         const missing = [...ids].filter((id) => !HTML.includes(`id="${id}"`));
@@ -53,6 +54,25 @@ describe('阶段11 内容中心 - 后台 DOM 契约', () => {
         expect(referenced.size).toBeGreaterThan(0);
         const missing = [...referenced].filter((id) => !declared.has(id));
         expect(missing).toEqual([]);
+    });
+
+    test('排障话术编辑器：读取的 support-f-* 字段都被 openSupportEditor 渲染', () => {
+        const declared = new Set(
+            [...CONTENT_SECTION.matchAll(/id="(support-f-[A-Za-z0-9_-]+)"/g)].map((m) => m[1])
+        );
+        const referenced = new Set(
+            [...CONTENT_SECTION.matchAll(/\$\('#(support-f-[A-Za-z0-9_-]+)'\)/g)].map((m) => m[1])
+        );
+        expect(referenced.size).toBeGreaterThan(0);
+        const missing = [...referenced].filter((id) => !declared.has(id));
+        expect(missing).toEqual([]);
+    });
+
+    test('排障话术库动作全部在 handleAction 中分发', () => {
+        ['refresh-support', 'support-new', 'support-edit', 'support-save', 'support-cancel',
+            'support-delete', 'support-restore', 'support-copy', 'support-copy-reset-url']
+            // handleAction 位于 CONTENT_SECTION 之后，故此处扫描整个 admin.js
+            .forEach((act) => expect(ADMIN_JS).toContain(`'${act}'`));
     });
 
     test('内容编辑器覆盖四类展示位与三种投放对象', () => {
