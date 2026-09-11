@@ -39,6 +39,10 @@
 - 新增 `tests/support-scripts.test.js`（19 项）：内置话术种子契约 6 项（分类合法 / `script_id` 唯一 / 必填非空 / `{RESET_URL}` 写法统一 / 各分类均有话术）+ 请求体归一化契约 13 项（`steps` 换行拆分含 CRLF 与封顶、`buildData` 新建校验、PATCH 部分更新语义——只改传入字段）
 - `tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546
 
+### 文档
+- **版本落点由「三处」升为「五处」**：哨兵带来 `index.html` 的 `window.__APP_VERSION__` 与根目录 `version.json` 两个新落点，`branch-release-strategy.md` §3.2 / §4 核对清单同步，并写明漏改的两种后果（不一致 → 每会话清一次缓存；一起漏改 → 自愈失效）
+- **发布门禁补上哨兵覆盖**：`ops-check-prod.ps1` 新增 3 项线上校验 —— `__APP_VERSION__` 与本地 `package.json` 一致、`/version.json` 与本地一致、排障短链 `/reset` 命中清洗页而非被 SPA 回退吞成首页（线上指纹 32 → 35 项）；`development-workflow.md` 同步口径（单测 12 套件 295 例、线上 35 项指纹、版本五处）并在排障速查表加入 `/reset` 手法
+
 ---
 
 ## [1.8.0] - 2026-09-11（内容/公告中心：分层投放 + 定时上线 + 运维后台内容管理）
