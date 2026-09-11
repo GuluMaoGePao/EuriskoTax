@@ -12,7 +12,7 @@
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时需同步更新下方 __APP_VERSION__ 与根目录 version.json 两处。 -->
     <script>
-        window.__APP_VERSION__ = '1.9.0';
+        window.__APP_VERSION__ = '1.10.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -897,60 +897,94 @@
         }
 
         /* ====== 悬浮税助手样式 ====== */
+        /* 44px 圆球：默认贴边半隐（只露月牙），hover/点击后完整滑出，可完全隐藏 */
         .assistant-fab {
             position: fixed;
             left: auto;
             top: auto;
-            width: 56px;
-            height: 56px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            background: #ffffff;
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 100;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-            transition: transform 0.25s ease, box-shadow 0.25s ease, left 0.25s ease, top 0.25s ease;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
             border: none;
-            font-size: 22px;
+            font-size: 18px;
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+            /* 半隐位移由 JS 写入 --peek-x(px)，缩放叠加在其上，避免 transform 互相覆盖 */
+            --peek-x: 0px;
+            transform: translateX(var(--peek-x)) scale(1);
+            transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
+                        box-shadow 0.25s ease,
+                        opacity 0.25s ease;
         }
         .assistant-fab:hover {
-            transform: scale(1.08);
+            transform: translateX(var(--peek-x)) scale(1.08);
             box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
         }
         .assistant-fab:active {
-            transform: scale(0.95);
+            transform: translateX(var(--peek-x)) scale(0.95);
         }
         .assistant-fab.dragging {
             transition: none !important;
-            transform: scale(1.1);
+            transform: translateX(var(--peek-x)) scale(1.1);
             cursor: grabbing;
             box-shadow: 0 8px 20px rgba(59, 130, 246, 0.55);
+        }
+        .assistant-fab-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        /* 半隐态：贴边只露月牙，稍降不透明度弱化存在感 */
+        .assistant-fab.assistant-fab--peek {
+            opacity: 0.5;
+        }
+        /* 完全隐藏态：移出视线，仅保留边缘热区可唤出 */
+        .assistant-fab.assistant-fab--hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(var(--peek-x)) scale(0.6);
         }
         .assistant-fab.dock-left .assistant-fab-pulse {
             right: auto;
             left: -2px;
         }
+        /* 状态点：静态，仅在有待办内容时显示，不再无限脉动抢视线 */
         .assistant-fab-pulse {
             position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 12px;
-            height: 12px;
+            top: -1px;
+            right: -1px;
+            width: 10px;
+            height: 10px;
             background: #ef4444;
             border-radius: 50%;
             border: 2px solid white;
-            animation: assistant-pulse 2s infinite;
         }
-        @keyframes assistant-pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
+        /* 恢复热区：完全隐藏后仅此处可唤出悬浮球，位置与停靠边对齐 */
+        .assistant-fab-hotzone {
+            position: fixed;
+            width: 16px;
+            border-radius: 4px;
+            background: transparent;
+            z-index: 99;
+            display: none;
+        }
+        .assistant-fab-hotzone.active {
+            display: block;
+            cursor: pointer;
+        }
+        .assistant-fab-hotzone.active:hover {
+            background: rgba(59, 130, 246, 0.12);
         }
 
         .assistant-overlay {
@@ -1003,6 +1037,11 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
+        }
+        .assistant-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .assistant-title {
             font-size: 18px;
@@ -5814,7 +5853,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.9.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.10.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6351,10 +6390,12 @@
     </footer>
 
     <!-- ====== 悬浮税助手 ====== -->
-    <button id="tax-assistant-fab" class="assistant-fab" title="税务助手">
-        <i class="fa fa-user-circle"></i>
-        <span class="assistant-fab-pulse"></span>
+    <button id="tax-assistant-fab" class="assistant-fab" title="税务助手" aria-label="打开税务助手">
+        <img class="assistant-fab-logo" src="images/EuriskoTaxLogo-zoomed.png" alt="税务助手">
+        <span class="assistant-fab-pulse" style="display:none;"></span>
     </button>
+    <!-- 完全隐藏后用于唤回悬浮球的透明热区 -->
+    <div id="tax-assistant-hotzone" class="assistant-fab-hotzone" title="唤出税务助手" role="button" aria-label="唤出税务助手"></div>
 
     <div id="tax-assistant-overlay" class="assistant-overlay"></div>
 
@@ -6362,12 +6403,17 @@
         <div class="assistant-header">
             <div class="assistant-header-top">
                 <div class="assistant-title">
-                    <i class="fa fa-user-circle"></i>
+                    <i class="fa fa-calculator"></i>
                     <span>税务助手</span>
                 </div>
-                <button id="assistant-close" class="assistant-close" title="关闭">
-                    <i class="fa fa-times"></i>
-                </button>
+                <div class="assistant-header-actions">
+                    <button id="assistant-hide" class="assistant-close" title="隐藏助手" aria-label="隐藏助手">
+                        <i class="fa fa-eye-slash"></i>
+                    </button>
+                    <button id="assistant-close" class="assistant-close" title="关闭" aria-label="关闭">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="assistant-search-wrap">
                 <i class="fa fa-search assistant-search-icon"></i>
