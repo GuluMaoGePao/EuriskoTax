@@ -648,3 +648,150 @@ describe('悬浮税助手 - 失败回滚', () => {
         expect(window.TaxAssistant.isFavorited('test_1')).toBe(!wasFav);
     });
 });
+
+describe('悬浮税助手 - 悬浮球半隐 / 隐藏 / 唤出', () => {
+    // 覆盖 beforeEach 的 DOM：补上恢复热区与「隐藏助手」按钮
+    function mountFabDom() {
+        document.body.innerHTML = `
+            <button id="tax-assistant-fab" class="assistant-fab" style="display:flex;">
+                <i class="fa fa-calculator"></i>
+            </button>
+            <div id="tax-assistant-hotzone" class="assistant-fab-hotzone"></div>
+            <div id="tax-assistant-overlay" class="assistant-overlay"></div>
+            <div id="tax-assistant-drawer" class="assistant-drawer assistant-drawer-closed">
+                <div class="assistant-header">
+                    <button id="assistant-hide" class="assistant-close">hide</button>
+                    <button id="assistant-close" class="assistant-close">×</button>
+                    <input type="text" id="assistant-search" class="assistant-search" />
+                </div>
+                <div class="assistant-body">
+                    <div id="assistant-shortcuts" class="assistant-shortcuts"></div>
+                    <div id="assistant-hot" class="assistant-hot"></div>
+                    <div id="assistant-categories" class="assistant-categories"></div>
+                    <div id="assistant-qa-list" class="assistant-qa-list"></div>
+                    <div id="assistant-suggest" class="assistant-suggest" style="display:none;"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    test('初始化后默认半隐：带 peek 类且位移不为 0', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        const fab = document.getElementById('tax-assistant-fab');
+        expect(fab.classList.contains('assistant-fab--peek')).toBe(true);
+        expect(fab.style.getPropertyValue('--peek-x')).not.toBe('0px');
+        expect(fab.style.getPropertyValue('--peek-x')).not.toBe('');
+    });
+
+    test('展开后位移归零并带 expanded 类', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        const fab = document.getElementById('tax-assistant-fab');
+        window.TaxAssistant.expandFab();
+
+        expect(fab.classList.contains('assistant-fab--expanded')).toBe(true);
+        expect(fab.classList.contains('assistant-fab--peek')).toBe(false);
+        expect(fab.style.getPropertyValue('--peek-x')).toBe('0px');
+    });
+
+    test('隐藏悬浮球：写入偏好并激活恢复热区', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        window.TaxAssistant.hideFab();
+
+        const fab = document.getElementById('tax-assistant-fab');
+        const zone = document.getElementById('tax-assistant-hotzone');
+        expect(fab.classList.contains('assistant-fab--hidden')).toBe(true);
+        expect(localStorage.getItem('taxAssistantFabHidden')).toBe('1');
+        expect(window.TaxAssistant.isFabHidden()).toBe(true);
+        expect(zone.classList.contains('active')).toBe(true);
+    });
+
+    test('唤出后清除隐藏态与偏好，并完整露出', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        window.TaxAssistant.hideFab();
+        window.TaxAssistant.showFab();
+
+        const fab = document.getElementById('tax-assistant-fab');
+        const zone = document.getElementById('tax-assistant-hotzone');
+        expect(fab.classList.contains('assistant-fab--hidden')).toBe(false);
+        expect(zone.classList.contains('active')).toBe(false);
+        expect(localStorage.getItem('taxAssistantFabHidden')).toBe(null);
+        expect(window.TaxAssistant.isFabHidden()).toBe(false);
+        expect(fab.classList.contains('assistant-fab--expanded')).toBe(true);
+    });
+
+    test('记住隐藏偏好：再次初始化仍保持隐藏', () => {
+        localStorage.setItem('taxAssistantFabHidden', '1');
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        const fab = document.getElementById('tax-assistant-fab');
+        expect(fab.classList.contains('assistant-fab--hidden')).toBe(true);
+        expect(document.getElementById('tax-assistant-hotzone').classList.contains('active')).toBe(true);
+    });
+
+    test('触屏首次点击月牙只滑出、第二次才打开抽屉', () => {
+        mountFabDom();
+        // 模拟触屏（无 hover）：matchMedia 返回 matches=true
+        const original = window.matchMedia;
+        window.matchMedia = () => ({
+            matches: true,
+            media: '(hover: none)',
+            addListener() {},
+            removeListener() {},
+            addEventListener() {},
+            removeEventListener() {}
+        });
+        try {
+            loadSource('src/js/ui/tax-assistant-ui.js');
+
+            const fab = document.getElementById('tax-assistant-fab');
+            const drawer = document.getElementById('tax-assistant-drawer');
+
+            fab.click();
+            expect(drawer.classList.contains('assistant-drawer-open')).toBe(false);
+            expect(fab.classList.contains('assistant-fab--expanded')).toBe(true);
+
+            fab.click();
+            expect(drawer.classList.contains('assistant-drawer-open')).toBe(true);
+        } finally {
+            if (original === undefined) delete window.matchMedia;
+            else window.matchMedia = original;
+        }
+    });
+
+    test('点击抽屉内「隐藏助手」应隐藏悬浮球并关闭抽屉', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+        expect(document.getElementById('tax-assistant-drawer').classList.contains('assistant-drawer-open')).toBe(true);
+
+        document.getElementById('assistant-hide').click();
+
+        const fab = document.getElementById('tax-assistant-fab');
+        expect(fab.classList.contains('assistant-fab--hidden')).toBe(true);
+        expect(document.getElementById('tax-assistant-drawer').classList.contains('assistant-drawer-open')).toBe(false);
+    });
+
+    test('关闭抽屉后悬浮球恢复并回到半隐态', () => {
+        mountFabDom();
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+        document.getElementById('assistant-close').click();
+
+        const fab = document.getElementById('tax-assistant-fab');
+        expect(fab.style.display).toBe('flex');
+        // 关闭后先完整露出（expanded），交由定时器回缩
+        expect(fab.classList.contains('assistant-fab--expanded')).toBe(true);
+        expect(fab.classList.contains('assistant-fab--hidden')).toBe(false);
+    });
+});

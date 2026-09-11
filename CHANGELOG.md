@@ -7,6 +7,32 @@
 
 ---
 
+## [1.10.0] - 2026-09-12（悬浮税助手悬浮球：品牌图形圆球 + 默认半隐 + 可完全隐藏 + 边缘热区唤回）
+
+> 上线方式：`ops-publish.ps1` 安全发布流水线（verify:local 门禁 → push → 线上 35 项指纹全绿 → 自动打 `v1.10.0`）。
+
+### 新增
+- **悬浮球默认半隐（peek）**：贴边停靠时只露出 18px 月牙（`--peek-x` 位移 + 0.5 不透明度弱化存在感）；桌面端鼠标移入即完整滑出，无操作 3s 后自动回缩，减少对页面内容的遮挡（`FAB_SIZE=44` / `FAB_MARGIN=12` / `PEEK_VISIBLE=18` / `COLLAPSE_DELAY=3000`）
+- **完全隐藏 + 边缘热区唤回**：抽屉头部新增「隐藏助手」按钮（`#assistant-hide`），隐藏后悬浮球移出视线并把偏好写入 `localStorage`（`taxAssistantFabHidden`，下次进入仍保持隐藏），同时激活与停靠边对齐的透明热区 `#tax-assistant-hotzone`（宽 16px、高随球高、hover 淡蓝提示），鼠标靠近或点击即唤回并恢复半隐形态
+- **触屏二次确认**：`(hover: none)` 设备上首次点击月牙只滑出悬浮球，第二次点击才打开抽屉，避免半隐态误触
+- **拖拽与形态联动**：开始拖拽立即完整露出（半隐态抓不住），松手停靠完成后自动回到半隐
+- **品牌图形图标**：悬浮球由 `fa-user-circle` 图标改为品牌图形圆球，启用 `images/EuriskoTaxLogo-zoomed.png`；新增构建脚本 `images/build-euriskotax-logo-zoomed.ps1`（扫描 `EuriskoTaxLogo.png` 的 alpha 内容包围盒 → 裁切 → 按 93% 填充率居中放大到 256×256，含产物填充率自检与非空校验，`-Size` 可调）
+- 悬浮球形态控制 API 对外暴露：`collapseFab / expandFab / hideFab / showFab / isFabHidden`
+
+### 变更
+- **悬浮球尺寸与配色**：56px 蓝色渐变圆球 → 44px 白色圆球承载 32px 品牌图形（`44px` 兼顾触控最小可点目标）；阴影由蓝色投影改为中性阴影，抽屉标题图标 `fa-user-circle` → `fa-calculator`
+- **transform 叠加方式统一**：`assistant-fab` 及其 hover/active/dragging/hidden 各态统一为 `translateX(var(--peek-x)) scale(...)`，避免缩放动画与半隐位移互相覆盖；半隐位移改由 JS 写入 CSS 变量
+- **状态红点不再脉动**：`.assistant-fab-pulse` 移除 2s 无限脉动关键帧并默认不展示（HTML 内联 `display:none`），从「持续抢视线」改为按需显示
+
+### 测试
+- 单元测试 303/303 通过（12 套件；1.9.0 为 295 例）
+- 新增 `tests/tax-assistant.test.js` 8 项：初始化默认半隐（带 `peek` 类且位移非 0）/ 展开后位移归零并带 `expanded` 类 / 隐藏写入偏好并激活热区 / 唤出清除隐藏态与偏好 / 隐藏偏好跨初始化保持 / 触屏首次点击只滑出第二次才开抽屉 / 抽屉内「隐藏助手」隐藏并关抽屉 / 关闭抽屉后恢复并回缩为半隐
+
+### 文档
+- `docs/guides/development-workflow.md` 单测口径 12 套件 295 例 → 303 例
+
+---
+
 ## [1.9.0] - 2026-09-12（防旧版残留加固：版本哨兵自愈 + /reset 排障短链 + 排障话术库后台可管理；公积金默认基数对齐社保；汇算「税前收入」口径修正；个人中心/管理台样式修复）
 
 > 上线方式：`ops-publish.ps1` 安全发布流水线（verify:local 门禁 → push → 线上 35 项指纹全绿 → 自动打 `v1.9.0`）。

@@ -20,10 +20,14 @@
     let currentKeyword = '';
 
     // ====== 拖拽相关常量与状态 ======
-    var FAB_SIZE = 56;
-    var FAB_MARGIN = 14; // 靠边停靠时与屏幕边的距离
-    var DRAG_THRESHOLD = 5; // 判定为拖拽的最小位移（px）
+    var FAB_SIZE = 44;                  // 悬浮球直径（44px 兼顾触控最小可点目标）
+    var FAB_MARGIN = 12;                // 靠边停靠时与屏幕边的距离
+    var DRAG_THRESHOLD = 5;             // 判定为拖拽的最小位移（px）
+    var PEEK_VISIBLE = 18;              // 半隐时露出的月牙宽度（px）
+    var COLLAPSE_DELAY = 3000;          // 展开后无操作自动回缩延时（ms）
     var STORAGE_KEY = 'taxAssistantFabPos';
+    var FAB_HIDDEN_KEY = 'taxAssistantFabHidden'; // 完全隐藏偏好
+    var fabCollapseTimer = null;        // 自动回缩定时器
     var dragState = {
         dragging: false,
         moved: false,
@@ -811,6 +815,7 @@
         isOpen = true;
         drawer.classList.add('assistant-drawer-open');
         drawer.classList.remove('assistant-drawer-closed');
+        clearFabCollapseTimer();
         if (fab) fab.style.display = 'none';
         if (overlay) overlay.classList.add('assistant-overlay-visible');
         logger.info('CLICK_OPEN', '抽屉已展开 / FAB 已隐藏 / 遮罩已显示', {
@@ -872,6 +877,11 @@
         drawer.classList.add('assistant-drawer-closed');
         if (fab) fab.style.display = 'flex';
         if (overlay) overlay.classList.remove('assistant-overlay-visible');
+        // 关闭抽屉后恢复悬浮球：先完整露出一下再自动回缩为半隐（隐藏态则保持隐藏）
+        if (fab && !fab.classList.contains('assistant-fab--hidden')) {
+            expandFab(fab);
+            scheduleCollapse(fab);
+        }
         hideSuggest();
         logger.info('CLICK_CLOSE', '抽屉已收起 / FAB 已恢复 / 遮罩已隐藏', {
             isOpen: isOpen,
@@ -928,10 +938,19 @@
         });
 
         if (fab) {
-            // 恢复上次停靠位置，否则默认右下角
+            // 恢复上次停靠位置（含半隐 / 完全隐藏偏好）
             restoreFabPosition(fab);
             // 启用拖拽
             initFabDrag(fab);
+
+            // 桌面端才有 hover：鼠标移入完整露出，移出后延时回缩为半隐。
+            // 触屏设备不绑定，避免 tap 时浏览器合成的 mouseenter 抢先展开、
+            // 令「首次点击只滑出」的两次点击逻辑失效。
+            if (!isTouchLike()) {
+                fab.addEventListener('mouseenter', function () { expandFab(fab); });
+                fab.addEventListener('mouseleave', function () { scheduleCollapse(fab); });
+            }
+
             fab.addEventListener('click', function (e) {
                 logger.info('CLICK_OPEN', 'FAB click 事件触发', {
                     suppressNextClick: suppressNextClick,
@@ -946,10 +965,28 @@
                     e.stopPropagation();
                     return;
                 }
+                // 触屏无 hover：首次点击先滑出月牙，再次点击才打开抽屉，避免误触
+                if (isTouchLike() && fab.classList.contains('assistant-fab--peek') && !isFabExpanded(fab)) {
+                    logger.info('CLICK_OPEN', '触屏首次点击月牙，先滑出 FAB', null);
+                    e.stopPropagation();
+                    expandFab(fab);
+                    scheduleCollapse(fab);
+                    return;
+                }
                 logger.info('CLICK_OPEN', '判定为正常点击，调用 openAssistant()', null);
                 e.stopPropagation();
                 openAssistant();
             });
+
+            // 完全隐藏后：鼠标靠近或点击边缘热区即可唤回
+            var hotzone = document.getElementById('tax-assistant-hotzone');
+            if (hotzone) {
+                hotzone.addEventListener('mouseenter', showFab);
+                hotzone.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    showFab();
+                });
+            }
         } else {
             logger.error('INIT', '未找到 #tax-assistant-fab，拖拽与点击逻辑未绑定', null);
         }
@@ -958,6 +995,15 @@
             closeBtn.addEventListener('click', closeAssistant);
         } else {
             logger.warn('INIT', '未找到 #assistant-close，关闭按钮未绑定', null);
+        }
+
+        // 抽屉内「隐藏助手」：隐藏悬浮球并关闭抽屉
+        var hideBtn = document.getElementById('assistant-hide');
+        if (hideBtn) {
+            hideBtn.addEventListener('click', function () {
+                hideFab();
+                closeAssistant();
+            });
         }
 
         if (overlay) {
@@ -1068,6 +1114,12 @@
         }
         fab.style.bottom = 'auto';
 
+        // 若当前处于半隐态，切换停靠方向后同步翻转位移方向
+        if (fab.classList.contains('assistant-fab--peek')) {
+            var peekOff = fabPeekOffset() * (side === 'left' ? -1 : 1);
+            fab.style.setProperty('--peek-x', peekOff + 'px');
+        }
+
         logger.info('DOCK', '应用停靠位置', {
             side: side,
             rawOffsetTop: rawTop,
@@ -1105,6 +1157,12 @@
             offsetTop: offsetTop
         });
         applyFabPosition(fab, side, offsetTop);
+        // 按偏好决定初始形态：曾隐藏则保持隐藏，否则默认半隐只露月牙
+        if (isFabHidden()) {
+            hideFab();
+        } else {
+            collapseFab(fab);
+        }
     }
 
     function saveFabPosition(side, offsetTop) {
@@ -1114,6 +1172,128 @@
         } catch (e) {
             logger.error('DOCK', '写入 localStorage 失败', { error: String(e), side: side, offsetTop: offsetTop });
         }
+    }
+
+    // ====== FAB 半隐 / 展开 / 隐藏 / 恢复 ======
+    // 设计目标：默认贴边半隐只露月牙，减少遮挡；触屏首次点击先滑出、再次点击才打开；
+    // 提供完全隐藏能力，隐藏后仅靠边缘透明热区唤回，偏好写入 localStorage。
+    function isTouchLike() {
+        // 触屏（无 hover）设备需要"点两次"；桌面端鼠标移到球上即展开，单击直接打开
+        try {
+            if (window.matchMedia) return window.matchMedia('(hover: none)').matches;
+        } catch (err) {}
+        return false;
+    }
+
+    function isFabExpanded(fab) {
+        return !!(fab && fab.classList.contains('assistant-fab--expanded'));
+    }
+
+    function isFabHidden() {
+        try { return localStorage.getItem(FAB_HIDDEN_KEY) === '1'; } catch (err) { return false; }
+    }
+
+    function setFabHiddenFlag(flag) {
+        try {
+            if (flag) localStorage.setItem(FAB_HIDDEN_KEY, '1');
+            else localStorage.removeItem(FAB_HIDDEN_KEY);
+        } catch (err) {}
+    }
+
+    // 半隐时需向外移出的距离：margin + 球宽 - 想露出的宽度
+    function fabPeekOffset() {
+        return FAB_MARGIN + FAB_SIZE - PEEK_VISIBLE;
+    }
+
+    function clearFabCollapseTimer() {
+        if (fabCollapseTimer) {
+            clearTimeout(fabCollapseTimer);
+            fabCollapseTimer = null;
+        }
+    }
+
+    // 让恢复热区对齐悬浮球的停靠位置
+    function positionHotzone(fab, side) {
+        var zone = document.getElementById('tax-assistant-hotzone');
+        if (!zone || !fab) return;
+        var rect = fab.getBoundingClientRect();
+        var top = rect.top || parseFloat(fab.style.top) || 0;
+        var height = rect.height || FAB_SIZE;
+        zone.style.top = top + 'px';
+        zone.style.height = height + 'px';
+        if (side === 'left') {
+            zone.style.left = '0px';
+            zone.style.right = 'auto';
+        } else {
+            zone.style.right = '0px';
+            zone.style.left = 'auto';
+        }
+    }
+
+    // 完整露出
+    function expandFab(fab) {
+        fab = fab || document.getElementById('tax-assistant-fab');
+        if (!fab) return;
+        clearFabCollapseTimer();
+        if (fab.classList.contains('assistant-fab--hidden')) return;
+        fab.classList.add('assistant-fab--expanded');
+        fab.classList.remove('assistant-fab--peek');
+        fab.style.setProperty('--peek-x', '0px');
+        logger.info('PEEK', 'FAB 完整露出', null);
+    }
+
+    // 贴边半隐，只露月牙
+    function collapseFab(fab) {
+        fab = fab || document.getElementById('tax-assistant-fab');
+        if (!fab) return;
+        clearFabCollapseTimer();
+        if (fab.classList.contains('assistant-fab--hidden')) return;
+        var side = fab.classList.contains('dock-left') ? 'left' : 'right';
+        var offset = fabPeekOffset() * (side === 'left' ? -1 : 1);
+        fab.classList.remove('assistant-fab--expanded');
+        fab.classList.add('assistant-fab--peek');
+        fab.style.setProperty('--peek-x', offset + 'px');
+        positionHotzone(fab, side);
+        logger.info('PEEK', 'FAB 半隐停靠', { side: side, peekX: offset });
+    }
+
+    // 展开后若长时间无操作则回缩为半隐
+    function scheduleCollapse(fab) {
+        clearFabCollapseTimer();
+        fab = fab || document.getElementById('tax-assistant-fab');
+        if (!fab || fab.classList.contains('assistant-fab--hidden')) return;
+        fabCollapseTimer = setTimeout(function () { collapseFab(fab); }, COLLAPSE_DELAY);
+    }
+
+    // 完全隐藏（记住偏好），仅保留边缘热区
+    function hideFab() {
+        var fab = document.getElementById('tax-assistant-fab');
+        var zone = document.getElementById('tax-assistant-hotzone');
+        clearFabCollapseTimer();
+        if (fab) {
+            fab.classList.add('assistant-fab--hidden');
+            fab.classList.remove('assistant-fab--expanded', 'assistant-fab--peek');
+        }
+        if (zone) {
+            positionHotzone(fab, (fab && fab.classList.contains('dock-left')) ? 'left' : 'right');
+            zone.classList.add('active');
+        }
+        setFabHiddenFlag(true);
+        InteractionLog.log('ASSISTANT', '隐藏悬浮球');
+        logger.info('PEEK', 'FAB 已隐藏', { hasHotzone: !!zone });
+    }
+
+    // 从隐藏态恢复：完整露出后自动回缩为半隐
+    function showFab() {
+        var fab = document.getElementById('tax-assistant-fab');
+        var zone = document.getElementById('tax-assistant-hotzone');
+        if (fab) fab.classList.remove('assistant-fab--hidden');
+        if (zone) zone.classList.remove('active');
+        setFabHiddenFlag(false);
+        expandFab(fab);
+        scheduleCollapse(fab);
+        InteractionLog.log('ASSISTANT', '唤出悬浮球');
+        logger.info('PEEK', 'FAB 已恢复', null);
     }
 
     function handleFabResize(fab) {
@@ -1126,6 +1306,7 @@
             viewportH: window.innerHeight
         });
         applyFabPosition(fab, side, rect.top);
+        positionHotzone(fab, side);
     }
 
     // ====== FAB 拖拽逻辑 ======
@@ -1147,6 +1328,8 @@
             var captured = true;
             try { fab.setPointerCapture(e.pointerId); } catch (err) { captured = false; }
             fab.classList.add('dragging');
+            // 拖拽期间完整露出，避免半隐时抓不住
+            expandFab(fab);
             fab.addEventListener('pointermove', onFabPointerMove);
             fab.addEventListener('pointerup', onFabPointerUp);
             fab.addEventListener('pointercancel', onFabPointerUp);
@@ -1245,6 +1428,9 @@
         applyFabPosition(fab, side, rect.top);
         saveFabPosition(side, rect.top);
 
+        // 松手停靠后回到半隐，减少对内容的遮挡
+        collapseFab(fab);
+
         InteractionLog.log('ASSISTANT', 'FAB 停靠到 ' + side + ' 侧', { top: rect.top });
     }
 
@@ -1262,6 +1448,12 @@
         goToRelatedPage: goToRelatedPage,
         showHelpModal: showHelpModal,
         showRateTable: showRateTable,
+        // 悬浮球形态控制（半隐 / 展开 / 隐藏 / 唤出）
+        collapseFab: collapseFab,
+        expandFab: expandFab,
+        hideFab: hideFab,
+        showFab: showFab,
+        isFabHidden: isFabHidden,
         mockApi: MockApi,   // 暴露 MockApi 便于测试注入失败
         logger: logger      // 暴露 logger 便于动态调级别
     };
