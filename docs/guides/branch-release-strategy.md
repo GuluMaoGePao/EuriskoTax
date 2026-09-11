@@ -79,13 +79,14 @@
 
 > 发布命令（推荐）：`.\tools\ops\ops-publish.ps1 -CommitMsg "chore(release): 发布 vX.Y.Z"`
 > 脚本在 push 成功后会自动创建/推送 `vX.Y.Z` 标签（已存在则跳过）。
+> 阶段11 起：线上核对前会自动幂等补种生产内容（读 `ADMIN_TOKEN_PROD`，缺失则跳过、失败不阻断）。
 
 ### Checklist（发布人逐项确认）
 
 1. [ ] CHANGELOG 已按 3.3 归档本次变更（含日期）
 2. [ ] `package.json`、关于弹窗版本号已改为 `X.Y.Z`
 3. [ ] 本地 `npm test` + `verify:local` 全绿（ops-publish 会自动再跑一遍）
-4. [ ] 执行 `ops-publish.ps1` → 等待线上指纹核对通过
+4. [ ] 执行 `ops-publish.ps1` → 等待线上指纹核对通过（阶段11 起 push 后自动幂等补种生产内容；未配置 `ADMIN_TOKEN_PROD` 时手动执行 `node tools\ops\ops-seed-prod.js`）
 5. [ ] 核对远程已出现 `vX.Y.Z` 标签：`git ls-remote --tags origin`
 6. [ ] （可选）GitHub Releases 按新标签发布说明，粘贴 CHANGELOG 摘要
 
