@@ -1,6 +1,6 @@
 # EuriskoTax 分支与版本发布策略
 
-> 最后更新：2026-09-08（v1.0）
+> 最后更新：2026-09-12（v1.1）
 > 配套文档：[开发工作流总览](development-workflow.md) / [CHANGELOG.md](../../CHANGELOG.md)
 > 生效范围：单人/小团队 + 生产环境（Zeabur 从 main 自动部署）场景
 
@@ -60,13 +60,22 @@
 | `y`（次版本） | 向后兼容的新功能 | 1.7.0 |
 | `z`（修订号） | Bug 修复 / 文案 / 文档 / 非功能调整 | 1.6.1 |
 
-### 3.2 版本号的三个落点（必须同步）
+### 3.2 版本号的五个落点（必须同步）
 
-1. `package.json` → `version`
+1. `package.json` → `version`（**源头**：发布脚本按它打 tag，线上核对接它比对）
 2. `index.html` 关于弹窗 → `版本 X.Y.Z`
 3. `CHANGELOG.md` → 顶部最新条目标题
+4. `index.html` 版本哨兵 → `window.__APP_VERSION__ = 'X.Y.Z'`
+5. 根目录 `version.json` → `version`
 
-> 历史教训：曾出现 package.json 与 CHANGELOG 不同步（如 1.5.1/1.6.0 错位），发布时按下方 checklist 强制三处同改。
+> 历史教训：曾出现 package.json 与 CHANGELOG 不同步（如 1.5.1/1.6.0 错位），发布时按下方 checklist 强制同步五处。
+
+> **为什么第 4、5 处不能漏**（2026-09-12 防旧版残留加固引入）：线上页面启动时用 `StaleGuard`
+> 拉取 `/version.json` 与本页 `__APP_VERSION__` 比对，不一致即注销 SW + 清空 Cache Storage + 重载。
+> - 两处**不一致** → 每个新会话都会清一次缓存并重载，用户可感卡顿（有 `sessionStorage` 防抖，不会死循环）；
+> - 两处**一起漏改** → 哨兵形同虚设，老用户不再自动自愈。
+>
+> `ops-check-prod.ps1` 已把这两处纳入线上门禁，漏改会在发布核对时红灯拦下；但**发布前仍应主动改全五处**。
 
 ### 3.3 发布前新增内容怎么写
 
@@ -84,7 +93,7 @@
 ### Checklist（发布人逐项确认）
 
 1. [ ] CHANGELOG 已按 3.3 归档本次变更（含日期）
-2. [ ] `package.json`、关于弹窗版本号已改为 `X.Y.Z`
+2. [ ] 版本号**五处**已同步为 `X.Y.Z`（见 3.2：`package.json` / 关于弹窗 / CHANGELOG / `index.html` 的 `__APP_VERSION__` / 根目录 `version.json`）
 3. [ ] 本地 `npm test` + `verify:local` 全绿（ops-publish 会自动再跑一遍）
 4. [ ] 执行 `ops-publish.ps1` → 等待线上指纹核对通过（阶段11 起 push 后自动幂等补种生产内容；未配置 `ADMIN_TOKEN_PROD` 时手动执行 `node tools\ops\ops-seed-prod.js`）
 5. [ ] 核对远程已出现 `vX.Y.Z` 标签：`git ls-remote --tags origin`

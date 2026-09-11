@@ -1,6 +1,6 @@
 # EuriskoTax 开发工作流总览（WORKFLOW）
 
-> 最后更新：2026-09-08
+> 最后更新：2026-09-12
 > 面向对象：所有在本仓库开发/上线的人。
 > 一句话原则：**本地起服务 → 改代码 → 本地门禁全绿 → 唯一入口发布 → 线上核对**。
 > 本文档是「按钮名 / 命令 / 流程」的唯一权威定义。遇到与本文不符的描述，以本文为准。
@@ -39,7 +39,7 @@
 |------|----------------|------|
 | push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 59 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 11 套件 274 例 |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 12 套件 295 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
 
@@ -54,7 +54,7 @@
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 32 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 35 项线上指纹，全绿退出码 0 |
 
 ---
 
@@ -98,6 +98,8 @@
 - **本地（localhost / 127.0.0.1）**：新版 `index.html` 会**跳过 Service Worker 注册**，并主动**注销历史 SW + 清理 euriskotax 缓存**。效果：改前端代码后**直接刷新即见即所得**，不需要再 Unregister / Clear site data。
 - 旧版残留：若本地页面曾注册过旧 SW，首次加载新页面会自动注销；极端情况硬刷一次（Ctrl+F5）。
 - **线上**：SW 为网络优先「瘦缓存」策略（无应用壳预缓存，导航请求 network-first），离线回退最近访问的缓存；发布后线上用户正常刷新即可拿到新版，无需手动清缓存。
+- **线上自愈（2026-09-12 起）**：`index.html` 内置版本哨兵 `StaleGuard` —— 启动时以 `cache: 'no-store'` 拉根目录 `/version.json`，与本页 `window.__APP_VERSION__` 比对，不一致即自动注销 SW、清空 Cache Storage 并重载（每会话只做一次；localhost 不启用，避免打断本地热更新）。前提是**版本号五处同步**（见 [分支与版本发布策略 §3.2](branch-release-strategy.md)），漏改会让它每次会话都清一次缓存。
+- **彻底卡死的兜底**：`GET /reset` → 302 → `/clean-cache.html?auto=1`，短、好念、可直接发给用户；旧 SW 死锁首页时它仍能穿透（独立页 + 全新 URL）。
 
 ### ③ 验证门禁（改完代码，push 前必跑）
 
@@ -114,8 +116,8 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 ### ④ 发布（只走安全发布）
 
 正式上线**只有一条路**：GUI「🔐 Git & 账号」→「🚀 安全发布」或命令行 `ops-publish.ps1`。
-它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 10 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
-> 版本号请在发布前同步三处：`package.json` / 关于弹窗 `版本 x.y.z` / `CHANGELOG.md` 最新条目。详见 [分支与版本发布策略](branch-release-strategy.md)。
+它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 35 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
+> 版本号请在发布前同步**五处**：`package.json` / 关于弹窗 `版本 x.y.z` / `CHANGELOG.md` 最新条目 / `index.html` 的 `window.__APP_VERSION__` / 根目录 `version.json`（后两处是版本哨兵基准，漏改会让用户每次新会话都清一次缓存）。详见 [分支与版本发布策略 §3.2](branch-release-strategy.md)。
 
 小技巧：重要发布先点「🧪 安全发布试运行」零风险预演一遍，确认门禁能绿再正式发。
 
@@ -124,7 +126,7 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 ## 3. 发布后：如何确认真的上线了
 
 - 发布脚本 `[4/4]` 会自动轮询直到 `ops-check-prod` 全绿；`[5/5]` 成功后自动打并推送版本标签；
-- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（10 项：页面可访问 / 无快速登录按钮 / 登录表单 / auth-ui dev 入口指纹 / 无 quick-login / 409 提示 / SW 无应用壳预缓存 / 协议守卫 / HTML 导航 network-first / app.js 无 `?v=` 指纹）；
+- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（**35 项**：页面可访问 / 登录表单 / 各阶段前端与后台指纹 / 版本三处线上比对（关于弹窗 `版本 x.y.z`、`__APP_VERSION__`、`/version.json`）/ 排障短链 `/reset` 命中清洗页 / 内容端点 / SW 与 app.js 缓存策略）；
 - 只改了 tools/docs 等非前端资源时，线上指纹不变，核对**会很快通过**——属正常现象。
 
 ---
@@ -150,7 +152,8 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 | verify 卡在 `prisma generate ... EPERM` | `:3000` 后端锁着引擎 DLL | 停后端，或 `VERIFY_SKIP_GENERATE=1`（schema 未变更时）；发布用 `-SkipVerifyGenerate` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |
 | 发布 `[4/4]` 一直显示「仍在构建」直到超时 | Zeabur 构建慢，或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；真慢就 `-PollMaxSeconds 900` 再来一次 |
-| 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 提示用户刷新；仍旧则 Unregister + Clear site data 一次 |
+| 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 先让用户刷新；仍旧则把 `https://<域名>/reset` 发给对方直接打开（302 → 独立清洗页，能穿透旧 SW 死锁，不必教开 F12）；也可让用户跑 `tools\clean-browser-cache.bat` |
+| 某用户**每次**进站都闪一下 / 被重载一次 | 线上 `/version.json` 与 `index.html` 的 `__APP_VERSION__` 不一致（版本落点漏改） | 补齐五处版本号后重新发布；`ops-check-prod.ps1` 已能红灯拦下。快速自查：直接访问 `<域名>/version.json` 对比页面底部版本号 |
 | 端口 3000 被占用启动失败 | 上次没正常退出 | GUI「强制释放 3000 端口」后重启 |
 | GUI 找不到某按钮 | 用的是旧文档名字（标准启动/完整测试/开发模式…） | 对照 §0 名词表找新名；按钮旁有说明，悬停看 Desc |
 

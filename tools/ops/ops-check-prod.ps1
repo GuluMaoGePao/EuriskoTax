@@ -80,6 +80,39 @@ if ($resources["index"]) {
         "本地 package.json=$localVersion"
 }
 
+# 版本哨兵一致性（2026-09-12 防旧版残留加固）：
+#   index.html 的 window.__APP_VERSION__ 与根目录 /version.json 必须与本地 package.json 一致。
+#   必要性：二者任一不一致或在线上缺失，StaleGuard 会在**每个新会话**注销 SW + 清空 Cache Storage
+#   + 重载一次（用户可感卡顿）；二者都漏改则「老用户自愈」彻底失效。故纳入门禁，不靠人记同步。
+if ($resources["index"]) {
+    $appVerMatch = [regex]::Match($resources["index"], "window\.__APP_VERSION__\s*=\s*'([^']+)'")
+    $appVer = if ($appVerMatch.Success) { $appVerMatch.Groups[1].Value } else { "" }
+    Add-Check "index.html 版本哨兵 __APP_VERSION__ 与本地版本一致($localVersion)" `
+        ($localVersion -ne "" -and $appVer -eq $localVersion) `
+        "index.html=$appVer, 本地 package.json=$localVersion"
+}
+
+try {
+    $verRaw = Fetch-Text "$BaseUrl/version.json"
+    $verJson = $verRaw | ConvertFrom-Json
+    Add-Check "版本哨兵基准 /version.json 与本地版本一致($localVersion)" `
+        ($localVersion -ne "" -and $verJson.version -eq $localVersion) `
+        "线上 version.json=$($verJson.version)"
+} catch {
+    Add-Check "版本哨兵基准 /version.json 与本地版本一致($localVersion)" $false $_.Exception.Message
+}
+
+# 排障短链 /reset：必须命中独立清洗页，而不是被 SPA 回退吞成首页。
+# 旧 SW 死锁缓存首页时它是唯一能穿透的入口（清洗页是全新 URL），被吞掉等于排障手段失效。
+try {
+    $resetHtml = Fetch-Text "$BaseUrl/reset"
+    Add-Check "排障短链 /reset 命中缓存重置页" `
+        ($resetHtml.Contains('id="run-btn"') -and -not $resetHtml.Contains('id="login-form"')) `
+        "应含 run-btn 且不含 login-form（返回登录表单说明被 SPA 回退吞成首页）"
+} catch {
+    Add-Check "排障短链 /reset 命中缓存重置页" $false $_.Exception.Message
+}
+
 if ($resources["auth_ui"]) {
     Add-Check "auth-ui.js 含本地开发填充入口(dev-login-fill)" ($resources["auth_ui"].Contains("dev-login-fill"))
     Add-Check "auth-ui.js 无 quick-login 残留" (-not $resources["auth_ui"].Contains("quick-login"))
