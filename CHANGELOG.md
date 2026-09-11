@@ -36,6 +36,7 @@
 ### 文档 / 门禁
 - `verify-local-auth.js` 更新阶段11 前端资源静态断言（内容中心 UI、DOM、auth-ui 钩子、plan.js 去专业版表述）与内容端点断言（`version+revision`、`since` 增量、`private/no-store` + `Vary`、feed、展示位过滤），`request()` 增加响应头回传
 - `tools/ops/ops-check-prod.ps1` 线上指纹同步至阶段11（内容中心脚本/DOM、auth-ui `triggerContentSync` + `profile-card-notices`、`tax-policy.js` `syncFeed/triggerSync`、admin 内容 CRUD、`tax-policy` 端点 `revision` + `feed` 端点）
+- 新增 `tools/ops/ops-seed-prod.js`：走运维后台 API（`X-Admin-Token`）把 `tax-policy.json` 幂等补种进**生产库**——阶段11 端点改读库后，换新库/重置生产库若不补种，内容端点会返回 `version` 空 + `items=0`，导致线上指纹门禁假失败。`ops-publish.ps1` 在线上核对轮询的间隙自动调用（Token 取 `ADMIN_TOKEN_PROD` 或 `server/.env`；拿不到自动跳过、补种失败只告警不阻断），并新增 `-NoSeedProd` 开关可临时关闭
 
 ---
 

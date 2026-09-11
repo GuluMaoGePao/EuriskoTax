@@ -37,22 +37,24 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 52 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 59 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 10 套件 252 例 |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 11 套件 274 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
 
 | 场景 | GUI 按钮（官方名） | 等价命令 | 说明 |
 |------|-------------------|---------|------|
 | 上线前零风险预演 | **「安全发布试运行」** | `.\tools\ops\ops-publish.ps1 -DryRun` | 只跑本地门禁，不 commit 不 push |
-| **正式上线（唯一入口）** | **「安全发布」** | `.\tools\ops\ops-publish.ps1` | verify → git add+commit → push origin main → 自动轮询线上核对 → 成功后自动打并推送 `v<package.json版本>` 标签（幂等） |
+| **正式上线（唯一入口）** | **「安全发布」** | `.\tools\ops\ops-publish.ps1` | verify → git add+commit → push origin main → 自动轮询线上核对（附带生产内容幂等补种）→ 成功后自动打并推送 `v<package.json版本>` 标签（幂等） |
 | 跳过发布后自动打标签 | — | `.\tools\ops\ops-publish.ps1 -NoAutoTag` | 版本号未变/不需要新标签时使用（默认自动打，已存在则跳过） |
+| 跳过发布后内容补种 | — | `.\tools\ops\ops-publish.ps1 -NoSeedProd` | 阶段11：生产内容种子默认自动执行（幂等）；未配置 `ADMIN_TOKEN_PROD` 时自动跳过 |
+| 手动补种生产内容 | — | `node tools\ops\ops-seed-prod.js [--dry-run]` | 换新库/重置生产库后必需，否则内容端点 `items=0` 会让线上核对失败 |
 | 指定提交说明 | — | `.\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"` | 弹窗输入即传此参数 |
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 22 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 32 项线上指纹，全绿退出码 0 |
 
 ---
 
@@ -68,7 +70,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（52 项 e2e 门禁）                            │
+│    + verify:local（59 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环

@@ -12,6 +12,9 @@
 | `ops-watchdog.ps1` | 服务守护脚本（监控后端+cpolar，自动重启，事件记录） | ✅ |
 | `ops-notify.ps1` | 邮件通知模块（模板渲染+SMTP发送+详细日志） | ✅ |
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
+| `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
+| `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
+| `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
 | `ops-deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
@@ -72,6 +75,23 @@ GUI 内置 8 大功能面板（共 110+ 按钮），调用本目录下的 `ops-s
 . .\tools\ops\ops-notify.ps1
 Send-TestNotification
 ```
+
+### 安全发布（唯一上线入口）
+
+```powershell
+# 正式上线：verify 门禁 → commit → push origin main → 线上指纹核对 → 自动打并推送 v<版本> 标签
+.\tools\ops\ops-publish.ps1
+
+# 零风险预演（只跑本地门禁，不 commit 不 push）
+.\tools\ops\ops-publish.ps1 -DryRun
+```
+
+> **阶段11 生产内容补种**：公共内容端点自阶段11 起读数据库（`ContentItem` / `ContentRelease`），
+> 生产库为空会让线上核对「假失败」（内容端点 `version` 为空、`items=0`）。
+> `ops-publish.ps1` 会在轮询线上指纹的间隙自动执行 `ops-seed-prod.js` 幂等补种：
+> - Token 取自环境变量 `ADMIN_TOKEN_PROD` 或 `server/.env`（**dev 的 `ADMIN_TOKEN` 对生产无效**）
+> - 拿不到 Token 自动跳过；补种失败只告警不阻断 —— 是否放行仍由线上指纹门禁决定
+> - 临时关闭：`ops-publish.ps1 -NoSeedProd`；手动补种：`node tools\ops\ops-seed-prod.js [--dry-run]`
 
 ### 一键部署到服务器
 
