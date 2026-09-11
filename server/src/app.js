@@ -16,6 +16,7 @@ const inviteRoutes = require('./routes/invites');
 const contentRoutes = require('./routes/content');
 const adminUserRoutes = require('./routes/adminUsers');
 const contentAdminRoutes = require('./routes/contentAdmin');
+const supportAdminRoutes = require('./routes/supportAdmin');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -169,6 +170,7 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
+app.use('/api/admin/support', supportAdminRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {
@@ -236,6 +238,14 @@ app.listen(PORT, '0.0.0.0', () => {
 
     // 首批邀请码自动兜底：仅当 InviteCode 表为空时生成并打印到日志
     // 部署日志仅账号主人可见；手动补充用 scripts/generate-invite-codes.js
+    // 排障话术库兜底：仅当 SupportScript 表为空时写入内置话术（不覆盖后台编辑）
+    const supportScriptService = require('./services/supportScriptService');
+    supportScriptService.ensureSupportScripts()
+        .then((n) => {
+            if (n > 0) console.log(`排障话术库已内置播种 ${n} 条（运维后台「排障」Tab 可维护）`);
+        })
+        .catch((err) => console.error('[SupportScript] 内置话术播种失败：', err.message));
+
     const authService = require('./services/authService');
     authService.ensureInviteCodes(20)
         .then((codes) => {

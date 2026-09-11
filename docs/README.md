@@ -79,6 +79,7 @@ EuriskoTax/
 | [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-08 |
 | [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本三落点/自动打 tag/回滚） | 2026-09-08 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
+| [guides/support-playbook.md](guides/support-playbook.md) | 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-12 |
 
 ### 项目报告
 

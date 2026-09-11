@@ -21,7 +21,9 @@ const state = {
     token: '',
     tab: 'overview',
     users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
-    content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null }
+    content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null },
+    // 排障话术库：source = 'api'（数据来自数据库，可编辑）/ 'offline'（接口不可用时的兜底快照，只读）
+    support: { items: [], source: 'api', editingId: null }
 };
 
 // ---------- 基础工具 ----------
@@ -150,6 +152,7 @@ function switchTab(tab) {
     else if (tab === 'users') loadUsers(true);
     else if (tab === 'invites') loadInvites();
     else if (tab === 'content') loadContent(true);
+    else if (tab === 'support') loadSupport();
 }
 
 // ---------- 总览 ----------
@@ -800,6 +803,345 @@ async function publishContentItems() {
     }
 }
 
+// ---------- 排障话术库（后端可管理） ----------
+// 数据源：GET/POST/PATCH/DELETE /api/admin/support。内置 9 条由服务端启动时幂等播种
+// （仅当 SupportScript 表为空），之后在后台改这里就生效，不必改代码发版。
+// 话术正文里的 {RESET_URL} 占位符，在渲染与复制时替换为当前站点的 /reset 短链。
+// 权威文档：docs/guides/support-playbook.md ｜ 服务端种子：server/src/services/supportScriptService.js
+const SUPPORT_CATEGORY_META = {
+    cache: { label: '缓存 / 版本', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+    account: { label: '账号 / 登录', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    data: { label: '数据 / 同步', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    pay: { label: '权益 / 兑换码', cls: 'bg-green-50 text-green-700 border-green-200' },
+    usage: { label: '功能使用', cls: 'bg-gray-50 text-gray-600 border-gray-200' }
+};
+
+// 离线兜底快照：仅当 /api/admin/support 不可用（后端未部署新版本 / 库未执行迁移）时展示，
+// 保证管理台不会因接口异常而白屏。正常运行的数据一律来自数据库，此处改动不影响线上。
+// 字段对齐数据库：script_id / steps（数组）/ script。
+const OFFLINE_SUPPORT_PLAYBOOK = [
+    {
+        id: 'stale-page',
+        category: 'cache',
+        title: '发版后仍看到旧版页面 / 功能没更新',
+        symptom: '界面与最新版本对不上（区块划分、文案、按钮行为不一致），或点击后毫无反应。',
+        steps: [
+            '先让用户看首页底部的「版本 x.y.z」，与当前线上版本核对。',
+            '把排障短链发给用户：会自动注销 Service Worker、清空离线缓存并跳回首页。',
+            '用户回来后再次核对底部版本号，应已是最新。',
+            '若仍为旧版：让用户用无痕窗口打开同址。无痕下正常，说明是其常规窗口的缓存污染。',
+            '仍不正常则换浏览器（Edge ↔ Chrome）复测，据此判断是否单个浏览器的问题。'
+        ],
+        script: '你看到的是旧版页面，按下面步骤可以自动修复：\n1. 打开这个链接（会自动清理旧缓存并回到首页）：\n{RESET_URL}\n2. 等页面提示「已完成」后会自动跳转。\n此操作不会影响你的登录状态和已保存的计算记录。\n如果还是旧版，请告诉我，我再帮你进一步排查。'
+    },
+    {
+        id: 'login-stuck',
+        category: 'cache',
+        title: '登录 / 注册按钮点不动、协议弹窗不出来',
+        symptom: '输入手机号或邮箱后点击按钮无反应；或登录页应弹出的《用户协议》《隐私政策》弹窗不出现。',
+        steps: [
+            '确认不是网络问题：让用户换网络（如切到手机热点）复测一次。',
+            '走缓存重置：发送排障短链，让用户在清理后的页面重试。',
+            '若清理后正常，判定为旧版脚本残留（旧包与新 HTML 混用）。',
+            '若清理后仍无反应：让用户按 F12 打开控制台，截图报错信息回传，据此定位具体脚本。'
+        ],
+        script: '这个现象通常是浏览器里的旧缓存导致的，请按下面步骤操作：\n1. 先关闭当前页面；\n2. 打开这个链接自动清理并回到首页：\n{RESET_URL}\n3. 重新登录试试。\n如果还是点不动，麻烦在页面上按 F12，把红色报错截图发我，我马上排查。'
+    },
+    {
+        id: 'blank-screen',
+        category: 'cache',
+        title: '页面白屏 / 一直转圈打不开',
+        symptom: '进入站点后一直空白、或长时间停留在加载动画，始终进不去。',
+        steps: [
+            '先确认服务端状态：访问 /health，返回 {"status":"ok"} 说明服务正常，问题在客户端。',
+            '让用户走排障短链重置缓存后重进。',
+            '若短链也打不开：让用户换浏览器或无痕窗口访问，排除单浏览器扩展干扰。',
+            '若全平台都无法访问：查服务端日志与部署状态，按线上故障处理。'
+        ],
+        script: '页面打不开通常是本地缓存异常，请试一下：\n1. 打开这个链接（一键重置，会自动回到首页）：\n{RESET_URL}\n2. 如果还是不行，请换一个浏览器（比如从 Edge 换成 Chrome）再打开。\n麻烦把结果告诉我，我这边同步检查服务状态。'
+    },
+    {
+        id: 'offline-stale',
+        category: 'cache',
+        title: '断网后看到的还是旧内容 / 离线打不开',
+        symptom: '断网时打开的页面版本很旧；或提示无法访问，看不到任何内容。',
+        steps: [
+            '说明机制：离线可用的前提是「联网状态下打开过该页面」——资源才会落入本地缓存。',
+            '让用户联网打开一次站点，把常用页面各访问一遍，之后即可离线使用。',
+            '若之前访问过仍打不开，让用户走排障短链重置后再联网完整访问一次。'
+        ],
+        script: '离线打开需要先「联网访问过一次」作为铺垫，缓存里才会有内容。\n请你在有网的情况下：\n1. 打开 {RESET_URL} 完成一次重置；\n2. 回到首页，把常用的计算页面都点开一遍；\n3. 之后再断网就能正常打开了。'
+    },
+    {
+        id: 'code-invalid',
+        category: 'pay',
+        title: '兑换码无效 / 专业版没生效',
+        symptom: '输入兑换码提示无效、已使用；或提示成功但功能仍是基础版。',
+        steps: [
+            '到管理台「兑换码」页核对：该码是否在「可用」列表、是否已出现在「已使用」列表（一机一码，用过即失效）。',
+            '到「用户」页搜索该用户，确认 plan 字段是否已变为 pro、有效期是否正确。',
+            '若端上未刷新：让用户退出登录再重新登录，或走一次排障短链后重登。',
+            '若权益已发但用户仍看不到：确认是否是同一个账号（手机号 / 邮箱可能与用户以为的不一致）。'
+        ],
+        script: '我这边查到你的兑换码记录是：{核对结果}。\n请按下面步骤让权益刷新出来：\n1. 打开 {RESET_URL} 完成一次缓存重置；\n2. 重新登录你的账号；\n3. 进入「个人中心」查看权益状态。\n如果仍未生效，把个人中心截图发我，我再核对一次。'
+    },
+    {
+        id: 'no-verify-code',
+        category: 'account',
+        title: '收不到邮箱验证码',
+        symptom: '点击发送后长时间收不到验证码邮件，或提示发送过于频繁。',
+        steps: [
+            '先看频率限制：验证码为 5 次 / 15 分钟 / IP，超限会提示稍后再试，等待即可。',
+            '让用户检查垃圾邮件 / 广告邮件文件夹，并把发件人加入白名单。',
+            '确认邮箱地址拼写正确（常见于 .com / .cn、数字与字母混淆）。',
+            '若确认无限制且多次未收到：查服务端日志中的邮件发送记录，必要时更换发信渠道。'
+        ],
+        script: '麻烦先确认两点：\n1. 邮箱地址是否填写正确；\n2. 请检查「垃圾邮件 / 广告邮件」文件夹，并把我们的发件人加入白名单。\n另外，验证码每 15 分钟最多发送 5 次，超过会被暂时限制，稍等一会再试即可。\n如果都排除了还是收不到，告诉我发送时间，我查一下服务端记录。'
+    },
+    {
+        id: 'sync-missing',
+        category: 'data',
+        title: '换设备后看不到云端历史记录',
+        symptom: '在新设备登录后，个人中心的历史记录为空，或数量比旧设备少。',
+        steps: [
+            '确认账号一致：两端必须是同一个账号登录（手机号 / 邮箱）。',
+            '确认权益：云端历史同步是专业版功能，基础版仅保存在本机。',
+            '到管理台「用户」页确认该账号 plan 为 pro、有效期未过期。',
+            '让用户在联网状态下打开个人中心，触发一次同步后下拉查看。',
+            '提醒用户：本地未上传过的记录不会自动出现在新设备上。'
+        ],
+        script: '云端历史同步需要满足两个条件：\n1. 两端登录的是同一个账号；\n2. 账号具有专业版权益（基础版的记录只保存在本机，不会跨设备）。\n请你在新设备上联网打开「个人中心」停留几秒触发同步。\n如果还是没有，把账号和我核对一下，我帮你确认权益状态。'
+    },
+    {
+        id: 'calc-diff',
+        category: 'data',
+        title: '计算结果与预期不一致 / 历史记录少了',
+        symptom: '同一组数据算出来的结果和之前不同，或历史记录数量变少。',
+        steps: [
+            '核对输入项：公积金 / 社保基数有默认值（当前默认 7546），用户可能未按实际填写。',
+            '核对口径：结果页「税前收入」「应纳税所得额」「应退/补税额」应与预算表汇总行一致。',
+            '确认版本：旧版本可能存在口径差异，让用户走一次排障短链确认是最新版。',
+            '若仍不一致：请用户提供计算类型、关键输入项与结果截图，按疑点复算并记录到反馈。'
+        ],
+        script: '麻烦帮我核对几个信息，方便定位：\n1. 你使用的计算类型（综合所得 / 经营所得 / 分类所得 / 反向倒算）；\n2. 关键输入项（收入、公积金基数、社保基数等）；\n3. 页面底部的版本号。\n另外请先打开 {RESET_URL} 重置一次缓存，确认你用的是最新版本。\n把以上信息发我，我马上帮你核对口径。'
+    },
+    {
+        id: 'export-result',
+        category: 'usage',
+        title: '如何导出 PDF / 保存计算结果',
+        symptom: '用户不清楚怎么把计算结果保存下来或打印出来。',
+        steps: [
+            '指引：计算完成后，在结果区找到「导出 / 保存」相关按钮。',
+            '若用户按钮无效：先走一次排障短链确认不是旧版脚本问题。',
+            '导出依赖浏览器下载权限，提醒用户不要拦截本站的下载。',
+            '仍失败则建议改用浏览器自带的「打印 → 另存为 PDF」。'
+        ],
+        script: '计算结果可以在结果页面直接导出：\n1. 先完成一次计算，停留在结果页；\n2. 在结果区域找到「导出 / 保存」按钮并点击；\n3. 如果浏览器提示是否允许下载，请选择「允许」。\n如果按钮没反应，先打开 {RESET_URL} 重置一次缓存再试；\n也可以按 Ctrl+P 选择「另存为 PDF」。'
+    }
+];
+
+function supportResetUrl() {
+    return `${location.origin}/reset`;
+}
+
+// steps 兼容两种来源：接口返回 JSON 字符串；离线快照是数组
+function parseSupportSteps(raw) {
+    if (Array.isArray(raw)) return raw;
+    try {
+        const parsed = JSON.parse(raw || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+// 归一化：接口条目（script_id）与离线快照（id）统一成同一种结构
+function normalizeSupportItem(raw) {
+    return {
+        id: raw.id,
+        script_id: raw.script_id || raw.id || '',
+        category: raw.category || 'usage',
+        title: raw.title || '',
+        symptom: raw.symptom || '',
+        steps: parseSupportSteps(raw.steps),
+        script: raw.script || '',
+        priority: Number(raw.priority) || 0
+    };
+}
+
+// 面板当前匹配的条目（前端过滤：条数少、输入即筛更跟手）
+function supportRows() {
+    const q = (($('#support-query') || {}).value || '').trim().toLowerCase();
+    const cat = (($('#support-category-filter') || {}).value) || '';
+    return state.support.items.filter((it) => {
+        if (cat && it.category !== cat) return false;
+        if (!q) return true;
+        return [it.title, it.symptom, it.script, ...it.steps].join(' ').toLowerCase().includes(q);
+    });
+}
+
+async function loadSupport() {
+    const urlEl = $('#support-reset-url');
+    if (urlEl) urlEl.textContent = supportResetUrl();
+
+    const el = $('#support-list');
+    if (el) el.innerHTML = '<div class="py-12 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2 align-middle"></i>加载中…</div>';
+
+    try {
+        const d = await api('/admin/support');
+        state.support.items = ((d && d.items) || []).map(normalizeSupportItem);
+        state.support.source = 'api';
+    } catch (err) {
+        // 接口不可用：退回离线快照，保证面板不至于白屏
+        state.support.items = OFFLINE_SUPPORT_PLAYBOOK.map(normalizeSupportItem);
+        state.support.source = 'offline';
+        reportError(err, '话术库接口不可用，已切换离线快照');
+    }
+    renderSupport();
+}
+
+function renderSupport() {
+    const el = $('#support-list');
+    if (!el) return;
+
+    const urlEl = $('#support-reset-url');
+    if (urlEl) urlEl.textContent = supportResetUrl();
+
+    const rows = supportRows();
+    const banner = state.support.source === 'offline'
+        ? '<div class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800"><i class="fa fa-plug mr-1"></i>当前展示的是<b>离线兜底快照</b>，此状态下无法编辑。请确认服务端已部署并执行数据库迁移（新增 SupportScript 表）后点「刷新」。</div>'
+        : '';
+
+    if (!rows.length) {
+        el.innerHTML = banner + '<div class="py-12 text-center text-gray-400 text-sm"><i class="fa fa-search mr-2 text-2xl align-middle"></i>没有匹配的条目</div>';
+        return;
+    }
+
+    const editable = state.support.source === 'api';
+    el.innerHTML = banner + rows.map((it) => {
+        const meta = SUPPORT_CATEGORY_META[it.category] || SUPPORT_CATEGORY_META.usage;
+        const full = it.script.replace(/\{RESET_URL\}/g, supportResetUrl());
+        return `<div class="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full border ${meta.cls} text-xs font-semibold">${meta.label}</span>
+                    <span class="text-sm font-bold text-gray-800">${esc(it.title)}</span>
+                    ${it.priority ? `<span class="text-[10px] text-gray-400">优先级 ${it.priority}</span>` : ''}
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button data-act="support-copy" data-key="${esc(it.script_id)}" class="px-2.5 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"><i class="fa fa-copy mr-1"></i>复制话术</button>
+                    ${editable ? `<button data-act="support-edit" data-id="${it.id}" class="px-2.5 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600 hover:bg-gray-200"><i class="fa fa-pencil mr-1"></i>编辑</button>
+                    <button data-act="support-delete" data-id="${it.id}" class="px-2.5 py-1.5 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100"><i class="fa fa-trash mr-1"></i>删除</button>` : ''}
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-2"><span class="font-semibold text-gray-600">典型症状：</span>${esc(it.symptom)}</p>
+            <ol class="list-decimal list-inside text-xs text-gray-600 leading-relaxed space-y-0.5 mb-3">
+                ${it.steps.map((s) => `<li>${esc(s)}</li>`).join('')}
+            </ol>
+            <pre class="text-xs text-gray-700 bg-gray-50 border border-gray-100 rounded-lg p-3 whitespace-pre-wrap break-words font-sans">${esc(full)}</pre>
+        </div>`;
+    }).join('');
+}
+
+// ---------- 话术编辑（新增 / 修改） ----------
+function openSupportEditor(id) {
+    const box = $('#support-editor');
+    if (!box) return;
+    const item = id ? state.support.items.find((x) => x.id === id) : null;
+    state.support.editingId = item ? item.id : null;
+
+    const catOptions = Object.entries(SUPPORT_CATEGORY_META)
+        .map(([k, v]) => `<option value="${k}"${item && item.category === k ? ' selected' : ''}>${v.label}</option>`)
+        .join('');
+
+    box.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h3 class="text-sm font-bold text-gray-800">${item ? '编辑话术' : '新增话术'}</h3>
+            <span class="text-[11px] text-gray-400">话术中的 <span class="mono">{RESET_URL}</span> 会替换为当前站点的 /reset 短链</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+            <label class="block"><span class="text-xs text-gray-500">问题标题 *</span>
+                <input id="support-f-title" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${esc(item ? item.title : '')}" placeholder="如：发版后仍看到旧版页面">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">分类</span>
+                <select id="support-f-category" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">${catOptions}</select>
+            </label>
+        </div>
+        <label class="block mb-3"><span class="text-xs text-gray-500">典型症状</span>
+            <input id="support-f-symptom" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${esc(item ? item.symptom : '')}">
+        </label>
+        <label class="block mb-3"><span class="text-xs text-gray-500">处理步骤（一行一步）</span>
+            <textarea id="support-f-steps" rows="5" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">${esc(item ? item.steps.join('\n') : '')}</textarea>
+        </label>
+        <label class="block mb-3"><span class="text-xs text-gray-500">话术正文 *（可直接复制发给用户）</span>
+            <textarea id="support-f-script" rows="6" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">${esc(item ? item.script : '')}</textarea>
+        </label>
+        <label class="block mb-4 w-40"><span class="text-xs text-gray-500">优先级（大的靠前）</span>
+            <input id="support-f-priority" type="number" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${item ? item.priority : 0}">
+        </label>
+        <div class="flex items-center gap-2">
+            <button data-act="support-save" class="bg-primary text-white text-sm font-medium rounded-lg px-4 py-2 hover:opacity-90"><i class="fa fa-save mr-1"></i>保存</button>
+            <button data-act="support-cancel" class="bg-gray-100 text-gray-600 text-sm rounded-lg px-4 py-2 hover:bg-gray-200">取消</button>
+        </div>`;
+    box.classList.remove('hidden');
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function saveSupport() {
+    const title = $('#support-f-title').value.trim();
+    const script = $('#support-f-script').value.trim();
+    if (!title) return toast('请填写问题标题', 'error');
+    if (!script) return toast('请填写话术正文', 'error');
+
+    const payload = {
+        title,
+        script,
+        category: $('#support-f-category').value,
+        symptom: $('#support-f-symptom').value.trim(),
+        steps: $('#support-f-steps').value,
+        priority: parseInt($('#support-f-priority').value, 10) || 0
+    };
+
+    const id = state.support.editingId;
+    try {
+        if (id) await api(`/admin/support/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        else await api('/admin/support', { method: 'POST', body: JSON.stringify(payload) });
+        toast(id ? '已保存' : '已新增', 'success');
+        $('#support-editor').classList.add('hidden');
+        state.support.editingId = null;
+        loadSupport();
+    } catch (err) {
+        reportError(err, '保存失败');
+    }
+}
+
+async function deleteSupport(id) {
+    const item = state.support.items.find((x) => x.id === id);
+    if (!confirm(`确认删除话术「${item ? item.title : id}」？\n\n删除后不可恢复；内置条目可用「恢复内置」找回。`)) return;
+    try {
+        await api(`/admin/support/${id}`, { method: 'DELETE' });
+        toast('已删除', 'success');
+        if (state.support.editingId === id) {
+            $('#support-editor').classList.add('hidden');
+            state.support.editingId = null;
+        }
+        loadSupport();
+    } catch (err) {
+        reportError(err, '删除失败');
+    }
+}
+
+async function restoreSupport() {
+    if (!confirm('将补回缺失的内置话术，并把已存在的内置条目还原为出厂内容。\n\n自建条目不受影响。确认继续？')) return;
+    try {
+        const d = await api('/admin/support/restore', { method: 'POST' });
+        toast(`已恢复内置话术（新增 ${d.created} 条，还原 ${d.restored} 条）`, 'success');
+        loadSupport();
+    } catch (err) {
+        reportError(err, '恢复失败');
+    }
+}
+
 // ---------- 动作分发（data-act 委托） ----------
 async function handleAction(e) {
     const act = e.target.closest('[data-act]');
@@ -807,6 +1149,19 @@ async function handleAction(e) {
     const id = act.dataset.id;
     const name = act.dataset.act;
     const back = async (fn) => { try { await fn; } catch (err) { reportError(err); } };
+    if (name === 'refresh-support') return back(loadSupport());
+    if (name === 'support-new') return openSupportEditor(null);
+    if (name === 'support-edit') return openSupportEditor(Number(id));
+    if (name === 'support-save') return back(saveSupport());
+    if (name === 'support-cancel') { $('#support-editor').classList.add('hidden'); state.support.editingId = null; return; }
+    if (name === 'support-delete') return back(deleteSupport(Number(id)));
+    if (name === 'support-restore') return back(restoreSupport());
+    if (name === 'support-copy-reset-url') return back(copyText(supportResetUrl(), '排障短链已复制'));
+    if (name === 'support-copy') {
+        const item = state.support.items.find((x) => x.script_id === act.dataset.key);
+        if (!item) return;
+        return back(copyText(item.script.replace(/\{RESET_URL\}/g, supportResetUrl()), '话术已复制'));
+    }
     if (name === 'refresh-overview') return back(loadOverview());
     if (name === 'refresh-feedback') return back(loadFeedback());
     if (name === 'search-users') return loadUsers(true);
@@ -861,6 +1216,10 @@ function init() {
     $('#content-status-filter').addEventListener('change', () => loadContent(true));
     $('#content-audience-filter').addEventListener('change', () => loadContent(true));
     $('#content-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadContent(true); });
+
+    // 排障话术库：输入即过滤，无需点查询
+    $('#support-query').addEventListener('input', () => renderSupport());
+    $('#support-category-filter').addEventListener('change', () => renderSupport());
     $('#content-editor').addEventListener('change', (e) => {
         if (e.target && e.target.id === 'content-f-type') {
             const isPolicy = e.target.value === 'policy';

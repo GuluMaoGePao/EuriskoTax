@@ -7,9 +7,16 @@
 
 ---
 
-## [未发布] 公积金默认基数对齐社保 + 综合所得汇算「税前收入」口径修正 + 个人中心/管理台样式修复
+## [未发布] 防旧版残留加固（版本哨兵 + 排障短链 + 排障话术库后台可管理）+ 公积金默认基数对齐社保 + 综合所得汇算「税前收入」口径修正 + 个人中心/管理台样式修复
 
-> 直接提交 main（纯前端口径/文案调整/样式修复，单点小改动）。
+> 直接提交 main（防旧版残留加固 + 前端口径/文案调整/样式修复）。
+
+### 新增
+- **版本哨兵 `StaleGuard`**：`index.html` 启动时以 `cache: 'no-store'` 拉取根目录 `version.json`，与本页 `window.__APP_VERSION__` 比对；不一致即自动注销全部 Service Worker、清空 Cache Storage 并重载，用户无感自愈。用 `sessionStorage` 防抖（本次会话只自愈一次），本地开发（localhost/127.0.0.1）不启用以免打断热更新
+- **排障短链 `GET /reset`**：302 跳转 `/clean-cache.html?auto=1`，用于口播、客服话术与群公告发放；定义在 SPA 回退之前，避免被 `index.html` 兜底吞掉
+- **`version.json`**：新增版本哨兵基准文件（`server/src/app.js` 的 `setHeaders` 已对其下发 `Cache-Control: no-cache`；`service-worker.js` 对其放行，不缓存、不拦截）
+- **排障话术库改为后端可管理（阶段12）**：新增 `SupportScript` 模型（迁移 `20260912_add_support_scripts`，随部署自动执行）与 `/api/admin/support` 接口（列表 / 新建 / 编辑 / 删除 / 恢复内置，均需 `X-Admin-Token`）；管理台新增 `support` Tab，支持增删改、一键复制话术、关键词检索与分类筛选，话术中的 `{RESET_URL}` 占位符自动替换为当前站点的 `/reset` 短链。内置 9 条高频问题在服务启动时幂等播种（**仅当表为空**，不覆盖后台编辑），此后改文案即时生效、无需发版；接口不可用时前端自动回退离线快照，面板不会空白
+- **客服排障手册**：`docs/guides/support-playbook.md`
 
 ### 变更
 - **住房公积金默认基数 4250 → 7546**：与社保默认基数保持一致，同步正向计税、反向倒算、经营所得三处表单默认值与重置逻辑，以及税务档案默认公积金基数；派生公积金金额随基数联动为 377.30（7546 × 5%）。最低基数校验常量 `MIN_HOUSING_FUND_BASE = 4250` 不变（仍作低于标准的提示阈值）
@@ -28,7 +35,9 @@
 - **发版后仍看到旧页面（旧 SW 滞留）**：注册 SW 补 `updateViaCache: 'none'` + 注册后 `reg.update()`
 
 ### 测试
-- 单元测试 274/274 通过（`tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546）
+- 单元测试 295/295 通过（12 套件）
+- 新增 `tests/support-scripts.test.js`（19 项）：内置话术种子契约 6 项（分类合法 / `script_id` 唯一 / 必填非空 / `{RESET_URL}` 写法统一 / 各分类均有话术）+ 请求体归一化契约 13 项（`steps` 换行拆分含 CRLF 与封顶、`buildData` 新建校验、PATCH 部分更新语义——只改传入字段）
+- `tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546
 
 ---
 

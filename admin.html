@@ -54,6 +54,7 @@
                 <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
                 <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
                 <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
+                <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
             </nav>
             <div class="ml-auto flex items-center gap-3">
                 <span id="connection-state" class="hidden text-xs text-gray-400"></span>
@@ -69,6 +70,7 @@
             <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
             <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
             <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
+            <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
         </nav>
     </header>
 
@@ -249,6 +251,36 @@
             </p>
             <div id="content-list" class="space-y-3"></div>
             <div id="content-editor" class="hidden mt-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+        </section>
+
+        <!-- 排障话术 -->
+        <section id="view-support" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-life-ring text-primary mr-2"></i>排障话术库</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input id="support-query" type="search" placeholder="搜索现象 / 关键词" class="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="support-category-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部分类</option>
+                        <option value="cache">缓存 / 版本</option>
+                        <option value="account">账号 / 登录</option>
+                        <option value="data">数据 / 同步</option>
+                        <option value="pay">权益 / 兑换码</option>
+                        <option value="usage">功能使用</option>
+                    </select>
+                    <button data-act="refresh-support" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
+                    <button data-act="support-new" class="bg-primary text-white text-sm font-medium rounded-lg px-3 py-2 hover:opacity-90"><i class="fa fa-plus mr-1"></i>新增话术</button>
+                    <button data-act="support-restore" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-3 py-2"><i class="fa fa-undo mr-1"></i>恢复内置</button>
+                    <button data-act="support-copy-reset-url" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-3 py-2"><i class="fa fa-link mr-1"></i>复制排障短链</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+                收集用户反馈时的「先自查、再回复」清单：每条含典型症状、处理步骤与可直接复制的话术。
+                排障短链固定为 <span class="mono" id="support-reset-url"></span>，把它发给用户即可完成缓存重置。
+                条目存在服务端 <span class="mono">SupportScript</span> 表，此处增删改即时生效（无需发版）；
+                权威文档见 <span class="mono">docs/guides/support-playbook.md</span>。
+            </p>
+            <div id="support-editor" class="hidden mb-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+            <div id="support-list" class="space-y-3"></div>
         </section>
 
         <footer class="mt-10 text-center text-[11px] text-gray-400">

@@ -132,3 +132,21 @@ model ContentRelease {
   published_at DateTime @default(now())
   created_at   DateTime @default(now())
 }
+
+// 阶段12：排障话术库（客服处理用户问题的「症状 → 步骤 → 话术」清单）
+// 刻意独立于 ContentItem：话术是内部客服资产，不参与用户端投放（ContentItem 有 placements/audience
+// 分层与端上可见性判定），混在一起会有误投放风险。话术中的 {RESET_URL} 由端上替换为 /reset 短链。
+model SupportScript {
+  id         Int      @id @default(autoincrement())
+  script_id  String   @unique // 幂等键；内置条目用固定 slug（如 stale-page），便于种子去重
+  category   String   @default("cache") // cache / account / data / pay / usage
+  title      String   @default("")
+  symptom    String   @default("") // 典型症状
+  steps      String   @default("[]") // JSON 字符串数组：处理步骤（有序）
+  script     String   @default("") // 可直接复制发给用户的话术
+  priority   Int      @default(0) // 排序，值大的靠前
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
+
+  @@index([category])
+}
