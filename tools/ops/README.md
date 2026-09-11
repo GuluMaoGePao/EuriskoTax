@@ -14,6 +14,7 @@
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
 | `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
+| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 59 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
@@ -92,6 +93,28 @@ Send-TestNotification
 > - Token 取自环境变量 `ADMIN_TOKEN_PROD` 或 `server/.env`（**dev 的 `ADMIN_TOKEN` 对生产无效**）
 > - 拿不到 Token 自动跳过；补种失败只告警不阻断 —— 是否放行仍由线上指纹门禁决定
 > - 临时关闭：`ops-publish.ps1 -NoSeedProd`；手动补种：`node tools\ops\ops-seed-prod.js [--dry-run]`
+
+### PostgreSQL 生产等价演练（动过 schema/迁移后必跑）
+
+```powershell
+# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 59 项 e2e
+npm run verify:pg
+
+# 等价「全新库首次部署」：先删数据卷再跑
+npm run verify:pg:fresh
+
+# 跑完保留容器（连续调试时省启动时间）
+.\tools\ops\ops-verify-pg.ps1 -KeepRunning
+```
+
+> **为什么需要**：本地日常开发用 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表。
+> 「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题在 SQLite 上**永远是绿的**，只会在上线后炸成 500。
+> 本脚本按线上同序在本地复现一遍，把这类问题拦在 publish 之前。
+>
+> 环境：演练库定义在根目录 `docker-compose.postgres.yml`（端口 **55432**、独立数据卷 `pg_drill_data`、仅放测试数据）。
+> 前置条件：Docker Desktop 已安装并启动；本地 `:3000` 后端需先停止（会锁 Prisma 引擎 DLL）。
+> 未装 Docker 时脚本**优雅退出（退出码 2）**并给出提示，不影响日常 `verify:local`。
+> 收尾会把 Prisma Client 自动恢复为 SQLite 版本，避免影响后续本地开发。
 
 ### 一键部署到服务器
 

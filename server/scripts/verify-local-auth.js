@@ -5,9 +5,16 @@
  * 用法（项目根目录）：
  *   npm run verify:local
  *   VERIFY_SKIP_GENERATE=1 npm run verify:local   // :3000 后端运行中占用引擎 DLL 时的逃生门（schema 未变更）
+ *   npm run verify:pg                             // 生产等价演练：同一套断言跑在本地 PostgreSQL 上
+ *
+ * 两种运行模式：
+ *   - 默认（SQLite dev.db）：日常门禁，快，但测不出 PostgreSQL 专有问题；
+ *   - VERIFY_PG=1（PostgreSQL）：由 tools/ops/ops-verify-pg.ps1 拉起 docker 演练库后调用，
+ *     DATABASE_URL 必须指向演练库；数据库准备改为「generate(生产 schema) + migrate deploy + 内容种子」，
+ *     与线上容器启动顺序一致，用来拦下「本地绿、上线炸」的迁移/字段类问题。
  *
  * 它会把「本地完整应用」真的跑起来做端到端验证：
- *   1. 数据库准备（prisma generate:dev + db push 到 server/prisma/dev.db，幂等）
+ *   1. 数据库准备（SQLite: prisma generate:dev + db push；PostgreSQL: generate + migrate deploy + 种子）
  *   2. 确保本地测试账号 dev@example.com / password 存在
  *   3. 随机空闲端口启动后端（node src/app.js，同源托管前端+API）
  *   4. HTTP 级 e2e：
@@ -32,6 +39,9 @@ const serverDir = path.resolve(__dirname, '..');   // …/server
 const envFile = path.join(serverDir, '.env');
 
 require('dotenv').config({ path: envFile });
+
+// 演练模式：由 ops-verify-pg.ps1 设置（DATABASE_URL 指向本地 docker PostgreSQL 演练库）
+const PG_MODE = process.env.VERIFY_PG === '1';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -155,7 +165,14 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         require('dotenv').config({ path: envFile });
         console.log('  [OK] 未检测到 server/.env，已自动从 .env.example 复制（开发用 SQLite 默认配置）');
     }
-    if (!(process.env.DATABASE_URL || '').includes('dev.db')) {
+    if (PG_MODE) {
+        if (!/^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '')) {
+            console.error(`\n[FAIL] VERIFY_PG=1 需要 DATABASE_URL 指向 PostgreSQL 演练库，当前为: ${process.env.DATABASE_URL || '(空)'}`);
+            console.error('       请用 npm run verify:pg（会自动拉起本地 PostgreSQL 演练容器并设置该变量）。');
+            process.exit(1);
+        }
+        console.log(`  [OK] PostgreSQL 演练模式：${String(process.env.DATABASE_URL).replace(/:[^:@/]*@/, ':***@')}`);
+    } else if (!(process.env.DATABASE_URL || '').includes('dev.db')) {
         console.error(`\n[FAIL] server/.env 的 DATABASE_URL 应为本地 SQLite dev.db，当前为: ${process.env.DATABASE_URL}`);
         console.error('       生产数据库不能作为本地验证目标。');
         process.exit(1);
@@ -170,35 +187,77 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         console.warn('         ▶ 有 schema 变更：请先停止该后端（其控制台 Ctrl+C）再重跑本命令。');
     }
 
-    // ---- 1. 数据库准备：固定顺序 generate:dev → db push（SQLite 开发库，幂等） ----
-    console.log('\n[1/6] 数据库准备（SQLite dev.db）...');
-    // npm install 的 postinstall 会用生产 schema(PostgreSQL) 生成 Prisma Client，
-    // 必须先按本地 SQLite schema 重新 generate，否则 PrismaClient 与 dev.db 引擎不匹配
+    // ---- 1. 数据库准备 ----
+    // 两种模式的差异只在「怎么把库准备好」：
+    //   SQLite   : generate:dev → db push（本地开发库，幂等）
+    //   PostgreSQL: generate（生产 schema）→ migrate deploy → 内容种子（与线上容器启动同序）
+    console.log(`\n[1/6] 数据库准备（${PG_MODE ? 'PostgreSQL 演练库' : 'SQLite dev.db'}）...`);
     const skipGenerate = process.env.VERIFY_SKIP_GENERATE === '1';
-    if (skipGenerate) {
-        console.log('  [SKIP] VERIFY_SKIP_GENERATE=1：跳过 prisma generate（沿用现有 Prisma Client）');
-    } else {
-        const gen = spawnSync('npx prisma generate --schema prisma/schema.dev.prisma',
-            { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
-        if (gen.status !== 0) {
-            console.error('  [FAIL] prisma generate:dev 失败。请先 cd server && npm install');
-            const genTail = (gen.stderr || '').slice(-600);
-            if (/EPERM|EBUSY/.test(genTail)) {
-                console.error('        疑似引擎 DLL 被运行中的后端占用：请先停止 :3000 后端后重跑，');
-                console.error('        或 schema 未变更时设 VERIFY_SKIP_GENERATE=1 跳过 generate。');
+    if (PG_MODE) {
+        if (skipGenerate) {
+            console.log('  [SKIP] VERIFY_SKIP_GENERATE=1：跳过 prisma generate（沿用现有 Prisma Client）');
+        } else {
+            const genPg = spawnSync('npx prisma generate',
+                { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 120000 });
+            if (genPg.status !== 0) {
+                console.error('  [FAIL] prisma generate（生产 PostgreSQL schema）失败。');
+                const genPgTail = (genPg.stderr || '') + (genPg.stdout || '');
+                if (/EPERM|EBUSY/.test(genPgTail)) {
+                    console.error('        疑似引擎 DLL 被运行中的后端占用：请先停止 :3000 后端后重跑。');
+                }
+                console.error(genPgTail.slice(-800));
+                process.exit(1);
             }
-            console.error(genTail);
+        }
+        // 与线上一致：容器启动执行的第一条命令就是 prisma migrate deploy
+        const migrate = spawnSync('npx prisma migrate deploy',
+            { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 180000 });
+        const migrateOut = (migrate.stdout || '') + (migrate.stderr || '');
+        if (migrate.status !== 0) {
+            console.error('  [FAIL] prisma migrate deploy 失败 —— 线上容器启动时执行的正是这条命令，');
+            console.error('         迁移不过 = 部署后建表失败、整站不可用。请先修迁移再发布。');
+            console.error(migrateOut.slice(-1500));
             process.exit(1);
         }
+        const migrateTail = migrateOut.trim().split(/\r?\n/).filter(Boolean).pop() || '';
+        console.log(`  [OK] 迁移已应用（${migrateTail}）`);
+        // 内容端点断言依赖库内内容，演练库是空的，必须先种子化（幂等）
+        const seed = spawnSync(process.execPath, [path.join(serverDir, 'scripts', 'seed-content.js')],
+            { cwd: serverDir, encoding: 'utf8', timeout: 60000 });
+        if (seed.status !== 0) {
+            console.error('  [FAIL] 内容种子写入演练库失败（后面「内容中心公开端点」断言会因此失败）。');
+            console.error(((seed.stdout || '') + (seed.stderr || '')).slice(-800));
+            process.exit(1);
+        }
+        console.log('  [OK] Prisma Client(PostgreSQL) 已生成，迁移已应用，内容已种子化');
+    } else {
+        // npm install 的 postinstall 会用生产 schema(PostgreSQL) 生成 Prisma Client，
+        // 必须先按本地 SQLite schema 重新 generate，否则 PrismaClient 与 dev.db 引擎不匹配
+        if (skipGenerate) {
+            console.log('  [SKIP] VERIFY_SKIP_GENERATE=1：跳过 prisma generate（沿用现有 Prisma Client）');
+        } else {
+            const gen = spawnSync('npx prisma generate --schema prisma/schema.dev.prisma',
+                { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
+            if (gen.status !== 0) {
+                console.error('  [FAIL] prisma generate:dev 失败。请先 cd server && npm install');
+                const genTail = (gen.stderr || '').slice(-600);
+                if (/EPERM|EBUSY/.test(genTail)) {
+                    console.error('        疑似引擎 DLL 被运行中的后端占用：请先停止 :3000 后端后重跑，');
+                    console.error('        或 schema 未变更时设 VERIFY_SKIP_GENERATE=1 跳过 generate。');
+                }
+                console.error(genTail);
+                process.exit(1);
+            }
+        }
+        const pushResult = spawnSync('npx prisma db push --schema prisma/schema.dev.prisma',
+            { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
+        if (pushResult.status !== 0) {
+            console.error('  [FAIL] prisma db push（SQLite 建表）失败。请检查 server/prisma/dev.db 是否被占用或已损坏。');
+            console.error((pushResult.stderr || '').slice(-1200));
+            process.exit(1);
+        }
+        console.log('  [OK] Prisma Client(SQLite) 已生成，dev.db 表结构已同步');
     }
-    const pushResult = spawnSync('npx prisma db push --schema prisma/schema.dev.prisma',
-        { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 60000 });
-    if (pushResult.status !== 0) {
-        console.error('  [FAIL] prisma db push（SQLite 建表）失败。请检查 server/prisma/dev.db 是否被占用或已损坏。');
-        console.error((pushResult.stderr || '').slice(-1200));
-        process.exit(1);
-    }
-    console.log('  [OK] Prisma Client(SQLite) 已生成，dev.db 表结构已同步');
 
     let prisma;
     try {
@@ -679,6 +738,17 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
     // ---- 5. 收尾 ----
     try { child.kill(); } catch { /* 已退出 */ }
     try { await prisma.$disconnect(); } catch { /* ignore */ }
+    // 演练模式把 Prisma Client 生成成了 PostgreSQL 版本，必须恢复为本地 SQLite 版本，
+    // 否则后续 npm run verify:local / 本地启动会因 Client provider 与 dev.db 不匹配而失败
+    if (PG_MODE) {
+        const restore = spawnSync('npx prisma generate --schema prisma/schema.dev.prisma',
+            { cwd: serverDir, shell: true, encoding: 'utf8', timeout: 120000 });
+        if (restore.status === 0) {
+            console.log('  [OK] 已恢复本地 SQLite Prisma Client（供日常开发/门禁使用）');
+        } else {
+            console.warn('  [WARN] 恢复 SQLite Client 失败，请手动执行: cd server && npm run prisma:generate:dev');
+        }
+    }
 
     const failed = results.filter((r) => !r.ok);
     console.log('\n========================================================');

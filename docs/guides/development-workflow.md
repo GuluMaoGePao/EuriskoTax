@@ -39,6 +39,7 @@
 |------|----------------|------|
 | push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 59 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 59 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
 | 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 12 套件 303 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
@@ -106,12 +107,19 @@
 ```powershell
 npm test              # 单元测试（快）
 npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
+npm run verify:pg     # 生产等价演练：同一套断言跑在本地 PostgreSQL（动过 schema/迁移后必跑）
 ```
 
 - verify 会自己起一个**随机端口**的临时后端，不影响你开着的 `:3000`。
 - 若 `:3000` 后端正在运行（会锁 Prisma 引擎 DLL），脚本会打印 **`[WARN] 检测到本地后端仍在运行`** 提示。此时二选一：
   - 停掉 `:3000` 后端再跑（GUI：停止后端服务）；
   - 或 schema 未变更时用逃生门：`VERIFY_SKIP_GENERATE=1 npm run verify:local`。
+- **什么时候必须跑 `verify:pg`**：改了 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 之后。
+  本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
+  「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
+  `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
+  再跑一遍同样的 59 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
 
 ### ④ 发布（只走安全发布）
 
@@ -133,12 +141,32 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 
 ## 4. 回滚
 
-| 部署模式 | 回滚方式 |
-|---------|---------|
-| **生产 Zeabur（当前主要）** | `git revert <有问题的 commit>` → 重新走一次「安全发布」。Zeabur 没有额外一键回滚；因为安全发布自带门禁，revert 后必然安全 |
-| 旧自建服务器模式（`ops-deploy.ps1`，已非主要） | GUI「📦 部署」→「回滚到上一个版本」或 `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接） |
+**核心观念**：版本标签 `vX.Y.Z`（见[分支与版本发布策略 §5.3 标签记录](branch-release-strategy.md)）就是**稳定锚点**——
+每次正式发布都会留下一个「当时线上 35 项指纹全绿」的 commit。所以线上**任何时刻都有一份可以立即回去的已知良好产物**，
+回退是「回到锚点」，不是「重新开发」。
 
-> 判断该回滚哪个 commit：`git --no-pager log --oneline -10`，revert 那个 SHA 即可。
+按「先止血、再修根」两步走：
+
+| 顺序 | 手段 | 耗时 | 适用 |
+|------|------|------|------|
+| 1️⃣ 止血 | **Zeabur 控制台 → 服务 → 部署历史 → 选上一个正常构建 → 重新部署**（不改代码、不过门禁） | ~1 分钟 | 线上已经不可用，先把服务恢复 |
+| 2️⃣ 修根 | `git revert <坏 commit>`（或批量回退到锚点）→ 再次走「安全发布」 | ~8-10 分钟 | 确认问题提交后，把代码也退回正确状态 |
+
+```powershell
+git --no-pager log --oneline -10          # 先定位：坏的是哪个 commit
+git revert <坏 commit>                    # 只退坏的这一批（保留历史，符合 trunk 模型）
+
+# 或整体退回某个稳定锚点之后的全部提交：
+git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
+.\tools\ops\ops-publish.ps1 -CommitMsg "revert: 回退到 v1.10.0 稳定版（线上故障）"
+```
+
+- 第 1️⃣ 步能否操作**以你 Zeabur 控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
+- 回退同样受门禁保护：revert 后必须重新通过 59 项 + 35 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
+- 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
+  `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
+
+> 回滚后用户端可能仍看到旧版缓存：把 `https://<域名>/reset` 发给对方即可（独立清洗页，能穿透旧 SW 死锁）。
 > 定位版本/发布/标签纪律见 [分支与版本发布策略 §6 回滚](branch-release-strategy.md#6-回滚策略)。
 
 ---
@@ -150,6 +178,9 @@ npm run verify:local  # 全链路门禁（约 1-2 分钟，起真实后端）
 | 本地改代码不生效 / 还是旧页面 | 浏览器还挂着历史 SW 缓存 | 本地新页面会自动注销 SW；极端情况 `Ctrl+F5` 硬刷一次。若仍旧：F12 → Application → Service Workers → Unregister + Clear site data |
 | 登录页 JS 报 `Cannot read properties of null (reading "classList")` / 栈里有 `updateUIBtn` | **浏览器加载的是旧版 auth-ui**（v1.5.1 之前的老缓存） | `updateUIBtn` 是旧版特征函数名。v1.5.2 起已移除 `?v=` 版本指纹并改为 SW 网络优先瘦缓存，正常刷新即拉新版；仍旧则清一次缓存 / 无痕窗口验证 |
 | verify 卡在 `prisma generate ... EPERM` | `:3000` 后端锁着引擎 DLL | 停后端，或 `VERIFY_SKIP_GENERATE=1`（schema 未变更时）；发布用 `-SkipVerifyGenerate` |
+| `npm run verify:pg` 提示「未检测到 docker 命令」（退出码 2） | 本机没装 Docker Desktop / 没启动 | **不是代码问题**：日常继续用 `verify:local`；要启用演练就装 Docker Desktop 并启动后重跑（见 §2③） |
+| `npm run verify:pg` 报 `prisma migrate deploy` 失败 | 迁移本身有问题——**这正是上线会炸的点** | 修好迁移再发布（`cd server && npx prisma migrate dev` 修正 SQL）；演练库可 `docker compose -f docker-compose.postgres.yml down -v` 重置后重跑 |
+| 跑完 `verify:pg` 后 `verify:local`/本地启动报 Client provider 不匹配 | 演练把 Prisma Client 生成成了 PostgreSQL 版本 | 脚本收尾会自动恢复 SQLite Client；若恢复失败（引擎被占用）手动执行 `cd server && npm run prisma:generate:dev` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |
 | 发布 `[4/4]` 一直显示「仍在构建」直到超时 | Zeabur 构建慢，或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；真慢就 `-PollMaxSeconds 900` 再来一次 |
 | 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 先让用户刷新；仍旧则把 `https://<域名>/reset` 发给对方直接打开（302 → 独立清洗页，能穿透旧 SW 死锁，不必教开 F12）；也可让用户跑 `tools\clean-browser-cache.bat` |
