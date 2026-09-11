@@ -6386,9 +6386,14 @@
             }
         } else if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('/service-worker.js')
+                // updateViaCache:'none' 让 SW 脚本本体及 import 绕过 HTTP 缓存。
+                // 默认 'imports' 会拿缓存里的旧 SW 做字节比对，导致更新检查永远比不出差异。
+                navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
                     .then(function (reg) {
                         console.log('[PWA] Service Worker 注册成功，作用域:', reg.scope);
+                        // 主动做一次更新检查：SW 更新检查只在导航时触发，
+                        // SPA 内跳转不会触发，这里补一次以缩短「线上已发版但页面仍旧」的窗口。
+                        reg.update().catch(function () {});
                         // 检测到新 SW 安装完成时，提示用户刷新
                         reg.addEventListener('updatefound', function () {
                             var newWorker = reg.installing;
