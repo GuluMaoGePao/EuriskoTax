@@ -25,6 +25,7 @@
   - 「应纳税所得额合计」原由「税前收入 − 年度扣除合计」反推，存在 20% 费用扣除时不成立；现直接取 `taxDetails.taxableIncome`
   - 「累计预缴税额」「应退/补税额」原自行重算（且把年终奖单独计税税额计入综合所得预缴），与结果区口径不符；现直接取 `taxDetails.prepaidTax` / `taxDetails.refundTax`，与结果区一致，并支持用户手动填写的预缴税额
 - **计算器步骤按钮移动端排版拥挤**：综合所得（3 步）、反向倒算（2 步）、经营所得（2 步）、分类所得（1 步）共 8 处步骤操作按钮组原用 `flex justify-between`，窄屏下按钮相互挤压、文字换行、主次操作错位；现统一为响应式布局（`flex-col md:flex-row` + `gap-3` + `whitespace-nowrap` + `w-full md:w-auto`），小屏垂直堆叠全宽、中大屏水平排列（`index.html`）
+- **发版后仍看到旧页面（旧 SW 滞留）**：注册 SW 补 `updateViaCache: 'none'` + 注册后 `reg.update()`
 
 ### 测试
 - 单元测试 274/274 通过（`tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546）
