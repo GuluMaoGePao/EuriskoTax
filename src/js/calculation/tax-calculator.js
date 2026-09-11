@@ -3,44 +3,8 @@ let reverseCalculationResults = {};
 let businessCalculationResults = {};
 let classificationCalculationResults = {};
 
-// 综合所得税率表
-const comprehensiveTaxRates = [
-    { min: 0, max: 36000, rate: 0.03, deduction: 0 },
-    { min: 36000, max: 144000, rate: 0.10, deduction: 2520 },
-    { min: 144000, max: 300000, rate: 0.20, deduction: 16920 },
-    { min: 300000, max: 420000, rate: 0.25, deduction: 31920 },
-    { min: 420000, max: 660000, rate: 0.30, deduction: 52920 },
-    { min: 660000, max: 960000, rate: 0.35, deduction: 85920 },
-    { min: 960000, max: Infinity, rate: 0.45, deduction: 181920 }
-];
-
-// 月度税率表（用于年终奖单独计税）
-const bonusMonthlyTaxRates = [
-    { max: 3000, rate: 0.03, deduction: 0 },
-    { max: 12000, rate: 0.10, deduction: 210 },
-    { max: 25000, rate: 0.20, deduction: 1410 },
-    { max: 35000, rate: 0.25, deduction: 2660 },
-    { max: 55000, rate: 0.30, deduction: 4410 },
-    { max: 80000, rate: 0.35, deduction: 7160 },
-    { max: Infinity, rate: 0.45, deduction: 15160 }
-];
-
-// 经营所得税率表
-const businessTaxRates = [
-    { max: 30000, rate: 0.05, deduction: 0 },
-    { max: 90000, rate: 0.10, deduction: 1500 },
-    { max: 300000, rate: 0.20, deduction: 10500 },
-    { max: 500000, rate: 0.30, deduction: 40500 },
-    { max: Infinity, rate: 0.35, deduction: 65500 }
-];
-
-// 分类所得税率表（比例税率20%）
-const classificationTaxRates = {
-    interest: { rate: 0.20, name: '利息、股息、红利所得' },
-    rent: { rate: 0.20, name: '财产租赁所得' },
-    transfer: { rate: 0.20, name: '财产转让所得' },
-    accidental: { rate: 0.20, name: '偶然所得' }
-};
+// 税法常量（综合所得/月度/经营所得/分类所得税率表）已抽离至 tax-constants.js
+// 该文件必须先于本文件加载：index.html 脚本顺序与 tests/helpers/load-source 加载顺序均需保证
 
 // 临界点提醒函数
 function checkTaxBracketThreshold(taxableIncome) {
@@ -201,16 +165,10 @@ function calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyal
     };
 }
 
-// 计算综合所得扣除项
-function calculateComprehensiveDeductions(workMonths) {
-    const monthlyBasicDeduction = parseFloat(document.getElementById('basic-deduction').value) || 5000;
-    const monthlyPensionInsurance = parseFloat(document.getElementById('pension-insurance').value) || 0;
-    const monthlyMedicalInsurance = parseFloat(document.getElementById('medical-insurance').value) || 0;
-    const monthlyUnemploymentInsurance = parseFloat(document.getElementById('unemployment-insurance').value) || 0;
-    const monthlyHousingFund = parseFloat(document.getElementById('housing-fund').value) || 0;
-    const monthlyElderlyDeduction = parseFloat(document.getElementById('elderly-deduction').value) || 0;
-    const monthlyChildrenInfantDeduction = parseFloat(document.getElementById('children-infant-deduction').value) || 0;
-
+// 从表单读取综合所得扣除项原始输入（DOM 适配器）
+// 含条件的解析（住房租金/贷款分支、学历教育在职勾选）集中在此，
+// 产出的对象即为 computeDeductions 的入参，便于纯函数部分独立测试与复用。
+function collectDeductionInput() {
     const housingType = document.getElementById('housing-type').value;
     let monthlyHousingDeduction = 0;
     if (housingType === 'rent') {
@@ -219,15 +177,46 @@ function calculateComprehensiveDeductions(workMonths) {
         monthlyHousingDeduction = parseFloat(document.getElementById('housing-loan-deduction').value) || 0;
     }
 
-    const annualEducationDeduction = parseFloat(document.getElementById('education-deduction').value) || 0;
-    const annualMedicalDeduction = parseFloat(document.getElementById('medical-deduction').value) || 0;
-    const annualProfessionalDeduction = document.getElementById('education-professional-checkbox')?.checked ? 3600 : 0;
+    return {
+        monthlyBasicDeduction: parseFloat(document.getElementById('basic-deduction').value) || 5000,
+        monthlyPensionInsurance: parseFloat(document.getElementById('pension-insurance').value) || 0,
+        monthlyMedicalInsurance: parseFloat(document.getElementById('medical-insurance').value) || 0,
+        monthlyUnemploymentInsurance: parseFloat(document.getElementById('unemployment-insurance').value) || 0,
+        monthlyHousingFund: parseFloat(document.getElementById('housing-fund').value) || 0,
+        monthlyElderlyDeduction: parseFloat(document.getElementById('elderly-deduction').value) || 0,
+        monthlyChildrenInfantDeduction: parseFloat(document.getElementById('children-infant-deduction').value) || 0,
+        monthlyHousingDeduction: monthlyHousingDeduction,
+        annualEducationDeduction: parseFloat(document.getElementById('education-deduction').value) || 0,
+        annualMedicalDeduction: parseFloat(document.getElementById('medical-deduction').value) || 0,
+        annualProfessionalDeduction: document.getElementById('education-professional-checkbox')?.checked ? 3600 : 0,
+        monthlyPensionDeduction: parseFloat(document.getElementById('pension-deduction').value) || 0,
+        monthlyEnterpriseAnnuity: parseFloat(document.getElementById('enterprise-annuity').value) || 0,
+        monthlyInsuranceOtherDeduction: parseFloat(document.getElementById('insurance-other-deduction').value) || 0,
+        monthlyTaxDeferredPension: parseFloat(document.getElementById('tax-deferred-pension').value) || 0,
+        annualCharitableDonation: parseFloat(document.getElementById('charitable-donation').value) || 0
+    };
+}
 
-    const monthlyPensionDeduction = parseFloat(document.getElementById('pension-deduction').value) || 0;
-    const monthlyEnterpriseAnnuity = parseFloat(document.getElementById('enterprise-annuity').value) || 0;
-    const monthlyInsuranceOtherDeduction = parseFloat(document.getElementById('insurance-other-deduction').value) || 0;
-    const monthlyTaxDeferredPension = parseFloat(document.getElementById('tax-deferred-pension').value) || 0;
-    const annualCharitableDonation = parseFloat(document.getElementById('charitable-donation').value) || 0;
+// 计算综合所得扣除项（纯函数：不读取 DOM，仅依赖 input 与 workMonths）
+function computeDeductions(input, workMonths) {
+    const {
+        monthlyBasicDeduction,
+        monthlyPensionInsurance,
+        monthlyMedicalInsurance,
+        monthlyUnemploymentInsurance,
+        monthlyHousingFund,
+        monthlyElderlyDeduction,
+        monthlyChildrenInfantDeduction,
+        monthlyHousingDeduction,
+        annualEducationDeduction,
+        annualMedicalDeduction,
+        annualProfessionalDeduction,
+        monthlyPensionDeduction,
+        monthlyEnterpriseAnnuity,
+        monthlyInsuranceOtherDeduction,
+        monthlyTaxDeferredPension,
+        annualCharitableDonation
+    } = input;
 
     // 计算年度大病医疗实际可扣除额
     const actualMedicalDeduction = annualMedicalDeduction > 15000 
@@ -287,6 +276,11 @@ function calculateComprehensiveDeductions(workMonths) {
         annualSpecialDeductionTotal,
         totalDeduction
     };
+}
+
+// 兼容包装：保留原签名，表单主链路与 helper-functions.js 的调用点无需改动
+function calculateComprehensiveDeductions(workMonths) {
+    return computeDeductions(collectDeductionInput(), workMonths);
 }
 
 // 计算年终奖税额
@@ -395,7 +389,11 @@ function performTaxCalculation(inputData) {
             annualRoyaltyIncome, bonusIncome, bonusInclude, userInputPrepaidTax } = inputData;
     
     const otherIncome = calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome);
-    const deductions = calculateComprehensiveDeductions(workMonths);
+    // 扣除项支持注入：注入时全链路纯计算（供方案对比 / 单测 / 未来 B 端 API 复用）；
+    // 未注入时回退读取表单，保持表单主链路行为完全不变
+    const deductions = (inputData && inputData.deductions)
+        ? inputData.deductions
+        : calculateComprehensiveDeductions(workMonths);
     
     const totalIncome = calculateTotalIncome(
         monthlySalaryIncome, workMonths, otherIncome, bonusIncome, bonusInclude
@@ -633,6 +631,10 @@ function updateTaxResultsUI(results) {
     updatePrepaidAndRefundTax(results);
     updateNetIncome(results);
     updateTaxBarVisualization(results);
+    // 计算过程面板由 utils.js 提供；未加载时跳过，保证计算层可独立加载与测试
+    if (typeof updateFormulaSteps === 'function') {
+        updateFormulaSteps(results);
+    }
 }
 
 function handleCalculationError(error) {

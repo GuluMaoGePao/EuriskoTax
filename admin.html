@@ -54,6 +54,7 @@
                 <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
                 <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
                 <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
+                <button data-nav="taxrates" class="tab-btn"><i class="fa fa-percent mr-1"></i>税率</button>
                 <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
             </nav>
             <div class="ml-auto flex items-center gap-3">
@@ -70,6 +71,7 @@
             <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
             <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
             <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
+            <button data-nav="taxrates" class="tab-btn"><i class="fa fa-percent mr-1"></i>税率</button>
             <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
         </nav>
     </header>
@@ -281,6 +283,27 @@
             </p>
             <div id="support-editor" class="hidden mb-4 bg-white rounded-xl border border-gray-200 p-5"></div>
             <div id="support-list" class="space-y-3"></div>
+        </section>
+
+        <!-- 税率（阶段12 C1：热改税制参数 + 版本化 + 可选公告联动） -->
+        <section id="view-taxrates" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-percent text-primary mr-2"></i>税制参数（热改税率）</h2>
+                <div class="flex items-center gap-2">
+                    <button data-act="taxrates-refresh" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
+                    <button data-act="taxrates-reset" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-undo mr-1"></i>载入当前生效值</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+                保存后立即对所有用户生效（端上下次启动 / 联网时应用，离线用缓存兜底）。税率错误会波及全站计税，请务必核对后再发布。
+                每次保存生成一个版本快照，可回滚；勾选「同步发送更新公告」会在保存后发一条公告（复用内容中心投放）。
+            </p>
+            <div id="taxrates-status" class="mb-3 text-xs"></div>
+            <div id="taxrates-editor" class="mb-4"></div>
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa fa-history mr-2 text-primary"></i>版本历史</h3>
+                <div id="taxrates-history" class="space-y-2"></div>
+            </div>
         </section>
 
         <footer class="mt-10 text-center text-[11px] text-gray-400">

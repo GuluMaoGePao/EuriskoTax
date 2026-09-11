@@ -12,7 +12,7 @@
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时需同步更新下方 __APP_VERSION__ 与根目录 version.json 两处。 -->
     <script>
-        window.__APP_VERSION__ = '1.10.0';
+        window.__APP_VERSION__ = '1.11.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -257,6 +257,10 @@
             .tax-budget-table {
                 @apply w-full border-collapse border border-gray-200 shadow-sm;
                 min-width: 700px;
+            }
+            /* 正向主表新增「税后到手」「累计收入」两列，需单独放宽最小宽度避免列被挤压 */
+            #tax-budget-table {
+                min-width: 850px;
             }
             .tax-budget-table th {
                 @apply px-4 py-3 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200;
@@ -2860,6 +2864,15 @@
                                 </div>
                             </div>
 
+                            <!-- 计算过程透明化：逐步展示公式与数据来源（阶段12 A2） -->
+                            <details id="formula-steps-panel" class="mt-4 hidden">
+                                <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                    <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
+                                    <span class="text-xs text-gray-500">每一步都可核对</span>
+                                </summary>
+                                <div id="formula-steps-body" class="mt-3"></div>
+                            </details>
+
                             <div class="mt-6">
                                 <button id="save-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
                                     <i class="fa fa-save mr-2"></i>保存计算结果
@@ -2907,6 +2920,8 @@
                                             <th>应纳税所得额</th>
                                             <th>税率</th>
                                             <th>月工资应纳税额</th>
+                                            <th>税后到手</th>
+                                            <th>累计收入</th>
                                             <th>累计应缴</th>
                                         </tr>
                                     </thead>
@@ -2997,6 +3012,33 @@
                             </div>
                         </div>
                         
+                        <!-- 方案对比中心（阶段12 A4）：保存多套方案并横向对比 -->
+                        <div class="card lg:col-span-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                                <h3 class="text-lg font-bold text-primary">
+                                    <i class="fa fa-balance-scale mr-2"></i>方案对比
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <button id="scenario-save-btn" class="btn btn-secondary text-sm">
+                                        <i class="fa fa-bookmark-o mr-1"></i>保存当前方案
+                                    </button>
+                                    <button id="scenario-generate-btn" class="btn btn-primary text-sm">
+                                        <i class="fa fa-magic mr-1"></i>生成年终奖方案
+                                    </button>
+                                </div>
+                            </div>
+                            <p id="scenario-hint" class="text-xs mb-3 text-gray-500"></p>
+                            <div id="scenario-empty" class="text-sm text-gray-500 py-6 text-center">
+                                暂无保存的方案。完成一次计算后，点击「保存当前方案」，或用「生成年终奖方案」一键对比「并入 / 单独计税 / 最优拆分」。
+                            </div>
+                            <div id="scenario-table-wrap" class="overflow-x-auto hidden">
+                                <table class="tax-budget-table" id="scenario-compare-table">
+                                    <thead id="scenario-compare-head"></thead>
+                                    <tbody id="scenario-compare-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <div class="lg:col-span-3 flex justify-center mt-4">
                             <button id="new-calculation-btn" class="btn btn-primary">
                                 <i class="fa fa-plus mr-2"></i>开始新的计算
@@ -5838,7 +5880,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.10.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.11.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -5874,6 +5916,11 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
+    <!-- 税法常量（税率表 / 缴费基数下限）：单一事实来源，必须最先加载，供 calculation 与 utils 分组消费 -->
+    <script src="src/js/calculation/tax-constants.js"></script>
+    <!-- 阶段12 C1：税制参数热更新同步层（管理台热改税率 → 校验后覆盖全局税率变量 + localStorage 缓存）。
+         必须紧随 tax-constants.js，保证首屏计算即用最新值；离线时回退缓存/出厂基线 -->
+    <script src="src/js/data/tax-rates-sync.js"></script>
     <!-- auth-ui 由 app.js 在 DOMContentLoaded 后动态 import（统一 URL 避免双份加载与旧版本缓存） -->
     <script src="src/js/data/data-management.js"></script>
     <script src="src/js/data/field-hints.js"></script>
@@ -5898,6 +5945,11 @@
     <script src="src/js/ui/content-center-ui.js"></script>
     <!-- 阶段10B：专业版汇算清缴报告 PDF（免费/专业分流导出入口） -->
     <script src="src/js/export/final-report.js"></script>
+    <!-- 计算引擎命名空间：聚合纯计算函数（仅引用、不承载逻辑），供方案对比/单测复用 -->
+    <script src="src/js/calculation/engine.js"></script>
+    <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
+    <script src="src/js/data/scenario-store.js"></script>
+    <script src="src/js/ui/scenario-ui.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；

@@ -17,6 +17,8 @@ const contentRoutes = require('./routes/content');
 const adminUserRoutes = require('./routes/adminUsers');
 const contentAdminRoutes = require('./routes/contentAdmin');
 const supportAdminRoutes = require('./routes/supportAdmin');
+const taxRateRoutes = require('./routes/taxRates');
+const taxRateAdminRoutes = require('./routes/taxRateAdmin');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -98,6 +100,18 @@ const contentLimiter = rateLimit({
     }
 });
 
+// 税制参数限流：60 次/分钟/IP（阶段12 C1 公开只读端点 /tax-rates）。
+// 端上仅在启动/登录时拉取一次并以 localStorage 缓存，宽松上限只挡批量刷取
+const configLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    skip: (req) => req.path !== '/tax-rates',
+    message: {
+        success: false,
+        error: { message: '请求过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -168,9 +182,11 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
+app.use('/api/config', configLimiter, taxRateRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
 app.use('/api/admin/support', supportAdminRoutes);
+app.use('/api/admin/tax-rates', taxRateAdminRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

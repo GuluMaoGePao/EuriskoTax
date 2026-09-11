@@ -22,6 +22,7 @@ beforeAll(() => {
     // 此处预先初始化以供 tax-calculator.js 的 saveToHistory 使用
     global.calculationHistory = [];
 
+    loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
     loadSource('src/js/ui/navigation-ui.js');
 });

@@ -37,10 +37,10 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 59 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 68 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 59 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 12 套件 303 例 |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 68 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 17 套件 361 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
 
@@ -71,7 +71,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（59 项 e2e 门禁）                            │
+│    + verify:local（68 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环
@@ -118,7 +118,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
   「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
   `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
-  再跑一遍同样的 59 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  再跑一遍同样的 68 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
   首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
 
 ### ④ 发布（只走安全发布）
@@ -162,7 +162,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 ```
 
 - 第 1️⃣ 步能否操作**以你 Zeabur 控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
-- 回退同样受门禁保护：revert 后必须重新通过 59 项 + 35 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
+- 回退同样受门禁保护：revert 后必须重新通过 68 项 + 35 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
 - 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
   `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
 

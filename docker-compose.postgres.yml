@@ -9,7 +9,7 @@
 #   本容器就是用来在推之前把这类问题在本地复现出来（npm run verify:pg）。
 #
 # 用法：
-#   npm run verify:pg              # 起容器 → 迁移 → 种内容 → 跑完整 59 项 e2e 门禁
+#   npm run verify:pg              # 起容器 → 迁移 → 种内容 → 跑完整 68 项 e2e 门禁
 #   npm run verify:pg:fresh        # 先销毁数据卷（等价「全新库首部署」场景）再跑
 #   docker compose -f docker-compose.postgres.yml down -v   # 手动彻底清理
 #

@@ -4,7 +4,7 @@
 # 定位：verify:local 只能证明「SQLite 上是对的」，而线上是 PostgreSQL + 容器启动
 #       `npx prisma migrate deploy` 建表。本脚本用 docker-compose.postgres.yml 起一个
 #       临时 PostgreSQL，按**与生产完全相同的顺序**（generate → migrate deploy → 起服务）
-#       把同一套 59 项 e2e 门禁再跑一遍，把「本地绿、上线炸」的迁移/字段类问题拦在本地。
+#       把同一套 68 项 e2e 门禁再跑一遍，把「本地绿、上线炸」的迁移/字段类问题拦在本地。
 #
 # 用法：
 #   npm run verify:pg                              # 等价于本脚本无参调用
@@ -46,7 +46,7 @@ function Write-Step {
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host "  EuriskoTax PostgreSQL 演练门禁 (verify:pg)" -ForegroundColor Cyan
-Write-Host "  流程: 起演练库 -> generate -> migrate deploy -> 59 项 e2e" -ForegroundColor Cyan
+Write-Host "  流程: 起演练库 -> generate -> migrate deploy -> 68 项 e2e" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 
 # ---- 0. 前置检查：Docker 可用性 ----
@@ -112,7 +112,7 @@ Write-Host "  DATABASE_URL = postgresql://${PgUser}:***@127.0.0.1:${PgPort}/${Pg
 Write-Host "  （后面的 generate / migrate deploy / 后端启动 / e2e 全部打向这个演练库，不碰线上）" -ForegroundColor Gray
 
 # ---- 3. 跑完整门禁 ----
-Write-Step "3/4 运行 59 项 e2e 门禁（PostgreSQL 演练库）"
+Write-Step "3/4 运行 68 项 e2e 门禁（PostgreSQL 演练库）"
 & node $VerifyScript
 $verifyCode = $LASTEXITCODE
 

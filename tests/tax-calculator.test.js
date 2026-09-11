@@ -4,7 +4,9 @@
 const { loadSource } = require('./helpers/load-source');
 
 // 加载源文件（注入到全局作用域）
+// 注意：tax-constants.js 必须先于 tax-calculator.js 加载（与 index.html 脚本顺序一致）
 beforeAll(() => {
+    loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
 });
 

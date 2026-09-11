@@ -150,3 +150,20 @@ model SupportScript {
 
   @@index([category])
 }
+
+// 阶段12 C1：税制参数配置化（管理台热改税率）
+// payload 为 JSON 字符串，含综合所得/月度/经营所得/分类所得税率表 + 缴费基数下限；
+// 每次保存生成一条 published 快照，旧版本保留（archived）供审计与回滚；公开端点取最新一条。
+// 约定：数组项 {min,max,rate,deduction}，无上限的 max 存 null（JSON 不支持 Infinity）。
+model TaxRateConfig {
+  id           Int      @id @default(autoincrement())
+  version      String   @unique // 如 2026.2 / 2026.09.12-1
+  status       String   @default("published") // published / archived
+  payload      String   @default("{}")
+  note         String   @default("") // 变更说明
+  created_by   String   @default("admin")
+  published_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  @@index([status, published_at])
+}

@@ -14,7 +14,7 @@
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
 | `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
-| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 59 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
+| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 68 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
@@ -97,7 +97,7 @@ Send-TestNotification
 ### PostgreSQL 生产等价演练（动过 schema/迁移后必跑）
 
 ```powershell
-# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 59 项 e2e
+# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 68 项 e2e
 npm run verify:pg
 
 # 等价「全新库首次部署」：先删数据卷再跑

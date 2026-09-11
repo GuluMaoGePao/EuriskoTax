@@ -94,7 +94,7 @@
 **任务清单**：
 - [x] 添加登录/注册页面（src/js/auth/auth-ui.js + index.html 登录/注册模态框）
 - [x] 添加用户信息展示区域（个人中心仪表盘，含账户设置/税务档案/数据管理/税务日历）
-- [x] 将前端计算调用改为API请求（src/js/api/api-client.js → /api/calculations/*）
+- [x] ~~将前端计算调用改为API请求（src/js/api/api-client.js → /api/calculations/*）~~ **（2026-09-12 订正：该路线已废弃）** 计算主链路实际保持**前端本地执行**（`src/js/calculation/tax-calculator.js`）；`api-client.js` 中对应 4 个计算封装无任何调用方，服务端 `/api/calculations/*` 仅 `/sync` 在用。遗留服务端引擎与前端引擎的漂移风险见 [stage12-core-enhancement-plan.md](./stage12-core-enhancement-plan.md) §1.1
 - [x] 集成JWT token管理（getAuthToken/setAuthToken/removeAuthToken + Bearer 头注入）
 - [x] 实现登录状态持久化（localStorage.auth_token + localStorage.current_user）
 - [x] 对接历史记录API（src/js/auth/auth-ui.js loadHistoryToList + GET /api/calculations/history）
@@ -309,6 +309,7 @@ EuriskoTax/
 | 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
 | 阶段10：免费/专业版体系 | ✅ 已完成（v1.7.0 已发布 2026-09-10 —— 10A 后端地基 a29bd12 + 前端同步链路 8f3195a；10B 政策要点更新（`GET /api/content/tax-policy` + `tax-policy.js` 增量合并/提示）与专业版汇算清缴报告（`final-report.js`）；同批上线运维管理后台（`admin.html` + `/api/admin/users`）与反馈附图；`verify:local` + Jest 全绿） | 1周+ | 2026-09-10 |
 | 阶段11：内容/公告中心 | 🚧 进行中（后端地基 `5a52776`；`ContentItem`/`ContentRelease` 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改读库、全体用户可见、增量 revision）与 `GET /api/content/feed`；运维后台内容 CRUD + 发布批次；前端 `content-center-ui.js` 四展示位；支付体系顺延阶段12） | 3天 | 预计 2026-09-12 |
+| 阶段12：支付体系与 B 端 API | 🚧 进行中（**A 阶段 ✅** 四项核心功能补强：公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化；**C1 ✅** 税制参数配置化 2026-09-12 —— `TaxRateConfig` 版本化快照 + 运维后台「税率」Tab 热改（保存即生效、可回滚、可选联动公告）+ 公开只读端点 `GET /api/config/tax-rates` + 端上 `tax-rates-sync.js` 离线兜底；支付体系与 B 端 API 待实施） | 3周+ | 进行中 |
 
 ### 当前状态
 
@@ -486,7 +487,7 @@ cpolar http 3000 -region=cn
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-09-11（阶段11 内容/公告中心：分层投放 + 定时上线 + 运维后台内容管理；v1.7.1：本地 SQLite 运维后台搜索 500 修复 + 门禁扩至 52/52；v1.7.0：阶段10 免费/专业版体系 + 运维后台 + 反馈附图，详见 CHANGELOG.md）*
+*最后更新：2026-09-12（阶段12：A 阶段核心功能补强（公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化）+ C1 税制参数配置化（`TaxRateConfig` 版本化热改 + 公开只读端点 `GET /api/config/tax-rates` + 运维后台「税率」Tab + 可选公告联动）；门禁扩至 **68/68**、单测 **17 套件 361 例**；详见 CHANGELOG.md）*
 *对应项目版本：v1.8.0（阶段11 内容/公告中心已交付）*
 
 ---
