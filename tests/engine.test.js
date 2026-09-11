@@ -159,7 +159,20 @@ describe('performTaxCalculation 注入路径与表单路径等价（零回归核
         document.body.innerHTML = '';
         const resultInjected = performTaxCalculation(injectedInput);
 
-        expect(resultInjected).toEqual(resultFromForm);
+        // calculationDate 由每次调用各自 new Date() 生成，两次调用相差 1ms 就会让 toEqual 失败
+        // （与本用例要证明的「两条路径等价」无关）。剔除后再逐字段比较，时间戳单独断言。
+        const stripCalculationDate = (r) => {
+            const copy = Object.assign({}, r);
+            delete copy.calculationDate;
+            return copy;
+        };
+        expect(stripCalculationDate(resultInjected)).toEqual(stripCalculationDate(resultFromForm));
+
+        const tInjected = Date.parse(resultInjected.calculationDate);
+        const tForm = Date.parse(resultFromForm.calculationDate);
+        expect(Number.isNaN(tInjected)).toBe(false);
+        expect(Number.isNaN(tForm)).toBe(false);
+        expect(Math.abs(tInjected - tForm)).toBeLessThan(1000);
     });
 
     test('注入路径产出的关键指标符合手算口径', () => {

@@ -61,8 +61,9 @@ var classificationTaxRates = {
 
 // 社保缴费基数最低标准（根据国家规定，各城市略有不同，这里使用全国平均值）
 // TODO(C2 社保地区政策库)：应改为按参保城市参数化，现为全国平均值兜底
-var MIN_SOCIAL_SECURITY_BASE = 4250;
-var MIN_HOUSING_FUND_BASE = 4250;
+// 取值与表单初始默认基数对齐：默认值即最低标准（默认 7546，输入低于 7546 才提示）
+var MIN_SOCIAL_SECURITY_BASE = 7546;
+var MIN_HOUSING_FUND_BASE = 7546;
 
 // 对外聚合出口：供 engine.js / 后续税务参数配置化（C1）与单测使用
 window.EuriskoTaxConstants = {

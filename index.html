@@ -12,7 +12,7 @@
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时需同步更新下方 __APP_VERSION__ 与根目录 version.json 两处。 -->
     <script>
-        window.__APP_VERSION__ = '1.11.0';
+        window.__APP_VERSION__ = '1.11.1';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -260,13 +260,15 @@
             }
             /* 正向主表新增「税后到手」「累计收入」两列，需单独放宽最小宽度避免列被挤压 */
             #tax-budget-table {
-                min-width: 850px;
+                min-width: 900px;
             }
+            /* 表头单行不折行，数据统一等宽数字，提升可读性 */
             .tax-budget-table th {
-                @apply px-4 py-3 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200;
+                @apply px-4 py-3.5 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200 leading-relaxed whitespace-nowrap;
             }
             .tax-budget-table td {
-                @apply px-4 py-3 text-sm text-gray-900 text-center border border-gray-200 transition-colors hover:bg-blue-50/30;
+                @apply px-4 py-3.5 text-sm text-gray-900 text-center border border-gray-200 leading-relaxed transition-colors hover:bg-blue-50/30;
+                font-variant-numeric: tabular-nums;
             }
             .tax-budget-table tr:nth-child(even) {
                 @apply bg-gray-50/50;
@@ -616,6 +618,16 @@
                 @apply sticky top-14 z-30 bg-white/95 backdrop-blur border-b border-gray-100;
                 position: sticky;
             }
+            /* 顶栏/底栏白底铺满视口宽度：此前白底只占容器宽度，
+               比下方卡片宽出一截又夹着灰缝，视觉上像悬空的独立白块，与卡片衔接生硬。
+               用负边距 + 补偿内边距铺满，内容位置保持不变。 */
+            .calc-sticky-header,
+            .calc-preview-bar {
+                margin-left: calc(50% - 50vw);
+                margin-right: calc(50% - 50vw);
+                padding-left: calc(50vw - 50%);
+                padding-right: calc(50vw - 50%);
+            }
 
             .calc-top-row {
                 @apply flex items-center justify-between py-2 gap-2;
@@ -695,9 +707,19 @@
                 .calc-preview-grid { @apply py-2; }
             }
 
-            /* 步骤内容增加底部留白以避开预览条 */
-            .step-content { @apply pb-4; }
+            /* 步骤内容增加上下留白：顶部与顶栏拉开呼吸感，底部避开预览条 */
+            .step-content { @apply pt-4 pb-4; }
             .has-preview-bar .step-content { @apply pb-20; }
+
+            /* 宽屏下为计算页主体增加左右留白，避免步骤条与卡片紧贴屏幕边缘 */
+            @media (min-width: 640px) {
+                .step-content.max-w-5xl,
+                .calc-sticky-header > .max-w-5xl,
+                .calc-preview-bar > .max-w-5xl {
+                    padding-left: 1.5rem;
+                    padding-right: 1.5rem;
+                }
+            }
 
             /* === 移动端创意细节优化 === */
             @media (max-width: 640px) {
@@ -770,6 +792,12 @@
                 color: #dc2626;
                 @apply text-xs mt-1.5;
             }
+        }
+
+        /* 铺满视口的顶栏/底栏会向两侧溢出，用 clip 裁掉溢出的几像素。
+           clip 不产生滚动容器，因此不会破坏 position: sticky；旧浏览器不支持时自动忽略。 */
+        @supports (overflow-x: clip) {
+            body { overflow-x: clip; }
         }
 
         /* 暗色模式基础样式 */
@@ -5880,7 +5908,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.11.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.11.1</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

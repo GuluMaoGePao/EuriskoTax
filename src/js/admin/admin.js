@@ -1165,9 +1165,22 @@ const TR_INPUT = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm';
 
 const trPct = (rate) => Number(((Number(rate) || 0) * 100).toFixed(4));
 
+// 状态反馈同时写入「Tab 顶部」与「保存按钮上方」两处：
+// 「保存并发布」在很长的编辑器最底部，只写顶部时用户点完按钮看不到任何反馈（表现为「点了没反应」）。
 function setTaxRatesStatus(html) {
-    const el = $('#taxrates-status');
-    if (el) el.innerHTML = html || '';
+    const text = html || '';
+    ['#taxrates-status', '#tr-status-inline'].forEach((sel) => {
+        const el = $(sel);
+        if (!el) return;
+        el.innerHTML = text;
+        el.classList.toggle('hidden', !text);
+    });
+}
+
+// 把反馈滚进视口，避免错误信息出现在看不见的位置
+function scrollToTaxRatesStatus() {
+    const el = $('#tr-status-inline') || $('#taxrates-status');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 function trBracketTable(def, rows) {
@@ -1261,6 +1274,7 @@ function taxRatesEditorHtml(model) {
                 <div class="pt-1">${placements}</div>
             </div>
         </div>
+        <div id="tr-status-inline" class="hidden mb-3 text-xs"></div>
         <div class="flex items-center gap-2">
             <button data-act="taxrates-save" class="bg-primary text-white text-sm font-medium rounded-lg px-4 py-2 hover:opacity-90"><i class="fa fa-cloud-upload mr-1"></i>保存并发布</button>
             <button data-act="taxrates-loaddefault" class="bg-gray-100 text-gray-600 text-sm rounded-lg px-4 py-2 hover:bg-gray-200"><i class="fa fa-undo mr-1"></i>载入出厂基线</button>
@@ -1306,8 +1320,10 @@ async function loadTaxRates() {
         st.history = d.history || [];
         const hasCustom = !!(d.current && d.current.payload);
         const rates = hasCustom ? d.current.payload : st.defaults;
+        // 版本号一律留空，由后端按 YYYY.MM.DD-N 自动生成。
+        // 切勿预填「当前生效版本」：version 在库中唯一，预填会让下一次保存直接撞号被 400 拒绝。
         st.modelOriginal = {
-            version: hasCustom ? d.current.version : ((rates && rates.constantsVersion) || ''),
+            version: '',
             note: hasCustom ? (d.current.note || '') : '',
             rates,
             sourceLabel: hasCustom ? `线上生效版本 ${d.current.version}` : '出厂基线（尚未发布过自定义配置）',
@@ -1421,9 +1437,20 @@ function resetTaxRatesForm() {
 }
 
 function loadDefaultTaxRates() {
-    if (!state.taxrates.defaults) return;
+    const st = state.taxrates;
+    if (!st.defaults) return;
     if (!confirm('将用「出厂基线」覆盖当前表单（不会立即生效，需再点「保存并发布」）。确认继续？')) return;
-    state.taxrates.model = JSON.parse(JSON.stringify(state.taxrates.defaults));
+    // defaults 是「扁平的 rates 对象」（comprehensiveTaxRates / MIN_* 直接在顶层），
+    // 而编辑器 model 的形状是 { version, note, rates, sourceLabel }，必须包进 rates。
+    // 整体直接赋值会让 taxRatesEditorHtml 的 r = model.rates || {} 取到空对象 → 表格被清空，
+    // 保存时 collectTaxRatesForm 收集到空数组 → 必然「不能为空」而发布失败。
+    st.model = {
+        version: '',
+        note: '',
+        rates: JSON.parse(JSON.stringify(st.defaults)),
+        sourceLabel: '出厂基线（尚未保存）',
+        sourceVersion: (st.modelOriginal && st.modelOriginal.sourceVersion) || '（出厂基线）'
+    };
     renderTaxRates();
     toast('已载入出厂基线，确认无误后点「保存并发布」', 'info');
 }
@@ -1440,7 +1467,10 @@ async function saveTaxRates() {
     const note = ($('#tr-f-note').value || '').trim();
     const errors = validateTaxRatesForm(rates);
     if (errors.length) {
-        setTaxRatesStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(errors[0])}${errors.length > 1 ? ` （共 ${errors.length} 项问题）` : ''}</span>`);
+        const msg = `${errors[0]}${errors.length > 1 ? ` （共 ${errors.length} 项问题）` : ''}`;
+        setTaxRatesStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(msg)}</span>`);
+        toast(msg, 'error');
+        scrollToTaxRatesStatus();
         return;
     }
     const notify = collectNotifyFromForm();
@@ -1458,7 +1488,9 @@ async function saveTaxRates() {
     } catch (err) {
         const detail = (err.details && err.details.length) ? err.details.slice(0, 3).join('；') : err.message;
         setTaxRatesStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(detail)}</span>`);
+        scrollToTaxRatesStatus();
         if (err.status === 401) reportError(err);
+        else toast(detail, 'error');
     }
 }
 
