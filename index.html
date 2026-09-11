@@ -1909,6 +1909,9 @@
         <div id="mode-selection-page" class="page active">
             <div class="max-w-5xl mx-auto pt-2 pb-6">
 
+                <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
+                <div id="content-home-banner" class="hidden"></div>
+
                 <!-- 卡片1：欢迎 + 今日税感 -->
                 <div class="home-card">
                     <div class="flex items-start justify-between mb-3">
@@ -5784,6 +5787,22 @@
         </div>
     </div>
 
+    <!-- 阶段11：内容中心公告弹窗（启动推送与个人中心「公告与更新」列表复用） -->
+    <div id="content-notice-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col transform scale-95 transition-transform duration-300">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl flex items-center justify-between">
+                <h3 id="content-notice-modal-title" class="text-base font-bold"><i class="fa fa-bullhorn mr-2"></i>更新公告</h3>
+                <button id="content-notice-modal-close" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div id="content-notice-modal-list" class="p-5 overflow-y-auto flex-1 space-y-4"></div>
+            <div class="p-4 border-t border-gray-200 flex justify-end">
+                <button id="content-notice-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg">我知道了</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 保存成功提示 -->
     <div id="save-success-toast" class="fixed bottom-4 right-4 bg-success text-white px-4 py-2 rounded-lg shadow-lg hidden">
         <div class="flex items-center">
@@ -5811,8 +5830,10 @@
     <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
     <script src="src/js/auth/plan.js"></script>
     <script src="src/js/data/history-sync.js"></script>
-    <!-- 阶段10B：政策要点更新同步（专业版登录后增量拉取并提示） -->
+    <!-- 阶段11：内容中心同步（政策要点全员可见 + 更新公告/运营内容 feed） -->
     <script src="src/js/data/tax-policy.js"></script>
+    <!-- 阶段11：内容中心 UI（启动弹窗 / 首页公告条 / 个人中心公告列表） -->
+    <script src="src/js/ui/content-center-ui.js"></script>
     <!-- 阶段10B：专业版汇算清缴报告 PDF（免费/专业分流导出入口） -->
     <script src="src/js/export/final-report.js"></script>
     <script src="src/js/app.js"></script>

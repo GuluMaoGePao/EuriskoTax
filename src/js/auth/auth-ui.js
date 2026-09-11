@@ -42,7 +42,7 @@ function clearLocalUserData() {
     localStorage.removeItem('taxCalculationHistory');    // 主页/个人中心共用 key
     localStorage.removeItem('tax_profile');
     localStorage.removeItem('taxSyncMeta');              // 阶段10：云同步元数据（墓碑/cloudIds）随会话清理，防换号残留
-    // 阶段10B：政策更新缓存与横幅 seen 状态随会话清理（退出/注销后不残留他人更新提示）
+    // 阶段11：内容中心缓存（政策覆盖层 + 公告 feed + 各处 seen 状态）随会话清理，退出/注销后不残留他人更新提示
     if (window.TaxPolicy && typeof window.TaxPolicy.clearState === 'function') {
         window.TaxPolicy.clearState();
     }
@@ -65,18 +65,19 @@ function setLoading(btn, loading) {
     }
 }
 
-// 阶段10B：专业版登录/恢复会话后静默拉取「政策要点」增量（免费版仅用内置快照，不发起请求）
-function triggerPolicySyncIfPro() {
+// 阶段11：登录 / 恢复会话后静默同步内容中心（政策要点 + 更新公告 / 运营内容）。
+// 政策要点自阶段11 起对全体用户开放（未登录游客亦同步，服务端按档位只返回 all 类内容），不再限定专业版。
+function triggerContentSync() {
     try {
         const tp = window.TaxPolicy;
-        if (!tp || typeof tp.syncNow !== 'function') return;
-        const user = apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
-        if (!user) return;
-        const planLib = window.EuriskoPlan;
-        if (!planLib || typeof planLib.isPro !== 'function' || !planLib.isPro(user.plan, user.plan_expires_at)) return;
-        tp.syncNow();
+        if (!tp) return;
+        if (typeof tp.triggerSync === 'function') {
+            tp.triggerSync();
+            return;
+        }
+        if (typeof tp.syncNow === 'function') tp.syncNow();
     } catch (e) {
-        console.error('[policy] 政策同步异常:', e);
+        console.error('[content] 内容同步异常:', e);
     }
 }
 
@@ -103,8 +104,8 @@ async function handleLogin() {
         if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
             window.EuriskoSync.afterLogin(apiClient.getCurrentUser());
         }
-        // 阶段10B：专业版静默拉取政策要点增量（免费版仅内置快照）
-        triggerPolicySyncIfPro();
+        // 阶段11：登录后静默同步内容中心（政策要点 + 公告/运营内容）
+        triggerContentSync();
         // 登录成功后直接进入应用，不再弹「操作成功」确认框打断流程
         // （顶栏用户名与版本徽标已是明确的成功反馈）
     } catch (error) {
@@ -747,6 +748,14 @@ const PROFILE_CARDS_CONFIG = [
         desc: '关键时间节点提醒',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar text-xl text-orange-600'
+    },
+    {
+        id: 'profile-card-notices',
+        icon: 'fa-bullhorn',
+        title: '公告与更新',
+        desc: '查看政策更新、版本公告与运营活动',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-bullhorn text-xl text-amber-600'
     },
     {
         id: 'profile-card-help',
@@ -1486,7 +1495,7 @@ function renderCloudSyncPanel() {
             : planLib.PRO_FEATURE_HINT;
         disableSyncBtn(true);
         if (accountEl) accountEl.textContent = `当前账号：${user.email}（基础版）`;
-        setCta('<p class="text-violet-800"><i class="fa fa-gift mr-1 text-violet-500"></i>免费领取 14 天专业版体验，解锁云同步、汇算 PDF 报告与政策更新。</p>' +
+        setCta('<p class="text-violet-800"><i class="fa fa-gift mr-1 text-violet-500"></i>免费领取 14 天专业版体验，解锁云同步与汇算 PDF 报告。</p>' +
             '<button id="cloud-sync-claim-btn" type="button" class="mt-2 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-4 py-2 text-sm"><i class="fa fa-gift mr-2"></i>免费领取 14 天专业版体验</button>');
         return;
     }
@@ -1515,7 +1524,7 @@ function upgradeHeroHtml(user) {
     if (!user) {
         return '<div class="text-center">' +
             '<p class="text-violet-700 font-bold text-base">登录后免费领取 14 天专业版体验</p>' +
-            '<p class="text-gray-500 text-xs mt-1">体验期内完整解锁云同步、汇算 PDF 报告与政策更新；公测期不限次数。</p>' +
+            '<p class="text-gray-500 text-xs mt-1">体验期内完整解锁云同步与汇算 PDF 报告；公测期不限次数。</p>' +
             claimBtn('登录领取体验') + '</div>';
     }
     if (!tier || tier.key === 'free') {
@@ -1538,12 +1547,12 @@ function upgradeHeroHtml(user) {
             '<span class="text-xs text-gray-400">' + fmtDate(tier.expireAt) + ' 到期</span></div>' +
             '<div class="h-2 rounded-full bg-violet-200 overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600" style="width:' + pct + '%"></div></div>' +
             '<p class="text-xs mt-2 ' + (warn ? 'text-amber-600 font-medium' : 'text-gray-500') + '">' +
-            (warn ? '体验即将到期：请确认云端数据已同步。到期后自动回到基础版，仍可再次免费领取。' : '专业版全功能体验中：云同步、汇算 PDF 报告、政策更新均已解锁。到期后自动回到基础版，可再次免费领取。') + '</p></div>';
+            (warn ? '体验即将到期：请确认云端数据已同步。到期后自动回到基础版，仍可再次免费领取。' : '专业版全功能体验中：云同步与汇算 PDF 报告均已解锁。到期后自动回到基础版，可再次免费领取。') + '</p></div>';
     }
     // 专业版：seed/正式授权均落此态；正式上线前不向用户明示"永久专业版授权"，用通用权益文案呈现
     const trailing = tier.permanent
-        ? '您已开通专业版，云同步、汇算清缴 PDF 报告与政策更新等全部专业功能均可用。'
-        : '专业版有效期至 ' + fmtDate(tier.expireAt) + '，云同步、汇算清缴 PDF 报告与政策更新等全部专业功能随时可用。';
+        ? '您已开通专业版，云同步、汇算清缴 PDF 报告等全部专业功能均可用。'
+        : '专业版有效期至 ' + fmtDate(tier.expireAt) + '，云同步、汇算清缴 PDF 报告等全部专业功能随时可用。';
     return '<div class="flex items-start">' +
         '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0"><i class="fa fa-check text-amber-600 text-xl"></i></div>' +
         '<div><p class="text-amber-700 font-bold text-base">专业版已启用</p>' +
@@ -1880,7 +1889,15 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
-        { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) }
+        { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },
+        {
+            cardId: 'profile-card-notices',
+            specialFn: () => {
+                if (window.ContentCenterUI && typeof window.ContentCenterUI.openNoticeList === 'function') {
+                    window.ContentCenterUI.openNoticeList();
+                }
+            }
+        }
     ];
 
     const profileCardsGrid = document.getElementById('profile-cards-grid');
@@ -2284,11 +2301,11 @@ function initAuth() {
     } catch (e) {
         console.error('[initAuth] 云同步初始化异常:', e);
     }
-    // 阶段10B：恢复会话（已登录专业版）后静默拉取政策要点增量
+    // 阶段11：恢复会话后静默同步内容中心（政策要点 + 公告/运营内容）
     try {
-        triggerPolicySyncIfPro();
+        triggerContentSync();
     } catch (e) {
-        console.error('[initAuth] 政策同步初始化异常:', e);
+        console.error('[initAuth] 内容同步初始化异常:', e);
     }
     try {
         setupAuthEventListeners();

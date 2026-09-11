@@ -93,3 +93,42 @@ model CalcEvent {
   @@unique([date, type])
   @@index([date])
 }
+
+// 阶段11：内容中心条目（政策要点 / 更新公告 / 运营内容），后台可管理
+// 注意：本表是「增量覆盖层」而非全量内容源——内置 QA 快照 window.TAX_ASSISTANT_QA 仍作离线兜底，
+//       policy 类条目按 item_id 对内置条目 upsert/覆盖/deleted 撤回（与 tax-policy.js applyUpdates 语义一致）。
+model ContentItem {
+  id         Int       @id @default(autoincrement())
+  item_id    String    @unique // 幂等键；policy 类与内置 QA id 对应
+  type       String // policy / announcement / operation
+  audience   String    @default("all") // all / free / pro
+  placements String    @default("[]") // JSON 数组：assistant_qa / home_banner / modal / notice_list
+  title      String    @default("")
+  summary    String    @default("") // 横幅/卡片摘要
+  body       String    @default("") // 正文（公告/运营内容）
+  category   String? // policy：政策法规/综合所得…
+  question   String? // policy：问答形式
+  answer     String    @default("") // policy：答案
+  keywords   String    @default("[]")
+  hot        Boolean   @default(false) // policy：是否进「热门问题」
+  link_url   String? // 运营内容/公告跳转
+  link_text  String?
+  priority   Int       @default(0) // 同展示位多条时排序
+  status     String    @default("draft") // draft / published / revoked
+  publish_at DateTime  @default(now()) // 定时上线
+  expire_at  DateTime? // null = 永不过期
+  updated_at DateTime  @updatedAt
+  created_at DateTime  @default(now())
+
+  @@index([type, status])
+  @@index([status, audience])
+}
+
+// 阶段11：内容发布批次（提供 since 版本闸门 + 通知文案；草稿编辑不推送到端）
+model ContentRelease {
+  id           Int      @id @default(autoincrement())
+  version      String   @unique // 如 2026.09.11-1
+  notice       String   @default("")
+  published_at DateTime @default(now())
+  created_at   DateTime @default(now())
+}

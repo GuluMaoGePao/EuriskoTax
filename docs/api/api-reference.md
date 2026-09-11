@@ -3,7 +3,7 @@
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
 > **版本**: v2.3
-> **最后更新**: 2026年9月11日（同步 v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`、政策内容端点 `GET /api/content/tax-policy`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **最后更新**: 2026年9月11日（阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -18,6 +18,7 @@
 7. [错误码](#7-错误码)
 8. [环境变量配置](#8-环境变量配置)
 9. [附录：注册流程与邀请码](#9-附录注册流程与邀请码)
+10. [内容中心接口（公开只读）](#10-内容中心接口公开只读)
 
 ---
 
@@ -417,6 +418,40 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 语义：`pro` + `expiresAt` 为空 → 永久专业版；`pro` + 未来时间 → 限时专业版（如补发 14 天体验）；`free` → 回落基础版（清空到期时间与来源）。`grantedBy` 默认 `admin`，取值范围 seed/invite/admin/purchase。响应返回更新后的用户信息。
 
+### 5.9 内容条目管理（管理员 · 阶段11）
+
+**GET** `/api/admin/content?type=policy|announcement|operation&status=draft|published|revoked&audience=all|free|pro&q=关键词&offset=0&limit=50`
+
+列表/筛选内容条目；`q` 匹配 `item_id`/标题/问题/正文（子串、忽略大小写）；`limit` 上限 200。响应：`{ total, offset, limit, items: [{ id, item_id, type, audience, placements, title, summary, body, category, question, answer, keywords, hot, link_url, link_text, priority, status, publish_at, expire_at, created_at, updated_at }] }`（`placements`/`keywords` 为 JSON 字符串）。
+
+**POST** `/api/admin/content`
+
+新建条目（201）。请求体：`{ item_id?, type, audience?, placements[], title?, summary?, body?, category?, question?, answer?, keywords?, hot?, link_url?, link_text?, priority?, status?, publish_at?, expire_at? }`。
+- `type` 必填（policy/announcement/operation）；`placements` 至少一项（assistant_qa/home_banner/modal/notice_list）；`status` 默认 `draft`
+- `item_id` 留空自动生成；policy 条目若需覆盖内置问答，`item_id` 须与内置 id 一致
+- `audience` 默认 `all`；`publish_at` 缺省为当前时间；`expire_at` 为空表示不过期
+- `item_id` 重复或参数非法返回 400
+
+**PATCH** `/api/admin/content/:id`
+
+编辑条目（含草稿/发布/撤回状态切换）；仅更新请求体中出现的字段，无字段可更新返回 400，条目不存在返回 404。
+
+**DELETE** `/api/admin/content/:id`
+
+删除条目；不存在返回 404。
+
+### 5.10 内容发布（管理员 · 阶段11）
+
+**GET** `/api/admin/content/releases`
+
+返回最近 50 条发布记录：`{ items: [{ id, version, notice, published_at }] }`。
+
+**POST** `/api/admin/content/releases`
+
+发布内容：将所有 `draft` 条目置为 `published`，并登记发布批次。请求体可选：`{ version?, notice? }`（`version` 留空自动生成 `YYYY.MM.DD-N`；`notice` 为端上「内容已更新」提示文案）。响应（200）：`{ version, notice, promotedCount }`。
+
+> 说明：发布动作只负责草稿 → 已发布；`publish_at`/`expire_at` 决定的可见时间窗由端上可见性判定实时生效，无需定时任务。
+
 ---
 
 ## 6. 请求/响应示例
@@ -560,3 +595,61 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 2. **用户注册路径**：输入邮箱 → 点「发送验证码」（60s 冷却倒计时）→ 收到 6 位数字邮件 → 填入验证码 + 邀请码 + 用户名密码 → 注册成功 → 自动跳转登录。
 3. **兜底机制**：服务启动时若 `InviteCode` 表为空，自动批量生成 20 个并打印到启动日志（幂等，非空不生成），防止"无码可用"。
 4. 历史固定邀请码 `EURISKO2026BETA` 已废弃，不再接受。
+
+---
+
+## 10. 内容中心接口（公开只读）
+
+> 阶段11：运营内容 / 更新公告 / 政策要点统一由数据库（`ContentItem`）维护，运维后台编辑发布。
+> 两端点均为公开只读、无需登录；但**响应按请求方登录态分层**（audience 分层），因此响应头为 `Cache-Control: private, no-store` + `Vary: Authorization`，禁止 CDN/共享缓存跨档串内容。
+> 分层规则：游客 = `all`；基础版 = `all + free`；专业版/体验版 = `all + free + pro`。
+> `revision` 是当前返回载荷的内容指纹（md5 前 12 位）：内容有实质变动才变化，可用于客户端增量判断。
+
+### 10.1 政策要点
+
+**GET** `/api/content/tax-policy?since=<revision>`
+
+返回政策要点条目（内置 QA 快照之上的**增量覆盖层**）。查询参数 `since` 为客户端本地已应用的 `revision`：与当前一致时返回空 `items`（表示无更新，无需拉取）。
+
+响应：
+```json
+{
+  "success": true,
+  "data": {
+    "version": "2026.09.11-1",
+    "revision": "a1b2c3d4e5f6",
+    "publishedAt": "2026-09-11T02:00:00.000Z",
+    "notice": "政策要点已更新",
+    "items": [
+      { "id": "policy-001", "category": "专项附加扣除", "keywords": ["子女教育"], "question": "...", "answer": "...", "hot": true, "effectiveAt": "2026-09-01", "tag": "policy-point", "updatedAt": "2026-09-11T02:00:00.000Z" }
+    ],
+    "total": 1
+  }
+}
+```
+
+> 对当前档位不可见的条目会以 `{ "id": "<item_id>", "deleted": true }` 墓碑形式返回，客户端按 id upsert/摘除（对内置条目意味着撤回覆盖，对新增条目为幂等无操作）。`since` 一致时 `items` 为空数组。
+
+### 10.2 更新公告 / 运营内容
+
+**GET** `/api/content/feed?placement=home_banner|modal|notice_list|assistant_qa`
+
+返回公告（announcement）与运营内容（operation）列表，供启动弹窗 / 首页公告条 / 个人中心公告列表等展示位消费。`placement` 省略时返回全部展示位的可见条目。
+
+响应：
+```json
+{
+  "success": true,
+  "data": {
+    "version": "2026.09.11-1",
+    "revision": "9f8e7d6c5b4a",
+    "placement": "home_banner",
+    "items": [
+      { "id": "op-001", "type": "operation", "audience": "free", "placements": ["home_banner"], "title": "...", "summary": "...", "body": "...", "linkUrl": "https://...", "linkText": "了解更多", "priority": 9, "publishedAt": "2026-09-11T02:00:00.000Z", "expireAt": null, "updatedAt": "2026-09-11T02:00:00.000Z" }
+    ],
+    "total": 1
+  }
+}
+```
+
+> 未到 `publish_at` 的预约条目与已过 `expire_at` 的条目自动过滤；条目按 `priority` 降序、`publish_at` 降序返回。
