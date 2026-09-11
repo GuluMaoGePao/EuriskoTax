@@ -139,6 +139,15 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **📁 打开 tests 目录** | 资源管理器 | 在文件管理器中打开 tests 目录 |
 
 > **发布门禁卡片**：本面板底部还含 **✅ 本地登录链路验证（verify:local）** = `npm run verify:local`（`server/scripts/verify-local-auth.js`）。部署前**必须跑绿**（共 59 项断言）：真实起本地后端验证 前端与 SW 网络优先特征冒烟 → 登录 dev 账号 → 反馈落库 + 附图（含非法附图 400）+ 用户/管理员列表 + 状态跟进 → 匿名埋点 + 聚合统计 → 运维后台用户列表/详情/权益调档 → 邀请码+验证码注册新号 → 新号登录身份。失败显示红字，此时**禁止发布**。
+>
+> 同一卡片还含两个 **PostgreSQL 生产等价演练** 按钮（2026-09-12 新增，脚本 `tools/ops/ops-verify-pg.ps1`）：
+>
+> | 按钮 | 执行命令 | 适用场景 |
+> |------|---------|---------|
+> | **🐘 PostgreSQL 演练门禁** | `.\tools\ops\ops-verify-pg.ps1`（= `npm run verify:pg`） | 改动 `server/prisma/schema.prisma` 或 `migrations/` 后**必跑**：Docker 起临时 PostgreSQL（端口 55432、独立数据卷）→ `prisma generate` → `prisma migrate deploy` → 内容种子 → 同一套 **59 项**断言。与线上容器启动同序，专拦「本地 SQLite 全绿、线上迁移才炸」 |
+> | **🔄 全新库演练** | `.\tools\ops\ops-verify-pg.ps1 -Fresh`（= `npm run verify:pg:fresh`） | 等价「线上全新库首次部署」：先删演练数据卷再跑一遍，验证从零建表的路径 |
+>
+> 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。未装 Docker 时按钮输出「未检测到 docker 命令，已跳过」并以**返回码 2** 结束（不是代码问题，日常继续用 `verify:local`）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。
 
 ### 4. 📋 日志查看
 
