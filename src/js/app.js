@@ -357,11 +357,11 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reverse-other-deduction-checkbox').checked = false;
         
         // 重置专项扣除数据
-        document.getElementById('reverse-social-security-base').value = 4250;
+        document.getElementById('reverse-social-security-base').value = 7546;
         document.getElementById('reverse-housing-fund-base').value = 4250;
-        document.getElementById('reverse-pension-insurance').value = 340;
-        document.getElementById('reverse-medical-insurance').value = 85;
-        document.getElementById('reverse-unemployment-insurance').value = 21.25;
+        document.getElementById('reverse-pension-insurance').value = 603.68;
+        document.getElementById('reverse-medical-insurance').value = 150.92;
+        document.getElementById('reverse-unemployment-insurance').value = 37.73;
         document.getElementById('reverse-housing-fund').value = 212.5;
         document.getElementById('reverse-pension-rate').value = 8;
         document.getElementById('reverse-medical-rate').value = 2;

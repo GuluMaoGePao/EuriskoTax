@@ -840,7 +840,7 @@ const TAX_PROFILE_KEY = 'tax_profile';
 
 function getDefaultTaxProfile() {
     return {
-        socialBase: 4250,
+        socialBase: 7546,
         housingBase: 4250,
         children: 0,
         elderly: 0,

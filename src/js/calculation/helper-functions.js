@@ -605,10 +605,10 @@ function resetDeductionData() {
     document.getElementById('basic-deduction').value = 5000;
     
     // 专项扣除
-    document.getElementById('social-security-base').value = 4250;
-    document.getElementById('pension-insurance').value = 340;
-    document.getElementById('medical-insurance').value = 85;
-    document.getElementById('unemployment-insurance').value = 21.25;
+    document.getElementById('social-security-base').value = 7546;
+    document.getElementById('pension-insurance').value = 603.68;
+    document.getElementById('medical-insurance').value = 150.92;
+    document.getElementById('unemployment-insurance').value = 37.73;
     document.getElementById('housing-fund').value = 212.5;
     document.getElementById('housing-fund-base').value = 4250;
     document.getElementById('pension-rate').value = 8;
@@ -674,7 +674,7 @@ function resetForwardCalculation() {
         // 1. 重置基本参数
         console.log('重置基本参数');
         document.getElementById('work-months').value = 12;
-        document.getElementById('prepaid-tax').value = 0;
+        document.getElementById('prepaid-tax').value = '';
         
         // 2. 重置收入明细
         console.log('重置收入明细');
@@ -727,7 +727,7 @@ function resetReverseCalculation() {
     document.getElementById('reverse-other-deduction-checkbox').checked = false;
     
     // 5. 重置专项扣除数据
-    document.getElementById('reverse-social-security-base').value = 4250;
+    document.getElementById('reverse-social-security-base').value = 7546;
     document.getElementById('reverse-housing-fund-base').value = 4250;
     document.getElementById('reverse-pension-rate').value = 8;
     document.getElementById('reverse-medical-rate').value = 2;
@@ -815,7 +815,7 @@ function resetBusinessCalculation() {
     // 重置专项扣除
     document.getElementById('business-special-deduction-checkbox').checked = false;
     document.getElementById('business-special-deduction-content').classList.add('hidden');
-    document.getElementById('business-social-security-base').value = 4250;
+    document.getElementById('business-social-security-base').value = 7546;
     document.getElementById('business-pension-insurance').value = 0;
     document.getElementById('business-pension-rate').value = 8;
     document.getElementById('business-medical-insurance').value = 0;

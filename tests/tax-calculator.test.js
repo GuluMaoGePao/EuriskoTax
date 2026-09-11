@@ -349,22 +349,20 @@ describe('calculateIncomeTax - 综合所得税额计算', () => {
 
 describe('determinePrepaidTax - 预缴税额判定', () => {
     test('用户输入预缴税额时应优先使用', () => {
-        const otherIncome = { laborTax: 1000, authorTax: 500, royaltyTax: 300 };
-        const result = determinePrepaidTax(8000, 5000, otherIncome, 1200);
+        const result = determinePrepaidTax(8000, 6800);
         expect(result).toBe(8000);
     });
 
-    test('用户未输入预缴税额时应自动计算', () => {
-        const otherIncome = { laborTax: 1000, authorTax: 500, royaltyTax: 300 };
-        // 5000 + 1000 + 500 + 300 + 1200 = 8000
-        const result = determinePrepaidTax(undefined, 5000, otherIncome, 1200);
-        expect(result).toBe(8000);
+    test('用户未输入预缴税额时应使用自动推演的预缴税额', () => {
+        // 自动值 = 工资累计预缴 5000 + 劳务 1000 + 稿酬 500 + 特许权 300 = 6800
+        const autoPrepaidTax = 5000 + 1000 + 500 + 300;
+        const result = determinePrepaidTax(undefined, autoPrepaidTax);
+        expect(result).toBe(6800);
     });
 
-    test('用户输入 NaN 时应回退到自动计算', () => {
-        const otherIncome = { laborTax: 1000, authorTax: 500, royaltyTax: 300 };
-        const result = determinePrepaidTax(NaN, 5000, otherIncome, 1200);
-        expect(result).toBe(8000);
+    test('用户输入 NaN 时应回退到自动推演', () => {
+        const result = determinePrepaidTax(NaN, 6800);
+        expect(result).toBe(6800);
     });
 });
 

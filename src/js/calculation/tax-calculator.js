@@ -328,7 +328,10 @@ function calculateCumulativePrepaidTax(workMonths, monthlySalaryIncome, monthlyB
 
 function collectTaxInputData() {
     const prepaidTaxElement = document.getElementById('prepaid-tax');
-    const userInputPrepaidTax = prepaidTaxElement ? parseFloat(prepaidTaxElement.value) : undefined;
+    // 留空（或填 0）表示不手动指定，交由系统按收入类型自动推演预缴税额
+    const rawPrepaidTax = prepaidTaxElement ? prepaidTaxElement.value.trim() : '';
+    const parsedPrepaidTax = rawPrepaidTax === '' ? NaN : parseFloat(rawPrepaidTax);
+    const userInputPrepaidTax = (isNaN(parsedPrepaidTax) || parsedPrepaidTax === 0) ? undefined : parsedPrepaidTax;
     
     return {
         workMonths: parseInt(document.getElementById('work-months').value) || 12,
@@ -338,7 +341,7 @@ function collectTaxInputData() {
         annualRoyaltyIncome: parseFloat(document.getElementById('royalty-income').value) || 0,
         bonusIncome: parseFloat(document.getElementById('bonus-income').value) || 0,
         bonusInclude: document.getElementById('bonus-include').checked,
-        userInputPrepaidTax: !isNaN(userInputPrepaidTax) ? userInputPrepaidTax : undefined
+        userInputPrepaidTax: userInputPrepaidTax
     };
 }
 
@@ -371,11 +374,15 @@ function calculateIncomeTax(taxableIncome) {
     };
 }
 
-function determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax) {
+// 判定综合所得汇算所用的"已预缴税额"
+// 用户手动填写时以其为准；未填写时按源泉扣缴规则自动推演：
+// 工资薪金累计预缴 + 劳务报酬/稿酬/特许权使用费预缴（这三类所得必然产生预缴税）
+// 注：年终奖单独计税的税额不属于综合所得预缴，故不计入
+function determinePrepaidTax(userInputPrepaidTax, autoPrepaidTax) {
     if (userInputPrepaidTax !== undefined && !isNaN(userInputPrepaidTax)) {
         return userInputPrepaidTax;
     }
-    return cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax + bonusTax;
+    return autoPrepaidTax;
 }
 
 function calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome, bonusIncome) {
@@ -406,12 +413,16 @@ function performTaxCalculation(inputData) {
         deductions.monthlyTaxDeferredPension);
     
     const bonusTax = calculateBonusTax(bonusIncome, bonusInclude);
-    const prepaidTax = determinePrepaidTax(userInputPrepaidTax, cumulativeTax, otherIncome, bonusTax);
+    // 综合所得自动预缴 = 工资累计预缴 + 劳务/稿酬/特许权使用费预缴
+    const autoPrepaidTax = cumulativeTax + otherIncome.laborTax + otherIncome.authorTax + otherIncome.royaltyTax;
+    const prepaidTax = determinePrepaidTax(userInputPrepaidTax, autoPrepaidTax);
     
+    // 综合所得汇算应退/应补 = 综合所得应纳税额 - 综合所得已预缴税额
     const refundTax = taxResult.totalTax - prepaidTax;
     const preTaxIncome = calculatePreTaxIncome(monthlySalaryIncome, workMonths, annualLaborIncome, 
         annualAuthorIncome, annualRoyaltyIncome, bonusIncome);
-    const netIncome = preTaxIncome - taxResult.totalTax;
+    // 税后年收入 = 税前年收入 - 综合所得应纳税额 - 年终奖（单独计税）税额
+    const netIncome = preTaxIncome - taxResult.totalTax - bonusTax;
     
     return {
         workMonths,
@@ -471,7 +482,7 @@ function performTaxCalculation(inputData) {
 }
 
 function updateBasicResults(results) {
-    document.getElementById('result-total-income').textContent = '¥' + results.incomeDetails.total.toFixed(2);
+    document.getElementById('result-total-income').textContent = '¥' + results.incomeDetails.preTaxTotal.toFixed(2);
     document.getElementById('result-total-deduction').textContent = '¥' + results.deductionDetails.total.toFixed(2);
     document.getElementById('result-taxable-income').textContent = '¥' + results.taxDetails.taxableIncome.toFixed(2);
     document.getElementById('result-tax-rate').textContent = (results.taxDetails.applicableRate * 100).toFixed(0) + '%';
@@ -574,7 +585,7 @@ function updatePrepaidAndRefundTax(results) {
     if (refundTaxElement) {
         const refundTax = results.taxDetails.refundTax;
         refundTaxElement.classList.remove('text-danger', 'text-success', 'text-primary');
-        if (refundTax === 0) {
+        if (Math.abs(refundTax) < 0.005) {
             refundTaxElement.textContent = '不退不补 ¥0.00';
         } else if (refundTax > 0) {
             refundTaxElement.textContent = '应补 ¥' + refundTax.toFixed(2);
@@ -908,15 +919,15 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
     // 进取模式（aggressive）：最高值，接近上限的税负水平
     let middleTaxableIncome;
     // 仅对最低税率档位设置合理最低值，保持对所有收入群体的适用性
-    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
+    // 3%档位允许应纳税所得额为 0 元（0-36000元均适用3%税率）
     // 其他档位使用原值+1，确保精确性和适用性
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 0 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         // 最高档位：根据模式调整
         switch(mode) {
             case 'conservative':
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 middleTaxableIncome = minTaxableIncome + 100000;
@@ -930,7 +941,7 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
     } else {
         switch(mode) {
             case 'conservative':
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
@@ -939,7 +950,7 @@ function calculateFromTargetRate(inputData, deductionData, bonusTax, mode = 'con
                 middleTaxableIncome = maxTaxableIncome;
                 break;
             default:
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
         }
     }
     
@@ -1052,13 +1063,13 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax, mode = 'bal
     const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
     
     let modeTaxableIncome;
-    // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
-    const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+    // 3%档位允许应纳税所得额为 0 元（0-36000元均适用3%税率）
+    const minimumTaxableIncome = minTaxableIncome === 0 ? 0 : minTaxableIncome + 1;
     
     if (maxTaxableIncome === Infinity) {
         switch(mode) {
             case 'conservative':
-                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                modeTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 modeTaxableIncome = baseTaxableIncome;
@@ -1072,7 +1083,7 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax, mode = 'bal
     } else {
         switch(mode) {
             case 'conservative':
-                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                modeTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 modeTaxableIncome = baseTaxableIncome;
@@ -1182,13 +1193,13 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
         
         let modeTaxableIncome;
-        // 3%档位设置1元作为最低基准（应纳税所得额1-36000元适用3%税率）
-        const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+        // 3%档位允许应纳税所得额为 0 元（0-36000元均适用3%税率）
+        const minimumTaxableIncome = minTaxableIncome === 0 ? 0 : minTaxableIncome + 1;
         
         if (maxTaxableIncome === Infinity) {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -1202,7 +1213,7 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         } else {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -1301,12 +1312,12 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         const maxTaxableIncome = targetBracket.max === Infinity ? 10000000 : targetBracket.max;
         
         let modeTaxableIncome;
-        const minimumTaxableIncome = minTaxableIncome === 0 ? 1 : minTaxableIncome + 1;
+        const minimumTaxableIncome = minTaxableIncome === 0 ? 0 : minTaxableIncome + 1;
         
         if (maxTaxableIncome === Infinity) {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -1320,7 +1331,7 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
         } else {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -1801,7 +1812,7 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
         // 最高档位：根据模式调整
         switch(mode) {
             case 'conservative':
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 middleTaxableIncome = minTaxableIncome + 100000;
@@ -1815,7 +1826,7 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
     } else {
         switch(mode) {
             case 'conservative':
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 middleTaxableIncome = (minTaxableIncome + maxTaxableIncome) / 2;
@@ -1824,7 +1835,7 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
                 middleTaxableIncome = maxTaxableIncome;
                 break;
             default:
-                middleTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                middleTaxableIncome = minimumTaxableIncome;
         }
     }
     
@@ -1936,7 +1947,7 @@ function calculateBusinessFromMonthlyNet(inputData, deductionData, mode = 'balan
         // 最高档位：基于基准应纳税所得额调整
         switch(mode) {
             case 'conservative':
-                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                modeTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 // 均衡模式：使用二分法算出的基准值
@@ -1952,7 +1963,7 @@ function calculateBusinessFromMonthlyNet(inputData, deductionData, mode = 'balan
     } else {
         switch(mode) {
             case 'conservative':
-                modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                modeTaxableIncome = minimumTaxableIncome;
                 break;
             case 'balanced':
                 modeTaxableIncome = baseTaxableIncome;
@@ -2063,7 +2074,7 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
             // 最高档位：基于基准应纳税所得额调整
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     // 均衡模式：使用二分法算出的基准值
@@ -2079,7 +2090,7 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         } else {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -2182,7 +2193,7 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         if (maxTaxableIncome === Infinity) {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;
@@ -2196,7 +2207,7 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         } else {
             switch(mode) {
                 case 'conservative':
-                    modeTaxableIncome = Math.max(minTaxableIncome + 1, minimumTaxableIncome);
+                    modeTaxableIncome = minimumTaxableIncome;
                     break;
                 case 'balanced':
                     modeTaxableIncome = baseTaxableIncome;

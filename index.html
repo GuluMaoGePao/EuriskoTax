@@ -2138,7 +2138,7 @@
                                 </span>
                             </label>
                             <div class="flex items-center space-x-2">
-                                <input type="number" id="prepaid-tax" class="input-field" value="0" min="0" step="100">
+                                <input type="number" id="prepaid-tax" class="input-field" value="" placeholder="留空自动计算" min="0" step="100">
                             </div>
                         </div>
                         
@@ -2311,7 +2311,7 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="social-security-base" class="input-field" value="4250" min="0" step="100">
+                                        <input type="number" id="social-security-base" class="input-field" value="7546" min="0" step="100">
                                     </div>
                                     <div id="social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                 </div>
@@ -2746,7 +2746,7 @@
                                 <div class="result-hero-label">税后年收入</div>
                                 <div class="result-hero-value" id="result-net-income">¥0</div>
                                 <div class="result-hero-sub">
-                                    <span>税前 <span id="result-total-income">¥0</span></span>
+                                    <span>税前年收入 <span id="result-total-income">¥0</span></span>
                                     <span class="result-hero-divider">|</span>
                                     <span>扣除 <span id="result-total-deduction" class="text-success">¥0</span></span>
                                 </div>
@@ -3352,7 +3352,7 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="reverse-social-security-base" class="input-field" value="4250" min="0" step="100">
+                                        <input type="number" id="reverse-social-security-base" class="input-field" value="7546" min="0" step="100">
                                     </div>
                                     <div id="reverse-social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                 </div>
@@ -4220,7 +4220,7 @@
                                         </span>
                                     </label>
                                     <div class="flex items-center space-x-2">
-                                        <input type="number" id="business-social-security-base" class="input-field" value="4250" min="0" step="100">
+                                        <input type="number" id="business-social-security-base" class="input-field" value="7546" min="0" step="100">
                                     </div>
                                     <div id="business-social-security-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                 </div>
@@ -5773,7 +5773,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.7.1</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.7.2</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6109,7 +6109,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="form-group">
                             <label class="label">默认社保缴费基数（元/月）</label>
-                            <input type="number" id="tax-profile-social-base" class="input-field !pl-3" placeholder="4250" min="0">
+                            <input type="number" id="tax-profile-social-base" class="input-field !pl-3" placeholder="7546" min="0">
                         </div>
                         <div class="form-group">
                             <label class="label">默认公积金基数（元/月）</label>
