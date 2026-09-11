@@ -1,241 +1,459 @@
-// === 阶段10B：税务政策要点「更新同步」 ===
+// === 阶段11：内容中心「更新同步」 ===
 //
-// 数据模型（与 stage10 计划 §5.2 对齐）：
-//   tax-assistant.js 内置快照 window.TAX_ASSISTANT_QA 是离线全量基准（免费版仅用它）；
-//   本模块负责"专业版增量更新"：登录后静默拉取 GET /api/content/tax-policy，
-//   服务端返回同结构的更新条目（id 与内置条目一一对应 or 全新条目），客户端按 id upsert：
-//     - id 已存在 → 覆盖更新字段（新增的 tag/updatedAt 等透传）
+// 数据模型：
+//   tax-assistant.js 内置快照 window.TAX_ASSISTANT_QA 是离线全量基准（断网兜底）；
+//   本模块维护服务端内容（ContentItem）作为「增量覆盖层」，按 id upsert：
+//     - id 已存在 → 覆盖字段（远端为准）
 //     - id 不存在 → push 到末尾
-//     - deleted:true → 撤回内置条目（从数组中移除）
-//   合并结果写本地缓存 taxPolicyCache（版本 + notice），供「政策已更新」提示条读取。
+//     - deleted:true → 撤回条目（从数组移除）
+//   合并结果连同「已应用条目快照」一起写入本地缓存，刷新页面后重放（阶段10B 仅缓存版本号，
+//   导致刷新后内容丢失且 since 版本一致后再不拉取——阶段11 修复）。
 //
-// 加载顺序：需在 tax-assistant.js 之后（运行时才读写 window.TAX_ASSISTANT_QA，不依赖加载时机）。
+// 阶段11 变更：
+//   1) 政策要点对所有用户开放（含未登录游客），不再专业版专属；携带 token 时服务端按档位分层返回。
+//   2) 新增 feed 同步：GET /api/content/feed（更新公告 / 运营内容），按展示位投放到启动弹窗、
+//      首页公告条与个人中心公告列表。
+//   3) 以 revision（内容指纹）替代 version 做增量判断；超过 STALE_MS 强制全量刷新，
+//      保证「预约上线 / 到期自动下架 / 撤回」在下次拉取时即时生效。
+//
+// 加载顺序：需在 tax-assistant.js 之后（模块初始化时会重放缓存覆盖层）。
 // 可测性：与 history-sync.js 一致——不直接依赖 DOM；fetch / window.apiClient 缺失时静默跳过。
-
 (function () {
     'use strict';
 
     var CACHE_KEY = 'taxPolicyCache';
-    var SEEN_KEY = 'taxPolicyBannerSeen';
+    var FEED_CACHE_KEY = 'contentFeedCache';
+    var BANNER_SEEN_KEY = 'taxPolicyBannerSeen';
+    var HOME_BANNER_SEEN_KEY = 'contentHomeBannerSeen';
+    var MODAL_SEEN_KEY = 'contentModalSeen';
+
     var EVENT_UPDATED = 'euriskotax:policy-updated';
+    var EVENT_FEED = 'euriskotax:content-feed-updated';
+
     var ENDPOINT = '/api/content/tax-policy';
+    var FEED_ENDPOINT = '/api/content/feed';
 
-    // 内部状态
+    // 缓存的新鲜期：超过则丢弃 since 指纹强制全量刷新（自动过期/撤回才能落地）
+    var STALE_MS = 10 * 60 * 1000;
+    var MAX_SEEN_KEYS = 60;
+
     var busy = false;
-    var memoryCache = null; // 会话内缓存（避免每次读 localStorage）
+    var feedBusy = false;
+    var feedMemory = null;
+    var baseSnapshot = null; // 内置快照基准（仅首次重建时捕获，用于幂等重放）
 
-    // 与云同步引擎共用 API 基址覆盖开关（沙箱 / 联调注入）
-    function apiBase() {
-        var override = (typeof window !== 'undefined' && window.__EURISKO_SYNC_API_BASE__) || '';
-        return override;
-    }
-
+    // ---------- 存储 ----------
     function readStore(key, fallback) {
         try {
             if (typeof localStorage === 'undefined') return fallback;
             var raw = localStorage.getItem(key);
-            return raw ? JSON.parse(raw) : fallback;
+            if (!raw) return fallback;
+            var parsed = JSON.parse(raw);
+            return parsed === null || parsed === undefined ? fallback : parsed;
         } catch (e) {
             return fallback;
         }
     }
 
-    function writeStore(key, val) {
+    function writeStore(key, value) {
         try {
-            if (typeof localStorage === 'undefined') return;
-            localStorage.setItem(key, JSON.stringify(val));
-        } catch (e) {
-            /* 隐私模式/配额满时静默 */
-        }
-    }
-
-    // 当前登录用户是否专业版（无 apiClient 时回退读存储，仍不可得则 false）
-    function getCurrentUser() {
-        try {
-            if (typeof window !== 'undefined' && window.apiClient && typeof window.apiClient.getCurrentUser === 'function') {
-                return window.apiClient.getCurrentUser() || null;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(key, JSON.stringify(value));
             }
-            // fallback（apiClient 未暴露到 window 时）：与 api-client.js 语义一致双级读取——
-            // 「保持登录状态」勾选写 localStorage，未勾选写 sessionStorage
-            var raw = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('current_user') : null)
-                || (typeof localStorage !== 'undefined' ? localStorage.getItem('current_user') : null);
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            return null;
-        }
+        } catch (e) { /* 隐私模式/配额不足时静默降级为内存态 */ }
     }
 
-    function isProActive() {
-        var user = getCurrentUser();
-        if (!user) return false;
-        var planLib = (typeof window !== 'undefined') ? window.EuriskoPlan : null;
-        if (!planLib || typeof planLib.isPro !== 'function') return false;
-        return planLib.isPro(user.plan, user.plan_expires_at);
+    function removeStore(key) {
+        try {
+            if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+        } catch (e) { /* ignore */ }
     }
 
     function nowISO() {
-        return new Date().toISOString();
+        try { return new Date().toISOString(); } catch (e) { return null; }
     }
 
     function readCache() {
-        if (memoryCache) return memoryCache;
-        memoryCache = readStore(CACHE_KEY, null);
-        return memoryCache;
+        var cache = readStore(CACHE_KEY, null);
+        return cache && typeof cache === 'object' ? cache : null;
     }
 
-    function setCache(cache) {
-        memoryCache = cache;
-        writeStore(CACHE_KEY, cache);
+    function readFeedCache() {
+        if (feedMemory) return feedMemory;
+        var cache = readStore(FEED_CACHE_KEY, null);
+        return cache && typeof cache === 'object' ? cache : null;
     }
 
-    function getItems() {
-        return (typeof window !== 'undefined' && window.TAX_ASSISTANT_QA) || null;
-    }
-
-    // 合并远端更新条目到内置快照。返回合并条数。
-    function applyUpdates(updates) {
-        var qa = getItems();
-        if (!qa || !Array.isArray(qa) || !Array.isArray(updates)) return 0;
-        var index = {};
-        for (var i = 0; i < qa.length; i++) {
-            if (qa[i] && qa[i].id) index[qa[i].id] = i;
-        }
-        var count = 0;
-        updates.forEach(function (u) {
-            if (!u || !u.id) return;
-            if (u.deleted === true) {
-                if (typeof index[u.id] === 'number') {
-                    qa.splice(index[u.id], 1);
-                    delete index[u.id];
-                    count++;
-                }
-                return;
-            }
-            var at = index[u.id];
-            if (typeof at === 'number') {
-                // 已存在：覆盖更新字段（远端为准）
-                var target = qa[at];
-                Object.keys(u).forEach(function (k) { target[k] = u[k]; });
-            } else {
-                qa.push(u);
-                index[u.id] = qa.length - 1;
-            }
-            count++;
-        });
-        return count;
-    }
-
-    // 远端拉取并合并（静默失败）。免费版直接返回 resolved（不用内置快照以外的数据）。
-    function syncNow() {
-        if (!isProActive()) {
-            return Promise.resolve({ updated: false, reason: 'free' });
-        }
-        if (busy) return Promise.resolve({ updated: false, reason: 'busy' });
-        busy = true;
-
-        var cache = readCache() || {};
-        var url = apiBase() + ENDPOINT;
-        if (cache.version) {
-            url += (url.indexOf('?') === -1 ? '?' : '&') + 'since=' + encodeURIComponent(cache.version);
-        }
-
-        var result;
-        return fetch(url, { cache: 'no-store' })
-            .then(function (res) {
-                if (!res.ok) {
-                    var err = new Error('政策内容请求失败 HTTP ' + res.status);
-                    err.status = res.status;
-                    throw err;
-                }
-                return res.json();
-            })
-            .then(function (payload) {
-                var data = payload && payload.data;
-                if (!data || typeof data.version !== 'string') {
-                    throw new Error('政策内容格式异常');
-                }
-                var items = Array.isArray(data.items) ? data.items : [];
-                var prevVersion = cache.version || null;
-                var prevNotice = cache.notice || '';
-                if (items.length === 0) {
-                    // 与本地版本一致 → 无更新，仅刷新 checkedAt
-                    setCache({
-                        version: data.version,
-                        notice: data.notice || prevNotice,
-                        publishedAt: data.publishedAt || cache.publishedAt || null,
-                        checkedAt: nowISO()
-                    });
-                    return { updated: false, version: data.version, reason: 'no-change' };
-                }
-                var count = applyUpdates(items);
-                var cacheEntry = {
-                    version: data.version,
-                    notice: data.notice || '',
-                    publishedAt: data.publishedAt || null,
-                    checkedAt: nowISO(),
-                    updatedAt: nowISO(),
-                    updatedCount: count
-                };
-                setCache(cacheEntry);
-                // 版本前进且确实有新增/变更时通知 UI（横幅/测试监听）
-                var fresh = (!prevVersion || prevVersion !== data.version);
-                if (typeof document !== 'undefined' && typeof CustomEvent === 'function' && fresh) {
-                    document.dispatchEvent(new CustomEvent(EVENT_UPDATED, {
-                        detail: { version: data.version, notice: cacheEntry.notice, count: count }
-                    }));
-                }
-                return { updated: true, version: data.version, count: count, notice: cacheEntry.notice, fresh: fresh };
-            })
-            .catch(function (err) {
-                if (typeof console !== 'undefined') {
-                    console.warn('[policy] 政策更新拉取失败（静默）:', err && err.message ? err.message : err);
-                }
-                return { updated: false, reason: 'network', error: err };
-            })
-            .then(function (r) {
-                busy = false;
-                return r;
-            });
-    }
-
-    // === 横幅「政策已更新」状态 ===
-    function getCache() { return readCache(); }
-
-    // 是否有尚未关闭的更新提示（版本高于上次 seen，且同步确实落过地）
-    function needsBanner() {
-        var cache = readCache();
-        if (!cache || !cache.version) return false;
-        var seen = readStore(SEEN_KEY, null);
-        if (seen && seen === cache.version) return false;
-        return true;
-    }
-
-    function setBannerSeen() {
-        var cache = readCache();
-        if (cache && cache.version) writeStore(SEEN_KEY, cache.version);
-    }
-
-    // 登出/注销时清理（退出后横幅不再显示当前会话的更新）
-    function clearState() {
-        memoryCache = null;
+    function emit(name, detail) {
         try {
-            if (typeof localStorage !== 'undefined') {
-                localStorage.removeItem(CACHE_KEY);
-                localStorage.removeItem(SEEN_KEY);
+            if (typeof document !== 'undefined' && typeof CustomEvent === 'function') {
+                document.dispatchEvent(new CustomEvent(name, { detail: detail }));
             }
         } catch (e) { /* ignore */ }
     }
 
-    window.TaxPolicy = {
-        EVENT_UPDATED: EVENT_UPDATED,
-        syncNow: syncNow,
-        applyUpdates: applyUpdates,
-        isProActive: isProActive,
-        getCurrentUser: getCurrentUser,
-        getCache: getCache,
-        needsBanner: needsBanner,
-        setBannerSeen: setBannerSeen,
-        clearState: clearState,
-        CACHE_KEY: CACHE_KEY
+    // ---------- 运行环境 ----------
+    function getItems() {
+        return (typeof window !== 'undefined' && window.TAX_ASSISTANT_QA) || null;
+    }
+
+    function apiBase() {
+        if (typeof window !== 'undefined' && window.__EURISKO_SYNC_API_BASE__) {
+            return String(window.__EURISKO_SYNC_API_BASE__).replace(/\/+$/, '');
+        }
+        return '';
+    }
+
+    function getToken() {
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                var s = sessionStorage.getItem('auth_token');
+                if (s) return s;
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            if (typeof localStorage !== 'undefined') {
+                var l = localStorage.getItem('auth_token');
+                if (l) return l;
+            }
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    function buildHeaders() {
+        var headers = {};
+        var token = getToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        return headers;
+    }
+
+    function hasFetch() {
+        return typeof fetch === 'function';
+    }
+
+    function isFresh(iso) {
+        if (!iso) return false;
+        var t = new Date(iso).getTime();
+        if (!isFinite(t)) return false;
+        return (Date.now() - t) < STALE_MS;
+    }
+
+    // ---------- 覆盖层应用 ----------
+    function applyUpdates(items) {
+        var qa = getItems();
+        if (!Array.isArray(qa) || !Array.isArray(items)) return 0;
+
+        var count = 0;
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            if (!item || !item.id) continue;
+
+            var idx = -1;
+            for (var j = 0; j < qa.length; j++) {
+                if (qa[j] && qa[j].id === item.id) { idx = j; break; }
+            }
+
+            if (item.deleted) {
+                if (idx !== -1) { qa.splice(idx, 1); count++; }
+                continue;
+            }
+
+            if (idx === -1) {
+                var clone = {};
+                for (var k in item) { if (Object.prototype.hasOwnProperty.call(item, k)) clone[k] = item[k]; }
+                delete clone.deleted;
+                qa.push(clone);
+                count++;
+            } else {
+                for (var key in item) {
+                    if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+                    if (key === 'deleted') continue;
+                    qa[idx][key] = item[key];
+                }
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // 捕获内置快照基准（在应用任何覆盖层之前调用）
+    function captureBase() {
+        if (baseSnapshot) return;
+        var qa = getItems();
+        if (!Array.isArray(qa) || qa.length === 0) return;
+        try {
+            baseSnapshot = JSON.parse(JSON.stringify(qa));
+        } catch (e) {
+            baseSnapshot = null;
+        }
+    }
+
+    // 以内置快照为基准重建，再应用覆盖层 → 幂等（重复重放/远端删条目都能得到正确结果）
+    function rebuild(overrides) {
+        captureBase();
+        var qa = getItems();
+        if (!baseSnapshot || !Array.isArray(qa)) return 0;
+        qa.length = 0;
+        for (var i = 0; i < baseSnapshot.length; i++) {
+            qa.push(JSON.parse(JSON.stringify(baseSnapshot[i])));
+        }
+        return applyUpdates(overrides);
+    }
+
+    // ---------- 同步：政策要点 ----------
+    function syncNow(opts) {
+        opts = opts || {};
+        if (busy) return Promise.resolve({ updated: false, reason: 'busy' });
+        if (!hasFetch()) return Promise.resolve({ updated: false, reason: 'no-fetch' });
+
+        var cache = readCache() || {};
+        var url = apiBase() + ENDPOINT;
+        // 指纹新鲜才做增量；否则强制全量（保证自动过期/撤回生效）
+        if (!opts.force && cache.revision && isFresh(cache.checkedAt)) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'since=' + encodeURIComponent(cache.revision);
+        }
+
+        busy = true;
+        return fetch(url, { cache: 'no-store', headers: buildHeaders() })
+            .then(function (res) {
+                if (!res || !res.ok) throw new Error('policy sync failed: ' + (res ? res.status : 'no-response'));
+                return res.json();
+            })
+            .then(function (payload) {
+                var data = payload && payload.data;
+                if (!data || typeof data.version !== 'string') throw new Error('policy payload malformed');
+
+                var items = Array.isArray(data.items) ? data.items : [];
+                var prevVersion = cache.version || null;
+                var prevNotice = cache.notice || '';
+
+                if (items.length === 0) {
+                    // 与本地指纹一致 → 无变化，仅刷新时间戳
+                    var next = {
+                        version: data.version,
+                        revision: data.revision || cache.revision || null,
+                        notice: data.notice || prevNotice,
+                        publishedAt: data.publishedAt || cache.publishedAt || null,
+                        checkedAt: nowISO(),
+                        updatedAt: cache.updatedAt || null,
+                        updatedCount: cache.updatedCount || 0,
+                        overrides: Array.isArray(cache.overrides) ? cache.overrides : []
+                    };
+                    writeStore(CACHE_KEY, next);
+                    return { updated: false, version: data.version, reason: 'no-change' };
+                }
+
+                // 服务端每次返回「完整生效集合」→ 直接替换覆盖层（远端删条目也能被摘除）
+                var overrides = items;
+                var count = rebuild(overrides);
+                var entry = {
+                    version: data.version,
+                    revision: data.revision || null,
+                    notice: data.notice || '',
+                    publishedAt: data.publishedAt || null,
+                    checkedAt: nowISO(),
+                    updatedAt: nowISO(),
+                    updatedCount: count,
+                    overrides: overrides
+                };
+                writeStore(CACHE_KEY, entry);
+
+                var isNewVersion = (!prevVersion || prevVersion !== data.version);
+                if (isNewVersion) {
+                    emit(EVENT_UPDATED, { version: data.version, notice: entry.notice, count: count });
+                }
+                return { updated: true, version: data.version, count: count, notice: entry.notice, fresh: isNewVersion };
+            })
+            .catch(function (err) {
+                return { updated: false, reason: 'error', error: err && err.message };
+            })
+            .then(function (result) {
+                busy = false;
+                return result;
+            });
+    }
+
+    // ---------- 同步：公告 / 运营内容 ----------
+    function syncFeed() {
+        if (feedBusy) return Promise.resolve({ updated: false, reason: 'busy' });
+        if (!hasFetch()) return Promise.resolve({ updated: false, reason: 'no-fetch' });
+
+        feedBusy = true;
+        return fetch(apiBase() + FEED_ENDPOINT, { cache: 'no-store', headers: buildHeaders() })
+            .then(function (res) {
+                if (!res || !res.ok) throw new Error('feed sync failed: ' + (res ? res.status : 'no-response'));
+                return res.json();
+            })
+            .then(function (payload) {
+                var data = payload && payload.data;
+                if (!data) throw new Error('feed payload malformed');
+
+                var items = Array.isArray(data.items) ? data.items : [];
+                var prev = readFeedCache() || {};
+                var changed = !prev.revision || prev.revision !== (data.revision || null) || !items.length === !(prev.items || []).length;
+
+                var entry = {
+                    version: data.version || null,
+                    revision: data.revision || null,
+                    checkedAt: nowISO(),
+                    items: items
+                };
+                feedMemory = entry;
+                writeStore(FEED_CACHE_KEY, entry);
+
+                if (changed) {
+                    emit(EVENT_FEED, { version: entry.version, count: items.length });
+                }
+                return { updated: changed, count: items.length, items: items };
+            })
+            .catch(function (err) {
+                return { updated: false, reason: 'error', error: err && err.message };
+            })
+            .then(function (result) {
+                feedBusy = false;
+                return result;
+            });
+    }
+
+    // 按展示位取本地已同步的公告/运营内容
+    function getFeed(placement) {
+        var cache = readFeedCache();
+        var items = (cache && Array.isArray(cache.items)) ? cache.items : [];
+        if (!placement) return items.slice();
+        return items.filter(function (it) {
+            return it && Array.isArray(it.placements) && it.placements.indexOf(placement) !== -1;
+        });
+    }
+
+    // ---------- 未读 / 已读 ----------
+    function isSeen(key, storeKey) {
+        var seen = readStore(storeKey, []);
+        return Array.isArray(seen) && seen.indexOf(key) !== -1;
+    }
+
+    function markSeen(key, storeKey) {
+        var seen = readStore(storeKey, []);
+        if (!Array.isArray(seen)) seen = [];
+        if (seen.indexOf(key) === -1) seen.push(key);
+        if (seen.length > MAX_SEEN_KEYS) seen = seen.slice(-MAX_SEEN_KEYS);
+        writeStore(storeKey, seen);
+    }
+
+    var itemKey = function (it) {
+        return it && it.id ? (it.id + ':' + (it.updatedAt || '')) : '';
     };
+
+    // 启动弹窗待展示内容（modal 展示位且未读）
+    function pendingModalNotices() {
+        return getFeed('modal').filter(function (it) {
+            var key = itemKey(it);
+            return key && !isSeen(key, MODAL_SEEN_KEY);
+        });
+    }
+
+    function markModalSeen(items) {
+        (Array.isArray(items) ? items : []).forEach(function (it) {
+            var key = itemKey(it);
+            if (key) markSeen(key, MODAL_SEEN_KEY);
+        });
+    }
+
+    // 首页公告条：取优先级最高且未关闭的一条（不依赖服务端排序）
+    function homeBannerItem() {
+        var list = getFeed('home_banner').filter(function (it) {
+            var key = itemKey(it);
+            return key && !isSeen(key, HOME_BANNER_SEEN_KEY) && (it.title || it.summary);
+        });
+        if (!list.length) return null;
+        list.sort(function (a, b) {
+            var pa = a && a.priority ? a.priority : 0;
+            var pb = b && b.priority ? b.priority : 0;
+            if (pb !== pa) return pb - pa;
+            var ta = a && a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+            var tb = b && b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+            return tb - ta;
+        });
+        return list[0];
+    }
+
+    function dismissHomeBanner(item) {
+        var key = itemKey(item);
+        if (key) markSeen(key, HOME_BANNER_SEEN_KEY);
+    }
+
+    // 个人中心公告列表（含全部展示位的公告/运营内容，按发布时间倒序）
+    function noticeList() {
+        var cache = readFeedCache();
+        var items = (cache && Array.isArray(cache.items)) ? cache.items.slice() : [];
+        return items.sort(function (a, b) {
+            var ta = a && a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+            var tb = b && b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+            if (tb !== ta) return tb - ta;
+            return (b && b.priority ? b.priority : 0) - (a && a.priority ? a.priority : 0);
+        });
+    }
+
+    // ---------- 提示条（税助手悬浮抽屉） ----------
+    function needsBanner() {
+        var cache = readCache();
+        if (!cache || !cache.version) return false;
+        var seen = readStore(BANNER_SEEN_KEY, null);
+        return seen !== cache.version;
+    }
+
+    function markBannerSeen() {
+        var cache = readCache();
+        if (cache && cache.version) writeStore(BANNER_SEEN_KEY, cache.version);
+    }
+
+    function getCache() {
+        return readCache();
+    }
+
+    function clearState() {
+        [CACHE_KEY, FEED_CACHE_KEY, BANNER_SEEN_KEY, HOME_BANNER_SEEN_KEY, MODAL_SEEN_KEY, 'taxPolicyBannerSeen']
+            .forEach(removeStore);
+        baseSnapshot = null;
+        feedMemory = null;
+    }
+
+    // 登录 / 恢复会话 / 启动时触发（游客亦同步，服务端只返回 all 档内容）
+    function triggerSync() {
+        syncFeed();
+        return syncNow();
+    }
+
+    // 模块初始化：重放上次已应用的覆盖层（修复阶段10B「刷新后内容丢失」）
+    (function replay() {
+        var cache = readCache();
+        if (!cache || !Array.isArray(cache.overrides) || cache.overrides.length === 0) return;
+        try { rebuild(cache.overrides); } catch (e) { /* 快照不可用时跳过 */ }
+    })();
+
+    var api = {
+        ENDPOINT: ENDPOINT,
+        FEED_ENDPOINT: FEED_ENDPOINT,
+        CACHE_KEY: CACHE_KEY,
+        FEED_CACHE_KEY: FEED_CACHE_KEY,
+        EVENT_UPDATED: EVENT_UPDATED,
+        EVENT_FEED: EVENT_FEED,
+        STALE_MS: STALE_MS,
+        syncNow: syncNow,
+        syncFeed: syncFeed,
+        triggerSync: triggerSync,
+        getFeed: getFeed,
+        noticeList: noticeList,
+        pendingModalNotices: pendingModalNotices,
+        markModalSeen: markModalSeen,
+        homeBannerItem: homeBannerItem,
+        dismissHomeBanner: dismissHomeBanner,
+        applyUpdates: applyUpdates,
+        needsBanner: needsBanner,
+        markBannerSeen: markBannerSeen,
+        setBannerSeen: markBannerSeen, // 兼容旧调用（tax-assistant-ui.js 关闭横幅）
+        getCache: getCache,
+        clearState: clearState
+    };
+
+    if (typeof window !== 'undefined') window.TaxPolicy = api;
 })();
