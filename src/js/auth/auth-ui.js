@@ -789,7 +789,7 @@ function renderProfileCards() {
     if (!grid || grid.children.length > 0) return; // 已渲染则跳过
 
     grid.innerHTML = PROFILE_CARDS_CONFIG.map(({ id, title, desc, iconWrapClass, iconClass }) => `
-        <div class="card cursor-pointer profile-card-hover h-full" id="${id}">
+        <div class="bg-white rounded-lg shadow-card cursor-pointer profile-card-hover h-full" id="${id}">
             <div class="p-4 sm:p-5 flex items-center gap-3.5 sm:gap-4">
                 <div class="${iconWrapClass}">
                     <i class="${iconClass}"></i>
@@ -1290,8 +1290,15 @@ function loadHistoryToList(listId, emptyId) {
     const history = getLocalHistory();
 
     if (history.length === 0) {
+        // 空态元素在 index.html 中位于列表容器内部，清空列表会把它一并移除，
+        // 导致「暂无计算记录」永不显示；因此清空后需按需挂回。
         if (historyList) historyList.innerHTML = '';
-        if (historyEmpty) historyEmpty.classList.remove('hidden');
+        if (historyEmpty) {
+            historyEmpty.classList.remove('hidden');
+            if (historyList && !historyList.contains(historyEmpty)) {
+                historyList.appendChild(historyEmpty);
+            }
+        }
         return;
     }
 
