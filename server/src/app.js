@@ -15,6 +15,7 @@ const statsRoutes = require('./routes/stats');
 const inviteRoutes = require('./routes/invites');
 const contentRoutes = require('./routes/content');
 const adminUserRoutes = require('./routes/adminUsers');
+const contentAdminRoutes = require('./routes/contentAdmin');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -84,12 +85,12 @@ const syncLimiter = rateLimit({
     }
 });
 
-// 政策内容限流：120 次/分钟/IP（阶段10B 公开只读端点）。
-// 专业版仅在登录后静默拉取一次，宽松上限只挡批量刷取
+// 内容中心限流：120 次/分钟/IP（阶段11 公开只读端点：/tax-policy 政策要点 + /feed 公告运营内容）。
+// 端上仅在启动/登录时拉取一次，宽松上限只挡批量刷取
 const contentLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 120,
-    skip: (req) => req.path !== '/tax-policy',
+    skip: (req) => !['/tax-policy', '/feed'].includes(req.path),
     message: {
         success: false,
         error: { message: '请求过于频繁，请稍后再试', statusCode: 429 }
@@ -126,6 +127,12 @@ const swaggerOptions = {
                     type: 'http',
                     scheme: 'bearer',
                     bearerFormat: 'JWT'
+                },
+                adminToken: {
+                    type: 'apiKey',
+                    in: 'header',
+                    name: 'X-Admin-Token',
+                    description: '运维后台令牌（ADMIN_TOKEN 环境变量）'
                 }
             }
         },
@@ -161,6 +168,7 @@ app.use('/api/stats', statsEventLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/content', contentAdminRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

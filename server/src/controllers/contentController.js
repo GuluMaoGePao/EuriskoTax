@@ -1,52 +1,62 @@
-// 阶段10B：税务政策内容只读端点
+// 阶段11：内容中心公开只读端点
 //
-// 内容源为 server/data/content/tax-policy.json（运维/内容同学修改后随发布上线，重启即生效，
-// 本控制器每次请求读盘以保证免重启热更新——文件仅 KB 级，代价可忽略）。
-// 公开只读静态数据：无用户数据交互、无 DB 访问、不占登录/验证码/同步等业务限流配额，
-// 独立宽松限流仅用于防批量刷取。
+// 内容源自阶段11 起改为数据库（ContentItem / ContentRelease），由运维后台维护；
+// server/data/content/tax-policy.json 退役为「种子源」（scripts/seed-content.js 导入后不再运行时读盘）。
+//
+// 两个端点均为公开只读、无用户数据写入，但**响应按请求方登录态分层**（audience = all/free/pro）：
+//   - 未携带 token（游客）→ 仅 all
+//   - 基础版              → all + free
+//   - 专业版/体验版        → all + free + pro
+// 因响应随 Authorization 变化，必须 private/no-store（禁止 CDN 或共享缓存跨档串内容）。
+const contentService = require('../services/contentService');
 
-const fs = require('fs');
-const path = require('path');
-
-const CONTENT_FILE = path.resolve(__dirname, '..', '..', 'data', 'content', 'tax-policy.json');
-
-// 每次请求读盘并做最小校验；内容文件缺失或损坏时返回 null（由控制器转 500）
-const loadContent = () => {
+// GET /api/content/tax-policy?since=<revision>
+// 政策要点（进税助手问答库）：返回可见条目 + 不可见条目的 deleted 墓碑，客户端按 id upsert/摘除。
+const getTaxPolicy = async (req, res, next) => {
     try {
-        const raw = fs.readFileSync(CONTENT_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || !parsed.version) return null;
-        if (!Array.isArray(parsed.items)) parsed.items = [];
-        return parsed;
-    } catch (err) {
-        console.error('[content] 读取政策内容失败:', err.message);
-        return null;
-    }
-};
+        const items = await contentService.buildPolicyPayload(req.user);
+        const revision = contentService.revisionOf(items);
+        const release = await contentService.latestRelease();
 
-const getTaxPolicy = (req, res, next) => {
-    try {
-        const content = loadContent();
-        if (!content) {
-            return res.status(500).json({
-                success: false,
-                error: { message: '政策内容暂不可用，请稍后重试', statusCode: 500 }
-            });
-        }
-
-        // 增量语义：?since=<version> 且与当前版本一致 → items 为空数组（客户端无需再合并）
+        // 增量语义：客户端回传的 revision 与当前一致 → 无变化，items 置空
         const since = String(req.query.since || '').trim();
-        const items = (since && since === content.version) ? [] : content.items;
+        const payloadItems = (since && since === revision) ? [] : items;
 
-        // 内容为公开静态数据，允许 CDN/浏览器缓存 5 分钟
-        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Vary', 'Authorization');
         res.json({
             success: true,
             data: {
-                version: content.version,
-                publishedAt: content.publishedAt || null,
-                notice: content.notice || '',
-                items: items,
+                version: release ? release.version : null,
+                revision,
+                publishedAt: release ? release.published_at : null,
+                notice: release ? release.notice : '',
+                items: payloadItems,
+                total: payloadItems.length
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// GET /api/content/feed?placement=<home_banner|modal|notice_list|assistant_qa>
+// 公告 / 运营内容：按展示位 + 登录态分层返回可见列表（条目量小，始终返回全量，便于自动过期即时生效）。
+const getFeed = async (req, res, next) => {
+    try {
+        const placement = String(req.query.placement || '').trim() || null;
+        const items = await contentService.buildFeedPayload(req.user, placement);
+        const release = await contentService.latestRelease();
+
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Vary', 'Authorization');
+        res.json({
+            success: true,
+            data: {
+                version: release ? release.version : null,
+                revision: contentService.revisionOf(items),
+                placement,
+                items,
                 total: items.length
             }
         });
@@ -55,4 +65,4 @@ const getTaxPolicy = (req, res, next) => {
     }
 };
 
-module.exports = { getTaxPolicy };
+module.exports = { getTaxPolicy, getFeed };
