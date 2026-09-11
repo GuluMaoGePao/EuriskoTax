@@ -7,9 +7,7 @@
 
 ---
 
-## [未发布] 阶段11：内容/公告中心（分层投放 + 定时上线）
-
-> 分支：`feature/stage11-content-center`。后端地基提交 `5a52776`。
+## [1.8.0] - 2026-09-11（内容/公告中心：分层投放 + 定时上线 + 运维后台内容管理）
 
 ### 新增
 - **内容/公告中心模型**：新增 `ContentItem`（`item_id` 幂等键、`type` = policy/announcement/operation、`audience` = all/free/pro、`placements` 展示位 JSON、`status` = draft/published/revoked、`publish_at`/`expire_at` 时间窗、`priority` 排序、`hot`、`link_url`/`link_text`、policy 专用 `question`/`answer`/`category`/`keywords`）与 `ContentRelease`（`version` 唯一、`notice` 端上提示文案）；生产 PostgreSQL 与本地 SQLite 双 schema 同步，迁移 `20260911_add_content_center`
