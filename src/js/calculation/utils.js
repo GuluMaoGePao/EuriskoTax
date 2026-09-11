@@ -67,6 +67,8 @@ function updateBudgetTable() {
             <td>${monthlyTaxableIncome.toFixed(2)}</td>
             <td>${(applicableRate * 100).toFixed(0)}%</td>
             <td>${Math.max(0, monthTax).toFixed(2)}</td>
+            <td>${(monthlyIncome - Math.max(0, monthTax)).toFixed(2)}</td>
+            <td>${(monthlyIncome * month).toFixed(2)}</td>
             <td>${cumulativeTax.toFixed(2)}</td>
         `;
         
@@ -97,7 +99,7 @@ function updateBudgetTable() {
     // 检查是否有任何其他收入或年终奖
     if (laborIncome > 0 || authorIncome > 0 || royaltyIncome > 0 || (bonusIncome > 0 && !bonusInclude)) {
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="7"></td>`;
+        emptyRow.innerHTML = `<td colspan="9"></td>`;
         tbody.appendChild(emptyRow);
         
         const categoryRow2 = document.createElement('tr');
@@ -108,7 +110,7 @@ function updateBudgetTable() {
             <td class="font-bold">应纳税所得额</td>
             <td class="font-bold">税率</td>
             <td class="font-bold">预缴税额</td>
-            <td></td>
+            <td colspan="3"></td>
         `;
         tbody.appendChild(categoryRow2);
         
@@ -121,7 +123,7 @@ function updateBudgetTable() {
                 <td>${laborTaxableIncome.toFixed(2)}</td>
                 <td>${(laborTaxRate * 100).toFixed(0)}%</td>
                 <td>${laborTax.toFixed(2)}</td>
-                <td></td>
+                <td colspan="3"></td>
             `;
             tbody.appendChild(laborRow);
         }
@@ -135,7 +137,7 @@ function updateBudgetTable() {
                 <td>${authorTaxableIncome.toFixed(2)}</td>
                 <td>${(authorTaxRate * 100).toFixed(0)}%</td>
                 <td>${authorTax.toFixed(2)}</td>
-                <td></td>
+                <td colspan="3"></td>
             `;
             tbody.appendChild(authorRow);
         }
@@ -149,7 +151,7 @@ function updateBudgetTable() {
                 <td>${royaltyTaxableIncome.toFixed(2)}</td>
                 <td>${(royaltyTaxRate * 100).toFixed(0)}%</td>
                 <td>${royaltyTax.toFixed(2)}</td>
-                <td></td>
+                <td colspan="3"></td>
             `;
             tbody.appendChild(royaltyRow);
         }
@@ -173,7 +175,7 @@ function updateBudgetTable() {
                 <td>${bonusIncome.toFixed(2)}</td>
                 <td>${(bonusTaxRate * 100).toFixed(0)}%</td>
                 <td>${bonusTax.toFixed(2)}</td>
-                <td></td>
+                <td colspan="3"></td>
             `;
             tbody.appendChild(bonusRow);
         }
@@ -192,12 +194,12 @@ function updateBudgetTable() {
     const refundTax = calculationResults.taxDetails.refundTax || 0;
     
     const finalRow1 = document.createElement('tr');
-    finalRow1.innerHTML = `<td class="section-title" colspan="7">综合所得汇算</td>`;
+    finalRow1.innerHTML = `<td class="section-title" colspan="9">综合所得汇算</td>`;
     tbody.appendChild(finalRow1);
     
     const finalRow2 = document.createElement('tr');
     finalRow2.innerHTML = `
-        <td>税前收入</td>
+        <td colspan="3">税前收入</td>
         <td>年度扣除合计</td>
         <td>应纳税所得额合计</td>
         <td>税率</td>
@@ -209,7 +211,7 @@ function updateBudgetTable() {
     
     const finalRow3 = document.createElement('tr');
     finalRow3.innerHTML = `
-        <td>${preTaxIncome.toFixed(2)}</td>
+        <td colspan="3">${preTaxIncome.toFixed(2)}</td>
         <td>${annualDeduction.toFixed(2)}</td>
         <td>${annualTaxableIncome.toFixed(2)}</td>
         <td>${(annualTaxRate * 100).toFixed(0)}%</td>
@@ -1321,6 +1323,228 @@ function getTaxRate(taxableIncome) {
         }
     }
     return 45;
+}
+
+// ===== 阶段12 A2：计算过程透明化 =====
+//
+// buildFormulaSteps 为纯函数：输入 performTaxCalculation 的结果对象，
+// 输出「步骤数据」数组（金额保持为数字，格式化交给渲染层），
+// 因此可单测，且能与结果区数值做逐位一致性断言。
+
+// 构建计算过程步骤数据（纯函数）
+function buildFormulaSteps(results) {
+    const months = results.workMonths || 12;
+    const income = results.incomeDetails;
+    const deduction = results.deductionDetails;
+    const tax = results.taxDetails;
+    const steps = [];
+
+    // 第一步：综合所得收入额
+    const incomeRows = [
+        {
+            label: '工资薪金',
+            note: income.salary.toFixed(2) + ' × ' + months + ' 个月',
+            value: income.salary * months
+        }
+    ];
+    if (income.laborCalculated > 0) {
+        incomeRows.push({
+            label: '劳务报酬收入额',
+            note: income.labor.toFixed(2) + ' × 80%（减除 20% 费用）',
+            value: income.laborCalculated
+        });
+    }
+    if (income.authorCalculated > 0) {
+        incomeRows.push({
+            label: '稿酬收入额',
+            note: income.author.toFixed(2) + ' × 80% × 70%（再减按 70% 计）',
+            value: income.authorCalculated
+        });
+    }
+    if (income.royaltyCalculated > 0) {
+        incomeRows.push({
+            label: '特许权使用费收入额',
+            note: income.royalty.toFixed(2) + ' × 80%（减除 20% 费用）',
+            value: income.royaltyCalculated
+        });
+    }
+    if (income.bonus > 0 && income.bonusInclude) {
+        incomeRows.push({
+            label: '年终奖（并入综合所得）',
+            note: '用户选择并入',
+            value: income.bonus
+        });
+    }
+
+    let incomeFootnote = '';
+    if (income.bonus > 0 && !income.bonusInclude) {
+        incomeFootnote = '年终奖 ' + income.bonus.toFixed(2) + ' 元选择单独计税，不并入综合所得';
+    }
+
+    steps.push({
+        title: '第一步：计算综合所得收入额',
+        rows: incomeRows,
+        totalLabel: '综合所得收入额合计',
+        totalValue: income.total,
+        footnote: incomeFootnote
+    });
+
+    // 第二步：汇总年度扣除额
+    const deductionRows = [
+        {
+            label: '基本减除费用',
+            note: deduction.basic.toFixed(2) + ' × ' + months + ' 个月',
+            value: deduction.basic * months
+        }
+    ];
+    if (deduction.specialDeductionTotal > 0) {
+        deductionRows.push({
+            label: '专项扣除（三险一金）',
+            note: '个人缴纳部分全年合计',
+            value: deduction.specialDeductionTotal
+        });
+    }
+    if (deduction.specialAdditionalTotal > 0) {
+        deductionRows.push({
+            label: '专项附加扣除',
+            note: '子女教育 / 赡养老人 / 住房 / 继续教育 / 大病医疗等',
+            value: deduction.specialAdditionalTotal
+        });
+    }
+    if (deduction.otherTotal > 0) {
+        deductionRows.push({
+            label: '其他扣除',
+            note: '个人养老金 / 企业年金 / 商业健康险 / 公益捐赠等',
+            value: deduction.otherTotal
+        });
+    }
+
+    steps.push({
+        title: '第二步：汇总年度扣除额',
+        rows: deductionRows,
+        totalLabel: '年度扣除合计',
+        totalValue: deduction.total,
+        footnote: ''
+    });
+
+    // 第三步：应纳税所得额
+    steps.push({
+        title: '第三步：计算应纳税所得额',
+        rows: [
+            { label: '综合所得收入额', note: '', value: income.total },
+            { label: '减：年度扣除合计', note: '', value: deduction.total }
+        ],
+        totalLabel: '应纳税所得额',
+        totalValue: tax.taxableIncome,
+        footnote: income.total <= deduction.total
+            ? '收入额未超过扣除额合计，应纳税所得额按 0 计'
+            : ''
+    });
+
+    // 第四步：适用税率与应纳税额
+    const ratePercent = (tax.applicableRate * 100).toFixed(0);
+    steps.push({
+        title: '第四步：适用税率与应纳税额',
+        rows: [
+            { label: '适用税率', note: '按应纳税所得额查综合所得税率表', value: tax.applicableRate, format: 'percent' },
+            { label: '速算扣除数', note: '', value: tax.applicableDeduction }
+        ],
+        totalLabel: '综合所得应纳税额',
+        totalValue: tax.totalTax,
+        footnote: tax.taxableIncome.toFixed(2) + ' × ' + ratePercent + '% − '
+            + tax.applicableDeduction.toFixed(2) + ' = ' + tax.totalTax.toFixed(2)
+    });
+
+    // 第五步：预缴税额与汇算结果
+    steps.push({
+        title: '第五步：预缴税额与年度汇算',
+        rows: [
+            { label: '综合所得应纳税额', note: '', value: tax.totalTax },
+            { label: '减：全年累计已预缴税额', note: '手动填写优先，未填则按源泉扣缴自动推演', value: tax.prepaidTax }
+        ],
+        totalLabel: tax.refundTax >= 0 ? '应补税额' : '应退税额',
+        totalValue: Math.abs(tax.refundTax),
+        footnote: '应退/应补 = 应纳税额 − 已预缴税额'
+    });
+
+    // 附：年终奖单独计税（仅在单独计税时展示）
+    if (income.bonus > 0 && !income.bonusInclude) {
+        steps.push({
+            title: '附：年终奖单独计税',
+            rows: [
+                { label: '年终奖金额', note: '', value: income.bonus },
+                { label: '折算月均金额', note: income.bonus.toFixed(2) + ' ÷ 12', value: income.bonus / 12 }
+            ],
+            totalLabel: '年终奖应纳税额',
+            totalValue: income.bonusTax,
+            footnote: '按月均金额查月度税率表确定税率与速算扣除数，再乘回年终奖全额'
+        });
+    }
+
+    // 最后一步：税后年收入
+    const netRows = [
+        { label: '税前年收入', note: '', value: income.preTaxTotal },
+        { label: '减：综合所得应纳税额', note: '', value: tax.totalTax }
+    ];
+    if (income.bonusTax > 0) {
+        netRows.push({ label: '减：年终奖应纳税额', note: '单独计税部分', value: income.bonusTax });
+    }
+
+    steps.push({
+        title: '最后一步：计算税后年收入',
+        rows: netRows,
+        totalLabel: '税后年收入',
+        totalValue: tax.netIncome,
+        footnote: ''
+    });
+
+    return steps;
+}
+
+// 金额/比例格式化（渲染层专用）
+function formatFormulaValue(value, format) {
+    if (format === 'percent') {
+        return (Number(value || 0) * 100).toFixed(0) + '%';
+    }
+    return '¥' + Number(value || 0).toFixed(2);
+}
+
+// 渲染计算过程面板
+function updateFormulaSteps(results) {
+    const panel = document.getElementById('formula-steps-panel');
+    const body = document.getElementById('formula-steps-body');
+    if (!panel || !body) return;
+
+    const steps = buildFormulaSteps(results);
+
+    body.innerHTML = steps.map(function (step) {
+        const rowsHtml = step.rows.map(function (row) {
+            const noteHtml = row.note
+                ? '<span class="block text-xs text-gray-500">' + row.note + '</span>'
+                : '';
+            return '<div class="flex items-start justify-between px-3 py-1 text-sm text-gray-600">'
+                + '<span>' + row.label + noteHtml + '</span>'
+                + '<span class="font-medium text-gray-800 whitespace-nowrap ml-3">'
+                + formatFormulaValue(row.value, row.format) + '</span>'
+                + '</div>';
+        }).join('');
+
+        const footnoteHtml = step.footnote
+            ? '<div class="px-3 py-1 text-xs text-gray-500">' + step.footnote + '</div>'
+            : '';
+
+        return '<div class="border border-gray-200 rounded-lg overflow-hidden mb-2">'
+            + '<div class="px-3 py-2 bg-gray-50 text-sm font-medium text-gray-800">' + step.title + '</div>'
+            + rowsHtml
+            + '<div class="flex justify-between px-3 py-2 text-sm font-medium text-gray-800 border-t border-gray-200">'
+            + '<span>' + step.totalLabel + '</span>'
+            + '<span class="text-primary">' + formatFormulaValue(step.totalValue) + '</span>'
+            + '</div>'
+            + footnoteHtml
+            + '</div>';
+    }).join('');
+
+    panel.classList.remove('hidden');
 }
 
 

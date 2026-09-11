@@ -411,6 +411,97 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('内容中心公开端点', false, e.message);
     }
 
+    // ---- 3.5 阶段12 C1：税制参数（公开只读 + 版本化发布/回滚 + 非法值拦截）----
+    // 说明：发布用「出厂基线原样」回填，功能上不改变任何计税结果；随后回滚到该版本，
+    //       因此本小节即使写库也保持生效配置 = 基线（零副作用）。
+    console.log('\n[3/6 续·税制] 税制参数端点（阶段12 C1：公开只读 + 版本化发布/回滚）...');
+    const trStamp = Date.now();
+    const trAdminH = { 'X-Admin-Token': process.env.ADMIN_TOKEN || 'local-verify-admin-token' };
+    let trPublishedId = null;
+    let trPublishedVersion = null;
+    try {
+        const tr = await request(PORT, 'GET', '/api/config/tax-rates');
+        const trData = (tr.body && tr.body.data) || {};
+        const trRates = trData.rates || {};
+        const comp = Array.isArray(trRates.comprehensiveTaxRates) ? trRates.comprehensiveTaxRates : [];
+        const lastComp = comp[comp.length - 1] || {};
+        const trWellFormed = comp.length > 0
+            && Array.isArray(trRates.bonusMonthlyTaxRates) && trRates.bonusMonthlyTaxRates.length > 0
+            && Array.isArray(trRates.businessTaxRates) && trRates.businessTaxRates.length > 0
+            && !!trRates.classificationTaxRates && typeof trRates.classificationTaxRates === 'object'
+            && typeof trRates.MIN_SOCIAL_SECURITY_BASE === 'number'
+            && typeof trRates.MIN_HOUSING_FUND_BASE === 'number'
+            && !!trData.revision;
+        record('GET /config/tax-rates 公开税率配置（结构完整 + source 合法）',
+            tr.status === 200 && trWellFormed && ['custom', 'default'].includes(trData.source),
+            `HTTP ${tr.status}, source=${trData.source}, version=${trData.version}, revision=${trData.revision}`);
+        // 末级无上限必须以 null 传输：端上还原为 Infinity 才能匹配最高档（JSON 无法表达 Infinity）
+        record('税率表末级无上限以 null 传输（端上还原为 Infinity）',
+            lastComp.max === null && lastComp.rate > 0,
+            `末级 max=${JSON.stringify(lastComp.max)}, rate=${lastComp.rate}`);
+
+        const trSame = await request(PORT, 'GET', '/api/config/tax-rates?since=' + encodeURIComponent(trData.revision || ''));
+        const trSameData = (trSame.body && trSame.body.data) || {};
+        record('since=当前指纹 → unchanged 且 rates=null（增量语义）',
+            trSame.status === 200 && trSameData.unchanged === true && trSameData.rates === null,
+            `HTTP ${trSame.status}, unchanged=${trSameData.unchanged}`);
+
+        // 管理端点：无令牌必须被拒（税率填错会波及全站计税）
+        const trNoTok = await request(PORT, 'GET', '/api/admin/tax-rates');
+        record('GET /admin/tax-rates 无令牌被拒(401)', trNoTok.status === 401, `HTTP ${trNoTok.status}`);
+
+        const trList = await request(PORT, 'GET', '/api/admin/tax-rates', { headers: trAdminH });
+        const trListData = (trList.body && trList.body.data) || {};
+        record('GET /admin/tax-rates 当前配置 + 出厂基线 + 历史',
+            trList.status === 200 && !!trListData.defaults && Array.isArray(trListData.history),
+            `HTTP ${trList.status}, hasCustom=${!!trListData.current}, history=${(trListData.history || []).length}`);
+
+        // 非法配置必须 400 + details（防误填把全站税率改坏）
+        const trBad = await request(PORT, 'POST', '/api/admin/tax-rates', {
+            headers: trAdminH,
+            json: { version: `verify-bad-${trStamp}`, rates: { comprehensiveTaxRates: [{ min: 0, max: 100, rate: 9, deduction: 0 }] } },
+        });
+        const trBadDetails = (trBad.body && trBad.body.error && trBad.body.error.details) || null;
+        record('POST /admin/tax-rates 非法税率被拒(400 + details)',
+            trBad.status === 400 && Array.isArray(trBadDetails) && trBadDetails.length > 0,
+            `HTTP ${trBad.status}, details=${Array.isArray(trBadDetails) ? trBadDetails.length : 0}`);
+
+        // 用出厂基线原样发布：验证写路径 + 版本化，且计税结果不变
+        if (trListData.defaults) {
+            const trPub = await request(PORT, 'POST', '/api/admin/tax-rates', {
+                headers: trAdminH,
+                json: { version: `verify.${trStamp}`, note: `[verify] e2e tax-rate publish ${trStamp}`, rates: trListData.defaults },
+            });
+            const trPubData = (trPub.body && trPub.body.data) || {};
+            const trPubCfg = trPubData.config || {};
+            trPublishedId = trPubCfg.id || null;
+            trPublishedVersion = trPubCfg.version || null;
+            record('POST /admin/tax-rates 发布基线版本(201；未勾选公告则 release=null)',
+                trPub.status === 201 && !!trPubCfg.version && trPubData.release === null,
+                `HTTP ${trPub.status}, version=${trPubCfg.version || 'N/A'}`);
+
+            const trAfter = await request(PORT, 'GET', '/api/config/tax-rates');
+            const trAfterData = (trAfter.body && trAfter.body.data) || {};
+            record('发布后公开端点 source=custom（热改已生效）',
+                trAfter.status === 200 && trAfterData.source === 'custom',
+                `HTTP ${trAfter.status}, source=${trAfterData.source}`);
+        }
+
+        // 回滚：以刚发布版本为蓝本另存新版本（历史保留、可再次回滚；仍为基线等价配置）
+        if (trPublishedId) {
+            const trRoll = await request(PORT, 'POST', '/api/admin/tax-rates/rollback', {
+                headers: trAdminH,
+                json: { id: trPublishedId, version: `verify-rb.${trStamp}`, note: `[verify] e2e rollback ${trStamp}` },
+            });
+            const trRollCfg = (trRoll.body && trRoll.body.data && trRoll.body.data.config) || {};
+            record('POST /admin/tax-rates/rollback 回滚另存新版本(201，from=源版本)',
+                trRoll.status === 201 && !!trRollCfg.version && trRollCfg.from === trPublishedVersion,
+                `HTTP ${trRoll.status}, from=${trRollCfg.from || 'N/A'} → ${trRollCfg.version || 'N/A'}`);
+        }
+    } catch (e) {
+        record('税制参数端点（阶段12 C1）', false, e.message);
+    }
+
     console.log('\n[4/6] 登录链路（dev 账号）...');
     let devToken = null;
     try {

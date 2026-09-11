@@ -1,8 +1,7 @@
 
 
-// 社保缴费基数最低标准（根据国家规定，各城市略有不同，这里使用全国平均值）
-const MIN_SOCIAL_SECURITY_BASE = 4250;
-const MIN_HOUSING_FUND_BASE = 4250;
+// 社保/公积金缴费基数下限已抽离至 tax-constants.js（必须先于本文件加载）
+// TODO(C2 社保地区政策库)：现为全国平均值，应改为按参保城市参数化
 
 // 验证社保缴费基数是否低于最低标准
 function validateSocialSecurityBase(prefix = '') {

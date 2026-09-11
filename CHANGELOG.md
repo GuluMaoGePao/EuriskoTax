@@ -7,22 +7,82 @@
 
 ---
 
-## [未发布] 发布流程加固：本地 PostgreSQL 演练门禁 + 回退 SOP 固化
+## [1.11.0] - 2026-09-12（阶段12：核心功能补强 + 税制参数配置化；发布流程加固）
 
-> 走 `ops-publish.ps1` 安全发布；不递增版本号（补丁推进，标签 `v1.10.0` 已存在因此自动跳过）。
+> 上线方式：`ops-publish.ps1` 安全发布流水线（verify:local 68 项门禁 → push → 线上 35 项指纹全绿 → 自动打 `v1.11.0`）。
+> 测试基线：12 套件 303 例 → **17 套件 361 例**；发布门禁 59 → **68 项**。
+> 本版归档三个工作流：**阶段12 A**（前端核心功能补强）、**阶段12 C1**（税制参数配置化，跨端）、**发布流程加固**（`verify:pg` 演练门禁 + 回退 SOP）。
 
-### 新增
-- **本地 PostgreSQL 演练门禁 `npm run verify:pg`**：新增根目录 `docker-compose.postgres.yml`（临时 PostgreSQL，端口 55432 / 独立数据卷）与 `tools/ops/ops-verify-pg.ps1`。按线上容器同序（`prisma generate` → `prisma migrate deploy` → 内容种子 → 起服务）把同一套 **59 项 e2e** 再跑一遍，专门拦截「本地 SQLite 全绿、线上迁移/字段才炸」的一类问题；`npm run verify:pg:fresh` 为全新库首部署场景；未装 Docker 时优雅退出（退出码 2）不影响日常门禁
+### 阶段12 A · 核心功能补强（常量版本化 / 月度明细增强 / 计算核心纯函数化 / 公式透明化 / 方案对比中心）
+
+> 全部改动落在**前端 + 常量文件**：不触碰后端、不引入构建工具、不动 Service Worker 与静态缓存策略。
+> 实施顺序：A5 → A3 → A1 → A2 → A4。
+
+#### 新增
+- **税法常量单一事实来源** `src/js/calculation/tax-constants.js`（`version = 2026.1`）：集中 4 组税率表（综合所得 / 年终奖月均 / 经营所得 / 分类所得）与 2 个缴费基数下限，供计算层统一消费，后续政策调整只需改一处
+- **计算引擎命名空间** `src/js/calculation/engine.js`（`window.EuriskoEngine`）：聚合计算层纯函数（含 `version`），供方案对比与单测**脱离 DOM 复用**（仅引用、零逻辑搬移）
+- **月度预算表新增两列**：「税后到手」= 月收入 − 当月税额、「累计收入」= 月收入 × 月序；正向主表列宽 `min-width` 上调至 850px（用 `#tax-budget-table` 限定，不影响其余 6 张共用 `.tax-budget-table` 的表）
+- **计算过程透明化**：结果区新增 `<details>` 可折叠面板，逐步展示 收入额 → 扣除额 → 应纳税所得额 → 适用税率与税额 → 预缴与汇算 → 税后年收入，另附年终奖单独计税步骤
+- **方案对比中心**：结果区新增通栏卡片，支持保存当前方案、一键生成「年终奖并入 / 单独计税 / 最优拆分」三方案并横向对比（税前年收入 / 税后年收入 / 年度应纳税额 / 实际税负率 / 月均到手 / 年终奖计税方式，最优值高亮）；本地方案库带 `ownerId` 账户隔离，免费 2 套 / 专业版 10 套（**计税能力不锁定**）
+
+#### 变更
+- `performTaxCalculation(inputData)` 支持**注入** `inputData.deductions`：注入时全链路纯计算，未注入时回退读表单，原有表单主链路行为逐位不变
+- `calculateComprehensiveDeductions(workMonths)` 拆分为 `collectDeductionInput()`（DOM 适配器）+ `computeDeductions(input, workMonths)`（纯函数）+ 兼容包装，旧调用点零改动
+
+#### 测试
+- 单元测试 A 阶段收口 **341/341 通过**（**16 套件**；阶段起点为 303 例 / 12 套件）
+- 新增 `tests/budget-table.test.js`（4 例，锁定 9 列不变量与新增列口径）
+- 新增 `tests/engine.test.js`（8 例，锁定 `window.EuriskoEngine` 契约，并**在清空 DOM 后**证明「注入路径 vs 表单路径」结果等价）
+- 新增 `tests/formula-steps.test.js`（9 例，公式步骤数值与结果区逐位一致）
+- 新增 `tests/scenario.test.js`（17 例，方案库纯函数 + 付费上限 + 年终奖方案口径）
+
+#### 文档
+- 新增 `docs/development/stage12-core-enhancement-plan.md`（A 阶段实施方案与完成记录）
+- 订正 `docs/development/development-plan.md`：原「前端计算改为调 API」记录与现状（前端本地计算）矛盾，已随本阶段修正
+
+### 阶段12 C1 · 税制参数配置化（管理台热改税率 + 可选公告联动）
+
+> 跨端改动：后端新增版本化配置模型与公开只读端点，管理台新增「税率」Tab，前端新增热更新同步层。
+> 设计要点：**税率不再硬编码**——管理台保存后对所有用户即时生效；旧版本保留可回滚；改动可选复用内容中心发一条更新公告。
+> 安全：税率错误会波及全站计税，故后端 `prepareTaxRates` 为最终校验边界，前端同规则预校验；公开端点只读。
+
+#### 新增
+- **税率配置模型 `TaxRateConfig`**（Prisma 双 schema + 迁移 `20260912_add_tax_rate_config`）：版本化快照（`version` 唯一 / `payload` JSON / `status` published|archived / `note` / `published_at`），每次保存写入新版本并归档旧的，天然支持审计与回滚
+- **公开只读端点 `GET /api/config/tax-rates`**：返回当前生效税率（库中无自定义配置时回退**出厂基线**，与 `tax-constants.js` 对齐）；支持 `?since=<revision>` 增量（指纹一致时 `rates=null`）；独立限流 60 次/分/IP
+- **管理端点 `GET/POST /api/admin/tax-rates` 与 `POST /api/admin/tax-rates/rollback`**（`requireAdmin`）：保存并发布新版本、列出版本历史、以历史版本为蓝本回滚；`POST` 支持 `notify` 字段，勾选后**在同一请求内联动发布一条公告**（`ContentItem` + `ContentRelease`，复用内容中心投放位）
+- **服务层 `server/src/services/taxRateService.js`**：出厂基线 `DEFAULT_TAX_RATES`、纯函数校验/归一化 `prepareTaxRates`（阶梯表衔接、税率递增、上限规则、基数非负）、`revisionOf` 指纹
+- **前端热更新同步层 `src/js/data/tax-rates-sync.js`**（`window.TaxRates`）：启动时**同步重放** localStorage 缓存（保证首屏计算即用最新值）→ 异步拉取最新配置 → 校验后覆盖全局税率变量并回写缓存；离线回退缓存/出厂基线；`pure.validate` / `pure.normalize` 供复用与单测
+- **管理台「税率」Tab**（`admin.html` + `admin.js`）：4 张税率表（综合所得 / 月度 / 经营所得 / 分类所得）与 2 个缴费基数下限的可视化编辑，实时预校验，保存并发布、版本历史与一键回滚、「同步发送更新公告」勾选
+
+#### 变更
+- 税率事实来源由「前端代码常量」升级为「后端配置 + 端上同步覆盖」：`tax-constants.js` 保留为**离线兜底基线**，并在注释标注 C1 契约
+- `admin.js` 的 `api()` 错误对象补 `details` 字段，管理台可一次展示后端返回的全部校验错误
+
+#### 测试
+- 新增 `tests/tax-rates.test.js`（20 例）：锁定 `window.TaxRates` 契约、校验规则与后端对齐、`applyRates` 覆盖全局并驱动 `calculateIncomeTax` / `calculateBonusTax` / `calculateSingleClassificationTax` 立即生效、缓存重放与 `syncNow` 增量/失败分支
+- 全量 **17 套件 / 361 例通过**
+- 发布门禁 `verify:local` 扩至 **68/68 通过**（新增 9 项税制参数断言：公开端点结构完整 + 末级无上限以 `null` 传输 / `since` 增量语义 / 管理端点无令牌 401 / 当前配置+出厂基线+历史 / 非法税率 400 + `details` / 发布 201 且公开端点转 `source=custom` / 回滚另存新版本。发布动作以「出厂基线原样」回填，跑完生效配置仍等价基线，不会改动任何计税结果）
+
+#### 文档
+- 新增 `docs/development/stage12-c1-tax-rate-config-plan.md`（C1 方案与实施记录）
+- 文档口径收口：`README` / `docs/README` / `tools/ops/README` / `tools/gui/README` / `docs/guides/development-workflow` / `ops-verify-pg.ps1` 的单元测试套件数与门禁断言数同步至 **17 套件 361 例** 与 **68 项**；`docs/api/api-reference.md` 升版 **v2.4** 并补 §5.11（税制参数管理）与 §10.3（公开只读端点）
+
+### 发布流程加固 · 本地 PostgreSQL 演练门禁 + 回退 SOP 固化
+
+> 本段为工具链与文档加固（无产品行为变更），已先行推送至 main，随本次 `v1.11.0` 一并归档。
+
+#### 新增
+- **本地 PostgreSQL 演练门禁 `npm run verify:pg`**：新增根目录 `docker-compose.postgres.yml`（临时 PostgreSQL，端口 55432 / 独立数据卷）与 `tools/ops/ops-verify-pg.ps1`。按线上容器同序（`prisma generate` → `prisma migrate deploy` → 内容种子 → 起服务）把同一套 e2e 门禁（当前 **68 项**）再跑一遍，专门拦截「本地 SQLite 全绿、线上迁移/字段才炸」的一类问题；`npm run verify:pg:fresh` 为全新库首部署场景；未装 Docker 时优雅退出（退出码 2）不影响日常门禁
 - `server/scripts/verify-local-auth.js` 支持 **`VERIFY_PG=1` 双模式**：迁移改为 `migrate deploy`（与线上同命令）、内容自动幂等种子化（内容端点断言依赖）、收尾自动恢复 SQLite Prisma Client；非 PG 模式行为与原先完全一致
 
-### 变更
+#### 变更
 - **移除未接线的状态红点**：`.assistant-fab-pulse` 自 1.10.0 起固定 `display:none`，且没有任何代码路径（含 `tax-assistant-ui.js`）会将其显示 —— 注释所述「有待办内容时显示」的数据源从未实现；已连同 `.assistant-fab.dock-left .assistant-fab-pulse` 定位规则和对应 `<span>` 元素一并删除，避免后续误判悬浮球具备未读提示能力
 - **回退 SOP 固化为两级流程**（`docs/guides/development-workflow.md` §4、`docs/guides/branch-release-strategy.md` §6.1）：明确「tag = 稳定锚点」语义，先止血（Zeabur 部署历史重部署上一正常构建，约 1 分钟）→ 再修根（`git revert` → 安全发布），并给出可直接抄的命令（含 `git revert --no-commit vX.Y.Z..main` 批量回退）
 - **排障速查表补 3 条新现象**：`verify:pg` 无 Docker（码 2）/ `migrate deploy` 失败（这正是上线会炸的点）/ 演练后 Client provider 不匹配如何恢复
 - **GUI 接线**：控制台「🧪 测试中心」→「3. 发布门禁」卡片新增 **🐘 PostgreSQL 演练门禁**（`ops-verify-pg.ps1`）与 **🔄 全新库演练**（`-Fresh`）两个按钮，门禁不必再记命令行；未装 Docker 时按钮输出「已跳过 + 返回码 2」，并弹一次「是否打开 Docker Desktop 下载页」引导（同一提示 180s 内去重，连点两个按钮不会被弹两次），`tools/gui/README.md` 同步补按钮说明表
 - **演练前置检查（点按钮前先看 `:3000`）**：本机有 Docker 且检测到本地 `:3000` 后端在监听时，两个演练按钮会先弹警告二次确认（可取消，取消时不执行任何命令），避免「跑到 `prisma generate` 才以 EPERM 失败」再回头排查；未装 Docker 时跳过该检查，直接让脚本走「返回码 2 → 装 Docker 引导」链路，不叠加多余弹窗
 - `tools/ops/README.md` 补 `ops-verify-pg.ps1` 文件清单与「PostgreSQL 生产等价演练」用法段落
-- **文档口径收口**：README（版本 1.7.1 → **1.10.0**、单测 10 套件 252 → **12 套件 303**、门禁 52 → **59 项**、线上指纹 22 → **35 项**）、`docs/README.md` 当前状态（v1.8.0 → **v1.10.0**）、`tools/gui/README.md` 门禁断言数（52 → 59）同步修正，并统一补上 `verify:pg` 的触发时机说明
+- **文档口径收口**：`README.md` / `docs/README.md` / `tools/gui/README.md` 补上 `verify:pg` 的触发时机说明与门禁按钮说明（版本号与门禁断言数的最终口径：单测 **17 套件 361 例**、门禁 **68 项**、线上指纹 **35 项**）
 
 ---
 

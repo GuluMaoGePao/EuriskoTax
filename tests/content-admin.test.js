@@ -32,12 +32,12 @@ describe('阶段11 内容中心 - 后台 DOM 契约', () => {
         expect(SECTION_START).toBeGreaterThan(-1);
         expect(SECTION_END).toBeGreaterThan(SECTION_START);
 
-        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* / support-f-* 字段，
-        // 它们分别由 renderContentEditor / openSupportEditor 在运行时产出，不属于静态节点）
+        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* / support-f-* / tr-* 字段，
+        // 它们分别由 renderContentEditor / openSupportEditor / taxRatesEditorHtml 在运行时产出，不属于静态节点）
         const ids = new Set(
             [...CONTENT_SECTION.matchAll(/\$\('#([A-Za-z0-9_-]+)'\)/g)]
                 .map((m) => m[1])
-                .filter((id) => !id.startsWith('content-f-') && !id.startsWith('support-f-'))
+                .filter((id) => !id.startsWith('content-f-') && !id.startsWith('support-f-') && !id.startsWith('tr-'))
         );
         expect(ids.size).toBeGreaterThan(0);
         const missing = [...ids].filter((id) => !HTML.includes(`id="${id}"`));

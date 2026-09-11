@@ -23,7 +23,10 @@ const state = {
     users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
     content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null },
     // 排障话术库：source = 'api'（数据来自数据库，可编辑）/ 'offline'（接口不可用时的兜底快照，只读）
-    support: { items: [], source: 'api', editingId: null }
+    support: { items: [], source: 'api', editingId: null },
+    // 税制参数（阶段12 C1）：model 为当前编辑态，modelOriginal 用于「载入当前生效值」回退，
+    // defaults 为服务端下发的出厂基线（库中尚无自定义配置时的编辑初始值）
+    taxrates: { history: [], defaults: null, model: null, modelOriginal: null, notify: { enabled: false, placements: ['modal', 'notice_list'] } }
 };
 
 // ---------- 基础工具 ----------
@@ -63,6 +66,7 @@ async function api(path, options = {}) {
     if (!res.ok || !body || body.success === false) {
         const err = new Error((body && body.error && body.error.message) || `请求失败（HTTP ${res.status}）`);
         err.status = res.status;
+        if (body && body.error && Array.isArray(body.error.details)) err.details = body.error.details;
         throw err;
     }
     return body.data;
@@ -152,6 +156,7 @@ function switchTab(tab) {
     else if (tab === 'users') loadUsers(true);
     else if (tab === 'invites') loadInvites();
     else if (tab === 'content') loadContent(true);
+    else if (tab === 'taxrates') loadTaxRates();
     else if (tab === 'support') loadSupport();
 }
 
@@ -1142,6 +1147,333 @@ async function restoreSupport() {
     }
 }
 
+// ---------- 税率（阶段12 C1：税制参数热改 + 版本化 + 可选公告联动） ----------
+// 前端预校验规则与后端 server/src/services/taxRateService.js 的 prepareTaxRates 保持一致
+// （后端为最终安全边界，前端校验只为即时反馈；表单税率以「百分数」编辑，提交前转小数）
+const TR_BRACKETS = [
+    { key: 'comprehensiveTaxRates', label: '综合所得税率表（年度）', hasMin: true },
+    { key: 'bonusMonthlyTaxRates', label: '月度税率表（年终奖单独计税）', hasMin: false },
+    { key: 'businessTaxRates', label: '经营所得税率表（年度）', hasMin: false }
+];
+const TR_PLACEMENTS = [
+    { key: 'modal', label: '启动弹窗' },
+    { key: 'notice_list', label: '个人中心公告' },
+    { key: 'home_banner', label: '首页公告条' },
+    { key: 'assistant_qa', label: '助手问答' }
+];
+const TR_INPUT = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm';
+
+const trPct = (rate) => Number(((Number(rate) || 0) * 100).toFixed(4));
+
+function setTaxRatesStatus(html) {
+    const el = $('#taxrates-status');
+    if (el) el.innerHTML = html || '';
+}
+
+function trBracketTable(def, rows) {
+    const head = def.hasMin
+        ? '<tr><th class="text-left px-3 py-2">级</th><th class="text-left px-3 py-2">起征下限 min</th><th class="text-left px-3 py-2">上限 max</th><th class="text-left px-3 py-2">税率 %</th><th class="text-left px-3 py-2">速算扣除数</th></tr>'
+        : '<tr><th class="text-left px-3 py-2">级</th><th class="text-left px-3 py-2">上限 max</th><th class="text-left px-3 py-2">税率 %</th><th class="text-left px-3 py-2">速算扣除数</th></tr>';
+    const body = (rows || []).map((r, i) => {
+        const last = i === rows.length - 1;
+        const minTd = def.hasMin
+            ? `<td class="px-3 py-2"><input type="number" step="any" data-tr="${def.key}|${i}|min" value="${r.min ?? ''}" class="${TR_INPUT}"></td>`
+            : '';
+        const maxVal = (r.max === null || r.max === undefined || r.max === Infinity) ? '' : r.max;
+        const maxPh = last ? 'placeholder="留空=无上限"' : '';
+        return `<tr class="text-gray-700">
+            <td class="px-3 py-2 text-gray-400">${i + 1}</td>
+            ${minTd}
+            <td class="px-3 py-2"><input type="number" step="any" ${maxPh} data-tr="${def.key}|${i}|max" value="${maxVal}" class="${TR_INPUT}"></td>
+            <td class="px-3 py-2"><input type="number" step="0.01" data-tr="${def.key}|${i}|rate" value="${trPct(r.rate)}" class="${TR_INPUT}"></td>
+            <td class="px-3 py-2"><input type="number" step="any" data-tr="${def.key}|${i}|deduction" value="${Number(r.deduction) || 0}" class="${TR_INPUT}"></td>
+        </tr>`;
+    }).join('');
+    return `<div class="mb-4">
+        <h4 class="text-xs font-semibold text-gray-600 mb-2">${def.label}</h4>
+        <div class="overflow-x-auto border border-gray-100 rounded-lg">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 text-gray-500">${head}</thead>
+                <tbody class="divide-y divide-gray-100">${body}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function trClassificationTable(cls) {
+    const rows = Object.entries(cls || {}).map(([key, v]) => `<tr class="text-gray-700">
+        <td class="px-3 py-2 text-gray-400">${esc(key)}</td>
+        <td class="px-3 py-2"><input data-trcls="${esc(key)}|name" value="${esc(v.name || '')}" class="${TR_INPUT}"></td>
+        <td class="px-3 py-2"><input type="number" step="0.01" data-trcls="${esc(key)}|rate" value="${trPct(v.rate)}" class="${TR_INPUT}"></td>
+    </tr>`).join('');
+    return `<div class="mb-4">
+        <h4 class="text-xs font-semibold text-gray-600 mb-2">分类所得税率表（比例税率）</h4>
+        <div class="overflow-x-auto border border-gray-100 rounded-lg">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 text-gray-500"><tr>
+                    <th class="text-left px-3 py-2">键</th><th class="text-left px-3 py-2">名称</th><th class="text-left px-3 py-2">税率 %</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">${rows}</tbody>
+            </table>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-1">键（interest / rent / transfer / accidental）为计算逻辑引用标识，请勿修改。</p>
+    </div>`;
+}
+
+function taxRatesEditorHtml(model) {
+    const r = model.rates || {};
+    const n = state.taxrates.notify || {};
+    const placements = TR_PLACEMENTS.map((p) => `<label class="inline-flex items-center gap-1.5 text-xs text-gray-600 mr-3">
+        <input type="checkbox" data-tr-placement="${p.key}" ${(n.placements || []).includes(p.key) ? 'checked' : ''}>${p.label}
+    </label>`).join('');
+    return `<div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 class="text-sm font-bold text-gray-800">编辑配置 <span class="text-xs font-normal text-gray-400">（${esc(model.sourceLabel || '')}）</span></h3>
+            <span class="text-[11px] text-gray-400">当前生效版本：${esc(model.sourceVersion || '—')}</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3 mb-4">
+            <label class="block"><span class="text-xs text-gray-500">版本号（留空自动生成 YYYY.MM.DD-N）</span>
+                <input id="tr-f-version" class="${TR_INPUT} mt-1" value="${esc(model.version || '')}" placeholder="如 2026.2">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">变更说明（写入版本历史）</span>
+                <input id="tr-f-note" class="${TR_INPUT} mt-1" value="${esc(model.note || '')}" placeholder="如：按新政调整综合所得第 3 档税率">
+            </label>
+        </div>
+        ${TR_BRACKETS.map((def) => trBracketTable(def, r[def.key] || [])).join('')}
+        ${trClassificationTable(r.classificationTaxRates)}
+        <div class="grid sm:grid-cols-2 gap-3 mb-4">
+            <label class="block"><span class="text-xs text-gray-500">社保缴费基数下限（元）</span>
+                <input id="tr-f-social" type="number" step="any" class="${TR_INPUT} mt-1" value="${r.MIN_SOCIAL_SECURITY_BASE ?? ''}">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">公积金缴费基数下限（元）</span>
+                <input id="tr-f-housing" type="number" step="any" class="${TR_INPUT} mt-1" value="${r.MIN_HOUSING_FUND_BASE ?? ''}">
+            </label>
+        </div>
+        <div class="border-t border-gray-100 pt-4 mb-4">
+            <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" id="tr-f-notify-enabled" ${n.enabled ? 'checked' : ''}>
+                同步发送更新公告（保存后发布一条公告，复用内容中心投放）
+            </label>
+            <div id="tr-notify-fields" class="${n.enabled ? '' : 'hidden'} mt-3 space-y-2">
+                <input id="tr-f-notify-title" class="${TR_INPUT}" value="${esc(n.title || '')}" placeholder="公告标题（留空自动生成）">
+                <input id="tr-f-notify-summary" class="${TR_INPUT}" value="${esc(n.summary || '')}" placeholder="摘要（留空自动生成）">
+                <textarea id="tr-f-notify-body" rows="3" class="${TR_INPUT}" placeholder="正文（留空同摘要）">${esc(n.body || '')}</textarea>
+                <div class="pt-1">${placements}</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button data-act="taxrates-save" class="bg-primary text-white text-sm font-medium rounded-lg px-4 py-2 hover:opacity-90"><i class="fa fa-cloud-upload mr-1"></i>保存并发布</button>
+            <button data-act="taxrates-loaddefault" class="bg-gray-100 text-gray-600 text-sm rounded-lg px-4 py-2 hover:bg-gray-200"><i class="fa fa-undo mr-1"></i>载入出厂基线</button>
+        </div>
+    </div>`;
+}
+
+function renderTaxRatesHistory() {
+    const box = $('#taxrates-history');
+    if (!box) return;
+    const items = state.taxrates.history || [];
+    box.innerHTML = items.length ? items.map((h) => `<div class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2">
+        <div class="min-w-0">
+            <div class="text-xs font-semibold text-gray-700">${esc(h.version)}
+                <span class="ml-1 text-[11px] ${h.status === 'published' ? 'text-green-600' : 'text-gray-400'}">${h.status === 'published' ? '生效中' : '历史'}</span>
+            </div>
+            <div class="text-[11px] text-gray-400 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
+        </div>
+        <button data-act="taxrates-rollback" data-id="${h.id}" data-version="${esc(h.version)}" ${h.status === 'published' ? 'disabled' : ''}
+            class="shrink-0 px-2.5 py-1.5 rounded-lg text-xs ${h.status === 'published' ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}">
+            <i class="fa fa-history mr-1"></i>回滚到此版本
+        </button>
+    </div>`).join('') : '<div class="text-xs text-gray-400">暂无历史版本（首次发布后出现）</div>';
+}
+
+function renderTaxRates() {
+    const box = $('#taxrates-editor');
+    if (!box) return;
+    box.innerHTML = state.taxrates.model
+        ? taxRatesEditorHtml(state.taxrates.model)
+        : '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">暂无税率配置</div>';
+    renderTaxRatesHistory();
+}
+
+async function loadTaxRates() {
+    const box = $('#taxrates-editor');
+    if (box) box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载税率配置中…</div>';
+    setTaxRatesStatus('');
+    try {
+        const d = await api('/admin/tax-rates');
+        const st = state.taxrates;
+        st.defaults = d.defaults || null;
+        st.history = d.history || [];
+        const hasCustom = !!(d.current && d.current.payload);
+        const rates = hasCustom ? d.current.payload : st.defaults;
+        st.modelOriginal = {
+            version: hasCustom ? d.current.version : ((rates && rates.constantsVersion) || ''),
+            note: hasCustom ? (d.current.note || '') : '',
+            rates,
+            sourceLabel: hasCustom ? `线上生效版本 ${d.current.version}` : '出厂基线（尚未发布过自定义配置）',
+            sourceVersion: hasCustom ? d.current.version : '（出厂基线）'
+        };
+        st.model = JSON.parse(JSON.stringify(st.modelOriginal));
+        st.notify = { enabled: false, placements: ['modal', 'notice_list'] };
+        renderTaxRates();
+    } catch (err) {
+        reportError(err, '税率配置加载失败');
+        if (box) box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">加载失败，请重试</div>';
+    }
+}
+
+function collectBracket(key, hasMin) {
+    const rows = [];
+    document.querySelectorAll(`[data-tr^="${key}|"]`).forEach((el) => {
+        const parts = el.dataset.tr.split('|');
+        const idx = Number(parts[1]);
+        if (!rows[idx]) rows[idx] = {};
+        rows[idx][parts[2]] = el.value === '' ? null : Number(el.value);
+    });
+    return rows.map((raw) => {
+        const r = raw || {};
+        const out = {
+            max: (r.max === null || r.max === undefined) ? null : Number(r.max),
+            rate: Number(r.rate) / 100,
+            deduction: Number(r.deduction)
+        };
+        if (hasMin) out.min = Number(r.min);
+        return out;
+    });
+}
+
+function collectTaxRatesForm() {
+    const rates = {};
+    TR_BRACKETS.forEach((def) => { rates[def.key] = collectBracket(def.key, def.hasMin); });
+    const cls = {};
+    document.querySelectorAll('[data-trcls]').forEach((el) => {
+        const parts = el.dataset.trcls.split('|');
+        const key = parts[0];
+        if (!cls[key]) cls[key] = {};
+        cls[key][parts[1]] = parts[1] === 'rate' ? Number(el.value) / 100 : el.value.trim();
+    });
+    rates.classificationTaxRates = cls;
+    rates.MIN_SOCIAL_SECURITY_BASE = Number($('#tr-f-social').value);
+    rates.MIN_HOUSING_FUND_BASE = Number($('#tr-f-housing').value);
+    return rates;
+}
+
+function collectNotifyFromForm() {
+    const enabled = !!($('#tr-f-notify-enabled') && $('#tr-f-notify-enabled').checked);
+    const placements = [];
+    document.querySelectorAll('[data-tr-placement]').forEach((el) => { if (el.checked) placements.push(el.dataset.trPlacement); });
+    return {
+        enabled,
+        title: $('#tr-f-notify-title') ? $('#tr-f-notify-title').value.trim() : '',
+        summary: $('#tr-f-notify-summary') ? $('#tr-f-notify-summary').value.trim() : '',
+        body: $('#tr-f-notify-body') ? $('#tr-f-notify-body').value.trim() : '',
+        placements
+    };
+}
+
+function trCheckBrackets(rows, label, hasMin) {
+    const errors = [];
+    if (!Array.isArray(rows) || !rows.length) return [label + '：不能为空'];
+    rows.forEach((r, i) => {
+        const tag = `${label} 第 ${i + 1} 级`;
+        if (!isFinite(r.rate) || r.rate <= 0 || r.rate > 1) errors.push(`${tag}：税率须在 (0, 100]%`);
+        if (!isFinite(r.deduction) || r.deduction < 0) errors.push(`${tag}：速算扣除数须 ≥ 0`);
+        if (hasMin && (!isFinite(r.min) || r.min < 0)) errors.push(`${tag}：起征下限须 ≥ 0`);
+        const isLast = i === rows.length - 1;
+        if (isLast) {
+            if (r.max !== null && (!isFinite(r.max) || r.max <= 0)) errors.push(`${tag}：上限须为正数或留空`);
+        } else if (r.max === null || !isFinite(r.max) || r.max <= 0) {
+            errors.push(`${tag}：非末级上限须为正数`);
+        }
+    });
+    for (let i = 1; i < rows.length; i++) {
+        const prev = rows[i - 1];
+        const cur = rows[i];
+        if (hasMin && isFinite(prev.max) && prev.max !== cur.min) errors.push(`${label}：第 ${i} / ${i + 1} 级不衔接`);
+        if (!hasMin && isFinite(prev.max) && isFinite(cur.max) && cur.max <= prev.max) errors.push(`${label}：第 ${i + 1} 级上限须递增`);
+        if (isFinite(prev.rate) && isFinite(cur.rate) && cur.rate < prev.rate) errors.push(`${label}：税率须递增`);
+    }
+    if (hasMin && rows.length && rows[0].min !== 0) errors.push(`${label}：第一级下限须为 0`);
+    return errors;
+}
+
+function validateTaxRatesForm(rates) {
+    let errors = [];
+    errors = errors.concat(trCheckBrackets(rates.comprehensiveTaxRates, '综合所得税率表', true));
+    errors = errors.concat(trCheckBrackets(rates.bonusMonthlyTaxRates, '月度税率表', false));
+    errors = errors.concat(trCheckBrackets(rates.businessTaxRates, '经营所得税率表', false));
+    Object.keys(rates.classificationTaxRates || {}).forEach((k) => {
+        const it = rates.classificationTaxRates[k];
+        if (!isFinite(it.rate) || it.rate <= 0 || it.rate > 1) errors.push(`分类所得税率「${it.name || k}」：税率须在 (0, 100]%`);
+    });
+    if (!isFinite(rates.MIN_SOCIAL_SECURITY_BASE) || rates.MIN_SOCIAL_SECURITY_BASE < 0) errors.push('社保缴费基数下限须 ≥ 0');
+    if (!isFinite(rates.MIN_HOUSING_FUND_BASE) || rates.MIN_HOUSING_FUND_BASE < 0) errors.push('公积金缴费基数下限须 ≥ 0');
+    return errors;
+}
+
+function resetTaxRatesForm() {
+    const st = state.taxrates;
+    if (!st.modelOriginal) return;
+    st.model = JSON.parse(JSON.stringify(st.modelOriginal));
+    st.notify = { enabled: false, placements: ['modal', 'notice_list'] };
+    renderTaxRates();
+    toast('已载入当前生效值', 'info');
+}
+
+function loadDefaultTaxRates() {
+    if (!state.taxrates.defaults) return;
+    if (!confirm('将用「出厂基线」覆盖当前表单（不会立即生效，需再点「保存并发布」）。确认继续？')) return;
+    state.taxrates.model = JSON.parse(JSON.stringify(state.taxrates.defaults));
+    renderTaxRates();
+    toast('已载入出厂基线，确认无误后点「保存并发布」', 'info');
+}
+
+function updateNotifyFieldsVisibility() {
+    const cb = $('#tr-f-notify-enabled');
+    const box = $('#tr-notify-fields');
+    if (cb && box) box.classList.toggle('hidden', !cb.checked);
+}
+
+async function saveTaxRates() {
+    const rates = collectTaxRatesForm();
+    const version = ($('#tr-f-version').value || '').trim();
+    const note = ($('#tr-f-note').value || '').trim();
+    const errors = validateTaxRatesForm(rates);
+    if (errors.length) {
+        setTaxRatesStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(errors[0])}${errors.length > 1 ? ` （共 ${errors.length} 项问题）` : ''}</span>`);
+        return;
+    }
+    const notify = collectNotifyFromForm();
+    state.taxrates.notify = notify;
+    const payload = { version, note, rates };
+    if (notify.enabled) payload.notify = notify;
+
+    if (!confirm(`确认发布税率版本「${version || '（自动生成）'}」？\n\n保存后立即对所有用户生效。${notify.enabled ? '\n并会同步发送一条更新公告。' : ''}`)) return;
+
+    setTaxRatesStatus('<span class="text-gray-500"><i class="fa fa-spinner fa-spin mr-1"></i>发布中…</span>');
+    try {
+        const d = await api('/admin/tax-rates', { method: 'POST', body: JSON.stringify(payload) });
+        toast(`已发布税率版本 ${d.config.version}${d.release ? '，并已发送公告' : ''}`, 'success');
+        loadTaxRates();
+    } catch (err) {
+        const detail = (err.details && err.details.length) ? err.details.slice(0, 3).join('；') : err.message;
+        setTaxRatesStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(detail)}</span>`);
+        if (err.status === 401) reportError(err);
+    }
+}
+
+async function rollbackTaxRates(id, version) {
+    if (id == null) return;
+    if (!confirm(`确认回滚到版本「${version || id}」？\n\n将以该版本配置另存为一个新版本（历史保留，可再次回滚）。`)) return;
+    try {
+        const d = await api('/admin/tax-rates/rollback', { method: 'POST', body: JSON.stringify({ id }) });
+        toast(`已回滚，新版本 ${d.config.version}`, 'success');
+        loadTaxRates();
+    } catch (err) {
+        reportError(err, '回滚失败');
+    }
+}
+
 // ---------- 动作分发（data-act 委托） ----------
 async function handleAction(e) {
     const act = e.target.closest('[data-act]');
@@ -1193,6 +1525,11 @@ async function handleAction(e) {
     if (name === 'publish-content') return back(publishContentItems());
     if (name === 'content-prev') { if (state.content.offset - state.content.limit >= 0) { state.content.offset -= state.content.limit; back(loadContent()); } return; }
     if (name === 'content-next') { if (state.content.offset + state.content.limit < state.content.total) { state.content.offset += state.content.limit; back(loadContent()); } return; }
+    if (name === 'taxrates-refresh') return back(loadTaxRates());
+    if (name === 'taxrates-reset') return resetTaxRatesForm();
+    if (name === 'taxrates-loaddefault') return loadDefaultTaxRates();
+    if (name === 'taxrates-save') return back(saveTaxRates());
+    if (name === 'taxrates-rollback') return back(rollbackTaxRates(Number(id), act.dataset.version));
 }
 
 // ---------- 初始化 ----------
@@ -1246,6 +1583,7 @@ function init() {
     document.addEventListener('change', (e) => {
         const sel = e.target.closest('[data-feedback-status]');
         if (sel) updateFeedbackStatus(Number(sel.dataset.feedbackStatus), sel.value);
+        if (e.target && e.target.id === 'tr-f-notify-enabled') updateNotifyFieldsVisibility();
     });
 
     // 记住的令牌直接进入

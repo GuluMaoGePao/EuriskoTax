@@ -1,6 +1,6 @@
 {
   "name": "EuriskoTax",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build": "echo 'Build complete - all files ready to deploy'",
@@ -21,9 +21,14 @@
       "<rootDir>/tests/**/*.test.js"
     ],
     "collectCoverageFrom": [
+      "src/js/calculation/tax-constants.js",
       "src/js/calculation/tax-calculator.js",
       "src/js/calculation/helper-functions.js",
       "src/js/calculation/utils.js",
+      "src/js/calculation/engine.js",
+      "src/js/data/scenario-store.js",
+      "src/js/data/tax-rates-sync.js",
+      "src/js/ui/scenario-ui.js",
       "src/js/ui/navigation-ui.js"
     ],
     "coverageDirectory": "coverage",

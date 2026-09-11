@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.3
-> **最后更新**: 2026年9月11日（阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **版本**: v2.4
+> **最后更新**: 2026年9月12日（阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -18,7 +18,7 @@
 7. [错误码](#7-错误码)
 8. [环境变量配置](#8-环境变量配置)
 9. [附录：注册流程与邀请码](#9-附录注册流程与邀请码)
-10. [内容中心接口（公开只读）](#10-内容中心接口公开只读)
+10. [公开只读接口（内容中心 / 税制参数）](#10-公开只读接口内容中心--税制参数)
 
 ---
 
@@ -452,6 +452,58 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 > 说明：发布动作只负责草稿 → 已发布；`publish_at`/`expire_at` 决定的可见时间窗由端上可见性判定实时生效，无需定时任务。
 
+### 5.11 税制参数管理（管理员 · 阶段12 C1）
+
+> 税制参数（4 组税率表 + 2 个缴费基数下限）由运维后台「税率」Tab 维护，保存即对所有用户生效。
+> 版本化：每次保存写入一条 `published` 快照并把旧的置为 `archived`，历史保留可回滚；改动可选联动发布一条公告。
+> 端上由 `src/js/data/tax-rates-sync.js` 在启动/联网时拉取（公开端点见 §10.3）并覆盖本地税率变量；离线回退 localStorage 缓存或出厂基线。
+
+**GET** `/api/admin/tax-rates`
+
+响应（200）：
+
+| 字段 | 说明 |
+|------|------|
+| `current` | 当前生效快照 `{ id, version, note, publishedAt, payload }`；库中无自定义配置时为 `null` |
+| `defaults` | 出厂基线（数值与 `src/js/calculation/tax-constants.js` 对齐） |
+| `history` | 最近 30 个版本 `[{ id, version, status, note, publishedAt, createdAt }]`（不含 payload） |
+
+**POST** `/api/admin/tax-rates`
+
+保存并发布新版本。请求体：
+
+```json
+{
+  "version": "2026.2",
+  "note": "按新政调整综合所得第 3 档税率",
+  "rates": {
+    "constantsVersion": "2026.2",
+    "comprehensiveTaxRates": [{ "min": 0, "max": 36000, "rate": 0.03, "deduction": 0 }],
+    "bonusMonthlyTaxRates": [{ "max": 3000, "rate": 0.03, "deduction": 0 }],
+    "businessTaxRates": [{ "max": 30000, "rate": 0.05, "deduction": 0 }],
+    "classificationTaxRates": { "interest": { "rate": 0.2, "name": "利息、股息、红利所得" } },
+    "MIN_SOCIAL_SECURITY_BASE": 4250,
+    "MIN_HOUSING_FUND_BASE": 4250
+  },
+  "notify": { "enabled": true, "title": "计税参数已更新", "placements": ["modal", "notice_list"] }
+}
+```
+
+- `rates` 为**全量**配置；数组项 `{ min?, max, rate, deduction }`，**仅末级可无上限**（`max` 传 `null`，JSON 无法表达 `Infinity`）
+- `version` 留空自动生成 `YYYY.MM.DD-N`（同日多次自动递增后缀）；与历史重复返回 400；长度 ≤ 40
+- `notify.enabled=true` 时，同一请求内联动发布一条公告：`ContentItem`（`type=announcement`、`audience=all`、`item_id=taxrate_<version>`、`priority=50`）+ `ContentRelease`（版本号 `tax-<version>`，避免与内容中心批次撞号）；`placements` 非法时回落 `["modal","notice_list"]`
+- 校验失败返回 400 + `error.details[]`（**全部**错误）：`rate ∈ (0,1]`、`deduction ≥ 0`、仅末级可无上限、综合所得首级 `min=0` 且相邻级严格衔接、月度/经营表各级 `max` 递增、各级 `rate` 单调不减、分类表非空、基数 ≥ 0、级数 ≤ 15
+
+响应（201）：`{ config: { id, version, note, publishedAt }, release: { version, notice, itemId, placements } | null }`
+
+**POST** `/api/admin/tax-rates/rollback`
+
+以历史版本为蓝本**另存为新版本**（历史不删，可再次回滚）。请求体：`{ id, version?, note? }`（`id` 为 `history[].id`；`note` 留空自动填「回滚至 <原版本>」）。
+
+响应（201）：`{ config: { id, version, note, publishedAt, from } }`。版本不存在返回 404；该版本 payload 损坏返回 400。
+
+典型错误：无 `X-Admin-Token`（401；未配置 `ADMIN_TOKEN` 时 503）、校验失败（400 + `details`）、版本号重复（400）、回滚 id 不存在（404）。
+
 ---
 
 ## 6. 请求/响应示例
@@ -598,9 +650,9 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 
 ---
 
-## 10. 内容中心接口（公开只读）
+## 10. 公开只读接口（内容中心 / 税制参数）
 
-> 阶段11：运营内容 / 更新公告 / 政策要点统一由数据库（`ContentItem`）维护，运维后台编辑发布。
+> 阶段11 / 阶段12 C1：运营内容 / 更新公告 / 政策要点统一由数据库（`ContentItem`）维护，运维后台编辑发布；税制参数由 `TaxRateConfig` 版本化维护（见 §10.3）。
 > 两端点均为公开只读、无需登录；但**响应按请求方登录态分层**（audience 分层），因此响应头为 `Cache-Control: private, no-store` + `Vary: Authorization`，禁止 CDN/共享缓存跨档串内容。
 > 分层规则：游客 = `all`；基础版 = `all + free`；专业版/体验版 = `all + free + pro`。
 > `revision` 是当前返回载荷的内容指纹（md5 前 12 位）：内容有实质变动才变化，可用于客户端增量判断。
@@ -653,3 +705,40 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 ```
 
 > 未到 `publish_at` 的预约条目与已过 `expire_at` 的条目自动过滤；条目按 `priority` 降序、`publish_at` 降序返回。
+
+### 10.3 税制参数（阶段12 C1）
+
+**GET** `/api/config/tax-rates?since=<revision>`
+
+返回当前生效的税制参数（运维后台热改后即时生效；库中无自定义配置时为出厂基线）。无需登录、**不按登录态分层**，但响应头为 `Cache-Control: no-store`，保证改动即时可见。
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "version": "2026.2",
+    "revision": "a1b2c3d4e5f6",
+    "publishedAt": "2026-09-12T02:00:00.000Z",
+    "note": "按新政调整综合所得第 3 档税率",
+    "source": "custom",
+    "unchanged": false,
+    "rates": {
+      "constantsVersion": "2026.2",
+      "comprehensiveTaxRates": [{ "min": 0, "max": 36000, "rate": 0.03, "deduction": 0 }],
+      "bonusMonthlyTaxRates": [{ "max": 3000, "rate": 0.03, "deduction": 0 }],
+      "businessTaxRates": [{ "max": 30000, "rate": 0.05, "deduction": 0 }],
+      "classificationTaxRates": { "interest": { "rate": 0.2, "name": "利息、股息、红利所得" } },
+      "MIN_SOCIAL_SECURITY_BASE": 4250,
+      "MIN_HOUSING_FUND_BASE": 4250
+    }
+  }
+}
+```
+
+- `source`：`custom`（运维后台已发布过配置）/ `default`（无自定义配置，回退出厂基线）
+- `revision`：当前载荷的内容指纹（md5 前 12 位），内容有实质变动才变化
+- `since` 与当前 `revision` 相等时 `unchanged=true` 且 `rates=null`（客户端跳过覆盖，仅刷新时间戳）
+- 数组项 `{ min?, max, rate, deduction }`；**仅末级可无上限**（`max=null`）。端上按 `taxableIncome <= max` 匹配，因此 `null` 在客户端还原为 `Infinity`
+- 限流：60 次/分钟/IP
