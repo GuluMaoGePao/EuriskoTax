@@ -1859,7 +1859,7 @@ $menuButtons = @()
 $tabs = @(
     @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 · 线上站点/管理台 · 健康检查";   Color = $C_SUCCESS },
     @{ Name = "数据库";   Icon = "💾"; Desc = "迁移 · 生成 · 重置账号 · 可视化管理 (6个功能)";     Color = $C_ACCENT   },
-    @{ Name = "测试中心"; Icon = "🧪"; Desc = "单元测试 · 覆盖率 · 性能基准 (9个功能)";           Color = $C_PURPLE   },
+    @{ Name = "测试中心"; Icon = "🧪"; Desc = "单元测试 · 覆盖率 · 性能基准 · 发布门禁 (12个功能)"; Color = $C_PURPLE   },
     @{ Name = "运维监控"; Icon = "🛠"; Desc = "看门狗守护 · cpolar 内网穿透 (6个功能)";           Color = $C_WARN     },
     @{ Name = "通知日志"; Icon = "📧"; Desc = "邮件通知配置 · 日志查看 (12个功能)";               Color = $C_CYAN     },
     @{ Name = "部署";     Icon = "📦"; Desc = "远程部署 · 回滚 · 服务器初始化 (11个功能)";        Color = $C_ACCENT   },
@@ -2862,7 +2862,7 @@ Add-SectionCard -TabCtx $tab2Ctx `
 # ==============================================================================
 # ============ 标签页 3: 测试中心 ============
 # ==============================================================================
-$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准测试" -HeaderDesc "本页包含 2 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）"
+$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准 · 发布门禁（SQLite + PostgreSQL 演练）" -HeaderDesc "本页包含 3 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）  ③ 发布门禁（verify:local 本地链路 + verify:pg PostgreSQL 生产等价演练）"
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "1. 单元测试" `
@@ -2902,11 +2902,15 @@ Add-SectionCard -TabCtx $tab3Ctx `
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "3. 发布门禁（上线前必跑）" `
-    -Subtitle "脚本：server/scripts/verify-local-auth.js" `
-    -Description "详细说明：部署前的端到端门禁 —— 真实启动本地后端，验证 登录 dev@example.com → 用邀请码+邮箱验证码注册新号 → 新号登录 全链路，并核对前端/SW 版本指纹。失败显示红字，禁止 push。" `
-    -AccentColor $C_SUCCESS -Buttons @(
-    @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } }
+    -Subtitle "脚本：server/scripts/verify-local-auth.js（同一套 59 项断言，两种数据库模式）" `
+    -Description "详细说明：部署前的端到端门禁 —— 真实启动本地后端，验证 登录 dev@example.com → 用邀请码+邮箱验证码注册新号 → 新号登录 全链路，并核对前端/SW 版本指纹。失败显示红字，禁止 push。日常跑 SQLite 版（verify:local）；改动 server/prisma/schema.prisma 或 migrations/ 后必须加跑 PostgreSQL 版（verify:pg）—— 它用 Docker 起临时库、按线上容器同序执行 migrate deploy，专拦「本地 SQLite 全绿、线上迁移才炸」的问题。" `
+    -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟，SQLite dev.db）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } },
+    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 59 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL，请先停后端。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } },
+    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 59 项断言，验证从零建表的部署路径。同样需要 Docker Desktop。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } }
 )
 
 # ==============================================================================
