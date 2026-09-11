@@ -66,6 +66,10 @@ self.addEventListener('fetch', (event) => {
   // 1. API 请求：不缓存、不拦截（数据实时 + 需认证）
   if (url.pathname.startsWith('/api/')) return;
 
+  // 1.5 版本哨兵文件：永不缓存、永不拦截。
+  //     端上靠它判断「本页是否滞后于线上」，一旦被缓存住自愈逻辑就会失效。
+  if (url.pathname === '/version.json') return;
+
   // 2. CDN 第三方资源：cache-first（命中直接返回，离线必需；未命中走网络并缓存）
   if (CDN_HOSTS.includes(url.host)) {
     event.respondWith(

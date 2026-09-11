@@ -175,11 +175,18 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 排障短链：/reset —— 好念好发的一键重置缓存入口
+// 务必定义在 SPA 回退（app.get('*')）之前，否则会被 index.html 兜底吞掉。
+// 短链本身无缓存能力，用户即使被旧 Service Worker 锁住，此全新 URL 也会穿透到网络。
+app.get('/reset', (req, res) => {
+    res.redirect(302, '/clean-cache.html?auto=1');
+});
+
 // 静态文件服务（生产环境）
 // 前端文件位于 server 目录的上一级
 // 差异化缓存策略：
-//   - index.html / manifest.json / service-worker.js → no-cache
-//     （每次需重新验证，确保新版本及时下发；SW 文件尤其不能被浏览器强缓存）
+//   - index.html / manifest.json / service-worker.js / version.json → no-cache
+//     （每次需重新验证，确保新版本及时下发；SW 文件与版本哨兵文件尤其不能被缓存）
 //   - JS / CSS → public, max-age=0, must-revalidate
 //     （ETag 协商缓存：只要服务器内容变化即返回新文件，否则 304 零流量。
 //       替代旧的 "1 年 immutable + ?v= 指纹" 方案——该方案会锁死无 ?v= 的
@@ -192,8 +199,8 @@ app.use(express.static(staticPath, {
     setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();
         const base = path.basename(filePath).toLowerCase();
-        // 必须 no-cache 的文件：HTML 入口、PWA 清单、Service Worker 本体
-        if (base === 'index.html' || base === 'manifest.json' || base === 'service-worker.js') {
+        // 必须 no-cache 的文件：HTML 入口、PWA 清单、Service Worker 本体、版本哨兵文件
+        if (base === 'index.html' || base === 'manifest.json' || base === 'service-worker.js' || base === 'version.json') {
             res.setHeader('Cache-Control', 'no-cache');
             return;
         }
