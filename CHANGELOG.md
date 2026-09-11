@@ -20,6 +20,7 @@
 - **回退 SOP 固化为两级流程**（`docs/guides/development-workflow.md` §4、`docs/guides/branch-release-strategy.md` §6.1）：明确「tag = 稳定锚点」语义，先止血（Zeabur 部署历史重部署上一正常构建，约 1 分钟）→ 再修根（`git revert` → 安全发布），并给出可直接抄的命令（含 `git revert --no-commit vX.Y.Z..main` 批量回退）
 - **排障速查表补 3 条新现象**：`verify:pg` 无 Docker（码 2）/ `migrate deploy` 失败（这正是上线会炸的点）/ 演练后 Client provider 不匹配如何恢复
 - **GUI 接线**：控制台「🧪 测试中心」→「3. 发布门禁」卡片新增 **🐘 PostgreSQL 演练门禁**（`ops-verify-pg.ps1`）与 **🔄 全新库演练**（`-Fresh`）两个按钮，门禁不必再记命令行；未装 Docker 时按钮输出「已跳过 + 返回码 2」，并弹一次「是否打开 Docker Desktop 下载页」引导（同一提示 180s 内去重，连点两个按钮不会被弹两次），`tools/gui/README.md` 同步补按钮说明表
+- **演练前置检查（点按钮前先看 `:3000`）**：本机有 Docker 且检测到本地 `:3000` 后端在监听时，两个演练按钮会先弹警告二次确认（可取消，取消时不执行任何命令），避免「跑到 `prisma generate` 才以 EPERM 失败」再回头排查；未装 Docker 时跳过该检查，直接让脚本走「返回码 2 → 装 Docker 引导」链路，不叠加多余弹窗
 - `tools/ops/README.md` 补 `ops-verify-pg.ps1` 文件清单与「PostgreSQL 生产等价演练」用法段落
 - **文档口径收口**：README（版本 1.7.1 → **1.10.0**、单测 10 套件 252 → **12 套件 303**、门禁 52 → **59 项**、线上指纹 22 → **35 项**）、`docs/README.md` 当前状态（v1.8.0 → **v1.10.0**）、`tools/gui/README.md` 门禁断言数（52 → 59）同步修正，并统一补上 `verify:pg` 的触发时机说明
 

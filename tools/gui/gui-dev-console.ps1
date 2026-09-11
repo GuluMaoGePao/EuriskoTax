@@ -1067,6 +1067,38 @@ function Show-GuiAlert {
 }
 
 # ==============================================================================
+# 辅助函数: Test-TcpPortListening / Confirm-PgDrillPreconditions
+#   PostgreSQL 演练（verify:pg）的前置检查：Windows 下**运行中的 :3000 后端会锁住
+#   Prisma 引擎 DLL**，演练里的 prisma generate 会直接以 EPERM 失败（见 ops-verify-pg.ps1 头注），
+#   与其让人对着 EPERM 排查，不如点按钮前先确认一次。
+#   本机没装 Docker 时不做此检查：脚本会在「0/4」直接以返回码 2 优雅退出，
+#   由 [END] 分支给出「已跳过 + 装 Docker」的引导，那里再问 :3000 是多余打扰。
+# ==============================================================================
+function Test-TcpPortListening {
+    param([int]$Port)
+    # 显式过滤 State=Listen：只有「真有进程在监听」才算占用，
+    # TIME_WAIT / CloseWait 等残留状态不应误报成「后端在跑」
+    return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Confirm-PgDrillPreconditions {
+    # 返回 $true = 继续跑演练；$false = 用户取消（此时不执行任何命令）
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $true }
+    if (-not (Test-TcpPortListening -Port 3000)) { return $true }
+    $r = [System.Windows.Forms.MessageBox]::Show(
+        "检测到本地 :3000 后端正在运行。`r`n`r`nWindows 下运行中的后端会锁住 Prisma 引擎 DLL，演练里的 prisma generate 会直接以 EPERM 失败。`r`n`r`n建议先停掉正在运行的本地后端（控制台里有「停止所有任务」），再跑演练。`r`n`r`n仍要继续吗？（继续很可能以 EPERM 失败收场）",
+        "演练前置未满足：本地后端仍在运行",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Warning)
+    if ($r -ne [System.Windows.Forms.DialogResult]::Yes) {
+        Write-Log "[取消] 本地 :3000 后端仍在运行，已取消 PostgreSQL 演练（未执行任何命令）。" "WARN"
+        return $false
+    }
+    Write-Log "[WARN] 本地 :3000 后端仍在运行 —— 若演练在 generate 步骤报 EPERM，请停掉后端再重跑。" "WARN"
+    return $true
+}
+
+# ==============================================================================
 # 辅助函数: Show-InputBox（简单文本输入对话框，用于输入分支名等）
 # ==============================================================================
 function Show-InputBox {
@@ -2919,10 +2951,10 @@ Add-SectionCard -TabCtx $tab3Ctx `
     -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
     @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟，SQLite dev.db）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } },
-    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 59 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL，请先停后端。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } },
-    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 59 项断言，验证从零建表的部署路径。同样需要 Docker Desktop。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } }
+    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 59 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } } },
+    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 59 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } } }
 )
 
 # ==============================================================================
