@@ -1636,6 +1636,18 @@ function Invoke-AsyncCommand {
             $proc = $script:RunningJobs[$name]
             if ($proc) {
                 Write-Log "[END] 任务 '$name' 已退出 (返回码: $($proc.ExitCode))" $(if ($proc.ExitCode -eq 0) { "OK" } else { "WARN" })
+                # PostgreSQL 演练专属收尾：返回码 2 = 本机缺 Docker（环境不满足，不是代码问题）
+                # 不用 ERROR 吓人，改为「已跳过 + 怎么启用」，并给一键打开 Docker Desktop 下载页
+                # （同一提示 180s 内只弹一次，避免连点两个按钮被弹两次）
+                if ($proc.ExitCode -eq 2 -and $name -like "verify-pg*") {
+                    Write-Log "[跳过] 未检测到可用的 Docker（docker compose 不可用）—— 演练门禁未执行，这不是代码问题。" "WARN"
+                    Write-Log "       日常发布前继续用「✅ 本地登录链路验证」；要启用演练请装 Docker Desktop 后重跑。" "GRAY"
+                    if (Test-AllowPopup -Key "PG_NO_DOCKER") {
+                        $pgMsg = "本机没有可用的 Docker，PostgreSQL 演练门禁已跳过（返回码 2）。`r`n`r`n这不是代码问题：`r`n  ① 日常发布前继续跑「✅ 本地登录链路验证（verify:local）」，SQLite 下同一套 59 项照样全跑；`r`n  ② 只有改了 server/prisma/schema.prisma 或 migrations/ 时才必须跑 PG 演练；`r`n  ③ 演练前请先停掉本地 :3000 后端（运行中会锁 Prisma 引擎 DLL，generate 会报 EPERM）。`r`n`r`n是否现在打开 Docker Desktop 下载页？"
+                        $pgR = [System.Windows.Forms.MessageBox]::Show($pgMsg, "PostgreSQL 演练已跳过（缺少 Docker）", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Information)
+                        if ($pgR -eq "Yes") { Start-Process "https://www.docker.com/products/docker-desktop/" }
+                    }
+                }
                 if ($name -eq "backend") { $script:BackendProcess = $null; $script:StartTime = $null }
                 if ($name -eq "watchdog") { $script:WatchdogProcess = $null }
                 $script:RunningJobs.Remove($name)

@@ -147,7 +147,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 > | **🐘 PostgreSQL 演练门禁** | `.\tools\ops\ops-verify-pg.ps1`（= `npm run verify:pg`） | 改动 `server/prisma/schema.prisma` 或 `migrations/` 后**必跑**：Docker 起临时 PostgreSQL（端口 55432、独立数据卷）→ `prisma generate` → `prisma migrate deploy` → 内容种子 → 同一套 **59 项**断言。与线上容器启动同序，专拦「本地 SQLite 全绿、线上迁移才炸」 |
 > | **🔄 全新库演练** | `.\tools\ops\ops-verify-pg.ps1 -Fresh`（= `npm run verify:pg:fresh`） | 等价「线上全新库首次部署」：先删演练数据卷再跑一遍，验证从零建表的路径 |
 >
-> 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。未装 Docker 时按钮输出「未检测到 docker 命令，已跳过」并以**返回码 2** 结束（不是代码问题，日常继续用 `verify:local`）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。
+> 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。未装 Docker 时按钮输出「未检测到 docker 命令，已跳过」并以**返回码 2** 结束（不是代码问题，日常继续用 `verify:local`）：GUI 识别到该返回码会额外打印橙色「[跳过] …这不是代码问题」说明，并弹一次「是否打开 Docker Desktop 下载页」的引导窗（同一提示 180s 内去重，连点两个演练按钮不会被弹两次）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。
 
 ### 4. 📋 日志查看
 
