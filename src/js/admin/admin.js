@@ -1,5 +1,5 @@
 // EuriskoTax Admin Console（运维后台）
-// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码；所有请求带 X-Admin-Token。
+// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码 / 内容中心；所有请求带 X-Admin-Token。
 
 const TOKEN_KEY = 'eurisko_admin_token';
 
@@ -17,7 +17,12 @@ const STATUS_META = {
 const SOURCE_META = { seed: '种子授权', invite: '兑换码', admin: '管理员', purchase: '购买' };
 const TYPE_META = { comprehensive: '综合所得', business: '经营所得', classification: '分类所得', reverse: '反向倒算' };
 
-const state = { token: '', tab: 'overview', users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] } };
+const state = {
+    token: '',
+    tab: 'overview',
+    users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
+    content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null }
+};
 
 // ---------- 基础工具 ----------
 const $ = (sel) => document.querySelector(sel);
@@ -144,6 +149,7 @@ function switchTab(tab) {
     else if (tab === 'feedback') loadFeedback();
     else if (tab === 'users') loadUsers(true);
     else if (tab === 'invites') loadInvites();
+    else if (tab === 'content') loadContent(true);
 }
 
 // ---------- 总览 ----------
@@ -512,6 +518,288 @@ function openLightbox(src, caption) {
     lb.classList.add('flex');
 }
 
+// ---------- 内容中心（阶段11） ----------
+const CONTENT_TYPES = { policy: '政策要点', announcement: '更新公告', operation: '运营内容' };
+const CONTENT_STATUS = {
+    draft: { label: '草稿', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+    published: { label: '已发布', cls: 'bg-green-50 text-green-700 border-green-200' },
+    revoked: { label: '已撤回', cls: 'bg-red-50 text-red-600 border-red-200' }
+};
+const CONTENT_AUDIENCE = {
+    all: { label: '全体', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    free: { label: '基础版', cls: 'bg-gray-50 text-gray-600 border-gray-200' },
+    pro: { label: '专业版', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+};
+const CONTENT_PLACEMENTS = [
+    { key: 'assistant_qa', label: '税助手问答库' },
+    { key: 'home_banner', label: '首页公告条' },
+    { key: 'modal', label: '启动弹窗' },
+    { key: 'notice_list', label: '个人中心列表' }
+];
+
+function contentPlacements(it) {
+    try { const p = JSON.parse((it && it.placements) || '[]'); return Array.isArray(p) ? p : []; } catch { return []; }
+}
+function contentKeywords(it) {
+    try { const k = JSON.parse((it && it.keywords) || '[]'); return Array.isArray(k) ? k : []; } catch { return []; }
+}
+const ctPad2 = (n) => String(n).padStart(2, '0');
+function toLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${ctPad2(d.getMonth() + 1)}-${ctPad2(d.getDate())}T${ctPad2(d.getHours())}:${ctPad2(d.getMinutes())}`;
+}
+function fromLocalInput(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function currentContentParams() {
+    const c = state.content;
+    const type = $('#content-type-filter').value;
+    const status = $('#content-status-filter').value;
+    const audience = $('#content-audience-filter').value;
+    const q = $('#content-query').value.trim();
+    if (type !== c.type || status !== c.status || audience !== c.audience || q !== c.q) {
+        c.type = type; c.status = status; c.audience = audience; c.q = q; c.offset = 0;
+    }
+    return c;
+}
+
+async function loadContent(reset) {
+    if (reset) state.content.offset = 0;
+    const { type, status, audience, q, offset, limit } = currentContentParams();
+    const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+    if (type) query.set('type', type);
+    if (status) query.set('status', status);
+    if (audience) query.set('audience', audience);
+    if (q) query.set('q', q);
+
+    $('#content-list').innerHTML = '<div class="py-10 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载内容中…</div>';
+    try {
+        const data = await api(`/admin/content?${query.toString()}`);
+        state.content.total = data.total;
+        state.content.items = data.items || [];
+        renderContentList();
+    } catch (err) {
+        $('#content-list').innerHTML = '';
+        reportError(err, '内容加载失败');
+    }
+}
+
+function renderContentList() {
+    const el = $('#content-list');
+    const rows = state.content.items;
+    if (!rows.length) {
+        el.innerHTML = '<div class="py-12 text-center text-gray-400 text-sm"><i class="fa fa-inbox mr-2 text-2xl align-middle"></i>没有匹配的内容</div>';
+        return;
+    }
+    const cards = rows.map((it) => {
+        const st = CONTENT_STATUS[it.status] || { label: it.status, cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+        const aud = CONTENT_AUDIENCE[it.audience] || { label: it.audience, cls: 'bg-gray-50 text-gray-600 border-gray-200' };
+        const pls = contentPlacements(it).map((k) => (CONTENT_PLACEMENTS.find((p) => p.key === k) || {}).label || k);
+        const head = it.type === 'policy' ? (it.question || it.title || '(未填写问题)') : (it.title || '(未填写标题)');
+        const raw = it.type === 'policy' ? (it.answer || '') : (it.summary || it.body || '');
+        const preview = String(raw).slice(0, 120);
+        const kws = contentKeywords(it);
+        return `<div class="bg-white rounded-xl border border-gray-200 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 flex-wrap text-sm">
+                    <span class="px-2 py-0.5 rounded-full border ${st.cls} text-xs font-semibold">${st.label}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">${CONTENT_TYPES[it.type] || it.type}</span>
+                    <span class="px-2 py-0.5 rounded-full border ${aud.cls} text-xs font-semibold">${aud.label}</span>
+                    ${it.hot ? '<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold">热门</span>' : ''}
+                    <span class="text-xs text-gray-400 mono">${esc(it.item_id)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">${fmtShort(it.updated_at)}</span>
+                    <button data-act="content-edit" data-id="${it.id}" class="px-2.5 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"><i class="fa fa-pencil mr-1"></i>编辑</button>
+                    <button data-act="content-delete" data-id="${it.id}" class="px-2.5 py-1.5 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100"><i class="fa fa-trash mr-1"></i>删除</button>
+                </div>
+            </div>
+            <div class="text-sm font-medium text-gray-800 mb-1 break-words">${esc(head)}</div>
+            <div class="text-xs text-gray-500 leading-relaxed mb-2 break-words">${esc(preview)}${String(raw).length > 120 ? '…' : ''}</div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                <span><i class="fa fa-map-marker mr-1"></i>${esc(pls.join(' / ') || '未设置展示位')}</span>
+                <span>优先级 ${it.priority || 0}</span>
+                <span>上线 ${fmtShort(it.publish_at)}</span>
+                <span>下架 ${it.expire_at ? fmtShort(it.expire_at) : '永不'}</span>
+                ${kws.length ? `<span>关键词 ${esc(kws.join('、'))}</span>` : ''}
+                ${it.link_url ? `<span>链接 ${esc(it.link_text || it.link_url)}</span>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+
+    const total = state.content.total || 0;
+    const { limit, offset } = state.content;
+    const pageNo = limit > 0 ? Math.floor(offset / limit) + 1 : 1;
+    const pageCount = Math.max(1, Math.ceil(total / limit));
+    el.innerHTML = cards + `<div class="px-1 pt-3 flex items-center justify-between text-sm text-gray-500">
+        <span class="text-xs">共 ${total} 条内容</span>
+        <div class="flex items-center gap-2">
+            <button data-act="content-prev" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs"${offset <= 0 ? ' disabled' : ''}>上一页</button>
+            <span class="text-xs">${pageNo} / ${pageCount}</span>
+            <button data-act="content-next" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs"${offset + limit >= total ? ' disabled' : ''}>下一页</button>
+        </div>
+    </div>`;
+}
+
+function contentField(label, inner, hint) {
+    return `<div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">${label}</label>
+        ${inner}
+        ${hint ? `<p class="text-[11px] text-gray-400 mt-1">${hint}</p>` : ''}
+    </div>`;
+}
+
+function renderContentEditor(it) {
+    const panel = $('#content-editor');
+    const isNew = !it;
+    const d = it || {};
+    const type = d.type || 'announcement';
+    const placements = isNew ? ['home_banner'] : contentPlacements(d);
+    const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+    panel.innerHTML = `
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700"><i class="fa ${isNew ? 'fa-plus' : 'fa-pencil'} mr-2 text-primary"></i>${isNew ? '新建内容' : '编辑内容'}${it ? ` <span class="text-gray-400 font-normal mono text-xs">#${it.id}</span>` : ''}</h3>
+            <button data-act="content-cancel" class="text-xs text-gray-400 hover:text-gray-600"><i class="fa fa-times mr-1"></i>关闭</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${contentField('item_id（幂等键）',
+                `<input id="content-f-item_id" class="${inputCls} mono" ${isNew ? '' : 'readonly'} value="${esc(d.item_id || '')}" placeholder="留空自动生成">`,
+                '政策条目要与内置问答对齐（覆盖/撤回）时，须填内置 id。')}
+            ${contentField('类型 type',
+                `<select id="content-f-type" class="${inputCls}">${Object.entries(CONTENT_TYPES).map(([k, v]) => `<option value="${k}"${k === type ? ' selected' : ''}>${v}（${k}）</option>`).join('')}</select>`)}
+            ${contentField('投放对象 audience',
+                `<select id="content-f-audience" class="${inputCls}">${Object.entries(CONTENT_AUDIENCE).map(([k, v]) => `<option value="${k}"${k === (d.audience || 'all') ? ' selected' : ''}>${v.label}（${k}）</option>`).join('')}</select>`,
+                '全体 = 含未登录游客可见。')}
+            ${contentField('状态 status',
+                `<select id="content-f-status" class="${inputCls}">${Object.entries(CONTENT_STATUS).map(([k, v]) => `<option value="${k}"${k === (d.status || 'draft') ? ' selected' : ''}>${v.label}（${k}）</option>`).join('')}</select>`,
+                '草稿不会推送到客户端。')}
+            ${contentField('优先级 priority',
+                `<input id="content-f-priority" type="number" step="1" class="${inputCls}" value="${Number.isInteger(d.priority) ? d.priority : 0}">`,
+                '数值越大越靠前。')}
+            ${contentField('上线时间 publish_at',
+                `<input id="content-f-publish_at" type="datetime-local" class="${inputCls}" value="${toLocalInput(d.publish_at)}">`,
+                '留空 = 立即生效。')}
+            ${contentField('下架时间 expire_at',
+                `<input id="content-f-expire_at" type="datetime-local" class="${inputCls}" value="${toLocalInput(d.expire_at)}">`,
+                '留空 = 永不过期。')}
+        </div>
+        <div class="mt-4">
+            <label class="block text-xs font-semibold text-gray-500 mb-1">展示位 placements</label>
+            <div class="flex flex-wrap gap-x-4 gap-y-2 mt-1">
+                ${CONTENT_PLACEMENTS.map((p) => `<label class="flex items-center gap-1.5 text-xs text-gray-600"><input type="checkbox" data-placement="${p.key}"${placements.includes(p.key) ? ' checked' : ''} class="rounded border-gray-300 text-blue-600">${p.label}</label>`).join('')}
+            </div>
+        </div>
+        <div id="content-fields-policy" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4${type === 'policy' ? '' : ' hidden'}">
+            ${contentField('分类 category', `<input id="content-f-category" class="${inputCls}" value="${esc(d.category || '')}" placeholder="政策法规 / 综合所得">`)}
+            ${contentField('是否热门 hot', `<label class="flex items-center gap-2 text-sm text-gray-600 pt-1"><input id="content-f-hot" type="checkbox" class="rounded border-gray-300 text-blue-600"${d.hot ? ' checked' : ''}>进入「热门问题」</label>`)}
+            ${contentField('问题 question', `<input id="content-f-question" class="${inputCls}" value="${esc(d.question || '')}" placeholder="如：2026 年专项附加扣除有哪些变化？">`)}
+            ${contentField('关键词 keywords', `<input id="content-f-keywords" class="${inputCls}" value="${esc(contentKeywords(d).join('，'))}" placeholder="逗号分隔">`)}
+            ${contentField('答案 answer', `<textarea id="content-f-answer" rows="5" class="${inputCls}">${esc(d.answer || '')}</textarea>`)}
+        </div>
+        <div id="content-fields-feed" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4${type === 'policy' ? ' hidden' : ''}">
+            ${contentField('标题 title', `<input id="content-f-title" class="${inputCls}" value="${esc(d.title || '')}">`)}
+            ${contentField('摘要 summary', `<input id="content-f-summary" class="${inputCls}" value="${esc(d.summary || '')}" placeholder="公告条/卡片上的一句话">`)}
+            ${contentField('跳转链接 link_url', `<input id="content-f-link_url" class="${inputCls}" value="${esc(d.link_url || '')}" placeholder="https://…">`)}
+            ${contentField('链接文案 link_text', `<input id="content-f-link_text" class="${inputCls}" value="${esc(d.link_text || '')}" placeholder="查看详情">`)}
+            ${contentField('正文 body', `<textarea id="content-f-body" rows="5" class="${inputCls}">${esc(d.body || '')}</textarea>`)}
+        </div>
+        <div class="flex items-center gap-2 mt-5 pt-4 border-t border-gray-100">
+            <button data-act="content-save" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-5 py-2"><i class="fa fa-save mr-1"></i>保存</button>
+            <button data-act="content-cancel" class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">取消</button>
+        </div>`;
+}
+
+function openContentEditor(id) {
+    const panel = $('#content-editor');
+    panel.classList.remove('hidden');
+    const it = id ? state.content.items.find((x) => x.id === id) : null;
+    state.content.editingId = it ? it.id : null;
+    renderContentEditor(it);
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function collectContentForm() {
+    const val = (id) => { const el = $(id); return el ? el.value : ''; };
+    const placements = Array.from(document.querySelectorAll('#content-editor [data-placement]'))
+        .filter((c) => c.checked)
+        .map((c) => c.dataset.placement);
+    const payload = {
+        type: val('#content-f-type'),
+        audience: val('#content-f-audience'),
+        status: val('#content-f-status'),
+        placements,
+        priority: parseInt(val('#content-f-priority'), 10) || 0,
+        publish_at: fromLocalInput(val('#content-f-publish_at')),
+        expire_at: fromLocalInput(val('#content-f-expire_at')),
+        title: val('#content-f-title'),
+        summary: val('#content-f-summary'),
+        body: val('#content-f-body'),
+        category: val('#content-f-category'),
+        question: val('#content-f-question'),
+        answer: val('#content-f-answer'),
+        keywords: val('#content-f-keywords'),
+        hot: $('#content-f-hot') ? $('#content-f-hot').checked : false,
+        link_url: val('#content-f-link_url'),
+        link_text: val('#content-f-link_text')
+    };
+    const itemIdEl = $('#content-f-item_id');
+    if (itemIdEl && !itemIdEl.readOnly) payload.item_id = itemIdEl.value.trim();
+    return payload;
+}
+
+async function saveContent() {
+    const payload = collectContentForm();
+    if (!payload.placements.length) { toast('请至少选择一个展示位', 'error'); return; }
+    if (payload.type === 'policy' && !payload.question.trim()) { toast('政策条目需要填写「问题」', 'error'); return; }
+    if (payload.type !== 'policy' && !payload.title.trim()) { toast('公告/运营内容需要填写「标题」', 'error'); return; }
+
+    const id = state.content.editingId;
+    try {
+        if (id) await api(`/admin/content/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        else await api('/admin/content', { method: 'POST', body: JSON.stringify(payload) });
+        toast(id ? '内容已更新' : '内容已创建', 'success');
+        $('#content-editor').classList.add('hidden');
+        state.content.editingId = null;
+        loadContent();
+    } catch (err) {
+        reportError(err, '保存失败');
+    }
+}
+
+async function deleteContentItem(id) {
+    if (!confirm(`确认删除内容 #${id}？\n\n删除后已同步过该条目的客户端会将其移除（政策条目会回退为内置内容）。`)) return;
+    try {
+        await api(`/admin/content/${id}`, { method: 'DELETE' });
+        toast('已删除', 'success');
+        if (state.content.editingId === id) {
+            $('#content-editor').classList.add('hidden');
+            state.content.editingId = null;
+        }
+        loadContent();
+    } catch (err) {
+        reportError(err, '删除失败');
+    }
+}
+
+async function publishContentItems() {
+    const notice = prompt('发布通知文案（端上「内容已更新」提示，可留空）：', '');
+    if (notice === null) return;
+    if (!confirm('将把所有草稿转为已发布，并生成新的内容版本号。\n\n注意：上线时间（publish_at）未到的条目仍不会对用户可见。确认发布吗？')) return;
+    try {
+        const d = await api('/admin/content/releases', { method: 'POST', body: JSON.stringify({ notice }) });
+        toast(`已发布版本 ${d.version}（草稿转正 ${d.promotedCount} 条）`, 'success');
+        loadContent();
+    } catch (err) {
+        reportError(err, '发布失败');
+    }
+}
+
 // ---------- 动作分发（data-act 委托） ----------
 async function handleAction(e) {
     const act = e.target.closest('[data-act]');
@@ -541,6 +829,15 @@ async function handleAction(e) {
     }
     if (name === 'gen-invites') return back(generateInvites());
     if (name === 'copy-code') return back(copyText(act.dataset.code, '兑换码已复制'));
+    if (name === 'search-content') return back(loadContent(true));
+    if (name === 'new-content') return openContentEditor(null);
+    if (name === 'content-edit') return openContentEditor(Number(id));
+    if (name === 'content-delete') return back(deleteContentItem(Number(id)));
+    if (name === 'content-save') return back(saveContent());
+    if (name === 'content-cancel') { $('#content-editor').classList.add('hidden'); state.content.editingId = null; return; }
+    if (name === 'publish-content') return back(publishContentItems());
+    if (name === 'content-prev') { if (state.content.offset - state.content.limit >= 0) { state.content.offset -= state.content.limit; back(loadContent()); } return; }
+    if (name === 'content-next') { if (state.content.offset + state.content.limit < state.content.total) { state.content.offset += state.content.limit; back(loadContent()); } return; }
 }
 
 // ---------- 初始化 ----------
@@ -558,6 +855,21 @@ function init() {
     $('#users-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadUsers(true); });
     $('#users-plan-filter').addEventListener('change', () => loadUsers(true));
     $('#invite-count').addEventListener('keydown', (e) => { if (e.key === 'Enter') generateInvites(); });
+
+    // 内容中心筛选与编辑器
+    $('#content-type-filter').addEventListener('change', () => loadContent(true));
+    $('#content-status-filter').addEventListener('change', () => loadContent(true));
+    $('#content-audience-filter').addEventListener('change', () => loadContent(true));
+    $('#content-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadContent(true); });
+    $('#content-editor').addEventListener('change', (e) => {
+        if (e.target && e.target.id === 'content-f-type') {
+            const isPolicy = e.target.value === 'policy';
+            const pf = $('#content-fields-policy');
+            const ff = $('#content-fields-feed');
+            if (pf) pf.classList.toggle('hidden', !isPolicy);
+            if (ff) ff.classList.toggle('hidden', isPolicy);
+        }
+    });
 
     document.addEventListener('click', (e) => {
         if (e.target.closest('[data-act]')) {

@@ -207,11 +207,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 7 个模块卡片', () => {
+    test('renderProfileCards 应渲染 8 个模块卡片', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(7);
+        expect(cards.length).toBe(8);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-history');
@@ -222,6 +222,8 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-about');
         // 阶段8：意见反馈入口卡片
         expect(ids).toContain('profile-card-feedback');
+        // 阶段11：内容中心「公告与更新」入口卡片
+        expect(ids).toContain('profile-card-notices');
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {
