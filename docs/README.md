@@ -1,16 +1,16 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-12
+> 最后更新：2026-09-13
 > 维护原则：按用途分类存放，本文件为统一入口索引
 
 ---
 
-## 当前状态（v1.11.1 · 2026-09-12）
+## 当前状态（v1.12.0 · 2026-09-13）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.11.1**（管理台「税率」Tab 保存链路修复（反馈位置不可见 / 版本号预填撞号 / 载入出厂基线清空表格）+ 缴费基数最低标准 4250 → 7546 与表单默认基数对齐；上一版 1.11.0 = 阶段12 A 阶段核心功能补强（公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化）+ C1 税制参数配置化（运维后台热改税率 + 版本化回滚 + 可选公告联动）+ 发布流程加固（`verify:pg` 演练门禁 + 两级回退 SOP））。1.11.1 已上线并打标签 `v1.11.1`
-- **测试**：17 套件 361 个单元测试全部通过（`npm test`，2026-09-12 复跑，含阶段12 C1 税率热更新守护 20 例）；发布门禁 `verify:local` **68/68** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A 阶段（核心功能补强：公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化）与 C1（税制参数配置化：运维后台热改税率 + 版本化回滚 + 可选公告联动）✅ 已完成 → 当前工作：**阶段12 支付体系与 B 端 API**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage12-core-enhancement-plan.md](development/stage12-core-enhancement-plan.md)
+- **主版本**：CHANGELOG 最新 **1.12.0**（阶段13 获客与转化：`Lead` 线索留资 + 管理台「线索」Tab 跟进状态机 + 一键结果分享图 + 转化漏斗埋点；上一版 1.11.1 = 管理台「税率」Tab 保存链路修复 + 缴费基数最低标准 7546 与表单默认基数对齐）
+- **测试**：20 套件 412 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡 22 例）；发布门禁 `verify:local` **100/100** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）→ 当前工作：**阶段14 变现与可信度（`ProCode` 兑换码 + 线下收款 / C2 城市社保参数库 / 高商业意图 SEO 落地页）**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md)
 
 ---
 
@@ -59,15 +59,17 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范（认证含邮箱验证码/邀请码、计税、历史记录、反馈、管理员、运营统计） | 2026-09-07 |
+| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范 v2.5（认证含邮箱验证码/邀请码、计税、历史记录、反馈、内容中心、税制参数、转化线索、管理员、运营统计） | 2026-09-12 |
 
 ### 开发规划
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-07 |
+| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-12 |
 | [development/file-management-policy.md](development/file-management-policy.md) | 文件管理规范（目录归属/命名/编码/变更流程） | 2026-09-07 |
 | [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 阶段10 免费/专业版实施方案（已确认 · 待命执行） | 2026-09-07 |
+| [development/stage12-c1-tax-rate-config-plan.md](development/stage12-c1-tax-rate-config-plan.md) | 阶段12 C1 税制参数配置化方案与实施记录 | 2026-09-12 |
+| [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md) | 阶段13 获客与转化（引流 → 线索）方案（13A 后端地基 ✅ / 13B 前端触点 ✅ / 13C 管理台「线索」Tab ✅ / 13D 一键结果分享图 ✅ / 13E 漏斗埋点 ✅，阶段13 已全部交付） | 2026-09-13 |
 
 ### 使用与开发指南
 
@@ -76,7 +78,7 @@ EuriskoTax/
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-07 |
-| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-08 |
+| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-12 |
 | [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本三落点/自动打 tag/回滚） | 2026-09-08 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
 | [guides/support-playbook.md](guides/support-playbook.md) | 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-12 |

@@ -19,6 +19,8 @@ const contentAdminRoutes = require('./routes/contentAdmin');
 const supportAdminRoutes = require('./routes/supportAdmin');
 const taxRateRoutes = require('./routes/taxRates');
 const taxRateAdminRoutes = require('./routes/taxRateAdmin');
+const leadRoutes = require('./routes/leads');
+const leadAdminRoutes = require('./routes/leadAdmin');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -112,6 +114,34 @@ const configLimiter = rateLimit({
     }
 });
 
+// 留资限流：10 次/小时/IP（阶段13 公开写入端点 /leads）。
+// 上限取 10 而非更严的 3：大陆移动网络存在运营商 NAT，大量真实用户共享同一出口 IP，
+// 过严会误伤正常留资；真正的防刷量靠「同手机号 24h 幂等去重」（控制器内实现，跨 IP 生效）
+// 与「垃圾线索需人工跟进」的天然成本。10 仍足以拦住批量脚本。
+const leadLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    skip: (req) => req.method !== 'POST',
+    message: {
+        success: false,
+        error: { message: '提交过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
+// 转化漏斗埋点限流：600 次/10 分钟/IP（阶段13E 公开写入端点 /stats/funnel）。
+// 比 /stats/events 的 300 更宽松：visit 是「页面级」上报，天然比「保存计算」频繁，
+// 且前端已用 sessionStorage 保证单会话只报一次；NAT 出口下多人共享 IP 时才可能触顶。
+// 触顶后果仅是少记若干计数（前端静默失败），不会影响任何用户功能，故额度取宽。
+const funnelLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 600,
+    skip: (req) => req.path !== '/funnel',
+    message: {
+        success: false,
+        error: { message: '操作过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
 // 基础安全 HTTP 头部（不引入额外依赖）
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -179,14 +209,16 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', codeLimiter, authLimiter, authRoutes);
 app.use('/api/calculations', syncLimiter, calculationRoutes);
 app.use('/api/feedback', feedbackRoutes);
-app.use('/api/stats', statsEventLimiter, statsRoutes);
+app.use('/api/stats', statsEventLimiter, funnelLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
 app.use('/api/config', configLimiter, taxRateRoutes);
+app.use('/api/leads', leadLimiter, leadRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
 app.use('/api/admin/support', supportAdminRoutes);
 app.use('/api/admin/tax-rates', taxRateAdminRoutes);
+app.use('/api/admin/leads', leadAdminRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

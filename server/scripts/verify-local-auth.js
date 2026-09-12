@@ -375,6 +375,65 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const taxAssistantJs = await request(PORT, 'GET', '/src/js/data/tax-assistant.js');
         record('tax-assistant.js 暴露内置快照(window.TAX_ASSISTANT_QA)',
             taxAssistantJs.status === 200 && taxAssistantJs.raw.includes('window.TAX_ASSISTANT_QA'), `HTTP ${taxAssistantJs.status}`);
+
+        // ---- 阶段13B 前端转化触点静态断言 ----
+        const leadPage = await request(PORT, 'GET', '/');
+        record('index.html 含留资弹窗(#lead-modal)与表单(#lead-form)',
+            leadPage.status === 200 && leadPage.raw.includes('id="lead-modal"') && leadPage.raw.includes('id="lead-form"'), `HTTP ${leadPage.status}`);
+        record('index.html 已引入 lead-modal.js / lead-touchpoints.js',
+            leadPage.status === 200 && leadPage.raw.includes('src/js/lead/lead-modal.js') && leadPage.raw.includes('src/js/lead/lead-touchpoints.js'), `HTTP ${leadPage.status}`);
+        const leadModalJs = await request(PORT, 'GET', '/src/js/lead/lead-modal.js');
+        record('lead-modal.js 暴露 window.LeadModal 且派发 lead-click 埋点',
+            leadModalJs.status === 200 && leadModalJs.raw.includes('window.LeadModal') && leadModalJs.raw.includes('euriskotax:lead-click'), `HTTP ${leadModalJs.status}`);
+        const apiClientJs = await request(PORT, 'GET', '/src/js/api/api-client.js');
+        record('api-client.js 新增 submitLead（公开端点，游客可用）',
+            apiClientJs.status === 200 && apiClientJs.raw.includes('function submitLead') && apiClientJs.raw.includes("'/leads'"), `HTTP ${apiClientJs.status}`);
+        const leadTouchJs = await request(PORT, 'GET', '/src/js/lead/lead-touchpoints.js');
+        const allowedMatch = leadTouchJs.raw.match(/ALLOWED_TYPES\s*=\s*\[([^\]]*)\]/);
+        const allowedBody = allowedMatch ? allowedMatch[1] : '';
+        record('lead-touchpoints.js 分流白名单排除谈薪(reverse)',
+            leadTouchJs.status === 200 && allowedMatch !== null && allowedBody.indexOf('reverse') === -1 && allowedBody.indexOf('business') !== -1,
+            `HTTP ${leadTouchJs.status}`);
+        record('lead-touchpoints.js 显式排除 reverse（硬约束）',
+            leadTouchJs.status === 200 && /BLOCKED_TYPES\s*=\s*\[[^\]]*'reverse'/.test(leadTouchJs.raw), `HTTP ${leadTouchJs.status}`);
+        record('auth-ui.js 含个人中心留资入口(profile-card-lead)',
+            authJs.status === 200 && authJs.raw.includes('profile-card-lead'), `HTTP ${authJs.status}`);
+
+        // ---- 阶段13C 运维后台「线索」Tab 静态断言 ----
+        const adminPage = await request(PORT, 'GET', '/admin.html');
+        record('admin.html 含线索 Tab(data-nav="leads")与视图(#view-leads)',
+            adminPage.status === 200 && adminPage.raw.includes('data-nav="leads"') && adminPage.raw.includes('id="view-leads"'), `HTTP ${adminPage.status}`);
+        const adminJs = await request(PORT, 'GET', '/src/js/admin/admin.js');
+        record('admin.js 接通线索端点(列表/统计/导出)与交互(状态机/分配)',
+            adminJs.status === 200 && adminJs.raw.includes('/admin/leads') && adminJs.raw.includes('loadLeadFunnel') && adminJs.raw.includes('data-lead-status') && adminJs.raw.includes('leads/export'),
+            `HTTP ${adminJs.status}`);
+
+        // ---- 阶段13D 分享图静态断言 ----
+        const shareJs = await request(PORT, 'GET', '/src/js/share/share-card.js');
+        record('share-card.js 含 2 模板(income/negotiation)与固定免责声明',
+            shareJs.status === 200 && shareJs.raw.includes("'income'") && shareJs.raw.includes("'negotiation'")
+            && shareJs.raw.includes('不构成税务建议'), `HTTP ${shareJs.status}`);
+        record('index.html 已引入 share-card.js / capture.js / 二维码库',
+            leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-card.js')
+            && leadPage.raw.includes('src/js/export/capture.js') && leadPage.raw.includes('qrcode'), `HTTP ${leadPage.status}`);
+        const captureJs = await request(PORT, 'GET', '/src/js/export/capture.js');
+        record('capture.js 暴露 window.Capture.captureHtml（PDF 与分享图共用截图层）',
+            captureJs.status === 200 && captureJs.raw.includes('window.Capture') && captureJs.raw.includes('captureHtml'), `HTTP ${captureJs.status}`);
+        const navJs = await request(PORT, 'GET', '/src/js/ui/navigation-ui.js');
+        record('PDF 导出已收敛到公共截图层（navigation-ui 内不再直接调用 html2canvas）',
+            navJs.status === 200 && navJs.raw.includes('window.Capture') && !navJs.raw.includes('html2canvas('), `HTTP ${navJs.status}`);
+        record('分享图二维码带 source=share 归因，且留资弹窗读取该落地来源（T4 闭环）',
+            shareJs.status === 200 && shareJs.raw.includes('source=share')
+            && leadModalJs.raw.includes('opts.source || landingSource()'), '');
+
+        // ---- Swagger 文档完整性：@swagger JSDoc 的 YAML 若写坏，端点会「静默」从文档消失 ----
+        // 典型坑：在 flow map（单行 {}）的值里写裸 { 或英文逗号，yaml 直接解析失败并只打日志，
+        // 端点仍在路由里正常工作，但 /api/docs 看不到 → 只能靠断言拦。
+        const docsJson = await request(PORT, 'GET', '/api/docs.json');
+        const docsPaths = (docsJson.body && docsJson.body.paths) || {};
+        record('Swagger /api/docs.json 可解析且含线索端点（JSDoc YAML 未写坏）',
+            docsJson.status === 200 && !!docsPaths['/api/leads'] && !!docsPaths['/api/admin/leads/export'],
+            `HTTP ${docsJson.status}, paths=${Object.keys(docsPaths).length}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }
@@ -502,6 +561,135 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('税制参数端点（阶段12 C1）', false, e.message);
     }
 
+    // ---- 3.6 阶段13：转化线索（公开留资 + 管理端跟进 + CSV 导出 + 限流）----
+    // 说明：留资是「工具 → 服务」的唯一入口，断链等于获客归零。
+    //       本小节走完「游客提交 → 同号幂等合并 → 参数校验 → 管理端跟进 → 搜索/统计 → CSV 导出 → 限流」全链路，
+    //       收尾按手机号前缀清理，不残留测试数据。
+    console.log('\n[3/6 续·线索] 转化线索端点（阶段13：公开留资 + 管理端跟进）...');
+    const leadStamp = Date.now();
+    // 11 位手机号（'139'+7位 = 10 位前缀 + 1 位序号）；限流压测换 '137' 前缀，避免与前缀冲突
+    const leadPhonePrefix = '139' + String(leadStamp).slice(-7);
+    const burstPhonePrefix = '137' + String(leadStamp).slice(-6);
+    const leadPhone = (n) => leadPhonePrefix + String(n);
+    const leadAdminH = { 'X-Admin-Token': process.env.ADMIN_TOKEN || 'local-verify-admin-token' };
+    let verifyLeadId = null;
+    try {
+        // 13.1 游客留资（无 JWT）必须成功 —— 绝大多数用户不会注册
+        const guestLead = await request(PORT, 'POST', '/api/leads', {
+            json: {
+                name: '验证用户', phone: leadPhone(1), company: '验证个体户',
+                entityType: 'sole', need: 'settlement', source: 'result_business',
+                scene: '经营所得·汇算清缴', note: `[verify] e2e lead ${leadStamp}`, consent: true,
+            },
+        });
+        verifyLeadId = (guestLead.body && guestLead.body.data && guestLead.body.data.id) || null;
+        record('POST /leads 游客留资成功(无需登录，201)',
+            guestLead.status === 201 && !!verifyLeadId && guestLead.body.data.merged === false,
+            `HTTP ${guestLead.status}, id=${verifyLeadId || 'N/A'}`);
+
+        // 13.2 同手机号 24h 内重复提交 → 幂等合并（不新建、不暴露"该号已提交"）
+        const dupLead = await request(PORT, 'POST', '/api/leads', {
+            json: { name: '验证用户', phone: leadPhone(1), source: 'share', note: `[verify] dup ${leadStamp}`, consent: true },
+        });
+        const dupId = (dupLead.body && dupLead.body.data && dupLead.body.data.id) || null;
+        const dupCount = await prisma.lead.count({ where: { phone: leadPhone(1) } });
+        record('POST /leads 同号 24h 幂等合并(200 且库中仅 1 条)',
+            dupLead.status === 200 && dupId === verifyLeadId && dupCount === 1,
+            `HTTP ${dupLead.status}, id=${dupId}, count=${dupCount}`);
+
+        // 13.3 参数校验：缺 name / 无联系方式 / 手机号非法 / 未同意隐私 → 全部 400
+        const badName = await request(PORT, 'POST', '/api/leads', { json: { phone: leadPhone(2), consent: true } });
+        record('POST /leads 缺 name 被拒(400)', badName.status === 400, `HTTP ${badName.status}`);
+
+        const noContact = await request(PORT, 'POST', '/api/leads', { json: { name: '无联系方式', consent: true } });
+        record('POST /leads 无手机号且无微信被拒(400)', noContact.status === 400, `HTTP ${noContact.status}`);
+
+        const badPhone = await request(PORT, 'POST', '/api/leads', { json: { name: '号错', phone: '1280013800', consent: true } });
+        record('POST /leads 手机号非法被拒(400)', badPhone.status === 400, `HTTP ${badPhone.status}`);
+
+        const noConsent = await request(PORT, 'POST', '/api/leads', { json: { name: '未同意', phone: leadPhone(3) } });
+        record('POST /leads 未勾选隐私同意被拒(400)', noConsent.status === 400, `HTTP ${noConsent.status}`);
+
+        // 13.4 管理端无令牌必须被拒（线索含手机号，裸奔等于客户名单泄漏）
+        const leadNoTok = await request(PORT, 'GET', '/api/admin/leads');
+        record('GET /admin/leads 无令牌被拒(401)', leadNoTok.status === 401, `HTTP ${leadNoTok.status}`);
+
+        // 13.5 列表：能查到刚提交的线索，且情境快照/主体类型完整（顾问跟进靠它精准开场）
+        const leadList = await request(PORT, 'GET', '/api/admin/leads?limit=200', { headers: leadAdminH });
+        const leadData = (leadList.body && leadList.body.data) || {};
+        const leadItems = Array.isArray(leadData.items) ? leadData.items : [];
+        const mineLead = leadItems.find((x) => x.id === verifyLeadId);
+        record('GET /admin/leads 列表含新线索(情境快照 + 主体类型 + byStatus)',
+            leadList.status === 200 && !!mineLead && mineLead.scene === '经营所得·汇算清缴'
+            && mineLead.entity_type === 'sole' && !!leadData.byStatus && typeof leadData.total === 'number',
+            `HTTP ${leadList.status}, total=${leadData.total}`);
+
+        // 13.6 关键词搜索：姓名/手机号/公司三字段 OR 匹配
+        const leadSearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent(leadPhone(1)), { headers: leadAdminH });
+        const searchItems = (leadSearch.body && leadSearch.body.data && leadSearch.body.data.items) || [];
+        record('GET /admin/leads 支持关键词搜索(手机号命中)',
+            leadSearch.status === 200 && searchItems.some((x) => x.id === verifyLeadId),
+            `HTTP ${leadSearch.status}, hits=${searchItems.length}`);
+
+        // 13.7 漏斗统计（北极星指标 lead_submit / calc_done 的分子）
+        const leadStatsResp = await request(PORT, 'GET', '/api/admin/leads/stats', { headers: leadAdminH });
+        const statsData = (leadStatsResp.body && leadStatsResp.body.data) || {};
+        record('GET /admin/leads/stats 漏斗统计(状态计数 + 今日新增 + 来源分布)',
+            leadStatsResp.status === 200 && typeof statsData.total === 'number' && statsData.total >= 1
+            && !!statsData.byStatus && typeof statsData.byStatus.new === 'number'
+            && typeof statsData.newToday === 'number' && !!statsData.bySource,
+            `HTTP ${leadStatsResp.status}, total=${statsData.total}, newToday=${statsData.newToday}`);
+
+        // 13.8 状态机跟进：new → contacted + 分配顾问；非法状态必须被拒
+        if (verifyLeadId) {
+            const leadPatch = await request(PORT, 'PATCH', `/api/admin/leads/${verifyLeadId}`, {
+                json: { status: 'contacted', owner: '验证顾问' }, headers: leadAdminH,
+            });
+            const patched = (leadPatch.body && leadPatch.body.data) || {};
+            record('PATCH /admin/leads/:id 状态机流转 + 分配顾问',
+                leadPatch.status === 200 && patched.status === 'contacted' && patched.owner === '验证顾问',
+                `HTTP ${leadPatch.status}, status=${patched.status}`);
+
+            const leadBadPatch = await request(PORT, 'PATCH', `/api/admin/leads/${verifyLeadId}`, {
+                json: { status: 'nope' }, headers: leadAdminH,
+            });
+            record('PATCH /admin/leads/:id 非法状态被拒(400)', leadBadPatch.status === 400, `HTTP ${leadBadPatch.status}`);
+        }
+
+        // 13.9 CSV 导出：UTF-8 BOM + 中文表头（Excel 不乱码，销售可导进自有 CRM）
+        const leadCsv = await request(PORT, 'GET', '/api/admin/leads/export?q=' + encodeURIComponent(leadPhone(1)), { headers: leadAdminH });
+        const csvHasBom = typeof leadCsv.raw === 'string' && leadCsv.raw.charCodeAt(0) === 0xFEFF;
+        record('GET /admin/leads/export CSV(含 BOM + 中文表头)',
+            leadCsv.status === 200 && csvHasBom && leadCsv.raw.includes('手机号') && leadCsv.raw.includes('情境'),
+            `HTTP ${leadCsv.status}, bom=${csvHasBom}`);
+
+        // 13.10 限流：公开写入端点必须挡批量刷量（10 次/小时/IP）
+        let sawLead429 = false;
+        let unexpectedStatus = null;
+        for (let i = 0; i < 12 && !sawLead429; i++) {
+            const burst = await request(PORT, 'POST', '/api/leads', {
+                json: { name: '压测', phone: burstPhonePrefix + String(i).padStart(2, '0'), consent: true },
+            });
+            if (burst.status === 429) sawLead429 = true;
+            else if (burst.status !== 201) { unexpectedStatus = burst.status; break; }
+        }
+        record('POST /leads 限流生效(429 拦截刷量)',
+            sawLead429, sawLead429 ? '已按 IP 上限拦截' : `未触发限流${unexpectedStatus ? `，意外状态 ${unexpectedStatus}` : ''}`);
+    } catch (e) {
+        record('转化线索端点（阶段13）', false, e.message);
+    } finally {
+        try {
+            await prisma.lead.deleteMany({
+                where: {
+                    OR: [
+                        { phone: { startsWith: leadPhonePrefix } },
+                        { phone: { startsWith: burstPhonePrefix } },
+                    ],
+                },
+            });
+        } catch { /* 清理失败不阻塞判定 */ }
+    }
+
     console.log('\n[4/6] 登录链路（dev 账号）...');
     let devToken = null;
     try {
@@ -595,6 +783,30 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             const ovTotal = ovData.calculations && ovData.calculations.total;
             const ovComp = ovData.calculations && ovData.calculations.byType && ovData.calculations.byType.comprehensive;
             record('GET /stats/overview 读聚合统计', ov.status === 200 && ovTotal >= 1 && ovComp >= 1, `HTTP ${ov.status}, total=${ovTotal}, comprehensive=${ovComp}`);
+
+            // ---- 8.5b 阶段13E 转化漏斗（visit → calc_done → share/save → lead_click → lead_submit）----
+            // 匿名上报（不带任何 token）：这正是 13E 要修的核心口径 —— visit / calc_done
+            // 大多发生在未登录状态，若要求登录，北极星分母只剩登录用户、转化率会系统性虚高。
+            const fnAnon = await request(PORT, 'POST', '/api/stats/funnel', { json: { step: 'visit' } });
+            record('POST /stats/funnel 匿名上报(visit) 被接受',
+                fnAnon.status === 201 && !!fnAnon.body && fnAnon.body.success === true
+                && !!fnAnon.body.data && fnAnon.body.data.step === 'visit',
+                `HTTP ${fnAnon.status}`);
+
+            // lead_submit 必须被拒：它的唯一真相是 Lead 表，前端再上报会让两个数对不上
+            const fnBad = await request(PORT, 'POST', '/api/stats/funnel', { json: { step: 'lead_submit' } });
+            record('POST /stats/funnel 拒绝白名单外步骤(lead_submit 只由 Lead 表统计)',
+                fnBad.status === 400, `HTTP ${fnBad.status}`);
+
+            const funnel = await request(PORT, 'GET', '/api/admin/leads/funnel?days=7', { headers: adminH });
+            const fd = (funnel.body && funnel.body.data) || {};
+            const fSteps = fd.steps || {};
+            const fKeys = ['visit', 'calc_done', 'share', 'save', 'lead_click', 'lead_submit'];
+            record('GET /admin/leads/funnel 转化漏斗(各步累计 + 今日 + 转化率 + 北极星)',
+                funnel.status === 200
+                && fKeys.every((k) => typeof fSteps[k] === 'number')
+                && !!fd.today && !!fd.rates && 'northStar' in fd,
+                `HTTP ${funnel.status}, visit=${fSteps.visit}, calc_done=${fSteps.calc_done}, lead_submit=${fSteps.lead_submit}`);
 
             // ---- 8.6 阶段10 运维后台（admin.html 后端）：用户列表/详情/权益调档 ----
             console.log('\n[4/6 续·运维] 运维后台用户端点（阶段10 运维后台）...');

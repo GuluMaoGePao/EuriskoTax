@@ -400,7 +400,7 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 // opts（可选，阶段10B 专业版汇算清缴报告复用）：
 //   { contentBuilder, beforeCapture, filename }
 //     contentBuilder  () => HTML 字符串，覆盖默认的 generateWordDocumentContent(title) 内容
-//     beforeCapture   (tempContainer) => void，html2canvas 截图前回调（如绘制 Chart 图表后等待就绪）
+//     beforeCapture   (container) => void，html2canvas 截图前回调（如绘制 Chart 图表后等待就绪）
 //     filename        自定义保存文件名（不含扩展名差异，直接作为 doc.save 参数）
 function exportToPDF(elementId, title, opts) {
     opts = opts || {};
@@ -417,46 +417,22 @@ function exportToPDF(elementId, title, opts) {
         ? opts.contentBuilder()
         : generateWordDocumentContent(title);
     
-    // 创建临时HTML文件
-    const tempContainer = document.createElement('div');
-    tempContainer.style.position = 'fixed';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.top = '-9999px';
-    tempContainer.style.width = '800px'; // 调整宽度以适应纵向布局
-    tempContainer.style.height = 'auto';
-    tempContainer.style.zIndex = '9999';
-    tempContainer.innerHTML = docContent;
-    document.body.appendChild(tempContainer);
-    
-    // 等待内容加载完成
-    setTimeout(() => {
-        // 阶段10B：截图前回调（绘制税负对比图等），异常不回滚主流程
-        if (typeof opts.beforeCapture === 'function') {
-            try {
-                opts.beforeCapture(tempContainer);
-            } catch (err) {
-                console.error('截图前渲染（图表）失败，继续导出:', err);
-            }
-        }
+    // 阶段13D：截图收敛到公共层 Capture —— 与分享图共用同一套 html2canvas 配置
+    // 与临时容器清理，避免「PDF 清晰但分享图糊」这类配置漂移问题。
+    const capture = window.Capture;
+    if (!capture || typeof capture.captureHtml !== 'function') {
+        showAlert('导出组件未就绪，请刷新页面后重试');
+        return;
+    }
 
-        // 使用html2canvas生成图片
-        html2canvas(tempContainer, {
-            scale: 2, // 提高清晰度
-            useCORS: true,
-            logging: true,
-            backgroundColor: '#ffffff',
-            width: 800, // 调整宽度以适应纵向布局
-            height: tempContainer.scrollHeight,
-            windowWidth: 800,
-            windowHeight: tempContainer.scrollHeight + 100,
-            allowTaint: true,
-            removeContainer: true
-        }).then(canvas => {
-            // 清理临时容器
-            if (tempContainer.parentNode) {
-                tempContainer.parentNode.removeChild(tempContainer);
-            }
-            
+    // delayMs 500：报告含长表格与图片，需要时间完成布局（分享图内容更简单，用默认值即可）
+    capture.captureHtml(docContent, {
+        width: 800, // 调整宽度以适应纵向布局
+        logging: true,
+        delayMs: 500,
+        beforeCapture: opts.beforeCapture
+    })
+        .then(canvas => {
             // 创建PDF文档，使用标准A4尺寸
             const { jsPDF } = window.jspdf;
             
@@ -526,15 +502,12 @@ function exportToPDF(elementId, title, opts) {
                 ? opts.filename
                 : `${title}_${new Date().toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
-        }).catch(error => {
+        })
+        .catch(error => {
             console.error('生成PDF时出错:', error);
-            
-            // 清理临时容器
-            if (tempContainer.parentNode) {
-                tempContainer.parentNode.removeChild(tempContainer);
-            }
+            // 原来只打日志，用户那边表现为「点了导出没反应」；给出明确反馈
+            showAlert('导出失败，请稍后重试');
         });
-    }, 500); // 500ms延迟，确保内容加载完成
 }
 
 

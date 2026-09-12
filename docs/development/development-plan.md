@@ -286,6 +286,29 @@ EuriskoTax/
 | notice | STRING | 端上「内容已更新」提示文案 |
 | published_at | DateTime | 发布时间 |
 
+### leads（转化线索 · 阶段13 新增）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK 自增 | ID |
+| user_id | INT? | 关联用户；**可空**（游客不登录也能留资）；用户注销时 `SET NULL`，线索作为业务资产保留 |
+| name | STRING | 联系人姓名（必填） |
+| phone / wechat | STRING? | 手机号 / 微信号（**至少提供一个**，否则无法跟进） |
+| company | STRING? | 公司 / 个体户名称 |
+| entity_type | STRING（默认 unknown） | 主体类型：individual / sole / small / other / unknown |
+| need | STRING（默认 ''） | 需求：bookkeeping / settlement / declare_check / consult / other |
+| source | STRING（默认 unknown） | 触点归因：result_business / result_settlement / result_budget / home_banner / modal / notice_list / profile / share / unknown |
+| scene | STRING（默认 ''） | **情境快照**（如「经营所得·汇算清缴」），顾问跟进精准开场 |
+| note | STRING（默认 ''） | 用户补充描述 / 顾问跟进备注 |
+| consent | BOOLEAN（默认 false） | **个保法显式同意留痕**；服务端强制要求为 true 才受理 |
+| status | STRING（默认 new） | 状态机：new / contacted / qualified / converted / dropped |
+| owner | STRING? | 跟进顾问 |
+| created_at / updated_at | DateTime | 时间戳 |
+
+> 索引：`(status, created_at)`、`(source)`、`(phone)`。
+> 写入侧限流 10 次/小时/IP（容忍运营商 NAT 共享出口）+ 同手机号 24h 幂等合并（真正的防刷量机制）。
+> 该表是「工具 → 服务」的唯一转化枢纽，对应北极星指标 `lead_submit / calc_done`。
+
 ---
 
 ## 🔌 API接口设计
@@ -309,7 +332,11 @@ EuriskoTax/
 | 阶段9：PWA 离线化改造 | ✅ 已完成（2026-09-06 上线；缓存策略精简为网络优先瘦缓存） | 3天 | 2026-09-06 |
 | 阶段10：免费/专业版体系 | ✅ 已完成（v1.7.0 已发布 2026-09-10 —— 10A 后端地基 a29bd12 + 前端同步链路 8f3195a；10B 政策要点更新（`GET /api/content/tax-policy` + `tax-policy.js` 增量合并/提示）与专业版汇算清缴报告（`final-report.js`）；同批上线运维管理后台（`admin.html` + `/api/admin/users`）与反馈附图；`verify:local` + Jest 全绿） | 1周+ | 2026-09-10 |
 | 阶段11：内容/公告中心 | 🚧 进行中（后端地基 `5a52776`；`ContentItem`/`ContentRelease` 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改读库、全体用户可见、增量 revision）与 `GET /api/content/feed`；运维后台内容 CRUD + 发布批次；前端 `content-center-ui.js` 四展示位；支付体系顺延阶段12） | 3天 | 预计 2026-09-12 |
-| 阶段12：支付体系与 B 端 API | 🚧 进行中（**A 阶段 ✅** 四项核心功能补强：公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化；**C1 ✅** 税制参数配置化 2026-09-12 —— `TaxRateConfig` 版本化快照 + 运维后台「税率」Tab 热改（保存即生效、可回滚、可选联动公告）+ 公开只读端点 `GET /api/config/tax-rates` + 端上 `tax-rates-sync.js` 离线兜底；支付体系与 B 端 API 待实施） | 3周+ | 进行中 |
+| 阶段12：支付体系与 B 端 API | 🚧 进行中（**A 阶段 ✅** 四项核心功能补强：公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化；**C1 ✅** 税制参数配置化 2026-09-12 —— `TaxRateConfig` 版本化快照 + 运维后台「税率」Tab 热改（保存即生效、可回滚、可选联动公告）+ 公开只读端点 `GET /api/config/tax-rates` + 端上 `tax-rates-sync.js` 离线兜底；**范围调整**：支付体系与 B 端 API 被 ICP 备案阻塞，移出本阶段顺延至阶段15；C2 城市社保参数库移入阶段14） | 3周+ | 进行中 |
+| 阶段13：获客与转化（引流 → 线索） | ✅ 已完成（**13A ✅ 后端地基 2026-09-12**：`Lead` 模型（`user_id` 可空 / `scene` 情境快照 / `consent` 同意留痕 / `status` 状态机）+ 迁移 `20260912_add_leads` + 公开端点 `POST /api/leads`（游客可提交、10 次/小时/IP 限流、同手机号 24h 幂等合并）+ 管理端 `GET/PATCH /api/admin/leads`、`/stats`、`/export`（CSV 含 BOM + 公式注入防护）；`verify:local` 82/82 全绿（新增 14 项线索断言）+ `tests/leads.test.js` 20 项。**13B ✅ 前端触点 2026-09-12**：结果页情境引导（分流白名单 `business`/`forward`/`comprehensive`/`classification`，显式排除谈薪 `reverse`）+ 留资弹窗 `lead-modal`（企业微信活码 + 留言表单双通道；活码经 `window.LEAD_CONFIG.wecomQrUrl` 注入，未配置自动降级为仅留言通道）+ 个人中心「财税服务」卡片 + `api-client.submitLead`（游客可用 / 登录则关联账号）；`verify:local` 89/89 全绿（13A 14 项 + 13B 新增 7 项前端触点断言）。**13C ✅ 管理台「线索」Tab 2026-09-12**：运维后台新增「线索」Tab —— 漏斗条（总数/今日新增/待分配/已成交·转化率）+ 列表（联系人·来源·情境·备注）+ 行内状态机即时保存 + 分配跟进人 + 按筛选导出 CSV；`verify:local` 92/92 全绿（13A 14 项 + 13B 7 项 + 13C 2 项 + Swagger 文档完整性 1 项）。**13E ✅ 漏斗埋点 2026-09-13**：`FunnelEvent`（日粒度聚合）+ 公开端点 `POST /api/stats/funnel`（无需登录、白名单、限流）+ `GET /api/admin/leads/funnel`（各步转化率 + 北极星）+ 前端 `funnel-tracking.js`（visit / calc_done / save / share / lead_click，其中 lead_click 包装 `LeadModal.open` 唯一入口）+ 管理台「转化漏斗」区块；**口径修正**：原 calc_done 只统计登录用户保存动作，游客与算完未保存者全不计入，北极星分母失真 → 改公开端点全量口径；`verify:local` 95/95 全绿（+13E 3 项）、单测 **20 套件 412 例**（+`tests/funnel.test.js` 9 例）。**13D ✅ 一键结果分享图 2026-09-13**：新增公共截图层 `Capture.captureHtml`（统一 html2canvas 配置 + 临时容器清理），PDF 导出与分享图共用同一层、消除配置漂移；`share-card.js` 结果页→模板路由（`income` 正向结果卡 / `negotiation` 谈薪卡，谈薪页唯一转化出口）+ 二维码（`qrcode-generator` CDN，离线可用）+ 预生成预览确认（保存/关闭）+ 固定免责声明「本测算结果仅供参考，不构成税务建议」；分享链接带 `?source=share` 回填 `Lead.source`，构成 T4 归因闭环；`verify:local` 100/100 全绿（阶段13 累计 +32 项：13A 14 / 13B 7 / 13C 2 / Swagger 1 / 13E 3 / 13D 5）、单测 **20 套件 412 例**（+`tests/share-card.test.js` 22 例）—— 阶段13 子项已全部完成）详见 [stage13-acquisition-and-leads-plan.md](./stage13-acquisition-and-leads-plan.md) | 1-2周 | 2026-09-13 |
+| 阶段14：变现与可信度 | ⏳ 待开始（`ProCode` 兑换码 + 线下收款（复用 `InviteCode` 一码一用事务）× C2 城市社保参数库（复用 C1 配置热更新模式）× 高商业意图 SEO 落地页） | 2周 | 预计 —
+| 阶段15：迁移与合规升级 | ⏳ 待开始（**前置：ICP 备案通过**）迁腾讯云国内节点（Zeabur 转预发）+ 官方支付（微信/支付宝）+ 微信小程序 + B 端 API | 3周+ | 预计 —
+| ⏳ 并行线：ICP 备案 | ⏳ 待启动（定域名 → 腾讯云轻量 → 域名实名 → 提交备案 → 排队 3-5 周；期间产品正常迭代，不阻塞阶段13/14） | 3-5周 | 预计 —
 
 ### 当前状态
 
@@ -487,8 +514,8 @@ cpolar http 3000 -region=cn
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-09-12（阶段12：A 阶段核心功能补强（公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化）+ C1 税制参数配置化（`TaxRateConfig` 版本化热改 + 公开只读端点 `GET /api/config/tax-rates` + 运维后台「税率」Tab + 可选公告联动）；门禁扩至 **68/68**、单测 **17 套件 361 例**；详见 CHANGELOG.md）*
-*对应项目版本：v1.8.0（阶段11 内容/公告中心已交付）*
+*最后更新：2026-09-13（阶段13：**获客与转化 13A–13E 全部完成，随 v1.12.0 上线** —— `Lead` 线索模型 + 公开留资端点 `POST /api/leads`（游客可提交 / 限流 / 同手机号 24h 幂等合并）+ 管理端 `GET/PATCH /api/admin/leads`、`/stats`、`/export` + 结果页情境引导与留资弹窗双通道 + 个人中心「财税服务」卡片 + 管理台「线索」Tab（漏斗条 / 列表 / 行内状态机 / 分配 / CSV 导出）+ 一键结果分享图（`capture.js` 公共层 + 2 模板 + 二维码归因）+ `FunnelEvent` 转化漏斗埋点；门禁扩至 **100/100**、单测 **20 套件 412 例**；同版完成生产凭据轮换整改。阶段12 A+C1 已完成；支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15 → 下一阶段：**阶段14 变现与可信度**。详见 CHANGELOG.md）*
+*对应项目版本：v1.12.0*
 
 ---
 

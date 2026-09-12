@@ -22,6 +22,7 @@ model User {
 
   calculations Calculation[]
   feedbacks     Feedback[]
+  leads         Lead[]
 }
 
 model Calculation {
@@ -91,6 +92,24 @@ model CalcEvent {
   count Int      @default(0)
 
   @@unique([date, type])
+  @@index([date])
+}
+
+// 阶段13E：转化漏斗埋点（visit / calc_done / share / save / lead_click）
+// 为什么是「日粒度聚合」而不是「逐条事件」：
+//   1) 北极星指标只需比值（lead_submit / calc_done），日粒度足够看趋势，聚合表查询极轻；
+//   2) 不落任何个人标识（无 IP / 无设备 ID / 无 user_id），从结构上规避个保法风险；
+//   3) upsert 自增天然幂等且抗刷——同一步骤同一天永远只有一行。
+// 口径提醒：本表 calc_done 是「全量口径」（含游客与算完未保存），
+//          与 CalcEvent（仅登录用户、仅在保存时上报、带 type 维度）不是同一个数，勿混用。
+// lead_submit 不进本表——它的唯一真相是 Lead 表，同一事实只存一处。
+model FunnelEvent {
+  id    Int      @id @default(autoincrement())
+  date  DateTime // 北京时间当日 0 点对应的 UTC 时刻
+  step  String // visit / calc_done / share / save / lead_click
+  count Int      @default(0)
+
+  @@unique([date, step])
   @@index([date])
 }
 
@@ -166,4 +185,35 @@ model TaxRateConfig {
   created_at   DateTime @default(now())
 
   @@index([status, published_at])
+}
+
+// 阶段13：转化线索（工具 → 服务）—— 会计/税务服务获客的枢纽
+// 设计要点：
+//   1) user_id 可空 + onDelete: SetNull：游客不登录也能留资；用户注销后线索仍可跟进（业务资产不随账号消失）
+//   2) scene 情境快照：记录用户从哪类计算结果进入（如「经营所得·汇算清缴」），顾问跟进可精准开场
+//   3) consent 显式同意：留资含收入相关敏感信息，个保法要求单独同意，必须留痕
+//   4) status 状态机：new → contacted → qualified → converted / dropped（管理台跟进用）
+model Lead {
+  id          Int      @id @default(autoincrement())
+  user_id     Int? // 可空：游客亦可留资
+  name        String
+  phone       String?
+  wechat      String?
+  company     String? // 公司 / 个体户名称
+  entity_type String   @default("unknown") // individual / sole / small / other / unknown
+  need        String   @default("") // 代理记账 / 汇算清缴 / 申报核对 / 咨询 / other
+  source      String   @default("unknown") // 触点归因（见阶段13方案 §3.1）
+  scene       String   @default("") // 情境快照
+  note        String   @default("")
+  consent     Boolean  @default(false) // 个保法显式同意留痕
+  status      String   @default("new") // new / contacted / qualified / converted / dropped
+  owner       String? // 跟进顾问
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([status, created_at])
+  @@index([source])
+  @@index([phone])
 }

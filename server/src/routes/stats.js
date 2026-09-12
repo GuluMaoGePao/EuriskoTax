@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAdmin } = require('../middleware/adminAuth');
 const { authenticateToken } = require('../middleware/auth');
-const { getOverview, trackCalculationEvent } = require('../controllers/statsController');
+const { getOverview, trackCalculationEvent, trackFunnelEvent } = require('../controllers/statsController');
 
 /**
  * @swagger
@@ -54,5 +54,37 @@ router.get('/overview', requireAdmin, getOverview);
  *       '401': { description: 未认证 }
  */
 router.post('/events', authenticateToken, trackCalculationEvent);
+
+/**
+ * @swagger
+ * /api/stats/funnel:
+ *   post:
+ *     tags: [统计 Stats]
+ *     summary: 转化漏斗埋点（公开，无需登录）
+ *     description: |
+ *       链路 visit → calc_done → share / save → lead_click。
+ *       公开端点：漏斗前两步大多发生在未登录状态，若要求登录，北极星分母只剩登录用户、指标会虚高。
+ *       仅记录「步骤 + 次数」并做日粒度聚合，不落 IP / 设备 ID / user_id。
+ *       lead_submit 不上报 —— 其唯一真相是 Lead 表，由 /api/admin/leads/funnel 直接统计。
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [step]
+ *             properties:
+ *               step:
+ *                 type: string
+ *                 enum: [visit, calc_done, share, save, lead_click]
+ *                 example: calc_done
+ *                 description: 漏斗步骤
+ *     responses:
+ *       '201': { description: 记录成功（data.count 为该步骤当日累计次数） }
+ *       '400': { description: step 非法（不在白名单内） }
+ *       '429': { description: 上报过于频繁 }
+ */
+router.post('/funnel', trackFunnelEvent);
 
 module.exports = router;

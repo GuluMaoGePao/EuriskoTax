@@ -8,6 +8,10 @@ const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
 // 合法计算类型白名单（与前端埋点约定一致）
 const VALID_CALC_TYPES = ['comprehensive', 'business', 'classification', 'reverse'];
 
+// 阶段13E：转化漏斗步骤白名单（与前端 api-client.reportFunnelEvent 约定一致）
+// lead_submit 不在这里 —— 它的唯一真相是 Lead 表，由 /api/admin/leads/funnel 直接统计
+const FUNNEL_STEPS = ['visit', 'calc_done', 'share', 'save', 'lead_click'];
+
 /**
  * 获取北京时间某日 0 点对应的 UTC 时间
  * @param {number} daysAgo - 距今天的天数（0=今天）
@@ -54,6 +58,47 @@ const trackCalculationEvent = async (req, res, next) => {
             success: true,
             data: {
                 type,
+                count: event.count
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * 转化漏斗埋点（阶段13E）
+ * POST /api/stats/funnel
+ * 公开端点（**无需登录**）：漏斗的 visit 与 calc_done 大多发生在未登录状态，
+ * 若要求登录，分母只剩登录用户，北极星指标会系统性偏高 —— 这正是 13E 要修的旧口径缺陷。
+ * 仅记录「哪一步 + 次数」并做日粒度 upsert 聚合：
+ *   - 不落 IP / 设备 ID / user_id，结构上无个人标识，规避个保法风险与数据清理成本；
+ *   - 失败由调用方静默处理，绝不阻塞计算与留资主流程。
+ */
+const trackFunnelEvent = async (req, res, next) => {
+    try {
+        const { step } = req.body || {};
+        if (!FUNNEL_STEPS.includes(step)) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: `Invalid funnel step. Must be one of: ${FUNNEL_STEPS.join(', ')}`,
+                    statusCode: 400
+                }
+            });
+        }
+        // date 存北京时间今日 0 点的 UTC 时刻（毫秒恒 0，可稳定命中 (date, step) 复合唯一键）
+        const { start } = getCstDayRange(0);
+        const event = await prisma.funnelEvent.upsert({
+            where: { date_step: { date: start, step } },
+            update: { count: { increment: 1 } },
+            create: { date: start, step, count: 1 }
+        });
+
+        res.status(201).json({
+            success: true,
+            data: {
+                step,
                 count: event.count
             }
         });
@@ -130,5 +175,6 @@ const getOverview = async (req, res, next) => {
 
 module.exports = {
     getOverview,
-    trackCalculationEvent
+    trackCalculationEvent,
+    trackFunnelEvent
 };

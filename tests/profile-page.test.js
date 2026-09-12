@@ -207,11 +207,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 8 个模块卡片', () => {
+    test('renderProfileCards 应渲染 9 个模块卡片', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(8);
+        expect(cards.length).toBe(9);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-history');
@@ -224,6 +224,8 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-feedback');
         // 阶段11：内容中心「公告与更新」入口卡片
         expect(ids).toContain('profile-card-notices');
+        // 阶段13B：财税服务（留资转化）入口卡片
+        expect(ids).toContain('profile-card-lead');
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {

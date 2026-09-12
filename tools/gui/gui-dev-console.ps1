@@ -1675,7 +1675,7 @@ function Invoke-AsyncCommand {
                     Write-Log "[跳过] 未检测到可用的 Docker（docker compose 不可用）—— 演练门禁未执行，这不是代码问题。" "WARN"
                     Write-Log "       日常发布前继续用「✅ 本地登录链路验证」；要启用演练请装 Docker Desktop 后重跑。" "GRAY"
                     if (Test-AllowPopup -Key "PG_NO_DOCKER") {
-                        $pgMsg = "本机没有可用的 Docker，PostgreSQL 演练门禁已跳过（返回码 2）。`r`n`r`n这不是代码问题：`r`n  ① 日常发布前继续跑「✅ 本地登录链路验证（verify:local）」，SQLite 下同一套 68 项照样全跑；`r`n  ② 只有改了 server/prisma/schema.prisma 或 migrations/ 时才必须跑 PG 演练；`r`n  ③ 演练前请先停掉本地 :3000 后端（运行中会锁 Prisma 引擎 DLL，generate 会报 EPERM）。`r`n`r`n是否现在打开 Docker Desktop 下载页？"
+                        $pgMsg = "本机没有可用的 Docker，PostgreSQL 演练门禁已跳过（返回码 2）。`r`n`r`n这不是代码问题：`r`n  ① 日常发布前继续跑「✅ 本地登录链路验证（verify:local）」，SQLite 下同一套 100 项照样全跑；`r`n  ② 只有改了 server/prisma/schema.prisma 或 migrations/ 时才必须跑 PG 演练；`r`n  ③ 演练前请先停掉本地 :3000 后端（运行中会锁 Prisma 引擎 DLL，generate 会报 EPERM）。`r`n`r`n是否现在打开 Docker Desktop 下载页？"
                         $pgR = [System.Windows.Forms.MessageBox]::Show($pgMsg, "PostgreSQL 演练已跳过（缺少 Docker）", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Information)
                         if ($pgR -eq "Yes") { Start-Process "https://www.docker.com/products/docker-desktop/" }
                     }
@@ -2946,14 +2946,14 @@ Add-SectionCard -TabCtx $tab3Ctx `
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "3. 发布门禁（上线前必跑）" `
-    -Subtitle "脚本：server/scripts/verify-local-auth.js（同一套 68 项断言，两种数据库模式）" `
+    -Subtitle "脚本：server/scripts/verify-local-auth.js（同一套 100 项断言，两种数据库模式）" `
     -Description "详细说明：部署前的端到端门禁 —— 真实启动本地后端，验证 登录 dev@example.com → 用邀请码+邮箱验证码注册新号 → 新号登录 全链路，并核对前端/SW 版本指纹。失败显示红字，禁止 push。日常跑 SQLite 版（verify:local）；改动 server/prisma/schema.prisma 或 migrations/ 后必须加跑 PostgreSQL 版（verify:pg）—— 它用 Docker 起临时库、按线上容器同序执行 migrate deploy，专拦「本地 SQLite 全绿、线上迁移才炸」的问题。" `
     -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
     @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟，SQLite dev.db）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } },
-    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 68 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 100 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } } },
-    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 68 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 100 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } } }
 )
 

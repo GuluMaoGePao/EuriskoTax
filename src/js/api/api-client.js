@@ -89,7 +89,7 @@ const ERROR_MESSAGE_MAP = {
     '验证码发送过于频繁，请 15 分钟后再试': '验证码发送过于频繁，请 15 分钟后再试'
 };
 
-async function apiRequest(url, method = 'GET', data = null, requiresAuth = false) {
+async function apiRequest(url, method = 'GET', data = null, requiresAuth = false, sendTokenIfPresent = false) {
     const options = {
         method: method,
         headers: {
@@ -103,6 +103,12 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
             throw new Error('请先登录');
         }
         options.headers['Authorization'] = `Bearer ${token}`;
+    } else if (sendTokenIfPresent) {
+        // 可选鉴权：有 token 就带上（用于「游客可用、登录则关联账号」的公开端点，如留资）
+        const token = getAuthToken();
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+        }
     }
 
     if (data) {
@@ -251,6 +257,25 @@ async function getMyFeedback() {
     return await apiRequest('/feedback', 'GET', null, true);
 }
 
+// 提交转化线索（阶段13）：公开端点，游客也可留资，故 requiresAuth=false。
+// 末位 sendTokenIfPresent=true：登录用户自动带上 JWT，后端 optionalAuth 会挂 user_id 便于顾问跟进；
+// 未登录时静默不带令牌，不打断主流程。字段需与后端 leadController 白名单一致（非法值后端回落默认）。
+async function submitLead(payload) {
+    const p = payload || {};
+    return await apiRequest('/leads', 'POST', {
+        name: p.name || '',
+        phone: p.phone || '',
+        wechat: p.wechat || '',
+        company: p.company || '',
+        entityType: p.entityType || 'unknown',
+        need: p.need || 'other',
+        source: p.source || 'unknown',
+        scene: p.scene || '',
+        note: p.note || '',
+        consent: p.consent === true
+    }, false, true);
+}
+
 // 匿名计算埋点（阶段8）：登录用户在保存计算后上报"计算类型"，供运营观察功能使用分布。
 // 关键设计：
 //   - 仅上报 type，绝不携带任何收入/扣除等输入数据（守住"收入不出浏览器"的隐私承诺）；
@@ -281,6 +306,45 @@ async function trackCalculation(type) {
     } catch (err) {
         // 埋点失败静默：统计属辅助数据，不影响用户主流程
     }
+}
+
+// 阶段13E：转化漏斗埋点（visit / calc_done / share / save / lead_click）
+// 与 trackCalculation 的关键区别：
+//   - 走公开端点，**不需要登录**（游客也要计入 —— 否则北极星分母只剩登录用户、指标虚高）；
+//   - 已登录则顺带 token（便于将来做人群切片），未登录即匿名上报；
+//   - 服务端不落任何个人标识，这里也只传「哪一步」；
+//   - 失败静默、不重试：统计是辅助数据，绝不打断计算与留资主流程。
+const FUNNEL_STEPS = ['visit', 'calc_done', 'share', 'save', 'lead_click'];
+const VISIT_FLAG_KEY = 'euriskotax:funnel-visit';
+
+async function reportFunnelEvent(step) {
+    if (FUNNEL_STEPS.indexOf(step) === -1) return;
+    try {
+        const token = getAuthToken();
+        await fetch(`${API_BASE_URL}/stats/funnel`, {
+            method: 'POST',
+            headers: Object.assign(
+                { 'Content-Type': 'application/json' },
+                token ? { 'Authorization': `Bearer ${token}` } : {}
+            ),
+            body: JSON.stringify({ step })
+        });
+    } catch (err) {
+        // 埋点失败静默
+    }
+}
+
+// visit 只在「每个会话」上报一次：刷新技术性刷新不应把访问量刷高。
+// 用 sessionStorage（关标签页即失效）而非 localStorage，与「一次访问」语义一致。
+// 隐私模式 / 存储被禁用时 sessionStorage 可能抛错，此时退化为「不上报 visit」（宁可少记不可报错）。
+function reportVisitOnce() {
+    try {
+        if (sessionStorage.getItem(VISIT_FLAG_KEY)) return;
+        sessionStorage.setItem(VISIT_FLAG_KEY, '1');
+    } catch (err) {
+        return;
+    }
+    reportFunnelEvent('visit');
 }
 
 function isLoggedIn() {
@@ -314,7 +378,10 @@ const apiClient = {
     deleteCalculation,
     submitFeedback,
     getMyFeedback,
+    submitLead,
     trackCalculation,
+    reportFunnelEvent,
+    reportVisitOnce,
     isLoggedIn
 };
 

@@ -16,7 +16,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *     summary: 当前税率配置 + 出厂基线 + 历史版本（运维后台）
  *     security: [{ adminToken: [] }]
  *     responses:
- *       '200': { description: { current, defaults, history[] } }
+ *       '200': { description: 当前配置 current + 出厂基线 defaults + 历史版本 history }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
 router.get('/', requireAdmin, taxRateAdminController.listTaxRates);
@@ -50,7 +50,7 @@ router.get('/', requireAdmin, taxRateAdminController.listTaxRates);
  *                     type: array
  *                     items: { type: string, enum: [assistant_qa, home_banner, modal, notice_list] }
  *     responses:
- *       '201': { description: { config, release|null } }
+ *       '201': { description: 发布成功：config 为新配置，公告联动时 release 为公告结果（未联动为 null） }
  *       '400': { description: 税率校验失败或版本号重复 }
  */
 router.post('/', requireAdmin, taxRateAdminController.createTaxRateConfig);
@@ -73,7 +73,7 @@ router.post('/', requireAdmin, taxRateAdminController.createTaxRateConfig);
  *               version: { type: string, description: 新版本号；留空自动生成 }
  *               note: { type: string }
  *     responses:
- *       '201': { description: { config } }
+ *       '201': { description: 回滚成功，返回新配置 config }
  *       '400': { description: 参数非法 }
  *       '404': { description: 配置版本不存在 }
  */
