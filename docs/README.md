@@ -8,7 +8,7 @@
 ## 当前状态（v1.12.0 · 2026-09-13）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.12.0**（阶段13 获客与转化：`Lead` 线索留资 + 管理台「线索」Tab 跟进状态机 + 一键结果分享图 + 转化漏斗埋点；上一版 1.11.1 = 管理台「税率」Tab 保存链路修复 + 缴费基数最低标准 7546 与表单默认基数对齐）
+- **主版本**：CHANGELOG 最新 **1.12.0**（阶段13 获客与转化：`Lead` 线索留资 + 管理台「线索」Tab 跟进状态机 + 一键结果分享图 + 转化漏斗埋点；上一版 1.11.1 = 管理台「税率」Tab 保存链路修复 + 缴费基数最低标准 7546 与表单默认基数对齐）。1.12.0 已上线并打标签 `v1.12.0`
 - **测试**：20 套件 412 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡 22 例）；发布门禁 `verify:local` **100/100** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
 - **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）→ 当前工作：**阶段14 变现与可信度（`ProCode` 兑换码 + 线下收款 / C2 城市社保参数库 / 高商业意图 SEO 落地页）**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md)
 
