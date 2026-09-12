@@ -12,7 +12,7 @@
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时需同步更新下方 __APP_VERSION__ 与根目录 version.json 两处。 -->
     <script>
-        window.__APP_VERSION__ = '1.11.1';
+        window.__APP_VERSION__ = '1.12.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -57,6 +57,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.20/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 阶段13D：分享图二维码（qrcode-generator；与 jspdf / html2canvas 同为 cdnjs + SW cache-first）。
+         加载失败不阻断：分享图会退化为「域名文字」，仅失去扫码入口 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <!-- 统一的 Tailwind 配置 -->
     <script>
         // 防止主题闪烁：在页面渲染前应用保存的主题
@@ -5908,7 +5911,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.11.1</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.12.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -5935,6 +5938,105 @@
         </div>
     </div>
 
+    <!-- 阶段13B：留资弹窗（双通道 —— 企业微信活码立即咨询 / 留言表单回访）
+         活码由 index.html 顶部 window.LEAD_CONFIG.wecomQrUrl 注入；未配置时自动降级为仅留言通道 -->
+    <div id="lead-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300"
+         onclick="if(event.target===this && window.LeadModal) window.LeadModal.close()">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[88vh] flex flex-col transform scale-95 transition-transform duration-300">
+            <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-base font-bold"><i class="fa fa-handshake-o mr-2"></i>免费咨询一次</h3>
+                    <p class="text-xs text-white/80 mt-1">专业顾问帮您核对扣除项 / 制定申报方案</p>
+                </div>
+                <button type="button" id="lead-modal-close" aria-label="关闭"
+                        class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors flex-shrink-0">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+
+            <div id="lead-modal-body" class="p-5 overflow-y-auto flex-1">
+                <div id="lead-modal-scene" class="hidden text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4"></div>
+
+                <!-- 通道1：企业微信活码（意向最强，立即咨询） -->
+                <div id="lead-wecom-channel" class="hidden text-center mb-4">
+                    <p class="text-sm font-medium text-gray-800 mb-2">扫码加顾问企业微信，立即咨询</p>
+                    <img id="lead-wecom-qr" src="" alt="企业微信顾问二维码"
+                         class="w-40 h-40 mx-auto rounded-lg border border-gray-200 bg-white object-contain" />
+                    <p class="text-[11px] text-gray-400 mt-2">工作日 9:00–18:00 在线，非工作时间也可留言</p>
+                </div>
+
+                <div id="lead-divider" class="flex items-center gap-3 text-[11px] text-gray-400 mb-4">
+                    <span class="h-px bg-gray-200 flex-1"></span>或留个联系方式，顾问主动联系您<span class="h-px bg-gray-200 flex-1"></span>
+                </div>
+
+                <!-- 通道2：留言表单 -->
+                <form id="lead-form" class="space-y-3" novalidate>
+                    <div>
+                        <label for="lead-name" class="block text-xs font-medium text-gray-600 mb-1">称呼 <span class="text-red-500">*</span></label>
+                        <input id="lead-name" type="text" maxlength="50" placeholder="如：张先生 / 李会计" class="input-field w-full" />
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="lead-phone" class="block text-xs font-medium text-gray-600 mb-1">手机号</label>
+                            <input id="lead-phone" type="tel" inputmode="numeric" maxlength="11" placeholder="手机号 / 微信号二选一" class="input-field w-full" />
+                        </div>
+                        <div>
+                            <label for="lead-wechat" class="block text-xs font-medium text-gray-600 mb-1">微信号</label>
+                            <input id="lead-wechat" type="text" maxlength="64" placeholder="手机号 / 微信号二选一" class="input-field w-full" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="lead-entity" class="block text-xs font-medium text-gray-600 mb-1">身份</label>
+                            <select id="lead-entity" class="input-field w-full">
+                                <option value="individual">个人（工资 / 劳务）</option>
+                                <option value="sole">个体工商户 / 独资</option>
+                                <option value="small">小微企业主</option>
+                                <option value="other">其他</option>
+                                <option value="unknown" selected>暂不说明</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="lead-need" class="block text-xs font-medium text-gray-600 mb-1">想咨询</label>
+                            <select id="lead-need" class="input-field w-full">
+                                <option value="settlement" selected>年度汇算 / 多缴退税</option>
+                                <option value="bookkeeping">记账报税</option>
+                                <option value="declare_check">申报核对</option>
+                                <option value="consult">其他财税咨询</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="lead-company" class="block text-xs font-medium text-gray-600 mb-1">公司 / 单位（选填）</label>
+                        <input id="lead-company" type="text" maxlength="100" class="input-field w-full" />
+                    </div>
+                    <div>
+                        <label for="lead-note" class="block text-xs font-medium text-gray-600 mb-1">想解决的问题（选填）</label>
+                        <textarea id="lead-note" rows="2" maxlength="1000" placeholder="如：专项附加扣除不确定填得对不对" class="input-field w-full"></textarea>
+                    </div>
+                    <label class="flex items-start gap-2 text-[11px] text-gray-500 leading-relaxed">
+                        <input id="lead-consent" type="checkbox" class="mt-0.5" />
+                        <span>我同意贵司就本次咨询通过电话 / 微信与我联系。本表单不采集具体收入金额，测算结果不构成税务建议。</span>
+                    </label>
+                    <p id="lead-form-error" class="hidden text-xs text-red-600"></p>
+                </form>
+
+                <!-- 提交成功态 -->
+                <div id="lead-success" class="hidden text-center py-6">
+                    <i class="fa fa-check-circle text-4xl text-success"></i>
+                    <p class="text-sm font-medium text-gray-800 mt-3">已收到，顾问会尽快与您联系</p>
+                    <p id="lead-success-sub" class="text-xs text-gray-500 mt-1"></p>
+                </div>
+            </div>
+
+            <div id="lead-modal-footer" class="p-4 border-t border-gray-200 flex items-center justify-between gap-3">
+                <p class="text-[11px] text-gray-400 leading-tight">本测算仅供参考，不构成税务建议</p>
+                <button type="submit" form="lead-form" id="lead-submit-btn" class="btn btn-primary px-5 py-2 rounded-lg">提交</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 保存成功提示 -->
     <div id="save-success-toast" class="fixed bottom-4 right-4 bg-success text-white px-4 py-2 rounded-lg shadow-lg hidden">
         <div class="flex items-center">
@@ -5952,6 +6054,8 @@
     <!-- auth-ui 由 app.js 在 DOMContentLoaded 后动态 import（统一 URL 避免双份加载与旧版本缓存） -->
     <script src="src/js/data/data-management.js"></script>
     <script src="src/js/data/field-hints.js"></script>
+    <!-- 阶段13D：DOM 截图公共层（PDF 导出与分享图共用；必须早于 navigation-ui.js 加载） -->
+    <script src="src/js/export/capture.js"></script>
     <script src="src/js/data/tax-assistant.js"></script>
     <script src="src/js/calculation/tax-calculator.js"></script>
     <script src="src/js/calculation/helper-functions.js"></script>
@@ -5979,6 +6083,19 @@
     <script src="src/js/data/scenario-store.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>
     <script src="src/js/app.js"></script>
+    <!-- 阶段13B：企业微信「联系我」活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
+         留空则留资弹窗自动降级为「仅留言通道」并打印一次控制台提示，不影响主流程 -->
+    <script>window.LEAD_CONFIG = { wecomQrUrl: '' };</script>
+    <!-- 阶段13B：留资弹窗（双通道）与结果页情境引导（分流白名单：谈薪页不出） -->
+    <script src="src/js/lead/lead-modal.js"></script>
+    <script src="src/js/lead/lead-touchpoints.js"></script>
+
+    <!-- 阶段13D：一键结果分享图（2 模板 + 二维码归因 + 生成前预览确认） -->
+    <script src="src/js/share/share-card.js"></script>
+
+    <!-- 阶段13E：转化漏斗埋点接线（visit → calc_done → save/share → lead_click）。
+         独立 type=module，与主程序加载顺序解耦；全部静默失败，不影响计算与留资 -->
+    <script type="module" src="src/js/stats/funnel-tracking.js"></script>
 
     <!-- 阶段8：匿名计算埋点监听器。仅登录用户在保存计算后上报"计算类型"（不含任何收入/扣除输入数据）；
          独立 type=module，与 app.js 加载顺序解耦；监听加载失败或离线时静默跳过，不影响主流程 -->

@@ -7,6 +7,73 @@
 
 ---
 
+## [1.12.0] - 2026-09-13（阶段13：获客与转化 13A 后端地基 / 13B 前端触点 / 13C 管理台「线索」Tab / 13D 一键结果分享图 / 13E 漏斗埋点；生产凭据轮换整改）
+
+> 门禁基线：**verify:local 100 项**（阶段13 累计新增 32 项：13A 线索端点 14 + 13B 前端触点 7 + 13C 管理台 2 + Swagger 文档完整性 1 + 13E 漏斗埋点 3 + 13D 分享图 5）；单测 **20 套件 412 例**（新增 `tests/leads.test.js` 20 例 + `tests/funnel.test.js` 9 例 + `tests/share-card.test.js` 22 例）；线上指纹 **36 项**（新增线索端点路径检查）。
+> 本阶段不改动任何计税逻辑。`Lead` 是「工具 → 服务」的唯一转化枢纽，北极星指标 `lead_submit / calc_done`。
+
+### 新增
+- **13A 后端地基**
+  - `Lead` 模型（`user_id` 可空 / `scene` 情境快照 / `consent` 同意留痕 / `status` 状态机），生产 PostgreSQL 与开发 SQLite 双 schema 一致；迁移 `20260912_add_leads`
+  - 公开端点 `POST /api/leads`：游客可提交（登录态经 `optionalAuth` 自动关联账号）、`consent` 强校验、字段白名单归一化、10 次/IP/小时限流、同手机号 24h 幂等合并（返回 200 且不新建记录）
+  - 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 UTF-8 BOM + 公式注入防护，最多 5000 条）
+- **13B 前端触点（工具 → 服务的转化入口）**
+  - 结果页情境引导：分流白名单仅经营所得 / 汇算清缴 / 分类所得，谈薪（`reverse`）**永不出现**（`ALLOWED_TYPES` + `BLOCKED_TYPES` 双保险，门禁断言守护）
+  - 留资弹窗 `#lead-modal` 双通道：企业微信活码（`window.LEAD_CONFIG.wecomQrUrl`，未配置自动降级为仅留言通道）+ 留言表单（称呼 / 手机号 / 微信号 / 主体 / 需求 / 备注 + 显式同意勾选；校验 → 提交 → 成功态 → 自动关闭）
+  - 个人中心「财税服务」常驻卡片（`profile-card-lead`）；`api-client.submitLead`（`apiRequest` 新增末尾 `sendTokenIfPresent`）；触点事件 `euriskotax:lead-click` / `euriskotax:lead-submit`
+- **13C 管理台「线索」Tab**
+  - 漏斗条（线索总数 / 今日新增 / 待分配 / 已成交·转化率 + `new→contacted→qualified→converted` 进度条）
+  - 列表（联系人含关联账号 / 公司·主体 / 需求 / 来源·情境·备注 / 状态 / 跟进人 / 提交时间）
+  - 行内状态机即时保存（失败自动回滚为服务端真实值）、分配跟进人（清空即取消分配）、按当前筛选导出 CSV
+
+- **13D 一键结果分享图（T4 触点：用户传播 → 扫码回流）**
+  - 新增 `src/js/export/capture.js`（DOM 截图公共层）：PDF 导出与分享图共用同一套 html2canvas 配置与临时容器清理，从根上消除「PDF 清晰但分享图糊」这类配置漂移 —— `navigation-ui.exportToPDF` 已改为调用它，自身不再保留一份截图实现（单测守护）
+  - 新增 `src/js/share/share-card.js`：2 个模板 —— `income` 正向结果卡（综合所得 / 经营所得 / 分类所得，主角「税后收入」）与 `negotiation` 谈薪卡（主角「税前该谈多少」，谈薪场景真正关心的事）；取数直接读结果页已渲染的 DOM，对计算模块零耦合
+  - 生成前预览确认（可保存 PNG，手机端提示长按保存）；二维码指向 `?source=share` 完成 T4 归因（`lead-modal` 落地时读取，优先级低于调用方显式指定）
+  - 每张图固定展示「本测算结果仅供参考，不构成税务建议」；文案不含「避税 / 节税 / 税筹」（单测 + 门禁双重守护）
+  - 谈薪页被服务引导显式排除（13B 硬约束），分享图是它**唯一**的转化出口 —— 单测专门守护这一产品决策，避免以后有人「顺手」把它删掉
+  - 二维码用 `qrcode-generator`（cdnjs + SW cache-first）；加载失败降级为「域名文字」，不阻断出图
+  - 生成成功派发 `euriskotax:share` → 自动计入 13E 漏斗 `share` 步（埋点在「真的拿到图」之后才触发，避免生成失败被记成一次分享）
+- **13E 漏斗埋点（visit → calc_done → share/save → lead_click → lead_submit）**
+  - `FunnelEvent` 模型（`date` + `step` 复合唯一，日粒度聚合）+ 迁移 `20260913_add_funnel_events`
+  - 公开端点 `POST /api/stats/funnel`（**无需登录**、step 白名单、600 次/10 分钟/IP、日粒度 upsert 自增）
+  - `GET /api/admin/leads/funnel?days=7`：各步累计 + 今日 + 各步转化率 + 北极星（`lead_submit` 直接 count Lead 表，不进埋点表）
+  - 前端 `src/js/stats/funnel-tracking.js`：visit 每会话一次（sessionStorage 去重）、calc_done 绑 4 个计算按钮（结果容器可见才计，避免校验失败误记）、save 复用 `euriskotax:calc-saved`、share 预留 `euriskotax:share`（13D 分享图派发即接入）、**lead_click 包装 `LeadModal.open` 唯一入口**（以后新增触点免再改埋点）
+  - 管理台「线索」Tab 新增「转化漏斗」区块（4 步 + 每步转化率 + 北极星徽标），与既有「线索状态漏斗」并列且语义不同
+  - **口径修正**：原 `calc_done` 只在「登录用户保存计算」时上报，游客与「算完未保存」的多数用户完全不计入 → 北极星分母严重偏低。13E 改为公开端点覆盖全量口径（`CalcEvent` 保留不动，两者口径差异已写明在 schema 注释与文档中）
+
+### 修复
+- **Swagger JSDoc 的 YAML 写坏，端点从文档「静默消失」**（`taxRateAdmin.js` / `supportAdmin.js` / `leads.js`）：在 flow map（单行 `{}`）的值里写了裸 `{` 或英文逗号，例如
+  `'201': { description: 已创建，返回 { id, merged: false } }`、`description: 支持 {RESET_URL} 占位`。
+  yaml 解析失败**只打服务端日志、不影响端点运行**，但 `/api/docs` 里这些端点与响应说明直接不可见；而 `/api/docs` 页面本身仍返回 200，
+  因此人工目测「能打开就算好」根本发现不了。现改为自然语言描述 + 必要的单引号包裹（`{RESET_URL}` 作为功能占位符原样保留）。
+- **新增门禁断言 `Swagger /api/docs.json 可解析且含线索端点`**：把「文档可见」从人工目测变成可回归检查。此前 13A 的 DoD 写了「Swagger 可见全部端点」却没有任何守护，这次缺陷正是从那个缺口漏过去的。
+
+### 安全（2026-09-13 凭据轮换整改）
+- **生产全部长期凭据完成轮换**（曾以明文形式出现在排障记录中，按最坏情况处置）：`ADMIN_TOKEN` / `JWT_SECRET` / `SMTP_PASS` / PostgreSQL 密码全部更换新值。每项都做了**独立探测验证**，而不是「改完就算」：
+  - `ADMIN_TOKEN`：旧令牌 → `401`、新令牌 → `200`（实测 `/api/stats/overview`）
+  - `JWT_SECRET`：用旧密钥签发的 token → `401 Token invalid`；用随机错误密钥做对照同样返回 `Token invalid`，先确认判别方法有效再下结论
+  - `SMTP_PASS`：QQ 授权码三向验证 —— 原始码与中间码均 `INVALID`、当前码 `VALID`，`POST /api/auth/send-code` 恢复 `200`
+  - PostgreSQL 密码：容器内 `psql -U root -d postgres` 可通过认证并返回 `current_user`
+- **Zeabur 控制台移除明文变量**：删除 `INVITE_CODE`（代码中已无任何引用）与 `PASSWORD`，不再以明文形式留存在面板
+- **澄清「QQ 授权码可并存」这一坑**：生成新授权码**不会**让旧码失效 —— 旧码必须到「设置 → 账号与安全 → 设备管理 → 授权码管理」手动点「失效」。首次换码时实测新旧码**同时可用**，属假整改；本次已确认旧码全部失效。这条已写入排障认知，避免以后重犯
+- **本地持密文件同步**：`server/.env`（`ADMIN_TOKEN` / `JWT_SECRET` / `SMTP_PASS` / `ADMIN_TOKEN_PROD`）与 `tools/ops/notify.config.json` 全部换新；轮换前的明文备份 `backup/server.env.20260913.bak` 已删除
+- **git 泄露面复核**：`.env` / `notify.config.json` / `backup/` 均在 `.gitignore` 覆盖范围内；`git grep` 确认新旧凭据均**未进入任何被跟踪文件**
+- 附带影响（预期内、无需处理）：`JWT_SECRET` 轮换使**所有在线用户被登出**，重新登录即可。本次整改不改动任何业务逻辑、接口契约与计税结果
+
+> 轮换后的值只存在于 Zeabur 控制台与本地 `.env`；本 CHANGELOG 不记录任何凭据明文。
+
+### 文档
+- 新增 `docs/development/stage13-acquisition-and-leads-plan.md`（四项决策、13A-13E 排期与 DoD、合规清单）
+- `docs/api/api-reference.md` 升 **v2.6**：新增 §5.12 转化线索管理、§5.13 转化漏斗统计、§11 公开写入口（线索提交）、§12 公开埋点接口（漏斗上报）
+- 门禁口径全量同步：`verify:local` 68 → **100 项**、单测 17 套件 361 例 → **20 套件 412 例**、线上指纹 35 → **36 项**（README / docs/README / development-workflow / ops / gui 文档与脚本）
+- 订正 `server/src/routes/leads.js` 注释与 Swagger 的限流口径（3 → 10 次/IP/小时，与 `app.js` 实际一致）
+
+### 待办输入
+- 企业微信「联系我」活码 URL：生成后填入 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl`；未配置时仅留言通道生效
+
+---
+
 ## [1.11.1] - 2026-09-12（管理台税率保存链路修复 + 缴费基数 7546 + 计算页样式打磨）
 
 > 上线方式：`ops-publish.ps1` 安全发布流水线（verify:local 68 项门禁 → push → 线上 35 项指纹全绿 → 自动打 `v1.11.1`）。

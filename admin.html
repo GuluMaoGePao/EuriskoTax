@@ -51,6 +51,7 @@
             <nav id="main-nav" class="ml-6 hidden md:flex items-center gap-1">
                 <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
                 <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
+                <button data-nav="leads" class="tab-btn"><i class="fa fa-user-plus mr-1"></i>线索</button>
                 <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
                 <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
                 <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
@@ -68,6 +69,7 @@
         <nav id="main-nav-mobile" class="md:hidden border-t border-gray-100 px-2 py-1.5 flex gap-1 overflow-x-auto">
             <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
             <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
+            <button data-nav="leads" class="tab-btn"><i class="fa fa-user-plus mr-1"></i>线索</button>
             <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
             <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
             <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
@@ -146,6 +148,72 @@
             </div>
             <p class="text-xs text-gray-400 mb-3">最近 200 条按提交时间倒序；附图已随反馈入库，仅管理员可见。改状态后点「处理」即保存。</p>
             <div id="feedback-list" class="space-y-3"></div>
+        </section>
+
+        <!-- 线索（阶段13C：漏斗条 + 列表 + 状态机 + 分配 + 导出） -->
+        <section id="view-leads" class="view-section hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-user-plus text-primary mr-2"></i>转化线索</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="leads-status-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部状态</option>
+                        <option value="new">待跟进 new</option>
+                        <option value="contacted">已联系 contacted</option>
+                        <option value="qualified">有意向 qualified</option>
+                        <option value="converted">已成交 converted</option>
+                        <option value="dropped">已放弃 dropped</option>
+                    </select>
+                    <select id="leads-source-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部来源</option>
+                        <option value="result_business">经营所得结果页</option>
+                        <option value="result_settlement">汇算清缴结果页</option>
+                        <option value="result_budget">预算表结果页</option>
+                        <option value="home_banner">首页公告条</option>
+                        <option value="modal">启动弹窗</option>
+                        <option value="notice_list">公告列表</option>
+                        <option value="profile">个人中心</option>
+                        <option value="share">分享图</option>
+                        <option value="unknown">未知</option>
+                    </select>
+                    <input id="leads-query" type="search" placeholder="姓名 / 手机号 / 公司" class="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button data-act="search-leads" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-search mr-1"></i>查询</button>
+                    <button data-act="refresh-leads" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
+                    <button data-act="leads-export" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-download mr-1"></i>导出 CSV</button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+                线索是「工具 → 服务」的唯一转化枢纽（北极星指标 <span class="mono">lead_submit / calc_done</span>）。
+                改状态下拉即时保存；填好跟进人后点 <i class="fa fa-check"></i> 保存（清空即取消分配）。导出 CSV 供销售导入自有 CRM。
+            </p>
+            <div id="lead-funnel" class="mb-4"></div>
+            <div id="conversion-funnel" class="mb-4"></div>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+                            <tr>
+                                <th class="px-3 py-3 font-semibold">ID</th>
+                                <th class="px-3 py-3 font-semibold">联系人</th>
+                                <th class="px-3 py-3 font-semibold">公司 / 主体</th>
+                                <th class="px-3 py-3 font-semibold">需求</th>
+                                <th class="px-3 py-3 font-semibold">来源 / 情境</th>
+                                <th class="px-3 py-3 font-semibold">状态</th>
+                                <th class="px-3 py-3 font-semibold">跟进人</th>
+                                <th class="px-3 py-3 font-semibold">提交</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                    <span id="leads-total"></span>
+                    <div class="flex items-center gap-2">
+                        <button data-act="leads-prev" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">上一页</button>
+                        <span id="leads-page" class="text-xs"></span>
+                        <button data-act="leads-next" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">下一页</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- 用户 -->

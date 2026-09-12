@@ -780,6 +780,14 @@ const PROFILE_CARDS_CONFIG = [
         desc: '提交 Bug、建议或截图，每条我们都会认真查看',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-comments-o text-xl text-rose-600'
+    },
+    {
+        id: 'profile-card-lead',
+        icon: 'fa-handshake-o',
+        title: '财税服务',
+        desc: '个税汇算核对、记账报税，留下联系方式顾问免费咨询',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-handshake-o text-xl text-blue-600'
     }
 ];
 
@@ -1902,6 +1910,15 @@ function setupAuthEventListeners() {
             specialFn: () => {
                 if (window.ContentCenterUI && typeof window.ContentCenterUI.openNoticeList === 'function') {
                     window.ContentCenterUI.openNoticeList();
+                }
+            }
+        },
+        {
+            // 阶段13B：个人中心常驻留资入口（source=profile，与后端 SOURCES 白名单一致）
+            cardId: 'profile-card-lead',
+            specialFn: () => {
+                if (window.LeadModal && typeof window.LeadModal.open === 'function') {
+                    window.LeadModal.open({ source: 'profile', scene: '个人中心·财税服务' });
                 }
             }
         }

@@ -37,10 +37,10 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 68 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 邀请码+验证码注册新号 → 新号登录 → 新号身份，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 100 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 68 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 17 套件 361 例 |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 100 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 20 套件 412 例 |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
 
@@ -55,7 +55,7 @@
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 35 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 36 项线上指纹，全绿退出码 0 |
 
 ---
 
@@ -71,7 +71,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（68 项 e2e 门禁）                            │
+│    + verify:local（100 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环
@@ -118,13 +118,13 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
   「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
   `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
-  再跑一遍同样的 68 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  再跑一遍同样的 100 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
   首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
 
 ### ④ 发布（只走安全发布）
 
 正式上线**只有一条路**：GUI「🔐 Git & 账号」→「🚀 安全发布」或命令行 `ops-publish.ps1`。
-它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 35 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
+它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 36 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
 > 版本号请在发布前同步**五处**：`package.json` / 关于弹窗 `版本 x.y.z` / `CHANGELOG.md` 最新条目 / `index.html` 的 `window.__APP_VERSION__` / 根目录 `version.json`（后两处是版本哨兵基准，漏改会让用户每次新会话都清一次缓存）。详见 [分支与版本发布策略 §3.2](branch-release-strategy.md)。
 
 小技巧：重要发布先点「🧪 安全发布试运行」零风险预演一遍，确认门禁能绿再正式发。
@@ -134,7 +134,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
 ## 3. 发布后：如何确认真的上线了
 
 - 发布脚本 `[4/4]` 会自动轮询直到 `ops-check-prod` 全绿；`[5/5]` 成功后自动打并推送版本标签；
-- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（**35 项**：页面可访问 / 登录表单 / 各阶段前端与后台指纹 / 版本三处线上比对（关于弹窗 `版本 x.y.z`、`__APP_VERSION__`、`/version.json`）/ 排障短链 `/reset` 命中清洗页 / 内容端点 / SW 与 app.js 缓存策略）；
+- 也可随时手动跑：`.\tools\ops\ops-check-prod.ps1`（**36 项**：页面可访问 / 登录表单 / 各阶段前端与后台指纹 / 版本三处线上比对（关于弹窗 `版本 x.y.z`、`__APP_VERSION__`、`/version.json`）/ 排障短链 `/reset` 命中清洗页 / 内容端点 / 线索端点 / SW 与 app.js 缓存策略）；
 - 只改了 tools/docs 等非前端资源时，线上指纹不变，核对**会很快通过**——属正常现象。
 
 ---
@@ -142,7 +142,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
 ## 4. 回滚
 
 **核心观念**：版本标签 `vX.Y.Z`（见[分支与版本发布策略 §5.3 标签记录](branch-release-strategy.md)）就是**稳定锚点**——
-每次正式发布都会留下一个「当时线上 35 项指纹全绿」的 commit。所以线上**任何时刻都有一份可以立即回去的已知良好产物**，
+每次正式发布都会留下一个「当时线上 36 项指纹全绿」的 commit。所以线上**任何时刻都有一份可以立即回去的已知良好产物**，
 回退是「回到锚点」，不是「重新开发」。
 
 按「先止血、再修根」两步走：
@@ -162,7 +162,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 ```
 
 - 第 1️⃣ 步能否操作**以你 Zeabur 控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
-- 回退同样受门禁保护：revert 后必须重新通过 68 项 + 35 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
+- 回退同样受门禁保护：revert 后必须重新通过 100 项 + 36 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
 - 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
   `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
 

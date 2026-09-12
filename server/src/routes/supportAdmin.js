@@ -47,7 +47,7 @@ router.get('/', requireAdmin, supportAdminController.listScripts);
  *               title: { type: string, description: 问题标题 }
  *               symptom: { type: string, description: 典型症状 }
  *               steps: { type: array, items: { type: string }, description: 处理步骤；也可传换行分隔的字符串（一行一步） }
- *               script: { type: string, description: 可直接复制给用户的话术，支持 {RESET_URL} 占位 }
+ *               script: { type: string, description: '可直接复制给用户的话术；支持 {RESET_URL} 占位符（端上替换为 /reset 短链）' }
  *               priority: { type: integer, description: 排序，值大的靠前 }
  *     responses:
  *       '201': { description: 已创建 }
@@ -63,7 +63,7 @@ router.post('/', requireAdmin, supportAdminController.createScript);
  *     summary: 恢复内置话术（缺失则补种、已存在则还原为出厂内容；不影响自建条目）
  *     security: [{ adminToken: [] }]
  *     responses:
- *       '200': { description: { created, restored } }
+ *       '200': { description: 恢复完成：created 为新建条数，restored 为还原条数 }
  */
 router.post('/restore', requireAdmin, supportAdminController.restoreBuiltin);
 

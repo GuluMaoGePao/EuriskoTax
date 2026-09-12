@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.4
-> **最后更新**: 2026年9月12日（阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **版本**: v2.6
+> **最后更新**: 2026年9月13日（阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -19,6 +19,7 @@
 8. [环境变量配置](#8-环境变量配置)
 9. [附录：注册流程与邀请码](#9-附录注册流程与邀请码)
 10. [公开只读接口（内容中心 / 税制参数）](#10-公开只读接口内容中心--税制参数)
+11. [公开写入接口（转化线索）](#11-公开写入接口转化线索)
 
 ---
 
@@ -504,6 +505,100 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 典型错误：无 `X-Admin-Token`（401；未配置 `ADMIN_TOKEN` 时 503）、校验失败（400 + `details`）、版本号重复（400）、回滚 id 不存在（404）。
 
+### 5.12 转化线索管理（管理员 · 阶段13）
+
+> 线索（`Lead`）是「工具 → 服务」的唯一转化枢纽，对应北极星指标 `lead_submit / calc_done`。
+> 全部端点要求 `X-Admin-Token`（= `ADMIN_TOKEN` 环境变量）；线索含手机号等个人信息，未鉴权必须拒绝。
+> 跟进状态机：`new` → `contacted` → `qualified` → `converted`，或任意状态 → `dropped`。
+
+**GET** `/api/admin/leads?status=&source=&q=&offset=0&limit=50`
+
+列表，按 `created_at` 倒序，默认 50 条（`limit` 上限 200）；`q` 为姓名/手机号/公司子串匹配（忽略大小写）；`items` 关联 `user`（`{ id, username, email, plan } | null`）。
+
+响应（200）：
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 128,
+    "offset": 0,
+    "limit": 50,
+    "byStatus": { "new": 40, "contacted": 30, "qualified": 20, "converted": 30, "dropped": 8 },
+    "items": [
+      {
+        "id": 12, "user_id": null, "name": "张先生", "phone": "13900000000", "wechat": null,
+        "company": "某个体户", "entity_type": "sole", "need": "settlement",
+        "source": "result_business", "scene": "经营所得·汇算清缴", "note": "",
+        "consent": true, "status": "new", "owner": null,
+        "created_at": "2026-09-12T02:00:00.000Z", "updated_at": "2026-09-12T02:00:00.000Z",
+        "user": null
+      }
+    ]
+  }
+}
+```
+
+**PATCH** `/api/admin/leads/:id`
+
+部分更新（仅更新请求体出现的字段）：
+
+```json
+{ "status": "contacted", "owner": "顾问A", "note": "已电话沟通，约周五核对扣除项" }
+```
+
+- `status` 必须在状态机白名单内，否则 400
+- `owner` 传 `null` 或 `""` → 取消分配（置空）；否则 trim 且 ≤ 50 字符
+- `note` 必须为字符串，trim 且 ≤ 1000 字符
+- 未提供任何可更新字段 → 400；线索不存在 → 404；`id` 非整数 → 400
+
+响应（200）：`{ id, ...更新后的完整线索 }`
+
+**GET** `/api/admin/leads/stats`
+
+漏斗统计（「今日」按北京时间 UTC+8 边界计算）：
+
+| 字段 | 说明 |
+|------|------|
+| `total` | 线索总数（北极星指标分子） |
+| `newToday` | 今日新增 |
+| `unassigned` | 待分配（`status=new` 且 `owner` 为空） |
+| `byStatus` | 各状态计数（五项齐全，缺省补 0） |
+| `bySource` | 按触点归因分布 |
+| `dateLabel` | 今日日期（北京时区，`YYYY-MM-DD`） |
+
+**GET** `/api/admin/leads/export?status=&source=&q=`
+
+CSV 导出（供销售导入自有 CRM）。筛选条件与列表一致，最多 5000 条；含 UTF-8 BOM（Excel 打开中文不乱码）；单元格做公式注入防护（`= + - @` 开头前置单引号）；`Content-Disposition` 文件名 `leads-YYYYMMDD.csv`，时间为北京时间。
+
+典型错误：无 / 错误 `X-Admin-Token`（401）、参数非法（400）、线索不存在（404）。
+
+### 5.13 转化漏斗统计（管理员 · 阶段13E）
+
+**GET** `/api/admin/leads/funnel?days=7`
+
+流量漏斗统计，回答「来了多少人 → 多少人算完 → 多少人点咨询 → 多少人留资」。
+
+| 字段 | 说明 |
+|------|------|
+| `days` | 统计窗口（含今日），默认 7，上限 90 |
+| `fromLabel` / `toLabel` | 区间起止日期（北京时间 `YYYY-MM-DD`） |
+| `steps` | 各步累计：`visit` / `calc_done` / `share` / `save` / `lead_click` / `lead_submit` |
+| `today` | 各步今日值（同结构） |
+| `rates` | 各步转化率（百分比，保留 1 位小数）：`visitToCalc`、`calcToLeadClick`、`calcToSubmit`、`visitToSubmit` |
+| `northStar` | 北极星 = `lead_submit / calc_done`（百分比） |
+
+**口径（务必分清，否则会误判投放）**：
+
+- `visit` / `calc_done` / `share` / `save` / `lead_click` 取自 `FunnelEvent` 日聚合表 —— 由**公开端点** §12 上报，**含游客**，且不落任何个人标识；
+- `lead_submit` **不取埋点表**，直接 `count` `Lead` 表 —— 同一事实只存一处，避免两个数对不上；
+- 北极星分母是 `calc_done` 而**不是** `visit`：没算完的流量不构成线索机会，用访问当分母会虚高转化率、误导投放判断；
+- 转化率分母为 0 时返回 `null`（前端显示「—」），**不是 0%** —— 0% 会被误读成「转化极差」，实际是「还没有样本」。
+
+与 §5.12 的 `stats` 区别：`stats` 是**线索状态漏斗**（`new → contacted → qualified → converted`，看销售跟进效率）；本接口是**流量转化漏斗**（看获客转化效率）。两者维度不同，不能互相替代。
+
+典型错误：无 / 错误 `X-Admin-Token`（401）、`days` 非正整数（400）。
+
 ---
 
 ## 6. 请求/响应示例
@@ -742,3 +837,95 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 - `since` 与当前 `revision` 相等时 `unchanged=true` 且 `rates=null`（客户端跳过覆盖，仅刷新时间戳）
 - 数组项 `{ min?, max, rate, deduction }`；**仅末级可无上限**（`max=null`）。端上按 `taxableIncome <= max` 匹配，因此 `null` 在客户端还原为 `Infinity`
 - 限流：60 次/分钟/IP
+
+---
+
+## 11. 公开写入接口（转化线索）
+
+> 阶段13：`POST /api/leads` 是全站唯一的「工具 → 服务」转化入口（结果页情境引导 / 内容中心投放 / 个人中心卡片 / 分享图落地页四类触点）。
+> **无需登录**（游客占多数，要求登录会丢掉绝大多数线索）；登录态可用时经 `optionalAuth` 自动关联 `user_id`。
+> 合规：留资涉及收入相关敏感信息，`consent` 必须为 `true`（个保法显式同意并落库留痕）；表单不采集具体收入金额。
+
+### 11.1 提交转化线索
+
+**POST** `/api/leads`
+
+请求体：
+
+| 字段 | 必填 | 规则 |
+|------|------|------|
+| `name` | ✅ | trim 后 1–50 字符 |
+| `phone` | 二选一 | 与 `wechat` 至少提供一个；提供时须匹配 `^1[3-9]\d{9}$` |
+| `wechat` | 二选一 | 1–64 字符 |
+| `company` | — | ≤ 100 字符 |
+| `entityType` | — | 枚举 `individual` / `sole` / `small` / `other` / `unknown`（非法回落 `unknown`） |
+| `need` | — | 枚举 `bookkeeping` / `settlement` / `declare_check` / `consult` / `other`（非法回落 `other`） |
+| `source` | — | 触点归因，枚举见下（非法回落 `unknown`） |
+| `scene` | — | 情境快照（如「经营所得·汇算清缴」），≤ 100 字符 |
+| `note` | — | ≤ 1000 字符 |
+| `consent` | ✅ | 必须为 `true`，否则 400 |
+
+`source` 白名单：`result_business` / `result_settlement` / `result_budget` / `home_banner` / `modal` / `notice_list` / `profile` / `share` / `unknown`。
+
+响应：
+
+- **201** `{ "success": true, "data": { "id": 12, "merged": false } }` —— 新建成功
+- **200** `{ "success": true, "data": { "id": 12, "merged": true } }` —— 同手机号 24h 内重复提交为**幂等合并**：不新建记录，合并情境/归因并追加备注
+  > 刻意不返回 409：避免暴露「该号码已提交过」，同时避免脏数据堆积。
+- **400** —— 缺 `name` / 无联系方式 / 手机号格式错 / `consent` 非 `true` / 文本超长
+- **429** —— 提交过于频繁（`leadLimiter`：10 次/IP/小时）
+
+```json
+{
+  "name": "张先生",
+  "phone": "13900000000",
+  "company": "某个体户",
+  "entityType": "sole",
+  "need": "settlement",
+  "source": "result_business",
+  "scene": "经营所得·汇算清缴",
+  "note": "想核实扣除项是否填全",
+  "consent": true
+}
+```
+
+> 防刷组合：限流 10 次/IP/小时（容忍运营商 NAT 共享出口，过严会误伤真实用户）+ 同手机号 24h 幂等去重（跨 IP 生效）+ 字段白名单归一化。
+
+---
+
+## 12. 公开埋点接口（转化漏斗 · 阶段13E）
+
+> 链路：`visit` → `calc_done` → `share` / `save` → `lead_click` → `lead_submit`。
+> **无需登录**：漏斗前两步大多发生在未登录状态；若要求登录，分母只剩登录用户，北极星指标会系统性虚高。
+> 不落任何个人标识（无 IP / 无设备 ID / 无 user_id），仅按「步骤 + 次数」做日粒度聚合，故无需脱敏与清理策略。
+
+### 12.1 上报漏斗步骤
+
+**POST** `/api/stats/funnel`
+
+```json
+{ "step": "calc_done" }
+```
+
+- `step` 必须为白名单之一：`visit` / `calc_done` / `share` / `save` / `lead_click`（否则 400）
+- 响应 201：`{ "step": "calc_done", "count": 12 }`（`count` 为该步骤**当日**累计次数）
+- 限流 600 次/10 分钟/IP；触顶返回 429（前端静默忽略，不影响任何用户功能）
+- **`lead_submit` 会被拒绝（400）**：它的唯一真相是 `Lead` 表，前端再上报一次只会制造「两个数对不上」
+
+### 12.2 `lead_submit` 为什么不在埋点里
+
+`lead_submit` 已由 §11.1 的 `POST /api/leads` 完整落库（含来源、需求、同意留痕）。若再埋点一次，就会出现两套数字（埋点可能丢失或重复 vs 线索表真实值），届时无法判断该信哪个。因此漏斗统计直接读 `Lead` 表，前端不重复上报。
+
+### 12.3 前端接入（新增触点无需改埋点）
+
+`src/js/stats/funnel-tracking.js` 已接线：
+
+| 步骤 | 触发点 |
+|------|--------|
+| `visit` | 页面加载，每会话一次（`sessionStorage` 去重，刷新不虚增） |
+| `calc_done` | 4 个计算按钮点击后结果容器可见（校验失败不误记） |
+| `save` | 既有事件 `euriskotax:calc-saved` |
+| `share` | 自定义事件 `euriskotax:share`（13D 分享图派发即可接入） |
+| `lead_click` | 包装 `window.LeadModal.open`（**留资弹窗唯一入口**） |
+
+> 新增任何留资触点，只要走 `LeadModal.open` 就会自动被统计 —— 不需要再动埋点代码。

@@ -183,6 +183,21 @@ if ($resources["app"]) {
     Add-Check "app.js 无 ?v= 指纹（ETag + SW network-first 保证更新）" (-not $resources["app"].Contains("auth-ui.js?v="))
 }
 
+# 阶段13：转化线索端点指纹（读 Swagger 规格，只读零副作用 —— 不写入任何线索数据）
+# 必要性：留资是「工具 → 服务」的唯一转化枢纽，端点缺失等于获客链路断链；
+#         用 /api/docs.json 而非真实 POST，避免每次发版校验都往线索表写测试数据（也省限流额度）。
+try {
+    $docsRaw = Fetch-Text "$BaseUrl/api/docs.json"
+    $docs = $docsRaw | ConvertFrom-Json
+    $pathNames = @($docs.paths.PSObject.Properties.Name)
+    $leadPaths = @('/api/leads', '/api/admin/leads', '/api/admin/leads/stats', '/api/admin/leads/export', '/api/admin/leads/{id}')
+    $missing = @($leadPaths | Where-Object { $pathNames -notcontains $_ -or $null -eq $docs.paths.$_ })
+    Add-Check "线索端点已上线(公开留资 + 管理端列表/统计/导出/更新)" ($missing.Count -eq 0) `
+        $(if ($missing.Count -gt 0) { "缺失: " + ($missing -join ', ') } else { "5 个路径齐备" })
+} catch {
+    Add-Check "线索端点已上线(公开留资 + 管理端列表/统计/导出/更新)" $false $_.Exception.Message
+}
+
 $fail = @($checks | Where-Object { -not $_.Ok })
 Write-Host ""
 foreach ($c in $checks) {

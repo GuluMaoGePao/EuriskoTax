@@ -17,10 +17,38 @@ const STATUS_META = {
 const SOURCE_META = { seed: '种子授权', invite: '兑换码', admin: '管理员', purchase: '购买' };
 const TYPE_META = { comprehensive: '综合所得', business: '经营所得', classification: '分类所得', reverse: '反向倒算' };
 
+// 线索跟进状态机（顺序即漏斗，与后端 leadAdminController.LEAD_STATUSES 一致）
+const LEAD_STATUS_META = {
+    new: { label: '待跟进', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    contacted: { label: '已联系', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    qualified: { label: '有意向', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    converted: { label: '已成交', cls: 'bg-green-50 text-green-700 border-green-200' },
+    dropped: { label: '已放弃', cls: 'bg-gray-100 text-gray-500 border-gray-200' }
+};
+// 触点归因（与后端 leadController.SOURCES 白名单一致）
+const LEAD_SOURCE_LABEL = {
+    result_business: '经营所得结果页', result_settlement: '汇算清缴结果页', result_budget: '预算表结果页',
+    home_banner: '首页公告条', modal: '启动弹窗', notice_list: '公告列表',
+    profile: '个人中心', share: '分享图', unknown: '未知'
+};
+const LEAD_ENTITY_LABEL = { individual: '个人', sole: '个体户/独资', small: '小微企业主', other: '其他', unknown: '未说明' };
+const LEAD_NEED_LABEL = { bookkeeping: '记账报税', settlement: '汇算/退税', declare_check: '申报核对', consult: '财税咨询', other: '其他' };
+const LEAD_FUNNEL = ['new', 'contacted', 'qualified', 'converted'];
+const LEAD_BAR_CLS = { new: 'bg-amber-400', contacted: 'bg-blue-400', qualified: 'bg-indigo-400', converted: 'bg-green-500' };
+// 阶段13E 转化漏斗步骤（与后端 leadAdminController.FUNNEL_STEPS + Lead 表口径一致）
+// 注意与上面的 LEAD_FUNNEL（线索状态漏斗）区分：这张是「访问 → 测算 → 咨询 → 留资」的流量漏斗
+const CONVERSION_STEPS = [
+    { key: 'visit', label: '访问', icon: 'fa-eye', cls: 'bg-slate-100 text-slate-600' },
+    { key: 'calc_done', label: '完成测算', icon: 'fa-calculator', cls: 'bg-blue-100 text-blue-700' },
+    { key: 'lead_click', label: '点击咨询', icon: 'fa-hand-o-right', cls: 'bg-amber-100 text-amber-700' },
+    { key: 'lead_submit', label: '提交线索', icon: 'fa-paper-plane', cls: 'bg-green-100 text-green-700' }
+];
+
 const state = {
     token: '',
     tab: 'overview',
     users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
+    leads: { status: '', source: '', q: '', offset: 0, limit: 20, total: 0, items: [], byStatus: {} },
     content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null },
     // 排障话术库：source = 'api'（数据来自数据库，可编辑）/ 'offline'（接口不可用时的兜底快照，只读）
     support: { items: [], source: 'api', editingId: null },
@@ -153,6 +181,7 @@ function switchTab(tab) {
     if (sec) sec.classList.remove('hidden');
     if (tab === 'overview') loadOverview();
     else if (tab === 'feedback') loadFeedback();
+    else if (tab === 'leads') loadLeads(true);
     else if (tab === 'users') loadUsers(true);
     else if (tab === 'invites') loadInvites();
     else if (tab === 'content') loadContent(true);
@@ -1506,6 +1535,253 @@ async function rollbackTaxRates(id, version) {
     }
 }
 
+// ---------- 线索（阶段13C：漏斗 + 列表 + 状态机 + 分配 + 导出） ----------
+function leadQuery() {
+    const s = state.leads;
+    const params = new URLSearchParams();
+    if (s.status) params.set('status', s.status);
+    if (s.source) params.set('source', s.source);
+    if (s.q) params.set('q', s.q);
+    params.set('offset', String(s.offset));
+    params.set('limit', String(s.limit));
+    return params;
+}
+
+async function loadLeads(reset) {
+    const s = state.leads;
+    if (reset) s.offset = 0;
+    const qEl = $('#leads-query');
+    if (qEl) s.q = (qEl.value || '').trim();
+    const tbody = $('#leads-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载线索中…</td></tr>';
+    try {
+        const d = await api(`/admin/leads?${leadQuery().toString()}`);
+        s.items = d.items || [];
+        s.total = d.total || 0;
+        s.byStatus = d.byStatus || {};
+        renderLeadsTable();
+    } catch (err) {
+        reportError(err, '线索加载失败');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 text-sm">加载失败，请重试</td></tr>';
+    }
+    loadLeadFunnel();
+    loadConversionFunnel();
+}
+
+async function loadLeadFunnel() {
+    const box = $('#lead-funnel');
+    if (!box) return;
+    if (!box.dataset.loaded) {
+        box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载漏斗…</div>';
+    }
+    try {
+        renderLeadFunnel(await api('/admin/leads/stats'));
+        box.dataset.loaded = '1';
+    } catch (err) {
+        // 漏斗是辅助信息：失败不打断列表，也不弹错（避免列表正常却满屏报错）
+        box.innerHTML = '';
+        box.dataset.loaded = '';
+    }
+}
+
+function renderLeadFunnel(d) {
+    const box = $('#lead-funnel');
+    if (!box) return;
+    const by = d.byStatus || {};
+    const total = Number(d.total) || 0;
+    const conv = by.converted || 0;
+    const rate = total ? Math.round((conv / total) * 100) : 0;
+
+    const metrics = [
+        metricCard('fa-inbox', 'bg-blue-50 text-blue-600', total, '线索总数（北极星分子）'),
+        metricCard('fa-plus', 'bg-green-50 text-green-600', d.newToday ?? 0, `今日新增 ${d.dateLabel || ''}`),
+        metricCard('fa-user-plus', 'bg-amber-50 text-amber-600', d.unassigned ?? 0, '待分配（无跟进人）'),
+        metricCard('fa-handshake-o', 'bg-emerald-600 text-white', `${conv} / ${rate}%`, '已成交 / 转化率')
+    ].join('');
+
+    const max = Math.max(1, ...LEAD_FUNNEL.map((k) => by[k] || 0));
+    const bars = LEAD_FUNNEL.map((k) => barRow(LEAD_STATUS_META[k].label, by[k] || 0, max, LEAD_BAR_CLS[k])).join('');
+
+    box.innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${metrics}</div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-filter text-primary mr-2"></i>跟进漏斗</h3>
+            ${bars}
+            <p class="text-[11px] text-gray-400 mt-2">已放弃 ${by.dropped || 0} 条（不计入漏斗）；「今日」按北京时间 UTC+8 边界统计。</p>
+        </div>`;
+}
+
+async function loadConversionFunnel() {
+    const box = $('#conversion-funnel');
+    if (!box) return;
+    if (!box.dataset.loaded) {
+        box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载转化漏斗…</div>';
+    }
+    try {
+        renderConversionFunnel(await api('/admin/leads/funnel?days=7'));
+        box.dataset.loaded = '1';
+    } catch (err) {
+        // 与线索状态漏斗同理：辅助信息，失败不打断列表
+        box.innerHTML = '';
+        box.dataset.loaded = '';
+    }
+}
+
+function renderConversionFunnel(d) {
+    const box = $('#conversion-funnel');
+    if (!box || !d) return;
+    const steps = d.steps || {};
+    const today = d.today || {};
+    // 分母为 0 时显示「—」而不是 0%：0 会被误读成「转化极差」，实际上是「还没有样本」
+    const percent = (cur, prev) => (prev > 0 ? Math.round((cur / prev) * 1000) / 10 : null);
+    const fmt = (p) => (p === null ? '—' : `${p}%`);
+
+    const cells = CONVERSION_STEPS.map((s, i) => {
+        const value = steps[s.key] || 0;
+        const prevKey = i > 0 ? CONVERSION_STEPS[i - 1].key : null;
+        const stepRate = prevKey ? percent(value, steps[prevKey] || 0) : null;
+        const tail = i > 0
+            ? `<div class="text-[11px] text-gray-500 mt-1">较上一步 <span class="font-semibold">${fmt(stepRate)}</span></div>`
+            : '<div class="text-[11px] text-gray-400 mt-1">漏斗起点</div>';
+        return `<div class="flex-1 min-w-[118px] bg-gray-50 rounded-lg p-3">
+            <div class="inline-flex items-center gap-1.5 text-xs font-medium ${s.cls} rounded-lg px-2 py-1">
+                <i class="fa ${s.icon}"></i>${s.label}
+            </div>
+            <div class="text-2xl font-bold text-gray-800 mt-2">${value}</div>
+            ${tail}
+            <div class="text-[11px] text-gray-400">今日 ${today[s.key] || 0}</div>
+        </div>`;
+    }).join('<div class="self-center text-gray-300 px-0.5"><i class="fa fa-angle-right"></i></div>');
+
+    const ns = d.northStar;
+    box.innerHTML = `<div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 class="text-sm font-bold text-gray-600"><i class="fa fa-line-chart text-primary mr-2"></i>转化漏斗（${d.fromLabel || ''} ~ ${d.toLabel || ''}）</h3>
+            <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1">
+                北极星 <span class="mono font-semibold">lead_submit / calc_done</span> = <span class="font-bold">${ns === null || ns === undefined ? '—' : ns + '%'}</span>
+            </span>
+        </div>
+        <div class="flex items-stretch gap-2 flex-wrap">${cells}</div>
+        <p class="text-[11px] text-gray-400 mt-3 leading-relaxed">
+            访问 / 测算 / 点击由埋点上报（<span class="mono">POST /api/stats/funnel</span>，公开端点：含游客、不落 IP 与设备标识）；
+            提交线索直接统计 <span class="mono">Lead</span> 表，同一事实只存一处。
+            北极星分母用「完成测算」而非「访问」—— 没算完的流量不构成线索机会，用访问当分母会虚高转化率、误导投放判断。
+        </p>
+    </div>`;
+}
+
+function renderLeadsTable() {
+    const s = state.leads;
+    const tbody = $('#leads-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = s.items.length ? s.items.map((it) => {
+        const statusKey = LEAD_STATUS_META[it.status] ? it.status : 'new';
+        const options = Object.keys(LEAD_STATUS_META)
+            .map((k) => `<option value="${k}" ${statusKey === k ? 'selected' : ''}>${LEAD_STATUS_META[k].label} ${k}</option>`)
+            .join('');
+        const contact = [
+            it.phone ? `<span class="mono">${esc(it.phone)}</span>` : '',
+            it.wechat ? `微信 ${esc(it.wechat)}` : ''
+        ].filter(Boolean).join(' · ');
+        const userLine = it.user
+            ? `<div class="text-[11px] text-blue-500 mt-0.5"><i class="fa fa-user-o mr-1"></i>${esc(it.user.username)}（${esc(it.user.email || '')}｜${esc(it.user.plan || '')}）</div>`
+            : '<div class="text-[11px] text-gray-300 mt-0.5">游客留资</div>';
+        return `<tr class="align-top">
+            <td class="px-3 py-3 text-xs text-gray-400">${it.id}</td>
+            <td class="px-3 py-3">
+                <div class="font-medium text-gray-800">${esc(it.name)} ${it.consent ? '<i class="fa fa-check-circle text-green-500 ml-1" title="已同意隐私条款"></i>' : '<i class="fa fa-exclamation-circle text-red-400 ml-1" title="未同意隐私条款"></i>'}</div>
+                <div class="text-xs text-gray-500 mt-0.5">${contact || '—'}</div>
+                ${userLine}
+            </td>
+            <td class="px-3 py-3 text-xs text-gray-600">${esc(it.company || '—')}
+                <div class="text-[11px] text-gray-400 mt-0.5">${esc(LEAD_ENTITY_LABEL[it.entity_type] || it.entity_type || '未说明')}</div></td>
+            <td class="px-3 py-3 text-xs text-gray-600">${esc(LEAD_NEED_LABEL[it.need] || it.need || '其他')}</td>
+            <td class="px-3 py-3 text-xs">
+                <div class="text-gray-600">${esc(LEAD_SOURCE_LABEL[it.source] || it.source || '未知')}</div>
+                ${it.scene ? `<div class="text-[11px] text-gray-400 mt-0.5">${esc(it.scene)}</div>` : ''}
+                ${it.note ? `<div class="text-[11px] text-gray-500 mt-1 bg-gray-50 border border-gray-100 rounded px-2 py-1 max-w-[240px] whitespace-pre-wrap">${esc(it.note)}</div>` : ''}
+            </td>
+            <td class="px-3 py-3">
+                <select data-lead-status="${it.id}" class="border rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${LEAD_STATUS_META[statusKey].cls}">${options}</select>
+            </td>
+            <td class="px-3 py-3">
+                <div class="flex items-center gap-1">
+                    <input data-lead-owner="${it.id}" value="${esc(it.owner || '')}" placeholder="未分配" class="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button data-act="lead-assign" data-id="${it.id}" title="保存跟进人" class="px-2 py-1 rounded-lg text-xs bg-gray-100 text-gray-600 hover:bg-gray-200"><i class="fa fa-check"></i></button>
+                </div>
+            </td>
+            <td class="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">${fmtShort(it.created_at)}</td>
+        </tr>`;
+    }).join('') : '<tr><td colspan="8" class="px-4 py-12 text-center text-gray-400 text-sm">暂无线索</td></tr>';
+
+    const totalEl = $('#leads-total');
+    if (totalEl) totalEl.textContent = `共 ${s.total} 条`;
+    const pageEl = $('#leads-page');
+    if (pageEl) {
+        const from = s.total ? s.offset + 1 : 0;
+        const to = Math.min(s.offset + s.limit, s.total);
+        pageEl.textContent = `${from}-${to} / ${s.total}`;
+    }
+}
+
+async function updateLeadStatus(id, status) {
+    try {
+        await api(`/admin/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+        toast(`线索 #${id} 已更新为「${(LEAD_STATUS_META[status] || {}).label || status}」`, 'success');
+        loadLeads();
+    } catch (err) {
+        reportError(err, '状态更新失败');
+        loadLeads(); // 重新拉取，把下拉恢复到服务端真实值
+    }
+}
+
+async function assignLead(id) {
+    const input = document.querySelector(`[data-lead-owner="${id}"]`);
+    if (!input) return;
+    const owner = (input.value || '').trim();
+    if (!confirm(owner ? `确认把线索 #${id} 分配给「${owner}」？` : `确认取消线索 #${id} 的分配？`)) return;
+    try {
+        await api(`/admin/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ owner: owner || null }) });
+        toast(owner ? `已分配给 ${owner}` : '已取消分配', 'success');
+        loadLeads();
+    } catch (err) {
+        reportError(err, '分配失败');
+    }
+}
+
+async function exportLeads() {
+    const qEl = $('#leads-query');
+    if (qEl) state.leads.q = (qEl.value || '').trim();
+    const params = leadQuery();
+    params.delete('offset');
+    params.delete('limit');
+    try {
+        const res = await fetch(`/api/admin/leads/export?${params.toString()}`, { headers: headers() });
+        if (!res.ok) {
+            let msg = `导出失败（HTTP ${res.status}）`;
+            // 出错时返回的是 JSON 错误体；正常导出是 CSV，不能无脑 res.json()
+            try { const b = await res.json(); if (b && b.error && b.error.message) msg = b.error.message; } catch { /* 非 JSON 错误体 */ }
+            const e = new Error(msg);
+            e.status = res.status;
+            throw e;
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename="?([^";]+)"?/i);
+        const filename = m ? m[1] : 'leads.csv';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+        toast(`已导出 ${filename}`, 'success');
+    } catch (err) {
+        reportError(err, '导出失败');
+    }
+}
+
 // ---------- 动作分发（data-act 委托） ----------
 async function handleAction(e) {
     const act = e.target.closest('[data-act]');
@@ -1562,6 +1838,12 @@ async function handleAction(e) {
     if (name === 'taxrates-loaddefault') return loadDefaultTaxRates();
     if (name === 'taxrates-save') return back(saveTaxRates());
     if (name === 'taxrates-rollback') return back(rollbackTaxRates(Number(id), act.dataset.version));
+    if (name === 'refresh-leads') return back(loadLeads());
+    if (name === 'search-leads') return back(loadLeads(true));
+    if (name === 'leads-export') return back(exportLeads());
+    if (name === 'lead-assign') return back(assignLead(Number(id)));
+    if (name === 'leads-prev') { if (state.leads.offset - state.leads.limit >= 0) { state.leads.offset -= state.leads.limit; back(loadLeads()); } return; }
+    if (name === 'leads-next') { if (state.leads.offset + state.leads.limit < state.leads.total) { state.leads.offset += state.leads.limit; back(loadLeads()); } return; }
 }
 
 // ---------- 初始化 ----------
@@ -1579,6 +1861,11 @@ function init() {
     $('#users-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadUsers(true); });
     $('#users-plan-filter').addEventListener('change', () => loadUsers(true));
     $('#invite-count').addEventListener('keydown', (e) => { if (e.key === 'Enter') generateInvites(); });
+
+    // 线索：下拉变更即查询，关键词回车查询
+    $('#leads-status-filter').addEventListener('change', () => loadLeads(true));
+    $('#leads-source-filter').addEventListener('change', () => loadLeads(true));
+    $('#leads-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadLeads(true); });
 
     // 内容中心筛选与编辑器
     $('#content-type-filter').addEventListener('change', () => loadContent(true));
@@ -1615,6 +1902,8 @@ function init() {
     document.addEventListener('change', (e) => {
         const sel = e.target.closest('[data-feedback-status]');
         if (sel) updateFeedbackStatus(Number(sel.dataset.feedbackStatus), sel.value);
+        const leadSel = e.target.closest('[data-lead-status]');
+        if (leadSel) updateLeadStatus(Number(leadSel.dataset.leadStatus), leadSel.value);
         if (e.target && e.target.id === 'tr-f-notify-enabled') updateNotifyFieldsVisibility();
     });
 
