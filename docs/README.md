@@ -5,12 +5,12 @@
 
 ---
 
-## 当前状态（v1.14.0 · 2026-09-13）
+## 当前状态（v1.15.0 · 2026-09-13）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.14.0**（阶段14 剩余项：高商业意图 SEO 落地页 —— 首个页面 `/seo/bonus-tax.html` 年终奖个税计算器：静态正文 + 同源口径速算器 + 六个临界点跳档提示，配 `robots.txt` / `sitemap.xml`；上一版 1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 + C2 城市社保参数库）。1.14.0 已上线并打标签 `v1.14.0`
-- **测试**：27 套件 558 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 11 例）；发布门禁 `verify:local` **152/152** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 交付首个页面「年终奖个税」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库 + `/seo/bonus-tax.html`（`verify:local` 152/152、单测 27 套件 558 例）→ 当前工作：**无进行中阶段**，仅剩待办「更多关键词落地页」（个税计算器 / 汇算清缴 / 社保基数 / 税后工资），见 [development/seo-landing-plan.md](development/seo-landing-plan.md)
+- **主版本**：CHANGELOG 最新 **1.15.0**（阶段14 剩余项：高商业意图 SEO 落地页 —— 第二个页面 `/seo/salary-tax.html` 月薪个税计算器：静态正文（累计预扣两步公式 / 七档预扣率表 / 12 个月逐月预扣示例表 / 5 条 FAQ）+ 同源口径速算器（与内核 `calculateCumulativePrepaidTax` 逐点对拍），配 `robots.txt` / `sitemap.xml` 收录；上一版 1.14.0 = 首个页面 `/seo/bonus-tax.html` 年终奖个税，再上一版 1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 + C2 城市社保参数库）。1.15.0 已上线并打标签 `v1.15.0`
+- **测试**：28 套件 571 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 25 例）；发布门禁 `verify:local` **156/156** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 陆续交付两页「年终奖个税」「月薪个税」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库 + `/seo/bonus-tax.html` + `/seo/salary-tax.html`（`verify:local` 156/156、单测 28 套件 571 例）→ 当前工作：**无进行中阶段**，仅剩待办「其余关键词落地页」（汇算清缴 / 社保基数 / 税后工资），见 [development/seo-landing-plan.md](development/seo-landing-plan.md)
 
 ---
 
@@ -70,7 +70,7 @@ EuriskoTax/
 | [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 阶段10 免费/专业版实施方案（已确认 · 待命执行） | 2026-09-07 |
 | [development/stage12-c1-tax-rate-config-plan.md](development/stage12-c1-tax-rate-config-plan.md) | 阶段12 C1 税制参数配置化方案与实施记录 | 2026-09-12 |
 | [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md) | 阶段13 获客与转化（引流 → 线索）方案（13A 后端地基 ✅ / 13B 前端触点 ✅ / 13C 管理台「线索」Tab ✅ / 13D 一键结果分享图 ✅ / 13E 漏斗埋点 ✅，阶段13 已全部交付） | 2026-09-13 |
-| [development/seo-landing-plan.md](development/seo-landing-plan.md) | 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；首个页面「年终奖个税」✅ v1.14.0，其余词条待办） | 2026-09-13 |
+| [development/seo-landing-plan.md](development/seo-landing-plan.md) | 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；前两页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0，其余词条待办） | 2026-09-13 |
 
 ### 使用与开发指南
 

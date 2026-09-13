@@ -9,14 +9,14 @@
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | CHANGELOG 最新 **1.14.0**（阶段14 剩余项：高商业意图 SEO 落地页 —— 首个页面 `/seo/bonus-tax.html`「年终奖个税计算器」已上线；上一版 1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 —— 线下收款发码 → 用户自助兑换 → 权益即时生效，C2 城市社保参数库 —— 按参保城市校验社保/公积金基数下限；详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
+| 版本 | CHANGELOG 最新 **1.15.0**（阶段14 剩余项：高商业意图 SEO 落地页 —— 第二个页面 `/seo/salary-tax.html`「月薪个税计算器」已上线；上一版 1.14.0 = 首个页面 `/seo/bonus-tax.html`「年终奖个税计算器」，再上一版 1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 —— 线下收款发码 → 用户自助兑换 → 权益即时生效，C2 城市社保参数库 —— 按参保城市校验社保/公积金基数下限；详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
 | 免费/专业版 | ✅ 阶段10 已上线（v1.7.0）：计税能力永不锁定，登录仅解锁云端历史同步；运维后台（`admin.html`）可调用户权益 |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |
 | 登录/找回 | 邮箱登录（可勾选"保持登录状态"）、注册勾选协议、忘记密码**邮箱验证码自助找回** |
 | 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；计算完成即进入「工具 → 服务」转化闭环（留资线索 + 顾问跟进状态机 + 转化漏斗，北极星 `lead_submit / calc_done`）；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
-| SEO 落地页 | ✅ v1.14.0 首个页面 [年终奖个税计算器](https://euriskotax.zeabur.app/seo/bonus-tax.html)（静态正文 + 同源口径速算器 + 六个临界点跳档提示），配 `robots.txt` / `sitemap.xml`；方案与后续词条见 [docs/development/seo-landing-plan.md](docs/development/seo-landing-plan.md) |
-| 测试 | ✅ 27 套件 558 个单元测试全通过（`npm test`，2026-09-13 复跑，含阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 11 例）；发布门禁 `verify:local` **152 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
+| SEO 落地页 | ✅ v1.14.0 [年终奖个税计算器](https://euriskotax.zeabur.app/seo/bonus-tax.html)（静态正文 + 同源口径速算器 + 六个临界点跳档提示）· ✅ v1.15.0 [月薪个税计算器](https://euriskotax.zeabur.app/seo/salary-tax.html)（累计预扣口径 + 七档预扣率表 + 12 个月逐月预扣示例表），配 `robots.txt` / `sitemap.xml`；方案与后续词条见 [docs/development/seo-landing-plan.md](docs/development/seo-landing-plan.md) |
+| 测试 | ✅ 28 套件 571 个单元测试全通过（`npm test`，2026-09-13 复跑，含阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 25 例）；发布门禁 `verify:local` **156 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
 
 ---
 
@@ -58,7 +58,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 > ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
 
 **发布纪律（先本地验证，再部署）**：
-1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 152 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 税制参数公开只读+版本化发布/回滚 / 城市社保参数公开只读（兜底城市不变量+指纹增量）+管理端发布·回滚·版本号唯一 / 邀请码+验证码注册新号登录 / 线索留资+管理端列表·统计·导出 / 前端转化触点（结果页分流·留资弹窗·个人中心卡片）静态指纹 / 运维后台「线索」Tab（漏斗·状态机·分配·导出）静态指纹 / 专业版兑换码端到端（生成·兑换·叠加续期·作废·导出）+ 兑换入口静态指纹）。**动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 时，还必须加跑 `npm run verify:pg`**——用本地 PostgreSQL 演练同一套断言（`generate` → `migrate deploy` → 起服务，与线上容器同序），专门拦「本地 SQLite 全绿、线上迁移才炸」的问题（需 Docker Desktop，未装则优雅跳过）。
+1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 156 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 税制参数公开只读+版本化发布/回滚 / 城市社保参数公开只读（兜底城市不变量+指纹增量）+管理端发布·回滚·版本号唯一 / 邀请码+验证码注册新号登录 / 线索留资+管理端列表·统计·导出 / 前端转化触点（结果页分流·留资弹窗·个人中心卡片）静态指纹 / 运维后台「线索」Tab（漏斗·状态机·分配·导出）静态指纹 / 专业版兑换码端到端（生成·兑换·叠加续期·作废·导出）+ 兑换入口静态指纹）。**动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 时，还必须加跑 `npm run verify:pg`**——用本地 PostgreSQL 演练同一套断言（`generate` → `migrate deploy` → 起服务，与线上容器同序），专门拦「本地 SQLite 全绿、线上迁移才炸」的问题（需 Docker Desktop，未装则优雅跳过）。
 2. **上线只走安全发布流水线**（本地门禁不过就物理上推不出去）：
    - 命令行：`.\tools\ops\ops-publish.ps1`（内部 = verify:local 全绿 → git commit → push origin main → 自动轮询核对线上指纹）；
    - GUI：控制台「🔐 Git & 账号」→「🚀 安全发布」（或先点「🧪 安全发布试运行」零风险预演一次）。
@@ -126,10 +126,10 @@ Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 ## 测试
 
 ```bash
-npm test                    # 运行全部单元测试（27 套件 558 个，含覆盖率报告）
+npm test                    # 运行全部单元测试（28 套件 571 个，含覆盖率报告）
 npm run test:watch          # 监听模式
 npm run test:performance    # 计税性能基准
-npm run verify:local        # 本地登录链路验证门禁（152 项断言，push 前必跑，见上文"发布纪律"）
+npm run verify:local        # 本地登录链路验证门禁（156 项断言，push 前必跑，见上文"发布纪律"）
 npm run verify:pg           # 生产等价演练：同一套断言跑在本地 PostgreSQL（改了 schema/迁移后必跑）
 npm run verify:release      # 发版前自检：版本号五处 + 文档口径 vs 实测（不一致退出码 1；加 `-- --write` 自动同步数字）
 ```
