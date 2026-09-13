@@ -7,7 +7,9 @@ const ENTITY_TYPES = ['individual', 'sole', 'small', 'other', 'unknown'];
 const NEEDS = ['bookkeeping', 'settlement', 'declare_check', 'consult', 'other'];
 const SOURCES = [
     'result_business', 'result_settlement', 'result_budget',
-    'home_banner', 'modal', 'notice_list', 'profile', 'share', 'unknown'
+    'home_banner', 'modal', 'notice_list', 'profile', 'share', 'unknown',
+    // 阶段14 剩余项：SEO 落地页（页面按页给独立来源，便于判断哪个关键词页真的带来线索）
+    'seo_bonus',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）

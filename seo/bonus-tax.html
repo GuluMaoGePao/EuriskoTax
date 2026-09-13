@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段14 剩余项）：高商业意图长尾词「年终奖个税」。
+         设计约束（见 docs/development/seo-landing-plan.md）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（bonus-tax-quick.js + window.bonusMonthlyTaxRates），
+              页面上不出现第二份税率表；
+           3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
+    <title>年终奖个税计算器 2026：单独计税还是并入综合所得更省税？</title>
+    <meta name="description" content="输入年终奖金额，立即算出单独计税的应纳税额与税后到手，并给出临界点跳档提示。含 36000 / 144000 / 300000 等六个临界点对照表与政策依据（财政部 税务总局公告 2023 年第 30 号）。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/bonus-tax.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="年终奖个税计算器 2026：单独计税还是并入综合所得更省税？">
+    <meta property="og:description" content="输入年终奖金额立即算税，附六个临界点对照表与政策依据。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/bonus-tax.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 年终奖个税计算器",
+                "url": "https://euriskotax.zeabur.app/seo/bonus-tax.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "计算全年一次性奖金单独计税的应纳税额与税后到手，并提示 36000 / 144000 / 300000 / 420000 / 660000 / 960000 六个临界点的跳档风险。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "年终奖单独计税政策 2026 年还有效吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "有效。财政部、税务总局公告 2023 年第 30 号将全年一次性奖金单独计税政策延续至 2027 年 12 月 31 日，居民个人在此期间取得全年一次性奖金可选择单独计税，也可并入当年综合所得。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "一年可以单独计税几次？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "一个纳税年度内只能用一次。同一年内多次发放的年终奖，只有一次可作为全年一次性奖金单独计税，其余需并入当月工资薪金或综合所得计税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "为什么年终奖多发 1 元反而到手更少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为税率由奖金除以 12 决定，而税额按奖金全额乘以税率计算。奖金刚好越过档位分界点时，整笔奖金跳档，例如 36000 元应纳税额 1080 元，36001 元则为 3390.10 元，多缴 2310.10 元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "单独计税和并入综合所得，哪个更省钱？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "取决于全年综合所得高低、专项附加扣除是否用足以及奖金是否越过临界点。全年综合所得较低、扣除额度用不完时并入更划算；综合所得已进入较高档位时单独计税更划算。准确做法是把两种算法的应纳税额各自算一遍再比较。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_bonus">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>年终奖个税怎么算：单独计税，还是并入综合所得？</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>全年一次性奖金可以选择<strong>单独计税</strong>（奖金 ÷ 12 定档，全额乘税率再减速算扣除数），
+            也可以<strong>并入当年综合所得</strong>一起算 —— 两者只能二选一，同一个纳税年度内单独计税<strong>只能用一次</strong>。
+            政策依据：《财政部 税务总局关于延续实施全年一次性奖金个人所得税政策的公告》（<strong>财政部 税务总局公告 2023 年第 30 号</strong>），
+            执行至 <strong>2027 年 12 月 31 日</strong>。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">年终奖税后到手速算</h2>
+            <label class="calc-label" for="bonus-input">年终奖金额（元，税前）</label>
+            <div class="calc-input-row">
+                <input class="calc-input" id="bonus-input" type="number" inputmode="decimal" min="0" step="100" value="60000" aria-describedby="calc-note">
+                <button class="btn btn-primary" id="calc-reset" type="button">重算</button>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                本页只算<strong>单独计税</strong>的结果。要判断「单独计税 vs 并入综合所得」哪个更省，需要结合全年工资与各项扣除，请用<a href="/?source=seo_bonus">完整计算器一键对比</a>。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">适用税率（速算扣除数）</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">单独计税应纳税额</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">税后到手</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方临界点对照表与公式手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>怎么算：两步就够</h2>
+        <ol>
+            <li><strong>定档</strong>：用「奖金 ÷ 12」的商去查下面的<strong>按月换算的税率表</strong>，确定税率与速算扣除数。</li>
+            <li><strong>算税</strong>：应纳税额 = <strong>奖金全额 × 税率 − 速算扣除数</strong>（注意：是全额，不是月均额）。</li>
+        </ol>
+        <p class="muted small">例：年终奖 60000 元 → 60000 ÷ 12 = 5000，落在「3000～12000」档（10%，速算扣除数 210）→ 应纳税额 = 60000 × 10% − 210 = 5790 元。</p>
+
+        <h2>税率表（全年一次性奖金单独计税）</h2>
+        <div class="table-scroll">
+            <table>
+                <caption class="small muted" style="text-align:left;padding:8px 0">按月换算后的综合所得税率表：先用奖金 ÷ 12 定档，再对奖金全额计税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">奖金 ÷ 12 落在区间（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 3000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>3000 ～ 12000</td><td class="num">10%</td><td class="num">210</td></tr>
+                <tr><td>12000 ～ 25000</td><td class="num">20%</td><td class="num">1410</td></tr>
+                <tr><td>25000 ～ 35000</td><td class="num">25%</td><td class="num">2660</td></tr>
+                <tr><td>35000 ～ 55000</td><td class="num">30%</td><td class="num">4410</td></tr>
+                <tr><td>55000 ～ 80000</td><td class="num">35%</td><td class="num">7160</td></tr>
+                <tr><td>超过 80000</td><td class="num">45%</td><td class="num">15160</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>六个临界点：多发 1 元，可能多缴上万元</h2>
+        <p>
+            因为税率是按「奖金 ÷ 12」定的，但税是按<strong>奖金全额</strong>算的，所以在档位分界点上会出现跳档：
+            奖金刚过临界点，整笔奖金都按更高税率计税，到手反而变少。这就是常说的「年终奖 1 元陷阱」。
+        </p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">临界点（元）</th>
+                    <th scope="col">该点应纳税额（元）</th>
+                    <th scope="col">多发 1 元后多缴（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>36000</td><td class="num">1080.00</td><td class="num">2310.10</td></tr>
+                <tr><td>144000</td><td class="num">14190.00</td><td class="num">13200.20</td></tr>
+                <tr><td>300000</td><td class="num">58590.00</td><td class="num">13750.25</td></tr>
+                <tr><td>420000</td><td class="num">102340.00</td><td class="num">19250.30</td></tr>
+                <tr><td>660000</td><td class="num">193590.00</td><td class="num">30250.35</td></tr>
+                <tr><td>960000</td><td class="num">328840.00</td><td class="num">88000.45</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/bonus-tax-quick.test.js</code> 逐点与 App 内核结果对拍守护。</p>
+
+        <h2>两个选择怎么选</h2>
+        <table>
+            <thead>
+            <tr><th scope="col">情况</th><th scope="col">通常更省的选择</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>全年综合所得低、专项附加扣除用不完</td><td>并入综合所得（把扣除额度用足）</td></tr>
+            <tr><td>全年综合所得高、已进入较高税率档</td><td>单独计税（把奖金单独按低档算）</td></tr>
+            <tr><td>奖金刚过临界点</td><td>先算一遍两种结果；必要时与单位协商把超出部分挪到工资或递延</td></tr>
+            </tbody>
+        </table>
+        <p class="small muted">判断的关键是把「奖金并入后的综合所得应纳税额」与「单独计税税额」放在一起比。手工算这两种情景很容易出错，<a href="/?source=seo_bonus">在 App 里填一次工资与扣除，两种结果会并排给出</a>（数据只存在本机浏览器）。</p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>年终奖单独计税政策 2026 年还有效吗？</summary>
+            <p>有效。财政部、税务总局公告 2023 年第 30 号将全年一次性奖金单独计税政策延续至 <strong>2027 年 12 月 31 日</strong>，居民个人在此期间取得全年一次性奖金可选择单独计税，也可并入当年综合所得。</p>
+        </details>
+        <details>
+            <summary>一年可以单独计税几次？</summary>
+            <p>一个纳税年度内<strong>只能用一次</strong>。同一年内多次发放的年终奖，只有一次可作为全年一次性奖金单独计税，其余需并入当月工资薪金或综合所得计税。</p>
+        </details>
+        <details>
+            <summary>为什么多发 1 元反而到手更少？</summary>
+            <p>因为税率由「奖金 ÷ 12」决定，而税额按「奖金全额 × 税率」计算。奖金刚好越过档位分界点（例如 36000 → 36001）时，整笔奖金从 3% 档跳到 10% 档，税额从 1080 元跳到 3390.10 元，多缴 2310.10 元。</p>
+        </details>
+        <details>
+            <summary>单独计税和并入综合所得，哪个更省钱？</summary>
+            <p>没有统一答案：取决于全年综合所得高低、可享受的专项附加扣除是否用足、以及奖金是否越过临界点。一般规律是全年综合所得较低、扣除额度用不完时并入更划算；综合所得已进入较高档位时单独计税更划算。准确做法是把两种算法的应纳税额各自算一遍再比较。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把全年工资一起算，看两种算法的差额</h2>
+            <p>输入工资、社保公积金与专项附加扣除，App 会同时给出「单独计税」与「并入综合所得」的结果、差额与最优拆分建议。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_bonus">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/bonus-tax.html">年终奖个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js  —— 出厂税率表（window.bonusMonthlyTaxRates）
+       tax-rates-sync.js —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       bonus-tax-quick.js —— 与内核 calculateBonusTax 等价的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/bonus-tax-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var input = document.getElementById('bonus-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var rRate = document.getElementById('r-rate');
+    var rTax = document.getElementById('r-tax');
+    var rNet = document.getElementById('r-net');
+    var quick = window.EuriskoBonusQuick;
+
+    // 临界点 = 各档月均上限 × 12（用于提示「再往上加就跳档」）
+    function thresholds() {
+        var rows = window.bonusMonthlyTaxRates || [];
+        return rows.filter(function (r) { return Number.isFinite(r.max); }).map(function (r) { return r.max * 12; });
+    }
+
+    function money(n) {
+        return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(rate) {
+        return (rate * 100).toFixed(rate * 100 % 1 === 0 ? 0 : 1) + '%';
+    }
+
+    function render() {
+        if (!input || !box) return;
+        if (!quick || typeof quick.taxOf !== 'function') {
+            // 计算脚本未加载（网络异常/被拦截）时不装作有结果
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「临界点对照表」与公式仍可手工估算。';
+            }
+            return;
+        }
+        var amount = Number(input.value);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            box.hidden = true;
+            if (hint) { hint.hidden = true; }
+            return;
+        }
+        var bracket = quick.bracketOf(amount);
+        var tax = quick.taxOf(amount);
+        var rate = bracket ? bracket.rate : 0;
+        box.hidden = false;
+        rRate.textContent = bracket ? pct(rate) + '（' + money(bracket.deduction) + '）' : '—';
+        rTax.textContent = money(tax) + ' 元';
+        rNet.textContent = money(amount - tax) + ' 元';
+
+        if (!hint) return;
+        var next = thresholds().filter(function (t) { return t > amount; })[0];
+        if (next) {
+            var gap = next - amount;
+            var extra = quick.taxOf(next + 1) - quick.taxOf(next);
+            hint.innerHTML = '距下一档临界点 <strong>' + money(next) + ' 元</strong>还差 ' +
+                money(gap) + ' 元；越过该点后整笔奖金跳档，仅多 1 元就多缴 <strong>' +
+                money(extra) + ' 元</strong>。';
+            hint.hidden = false;
+        } else {
+            hint.hidden = true;
+        }
+    }
+
+    if (input) {
+        input.addEventListener('input', render);
+        var reset = document.getElementById('calc-reset');
+        if (reset) reset.addEventListener('click', function () { input.value = '60000'; render(); });
+        render();
+        // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+        document.addEventListener('euriskotax:tax-rates-updated', render);
+    }
+});
+</script>
+</body>
+</html>

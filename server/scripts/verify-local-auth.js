@@ -526,6 +526,57 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             docsJson.status === 200 && !!docsPaths['/api/config/city-social']
             && !!docsPaths['/api/admin/city-social'] && !!docsPaths['/api/admin/city-social/rollback'],
             `HTTP ${docsJson.status}, paths=${Object.keys(docsPaths).length}`);
+
+        // ---- 阶段14 剩余项：SEO 落地页（收录自洽 + 口径同源） ----
+        // 落地页最容易腐烂的三件事：页面上了线但 sitemap 没收录；sitemap 收录了却是 404；
+        // 为了「能算」在页面里抄了第二份税率表，App 改口径后两个页面数字不一致。
+        const robots = await request(PORT, 'GET', '/robots.txt');
+        record('robots.txt 允许抓取公开页且声明 sitemap',
+            robots.status === 200 && /User-agent:\s*\*/i.test(robots.raw)
+            && /Disallow:\s*\/api\//.test(robots.raw)
+            && robots.raw.includes('Sitemap: https://euriskotax.zeabur.app/sitemap.xml'),
+            `HTTP ${robots.status}`);
+        const sitemap = await request(PORT, 'GET', '/sitemap.xml');
+        const sitemapLocs = (sitemap.raw.match(/<loc>([^<]+)<\/loc>/g) || []).map((s) => s.replace(/<\/?loc>/g, ''));
+        record('sitemap.xml 可访问且收录首页与年终奖落地页',
+            sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
+            && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html')),
+            `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
+        const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
+        record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            bonusPage.status === 200 && bonusPage.raw.includes('rel="canonical"')
+            && bonusPage.raw.includes('FAQPage') && bonusPage.raw.includes('2027 年 12 月 31 日')
+            && bonusPage.raw.includes('财政部 税务总局公告 2023 年第 30 号'),
+            `HTTP ${bonusPage.status}`);
+        // 落地页为了「爬虫不执行 JS 也能读到税率表」，正文里必然有一份**静态**表格 ——
+        // 所以不能靠「禁止出现某个税率数字」来防重复口径（那会误伤可抓取性），
+        // 正确做法是：把页面上的静态表与常量文件里的表**逐档对账**，常量改了页面没改就红。
+        const constantsJs = await request(PORT, 'GET', '/src/js/calculation/tax-constants.js');
+        const bonusBlock = (constantsJs.raw.match(/bonusMonthlyTaxRates\s*=\s*\[([\s\S]*?)\n\s*\]/) || [])[1] || '';
+        const bonusRows = Array.from(bonusBlock.matchAll(/rate:\s*([\d.]+)\s*,\s*deduction:\s*(\d+)/g))
+            .map((m) => ({ rate: Number(m[1]), deduction: Number(m[2]) }));
+        const staleRows = bonusRows.filter((r) => {
+            const pct = `${Math.round(r.rate * 1000) / 10}%`;   // 0.03 → '3%'（避开浮点 3.0000000000000004）
+            return !bonusPage.raw.includes(pct) || !bonusPage.raw.includes(`>${r.deduction}<`);
+        });
+        record('落地页静态税率表与常量文件逐档一致（页面不维护第二份口径）',
+            bonusPage.status === 200 && bonusRows.length === 7 && staleRows.length === 0
+            && bonusPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && bonusPage.raw.includes('/src/js/calculation/bonus-tax-quick.js')
+            && bonusPage.raw.includes('/src/js/data/tax-rates-sync.js'),
+            `常量 ${bonusRows.length} 档, 与页面不一致 ${staleRows.length} 档`);
+        record('落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            bonusPage.status === 200 && bonusPage.raw.includes('?source=seo_bonus'), '');
+        const deadLocs = [];
+        for (const loc of sitemapLocs) {
+            let pathname = loc;
+            try { pathname = new URL(loc).pathname; } catch { /* 非绝对 URL：直接按路径探测 */ }
+            // eslint-disable-next-line no-await-in-loop
+            const probe = await request(PORT, 'GET', pathname);
+            if (probe.status !== 200) deadLocs.push(`${pathname}=${probe.status}`);
+        }
+        record('sitemap 内每条 URL 均可访问（防收录 404）',
+            sitemapLocs.length > 0 && deadLocs.length === 0, deadLocs.join(', '));
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }
@@ -1380,8 +1431,25 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
     }
 
     const failed = results.filter((r) => !r.ok);
+    const total = results.length;
+    const passed = total - failed.length;
+
+    // 口径落盘：把「本次实跑项数」留给文档口径守护比对（tests/docs-metrics.test.js / npm run verify:release）。
+    // 只写默认本地模式 —— PG 演练模式的断言路径不同，覆盖快照会污染口径来源。
+    if (!PG_MODE) {
+        try {
+            fs.writeFileSync(
+                path.join(__dirname, '..', '..', 'tools', 'ops', '.verify-local-last.json'),
+                JSON.stringify({ total, passed, at: new Date().toISOString() }, null, 2) + '\n',
+                'utf8'
+            );
+        } catch (e) {
+            console.warn(`  [WARN] 门禁口径快照写入失败（不影响判定）: ${e.message}`);
+        }
+    }
+
     console.log('\n========================================================');
-    console.log(`  结果: ${results.length - failed.length}/${results.length} 通过`);
+    console.log(`  结果: ${passed}/${total} 通过`);
     if (failed.length > 0) {
         console.log('  未通过项:');
         failed.forEach((r) => console.log(`    - ${r.name}${r.detail ? `（${r.detail}）` : ''}`));
@@ -1389,6 +1457,24 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         exitCode = 1;
     } else {
         console.log('  ✅ 本地验证全部通过 —— 可以安全部署（git push）。');
+    }
+
+    // 文档口径自检：文档里的门禁项数必须等于本次实跑项数。
+    // 这里只提示不改退出码 —— 口径滞后由 npm test / verify:release 拦，
+    // 门禁本身变红会掩盖真正的功能失败。
+    try {
+        const { checkMetrics } = require(path.join(__dirname, '..', '..', 'tools', 'ops', 'release-metrics.js'));
+        const claims = checkMetrics().claims.gate;
+        const declared = Array.from(new Set(claims.map((c) => c.value)));
+        if (declared.length === 1 && declared[0] !== total) {
+            console.warn(`  ⚠ 文档口径待同步: 文档写 ${declared[0]} 项，本次实跑 ${total} 项`);
+            console.warn(`     需改: ${claims.filter((c) => c.value !== total).map((c) => `${c.file}:${c.line}`).join(' / ')}`);
+        } else if (declared.length === 1) {
+            console.log(`  口径自检: 文档声明 ${declared[0]} 项 ＝ 本次实跑 ${total} 项 ✅`);
+        }
+    } catch (e) {
+        // 口径自检是加分项，读不到口径定义不该让门禁失败
+        console.warn(`  [WARN] 文档口径自检跳过: ${e.message}`);
     }
     console.log('========================================================\n');
     process.exit(exitCode);

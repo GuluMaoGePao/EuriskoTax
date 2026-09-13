@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EuriskoTax 站点地图。新增 SEO 落地页时必须同步这里，
+  并由 verify:local 的「sitemap 内每条 URL 均可访问」断言防「收录了 404」。
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://euriskotax.zeabur.app/</loc>
+        <lastmod>2026-09-13</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://euriskotax.zeabur.app/seo/bonus-tax.html</loc>
+        <lastmod>2026-09-13</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>

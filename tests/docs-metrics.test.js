@@ -10,7 +10,7 @@
 //   - 门禁/指纹项数无法离线推导（脚本含 catch 分支回退断言），只夹逼「文档彼此一致 + 不超过脚本文本断言数」
 //
 // 顺带守住一个反例：既然口径已一致，`verify:release --write` 的 dry-run 必须是空操作。
-const { checkMetrics, measureCounts, syncMetricNumbers } = require('../tools/ops/release-metrics.js');
+const { checkMetrics, measureCounts, syncMetricNumbers, readRecordedGateRun } = require('../tools/ops/release-metrics.js');
 
 describe('文档口径与实测一致', () => {
     test('所有口径落点都能解析出当前声明（措辞被改写时在这里指名文件）', () => {
@@ -43,6 +43,14 @@ describe('文档口径与实测一致', () => {
         expect(Array.from(new Set(r.claims.fingerprints.map((c) => c.value))).length).toBe(1);
         expect(r.claims.gate[0].value).toBeLessThanOrEqual(m.verifyLocalTextAssertions);
         expect(r.claims.fingerprints[0].value).toBeLessThanOrEqual(m.opsCheckTextAssertions);
+    });
+
+    test('门禁项数：与最近一次 verify:local 实跑项数一致（有实跑快照时）', () => {
+        const recorded = readRecordedGateRun();
+        if (!recorded) return;   // 本机还没跑过门禁：没有证据就不假装有，跳过
+        const r = checkMetrics();
+        const declared = Array.from(new Set(r.claims.gate.map((c) => c.value)));
+        expect(declared).toEqual([recorded.total]);
     });
 
     test('口径已一致时，自动同步（--write）的 dry-run 为空操作', () => {
