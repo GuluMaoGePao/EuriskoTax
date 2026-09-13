@@ -538,9 +538,10 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             `HTTP ${robots.status}`);
         const sitemap = await request(PORT, 'GET', '/sitemap.xml');
         const sitemapLocs = (sitemap.raw.match(/<loc>([^<]+)<\/loc>/g) || []).map((s) => s.replace(/<\/?loc>/g, ''));
-        record('sitemap.xml 可访问且收录首页与年终奖落地页',
+        record('sitemap.xml 可访问且收录首页与全部落地页',
             sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
-            && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -567,6 +568,31 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             `常量 ${bonusRows.length} 档, 与页面不一致 ${staleRows.length} 档`);
         record('落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             bonusPage.status === 200 && bonusPage.raw.includes('?source=seo_bonus'), '');
+        // 同一套守护扩到「月薪个税」落地页：可访问 + 结构化数据 + 静态预扣率表逐档对账 + 归因参数。
+        // 页面上的逐月示例表数字也要能被读到（爬虫不执行 JS，示例是纯静态正文）。
+        const salaryPage = await request(PORT, 'GET', '/seo/salary-tax.html');
+        record('月薪个税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            salaryPage.status === 200 && salaryPage.raw.includes('rel="canonical"')
+            && salaryPage.raw.includes('FAQPage') && salaryPage.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${salaryPage.status}`);
+        const comprehensiveBlock = (constantsJs.raw.match(/comprehensiveTaxRates\s*=\s*\[([\s\S]*?)\n\s*\]/) || [])[1] || '';
+        const comprehensiveRows = Array.from(comprehensiveBlock.matchAll(/rate:\s*([\d.]+)\s*,\s*deduction:\s*(\d+)/g))
+            .map((m) => ({ rate: Number(m[1]), deduction: Number(m[2]) }));
+        const staleSalaryRows = comprehensiveRows.filter((r) => {
+            const pct = `${Math.round(r.rate * 1000) / 10}%`;   // 0.03 → '3%'（避开浮点 3.0000000000000004）
+            return !salaryPage.raw.includes(pct) || !salaryPage.raw.includes(`>${r.deduction}<`);
+        });
+        record('月薪个税落地页静态预扣率表与常量文件逐档一致（页面不维护第二份口径）',
+            salaryPage.status === 200 && comprehensiveRows.length === 7 && staleSalaryRows.length === 0
+            && salaryPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && salaryPage.raw.includes('/src/js/data/tax-rates-sync.js')
+            && salaryPage.raw.includes('/src/js/calculation/salary-tax-quick.js'),
+            `常量 ${comprehensiveRows.length} 档, 与页面不一致 ${staleSalaryRows.length} 档`);
+        record('月薪个税落地页静态逐月示例表可被读到（首月 300 / 第 4 月 580 / 全年 9480）',
+            salaryPage.status === 200 && salaryPage.raw.includes('>300.00<')
+            && salaryPage.raw.includes('>580.00<') && salaryPage.raw.includes('>9480.00<'), '');
+        record('月薪个税落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            salaryPage.status === 200 && salaryPage.raw.includes('?source=seo_salary'), '');
         const deadLocs = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;

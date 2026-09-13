@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段14 剩余项）：高商业意图长尾词「个税计算器 / 工资个税怎么算」。
+         设计约束（见 docs/development/seo-landing-plan.md）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（salary-tax-quick.js + window.comprehensiveTaxRates），
+              页面上不出现第二份税率表；
+           3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
+    <title>月薪个税计算器 2026：累计预扣法怎么算，每月到手多少？</title>
+    <meta name="description" content="输入月薪、五险一金与专项附加扣除，按累计预扣法算出全年个税与月均税额，并给出每月预扣明细。含预扣率表（3%～45% 七档）与政策依据（国家税务总局公告 2018 年第 61 号）。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/salary-tax.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="月薪个税计算器 2026：累计预扣法怎么算，每月到手多少？">
+    <meta property="og:description" content="按月薪算全年个税与月均税额，附预扣率表与每月预扣明细。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/salary-tax.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 月薪个税计算器",
+                "url": "https://euriskotax.zeabur.app/seo/salary-tax.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按累计预扣法计算工资薪金个人所得税：输入月薪、五险一金与专项附加扣除，给出全年应纳税额、月均税额、税后月薪与每月预扣明细。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "为什么月薪一样，每个月扣的个税却不一样？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为工资薪金按累计预扣法计税：每月都按「年初到本月的累计应纳税所得额」查同一张年度税率表。累计所得越高，适用档位越高，所以往往是年初扣得少、下半年扣得多。全年合计才是应缴的总税额。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "5000 元的起征点是每个月都能扣吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "是的。基本减除费用按 5000 元/月累计扣除，发放 12 个月就扣 12 × 5000 = 60000 元。此外五险一金个人部分和专项附加扣除也按月累计扣除。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "社保公积金和专项附加扣除怎么影响个税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "两者都从应纳税所得额中减掉，减得越多、适用档位越低。每月应纳税所得额 = 月薪 − 5000 − 五险一金个人部分 − 专项附加扣除。专项附加扣除包括子女教育、赡养老人、住房贷款利息或租金、继续教育、大病医疗、3 岁以下婴幼儿照护等。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "年中入职或跳槽，计税月数怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "累计预扣按在本单位的任职受雇月份数累计减除费用，年中入职就从入职当月算起。例如 7 月入职，到年底只累计 6 个月的 5000 元减除费用。跳槽后新单位重新起算任职月份，全年税额需在次年汇算清缴时按年度口径多退少补。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_salary">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>月薪个税怎么算：为什么下半年比上半年扣得多？</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>工资薪金按<strong>累计预扣法</strong>预扣预缴 —— 每个月都用「年初到本月的累计应纳税所得额」去查同一张<strong>年度</strong>税率表，
+            再减掉前面各月已预扣的税额。所以月薪不变时，<strong>年初扣得少、下半年扣得多</strong>，全年合计才是总税额。
+            计算依据：《中华人民共和国个人所得税法》及其实施条例、<strong>国家税务总局公告 2018 年第 61 号</strong>（累计预扣法）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">月薪个税速算（累计预扣口径）</h2>
+            <div class="calc-input-row">
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="salary-input">月薪（元，税前）</label>
+                    <input class="calc-input" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000" style="width:100%">
+                </div>
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="insurance-input">每月五险一金（元）</label>
+                    <input class="calc-input" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000" style="width:100%">
+                </div>
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="special-input">每月专项附加扣除（元）</label>
+                    <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000" style="width:100%">
+                </div>
+                <div style="flex:0 1 140px;min-width:0">
+                    <label class="calc-label" for="months-input">计税月数</label>
+                    <input class="calc-input" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12" style="width:100%">
+                </div>
+                <button class="btn btn-primary" id="calc-reset" type="button" style="align-self:flex-end">重算</button>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                本页按「全年固定月薪」测算。若有年终奖，年终奖选择单独计税还是并入综合所得，会改变整体税负，请用<a href="/?source=seo_salary">完整计算器对比两种方案</a>。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">适用预扣率（速算扣除数）</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">全年应纳税额</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">月均税额</div>
+                    <div class="v" id="r-avg">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">税后月薪（扣个税后）</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、预扣率表与示例表手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>怎么算：累计预扣两步</h2>
+        <ol>
+            <li><strong>算累计应纳税所得额</strong>：每月应纳税所得额 = 月薪 − 5000 − 五险一金 − 专项附加扣除（不足 0 按 0），再把每月的结果累加。</li>
+            <li><strong>查表算税再相减</strong>：累计应纳税额 = 累计应纳税所得额 × 预扣率 − 速算扣除数；<strong>本月应预扣 = 截至本月累计应纳税额 − 截至上月累计应纳税额</strong>。</li>
+        </ol>
+        <p class="muted small">例：月薪 20000 元、每月五险一金 3000 元、专项附加扣除 2000 元 → 每月应纳税所得额 = 20000 − 5000 − 3000 − 2000 = 10000 元；12 个月累计 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）→ 全年应纳税额 = 120000 × 10% − 2520 = 9480 元。</p>
+
+        <h2>预扣率表（居民个人工资薪金预扣预缴）</h2>
+        <div class="table-scroll">
+            <table id="rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">按「累计预扣预缴应纳税所得额」定档，即年初至今的累计所得；与综合所得年度税率表同档</caption>
+                <thead>
+                <tr>
+                    <th scope="col">累计预扣预缴应纳税所得额（元）</th>
+                    <th scope="col">预扣率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>为什么下半年扣得比上半年多</h2>
+        <p>
+            税率由<strong>累计</strong>所得决定，而每月都要重查一次表。以「月薪 20000 元、五险一金 3000 元、专项附加扣除 2000 元」为例，
+            每月应纳税所得额都是 10000 元，但累计值会一路抬升，越过 36000 元的档位分界后，整笔累计所得从 3% 档跳到 10% 档 —— 于是第 4 个月起预扣额明显变大。
+        </p>
+        <div class="table-scroll">
+            <table id="example-schedule">
+                <caption class="small muted" style="text-align:left;padding:8px 0">示例：月薪 20000 元 · 每月五险一金 3000 元 · 每月专项附加扣除 2000 元 · 12 个月</caption>
+                <thead>
+                <tr>
+                    <th scope="col">月份</th>
+                    <th scope="col">本月预扣税额（元）</th>
+                    <th scope="col">累计预扣税额（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>第 1 月</td><td class="num">300.00</td><td class="num">300.00</td></tr>
+                <tr><td>第 2 月</td><td class="num">300.00</td><td class="num">600.00</td></tr>
+                <tr><td>第 3 月</td><td class="num">300.00</td><td class="num">900.00</td></tr>
+                <tr><td>第 4 月</td><td class="num">580.00</td><td class="num">1480.00</td></tr>
+                <tr><td>第 5 月</td><td class="num">1000.00</td><td class="num">2480.00</td></tr>
+                <tr><td>第 6 月</td><td class="num">1000.00</td><td class="num">3480.00</td></tr>
+                <tr><td>第 7 月</td><td class="num">1000.00</td><td class="num">4480.00</td></tr>
+                <tr><td>第 8 月</td><td class="num">1000.00</td><td class="num">5480.00</td></tr>
+                <tr><td>第 9 月</td><td class="num">1000.00</td><td class="num">6480.00</td></tr>
+                <tr><td>第 10 月</td><td class="num">1000.00</td><td class="num">7480.00</td></tr>
+                <tr><td>第 11 月</td><td class="num">1000.00</td><td class="num">8480.00</td></tr>
+                <tr><td>第 12 月</td><td class="num">1000.00</td><td class="num">9480.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/salary-tax-quick.test.js</code> 逐月与 App 内核结果对拍守护。</p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>为什么月薪一样，每个月扣的个税却不一样？</summary>
+            <p>因为工资薪金按<strong>累计预扣法</strong>计税：每月都按「年初到本月的累计应纳税所得额」查同一张年度税率表。累计所得越高，适用档位越高，所以往往是年初扣得少、下半年扣得多。全年合计才是应缴的总税额。</p>
+        </details>
+        <details>
+            <summary>5000 元的起征点是每个月都能扣吗？</summary>
+            <p>是的。基本减除费用按 <strong>5000 元/月累计扣除</strong>，发放 12 个月就扣 12 × 5000 = 60000 元。此外五险一金个人部分和专项附加扣除也按月累计扣除。</p>
+        </details>
+        <details>
+            <summary>社保公积金和专项附加扣除怎么影响个税？</summary>
+            <p>两者都从应纳税所得额中减掉，减得越多、适用档位越低。每月应纳税所得额 = 月薪 − 5000 − 五险一金个人部分 − 专项附加扣除。专项附加扣除包括子女教育、赡养老人、住房贷款利息或租金、继续教育、大病医疗、3 岁以下婴幼儿照护等。</p>
+        </details>
+        <details>
+            <summary>年中入职或跳槽，计税月数怎么算？</summary>
+            <p>累计预扣按在本单位的任职受雇月份数累计减除费用，年中入职就从入职当月算起。例如 7 月入职，到年底只累计 6 个月的 5000 元减除费用。跳槽后新单位重新起算任职月份，全年税额需在次年汇算清缴时按年度口径多退少补。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把年终奖、社保基数一起算，看全年税负</h2>
+            <p>输入工资、五险一金、专项附加扣除与年终奖，App 会给出全年应纳税额、两种年终奖计税方式的差额，以及社保基数是否达到参保城市下限。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_salary">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/salary-tax.html">月薪个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂税率表（window.comprehensiveTaxRates）
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       salary-tax-quick.js —— 与内核 calculateCumulativePrepaidTax 等价的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/salary-tax-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var salary = document.getElementById('salary-input');
+    var insurance = document.getElementById('insurance-input');
+    var special = document.getElementById('special-input');
+    var months = document.getElementById('months-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoSalaryQuick;
+
+    function money(n) {
+        return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(rate) {
+        return (rate * 100).toFixed(rate * 100 % 1 === 0 ? 0 : 1) + '%';
+    }
+
+    function inputs() {
+        return {
+            income: Number(salary ? salary.value : NaN),
+            insurance: Number(insurance ? insurance.value : 0) || 0,   // 空值按 0，不当成非法
+            special: Number(special ? special.value : 0) || 0,
+            months: Number(months ? months.value : 12)
+        };
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.taxOf !== 'function') {
+            // 计算脚本未加载（网络异常/被拦截）时不装作有结果
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方公式、预扣率表与示例表仍可手工估算。';
+            }
+            return;
+        }
+        var v = inputs();
+        if (!Number.isFinite(v.income) || v.income <= 0 || !Number.isFinite(v.months) || v.months <= 0) {
+            box.hidden = true;
+            if (hint) { hint.hidden = true; }
+            return;
+        }
+        var m = Math.min(12, Math.max(1, Math.floor(v.months)));
+        var cumulative = quick.cumulativeTaxableOf(v.income, m, v.insurance, v.special);
+        var total = quick.taxOf(v.income, m, v.insurance, v.special);
+        var bracket = quick.bracketOf(cumulative);
+        var avg = total / m;
+        var netMonthly = v.income - v.insurance - avg;
+
+        box.hidden = false;
+        document.getElementById('r-rate').textContent = bracket ? pct(bracket.rate) + '（' + money(bracket.deduction) + '）' : '—';
+        document.getElementById('r-tax').textContent = money(total) + ' 元';
+        document.getElementById('r-avg').textContent = money(avg) + ' 元';
+        document.getElementById('r-net').textContent = money(netMonthly) + ' 元';
+
+        if (!hint) return;
+        var schedule = quick.monthlyScheduleOf(v.income, m, v.insurance, v.special);
+        if (schedule.length >= 2) {
+            var first = schedule[0];
+            var last = schedule[schedule.length - 1];
+            if (last > first + 0.005) {
+                hint.innerHTML = '累计预扣下税额逐月抬升：第 1 个月预扣 <strong>' + money(first) + ' 元</strong>，第 ' + m +
+                    ' 个月预扣 <strong>' + money(last) + ' 元</strong>；全年 ' + money(total) + ' 元，月均 ' + money(avg) + ' 元。';
+            } else {
+                hint.innerHTML = '累计应纳税所得额尚未越过首档 36000 元，全年各月预扣一致，均为 <strong>' + money(first) + ' 元</strong>。';
+            }
+            hint.hidden = false;
+        } else {
+            hint.hidden = true;
+        }
+    }
+
+    [salary, insurance, special, months].forEach(function (el) {
+        if (el) el.addEventListener('input', render);
+    });
+    var reset = document.getElementById('calc-reset');
+    if (reset) {
+        reset.addEventListener('click', function () {
+            salary.value = '20000';
+            insurance.value = '3000';
+            special.value = '2000';
+            months.value = '12';
+            render();
+        });
+    }
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>
