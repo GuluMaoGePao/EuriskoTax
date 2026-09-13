@@ -2,8 +2,8 @@
 
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
-> **版本**: v2.6
-> **最后更新**: 2026年9月13日（阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **版本**: v2.8
+> **最后更新**: 2026年9月13日（阶段14 C2 城市社保参数库——`CitySocialConfig` 模型 + 运维后台「社保基数」Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（此前全站统一用全国平均 7546，会误报高/低基数城市用户的合规性）+ 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/city-social`（支持 `since` 增量指纹，见 §10.4）；管理端点 `GET/POST /api/admin/city-social`、`POST /api/admin/city-social/rollback`（见 §5.15）；阶段14 变现与可信度——专业版兑换码 `ProCode`（线下收款 → 运营发码 → 用户自助兑换）：用户端 `POST /api/pro-codes/redeem`（一码一用 / 事务内原子占用 / 限时码叠加续期，见 §2.10）与 `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /api/admin/pro-codes/:id`（已兑换码禁止作废）、`GET /api/admin/pro-codes/export`（CSV 含 BOM + 公式注入防护，见 §5.14）；阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -18,8 +18,9 @@
 7. [错误码](#7-错误码)
 8. [环境变量配置](#8-环境变量配置)
 9. [附录：注册流程与邀请码](#9-附录注册流程与邀请码)
-10. [公开只读接口（内容中心 / 税制参数）](#10-公开只读接口内容中心--税制参数)
+10. [公开只读接口（内容中心 / 税制参数 / 城市社保参数）](#10-公开只读接口内容中心--税制参数--城市社保参数)
 11. [公开写入接口（转化线索）](#11-公开写入接口转化线索)
+12. [公开埋点接口（转化漏斗 · 阶段13E）](#12-公开埋点接口转化漏斗--阶段13e)
 
 ---
 
@@ -39,7 +40,7 @@
 | 方式 | 使用位置 | 说明 |
 |------|---------|------|
 | **JWT Bearer** | 用户接口 | 请求头 `Authorization: Bearer <token>`；登录返回，默认 7 天有效（`JWT_EXPIRES_IN` 可调） |
-| **X-Admin-Token** | 管理员接口 | 请求头 `X-Admin-Token: <ADMIN_TOKEN 环境变量值>`；用于 `/api/stats/overview`、`/api/invites`、`/api/feedback/admin`；未配置 `ADMIN_TOKEN` 返回 503 |
+| **X-Admin-Token** | 管理员接口 | 请求头 `X-Admin-Token: <ADMIN_TOKEN 环境变量值>`；用于 `/api/stats/overview`、`/api/invites`、`/api/feedback/admin`、`/api/admin/pro-codes`（阶段14）；未配置 `ADMIN_TOKEN` 返回 503 |
 | 无认证 | 计算类 / 健康检查 | 见各接口标注 |
 
 ### 1.3 通用响应格式
@@ -196,6 +197,42 @@
 行为：校验邮箱已注册 → 校验重置验证码（一次性使用）→ 更新密码哈希。重置后原密码立即失效。
 
 典型错误：参数缺失 / 密码过短 / 验证码无效或过期（400/429）、该邮箱未注册（404）。
+
+### 2.10 专业版兑换码（用户端 · 阶段14）
+
+> 变现闭环：线下收款 → 运营在运维后台生成兑换码 → 用户自助兑换开通专业版，全程无需人工改库。
+
+**POST** `/api/pro-codes/redeem`（需 JWT）
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| code | string | 是 | 运营发放的兑换码，形如 `PRO-ABCD-EFGH`（大小写与空格不敏感，手抄空格同样容忍） |
+
+返回 `data`：更新后的用户信息（`plan` / `plan_expires_at` / `pro_granted_by`），前端据此刷新本地会话与权益徽标。
+
+到期语义（`duration_days` 为空即**永久码**）：
+
+| 兑换时账号状态 | 限时码 | 永久码 |
+|---------------|--------|--------|
+| 基础版 / 专业版已过期 | 自兑换时刻起算 N 天 | `plan_expires_at = null`（永久） |
+| 专业版仍在有效期内 | 在现有到期日上**叠加**续期（不清零，用户不吃亏） | `plan_expires_at = null` |
+| 已是永久专业版 | 409 拒绝且**不消耗**兑换码（不白买一个用不上的码） | 同左 |
+
+安全约束：
+
+- **一码一用**由兑换事务内 `used_by IS NULL` 的原子占用（`updateMany`）保证，并发下不会出现一码两人（`count === 0` 视为已被抢用）；
+- 「校验 → 占用 → 发放权益」在同一事务内，要么全成要么全回滚；
+- 本组路由挂 `redeemLimiter`：同 IP 15 分钟 10 次（兑换对真人是终身低频动作，10 次完全无感；对脚本枚举则是硬约束；限流只计 `/redeem`，不影响 `/mine`）。
+
+典型错误：未提供兑换码（400）、未登录 / Token 失效（401）、兑换码不存在或已被作废（403）、兑换码已被使用 / 当前已是永久专业版（409）、尝试过于频繁（429）。
+
+**GET** `/api/pro-codes/mine`（需 JWT）
+
+我的兑换记录（用户自查 / 客服核对用）。返回 `data.total` + `data.items`，单项字段：`code` / `durationDays`（`null` = 永久）/ `permanent` / `batch` / `note` / `usedAt`，按兑换时间倒序。
+
+典型错误：未登录 / Token 失效（401）。
 
 ---
 
@@ -456,6 +493,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 ### 5.11 税制参数管理（管理员 · 阶段12 C1）
 
 > 税制参数（4 组税率表 + 2 个缴费基数下限）由运维后台「税率」Tab 维护，保存即对所有用户生效。
+> ⚠️ 两处会写同一对全局量的配置：这里维护的是**全国口径**兜底值；若用户已选参保城市，最终生效的是「社保基数」Tab 的城市口径（见 §5.15 / §10.4），此处改动仅在用户未选城市时可见。**改这两个下限优先改「社保基数」Tab。**
 > 版本化：每次保存写入一条 `published` 快照并把旧的置为 `archived`，历史保留可回滚；改动可选联动发布一条公告。
 > 端上由 `src/js/data/tax-rates-sync.js` 在启动/联网时拉取（公开端点见 §10.3）并覆盖本地税率变量；离线回退 localStorage 缓存或出厂基线。
 
@@ -529,7 +567,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
       {
         "id": 12, "user_id": null, "name": "张先生", "phone": "13900000000", "wechat": null,
         "company": "某个体户", "entity_type": "sole", "need": "settlement",
-        "source": "result_business", "scene": "经营所得·汇算清缴", "note": "",
+        "source": "result_business", "scene": "经营所得年度汇算 · 预计补税 · 适用税率 35%", "note": "",
         "consent": true, "status": "new", "owner": null,
         "created_at": "2026-09-12T02:00:00.000Z", "updated_at": "2026-09-12T02:00:00.000Z",
         "user": null
@@ -598,6 +636,99 @@ CSV 导出（供销售导入自有 CRM）。筛选条件与列表一致，最多
 与 §5.12 的 `stats` 区别：`stats` 是**线索状态漏斗**（`new → contacted → qualified → converted`，看销售跟进效率）；本接口是**流量转化漏斗**（看获客转化效率）。两者维度不同，不能互相替代。
 
 典型错误：无 / 错误 `X-Admin-Token`（401）、`days` 非正整数（400）。
+
+### 5.14 专业版兑换码管理（管理员 · 阶段14）
+
+线下收款授权闭环：运营生成批次 → 交付客户 → 客户端自助兑换（§2.10）→ 导出 CSV 对账。全部端点要求 `X-Admin-Token`。
+
+**GET** `/api/admin/pro-codes?batch=&status=&offset=0&limit=50`
+
+| 参数 | 说明 |
+|------|------|
+| `batch` | 按批次精确筛选 |
+| `status` | `available`（可用）/ `used`（已兑换）/ `disabled`（已作废）；非法值按不筛选处理 |
+| `offset` / `limit` | 分页，`limit` 默认 50、上限 200 |
+
+返回 `data`：`total` / `offset` / `limit` / `items`，外加三类**全局计数** `availableCount` / `usedCount` / `disabledCount`（不受 `batch`/`status` 筛选影响，用于计数卡片）。
+
+`items` 单项字段：`id` / `code` / `durationDays`（`null` = 永久）/ `permanent` / `batch` / `note` / `disabled` / `status` / `usedBy` / `usedByName` / `usedByEmail` / `usedAt` / `createdAt`。
+
+**POST** `/api/admin/pro-codes`（生成成功返回 `201`）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| count | integer | 是 | 生成数量，1-200。**必须是整数**：非整数直接 400 拒绝（早期实现用 `parseInt` 会把 `1.5` 静默截断为 1 → 无声少发码） |
+| durationDays | integer \| null | 否 | 授权天数，1-3650；省略 / `null` / 空串 = **永久授权** |
+| batch | string | 否 | 批次标识（如 `2026.09-线下收款`），便于对账，超 64 字符截断 |
+| note | string | 否 | 备注（如客户名称），超 200 字符截断 |
+
+返回 `data`：`createdCount` / `durationDays` / `batch` / `codes`（明文码数组，**仅生成时返回一次**，请当场交付客户）。
+码格式 `PRO-XXXX-XXXX`，字符集排除易混字符 `0/O`、`1/I/L`、`U/V`，与注册邀请码前缀 `EURISKO-` 显式区分（避免用户在注册框误填）。
+
+**PATCH** `/api/admin/pro-codes/:id`（作废 / 恢复）
+
+请求体：`{ "disabled": true | false }`（必须为布尔值，否则 400）。
+
+**已被兑换的码禁止作废（409）** —— 该码是收款凭证需留痕；客户退款请改用 §5.8 调整用户计划回收权益。
+
+返回 `data`：`id` / `code` / `disabled` / `status`。
+
+**GET** `/api/admin/pro-codes/export?batch=`
+
+导出 CSV 对账（`text/csv`，含 UTF-8 BOM，Excel 打开中文不乱码；`= + - @` 开头的单元格前置单引号防公式注入）；`Content-Disposition` 文件名 `pro-codes-YYYYMMDD.csv`。
+列：`code` / `status` / `duration_days`（永久码输出 `permanent`）/ `batch` / `note` / `used_by` / `used_by_name` / `used_at` / `created_at`。
+
+典型错误：无 / 错误 `X-Admin-Token`（401）、参数非法（400）、兑换码不存在（404）、已被兑换的码作废被拒（409）。
+
+### 5.15 城市社保参数管理（管理员 · 阶段14 C2）
+
+> 各城市社保 / 公积金缴费基数口径由运维后台「社保基数」Tab 维护，保存即对所有用户生效（公开只读端点见 §10.4）。
+> 版本化：每次保存写入一条 `published` 快照并把旧的置为 `archived`，历史保留可回滚；改动可选联动发布一条公告（复用内容中心，公告版本号加 `city-` 前缀，与税率公告的 `tax-` 前缀区分，避免互相覆盖）。
+> **为什么这些校验是安全边界**：基数下限填错会直接误导全站用户的合规判断 —— 定得过高把合规基数误报为「低于最低标准」，定得过低则漏报。
+
+**GET** `/api/admin/city-social`
+
+返回 `data`：`current`（当前生效配置，含 `id` / `version` / `note` / `publishedAt` / `payload`，无自定义配置时为 `null`）、`defaults`（出厂基线，编辑器初始值）、`history`（版本列表，最近 30 条，含 `id` / `version` / `status` / `note` / `publishedAt` / `createdAt`）。
+
+**POST** `/api/admin/city-social`（发布成功返回 `201`）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| version | string | 否 | 版本号（≤40 字符，**库中唯一**）；留空自动生成 `YYYY.MM.DD-N`。重复返回 400（防止静默覆盖可回滚的历史版本） |
+| note | string | 否 | 变更说明（≤500 字符），写入版本历史 |
+| config | object | 是 | 全量城市配置，见下 |
+| notify | object | 否 | `{ enabled, title?, summary?, body?, placements? }`；`enabled=true` 时同步发布一条公告，`placements` 白名单 `assistant_qa / home_banner / modal / notice_list`（缺省 `[modal, notice_list]`） |
+
+`config` 字段：`constantsVersion`（≤40 字）、`defaultCity`（必须在城市列表中，留空回落 `national`）、`cities`（1-200 项）。
+
+单个城市项校验（**任一项不通过整份配置被 400 拒绝并返回 `error.details` 全量错误**）：
+
+| 字段 | 规则 |
+|------|------|
+| code | 小写字母开头，仅 `a-z0-9_-`，长度 2-32，列表内不可重复 |
+| name | 非空，≤50 字 |
+| socialBaseMin / housingBaseMin | 必填，数值 ≥ 0 |
+| socialBaseMax / housingBaseMax | 留空 / `null` = **不设上限**；填了则必须 ≥ 对应下限，否则 400（否则「基数超标」判定会全线颠倒） |
+| housingFundRateOptions | 百分比数值数组，去重升序，最多 6 项，取值 `(0,100]`；缺省 `[5,7]` |
+| note | ≤200 字 |
+
+**不变量**：列表中必须保留 `code = "national"` 的兜底城市，删除即 400 —— 它是用户未选择城市（或所选城市被删除）时的回落口径，缺失会让基数回落链断裂。
+
+返回 `data`：`config`（`id` / `version` / `note` / `publishedAt`）、`release`（未联动公告时为 `null`）。
+
+**POST** `/api/admin/city-social/rollback`（返回 `201`）
+
+以历史版本为蓝本**另存为一个新版本**（历史不删除，可再次回滚）。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | integer | 是 | 历史配置记录 id |
+| version | string | 否 | 新版本号，留空自动生成；重复返回 400 |
+| note | string | 否 | 缺省 `回滚至 <源版本号>` |
+
+返回 `data.config`：`id` / `version` / `note` / `publishedAt` / `from`（源版本号）；历史版本 `payload` 损坏时返回 400。
+
+典型错误：无 / 错误 `X-Admin-Token`（401）、参数校验失败或版本号重复（400）、配置版本不存在（404）。
 
 ---
 
@@ -745,7 +876,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 
 ---
 
-## 10. 公开只读接口（内容中心 / 税制参数）
+## 10. 公开只读接口（内容中心 / 税制参数 / 城市社保参数）
 
 > 阶段11 / 阶段12 C1：运营内容 / 更新公告 / 政策要点统一由数据库（`ContentItem`）维护，运维后台编辑发布；税制参数由 `TaxRateConfig` 版本化维护（见 §10.3）。
 > 两端点均为公开只读、无需登录；但**响应按请求方登录态分层**（audience 分层），因此响应头为 `Cache-Control: private, no-store` + `Vary: Authorization`，禁止 CDN/共享缓存跨档串内容。
@@ -838,6 +969,66 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 - 数组项 `{ min?, max, rate, deduction }`；**仅末级可无上限**（`max=null`）。端上按 `taxableIncome <= max` 匹配，因此 `null` 在客户端还原为 `Infinity`
 - 限流：60 次/分钟/IP
 
+### 10.4 城市社保参数（阶段14 C2）
+
+**GET** `/api/config/city-social?since=<revision>`
+
+返回各参保城市的社保 / 公积金缴费基数上下限与公积金可选比例（运维后台「社保基数」Tab 热改后即时生效；库中无自定义配置时为出厂基线）。无需登录、**不按登录态分层**，响应头 `Cache-Control: no-store`。
+
+> 为什么需要它：各城市缴费基数下限差异极大（同一年度可相差一倍以上），此前全站统一用全国平均 7546，会让高基数城市用户被误告「基数合规」、低基数城市用户被误报「低于最低标准」。
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "version": "2026.09.13-1",
+    "revision": "1d387dda1de3",
+    "publishedAt": "2026-09-13T02:00:00.000Z",
+    "note": "按 2026 年度社保基数口径更新 12 城",
+    "source": "custom",
+    "unchanged": false,
+    "config": {
+      "constantsVersion": "2026.1",
+      "defaultCity": "national",
+      "cities": [
+        {
+          "code": "national",
+          "name": "全国平均",
+          "socialBaseMin": 7546,
+          "socialBaseMax": null,
+          "housingBaseMin": 7546,
+          "housingBaseMax": null,
+          "housingFundRateOptions": [5, 7],
+          "note": "出厂基线：未按参保城市细化时的兜底口径"
+        },
+        {
+          "code": "beijing",
+          "name": "北京",
+          "socialBaseMin": 6821,
+          "socialBaseMax": 35811,
+          "housingBaseMin": 2420,
+          "housingBaseMax": null,
+          "housingFundRateOptions": [5, 12],
+          "note": ""
+        }
+      ]
+    }
+  }
+}
+```
+
+- `source`：`custom`（库中有可用自定义配置）/ `default`（无配置**或配置已损坏无法解析**，回退出厂基线）。配置损坏时 `version` 仍是库中版本号，运维可据「`version` 存在但 `source=default`」定位损坏版本
+- `revision`：当前 `config` 的**内容指纹**（md5 前 12 位）。按内容寻址 —— 内容相同则指纹不变（端上不必重复覆盖），内容有实质变动才变化
+- `since` 与当前 `revision` 相等时 `unchanged=true` 且 `config=null`（客户端跳过覆盖，仅刷新时间戳）
+- 城市项字段：`code` 小写字母开头、仅 `a-z0-9_-`、长度 2-32（前后端契约与端上 `localStorage` 键的一部分）、`name` ≤50 字、`note` ≤200 字
+- 基数：`*BaseMin` 必填且 ≥ 0；`*BaseMax` 为 `null` 表示**不设上限**（JSON 不支持 `Infinity`，故不用 `Infinity` 传输）
+- `housingFundRateOptions`：公积金可选比例（百分比数值），去重升序，最多 6 项，缺省 `[5,7]`
+- `national` 是**兜底城市**且不可删除：用户未选择城市、或所选城市在新版本中被删除时端上回落于此。未命中时端上回落链为「所选城市 → `defaultCity` → `national` → 列表首项」
+- 限流：60 次/分钟/IP
+- 端上应用：`window.CitySocial`（`src/js/data/city-social-sync.js`）按所选城市覆盖 `MIN_SOCIAL_SECURITY_BASE` / `MIN_HOUSING_FUND_BASE`，UI 见 §1 关联说明；离线回退 `localStorage` 缓存或出厂基线
+
 ---
 
 ## 11. 公开写入接口（转化线索）
@@ -861,7 +1052,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 | `entityType` | — | 枚举 `individual` / `sole` / `small` / `other` / `unknown`（非法回落 `unknown`） |
 | `need` | — | 枚举 `bookkeeping` / `settlement` / `declare_check` / `consult` / `other`（非法回落 `other`） |
 | `source` | — | 触点归因，枚举见下（非法回落 `unknown`） |
-| `scene` | — | 情境快照（如「经营所得·汇算清缴」），≤ 100 字符 |
+| `scene` | — | 咨询情境快照，≤ 100 字符。**应为可核实的非金额摘要**（如「经营所得年度汇算 · 预计补税 · 适用税率 35%」）：由端上 `lead-context.js` 从结果页已渲染结果或用户选定的本机历史记录反推，**不携带任何收入金额** |
 | `note` | — | ≤ 1000 字符 |
 | `consent` | ✅ | 必须为 `true`，否则 400 |
 
@@ -883,7 +1074,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
   "entityType": "sole",
   "need": "settlement",
   "source": "result_business",
-  "scene": "经营所得·汇算清缴",
+  "scene": "经营所得年度汇算 · 预计补税 · 适用税率 35%",
   "note": "想核实扣除项是否填全",
   "consent": true
 }

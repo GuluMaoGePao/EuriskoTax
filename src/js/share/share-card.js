@@ -27,9 +27,17 @@
     var SHARE_IMAGE_WIDTH = 750; // 分享图宽度：移动端长图主流宽度，够清晰又不过大
     var SHARE_IMAGE_SCALE = 2;   // 2 倍像素密度，微信二次压缩后仍清晰
     var DISCLAIMER = '本测算结果仅供参考，不构成税务建议';
-    var LOGO_SRC = 'images/EuriskoTaxLogo.png';
+    var LOGO_SRC = 'images/logo-zoomed.png';
     var CTA_BLOCK_ID = 'share-card-cta';
     var PREVIEW_ID = 'share-preview-modal';
+
+    // 二维码的三个硬参数（都是「扫码能否成功」的直接变量，不能随手改）：
+    //   1) 显示 168px —— 分享图 750px 宽，占 22%，微信里缩略时仍有足够物理尺寸；
+    //   2) 静区 4 个模块 —— 二维码标准下限，少于此值部分扫码 App 直接识别失败；
+    //   3) 位图 = 显示尺寸 × 截图倍率 —— 导出图里二维码近似 1:1 像素，不糊边。
+    var QR_DISPLAY_PX = 168;
+    var QR_QUIET_MODULES = 4;
+    var QR_BITMAP_TARGET_PX = QR_DISPLAY_PX * SHARE_IMAGE_SCALE;
 
     // 结果容器 → 模板与取数规则（容器 id 取自 index.html 的 step-pane）
     var SOURCES = {
@@ -81,10 +89,11 @@
         { buttonId: 'calculate-reverse-btn', containerId: 'reverse-step-result' }
     ];
 
-    // 模板文案：如实描述功能，不承诺收益（合规红线）
+    // 模板文案：如实描述功能，不承诺收益（合规红线）。
+    // 「微信扫码」这一步的指引放在二维码旁固定展示，文案本身只说价值，避免同一句话重复两遍。
     var TEMPLATE_TEXT = {
-        income: { lead: '微信扫码，30 秒算出你的税后收入' },
-        negotiation: { lead: '微信扫码，测测谈薪目标该定多少' }
+        income: { lead: '30 秒算出你的税后收入' },
+        negotiation: { lead: '谈薪前，先算清税前该谈多少' }
     };
 
     function escapeHtml(text) {
@@ -95,12 +104,15 @@
             .replace(/"/g, '&quot;');
     }
 
-    // 判断取到的文本是否是「真的算完了」：未计算时节点里是占位符（¥0 / — / 空）
+    // 判断取到的文本是否是「真的算完了」：未计算时节点里是占位符（¥0 / ¥0.00 / — / 空）
+    // 注意：¥0.00 这种「小数零」也要拒绝，否则分享图会生成一张写着 0 元的结果图
     function isMeaningful(text) {
         if (!text) return false;
-        var normalized = String(text).replace(/[\s¥￥,]/g, '');
+        var normalized = String(text).replace(/[\s¥￥,%]/g, '');
         if (!normalized) return false;
-        return normalized !== '0' && normalized !== '-' && normalized !== '—' && normalized !== '--';
+        // 允许 "3%" 这种有意义的税率，但拒绝纯 0（含 0.00 / 0.0）
+        if (normalized === '0' || /^0\.0*$/.test(normalized)) return false;
+        return normalized !== '-' && normalized !== '—' && normalized !== '--';
     }
 
     function readText(selector) {
@@ -123,10 +135,23 @@
         return { heroLabel: cfg.hero.label, heroValue: heroValue, rows: rows };
     }
 
-    // 分享落地页地址：带上 source=share 供 T4 归因（origin 自动适配本地/生产域名）
+    // 分享落地页地址：带上 source=share 供 T4 归因。
+    // 默认取 window.location.origin，但允许通过 window.EuriskoTaxConfig.shareBaseUrl 或
+    // ShareCard.setShareBaseUrl() 覆盖 —— 避免本地开发环境（localhost:3000）被生成到线上分享图里。
+    // 「无损缩短」是刻意的：二维码每多一个字符就可能多占一个版本（模块更密 → 更难扫），
+    // 所以去掉默认文档名 index.html（多数静态托管处以 / 访问同一页面）与多余的查询串。
+    var shareBaseUrl = (typeof window !== 'undefined' && window.EuriskoTaxConfig && window.EuriskoTaxConfig.shareBaseUrl)
+        ? window.EuriskoTaxConfig.shareBaseUrl
+        : '';
+
     function shareUrl() {
-        var base = window.location.origin + window.location.pathname;
-        return base + (base.indexOf('?') === -1 ? '?' : '&') + 'source=share';
+        var origin = shareBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+        var path = (typeof window !== 'undefined' ? (window.location.pathname || '/') : '/').replace(/index\.html?$/i, '') || '/';
+        return origin + path + '?source=share';
+    }
+
+    function setShareBaseUrl(url) {
+        shareBaseUrl = String(url || '').replace(/\/$/, '');
     }
 
     // 二维码：qrcode-generator（CDN，与 jspdf / html2canvas 同为 SW cache-first）。
@@ -134,34 +159,54 @@
     function qrDataUrl(text) {
         try {
             if (typeof window.qrcode !== 'function') return '';
-            var qr = window.qrcode(0, 'M'); // typeNumber 0 = 自动选择版本，M 级容错
+            var qr = window.qrcode(0, 'M'); // typeNumber 0 = 按内容长度自动选版本；M 级容错兼顾模块密度与抗压缩
             qr.addData(text);
             qr.make();
-            return qr.createDataURL(6, 8);
+
+            // 模块尺寸取整：二维码是纯硬边图形，非整数倍缩放会把黑块糊成灰块，微信再压一道就扫不动了。
+            // 所以按「目标位图像素 ÷ 总模块数」反算 cellSize，而不是固定 6px ——
+            // 固定值会让较长的 URL 悄悄变成更密的图案（更难扫），长度变化时质量不可控。
+            var totalModules = qr.getModuleCount() + QR_QUIET_MODULES * 2;
+            var cellSize = Math.max(2, Math.round(QR_BITMAP_TARGET_PX / totalModules));
+
+            // 注意：qrcode-generator 的 margin 单位是「像素」而不是「模块」
+            // （1.4.x 源码：margin 默认 4 * cellSize），所以这里显式传 4 个模块的像素宽度。
+            return qr.createDataURL(cellSize, QR_QUIET_MODULES * cellSize);
         } catch (err) {
             console.warn('[ShareCard] 二维码生成失败，降级为域名文字:', err);
             return '';
         }
     }
 
-    function rowHtml(row) {
+    // isLast：最后一行去掉下边框，否则明细表底部会多出一条悬空的线
+    function rowHtml(row, isLast) {
+        var border = isLast ? 'none' : '1px solid #e2e8f0';
         return '<tr>' +
-            '<td style="padding:12px 0;font-size:15px;color:#64748b;border-bottom:1px solid #e2e8f0;">' + escapeHtml(row.label) + '</td>' +
-            '<td style="padding:12px 0;font-size:18px;font-weight:600;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">' + escapeHtml(row.value) + '</td>' +
+            '<td style="padding:13px 0;font-size:15px;color:#64748b;border-bottom:' + border + ';">' + escapeHtml(row.label) + '</td>' +
+            '<td style="padding:13px 0;font-size:18px;font-weight:600;color:#0f172a;text-align:right;border-bottom:' + border + ';">' + escapeHtml(row.value) + '</td>' +
         '</tr>';
     }
 
-    function qrBlockHtml(qr, template) {
+    function qrBlockHtml(qr, template, host) {
         var text = TEMPLATE_TEXT[template] || TEMPLATE_TEXT.income;
-        var host = window.location.host;
+        host = host || (typeof window !== 'undefined' ? window.location.host : '');
+        var size = QR_DISPLAY_PX + 'px';
+
+        // 二维码外面再包一层白卡：给扫码 App 留出干净的识别底，
+        // 直接压在渐变底色上时，部分 App 会因对比度判定不足而识别变慢。
         var code = qr
-            ? '<img src="' + qr + '" alt="扫码测算" style="width:120px;height:120px;display:block;" />'
-            : '<div style="width:120px;height:120px;border:1px dashed #cbd5e1;border-radius:10px;font-size:12px;color:#94a3b8;text-align:center;line-height:120px;">扫码访问</div>';
+            ? '<img src="' + qr + '" alt="微信扫码测算" style="width:' + size + ';height:' + size + ';display:block;" />'
+            : '<div style="width:' + size + ';height:' + size + ';border:1px dashed #cbd5e1;border-radius:12px;' +
+              'font-size:13px;color:#94a3b8;text-align:center;line-height:' + size + ';">扫码访问</div>';
+
         return '<table style="width:100%;border-top:1px dashed #cbd5e1;margin-top:34px;"><tr>' +
-            '<td style="width:132px;padding-top:26px;vertical-align:middle;">' + code + '</td>' +
-            '<td style="padding-top:26px;padding-left:16px;vertical-align:middle;">' +
-                '<div style="font-size:16px;color:#334155;line-height:1.7;">' + escapeHtml(text.lead) + '</div>' +
-                '<div style="font-size:12px;color:#94a3b8;margin-top:8px;">' + escapeHtml(host) + '</div>' +
+            '<td style="width:' + (QR_DISPLAY_PX + 24) + 'px;padding-top:26px;vertical-align:middle;">' +
+                '<div style="display:inline-block;padding:10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;">' + code + '</div>' +
+            '</td>' +
+            '<td style="padding-top:26px;padding-left:20px;vertical-align:middle;">' +
+                '<div style="font-size:12px;font-weight:700;color:#2563eb;letter-spacing:1px;">微信扫码 · 长按识别</div>' +
+                '<div style="font-size:17px;font-weight:600;color:#1f2937;line-height:1.6;margin-top:8px;">' + escapeHtml(text.lead) + '</div>' +
+                '<div style="font-size:12px;color:#94a3b8;margin-top:10px;">' + escapeHtml(host) + '</div>' +
             '</td>' +
         '</tr></table>';
     }
@@ -170,14 +215,25 @@
     // 不用 flex 是刻意的 —— html2canvas 对 flexbox 的还原度不稳，
     // 而 table / 内联块在本项目 PDF 报告里已验证可靠。
     function buildHtml(cfg, data, qr) {
-        var rowsHtml = (data.rows || []).map(rowHtml).join('');
-        return '<div style="width:' + SHARE_IMAGE_WIDTH + 'px;box-sizing:border-box;padding:46px 44px 34px;' +
-                'background:linear-gradient(160deg,#eef4ff 0%,#ffffff 46%);' +
+        var rows = data.rows || [];
+        var rowsHtml = rows.map(function (row, index, arr) {
+            return rowHtml(row, index === arr.length - 1);
+        }).join('');
+
+        // 二维码区显示的 host 必须与二维码实际指向的域名一致（避免用户扫的是一个域名、看的是另一个域名）
+        var landingUrl = shareUrl();
+        var host = landingUrl.replace(/^https?:\/\//, '').split('/')[0];
+
+        // 两层结构：外层白底承载顶部品牌条，内层负责渐变底与留白 ——
+        // 品牌条必须通栏（不受 padding 约束），因此不能与内容共用一层。
+        return '<div style="width:' + SHARE_IMAGE_WIDTH + 'px;box-sizing:border-box;background:#ffffff;' +
                 'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',\'PingFang SC\',\'Microsoft YaHei\',sans-serif;color:#1f2937;">' +
+            '<div style="height:6px;background:linear-gradient(90deg,#2563eb 0%,#60a5fa 50%,#2563eb 100%);"></div>' +
+            '<div style="padding:42px 44px 34px;background:linear-gradient(160deg,#eef4ff 0%,#ffffff 46%);">' +
             '<table style="width:100%;"><tr>' +
                 '<td style="vertical-align:middle;">' +
-                    '<img src="' + LOGO_SRC + '" alt="" style="width:42px;height:42px;border-radius:10px;vertical-align:middle;margin-right:12px;" />' +
-                    '<span style="font-size:20px;font-weight:700;letter-spacing:.5px;vertical-align:middle;">EuriskoTax</span>' +
+                    '<img src="' + LOGO_SRC + '" alt="EuriskoTax" style="width:150px;height:auto;display:block;" />' +
+                    
                     '<div style="font-size:12px;color:#64748b;margin-top:4px;">个人所得税测算工具</div>' +
                 '</td>' +
                 '<td style="text-align:right;vertical-align:middle;">' +
@@ -185,16 +241,17 @@
                 '</td>' +
             '</tr></table>' +
 
-            '<div style="margin-top:38px;">' +
+            '<div style="margin-top:34px;background:#f4f8ff;border:1px solid #dbe7ff;border-left:6px solid #2563eb;border-radius:18px;padding:26px 30px;">' +
                 '<div style="font-size:15px;color:#64748b;">' + escapeHtml(data.heroLabel) + '</div>' +
                 '<div style="font-size:64px;font-weight:800;color:#1d4ed8;line-height:1.12;margin-top:8px;letter-spacing:-1px;">' + escapeHtml(data.heroValue) + '</div>' +
             '</div>' +
 
             '<table style="width:100%;border-collapse:collapse;margin-top:30px;">' + rowsHtml + '</table>' +
 
-            qrBlockHtml(qr, cfg.template) +
+            qrBlockHtml(qr, cfg.template, host) +
 
-            '<div style="margin-top:22px;font-size:12px;color:#94a3b8;">' + DISCLAIMER + '</div>' +
+            '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">' + DISCLAIMER + '</div>' +
+            '</div>' +
         '</div>';
     }
 
@@ -206,6 +263,58 @@
             img.onerror = function () { resolve(); };
             img.src = src;
         });
+    }
+
+    // 轻量提示条：替代浏览器原生 alert 对话框。
+    // 为什么必须换掉：Chrome 在用户多次触发后会静默屏蔽后续对话框
+    // （「阻止此页面创建更多对话框」），届时 alert 既不显示也不报错，
+    // 用户看到的就是「点了没反应」——最难排查的一类故障。
+    // 页面内提示不受该限制，且不阻塞主线程。
+    var TOAST_ID = 'share-card-toast';
+
+    // 提示条要落在「贴住视口顶部、且不与既有固定层重叠」的位置：
+    // 顶部导航栏（sticky）与离线 / 更新横幅都是贴顶固定元素，
+    // 一律压 top:16px 会叠在一起，所以按实际占位顺延。
+    function toastTopOffset() {
+        var offset = 16;
+        ['.compact-nav', '#offline-banner', '#sw-update-banner'].forEach(function (selector) {
+            var el = document.querySelector(selector);
+            if (!el) return;
+            var rect = el.getBoundingClientRect();
+            // 只顺延「真的贴在视口顶部」的元素（sticky 导航滚动后仍满足这一条件）
+            if (rect.height > 0 && rect.top <= 1) offset += rect.height;
+        });
+        return offset;
+    }
+
+    function showToast(message) {
+        var existing = document.getElementById(TOAST_ID);
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+        var toast = document.createElement('div');
+        toast.id = TOAST_ID;
+        toast.setAttribute('role', 'alert');
+        // 放在顶部：底部提示落在结果区与按钮的视线之外，用户很容易整条错过。
+        // z-index 高于预览遮罩(10000)与页面顶部横幅(9999)，保证任何情况下都可见。
+        toast.style.cssText = 'position:fixed;left:50%;z-index:10002;' +
+            'top:calc(' + toastTopOffset() + 'px + env(safe-area-inset-top, 0px));' +
+            'transform:translateX(-50%);max-width:88%;padding:12px 20px;border-radius:10px;' +
+            'background:rgba(15,23,42,.94);color:#fff;font-size:13px;line-height:1.5;text-align:center;' +
+            'box-shadow:0 10px 30px rgba(0,0,0,.25);';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        // 顶部静态出现的提示最容易被当成「页面本来就有的东西」而滑过去，补一个下滑入场
+        if (typeof toast.animate === 'function') {
+            toast.animate(
+                [{ opacity: 0, transform: 'translate(-50%,-12px)' }, { opacity: 1, transform: 'translate(-50%,0)' }],
+                { duration: 220, easing: 'ease-out' }
+            );
+        }
+
+        setTimeout(function () {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 3600);
     }
 
     function closePreview() {
@@ -272,18 +381,29 @@
         document.body.appendChild(mask);
     }
 
+    // 任何一条失败路径都必须有「用户可见 + 控制台可查」的反馈。
+    // 静默 return 是最坏的选择：用户只会说「点了没反应」，排查时无从下手。
     function generate(containerId) {
         var cfg = SOURCES[containerId];
-        if (!cfg) return;
+        if (!cfg) {
+            console.warn('[ShareCard] 未识别的结果容器，无法生成分享图:', containerId);
+            showToast('生成失败：未识别的结果类型，请刷新页面后重试');
+            return;
+        }
 
         if (!window.Capture || typeof window.Capture.captureHtml !== 'function') {
-            alert('生成组件未就绪，请刷新页面后重试');
+            console.warn('[ShareCard] 截图公共层 Capture 未就绪');
+            showToast('生成组件未就绪，请刷新页面后重试');
             return;
         }
 
         var data = collect(cfg);
         if (!data) {
-            alert('请先完成测算，再生成分享图');
+            // 把实际读到的值一并提示：用户一眼就知道该回去补哪一步，
+            // 而不是怀疑「按钮坏了」
+            var current = readText(cfg.hero.selector) || '空';
+            console.warn('[ShareCard] 结果为空，拒绝出图:', cfg.hero.selector, '=', current);
+            showToast('暂无可分享的结果（' + cfg.hero.label + '显示为 ' + current + '），请先完成一次测算');
             return;
         }
 
@@ -306,7 +426,7 @@
             })
             .catch(function (err) {
                 console.error('[ShareCard] 生成分享图失败:', err);
-                alert('生成分享图失败，请稍后重试');
+                showToast('生成分享图失败，请稍后重试');
             });
     }
 
@@ -316,8 +436,8 @@
                 '<i class="fa fa-picture-o text-blue-600"></i>' +
             '</div>' +
             '<div class="flex-1 min-w-0">' +
-                '<h3 class="font-semibold text-gray-800 text-sm">把结果生成一张图，分享给需要的人</h3>' +
-                '<p class="text-xs text-gray-600 mt-1">含税后收入的清晰长图，可直接发到群里</p>' +
+                '<h3 class="font-semibold text-gray-800 text-sm">生成一张结果长图，分享给需要的人</h3>' +
+                '<p class="text-xs text-gray-600 mt-1">含税后收入与税额明细，可直接转发到群聊或朋友圈</p>' +
             '</div>' +
             '<button type="button" class="share-card-btn btn btn-secondary text-xs px-4 py-1.5 rounded-lg whitespace-nowrap"' +
                 ' data-container="' + containerId + '">生成分享图</button>' +
@@ -375,6 +495,8 @@
         buildHtml: buildHtml,
         collect: collect,
         generate: generate,
-        shareUrl: shareUrl
+        shareUrl: shareUrl,
+        setShareBaseUrl: setShareBaseUrl,
+        showToast: showToast
     };
 })();

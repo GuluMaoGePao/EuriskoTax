@@ -1,5 +1,5 @@
 // EuriskoTax Admin Console（运维后台）
-// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码 / 内容中心；所有请求带 X-Admin-Token。
+// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码 / 内容中心 / 税制参数 / 城市社保参数；所有请求带 X-Admin-Token。
 
 const TOKEN_KEY = 'eurisko_admin_token';
 
@@ -16,6 +16,13 @@ const STATUS_META = {
 };
 const SOURCE_META = { seed: '种子授权', invite: '兑换码', admin: '管理员', purchase: '购买' };
 const TYPE_META = { comprehensive: '综合所得', business: '经营所得', classification: '分类所得', reverse: '反向倒算' };
+
+// 专业版兑换码状态（与后端 proCodeService.listCodes 的 status 口径一致）
+const PROCODE_STATUS_META = {
+    available: { label: '可用', cls: 'bg-green-50 text-green-700 border-green-200' },
+    used: { label: '已兑换', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    disabled: { label: '已作废', cls: 'bg-gray-100 text-gray-500 border-gray-200' }
+};
 
 // 线索跟进状态机（顺序即漏斗，与后端 leadAdminController.LEAD_STATUSES 一致）
 const LEAD_STATUS_META = {
@@ -48,13 +55,17 @@ const state = {
     token: '',
     tab: 'overview',
     users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
+    // 专业版兑换码（阶段14 变现）：batch/status 为服务端筛选条件，counts 为全局三类计数
+    proCodes: { batch: '', status: '', total: 0, items: [], availableCount: 0, usedCount: 0, disabledCount: 0 },
     leads: { status: '', source: '', q: '', offset: 0, limit: 20, total: 0, items: [], byStatus: {} },
     content: { type: '', status: '', audience: '', q: '', offset: 0, limit: 50, total: 0, items: [], editingId: null },
     // 排障话术库：source = 'api'（数据来自数据库，可编辑）/ 'offline'（接口不可用时的兜底快照，只读）
     support: { items: [], source: 'api', editingId: null },
     // 税制参数（阶段12 C1）：model 为当前编辑态，modelOriginal 用于「载入当前生效值」回退，
     // defaults 为服务端下发的出厂基线（库中尚无自定义配置时的编辑初始值）
-    taxrates: { history: [], defaults: null, model: null, modelOriginal: null, notify: { enabled: false, placements: ['modal', 'notice_list'] } }
+    taxrates: { history: [], defaults: null, model: null, modelOriginal: null, notify: { enabled: false, placements: ['modal', 'notice_list'] } },
+    // 城市社保参数库（阶段14 C2）：结构同 taxrates，model.config 形如 { constantsVersion, defaultCity, cities[] }
+    citysocial: { history: [], defaults: null, model: null, modelOriginal: null, notify: { enabled: false, placements: ['modal', 'notice_list'] } }
 };
 
 // ---------- 基础工具 ----------
@@ -184,8 +195,10 @@ function switchTab(tab) {
     else if (tab === 'leads') loadLeads(true);
     else if (tab === 'users') loadUsers(true);
     else if (tab === 'invites') loadInvites();
+    else if (tab === 'procodes') loadProCodes();
     else if (tab === 'content') loadContent(true);
     else if (tab === 'taxrates') loadTaxRates();
+    else if (tab === 'citysocial') loadCitySocial();
     else if (tab === 'support') loadSupport();
 }
 
@@ -496,7 +509,7 @@ function renderInvites(d) {
                 <span class="text-[10px] text-gray-400 hidden sm:inline">${fmtShort(it.createdAt)}</span>
                 <button data-act="copy-code" data-code="${esc(it.code)}" class="text-[11px] text-blue-600 hover:text-blue-800 px-1.5 py-1 rounded"><i class="fa fa-copy"></i></button>
             </div>`).join('')
-        : '<p class="py-6 text-center text-gray-400 text-xs">暂无可用兑换码</p>';
+        : '<p class="py-6 text-center text-gray-400 text-xs">暂无可用邀请码，点右上角「生成邀请码」创建</p>';
     const used = Array.isArray(d.used) ? d.used : [];
     $('#invite-used').innerHTML = used.length
         ? used.map((it) => `
@@ -505,7 +518,7 @@ function renderInvites(d) {
                 <span class="text-[11px] text-gray-400">→ ${esc(it.usedBy)}</span>
                 <span class="text-[10px] text-gray-300">${fmtShort(it.usedAt)}</span>
             </div>`).join('')
-        : '<p class="py-6 text-center text-gray-400 text-xs">暂无已使用的兑换码</p>';
+        : '<p class="py-6 text-center text-gray-400 text-xs">暂无已使用的邀请码</p>';
 }
 
 async function generateInvites() {
@@ -513,7 +526,7 @@ async function generateInvites() {
     const count = Number.isInteger(raw) && raw >= 1 && raw <= 100 ? raw : 5;
     try {
         const d = await api('/invites', { method: 'POST', body: JSON.stringify({ count }) });
-        toast(`已生成 ${d.createdCount} 个兑换码`, 'success');
+        toast(`已生成 ${d.createdCount} 个注册邀请码`, 'success');
         loadInvites();
     } catch (err) {
         reportError(err, '生成失败');
@@ -536,6 +549,138 @@ async function copyText(text, okMsg) {
         }
         toast(okMsg || '已复制', 'success');
     } catch { /* fallthrough */ }
+}
+
+// ---------- 专业版兑换码（阶段14 变现 · 线下收款授权） ----------
+// 与上面的「邀请码」（注册用）区分：这里的码是给已注册用户开通专业版的付费凭证。
+async function loadProCodes() {
+    const tbody = $('#procode-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载中…</td></tr>';
+    try {
+        const params = new URLSearchParams();
+        if (state.proCodes.batch) params.set('batch', state.proCodes.batch);
+        if (state.proCodes.status) params.set('status', state.proCodes.status);
+        params.set('limit', '200');
+        renderProCodes(await api(`/admin/pro-codes?${params.toString()}`));
+    } catch (err) {
+        if (tbody) tbody.innerHTML = '';
+        reportError(err, '兑换码加载失败');
+    }
+}
+
+function renderProCodes(d) {
+    state.proCodes.items = Array.isArray(d.items) ? d.items : [];
+    state.proCodes.total = d.total || 0;
+    state.proCodes.availableCount = d.availableCount || 0;
+    state.proCodes.usedCount = d.usedCount || 0;
+    state.proCodes.disabledCount = d.disabledCount || 0;
+
+    $('#procode-available-badge').textContent = d.availableCount ?? 0;
+    $('#procode-used-badge').textContent = d.usedCount ?? 0;
+    $('#procode-disabled-badge').textContent = d.disabledCount ?? 0;
+
+    const items = state.proCodes.items;
+    const tbody = $('#procode-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = items.length ? items.map((it) => {
+        const meta = PROCODE_STATUS_META[it.status] || { label: it.status, cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+        const validity = it.permanent ? '<span class="text-purple-600 font-medium">永久</span>' : `${it.durationDays} 天`;
+        const owner = it.usedByName
+            ? `${esc(it.usedByName)} <span class="text-gray-400">#${it.usedBy}</span>`
+            : (it.usedBy !== null && it.usedBy !== undefined ? `<span class="text-gray-400">#${it.usedBy}</span>` : '—');
+        const ownerMeta = it.usedAt ? `<div class="text-[10px] text-gray-300">${fmtShort(it.usedAt)}</div>` : '';
+        // 已兑换的码为收款凭证，不允许作废（后端亦会拒绝）
+        const op = it.status === 'used'
+            ? '<span class="text-xs text-gray-300">—</span>'
+            : `<button data-act="toggle-procode" data-id="${it.id}" data-disabled="${it.disabled ? 'true' : 'false'}" class="px-2.5 py-1 rounded-lg text-xs ${it.disabled ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}"><i class="fa ${it.disabled ? 'fa-rotate-left' : 'fa-ban'} mr-1"></i>${it.disabled ? '恢复' : '作废'}</button>`;
+        return `<tr class="hover:bg-gray-50">
+            <td class="py-2 pr-3"><span class="mono text-xs text-gray-800 select-all">${esc(it.code)}</span>
+                <button data-act="copy-procode" data-code="${esc(it.code)}" class="text-[11px] text-blue-600 hover:text-blue-800 px-1 ml-1 rounded"><i class="fa fa-copy"></i></button></td>
+            <td class="py-2 pr-3"><span class="text-xs border rounded-full px-2 py-0.5 ${meta.cls}">${meta.label}</span></td>
+            <td class="py-2 pr-3 text-xs text-gray-600">${validity}</td>
+            <td class="py-2 pr-3 text-xs text-gray-500">${it.batch ? esc(it.batch) : '—'}</td>
+            <td class="py-2 pr-3 text-xs text-gray-500">${it.note ? esc(it.note) : '—'}</td>
+            <td class="py-2 pr-3 text-xs text-gray-700">${owner}${ownerMeta}</td>
+            <td class="py-2 text-right">${op}</td>
+        </tr>`;
+    }).join('') : '<tr><td colspan="7">没有匹配的兑换码：可调整上方筛选条件，或先在上方「生成新兑换码」中创建</td></tr>';
+}
+
+async function generateProCodes() {
+    const rawCount = Number($('#procode-count').value);
+    if (!Number.isInteger(rawCount) || rawCount < 1 || rawCount > 200) {
+        return toast('数量需为 1-200 的整数', 'error');
+    }
+    const daysRaw = ($('#procode-days').value || '').trim();
+    let durationDays = null;
+    if (daysRaw !== '') {
+        durationDays = Number(daysRaw);
+        if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3650) {
+            return toast('天数需为 1-3650 的整数，留空表示永久', 'error');
+        }
+    }
+    const batch = ($('#procode-batch').value || '').trim();
+    const note = ($('#procode-note').value || '').trim();
+    try {
+        const d = await api('/admin/pro-codes', {
+            method: 'POST',
+            body: JSON.stringify({ count: rawCount, durationDays, batch: batch || null, note })
+        });
+        toast(`已生成 ${d.createdCount} 个${durationDays === null ? '永久' : ` ${durationDays} 天`}兑换码`, 'success');
+        loadProCodes();
+    } catch (err) {
+        reportError(err, '生成失败');
+    }
+}
+
+function filterProCodes() {
+    state.proCodes.batch = ($('#procode-batch-filter').value || '').trim();
+    state.proCodes.status = $('#procode-status-filter').value || '';
+    loadProCodes();
+}
+
+async function toggleProCode(id, disabled) {
+    const action = disabled ? '作废' : '恢复';
+    if (disabled && !confirm(`确认作废兑换码 #${id}？作废后客户将无法再兑换（已兑换的码不受影响）。`)) return;
+    try {
+        await api(`/admin/pro-codes/${id}`, { method: 'PATCH', body: JSON.stringify({ disabled }) });
+        toast(`已${action}兑换码 #${id}`, 'success');
+        loadProCodes();
+    } catch (err) {
+        reportError(err, `${action}失败`);
+    }
+}
+
+async function exportProCodes() {
+    const params = new URLSearchParams();
+    const batch = ($('#procode-batch-filter').value || '').trim();
+    if (batch) params.set('batch', batch);
+    const qs = params.toString();
+    try {
+        const res = await fetch(`/api/admin/pro-codes/export${qs ? `?${qs}` : ''}`, { headers: headers() });
+        if (!res.ok) {
+            let msg = `导出失败（HTTP ${res.status}）`;
+            // 正常导出是 CSV，出错才是 JSON 错误体，不能无脑 res.json()
+            try { const b = await res.json(); if (b && b.error && b.error.message) msg = b.error.message; } catch { /* 非 JSON 错误体 */ }
+            const e = new Error(msg);
+            e.status = res.status;
+            throw e;
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename="?([^";]+)"?/i);
+        const filename = m ? m[1] : 'pro-codes.csv';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+        toast(`已导出 ${filename}`, 'success');
+    } catch (err) {
+        reportError(err, '导出失败');
+    }
 }
 
 // ---------- Lightbox ----------
@@ -1535,6 +1680,361 @@ async function rollbackTaxRates(id, version) {
     }
 }
 
+// ---------- 社保基数（阶段14 C2：城市社保参数库 + 版本化 + 可选公告联动） ----------
+// 与「税率」Tab 同构（同一套版本化快照 + 热更新 + 回滚 + 公告联动），差异只在配置内容：
+// 税率是一组阶梯表，这里是「城市列表」，故编辑器改成一城一行的可增删表格。
+const CS_INPUT = TR_INPUT;
+// 兜底城市编码：与后端 citySocialService.FALLBACK_CITY 一致，不可删除
+const CS_FALLBACK_CITY = 'national';
+
+function csPctList(list) {
+    return (Array.isArray(list) ? list : []).join(',');
+}
+
+function csCityRow(c, i) {
+    const isFallback = c.code === CS_FALLBACK_CITY;
+    return `<tr class="border-t border-gray-100">
+        <td class="px-2 py-2"><input data-cs="${i}|code" class="${CS_INPUT} w-32 mono" value="${esc(c.code || '')}" placeholder="beijing"></td>
+        <td class="px-2 py-2"><input data-cs="${i}|name" class="${CS_INPUT} w-28" value="${esc(c.name || '')}" placeholder="北京"></td>
+        <td class="px-2 py-2"><input type="number" step="any" data-cs="${i}|socialBaseMin" class="${CS_INPUT} w-28" value="${c.socialBaseMin ?? ''}" placeholder="元/月"></td>
+        <td class="px-2 py-2"><input type="number" step="any" data-cs="${i}|socialBaseMax" class="${CS_INPUT} w-28" value="${c.socialBaseMax ?? ''}" placeholder="留空=无上限"></td>
+        <td class="px-2 py-2"><input type="number" step="any" data-cs="${i}|housingBaseMin" class="${CS_INPUT} w-28" value="${c.housingBaseMin ?? ''}" placeholder="元/月"></td>
+        <td class="px-2 py-2"><input type="number" step="any" data-cs="${i}|housingBaseMax" class="${CS_INPUT} w-28" value="${c.housingBaseMax ?? ''}" placeholder="留空=无上限"></td>
+        <td class="px-2 py-2"><input data-cs="${i}|housingFundRateOptions" class="${CS_INPUT} w-24" value="${esc(csPctList(c.housingFundRateOptions))}" placeholder="5,7"></td>
+        <td class="px-2 py-2"><input data-cs="${i}|note" class="${CS_INPUT} w-40" value="${esc(c.note || '')}" placeholder="口径来源 / 备注"></td>
+        <td class="px-2 py-2 text-right">
+            ${isFallback
+        ? '<span class="text-[11px] text-gray-400 whitespace-nowrap">兜底城市</span>'
+        : `<button data-act="citysocial-del" data-id="${i}" class="px-2 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 whitespace-nowrap"><i class="fa fa-trash-o"></i></button>`}
+        </td>
+    </tr>`;
+}
+
+function citySocialEditorHtml(model) {
+    const cfg = model.config || {};
+    const cities = cfg.cities || [];
+    const n = state.citysocial.notify || {};
+    const placements = TR_PLACEMENTS.map((p) => `<label class="inline-flex items-center gap-1.5 text-xs text-gray-600 mr-3">
+        <input type="checkbox" data-cs-placement="${p.key}" ${(n.placements || []).includes(p.key) ? 'checked' : ''}>${p.label}
+    </label>`).join('');
+    // 默认城市下拉：只能从已填编码的城市里选（空白新行不参与）
+    const codeOptions = cities
+        .filter((c) => c.code)
+        .map((c) => `<option value="${esc(c.code)}" ${c.code === cfg.defaultCity ? 'selected' : ''}>${esc(c.code)}（${esc(c.name || '未命名')}）</option>`)
+        .join('');
+
+    return `<div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 class="text-sm font-bold text-gray-800">编辑配置 <span class="text-xs font-normal text-gray-400">（${esc(model.sourceLabel || '')}）</span></h3>
+            <span class="text-[11px] text-gray-400">当前生效版本：${esc(model.sourceVersion || '—')}</span>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <label class="block"><span class="text-xs text-gray-500">参数版本号（随配置下发，用于用户端展示）</span>
+                <input id="cs-f-constants-version" class="${CS_INPUT} mt-1" value="${esc(cfg.constantsVersion || '')}" placeholder="如 2026.1">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">版本号（留空自动生成 YYYY.MM.DD-N）</span>
+                <input id="cs-f-version" class="${CS_INPUT} mt-1" value="${esc(model.version || '')}" placeholder="如 2026.09.13-1">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">变更说明（写入版本历史）</span>
+                <input id="cs-f-note" class="${CS_INPUT} mt-1" value="${esc(model.note || '')}" placeholder="如：按 2026 年度社保基数口径更新 12 城">
+            </label>
+            <label class="block"><span class="text-xs text-gray-500">默认城市（用户未选择时使用）</span>
+                <select id="cs-f-default-city" class="${CS_INPUT} mt-1">${codeOptions}</select>
+            </label>
+        </div>
+        <div class="overflow-x-auto border border-gray-100 rounded-lg mb-2">
+            <table class="w-full text-xs whitespace-nowrap">
+                <thead class="bg-gray-50 text-gray-500">
+                    <tr>
+                        <th class="text-left px-2 py-2">编码</th>
+                        <th class="text-left px-2 py-2">城市</th>
+                        <th class="text-left px-2 py-2">社保下限</th>
+                        <th class="text-left px-2 py-2">社保上限</th>
+                        <th class="text-left px-2 py-2">公积金下限</th>
+                        <th class="text-left px-2 py-2">公积金上限</th>
+                        <th class="text-left px-2 py-2">公积金比例 %</th>
+                        <th class="text-left px-2 py-2">备注</th>
+                        <th class="text-right px-2 py-2">操作</th>
+                    </tr>
+                </thead>
+                <tbody>${cities.map((c, i) => csCityRow(c, i)).join('')}</tbody>
+            </table>
+        </div>
+        <div class="flex items-center justify-between gap-2 mb-4">
+            <p class="text-[11px] text-gray-400">基数单位：元/月。上限留空=不设上限；公积金比例用英文逗号分隔（如 5,7）。</p>
+            <button data-act="citysocial-add" class="bg-gray-100 text-gray-600 text-xs rounded-lg px-3 py-1.5 hover:bg-gray-200"><i class="fa fa-plus mr-1"></i>新增城市</button>
+        </div>
+        <div class="border-t border-gray-100 pt-4 mb-4">
+            <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" id="cs-f-notify-enabled" ${n.enabled ? 'checked' : ''}>
+                同步发送更新公告（保存后发布一条公告，复用内容中心投放）
+            </label>
+            <div id="cs-notify-fields" class="${n.enabled ? '' : 'hidden'} mt-3 space-y-2">
+                <input id="cs-f-notify-title" class="${CS_INPUT}" value="${esc(n.title || '')}" placeholder="公告标题（留空自动生成）">
+                <input id="cs-f-notify-summary" class="${CS_INPUT}" value="${esc(n.summary || '')}" placeholder="摘要（留空自动生成）">
+                <textarea id="cs-f-notify-body" rows="3" class="${CS_INPUT}" placeholder="正文（留空同摘要）">${esc(n.body || '')}</textarea>
+                <div class="pt-1">${placements}</div>
+            </div>
+        </div>
+        <div id="cs-status-inline" class="hidden mb-3 text-xs"></div>
+        <div class="flex items-center gap-2">
+            <button data-act="citysocial-save" class="bg-primary text-white text-sm font-medium rounded-lg px-4 py-2 hover:opacity-90"><i class="fa fa-cloud-upload mr-1"></i>保存并发布</button>
+            <button data-act="citysocial-loaddefault" class="bg-gray-100 text-gray-600 text-sm rounded-lg px-4 py-2 hover:bg-gray-200"><i class="fa fa-undo mr-1"></i>载入出厂基线</button>
+        </div>
+    </div>`;
+}
+
+// 状态反馈同时写入「Tab 顶部」与「保存按钮上方」两处（原因同税率页：编辑器很长，只写顶部会看不到反馈）
+function setCitySocialStatus(html) {
+    const text = html || '';
+    ['#citysocial-status', '#cs-status-inline'].forEach((sel) => {
+        const el = $(sel);
+        if (!el) return;
+        el.innerHTML = text;
+        el.classList.toggle('hidden', !text);
+    });
+}
+
+function scrollToCitySocialStatus() {
+    const el = $('#cs-status-inline') || $('#citysocial-status');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function renderCitySocialHistory() {
+    const box = $('#citysocial-history');
+    if (!box) return;
+    const items = state.citysocial.history || [];
+    box.innerHTML = items.length ? items.map((h) => `<div class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2">
+        <div class="min-w-0">
+            <div class="text-xs font-semibold text-gray-700">${esc(h.version)}
+                <span class="ml-1 text-[11px] ${h.status === 'published' ? 'text-green-600' : 'text-gray-400'}">${h.status === 'published' ? '生效中' : '历史'}</span>
+            </div>
+            <div class="text-[11px] text-gray-400 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
+        </div>
+        <button data-act="citysocial-rollback" data-id="${h.id}" data-version="${esc(h.version)}" ${h.status === 'published' ? 'disabled' : ''}
+            class="shrink-0 px-2.5 py-1.5 rounded-lg text-xs ${h.status === 'published' ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}">
+            <i class="fa fa-history mr-1"></i>回滚到此版本
+        </button>
+    </div>`).join('') : '<div class="text-xs text-gray-400">暂无历史版本（首次发布后出现）</div>';
+}
+
+function renderCitySocial() {
+    const box = $('#citysocial-editor');
+    if (!box) return;
+    box.innerHTML = state.citysocial.model
+        ? citySocialEditorHtml(state.citysocial.model)
+        : '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">暂无城市社保配置</div>';
+    renderCitySocialHistory();
+}
+
+async function loadCitySocial() {
+    const box = $('#citysocial-editor');
+    if (box) box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载城市社保配置中…</div>';
+    setCitySocialStatus('');
+    try {
+        const d = await api('/admin/city-social');
+        const st = state.citysocial;
+        st.defaults = d.defaults || null;
+        st.history = d.history || [];
+        const hasCustom = !!(d.current && d.current.payload);
+        const config = hasCustom ? d.current.payload : st.defaults;
+        // 版本号一律留空，由后端按 YYYY.MM.DD-N 自动生成（version 在库中唯一，预填会撞号被 400 拒绝）
+        st.modelOriginal = {
+            version: '',
+            note: hasCustom ? (d.current.note || '') : '',
+            config: JSON.parse(JSON.stringify(config || { cities: [] })),
+            sourceLabel: hasCustom ? `线上生效版本 ${d.current.version}` : '出厂基线（尚未发布过自定义配置）',
+            sourceVersion: hasCustom ? d.current.version : '（出厂基线）'
+        };
+        st.model = JSON.parse(JSON.stringify(st.modelOriginal));
+        st.notify = { enabled: false, placements: ['modal', 'notice_list'] };
+        renderCitySocial();
+    } catch (err) {
+        reportError(err, '城市社保配置加载失败');
+        if (box) box.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">加载失败，请重试</div>';
+    }
+}
+
+function collectCitySocialForm() {
+    const cities = [];
+    document.querySelectorAll('[data-cs]').forEach((el) => {
+        const [idx, field] = el.dataset.cs.split('|');
+        const i = Number(idx);
+        if (!cities[i]) cities[i] = {};
+        const v = (el.value || '').trim();
+        if (field === 'housingFundRateOptions') {
+            // 留空 → 不传，由后端回落默认 [5,7]；非数字项被过滤（前端校验会提示）
+            const list = v ? v.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n)) : [];
+            if (list.length) cities[i][field] = list;
+        } else if (field === 'code' || field === 'name' || field === 'note') {
+            cities[i][field] = v;
+        } else {
+            // 基数：留空 → null（上限=不设上限；下限留空会被前端校验拦下）
+            cities[i][field] = v === '' ? null : Number(v);
+        }
+    });
+    const defEl = $('#cs-f-default-city');
+    return {
+        constantsVersion: (($('#cs-f-constants-version') || {}).value || '').trim(),
+        defaultCity: defEl ? defEl.value : '',
+        cities: cities.filter(Boolean)
+    };
+}
+
+function collectCitySocialNotify() {
+    const enabled = !!($('#cs-f-notify-enabled') && $('#cs-f-notify-enabled').checked);
+    const placements = [];
+    document.querySelectorAll('[data-cs-placement]').forEach((el) => { if (el.checked) placements.push(el.dataset.csPlacement); });
+    return {
+        enabled,
+        title: $('#cs-f-notify-title') ? $('#cs-f-notify-title').value.trim() : '',
+        summary: $('#cs-f-notify-summary') ? $('#cs-f-notify-summary').value.trim() : '',
+        body: $('#cs-f-notify-body') ? $('#cs-f-notify-body').value.trim() : '',
+        placements
+    };
+}
+
+// 前端预校验：与后端 citySocialService.prepareCitySocial 同口径，
+// 目的是把错误在点击瞬间就报给运维（后端仍会再校验一次，前端校验不是安全边界）
+function validateCitySocialForm(config) {
+    const errors = [];
+    const cities = config.cities || [];
+    if (!cities.length) errors.push('城市列表：不能为空（至少保留一个城市）');
+    const seen = new Set();
+    cities.forEach((c, i) => {
+        const tag = `${c.name || c.code || `第 ${i + 1} 行`}`;
+        const code = String(c.code || '');
+        if (!/^[a-z][a-z0-9_-]{1,31}$/.test(code)) {
+            errors.push(`${tag}：编码须为小写字母开头、仅含小写字母/数字/_/-，长度 2-32`);
+        } else if (seen.has(code)) {
+            errors.push(`${tag}：编码重复「${code}」`);
+        }
+        seen.add(code);
+        if (!String(c.name || '').trim()) errors.push(`${tag}：城市名称不能为空`);
+        if (!Number.isFinite(c.socialBaseMin) || c.socialBaseMin < 0) errors.push(`${tag}：社保基数下限须 ≥ 0`);
+        if (!Number.isFinite(c.housingBaseMin) || c.housingBaseMin < 0) errors.push(`${tag}：公积金基数下限须 ≥ 0`);
+        if (c.socialBaseMax !== null && (!Number.isFinite(c.socialBaseMax) || c.socialBaseMax < c.socialBaseMin)) {
+            errors.push(`${tag}：社保基数上限须 ≥ 下限（留空=不设上限）`);
+        }
+        if (c.housingBaseMax !== null && (!Number.isFinite(c.housingBaseMax) || c.housingBaseMax < c.housingBaseMin)) {
+            errors.push(`${tag}：公积金基数上限须 ≥ 下限（留空=不设上限）`);
+        }
+        (c.housingFundRateOptions || []).forEach((r) => {
+            if (!Number.isFinite(r) || r <= 0 || r > 100) errors.push(`${tag}：公积金比例须在 (0, 100] 之间`);
+        });
+    });
+    const codes = cities.map((c) => c.code);
+    if (codes.length && !codes.includes(CS_FALLBACK_CITY)) {
+        errors.push(`城市列表：必须保留编码为 ${CS_FALLBACK_CITY} 的兜底城市`);
+    }
+    if (config.defaultCity && !codes.includes(config.defaultCity)) {
+        errors.push(`默认城市「${config.defaultCity}」不在城市列表中`);
+    }
+    return errors;
+}
+
+// 增删城市前先把表单收进 model，否则重渲染会丢掉用户刚输入的值
+function addCitySocialRow() {
+    const st = state.citysocial;
+    if (!st.model) return;
+    st.model.config = collectCitySocialForm();
+    st.model.config.cities.push({
+        code: '', name: '', socialBaseMin: null, socialBaseMax: null,
+        housingBaseMin: null, housingBaseMax: null, housingFundRateOptions: [5, 7], note: ''
+    });
+    renderCitySocial();
+}
+
+function removeCitySocialRow(idx) {
+    const st = state.citysocial;
+    if (!st.model) return;
+    st.model.config = collectCitySocialForm();
+    const target = st.model.config.cities[idx];
+    if (!target) return;
+    if (target.code === CS_FALLBACK_CITY) {
+        toast('兜底城市 national 不可删除（用户未选择城市时的回落口径）', 'error');
+        return;
+    }
+    if (!confirm(`确认移除城市「${target.name || target.code}」？\n\n移除并发布后，已选该城市的用户将自动回落到默认城市。`)) return;
+    st.model.config.cities.splice(idx, 1);
+    renderCitySocial();
+}
+
+function resetCitySocialForm() {
+    const st = state.citysocial;
+    if (!st.modelOriginal) return;
+    st.model = JSON.parse(JSON.stringify(st.modelOriginal));
+    st.notify = { enabled: false, placements: ['modal', 'notice_list'] };
+    renderCitySocial();
+    toast('已载入当前生效值', 'info');
+}
+
+function loadDefaultCitySocial() {
+    const st = state.citysocial;
+    if (!st.defaults) return;
+    if (!confirm('将用「出厂基线」覆盖当前表单（不会立即生效，需再点「保存并发布」）。确认继续？')) return;
+    st.model = {
+        version: '',
+        note: '',
+        config: JSON.parse(JSON.stringify(st.defaults)),
+        sourceLabel: '出厂基线（尚未保存）',
+        sourceVersion: (st.modelOriginal && st.modelOriginal.sourceVersion) || '（出厂基线）'
+    };
+    renderCitySocial();
+    toast('已载入出厂基线，确认无误后点「保存并发布」', 'info');
+}
+
+function updateCitySocialNotifyFields() {
+    const cb = $('#cs-f-notify-enabled');
+    const box = $('#cs-notify-fields');
+    if (cb && box) box.classList.toggle('hidden', !cb.checked);
+}
+
+async function saveCitySocial() {
+    const config = collectCitySocialForm();
+    const version = ($('#cs-f-version').value || '').trim();
+    const note = ($('#cs-f-note').value || '').trim();
+    const errors = validateCitySocialForm(config);
+    if (errors.length) {
+        const msg = `${errors[0]}${errors.length > 1 ? ` （共 ${errors.length} 项问题）` : ''}`;
+        setCitySocialStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(msg)}</span>`);
+        toast(msg, 'error');
+        scrollToCitySocialStatus();
+        return;
+    }
+    const notify = collectCitySocialNotify();
+    state.citysocial.notify = notify;
+    const payload = { version, note, config };
+    if (notify.enabled) payload.notify = notify;
+
+    if (!confirm(`确认发布城市社保版本「${version || '（自动生成）'}」？\n\n保存后立即对所有用户生效。${notify.enabled ? '\n并会同步发送一条更新公告。' : ''}`)) return;
+
+    setCitySocialStatus('<span class="text-gray-500"><i class="fa fa-spinner fa-spin mr-1"></i>发布中…</span>');
+    try {
+        const d = await api('/admin/city-social', { method: 'POST', body: JSON.stringify(payload) });
+        toast(`已发布城市社保版本 ${d.config.version}${d.release ? '，并已发送公告' : ''}`, 'success');
+        loadCitySocial();
+    } catch (err) {
+        const detail = (err.details && err.details.length) ? err.details.slice(0, 3).join('；') : err.message;
+        setCitySocialStatus(`<span class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i>${esc(detail)}</span>`);
+        scrollToCitySocialStatus();
+        if (err.status === 401) reportError(err);
+        else toast(detail, 'error');
+    }
+}
+
+async function rollbackCitySocial(id, version) {
+    if (id == null) return;
+    if (!confirm(`确认回滚到版本「${version || id}」？\n\n将以该版本配置另存为一个新版本（历史保留，可再次回滚）。`)) return;
+    try {
+        const d = await api('/admin/city-social/rollback', { method: 'POST', body: JSON.stringify({ id }) });
+        toast(`已回滚，新版本 ${d.config.version}`, 'success');
+        loadCitySocial();
+    } catch (err) {
+        reportError(err, '回滚失败');
+    }
+}
+
 // ---------- 线索（阶段13C：漏斗 + 列表 + 状态机 + 分配 + 导出） ----------
 function leadQuery() {
     const s = state.leads;
@@ -1823,7 +2323,12 @@ async function handleAction(e) {
         return applyUserPlan(Number(id), { plan: 'free' }, `将把用户 #${id} 回落为基础版（云端历史数据不受影响，仅停用同步等专业功能）。`);
     }
     if (name === 'gen-invites') return back(generateInvites());
-    if (name === 'copy-code') return back(copyText(act.dataset.code, '兑换码已复制'));
+    if (name === 'copy-code') return back(copyText(act.dataset.code, '邀请码已复制'));
+    if (name === 'gen-procodes') return back(generateProCodes());
+    if (name === 'filter-procodes') return filterProCodes();
+    if (name === 'export-procodes') return back(exportProCodes());
+    if (name === 'toggle-procode') return back(toggleProCode(Number(id), act.dataset.disabled !== 'true'));
+    if (name === 'copy-procode') return back(copyText(act.dataset.code, '兑换码已复制'));
     if (name === 'search-content') return back(loadContent(true));
     if (name === 'new-content') return openContentEditor(null);
     if (name === 'content-edit') return openContentEditor(Number(id));
@@ -1838,6 +2343,13 @@ async function handleAction(e) {
     if (name === 'taxrates-loaddefault') return loadDefaultTaxRates();
     if (name === 'taxrates-save') return back(saveTaxRates());
     if (name === 'taxrates-rollback') return back(rollbackTaxRates(Number(id), act.dataset.version));
+    if (name === 'citysocial-refresh') return back(loadCitySocial());
+    if (name === 'citysocial-reset') return resetCitySocialForm();
+    if (name === 'citysocial-loaddefault') return loadDefaultCitySocial();
+    if (name === 'citysocial-add') return addCitySocialRow();
+    if (name === 'citysocial-del') return removeCitySocialRow(Number(id));
+    if (name === 'citysocial-save') return back(saveCitySocial());
+    if (name === 'citysocial-rollback') return back(rollbackCitySocial(Number(id), act.dataset.version));
     if (name === 'refresh-leads') return back(loadLeads());
     if (name === 'search-leads') return back(loadLeads(true));
     if (name === 'leads-export') return back(exportLeads());
@@ -1861,6 +2373,13 @@ function init() {
     $('#users-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadUsers(true); });
     $('#users-plan-filter').addEventListener('change', () => loadUsers(true));
     $('#invite-count').addEventListener('keydown', (e) => { if (e.key === 'Enter') generateInvites(); });
+
+    // 专业版兑换码：状态下拉变更即筛选，批次回车筛选，数量回车生成
+    $('#procode-status-filter').addEventListener('change', () => filterProCodes());
+    $('#procode-batch-filter').addEventListener('keydown', (e) => { if (e.key === 'Enter') filterProCodes(); });
+    ['#procode-count', '#procode-days'].forEach((sel) => {
+        $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') generateProCodes(); });
+    });
 
     // 线索：下拉变更即查询，关键词回车查询
     $('#leads-status-filter').addEventListener('change', () => loadLeads(true));
@@ -1905,6 +2424,7 @@ function init() {
         const leadSel = e.target.closest('[data-lead-status]');
         if (leadSel) updateLeadStatus(Number(leadSel.dataset.leadStatus), leadSel.value);
         if (e.target && e.target.id === 'tr-f-notify-enabled') updateNotifyFieldsVisibility();
+        if (e.target && e.target.id === 'cs-f-notify-enabled') updateCitySocialNotifyFields();
     });
 
     // 记住的令牌直接进入

@@ -19,8 +19,12 @@ const contentAdminRoutes = require('./routes/contentAdmin');
 const supportAdminRoutes = require('./routes/supportAdmin');
 const taxRateRoutes = require('./routes/taxRates');
 const taxRateAdminRoutes = require('./routes/taxRateAdmin');
+const citySocialRoutes = require('./routes/citySocial');
+const citySocialAdminRoutes = require('./routes/citySocialAdmin');
 const leadRoutes = require('./routes/leads');
 const leadAdminRoutes = require('./routes/leadAdmin');
+const proCodeRoutes = require('./routes/proCodes');
+const proCodeAdminRoutes = require('./routes/proCodeAdmin');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -102,12 +106,12 @@ const contentLimiter = rateLimit({
     }
 });
 
-// 税制参数限流：60 次/分钟/IP（阶段12 C1 公开只读端点 /tax-rates）。
-// 端上仅在启动/登录时拉取一次并以 localStorage 缓存，宽松上限只挡批量刷取
+// 税制参数限流：60 次/分钟/IP（阶段12 C1 公开只读端点 /tax-rates；
+// 阶段14 C2 新增同族只读端点 /city-social，与税率配置同属「启动拉一次 + localStorage 缓存」的低频读取）
 const configLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 60,
-    skip: (req) => req.path !== '/tax-rates',
+    skip: (req) => !['/tax-rates', '/city-social'].includes(req.path),
     message: {
         success: false,
         error: { message: '请求过于频繁，请稍后再试', statusCode: 429 }
@@ -139,6 +143,20 @@ const funnelLimiter = rateLimit({
     message: {
         success: false,
         error: { message: '操作过于频繁，请稍后再试', statusCode: 429 }
+    }
+});
+
+// 专业版兑换码限流（阶段14）：10 次/15 分钟/IP（仅计 /redeem）。
+// 兑换码是可被枚举的凭证（8 位 × 29 字符集 ≈ 5.0e11 组合），必须有速率限制兜底：
+// 兑换对真人是一辈子的低频动作，10 次额度完全无感，却把脚本枚举成功率压到可忽略。
+// 真正的「一码一用」由兑换事务内的 used_by IS NULL 原子占用保证，限流只是纵深防御。
+const redeemLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    skip: (req) => req.path !== '/redeem',
+    message: {
+        success: false,
+        error: { message: '尝试过于频繁，请稍后再试', statusCode: 429 }
     }
 });
 
@@ -213,12 +231,16 @@ app.use('/api/stats', statsEventLimiter, funnelLimiter, statsRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/content', contentLimiter, contentRoutes);
 app.use('/api/config', configLimiter, taxRateRoutes);
+app.use('/api/config', configLimiter, citySocialRoutes);
 app.use('/api/leads', leadLimiter, leadRoutes);
+app.use('/api/pro-codes', redeemLimiter, proCodeRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
 app.use('/api/admin/support', supportAdminRoutes);
 app.use('/api/admin/tax-rates', taxRateAdminRoutes);
+app.use('/api/admin/city-social', citySocialAdminRoutes);
 app.use('/api/admin/leads', leadAdminRoutes);
+app.use('/api/admin/pro-codes', proCodeAdminRoutes);
 
 // 健康检查端点（用于云平台健康检查）
 app.get('/health', (req, res) => {

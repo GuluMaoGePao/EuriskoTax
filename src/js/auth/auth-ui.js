@@ -716,100 +716,140 @@ function renderProfileStats() {
 
 // === 个人中心功能模块卡片配置 ===
 // 同样使用完整静态类名，避免动态拼接触发 Tailwind CDN 重扫
+// group 决定卡片归属的分组（见 PROFILE_CARD_GROUPS）；数组顺序即组内展示顺序。
+// 排序原则：先「常用功能」（与测算直接相关、高频），再「服务与支持」（咨询与帮助），
+// 并把商业价值最高的「财税服务」放在服务组首位，让有需求的用户第一眼看到。
 const PROFILE_CARDS_CONFIG = [
     {
         id: 'profile-card-history',
+        group: 'tools',
         icon: 'fa-history',
         title: '计算历史',
-        desc: '查看和管理您的计算记录',
+        desc: '查看、复算与清理已保存的测算记录',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-history text-xl text-blue-600'
     },
     {
         id: 'profile-card-tax',
+        group: 'tools',
         icon: 'fa-file-text-o',
         title: '税务档案',
-        desc: '设置常用扣除配置，快速应用',
+        desc: '保存常用扣除配置，测算时一键套用',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-file-text-o text-xl text-green-600'
     },
     {
         id: 'profile-card-data',
+        group: 'tools',
         icon: 'fa-database',
         title: '数据管理',
-        desc: '导出计算数据，备份与迁移',
+        desc: '云端同步、数据导出与本地备份',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-database text-xl text-purple-600'
     },
     {
         id: 'profile-card-calendar',
+        group: 'tools',
         icon: 'fa-calendar',
         title: '税务日历',
-        desc: '关键时间节点提醒',
+        desc: '汇算清缴、申报截止等关键时间提醒',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar text-xl text-orange-600'
     },
     {
+        // 阶段13B：个人中心常驻付费服务入口（商业价值最高，置于服务组首位）
+        id: 'profile-card-lead',
+        group: 'service',
+        icon: 'fa-handshake-o',
+        title: '财税服务',
+        desc: '个税汇算核对 / 记账报税，留下联系方式由顾问免费评估',
+        tag: '顾问咨询',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-handshake-o text-xl text-blue-600'
+    },
+    {
         id: 'profile-card-notices',
+        group: 'service',
         icon: 'fa-bullhorn',
         title: '公告与更新',
-        desc: '查看政策更新、版本公告与运营活动',
+        desc: '政策要点、版本更新与运营活动',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-bullhorn text-xl text-amber-600'
     },
     {
+        id: 'profile-card-feedback',
+        group: 'service',
+        icon: 'fa-comments-o',
+        title: '意见反馈',
+        desc: '提交问题与建议，我们逐条跟进处理',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-comments-o text-xl text-rose-600'
+    },
+    {
         id: 'profile-card-help',
+        group: 'service',
         icon: 'fa-question-circle',
         title: '使用帮助',
-        desc: '了解如何使用本工具',
+        desc: '功能说明与常见问题解答',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-question-circle text-xl text-gray-600'
     },
     {
         id: 'profile-card-about',
+        group: 'service',
         icon: 'fa-info-circle',
         title: '关于我们',
-        desc: '了解版本信息与开发者',
+        desc: '版本信息、免责声明与联系方式',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-info-circle text-xl text-indigo-600'
-    },
-    {
-        id: 'profile-card-feedback',
-        icon: 'fa-comments-o',
-        title: '意见反馈',
-        desc: '提交 Bug、建议或截图，每条我们都会认真查看',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
-        iconClass: 'fa fa-comments-o text-xl text-rose-600'
-    },
-    {
-        id: 'profile-card-lead',
-        icon: 'fa-handshake-o',
-        title: '财税服务',
-        desc: '个税汇算核对、记账报税，留下联系方式顾问免费咨询',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
-        iconClass: 'fa fa-handshake-o text-xl text-blue-600'
     }
 ];
 
-// 渲染功能模块卡片（横向紧凑式：图标 + 说明 + 箭头，点击委托见 manageProfileEventBindings）
-function renderProfileCards() {
-    const grid = document.getElementById('profile-cards-grid');
-    if (!grid || grid.children.length > 0) return; // 已渲染则跳过
+// 分组标题：key 与卡片配置的 group 对应，数组顺序即分组展示顺序
+const PROFILE_CARD_GROUPS = [
+    { key: 'tools', title: '常用功能', desc: '测算记录、档案与数据' },
+    { key: 'service', title: '服务与支持', desc: '咨询、反馈与帮助' }
+];
 
-    grid.innerHTML = PROFILE_CARDS_CONFIG.map(({ id, title, desc, iconWrapClass, iconClass }) => `
+// 单张功能卡片（横向紧凑式：图标 + 标题/说明 + 箭头）
+// 所有类名均为完整静态字符串，避免动态拼接触发 Tailwind CDN 重扫导致卡顿。
+function profileCardHtml({ id, title, desc, tag, iconWrapClass, iconClass }) {
+    return `
         <div class="bg-white rounded-lg shadow-card cursor-pointer profile-card-hover h-full" id="${id}">
             <div class="p-4 sm:p-5 flex items-center gap-3.5 sm:gap-4">
                 <div class="${iconWrapClass}">
                     <i class="${iconClass}"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-semibold text-gray-800 text-[15px] leading-snug">${title}</h3>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h3 class="font-semibold text-gray-800 text-[15px] leading-snug">${title}</h3>
+                        ${tag ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${tag}</span>` : ''}
+                    </div>
                     <p class="text-xs text-gray-500 mt-1 leading-relaxed">${desc}</p>
                 </div>
                 <i class="fa fa-chevron-right text-gray-300 flex-shrink-0"></i>
             </div>
         </div>
-    `).join('');
+    `;
+}
+
+// 渲染功能模块卡片：按 PROFILE_CARD_GROUPS 分组输出，组标题占满整行（md:col-span-2）。
+// 点击委托见 manageProfileEventBindings（按 [id^="profile-card-"] 匹配，组标题不参与）。
+function renderProfileCards() {
+    const grid = document.getElementById('profile-cards-grid');
+    if (!grid || grid.children.length > 0) return; // 已渲染则跳过
+
+    grid.innerHTML = PROFILE_CARD_GROUPS.map((group, index) => {
+        const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key);
+        if (!cards.length) return '';
+        const head = `
+            <div class="md:col-span-2 flex items-center gap-2 px-1 ${index === 0 ? '' : 'pt-3'}">
+                <span class="w-1 h-4 rounded-full bg-primary"></span>
+                <h4 class="text-sm font-bold text-gray-700">${group.title}</h4>
+                <span class="text-[11px] text-gray-400">${group.desc}</span>
+            </div>`;
+        return head + cards.map(profileCardHtml).join('');
+    }).join('');
 }
 
 function updateProfileStats() {
@@ -1574,12 +1614,27 @@ function upgradeHeroHtml(user) {
         '<p class="text-gray-500 text-xs mt-1">' + trailing + '</p></div></div>';
 }
 
+// 弹窗标题旁的版本徽标：取自 window.__APP_VERSION__（版本哨兵同一份来源）。
+// 刻意不在这里再写一个版本号字符串 —— 版本号本来就有「五处同步」的维护负担，
+// 多一个落点就是多一次漏改（漏改的表现是用户每次进站都被清一次缓存）。
+function renderUpgradeVersion() {
+    const badge = document.getElementById('upgrade-version');
+    if (!badge) return;
+    const ver = (typeof window !== 'undefined' && window.__APP_VERSION__)
+        ? String(window.__APP_VERSION__).trim()
+        : '';
+    if (!ver) { badge.textContent = ''; badge.classList.add('hidden'); return; }
+    badge.textContent = 'v' + ver;
+    badge.classList.remove('hidden');
+}
+
 function openUpgradeModal() {
     const modal = document.getElementById('upgrade-modal');
     if (!modal) return;
     const hero = document.getElementById('upgrade-hero');
     const user = apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
     if (hero) hero.innerHTML = upgradeHeroHtml(user);
+    renderUpgradeVersion();
     openModal(modal);
 }
 
@@ -1611,6 +1666,55 @@ async function handleClaimTrial(btn) {
     } catch (err) {
         if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = origHtml; }
         showAlert((err && err.message) || '领取失败，请稍后重试');
+    }
+}
+
+// 兑换专业版兑换码（「版本与权益」弹窗内的自助开通入口）
+// 适用场景：线下收款后运营发放兑换码，客户自行开通，无需人工改库
+async function handleRedeemProCode(btn) {
+    if (!apiClient || typeof apiClient.isLoggedIn !== 'function' || !apiClient.isLoggedIn()) {
+        showAlert('请先登录后再兑换专业版兑换码');
+        return;
+    }
+    if (!apiClient.redeemProCode) {
+        showAlert('服务暂不可用，请刷新页面后重试');
+        return;
+    }
+    const input = document.getElementById('upgrade-redeem-input');
+    const code = input ? String(input.value || '').trim() : '';
+    if (!code) {
+        showAlert('请输入兑换码');
+        if (input) input.focus();
+        return;
+    }
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner inline-block w-4 h-4 mr-2"></span>兑换中…';
+    }
+    try {
+        const updated = await apiClient.redeemProCode(code);
+        if (window.EuriskoSync && typeof window.EuriskoSync.updateUser === 'function') {
+            window.EuriskoSync.updateUser(updated);
+        }
+        renderPlanBadges(updated);
+        renderCloudSyncPanel();
+        const hero = document.getElementById('upgrade-hero');
+        if (hero) hero.innerHTML = upgradeHeroHtml(updated);
+        if (input) input.value = '';
+        const until = updated && updated.plan_expires_at
+            ? new Date(updated.plan_expires_at).toLocaleDateString('zh-CN')
+            : null;
+        showAlert(
+            until
+                ? '兑换成功，专业版已开通至 ' + until
+                : '兑换成功，专业版永久授权已生效',
+            'success'
+        );
+    } catch (err) {
+        // 失败时恢复按钮，并把服务端的具体原因透出（已使用 / 已作废 / 太频繁）
+        if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = origHtml; }
+        showAlert((err && err.message) || '兑换失败，请稍后重试');
     }
 }
 
@@ -1857,31 +1961,42 @@ function setupAuthEventListeners() {
         document.addEventListener('euriskotax:history-synced', refreshAfterCloudSync);
 
         // === 版本权益弹窗（三档体系：基础版/体验版/专业版）事件绑定 ===
+        // 入口刻意收敛为 2 处（阶段14）：
+        //   ① 顶栏 pill #topbar-plan-badge（档位常驻可见，登录后显示）
+        //   ② 个人中心横幅 #profile-nav-upgrade（见 binder 底部绑定）
+        // 原先的「用户下拉菜单 → 版本与权益」项已删除：它与 ① 同处右上角、点击目标相邻，属重复入口。
         const upgradeModalEl = document.getElementById('upgrade-modal');
         const topbarPlanBadgeBtn = document.getElementById('topbar-plan-badge');
         if (topbarPlanBadgeBtn) topbarPlanBadgeBtn.addEventListener('click', openUpgradeModal);
-        const topbarPlanEntry = document.getElementById('topbar-plan-entry');
-        if (topbarPlanEntry) {
-            topbarPlanEntry.addEventListener('click', (e) => {
-                e.preventDefault();
-                const dd = document.getElementById('user-dropdown');
-                if (dd) dd.classList.add('hidden');
-                openUpgradeModal();
-            });
-        }
         if (upgradeModalEl) {
             const closeUpgrade = () => closeModal(upgradeModalEl);
             const closeBtn = document.getElementById('close-upgrade-modal');
             if (closeBtn) closeBtn.addEventListener('click', closeUpgrade);
             const cancelBtn = document.getElementById('upgrade-cancel-btn');
             if (cancelBtn) cancelBtn.addEventListener('click', closeUpgrade);
-            // 领取按钮委托：内容随档位动态填充
+            // 领取 / 兑换按钮委托：内容随档位动态填充
             upgradeModalEl.addEventListener('click', (e) => {
                 const claimBtn = e.target.closest('#upgrade-claim-btn');
-                if (!claimBtn) return;
-                e.preventDefault();
-                handleClaimTrial(claimBtn);
+                if (claimBtn) {
+                    e.preventDefault();
+                    handleClaimTrial(claimBtn);
+                    return;
+                }
+                const redeemBtn = e.target.closest('#upgrade-redeem-btn');
+                if (redeemBtn) {
+                    e.preventDefault();
+                    handleRedeemProCode(redeemBtn);
+                }
             });
+            // 兑换码输入框回车即兑换（少一次移动鼠标，兑换码场景高频操作）
+            const redeemInput = document.getElementById('upgrade-redeem-input');
+            if (redeemInput) {
+                redeemInput.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    handleRedeemProCode(document.getElementById('upgrade-redeem-btn'));
+                });
+            }
         }
         // 数据管理页云同步 CTA 的领取按钮委托（CTA 由 renderCloudSyncPanel 动态注入）
         const dataPageEl = document.getElementById('profile-data-page');
@@ -1915,10 +2030,12 @@ function setupAuthEventListeners() {
         },
         {
             // 阶段13B：个人中心常驻留资入口（source=profile，与后端 SOURCES 白名单一致）
+            // 不传 scene：个人中心没有「当前测算」，硬塞一个入口标签会被弹窗当成测算情境展示。
+            // 弹窗会改为列出本地已保存记录，由用户主动挑一条（见 lead-context.js）
             cardId: 'profile-card-lead',
             specialFn: () => {
                 if (window.LeadModal && typeof window.LeadModal.open === 'function') {
-                    window.LeadModal.open({ source: 'profile', scene: '个人中心·财税服务' });
+                    window.LeadModal.open({ source: 'profile' });
                 }
             }
         }
@@ -1958,6 +2075,15 @@ function setupAuthEventListeners() {
             ['showPage', () => showPage('profile-settings-page')]
         ], { eventTime });
     });
+
+    // 个人中心横幅的「版本与权益」入口（阶段14：兑换码自助开通的主要发现路径之一）
+    const profileNavUpgrade = document.getElementById('profile-nav-upgrade');
+    if (profileNavUpgrade) {
+        profileNavUpgrade.addEventListener('click', (e) => {
+            e.preventDefault();
+            openUpgradeModal();
+        });
+    }
 
     document.getElementById('user-btn').addEventListener('click', () => {
         document.getElementById('user-dropdown').classList.toggle('hidden');

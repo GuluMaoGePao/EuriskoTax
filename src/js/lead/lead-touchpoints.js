@@ -21,27 +21,39 @@
     var BLOCKED_TYPES = ['reverse'];
 
     // 类型 → 结果容器 + 触点归因（source 需与后端 leadController.SOURCES 一致）
+    // 刻意不再携带固定 scene 字符串：情境由 lead-context.js 从已渲染结果反推，
+    // 传递不可信的死标签只会把「测算类型名」当成「用户的当前测算」写进线索表。
     var TOUCHPOINTS = {
-        forward:        { containerId: 'step-result',                source: 'result_settlement', scene: '综合所得·年度汇算' },
-        comprehensive:  { containerId: 'step-result',                source: 'result_settlement', scene: '综合所得·年度汇算' },
-        business:       { containerId: 'business-step-result',       source: 'result_business',   scene: '经营所得·年度汇算' },
-        classification: { containerId: 'classification-step-result', source: 'result_budget',     scene: '分类所得·计税' }
+        forward:        { containerId: 'step-result',                source: 'result_settlement' },
+        comprehensive:  { containerId: 'step-result',                source: 'result_settlement' },
+        business:       { containerId: 'business-step-result',       source: 'result_business' },
+        classification: { containerId: 'classification-step-result', source: 'result_budget' }
     };
 
     var GUIDE_ID = 'lead-result-guide';
 
-    function guideHTML(source, scene) {
+    function guideHTML(source, type) {
         return '' +
-            '<div class="flex items-start gap-3">' +
-                '<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">' +
-                    '<i class="fa fa-user-circle-o text-blue-600"></i>' +
+            '<div class="flex items-start gap-3 sm:gap-4">' +
+                '<div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">' +
+                    '<i class="fa fa-user-circle-o text-lg"></i>' +
                 '</div>' +
                 '<div class="flex-1 min-w-0">' +
-                    '<h3 class="font-semibold text-gray-800 text-sm">不确定填得对不对？让专业顾问免费核对一次</h3>' +
-                    '<p class="text-xs text-gray-600 mt-1 leading-relaxed">专项附加扣除、社保公积金、年终奖计税方式等容易漏填或选错。留下联系方式，顾问帮您核对确认无误再申报。</p>' +
-                    '<button type="button" class="lead-result-cta mt-3 btn btn-primary text-xs px-4 py-1.5 rounded-lg"' +
-                        ' data-source="' + source + '" data-scene="' + scene + '">免费核对一次</button>' +
-                    '<p class="text-[11px] text-gray-400 mt-2">本测算仅供参考，不构成税务建议</p>' +
+                    '<div class="flex items-center gap-2 flex-wrap">' +
+                        '<h3 class="font-bold text-gray-800 text-sm">申报前先核对，避免多缴或漏扣</h3>' +
+                        '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">免费</span>' +
+                    '</div>' +
+                    '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">下面这三项最容易被忽略，申报前建议先过一遍：</p>' +
+                    '<ul class="mt-2 space-y-1 text-xs text-gray-600 leading-relaxed">' +
+                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>专项附加扣除有没有漏填、还能不能补扣</li>' +
+                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>社保公积金、年终奖选哪种算法更划算</li>' +
+                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>退税 / 补税的结论对不对、依据全不全</li>' +
+                    '</ul>' +
+                    '<div class="flex flex-wrap items-center gap-2 mt-3">' +
+                        '<button type="button" class="lead-result-cta btn btn-primary text-xs px-4 py-2 rounded-lg"' +
+                            ' data-source="' + source + '" data-type="' + type + '">免费咨询</button>' +
+                        '<span class="text-[11px] text-gray-400">不采集收入金额 · 测算结果仅供参考</span>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
     }
@@ -59,8 +71,8 @@
 
         var wrap = document.createElement('div');
         wrap.id = GUIDE_ID;
-        wrap.className = 'mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 sm:p-5';
-        wrap.innerHTML = guideHTML(cfg.source, cfg.scene);
+        wrap.className = 'mt-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 sm:p-5';
+        wrap.innerHTML = guideHTML(cfg.source, type);
         container.appendChild(wrap);
     }
 
@@ -79,9 +91,11 @@
             var cta = (target && target.closest) ? target.closest('.lead-result-cta') : null;
             if (!cta) return;
             if (window.LeadModal && typeof window.LeadModal.open === 'function') {
+                // 只传计算类型：情境文本由 LeadModal 依据 lead-context 反推，
+                // 避免把入口标签伪装成「用户的当前测算」
                 window.LeadModal.open({
                     source: cta.getAttribute('data-source') || 'modal',
-                    scene: cta.getAttribute('data-scene') || ''
+                    type: cta.getAttribute('data-type') || ''
                 });
             }
         });

@@ -32,12 +32,14 @@ describe('阶段11 内容中心 - 后台 DOM 契约', () => {
         expect(SECTION_START).toBeGreaterThan(-1);
         expect(SECTION_END).toBeGreaterThan(SECTION_START);
 
-        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* / support-f-* / tr-* 字段，
-        // 它们分别由 renderContentEditor / openSupportEditor / taxRatesEditorHtml 在运行时产出，不属于静态节点）
+        // 取 $('  #静态id  ') 形式的引用（排除编辑器动态生成的 content-f-* / support-f-* / tr-* / cs-* 字段，
+        // 它们分别由 renderContentEditor / openSupportEditor / taxRatesEditorHtml / citySocialEditorHtml 在运行时产出，
+        // 不属于静态节点）
         const ids = new Set(
             [...CONTENT_SECTION.matchAll(/\$\('#([A-Za-z0-9_-]+)'\)/g)]
                 .map((m) => m[1])
-                .filter((id) => !id.startsWith('content-f-') && !id.startsWith('support-f-') && !id.startsWith('tr-'))
+                .filter((id) => !id.startsWith('content-f-') && !id.startsWith('support-f-')
+                    && !id.startsWith('tr-') && !id.startsWith('cs-'))
         );
         expect(ids.size).toBeGreaterThan(0);
         const missing = [...ids].filter((id) => !HTML.includes(`id="${id}"`));
@@ -50,6 +52,18 @@ describe('阶段11 内容中心 - 后台 DOM 契约', () => {
         );
         const referenced = new Set(
             [...CONTENT_SECTION.matchAll(/\$\('#(content-f-[A-Za-z0-9_-]+)'\)/g)].map((m) => m[1])
+        );
+        expect(referenced.size).toBeGreaterThan(0);
+        const missing = [...referenced].filter((id) => !declared.has(id));
+        expect(missing).toEqual([]);
+    });
+
+    test('城市社保参数编辑器：读取的 cs-* 字段都被 citySocialEditorHtml 渲染', () => {
+        const declared = new Set(
+            [...CONTENT_SECTION.matchAll(/id="(cs-[A-Za-z0-9_-]+)"/g)].map((m) => m[1])
+        );
+        const referenced = new Set(
+            [...CONTENT_SECTION.matchAll(/\$\('#(cs-[A-Za-z0-9_-]+)'\)/g)].map((m) => m[1])
         );
         expect(referenced.size).toBeGreaterThan(0);
         const missing = [...referenced].filter((id) => !declared.has(id));

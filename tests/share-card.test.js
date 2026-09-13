@@ -118,10 +118,14 @@ describe('阶段13D 分享图 - 合规与内容', () => {
         expect(html).toContain('&lt;img');
     });
 
-    test('未测算（占位符 ¥0）时拒绝生成 —— 一张写着 ¥0 的图比不出图更伤品牌', () => {
+    test('未测算（占位符 ¥0 / ¥0.00）时拒绝生成 —— 一张写着 0 的图比不出图更伤品牌', () => {
         document.body.innerHTML = '<div id="t-hero">¥0</div>';
         const cfg = { template: 'income', title: 'X', hero: { selector: '#t-hero', label: 'L' }, rows: [] };
         expect(ShareCard.collect(cfg)).toBeNull();
+
+        document.body.innerHTML = '<div id="t-hero2">¥0.00</div>';
+        const cfg2 = { template: 'income', title: 'X', hero: { selector: '#t-hero2', label: 'L' }, rows: [] };
+        expect(ShareCard.collect(cfg2)).toBeNull();
     });
 
     test('已测算时 collect 汇总 hero 并过滤占位符明细', () => {
@@ -141,9 +145,56 @@ describe('阶段13D 分享图 - 合规与内容', () => {
     });
 });
 
+describe('阶段13D 分享图 - 失败反馈可见性（静默失败最难排查）', () => {
+    test('不再使用 alert 对话框（会被浏览器静默屏蔽成「点了没反应」）', () => {
+        const src = readSrc('src/js/share/share-card.js');
+        expect(src).toContain('showToast');
+        expect(src).not.toMatch(/\balert\s*\(/);
+    });
+
+    test('未识别的结果容器不再静默 return，而是给出可见提示', () => {
+        const src = readSrc('src/js/share/share-card.js');
+        expect(src).not.toMatch(/if \(!cfg\) return;/);
+        expect(src).toContain('未识别的结果容器');
+    });
+
+    test('showToast 渲染页面内提示条（不依赖浏览器对话框）', () => {
+        document.body.innerHTML = '';
+        ShareCard.showToast('测试提示');
+        const toast = document.getElementById('share-card-toast');
+        expect(toast).toBeTruthy();
+        expect(toast.textContent).toBe('测试提示');
+        expect(toast.style.position).toBe('fixed');
+    });
+
+    test('提示条固定在顶部 —— 放底部会落在结果区视线之外，用户整条错过', () => {
+        const src = readSrc('src/js/share/share-card.js');
+        expect(src).toMatch(/top:calc\(/);
+        expect(src).not.toMatch(/bottom:\s*32px/);
+        // 顶部还有导航栏与离线/更新横幅，提示条必须顺延而不是压在它们身上
+        expect(src).toContain('toastTopOffset');
+        // 层级要高于预览遮罩(10000)与页面顶部横幅(9999)
+        expect(src).toContain('z-index:10002');
+    });
+});
+
 describe('阶段13D 分享图 - 闭环（归因 + 埋点）', () => {
     test('二维码指向的落地地址带 source=share（T4 归因）', () => {
         expect(ShareCard.shareUrl()).toContain('source=share');
+    });
+
+    test('分享落地地址可通过 setShareBaseUrl 覆盖，避免 localhost 泄露到线上图', () => {
+        ShareCard.setShareBaseUrl('https://euriskotax.example.com');
+        expect(ShareCard.shareUrl()).toBe('https://euriskotax.example.com/?source=share');
+        ShareCard.setShareBaseUrl(''); // 恢复默认值，避免污染后续测试
+    });
+
+    test('二维码下方显示的 host 与落地地址域名一致', () => {
+        ShareCard.setShareBaseUrl('https://euriskotax.example.com');
+        const html = ShareCard.buildHtml({ template: 'income', title: '综合所得年度汇算' }, SAMPLE_DATA, '');
+        expect(html).toContain('euriskotax.example.com');
+        expect(html).not.toContain('localhost');
+        ShareCard.setShareBaseUrl('');
     });
 
     test('派发 euriskotax:share，且漏斗端确实在监听（任一端改名即断链）', () => {
@@ -192,5 +243,29 @@ describe('阶段13D 截图公共层 - PDF 与分享图共用', () => {
         expect(src).toContain('cleanup()');
         expect(src).toContain('removeChild');
         expect(src).toContain('html2canvas(');
+    });
+});
+
+describe('阶段13D+ 分享落地引导', () => {
+    test('index.html 引入 share-landing.js', () => {
+        expect(INDEX_HTML).toContain('src/js/share/share-landing.js');
+    });
+
+    test('仅 ?source=share 落地时展示横幅', () => {
+        const src = readSrc('src/js/share/share-landing.js');
+        expect(src).toContain('source=share');
+        expect(src).toContain('isShareLanding');
+    });
+
+    test('CTA 锚点在页面中真实存在（锚点被改名 = 按钮点了没反应）', () => {
+        expect(INDEX_HTML).toContain('id="home-start-card"');
+        expect(readSrc('src/js/share/share-landing.js')).toContain('home-start-card');
+    });
+
+    test('落地引导不承担归因与埋点（职责单一，可整体下线而不影响闭环）', () => {
+        const src = readSrc('src/js/share/share-landing.js');
+        // 注释里会提到 sessionStorage 属于别的模块，这里断言的是「没有真的去读写」
+        expect(src).not.toMatch(/sessionStorage\s*\./);
+        expect(src).not.toContain('reportFunnelEvent');
     });
 });

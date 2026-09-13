@@ -76,11 +76,19 @@
 > - 两处**一起漏改** → 哨兵形同虚设，老用户不再自动自愈。
 >
 > `ops-check-prod.ps1` 已把这两处纳入线上门禁，漏改会在发布核对时红灯拦下；但**发布前仍应主动改全五处**。
+>
+> 拦截已提前到本地：`tests/version-sync.test.js`（随 `npm test` 跑）逐处比对五处版本号、
+> 并校验 `version.json` 的 `releasedAt` 与 CHANGELOG 该版日期同日 —— 漏改不必等 push 之后的线上核对，
+> 本地单测当场变红（发布 checklist 第 3 步「`npm test` 全绿」因此顺带覆盖了版本同步）。
+>
+> `version.json` 的 `releasedAt` 是**唯一权威发布日**：CHANGELOG 该版标题日期须与它同日、且不得晚于今天
+> （它此前没有任何消费方，属「写了没人看」—— 现在由单测与下条命令共同消费）。
+> 发版前可一键核对五处落点与文档口径：`npm run verify:release`（输出含 `文件:行号`；不一致退出码 1）。
 
 ### 3.3 发布前新增内容怎么写
 
 日常开发产生的变更，**随时追加**到 `CHANGELOG.md` 顶部“未发布”暂存（按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 分组：`新增/变更/修复/安全`）。
-发布时把暂存条目归档为正式版本标题（`## [X.Y.Z] - YYYY-MM-DD`），并同步版本号三落点。
+发布时把暂存条目归档为正式版本标题（`## [X.Y.Z] - YYYY-MM-DD`），并同步版本号**五处**（见 §3.2）。
 
 ---
 
@@ -94,7 +102,7 @@
 
 1. [ ] CHANGELOG 已按 3.3 归档本次变更（含日期）
 2. [ ] 版本号**五处**已同步为 `X.Y.Z`（见 3.2：`package.json` / 关于弹窗 / CHANGELOG / `index.html` 的 `__APP_VERSION__` / 根目录 `version.json`）
-3. [ ] 本地 `npm test` + `verify:local` 全绿（ops-publish 会自动再跑一遍）
+3. [ ] 本地 `npm test` + `verify:local` 全绿（ops-publish 会自动再跑一遍）；另跑 `npm run verify:release` 核对版本五处 + 文档口径（套件/用例数、门禁项数、指纹项数）。两份数字若需更新，`-- --write` 可自动同步套件/用例数，门禁与指纹项数须以实跑输出为准手工改
 4. [ ] 执行 `ops-publish.ps1` → 等待线上指纹核对通过（阶段11 起 push 后自动幂等补种生产内容；未配置 `ADMIN_TOKEN_PROD` 时手动执行 `node tools\ops\ops-seed-prod.js`）
 5. [ ] 核对远程已出现 `vX.Y.Z` 标签：`git ls-remote --tags origin`
 6. [ ] （可选）GitHub Releases 按新标签发布说明，粘贴 CHANGELOG 摘要

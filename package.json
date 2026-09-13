@@ -1,6 +1,6 @@
 {
   "name": "EuriskoTax",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build": "echo 'Build complete - all files ready to deploy'",
@@ -9,7 +9,8 @@
     "test:performance": "node tests/performance/benchmark.js",
     "verify:local": "node server/scripts/verify-local-auth.js",
     "verify:pg": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1",
-    "verify:pg:fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1 -Fresh"
+    "verify:pg:fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1 -Fresh",
+    "verify:release": "node tools/ops/preflight-release.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",
@@ -28,7 +29,9 @@
       "src/js/calculation/engine.js",
       "src/js/data/scenario-store.js",
       "src/js/data/tax-rates-sync.js",
+      "src/js/data/city-social-sync.js",
       "src/js/ui/scenario-ui.js",
+      "src/js/ui/city-social-ui.js",
       "src/js/ui/navigation-ui.js"
     ],
     "coverageDirectory": "coverage",
