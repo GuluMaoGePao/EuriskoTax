@@ -308,7 +308,7 @@ Select-String -Path .\tools\ops\events.log -Pattern "2026-08-10"
 [2026-08-10 21:18:36] [DEBUG]   replaced {newUrl} -> https://abc.r8.cpolar.cn
 [2026-08-10 21:18:36] [DEBUG]   replaced {reason} -> 隧道重启后分配了新的公网地址
 [2026-08-10 21:18:36] [INFO] Connecting to SMTP: smtp.qq.com:587 (SSL=True, timeout=15s)
-[2026-08-10 21:18:37] [INFO] Email sent OK in 1140ms -> 2649719969@qq.com, 971699503@qq.com
+[2026-08-10 21:18:37] [INFO] Email sent OK in 1140ms -> user-a@example.com, user-b@example.com
 ```
 
 查看命令：
