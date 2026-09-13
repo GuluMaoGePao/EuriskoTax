@@ -148,6 +148,20 @@ function extract(full, spot, patterns) {
 // 取作用域内「最大」的一条为当前口径（历史值必然更小）
 const currentHit = (hits, pick) => hits.reduce((a, b) => (pick(b) > pick(a) ? b : a));
 
+// 门禁实跑快照：verify-local-auth.js 每次本地实跑都会写一份（gitignored）。
+// 有了它，「门禁项数」从「无从离线推导」变成「有实跑证据可对账」——
+// 2026-09-13 那次「文档写 142、实跑 146」能瞒过一切断言，正是因为文档里的数字
+// 是「基线 + 新增项」推算出来的，没有任何一次实跑值与它对照。
+const GATE_RUN_FILE = 'tools/ops/.verify-local-last.json';
+
+function readRecordedGateRun() {
+    try {
+        return readJson(GATE_RUN_FILE);
+    } catch (err) {
+        return null;   // 还没跑过门禁的开发机：没有证据，不假装有
+    }
+}
+
 // ======================= 口径核对 =======================
 
 function checkMetrics() {
@@ -195,6 +209,15 @@ function checkMetrics() {
     }
     if (gateSet.length && gateSet[0] > measured.verifyLocalTextAssertions) {
         issues.push(`门禁项数声明 ${gateSet[0]} > 脚本内文本断言数 ${measured.verifyLocalTextAssertions}（verify-local-auth.js 不可能有这么多断言）`);
+    }
+    // 有实跑快照时，声明值必须等于「最近一次真跑出来的项数」——这是唯一能抓住
+    // 「数字是推算的」的断言：上界检查只能拦虚报，拦不住少报/多报几个
+    const recorded = readRecordedGateRun();
+    if (recorded && gateSet.length && typeof recorded.total === 'number' && gateSet[0] !== recorded.total) {
+        issues.push(
+            `门禁项数声明 ${gateSet[0]} ≠ 最近一次 verify:local 实跑 ${recorded.total} 项（快照 ${GATE_RUN_FILE} @ ${recorded.at}）——`
+            + '跑一次 npm run verify:local 看分段明细后回填文档，不要按「基线 + 新增项」推算'
+        );
     }
 
     // ---- 线上指纹数：同上，上界为 ops-check-prod 的 Add-Check 文本数 ----
@@ -321,4 +344,5 @@ module.exports = {
     syncMetricNumbers,
     readVersionSpots,
     checkVersionSpots,
+    readRecordedGateRun,
 };

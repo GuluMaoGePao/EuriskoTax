@@ -14,6 +14,9 @@ server/prisma/*.db
 # Watchdog notification config (contains SMTP credentials)
 tools/ops/notify.config.json
 
+# 门禁实跑口径快照（本机生成物：最近一次 verify:local 的项数，供文档口径守护比对）
+tools/ops/.verify-local-last.json
+
 # Deploy config (contains server credentials)
 tools/ops/ops-deploy.config.json
 tools/ops/deploy.config.json
