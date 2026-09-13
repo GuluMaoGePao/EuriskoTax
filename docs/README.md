@@ -5,12 +5,12 @@
 
 ---
 
-## 当前状态（v1.15.0 · 2026-09-13）
+## 当前状态（v1.17.0 · 2026-09-13）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.15.0**（阶段14 剩余项：高商业意图 SEO 落地页 —— 第二个页面 `/seo/salary-tax.html` 月薪个税计算器：静态正文（累计预扣两步公式 / 七档预扣率表 / 12 个月逐月预扣示例表 / 5 条 FAQ）+ 同源口径速算器（与内核 `calculateCumulativePrepaidTax` 逐点对拍），配 `robots.txt` / `sitemap.xml` 收录；上一版 1.14.0 = 首个页面 `/seo/bonus-tax.html` 年终奖个税，再上一版 1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 + C2 城市社保参数库）。1.15.0 已上线并打标签 `v1.15.0`
-- **测试**：28 套件 571 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 25 例）；发布门禁 `verify:local` **156/156** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 陆续交付两页「年终奖个税」「月薪个税」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库 + `/seo/bonus-tax.html` + `/seo/salary-tax.html`（`verify:local` 156/156、单测 28 套件 571 例）→ 当前工作：**无进行中阶段**，仅剩待办「其余关键词落地页」（汇算清缴 / 社保基数 / 税后工资），见 [development/seo-landing-plan.md](development/seo-landing-plan.md)
+- **主版本**：CHANGELOG 最新 **1.17.0**（产品方向调整：计算页取消「参保城市」选择，回到「默认基数 + 用户自改」，城市改由留资时收集、顾问核对当地口径；上一版 1.16.0 = 阶段14 剩余项：高商业意图 SEO 落地页 —— 第三个页面 `/seo/annual-settlement.html` 个税汇算清缴：静态正文（汇算公式与手算示例 / 七档年度税率表 / 三种典型情形示例表 / 退税与补税情形清单 / 办理时间与渠道 / 5 条 FAQ）+ 同源口径速算器（与内核 `computeDeductions` + `performTaxCalculation` 逐点对拍，并与月薪页互相对拍），把汇算讲成「应退/应补 = 全年应纳税额 − 已预缴税额」一道减法；上一版 1.15.0 = 第二个页面 `/seo/salary-tax.html` 月薪个税，1.14.0 = 首个页面 `/seo/bonus-tax.html` 年终奖个税，1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 + C2 城市社保参数库）。线上正式发布锚点见 [分支与版本发布策略 §5.3](guides/branch-release-strategy.md)：本地标签最新 `v1.15.0`，1.16.0 / 1.17.0 的标签尚未登记
+- **测试**：28 套件 562 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 22 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **165/165** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练；本机 Docker 已就绪，2026-09-13 实跑 165/165 全绿）
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 / v1.16.0 陆续交付三页「年终奖个税」「月薪个税」「汇算清缴」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库（端上「参保城市」下拉已于 v1.17.0 回退为「默认基数 + 用户自改」，参数库保留待 SEO 落地页复用）+ `/seo/bonus-tax.html` + `/seo/salary-tax.html` + `/seo/annual-settlement.html`（`verify:local` 165/165、单测 28 套件 562 例）→ 当前工作：**无进行中阶段**，仅剩待办「其余关键词落地页」（社保基数 / 税后工资），见 [development/seo-landing-plan.md](development/seo-landing-plan.md)
 
 ---
 
@@ -65,24 +65,24 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-12 |
+| [development/development-plan.md](development/development-plan.md) | 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-13 |
 | [development/file-management-policy.md](development/file-management-policy.md) | 文件管理规范（目录归属/命名/编码/变更流程） | 2026-09-07 |
 | [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 阶段10 免费/专业版实施方案（已确认 · 待命执行） | 2026-09-07 |
 | [development/stage12-c1-tax-rate-config-plan.md](development/stage12-c1-tax-rate-config-plan.md) | 阶段12 C1 税制参数配置化方案与实施记录 | 2026-09-12 |
 | [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md) | 阶段13 获客与转化（引流 → 线索）方案（13A 后端地基 ✅ / 13B 前端触点 ✅ / 13C 管理台「线索」Tab ✅ / 13D 一键结果分享图 ✅ / 13E 漏斗埋点 ✅，阶段13 已全部交付） | 2026-09-13 |
-| [development/seo-landing-plan.md](development/seo-landing-plan.md) | 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；前两页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0，其余词条待办） | 2026-09-13 |
+| [development/seo-landing-plan.md](development/seo-landing-plan.md) | 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；已交付三页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0、「汇算清缴」✅ v1.16.0，其余词条待办） | 2026-09-13 |
 
 ### 使用与开发指南
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-08-04 |
+| [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-09-13 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-07 |
-| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-12 |
+| [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-13 |
 | [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本号五处同步/自动打 tag/回滚） | 2026-09-08 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
-| [guides/support-playbook.md](guides/support-playbook.md) | 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-12 |
+| [guides/support-playbook.md](guides/support-playbook.md) | 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-13 |
 
 ### 项目报告
 
@@ -96,7 +96,7 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-07 |
+| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-13 |
 
 ### 技术报告
 

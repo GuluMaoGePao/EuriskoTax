@@ -14,7 +14,7 @@
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
 | `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
-| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 156 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
+| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 165 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
@@ -99,7 +99,7 @@ Send-TestNotification
 ### PostgreSQL 生产等价演练（动过 schema/迁移后必跑）
 
 ```powershell
-# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 156 项 e2e
+# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 165 项 e2e
 npm run verify:pg
 
 # 等价「全新库首次部署」：先删数据卷再跑
@@ -114,7 +114,10 @@ npm run verify:pg:fresh
 > 本脚本按线上同序在本地复现一遍，把这类问题拦在 publish 之前。
 >
 > 环境：演练库定义在根目录 `docker-compose.postgres.yml`（端口 **55432**、独立数据卷 `pg_drill_data`、仅放测试数据）。
-> 前置条件：Docker Desktop 已安装并启动；本地 `:3000` 后端需先停止（会锁 Prisma 引擎 DLL）。
+> 前置条件（Windows）：① 启用 WSL2 —— `VirtualMachinePlatform` + WSL 可选功能两项都要开，重启后生效（家庭版没有 Hyper-V，Docker Desktop 只能走 WSL2 后端）；
+> ② 安装并启动 Docker Desktop（首次启动需人工接受许可协议），`docker version` 要能看到 **Server** 段、`docker compose version` 为 v2+；
+> ③ 能拉到 `postgres:16-alpine` —— 国内直连 Docker Hub 常超时，需在 `Settings → Docker Engine`（即 `~/.docker/daemon.json`）配 `registry-mirrors` 后重启 Desktop，**配前先实测源可用**（公开加速源失效很快）；
+> ④ 停掉本地 `:3000` 后端（会锁 Prisma 引擎 DLL，不停会 `EPERM`）。
 > 未装 Docker 时脚本**优雅退出（退出码 2）**并给出提示，不影响日常 `verify:local`。
 > 收尾会把 Prisma Client 自动恢复为 SQLite 版本，避免影响后续本地开发。
 

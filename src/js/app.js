@@ -244,7 +244,12 @@ window.addEventListener('DOMContentLoaded', function() {
         calculateReverseHousingFund();
         validateHousingFundBase('reverse');
     });
-    document.getElementById('reverse-housing-fund-rate').addEventListener('change', function() {
+    // 同正向页：比例用户自填，输入即时重算 + 失焦归一
+    document.getElementById('reverse-housing-fund-rate').addEventListener('input', function() {
+        calculateReverseHousingFund();
+    });
+    document.getElementById('reverse-housing-fund-rate').addEventListener('blur', function() {
+        normalizeRateInput(this);
         calculateReverseHousingFund();
     });
     
@@ -515,6 +520,36 @@ window.addEventListener('DOMContentLoaded', function() {
                 performRealTimeBusinessCalculation();
             });
         }
+    });
+
+    // 经营页「缴费基数 / 缴费比例」此前没有任何事件接线（改什么都不发生），补齐联动：
+    // 基数 × 比例 → 月度金额，并复用正向页的「低于下限」提示（提示位 id 已按 business-* 对齐）
+    ['business-social-security-base', 'business-housing-fund-base'].forEach(function(baseId) {
+        const element = document.getElementById(baseId);
+        if (!element) return;
+        element.addEventListener('input', function() {
+            if (baseId === 'business-social-security-base') {
+                validateSocialSecurityBase('business');
+                calculateBusinessSocialInsurance();
+            } else {
+                validateHousingFundBase('business');
+                calculateBusinessInsurance('business-housing-fund-rate');
+            }
+            performRealTimeBusinessCalculation();
+        });
+    });
+
+    ['business-pension-rate', 'business-medical-rate', 'business-unemployment-rate', 'business-housing-fund-rate'].forEach(function(rateId) {
+        const element = document.getElementById(rateId);
+        if (!element) return;
+        element.addEventListener('input', function() {
+            calculateBusinessInsurance(rateId);
+            performRealTimeBusinessCalculation();
+        });
+        element.addEventListener('blur', function() {
+            calculateBusinessInsurance(rateId, true);
+            performRealTimeBusinessCalculation();
+        });
     });
 
     // 经营所得综合所得勾选变化时
@@ -1199,7 +1234,14 @@ window.addEventListener('DOMContentLoaded', function() {
         updateDeductionCalculation();
         validateHousingFundBase();
     });
-    document.getElementById('housing-fund-rate').addEventListener('change', function() {
+    // 缴费比例是用户自填项（各地口径不同，默认 5%）：input 事件即时重算，
+    // 失焦时把留空/越界值归一，避免清空后公积金静默算成 0
+    document.getElementById('housing-fund-rate').addEventListener('input', function() {
+        calculateHousingFund();
+        updateDeductionCalculation();
+    });
+    document.getElementById('housing-fund-rate').addEventListener('blur', function() {
+        normalizeRateInput(this);
         calculateHousingFund();
         updateDeductionCalculation();
     });

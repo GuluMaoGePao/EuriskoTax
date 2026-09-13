@@ -7,6 +7,61 @@
 
 ---
 
+## [1.17.0] - 2026-09-13（产品方向调整：取消计算页「参保城市」选择，回到默认基数 + 用户自改；城市改由留资收集）
+
+> 门禁基线：**verify:local 165 项，实跑 165/165 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版新增：移除已下线前端模块的 6 项静态断言；新增「城市改在留资里」5 项 + 「缴费比例可输入 / 留空越界兜底」2 项 + 「经营页基数 × 比例联动」1 项断言。**口径修正**：文档曾按「基线 + 新增项」推算为 164，与实跑不符（少 1 项），现按实跑值回填 —— 该项数一律以实跑快照为准，不做推算。
+> 生产等价演练：本版动过 `schema.prisma` 与 `server/prisma/migrations/`，按 `docs/guides/development-workflow.md` 属**必跑** `npm run verify:pg` 的范围 —— 已于 2026-09-13 在本机装好 Docker Desktop（4.90.0 / 引擎 29.7.2 / Compose v5.5.1，WSL2 后端）并**实跑通过：165/165 全绿**（与线上容器同序：`generate` → `migrate deploy` → 内容种子 → 起服务），迁移 `20260913_add_lead_city` 已在生产等价 PostgreSQL 上验收；此前记的「本机未装 Docker、尚未执行」按实跑结果更正。同批做的离线等价核对：两份 schema 各自 `prisma validate` 通过（`schema.prisma` 需给 PG 形状的 `DATABASE_URL`，本地 `.env` 的 `file:./dev.db` 会触发 URL 协议不匹配，属既有约定）、两份 `Lead` 模型逐字段一致（`city String @default("")`）、迁移 SQL 只有一条纯加列语句 `ALTER TABLE "Lead" ADD COLUMN "city" TEXT NOT NULL DEFAULT ''`（带非空默认值，PG 对存量行安全）；SQLite 侧的落库 / 按城市搜索 / CSV 城市列已由 `verify:local` 实跑覆盖。**改动迁移时随时可重跑 `npm run verify:pg`**（全新库首部署场景用 `verify:pg:fresh`；演练库端口 55432、容器 `euriskotax-pg-drill`，跑完只停容器、数据卷 `pg_drill_data` 保留，彻底清理用 `docker compose -f docker-compose.postgres.yml down -v`）。
+> 单测 **28 套件 562 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增城市字段契约 2 例，搜索字段扩为四字段同步 1 例）。
+> 线上指纹 **37 项**（本版不改动指纹覆盖点）。
+> 本版不动税率与税额算法：只调整「谁来提供城市」与字段链路。
+
+### 变更
+- **取消计算页的「参保城市」选择**（回退阶段14 C2 的端上部分）：正向 / 反向 / 经营三页不再注入城市下拉，社保与公积金基数下限回到**全国口径兜底**（`tax-constants.js` 的 7546，仍可被管理台「税率」Tab 的全国口径热更新覆盖）—— 即「初始给一个默认值，用户按自身情况修改」的原设计。各地口径差异大，让用户在计算页先选城市既多一步操作，也容易因选错而给出误导性提示
+- 删除 `src/js/data/city-social-sync.js` 与 `src/js/ui/city-social-ui.js`（含 `tests/city-social-sync.test.js`），`package.json` 覆盖率采集清单同步移除；`tax-constants.js` 的契约注释回退为 C1 口径并记下本版取舍
+- **城市改由留资 / 咨询时收集**（顾问跟进必须知道当地口径）：`lead-modal.js` 表单新增「所在城市」（必填、20 字内；空值在 `validate()` 里拦截，未填不发请求 —— 首轮实跑门禁拦下过「只收集不校验、必填星号是假的」这一版）、`api-client.js` 透传 `city`、`leadController.js` 按 `CITY_MAX` 校验入库且幂等合并时以最新一次为准、`leadAdminController.js` 支持按城市搜索并新增 CSV 城市列、管理台线索列表展示城市
+- 数据库新增 `Lead.city`（`TEXT NOT NULL DEFAULT ''`）：`server/prisma/schema.prisma` + `schema.dev.prisma` + 迁移 `20260913_add_lead_city`
+- **三页「缴费比例」由固定两档下拉改为用户可输入的数字框**（默认 5% 只是初始值）：各地公积金比例 5%~12% 不等（上海 5/6/7、北京 5~12），固定档位会让用户选不到自己的比例；现在与同页其他「缴费比例」控件（`<input type="number">` + `%`）形态一致。正向 / 反向页由 `change` 改为 `input` 事件即时重算，并新增 `normalizeRateInput`（失焦时把留空 / 非数字 / 越界值回落默认 5%）—— 否则用户清空输入会按 `parseFloat('')||0` 静默算成 0，看起来像算错
+- **修复经营所得页「缴费基数 / 缴费比例」从未接线**：社保基数、公积金基数、养老 / 医疗 / 失业 / 公积金比例这 6 个输入框此前改什么都不发生，连「低于下限」提示位（`business-social-security-base-warning`、`business-housing-fund-base-warning`）也没有人写入；现补齐 `基数 × 比例 → 月度金额` 联动（新增 `calculateBusinessInsurance` / `calculateBusinessSocialInsurance`）并接上 `validateSocialSecurityBase('business')` / `validateHousingFundBase('business')`，与正向页口径一致。注意各险种清空后回落的是**自己的**默认比例（养老 8 / 医疗 2 / 失业 0.5 / 公积金 5），不是统一 5%
+- 门禁口径收口：`tools/ops/ops-verify-pg.ps1`、`tools/gui/gui-dev-console.ps1`、`docs/guides/development-workflow.md` 里遗留的旧口径「152 项 / 156 项」共 10 处统一回填为实跑值 **165 项**——`verify:release` 与 `tests/docs-metrics.test.js` 都以「文档声明＝实跑结果」为准，旧口径会让口径自检变红
+
+### 说明
+- **城市社保参数库保留，但不再被端上消费**：`GET /api/config/city-social`（公开只读）、管理端发布 / 回滚 / 版本唯一校验与「社保基数」Tab 全部保留原样，供后续「社保基数」SEO 落地页复用（该页需要真实城市口径）；日后要恢复端上分档，按 git 历史回滚那两个前端模块并在 `index.html` 重新引入即可
+- **口径提示降级为「全国兜底」**：非全国口径城市的用户可能收到本不该出现的「低于最低标准」提示（如上海公积金下限远低于 7546），这类差异改由顾问在留资后人工核对 —— 属本期「前期缩小范围」的已知取舍
+- 门禁断言同步改造：删掉 6 条已下线模块的静态断言，换成「回滚不残留（`index.html` 不得再引用这两个文件）+ 留资城市字段四处接线」断言，并给 e2e 加上城市落库 / 按城市搜索 / CSV 城市列的核对
+
+## [1.16.0] - 2026-09-13（阶段14 剩余项：第三个 SEO 落地页「汇算清缴」+ 参保城市下拉两处修复）
+
+> 门禁基线：**verify:local 162 项**（本次实跑 **162/162** 全绿；新增「汇算清缴」落地页断言 **4** 项 + 参保城市下拉断言 **2** 项，项数 156 → 162，其余分段明细见下方 1.13.0 行）。
+> 单测 **29 套件 592 例**（新增 `tests/annual-settlement-quick.test.js` 16 例：与内核 `computeDeductions` + `performTaxCalculation` 逐点对拍；`tests/city-social-sync.test.js` +5 例：首访广播 2 例、公积金比例随城市联动 2 例、「未指定」文案 1 例）。
+> 线上指纹 **37 项**（本版不改动指纹覆盖点）。
+> 本版不动税率与税额算法：新增内容是独立的静态落地页，另有参保城市下拉的两处端上修复（见「修复」）。
+
+### 新增
+- **SEO 落地页第三个页面：`/seo/annual-settlement.html`（个税汇算清缴：你是退税还是补税）**
+  - 瞄准汇算季（次年 3 月 1 日—6 月 30 日）意图最强的「汇算清缴怎么算 / 为什么会退税 / 应退应补多少」；页面自带速算器（输入月薪、任职月数、每月五险一金、每月专项附加扣除、已预缴税额 → 全年应纳税额 / 已预缴税额 / 应退或应补税额 / 适用年度税率）
+  - 把汇算讲成一道减法：**应退/应补 = 全年应纳税额 − 全年已预缴税额**（正数应补、负数应退）；「已预缴税额」留空时按累计预扣法推演、填写则以填写为准 —— 与主站「已预缴税额」输入框同语义
+  - 正文为静态 HTML（汇算公式与手算示例、七档年度税率表、三种典型情形示例表、退税/补税情形清单、办理时间与渠道、5 条 FAQ），配 `canonical` + JSON-LD（`WebApplication` + `FAQPage`，与正文问答逐条对应、由单测守护）
+  - **口径同源**：走 `src/js/calculation/annual-settlement-quick.js`，与内核 `computeDeductions` + `performTaxCalculation` 等价（全年收入 = 月薪 × 任职月数；年度总扣除 =（5000 + 五险一金 + 专项附加扣除）× 任职月数；年度税额查 `window.comprehensiveTaxRates`），并与「月薪个税」页的 `salary-tax-quick.js` 互相对拍 —— 三个落地页与 App 不会给出两种结论
+  - 正文如实说明「全年在同一单位领取、扣除均已申报时，推演预缴额就等于全年应纳税额（差额 0）」，差额来自多处工资薪金合并、年中入职/跳槽、扣除未及时填报、劳务报酬预扣率偏高等；示例表三行（差额 0 / 应补 9600 / 应退）覆盖三种结论方向
+  - 进 App 的链接带 `?source=seo_settlement`，服务端 `SOURCES` 白名单同步登记：本页带来的留资可在管理台按来源区分
+  - 正文注明政策依据《中华人民共和国个人所得税法》及其实施条例、**国家税务总局公告 2019 年第 44 号**（综合所得汇算清缴）与免责声明
+- **`sitemap.xml` 收录 `/seo/annual-settlement.html`**
+
+### 变更
+- 门禁新增 4 条「汇算清缴」落地页断言：可访问且含 canonical/FAQPage 与政策依据（含「6 月 30 日」办理期）、**静态年度税率表与 `comprehensiveTaxRates` 逐档一致**、静态示例表可被读到（9480 / 3480 / 19080 / 9600）、CTA 带归因参数；`sitemap.xml` 断言由「收录首页与全部落地页」扩为含第三个页面
+- `server/src/controllers/leadController.js` 的 `SOURCES` 白名单新增 `seo_settlement`
+
+### 修复
+- **首访（无缓存）时「参保城市」下拉卡在空态**（`src/js/data/city-social-sync.js`）：拿到配置后只在 `revision` 变化时才广播 `euriskotax:city-social-updated`，而首访没有旧指纹 → 广播被吞掉，`city-social-ui.js` 便永远停在 `init` 时的状态：下拉只剩一个「未指定（按默认城市）」且禁用，用户必须**手动刷新页面**才能选城市（1.13.0 起存在，本地已复现：新开无痕页发布城市参数后等待 5s，选项仍为 1 且 `disabled=true`）。现在「首次拿到配置」也广播（`detail.firstLoad = true`，仍不算版本变更、不误报「参数已更新」），`revision` 未变则不重复广播
+- **公积金「缴费比例」下拉不随参保城市变化**（`src/js/ui/city-social-ui.js`）：城市参数里的 `housingFundRateOptions` 此前只出现在提示文案中，三页的「缴费比例」下拉永远是页面静态的 5% / 7% —— 提示写「公积金比例可选 5% / 12%」，控件里却选不到 12%，用户还可能选出当地并不允许的比例（提示与控制自相矛盾）。现在按所选城市重建三页比例下拉：原值仍合法则保留，否则回落到首个合法值并触发一次 `change`（借页面既有监听重算公积金与专项附加扣除，不耦合计算函数）；无城市口径时保持出厂选项
+- **「未指定」与默认城市的说法统一**：选项文案由「未指定（按默认城市）」改为「未指定（按默认城市：全国平均）」，提示由「按『全国平均』口径」改为「未指定参保城市，按默认城市『全国平均』口径」，并注明可选比例已同步到上方「缴费比例」控件
+
+### 说明
+- 本版发布后，阶段14 的公开待办仅剩「其余关键词落地页」（社保基数 / 税后工资），优先级见 `seo-landing-plan.md` §3；其中「社保基数」页依赖管理台录入真实城市口径（当前库内只有兜底城市 `national`，下拉因此只有一个可选城市）
+- 汇算页的流量高峰在次年 3—6 月，旺季前上线以便收录起飞；本页复用的仍是 App 的年度汇算口径（基本减除费用按任职月数累计），页面上已如实写明
+
+---
+
 ## [1.15.0] - 2026-09-13（阶段14 剩余项：高商业意图 SEO 落地页 —— 第二个页面「月薪个税」）
 
 > 门禁基线：**verify:local 156 项**（本次实跑 **156/156** 全绿；新增「月薪个税」落地页断言 **4** 项，项数 152 → 156，其余分段明细见下方 1.13.0 行）。
