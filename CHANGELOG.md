@@ -11,7 +11,7 @@
 
 > 门禁基线：**verify:local 165 项，实跑 165/165 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版新增：移除已下线前端模块的 6 项静态断言；新增「城市改在留资里」5 项 + 「缴费比例可输入 / 留空越界兜底」2 项 + 「经营页基数 × 比例联动」1 项断言。**口径修正**：文档曾按「基线 + 新增项」推算为 164，与实跑不符（少 1 项），现按实跑值回填 —— 该项数一律以实跑快照为准，不做推算。
 > 生产等价演练：本版动过 `schema.prisma` 与 `server/prisma/migrations/`，按 `docs/guides/development-workflow.md` 属**必跑** `npm run verify:pg` 的范围 —— 已于 2026-09-13 在本机装好 Docker Desktop（4.90.0 / 引擎 29.7.2 / Compose v5.5.1，WSL2 后端）并**实跑通过：165/165 全绿**（与线上容器同序：`generate` → `migrate deploy` → 内容种子 → 起服务），迁移 `20260913_add_lead_city` 已在生产等价 PostgreSQL 上验收；此前记的「本机未装 Docker、尚未执行」按实跑结果更正。同批做的离线等价核对：两份 schema 各自 `prisma validate` 通过（`schema.prisma` 需给 PG 形状的 `DATABASE_URL`，本地 `.env` 的 `file:./dev.db` 会触发 URL 协议不匹配，属既有约定）、两份 `Lead` 模型逐字段一致（`city String @default("")`）、迁移 SQL 只有一条纯加列语句 `ALTER TABLE "Lead" ADD COLUMN "city" TEXT NOT NULL DEFAULT ''`（带非空默认值，PG 对存量行安全）；SQLite 侧的落库 / 按城市搜索 / CSV 城市列已由 `verify:local` 实跑覆盖。**改动迁移时随时可重跑 `npm run verify:pg`**（全新库首部署场景用 `verify:pg:fresh`；演练库端口 55432、容器 `euriskotax-pg-drill`，跑完只停容器、数据卷 `pg_drill_data` 保留，彻底清理用 `docker compose -f docker-compose.postgres.yml down -v`）。
-> 单测 **28 套件 562 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增城市字段契约 2 例，搜索字段扩为四字段同步 1 例）。
+> 单测 **28 套件 568 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增城市字段契约 2 例，搜索字段扩为四字段同步 1 例）。
 > 线上指纹 **37 项**（本版不改动指纹覆盖点）。
 > 本版不动税率与税额算法：只调整「谁来提供城市」与字段链路。
 
@@ -23,6 +23,7 @@
 - **三页「缴费比例」由固定两档下拉改为用户可输入的数字框**（默认 5% 只是初始值）：各地公积金比例 5%~12% 不等（上海 5/6/7、北京 5~12），固定档位会让用户选不到自己的比例；现在与同页其他「缴费比例」控件（`<input type="number">` + `%`）形态一致。正向 / 反向页由 `change` 改为 `input` 事件即时重算，并新增 `normalizeRateInput`（失焦时把留空 / 非数字 / 越界值回落默认 5%）—— 否则用户清空输入会按 `parseFloat('')||0` 静默算成 0，看起来像算错
 - **修复经营所得页「缴费基数 / 缴费比例」从未接线**：社保基数、公积金基数、养老 / 医疗 / 失业 / 公积金比例这 6 个输入框此前改什么都不发生，连「低于下限」提示位（`business-social-security-base-warning`、`business-housing-fund-base-warning`）也没有人写入；现补齐 `基数 × 比例 → 月度金额` 联动（新增 `calculateBusinessInsurance` / `calculateBusinessSocialInsurance`）并接上 `validateSocialSecurityBase('business')` / `validateHousingFundBase('business')`，与正向页口径一致。注意各险种清空后回落的是**自己的**默认比例（养老 8 / 医疗 2 / 失业 0.5 / 公积金 5），不是统一 5%
 - 门禁口径收口：`tools/ops/ops-verify-pg.ps1`、`tools/gui/gui-dev-console.ps1`、`docs/guides/development-workflow.md` 里遗留的旧口径「152 项 / 156 项」共 10 处统一回填为实跑值 **165 项**——`verify:release` 与 `tests/docs-metrics.test.js` 都以「文档声明＝实跑结果」为准，旧口径会让口径自检变红
+- **口径守卫加固（旧口径残留防护）**：`tools/ops/release-metrics.js` 原先只校验「每份文件里数值最大的那一条」项数声明，同文件内其余出现既不校验、也不要求版本前缀 —— 上面那 10 处旧口径正是这么漏过去的。现改为**逐条校验 + 版本前缀约束**：非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`（增量描述「新增 / 移除 / 少 N 项」不计入）；`history` 落点的当前口径还必须锚定当前版本，不再靠「取最大」猜（项数下降的版本里历史值会比当前值大）；`ops-verify-pg.ps1` / `gui-dev-console.ps1` 一并纳入扫描
 
 ### 说明
 - **城市社保参数库保留，但不再被端上消费**：`GET /api/config/city-social`（公开只读）、管理端发布 / 回滚 / 版本唯一校验与「社保基数」Tab 全部保留原样，供后续「社保基数」SEO 落地页复用（该页需要真实城市口径）；日后要恢复端上分档，按 git 历史回滚那两个前端模块并在 `index.html` 重新引入即可
