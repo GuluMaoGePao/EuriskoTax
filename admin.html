@@ -30,8 +30,50 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         .mono { font-family: Consolas, Menlo, Monaco, monospace; }
-        .tab-btn { @apply px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors whitespace-nowrap; }
+
+        /* ---- 导航 ---- */
+        .tab-btn { @apply px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors whitespace-nowrap; }
         .tab-btn.active { @apply text-primary bg-blue-50; }
+        .nav-sep { @apply hidden md:block w-px h-5 bg-gray-200 mx-1.5 shrink-0; }
+
+        /* ---- 页头 ---- */
+        .page-head { @apply flex flex-wrap items-start justify-between gap-3 mb-3; }
+        .page-title { @apply text-lg font-bold text-gray-800 flex items-center gap-2; }
+        .page-desc { @apply text-xs text-gray-500 leading-relaxed mt-1; }
+
+        /* ---- 面板 ---- */
+        .panel { @apply bg-white rounded-xl border border-gray-200; }
+        .panel-head { @apply flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b border-gray-100; }
+        .panel-title { @apply text-sm font-bold text-gray-700 flex items-center gap-2; }
+        .panel-body { @apply p-5; }
+
+        /* ---- 说明块：功能「是什么 / 怎么用 / 注意点」 ---- */
+        .hint { @apply text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 leading-relaxed; }
+        .hint b { @apply text-gray-800; }
+        .hint-step { @apply inline-flex items-center justify-center w-4 h-4 mr-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold align-middle; }
+
+        /* ---- 表单控件 ---- */
+        .field { @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500; }
+        .field-sm { @apply border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500; }
+        .label { @apply block text-[11px] font-semibold text-gray-500 mb-1; }
+
+        /* ---- 按钮 ---- */
+        .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-4 py-2 transition-colors whitespace-nowrap; }
+        .btn-primary { @apply bg-primary text-white hover:bg-blue-800; }
+        .btn-success { @apply bg-success text-white hover:bg-emerald-600; }
+        .btn-ghost { @apply bg-white border border-gray-200 text-gray-600 hover:text-primary hover:border-blue-200; }
+        .btn-muted { @apply bg-gray-100 text-gray-700 hover:bg-gray-200; }
+        .btn-xs { @apply px-3 py-1.5 text-xs; }
+
+        /* ---- 表格：表头/单元格统一在此定义，业务行无需重复写间距类 ---- */
+        .tbl { @apply w-full text-sm; }
+        .tbl thead th { @apply bg-gray-50/80 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap border-b border-gray-200; }
+        .tbl tbody tr { @apply hover:bg-gray-50; }
+        .tbl tbody td { @apply px-4 py-3 align-top; }
+        /* 空态：仅 colspan 单元格（占满整行）走居中留白，正常数据行不受影响 */
+        .tbl tbody td[colspan] { @apply py-12 text-center text-gray-400 whitespace-normal; }
+        .tbl-foot { @apply px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500; }
+        .pager-btn { @apply px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs transition-colors; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
@@ -39,26 +81,32 @@
     <!-- 顶栏 -->
     <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-2.5 shrink-0">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-blue-500 text-white flex items-center justify-center">
                     <i class="fa fa-crown text-sm"></i>
                 </div>
                 <div class="leading-tight">
                     <div class="font-bold text-gray-800 text-sm">EuriskoTax 管理台</div>
-                    <div class="text-[10px] text-gray-400 hidden sm:block">内部运维 · 权益发放 / 反馈跟进 / 数据观察</div>
+                    <div class="text-[10px] text-gray-400 hidden sm:block">内部运维 · 线索跟进 / 权益发放 / 内容与配置</div>
                 </div>
             </div>
-            <nav id="main-nav" class="ml-6 hidden md:flex items-center gap-1">
-                <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
-                <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
-                <button data-nav="leads" class="tab-btn"><i class="fa fa-user-plus mr-1"></i>线索</button>
-                <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
-                <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
-                <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
-                <button data-nav="taxrates" class="tab-btn"><i class="fa fa-percent mr-1"></i>税率</button>
-                <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
+            <nav id="main-nav" class="ml-6 hidden md:flex items-center">
+                <button data-nav="overview" title="平台运行概况与趋势" class="tab-btn"><i class="fa fa-dashboard mr-1.5"></i>总览</button>
+                <span class="nav-sep"></span>
+                <button data-nav="leads" title="用户咨询意向与跟进" class="tab-btn"><i class="fa fa-user-plus mr-1.5"></i>线索</button>
+                <button data-nav="feedback" title="Bug / 建议 / 其他反馈" class="tab-btn"><i class="fa fa-comments-o mr-1.5"></i>反馈</button>
+                <span class="nav-sep"></span>
+                <button data-nav="users" title="注册账号与权益状态" class="tab-btn"><i class="fa fa-users mr-1.5"></i>用户</button>
+                <button data-nav="invites" title="新用户注册准入码" class="tab-btn"><i class="fa fa-link mr-1.5"></i>邀请码</button>
+                <button data-nav="procodes" title="专业版付费兑换码" class="tab-btn"><i class="fa fa-ticket mr-1.5"></i>兑换码</button>
+                <span class="nav-sep"></span>
+                <button data-nav="content" title="政策要点 / 公告 / 运营内容" class="tab-btn"><i class="fa fa-bullhorn mr-1.5"></i>内容</button>
+                <button data-nav="taxrates" title="税制参数热更新" class="tab-btn"><i class="fa fa-percent mr-1.5"></i>税率</button>
+                <button data-nav="citysocial" title="各城市社保/公积金缴费基数口径" class="tab-btn"><i class="fa fa-map-marker mr-1.5"></i>社保基数</button>
+                <span class="nav-sep"></span>
+                <button data-nav="support" title="客服排障话术库" class="tab-btn"><i class="fa fa-life-ring mr-1.5"></i>排障</button>
             </nav>
-            <div class="ml-auto flex items-center gap-3">
+            <div class="ml-auto flex items-center gap-3 shrink-0">
                 <span id="connection-state" class="hidden text-xs text-gray-400"></span>
                 <button id="logout-btn" class="hidden px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
                     <i class="fa fa-sign-out mr-1"></i>退出
@@ -67,13 +115,15 @@
         </div>
         <!-- 移动端导航 -->
         <nav id="main-nav-mobile" class="md:hidden border-t border-gray-100 px-2 py-1.5 flex gap-1 overflow-x-auto">
-            <button data-nav="overview" class="tab-btn"><i class="fa fa-tachometer mr-1"></i>总览</button>
-            <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
+            <button data-nav="overview" class="tab-btn"><i class="fa fa-dashboard mr-1"></i>总览</button>
             <button data-nav="leads" class="tab-btn"><i class="fa fa-user-plus mr-1"></i>线索</button>
+            <button data-nav="feedback" class="tab-btn"><i class="fa fa-comments-o mr-1"></i>反馈</button>
             <button data-nav="users" class="tab-btn"><i class="fa fa-users mr-1"></i>用户</button>
-            <button data-nav="invites" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
+            <button data-nav="invites" class="tab-btn"><i class="fa fa-link mr-1"></i>邀请码</button>
+            <button data-nav="procodes" class="tab-btn"><i class="fa fa-ticket mr-1"></i>兑换码</button>
             <button data-nav="content" class="tab-btn"><i class="fa fa-bullhorn mr-1"></i>内容</button>
             <button data-nav="taxrates" class="tab-btn"><i class="fa fa-percent mr-1"></i>税率</button>
+            <button data-nav="citysocial" class="tab-btn"><i class="fa fa-map-marker mr-1"></i>社保基数</button>
             <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
         </nav>
     </header>
@@ -86,20 +136,23 @@
                     <i class="fa fa-lock text-2xl"></i>
                 </div>
                 <h1 class="text-xl font-bold text-gray-800">管理员登录</h1>
-                <p class="text-xs text-gray-400 mt-1">输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
+                <p class="text-xs text-gray-400 mt-1">请输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
             </div>
-            <label class="block text-xs font-semibold text-gray-500 mb-1.5">访问令牌</label>
+            <label class="label" for="login-token-input">访问令牌</label>
             <input id="login-token-input" type="password" autocomplete="off" spellcheck="false"
-                placeholder="粘贴 ADMIN_TOKEN" class="mono w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                placeholder="粘贴 ADMIN_TOKEN" class="mono field">
             <label class="flex items-center gap-2 mt-3 text-xs text-gray-500 cursor-pointer select-none">
                 <input id="login-remember" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                在本机记住令牌（下次免输，存 localStorage）
+                在本机记住令牌（下次免输，仅保存在本机 localStorage）
             </label>
             <button id="login-btn" class="mt-5 w-full bg-primary hover:bg-blue-800 text-white font-semibold rounded-lg py-2.5 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
                 <i class="fa fa-sign-in"></i>进入管理台
             </button>
             <p id="login-error" class="hidden mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"></p>
-            <p class="text-[11px] text-gray-400 mt-4 text-center leading-relaxed">令牌仅用于请求管理接口的 <span class="mono">X-Admin-Token</span> 请求头，不发送到其它域名。</p>
+            <div class="hint mt-4">
+                令牌仅用于管理接口的 <span class="mono">X-Admin-Token</span> 请求头，不会发送到其它域名；
+                本页面已禁止搜索引擎收录（<span class="mono">noindex, nofollow</span>）。
+            </div>
         </div>
     </main>
 
@@ -108,54 +161,35 @@
 
         <!-- 总览 -->
         <section id="view-overview" class="view-section">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-tachometer text-primary mr-2"></i>运营总览</h2>
-                <button data-act="refresh-overview" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-1.5"><i class="fa fa-refresh mr-1"></i>刷新</button>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-dashboard text-primary"></i>运营总览</h2>
+                    <p class="page-desc">平台运行概况：用户规模、计算量、线索转化与近期趋势。</p>
+                </div>
+                <button data-act="refresh-overview" class="btn btn-ghost btn-xs"><i class="fa fa-refresh"></i>刷新数据</button>
             </div>
             <div id="overview-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5"></div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 class="text-sm font-bold text-gray-600 mb-4"><i class="fa fa-bar-chart text-primary mr-2"></i>计算类型分布（累计）</h3>
-                    <div id="overview-types"></div>
+                <div class="panel">
+                    <div class="panel-head"><h3 class="panel-title"><i class="fa fa-bar-chart text-primary"></i>计算类型分布（累计）</h3></div>
+                    <div class="panel-body"><div id="overview-types"></div></div>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 class="text-sm font-bold text-gray-600 mb-4"><i class="fa fa-line-chart text-primary mr-2"></i>近 7 日趋势（注册 / 计算）</h3>
-                    <div id="overview-trend"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 反馈 -->
-        <section id="view-feedback" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-comments-o text-primary mr-2"></i>用户反馈</h2>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <select id="feedback-status-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">全部状态</option>
-                        <option value="open">待处理 open</option>
-                        <option value="resolved">已解决 resolved</option>
-                        <option value="closed">已关闭 closed</option>
-                    </select>
-                    <select id="feedback-category-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">全部分类</option>
-                        <option value="bug">Bug</option>
-                        <option value="suggestion">建议</option>
-                        <option value="other">其他</option>
-                        <option value="general">一般</option>
-                    </select>
-                    <button data-act="refresh-feedback" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
+                <div class="panel">
+                    <div class="panel-head"><h3 class="panel-title"><i class="fa fa-line-chart text-primary"></i>近 7 日趋势（注册 / 计算）</h3></div>
+                    <div class="panel-body"><div id="overview-trend"></div></div>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">最近 200 条按提交时间倒序；附图已随反馈入库，仅管理员可见。改状态后点「处理」即保存。</p>
-            <div id="feedback-list" class="space-y-3"></div>
         </section>
 
         <!-- 线索（阶段13C：漏斗条 + 列表 + 状态机 + 分配 + 导出） -->
         <section id="view-leads" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-user-plus text-primary mr-2"></i>转化线索</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-user-plus text-primary"></i>转化线索</h2>
+                    <p class="page-desc">用户主动留下联系方式的咨询意向，是「免费工具 → 付费服务」的核心转化口径。</p>
+                </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <select id="leads-status-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="leads-status-filter" class="field-sm" title="按跟进状态筛选">
                         <option value="">全部状态</option>
                         <option value="new">待跟进 new</option>
                         <option value="contacted">已联系 contacted</option>
@@ -163,7 +197,7 @@
                         <option value="converted">已成交 converted</option>
                         <option value="dropped">已放弃 dropped</option>
                     </select>
-                    <select id="leads-source-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="leads-source-filter" class="field-sm" title="按留资入口筛选，可判断哪个页面转化最好">
                         <option value="">全部来源</option>
                         <option value="result_business">经营所得结果页</option>
                         <option value="result_settlement">汇算清缴结果页</option>
@@ -175,161 +209,312 @@
                         <option value="share">分享图</option>
                         <option value="unknown">未知</option>
                     </select>
-                    <input id="leads-query" type="search" placeholder="姓名 / 手机号 / 公司" class="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button data-act="search-leads" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-search mr-1"></i>查询</button>
-                    <button data-act="refresh-leads" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
-                    <button data-act="leads-export" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-download mr-1"></i>导出 CSV</button>
+                    <input id="leads-query" type="search" placeholder="姓名 / 手机号 / 公司" class="field-sm w-48">
+                    <button data-act="search-leads" class="btn btn-primary btn-xs"><i class="fa fa-search"></i>查询</button>
+                    <button data-act="refresh-leads" class="btn btn-ghost btn-xs"><i class="fa fa-refresh"></i>刷新</button>
+                    <button data-act="leads-export" class="btn btn-ghost btn-xs"><i class="fa fa-download"></i>导出 CSV</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">
-                线索是「工具 → 服务」的唯一转化枢纽（北极星指标 <span class="mono">lead_submit / calc_done</span>）。
-                改状态下拉即时保存；填好跟进人后点 <i class="fa fa-check"></i> 保存（清空即取消分配）。导出 CSV 供销售导入自有 CRM。
-            </p>
+            <div class="hint mb-4">
+                <b>怎么用：</b>先在漏斗看哪一环掉得最快，再用状态筛选出待跟进线索。
+                <span class="hint-step">1</span>改「状态」下拉即自动保存；
+                <span class="hint-step">2</span>填好跟进人后点 <i class="fa fa-check"></i> 保存（清空即取消分配）；
+                <span class="hint-step">3</span>点「导出 CSV」可把当前筛选结果交给销售导入自有 CRM。
+                北极星指标 <span class="mono">lead_submit / calc_done</span> 表示「完成测算的人里有多少留下了咨询意向」。
+            </div>
             <div id="lead-funnel" class="mb-4"></div>
             <div id="conversion-funnel" class="mb-4"></div>
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div class="panel overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+                    <table class="tbl">
+                        <thead>
                             <tr>
-                                <th class="px-3 py-3 font-semibold">ID</th>
-                                <th class="px-3 py-3 font-semibold">联系人</th>
-                                <th class="px-3 py-3 font-semibold">公司 / 主体</th>
-                                <th class="px-3 py-3 font-semibold">需求</th>
-                                <th class="px-3 py-3 font-semibold">来源 / 情境</th>
-                                <th class="px-3 py-3 font-semibold">状态</th>
-                                <th class="px-3 py-3 font-semibold">跟进人</th>
-                                <th class="px-3 py-3 font-semibold">提交</th>
+                                <th>ID</th>
+                                <th>联系人</th>
+                                <th>公司 / 主体</th>
+                                <th>需求</th>
+                                <th>来源 / 情境</th>
+                                <th>状态</th>
+                                <th>跟进人</th>
+                                <th>提交时间</th>
                             </tr>
                         </thead>
                         <tbody id="leads-table-body" class="divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
-                <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                <div class="tbl-foot">
                     <span id="leads-total"></span>
                     <div class="flex items-center gap-2">
-                        <button data-act="leads-prev" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">上一页</button>
+                        <button data-act="leads-prev" class="pager-btn">上一页</button>
                         <span id="leads-page" class="text-xs"></span>
-                        <button data-act="leads-next" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">下一页</button>
+                        <button data-act="leads-next" class="pager-btn">下一页</button>
                     </div>
                 </div>
             </div>
         </section>
 
+        <!-- 反馈 -->
+        <section id="view-feedback" class="view-section hidden">
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-comments-o text-primary"></i>用户反馈</h2>
+                    <p class="page-desc">用户提交的 Bug、建议与其他反馈，逐条跟进处理。</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="feedback-status-filter" class="field-sm" title="按处理状态筛选">
+                        <option value="">全部状态</option>
+                        <option value="open">待处理 open</option>
+                        <option value="resolved">已解决 resolved</option>
+                        <option value="closed">已关闭 closed</option>
+                    </select>
+                    <select id="feedback-category-filter" class="field-sm" title="按反馈分类筛选">
+                        <option value="">全部分类</option>
+                        <option value="bug">Bug</option>
+                        <option value="suggestion">建议</option>
+                        <option value="other">其他</option>
+                        <option value="general">一般</option>
+                    </select>
+                    <button data-act="refresh-feedback" class="btn btn-ghost btn-xs"><i class="fa fa-refresh"></i>刷新</button>
+                </div>
+            </div>
+            <div class="hint mb-4">
+                列表为最近 200 条、按提交时间倒序。<b>怎么用：</b>点缩略图看大图 → 改「状态」下拉 → 点「处理」保存。
+                附图随反馈一并入库，仅管理员可见。
+            </div>
+            <div id="feedback-list" class="space-y-3"></div>
+        </section>
+
         <!-- 用户 -->
         <section id="view-users" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-users text-primary mr-2"></i>用户与权益</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-users text-primary"></i>用户与权益</h2>
+                    <p class="page-desc">注册账号及其版本权益（基础版 / 专业版）。</p>
+                </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <input id="users-query" type="search" placeholder="用户名或邮箱" class="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <select id="users-plan-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input id="users-query" type="search" placeholder="用户名或邮箱" class="field-sm w-48">
+                    <select id="users-plan-filter" class="field-sm" title="按版本筛选">
                         <option value="">全部计划</option>
                         <option value="pro">专业版 pro</option>
                         <option value="free">基础版 free</option>
                     </select>
-                    <button data-act="search-users" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-search mr-1"></i>查询</button>
+                    <button data-act="search-users" class="btn btn-primary btn-xs"><i class="fa fa-search"></i>查询</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">授予专业版：14 天体验补发 / 永久授权 / 自定义天数；也可回落基础版。操作记录在服务器日志。正式对外授权建议走下方兑换码。</p>
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div class="hint mb-4">
+                <b>怎么用：</b>点行内「详情」查看账号全貌；权益调整支持<b>补发 14 天体验</b>、<b>自定义天数</b>、<b>永久授权</b>与<b>回落基础版</b>。
+                所有调整都会写入服务器日志。<b>注意：</b>正式对外收费请一律走「兑换码」页发码，不要用这里直接改权益（缺少收款凭证）。
+            </div>
+            <div class="panel overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+                    <table class="tbl">
+                        <thead>
                             <tr>
-                                <th class="px-4 py-3 font-semibold">ID</th>
-                                <th class="px-4 py-3 font-semibold">用户</th>
-                                <th class="px-4 py-3 font-semibold">邮箱</th>
-                                <th class="px-4 py-3 font-semibold">计划</th>
-                                <th class="px-4 py-3 font-semibold">有效期 / 来源</th>
-                                <th class="px-4 py-3 font-semibold">注册</th>
-                                <th class="px-4 py-3 font-semibold">操作</th>
+                                <th>ID</th>
+                                <th>用户</th>
+                                <th>邮箱</th>
+                                <th>计划</th>
+                                <th>有效期 / 来源</th>
+                                <th>注册时间</th>
+                                <th class="text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody id="users-table-body" class="divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
-                <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+                <div class="tbl-foot">
                     <span id="users-total"></span>
                     <div class="flex items-center gap-2">
-                        <button data-act="users-prev" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">上一页</button>
+                        <button data-act="users-prev" class="pager-btn">上一页</button>
                         <span id="users-page" class="text-xs"></span>
-                        <button data-act="users-next" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 text-xs">下一页</button>
+                        <button data-act="users-next" class="pager-btn">下一页</button>
                     </div>
                 </div>
             </div>
-            <div id="user-detail" class="hidden mt-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+            <div id="user-detail" class="hidden mt-4 panel p-5"></div>
         </section>
 
-        <!-- 兑换码 -->
+        <!-- 邀请码：注册准入码（与「兑换码」区分） -->
         <section id="view-invites" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-ticket text-primary mr-2"></i>兑换码（一机一码 · 专业版授权）</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-link text-primary"></i>注册邀请码</h2>
+                    <p class="page-desc">新用户注册时的准入码，一码一用，只影响「能否注册」，不影响用户权益。</p>
+                </div>
                 <div class="flex items-center gap-2">
-                    <input id="invite-count" type="number" min="1" max="100" value="5" class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button data-act="gen-invites" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-plus mr-1"></i>生成</button>
+                    <input id="invite-count" type="number" min="1" max="100" value="5" class="field-sm w-20" title="本次生成数量（1-100）">
+                    <button data-act="gen-invites" class="btn btn-primary btn-xs"><i class="fa fa-plus"></i>生成邀请码</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-4">把生成的兑换码发给用户，注册/兑换时输入即开通专业版；已使用列表用于核对发放去向。</p>
+            <div class="hint mb-4">
+                <b>怎么用：</b>生成后把邀请码发给受邀用户，对方在注册页填写即可完成注册；
+                「已使用」列表会记录该邀请码注册出的账号，便于核对邀请来源。
+                <b>需要给用户开通专业版？</b>请改用右侧导航的「兑换码」页。
+            </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-gift text-success mr-2"></i>可用兑换码
-                        <span id="invite-available-badge" class="ml-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5"></span>
-                    </h3>
-                    <div id="invite-available" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3 class="panel-title"><i class="fa fa-gift text-success"></i>可用邀请码
+                            <span id="invite-available-badge" class="text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5"></span>
+                        </h3>
+                    </div>
+                    <div class="panel-body">
+                        <div id="invite-available" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 p-5">
-                    <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-check-circle-o text-warning mr-2"></i>已使用
-                        <span id="invite-used-badge" class="ml-2 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5"></span>
-                    </h3>
-                    <div id="invite-used" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3 class="panel-title"><i class="fa fa-check-circle-o text-warning"></i>已使用邀请码
+                            <span id="invite-used-badge" class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5"></span>
+                        </h3>
+                    </div>
+                    <div class="panel-body">
+                        <div id="invite-used" class="space-y-1.5 max-h-[480px] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 兑换码（专业版授权 · 阶段14 变现：线下收款后发放） -->
+        <section id="view-procodes" class="view-section hidden">
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-ticket text-primary"></i>专业版兑换码</h2>
+                    <p class="page-desc">线下收款后发放给客户的付费凭证，用于自助开通专业版，全程无需后台改库。</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input id="procode-batch-filter" type="text" class="field-sm w-40" placeholder="按批次筛选">
+                    <select id="procode-status-filter" class="field-sm" title="按兑换状态筛选">
+                        <option value="">全部状态</option>
+                        <option value="available">仅可用</option>
+                        <option value="used">仅已兑换</option>
+                        <option value="disabled">仅已作废</option>
+                    </select>
+                    <button data-act="filter-procodes" class="btn btn-ghost btn-xs"><i class="fa fa-filter"></i>筛选</button>
+                    <button data-act="export-procodes" class="btn btn-ghost btn-xs"><i class="fa fa-download"></i>导出 CSV</button>
+                </div>
+            </div>
+
+            <div class="hint mb-4">
+                <b>怎么用：</b>
+                <span class="hint-step">1</span>收到客户款项后，在下方「生成新兑换码」填写数量、有效期、批次与备注，点「生成」；
+                <span class="hint-step">2</span>复制兑换码交付客户；
+                <span class="hint-step">3</span>客户在 App「版本与权益」弹窗内输入即可自助开通。
+                <br class="hidden sm:block" />
+                <b>注意：</b>一码一用，<b>已被兑换的码不可作废</b>（保留作收款凭证），如需退款请到「用户」页回落该账号权益；
+                「批次」建议按收款月份或客户填写，方便对账与 CSV 导出。
+            </div>
+
+            <!-- 生成表单 -->
+            <div class="panel mb-4">
+                <div class="panel-head">
+                    <h3 class="panel-title"><i class="fa fa-plus-circle text-primary"></i>生成新兑换码</h3>
+                    <span class="text-[11px] text-gray-400">有效期留空即为「永久专业版」，请谨慎发放</span>
+                </div>
+                <div class="panel-body">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                            <label class="label" for="procode-count">数量（1-200）</label>
+                            <input id="procode-count" type="number" min="1" max="200" value="5" class="field">
+                        </div>
+                        <div>
+                            <label class="label" for="procode-days">有效期天数（留空 = 永久）</label>
+                            <input id="procode-days" type="number" min="1" max="3650" class="field" placeholder="如 365">
+                        </div>
+                        <div>
+                            <label class="label" for="procode-batch">批次（选填，用于对账）</label>
+                            <input id="procode-batch" type="text" class="field" placeholder="如 2026.09">
+                        </div>
+                        <div>
+                            <label class="label" for="procode-note">备注（选填，如客户名）</label>
+                            <input id="procode-note" type="text" class="field" placeholder="如 张先生 年度服务">
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-3">
+                        <button data-act="gen-procodes" class="btn btn-primary"><i class="fa fa-plus"></i>生成兑换码</button>
+                        <span class="text-[11px] text-gray-400">生成后请立即复制并交付客户，避免凭证外泄。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 mb-4">
+                <span class="text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2.5 py-1">可用 <b id="procode-available-badge">0</b></span>
+                <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-1">已兑换 <b id="procode-used-badge">0</b></span>
+                <span class="text-xs bg-gray-100 text-gray-600 border border-gray-200 rounded-full px-2.5 py-1">已作废 <b id="procode-disabled-badge">0</b></span>
+            </div>
+
+            <div class="panel overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>兑换码</th>
+                                <th>状态</th>
+                                <th>有效期</th>
+                                <th>批次</th>
+                                <th>备注</th>
+                                <th>兑换者</th>
+                                <th class="text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="procode-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
                 </div>
             </div>
         </section>
 
         <!-- 内容中心 -->
         <section id="view-content" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-bullhorn text-primary mr-2"></i>内容中心</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-bullhorn text-primary"></i>内容中心</h2>
+                    <p class="page-desc">统一管理政策要点、更新公告与运营内容，发布后按投放对象触达用户。</p>
+                </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <select id="content-type-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="content-type-filter" class="field-sm" title="内容类型">
                         <option value="">全部类型</option>
                         <option value="policy">政策要点 policy</option>
                         <option value="announcement">更新公告 announcement</option>
                         <option value="operation">运营内容 operation</option>
                     </select>
-                    <select id="content-status-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="content-status-filter" class="field-sm" title="发布状态">
                         <option value="">全部状态</option>
                         <option value="draft">草稿 draft</option>
                         <option value="published">已发布 published</option>
                         <option value="revoked">已撤回 revoked</option>
                     </select>
-                    <select id="content-audience-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="content-audience-filter" class="field-sm" title="投放对象">
                         <option value="">全部投放对象</option>
                         <option value="all">全体 all</option>
                         <option value="free">基础版 free</option>
                         <option value="pro">专业版 pro</option>
                     </select>
-                    <input id="content-query" type="search" placeholder="标题 / 问题 / 正文 / item_id" class="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button data-act="search-content" class="bg-primary hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-search mr-1"></i>查询</button>
-                    <button data-act="new-content" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-plus mr-1"></i>新建</button>
-                    <button data-act="publish-content" class="bg-success text-white hover:bg-emerald-600 text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-paper-plane mr-1"></i>发布</button>
+                    <input id="content-query" type="search" placeholder="标题 / 问题 / 正文 / item_id" class="field-sm w-56">
+                    <button data-act="search-content" class="btn btn-primary btn-xs"><i class="fa fa-search"></i>查询</button>
+                    <button data-act="new-content" class="btn btn-ghost btn-xs"><i class="fa fa-plus"></i>新建内容</button>
+                    <button data-act="publish-content" class="btn btn-success btn-xs"><i class="fa fa-paper-plane"></i>发布</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">
-                政策要点（policy）会合并进税助手问答库，<span class="mono">item_id</span> 与内置条目一致时覆盖内置内容；公告与运营内容（announcement / operation）按展示位投放到启动弹窗、首页公告条与个人中心。
-                投放对象 <span class="mono">audience</span>：全体（含游客）/ 基础版 / 专业版。<span class="mono">publish_at</span> 支持预约上线，<span class="mono">expire_at</span> 到期自动下架。
-            </p>
+            <div class="hint mb-4">
+                <b>policy（政策要点）</b>：会合并进「税助手」问答库；<span class="mono">item_id</span> 与内置条目一致时覆盖内置内容。
+                <b>announcement / operation</b>：按展示位投放到启动弹窗、首页公告条与个人中心。
+                <br class="hidden sm:block" />
+                <span class="mono">audience</span> 决定谁能看到（全体含游客 / 基础版 / 专业版）；<span class="mono">publish_at</span> 支持预约上线，<span class="mono">expire_at</span> 到期自动下架。
+            </div>
             <div id="content-list" class="space-y-3"></div>
-            <div id="content-editor" class="hidden mt-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+            <div id="content-editor" class="hidden mt-4 panel p-5"></div>
         </section>
 
         <!-- 排障话术 -->
         <section id="view-support" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-life-ring text-primary mr-2"></i>排障话术库</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-life-ring text-primary"></i>排障话术库</h2>
+                    <p class="page-desc">客服「先自查、再回复」的标准清单：每条含典型症状、处理步骤与可直接复制的话术。</p>
+                </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <input id="support-query" type="search" placeholder="搜索现象 / 关键词" class="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <select id="support-category-filter" class="border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input id="support-query" type="search" placeholder="搜索现象 / 关键词" class="field-sm w-56">
+                    <select id="support-category-filter" class="field-sm" title="按问题分类筛选">
                         <option value="">全部分类</option>
                         <option value="cache">缓存 / 版本</option>
                         <option value="account">账号 / 登录</option>
@@ -337,45 +522,74 @@
                         <option value="pay">权益 / 兑换码</option>
                         <option value="usage">功能使用</option>
                     </select>
-                    <button data-act="refresh-support" class="text-xs text-gray-500 hover:text-primary bg-white border border-gray-200 rounded-lg px-3 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
-                    <button data-act="support-new" class="bg-primary text-white text-sm font-medium rounded-lg px-3 py-2 hover:opacity-90"><i class="fa fa-plus mr-1"></i>新增话术</button>
-                    <button data-act="support-restore" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-3 py-2"><i class="fa fa-undo mr-1"></i>恢复内置</button>
-                    <button data-act="support-copy-reset-url" class="bg-white border border-gray-200 text-gray-600 hover:text-primary text-sm font-medium rounded-lg px-3 py-2"><i class="fa fa-link mr-1"></i>复制排障短链</button>
+                    <button data-act="refresh-support" class="btn btn-ghost btn-xs"><i class="fa fa-refresh"></i>刷新</button>
+                    <button data-act="support-new" class="btn btn-primary btn-xs"><i class="fa fa-plus"></i>新增话术</button>
+                    <button data-act="support-restore" class="btn btn-ghost btn-xs"><i class="fa fa-undo"></i>恢复内置</button>
+                    <button data-act="support-copy-reset-url" class="btn btn-ghost btn-xs"><i class="fa fa-link"></i>复制排障短链</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">
-                收集用户反馈时的「先自查、再回复」清单：每条含典型症状、处理步骤与可直接复制的话术。
-                排障短链固定为 <span class="mono" id="support-reset-url"></span>，把它发给用户即可完成缓存重置。
-                条目存在服务端 <span class="mono">SupportScript</span> 表，此处增删改即时生效（无需发版）；
-                权威文档见 <span class="mono">docs/guides/support-playbook.md</span>。
-            </p>
-            <div id="support-editor" class="hidden mb-4 bg-white rounded-xl border border-gray-200 p-5"></div>
+            <div class="hint mb-4">
+                排障短链固定为 <span class="mono" id="support-reset-url"></span>，发给用户打开即可完成缓存重置。
+                条目保存在服务端 <span class="mono">SupportScript</span> 表，此处增删改<b>即时生效、无需发版</b>；
+                搜索框输入即过滤。权威文档见 <span class="mono">docs/guides/support-playbook.md</span>。
+            </div>
+            <div id="support-editor" class="hidden mb-4 panel p-5"></div>
             <div id="support-list" class="space-y-3"></div>
         </section>
 
         <!-- 税率（阶段12 C1：热改税制参数 + 版本化 + 可选公告联动） -->
         <section id="view-taxrates" class="view-section hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa fa-percent text-primary mr-2"></i>税制参数（热改税率）</h2>
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-percent text-primary"></i>税制参数（热改税率）</h2>
+                    <p class="page-desc">税率表与缴费基数下限的热更新入口，保存即对所有用户生效，无需发版。</p>
+                </div>
                 <div class="flex items-center gap-2">
-                    <button data-act="taxrates-refresh" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-refresh mr-1"></i>刷新</button>
-                    <button data-act="taxrates-reset" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg px-4 py-2"><i class="fa fa-undo mr-1"></i>载入当前生效值</button>
+                    <button data-act="taxrates-refresh" class="btn btn-muted btn-xs"><i class="fa fa-refresh"></i>刷新</button>
+                    <button data-act="taxrates-reset" class="btn btn-muted btn-xs"><i class="fa fa-undo"></i>载入当前生效值</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-400 mb-3">
-                保存后立即对所有用户生效（端上下次启动 / 联网时应用，离线用缓存兜底）。税率错误会波及全站计税，请务必核对后再发布。
-                每次保存生成一个版本快照，可回滚；勾选「同步发送更新公告」会在保存后发一条公告（复用内容中心投放）。
-            </p>
+            <div class="hint mb-4">
+                <b>生效方式：</b>用户端下次启动或联网时应用新值，离线时用缓存兜底。
+                <b>风险提示：</b>税率错误会波及全站计税结果，发布前务必逐项核对。
+                每次保存都会生成一个版本快照，可随时回滚；勾选「同步发送更新公告」会在保存后自动发一条公告（复用内容中心的投放能力）。
+            </div>
             <div id="taxrates-status" class="mb-3 text-xs"></div>
             <div id="taxrates-editor" class="mb-4"></div>
-            <div class="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 class="text-sm font-bold text-gray-700 mb-3"><i class="fa fa-history mr-2 text-primary"></i>版本历史</h3>
-                <div id="taxrates-history" class="space-y-2"></div>
+            <div class="panel">
+                <div class="panel-head"><h3 class="panel-title"><i class="fa fa-history text-primary"></i>版本历史</h3></div>
+                <div class="panel-body"><div id="taxrates-history" class="space-y-2"></div></div>
             </div>
         </section>
 
-        <footer class="mt-10 text-center text-[11px] text-gray-400">
-            EuriskoTax Admin Console · 请求均携带 X-Admin-Token
+        <!-- 社保基数（阶段14 C2：城市社保参数库 + 版本化 + 可选公告联动） -->
+        <section id="view-citysocial" class="view-section hidden">
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-map-marker text-primary"></i>社保基数（城市参数库）</h2>
+                    <p class="page-desc">各参保城市的社保/公积金缴费基数上下限与公积金可选比例，保存即对所有用户生效，无需发版。</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button data-act="citysocial-refresh" class="btn btn-muted btn-xs"><i class="fa fa-refresh"></i>刷新</button>
+                    <button data-act="citysocial-reset" class="btn btn-muted btn-xs"><i class="fa fa-undo"></i>载入当前生效值</button>
+                </div>
+            </div>
+            <div class="hint mb-4">
+                <b>怎么用：</b>按城市维护缴费基数口径 → 保存并发布 → 用户端下次启动或联网时自动应用。
+                <b>注意：</b>基数下限定得过高会把合规的基数误报为「低于最低标准」，定得过低则会漏报，发布前务必对照当地社保局公布口径。
+                编码 <span class="mono">national</span> 为兜底城市（用户未选择城市时使用），<b>不可删除</b>；
+                上限留空表示不设上限。每次保存都会生成版本快照，可随时回滚。
+            </div>
+            <div id="citysocial-status" class="mb-3 text-xs"></div>
+            <div id="citysocial-editor" class="mb-4"></div>
+            <div class="panel">
+                <div class="panel-head"><h3 class="panel-title"><i class="fa fa-history text-primary"></i>版本历史</h3></div>
+                <div class="panel-body"><div id="citysocial-history" class="space-y-2"></div></div>
+            </div>
+        </section>
+
+        <footer class="mt-10 text-center text-[11px] text-gray-400 leading-relaxed">
+            EuriskoTax Admin Console · 所有请求均携带 <span class="mono">X-Admin-Token</span> 校验 · 本页已禁止搜索引擎收录
         </footer>
     </main>
 

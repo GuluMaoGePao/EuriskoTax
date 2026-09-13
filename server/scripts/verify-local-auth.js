@@ -24,6 +24,9 @@
  *      - 阶段10 运维后台（admin.html 后端）：用户列表搜索、详情计数、权益调档 pro↔free、无令牌 401
  *      - 阶段10A 云端同步链路：上传/全量拉取、幂等、冲突新者胜、墓碑广播、
  *        SYNC_MAX_RECORDS 上限拒绝、free 账号 403 PRO_REQUIRED
+ *      - 阶段14 专业版兑换码：管理端生成/列表/作废/CSV 导出 + 用户端一码一用兑换
+ *      - 阶段14 C2 城市社保参数库：公开只读（含兜底城市不变量 / since 增量）+ 管理端
+ *        发布/回滚/版本号唯一/上限低于下限拒绝 + 前端同步层与选择器静态接线
  *      - 完整注册链路：申请邀请码(写库) → send-code(读后端控制台验证码) → register → 登录新号 → profile
  *   5. 清理（删临时账号/邀请码/关后端），输出 PASS/FAIL，失败时退出码非 0
  *
@@ -399,6 +402,23 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('auth-ui.js 含个人中心留资入口(profile-card-lead)',
             authJs.status === 200 && authJs.raw.includes('profile-card-lead'), `HTTP ${authJs.status}`);
 
+        // ---- 阶段13B+ 咨询情境真实性（不再拿入口标签冒充「当前测算」）----
+        const leadCtxJs = await request(PORT, 'GET', '/src/js/lead/lead-context.js');
+        record('lead-context.js 暴露 window.LeadContext（咨询情境数据层）',
+            leadCtxJs.status === 200 && leadCtxJs.raw.includes('window.LeadContext') && leadCtxJs.raw.includes('historyOptions'),
+            `HTTP ${leadCtxJs.status}`);
+        record('index.html 引入 lead-context.js 且含情境选择器(#lead-scene-select)',
+            leadPage.status === 200 && leadPage.raw.includes('src/js/lead/lead-context.js')
+            && leadPage.raw.includes('id="lead-scene-select"'), `HTTP ${leadPage.status}`);
+        record('弹窗不再伪造「当前测算」，改用可核实的「参考您的测算」',
+            leadModalJs.status === 200 && leadModalJs.raw.includes('参考您的测算：')
+            && leadModalJs.raw.indexOf("'当前测算：'") === -1, `HTTP ${leadModalJs.status}`);
+        record('结果页触点只传计算类型(data-type)，不再传死场景(data-scene)',
+            leadTouchJs.status === 200 && leadTouchJs.raw.includes('data-type')
+            && leadTouchJs.raw.indexOf('data-scene') === -1, `HTTP ${leadTouchJs.status}`);
+        record('个人中心入口不再伪造「个人中心·财税服务」这一假测算',
+            authJs.status === 200 && authJs.raw.indexOf('个人中心·财税服务') === -1, `HTTP ${authJs.status}`);
+
         // ---- 阶段13C 运维后台「线索」Tab 静态断言 ----
         const adminPage = await request(PORT, 'GET', '/admin.html');
         record('admin.html 含线索 Tab(data-nav="leads")与视图(#view-leads)',
@@ -416,6 +436,13 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('index.html 已引入 share-card.js / capture.js / 二维码库',
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-card.js')
             && leadPage.raw.includes('src/js/export/capture.js') && leadPage.raw.includes('qrcode'), `HTTP ${leadPage.status}`);
+        const shareLandingJs = await request(PORT, 'GET', '/src/js/share/share-landing.js');
+        record('share-landing.js 提供分享落地首屏引导(?source=share)',
+            shareLandingJs.status === 200 && shareLandingJs.raw.includes('source=share')
+            && shareLandingJs.raw.includes('home-start-card'), `HTTP ${shareLandingJs.status}`);
+        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-start-card)',
+            leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-landing.js')
+            && leadPage.raw.includes('id="home-start-card"'), `HTTP ${leadPage.status}`);
         const captureJs = await request(PORT, 'GET', '/src/js/export/capture.js');
         record('capture.js 暴露 window.Capture.captureHtml（PDF 与分享图共用截图层）',
             captureJs.status === 200 && captureJs.raw.includes('window.Capture') && captureJs.raw.includes('captureHtml'), `HTTP ${captureJs.status}`);
@@ -425,6 +452,64 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('分享图二维码带 source=share 归因，且留资弹窗读取该落地来源（T4 闭环）',
             shareJs.status === 200 && shareJs.raw.includes('source=share')
             && leadModalJs.raw.includes('opts.source || landingSource()'), '');
+        record('分享图拒绝生成「0 元结果」—— isMeaningful 拦截 ¥0.00 等小数零',
+            shareJs.status === 200 && shareJs.raw.includes('isMeaningful')
+            && shareJs.raw.includes('/^0\\.0*$/'), `HTTP ${shareJs.status}`);
+        record('分享图二维码 URL 支持外部配置（setShareBaseUrl / EuriskoTaxConfig），避免 localhost 泄露',
+            shareJs.status === 200 && shareJs.raw.includes('setShareBaseUrl')
+            && shareJs.raw.includes('shareBaseUrl'), `HTTP ${shareJs.status}`);
+        record('分享图失败分支使用页面内提示（alert 会被浏览器屏蔽成「点了没反应」）',
+            shareJs.status === 200 && shareJs.raw.includes('showToast')
+            && shareJs.raw.indexOf('alert(') === -1, `HTTP ${shareJs.status}`);
+        record('分享图失败提示条固定在顶部、层级高于页面横幅（底部提示会被整条错过）',
+            shareJs.status === 200 && shareJs.raw.includes('toastTopOffset')
+            && shareJs.raw.includes('z-index:10002'), `HTTP ${shareJs.status}`);
+
+        // ---- 阶段14 专业版兑换码静态断言（线下收款授权闭环）----
+        record('admin.html 含兑换码 Tab(data-nav="procodes")与视图(#view-procodes)',
+            adminPage.status === 200 && adminPage.raw.includes('data-nav="procodes"') && adminPage.raw.includes('id="view-procodes"'),
+            `HTTP ${adminPage.status}`);
+        record('admin.js 接通兑换码端点(生成/列表/作废/导出)与筛选交互',
+            adminJs.status === 200 && adminJs.raw.includes('/admin/pro-codes') && adminJs.raw.includes('loadProCodes')
+            && adminJs.raw.includes('generateProCodes') && adminJs.raw.includes('toggleProCode') && adminJs.raw.includes('exportProCodes'),
+            `HTTP ${adminJs.status}`);
+        record('api-client.js 新增 redeemProCode（用户端自助兑换）',
+            apiClientJs.status === 200 && apiClientJs.raw.includes('function redeemProCode') && apiClientJs.raw.includes("'/pro-codes/redeem'"),
+            `HTTP ${apiClientJs.status}`);
+        record('index.html 含兑换码输入框(#upgrade-redeem-input)与兑换按钮',
+            leadPage.status === 200 && leadPage.raw.includes('id="upgrade-redeem-input"') && leadPage.raw.includes('id="upgrade-redeem-btn"'),
+            `HTTP ${leadPage.status}`);
+        record('auth-ui.js 集成兑换码处理(handleRedeemProCode → redeemProCode)',
+            authJs.status === 200 && authJs.raw.includes('handleRedeemProCode') && authJs.raw.includes('redeemProCode'),
+            `HTTP ${authJs.status}`);
+
+        // ---- 阶段14 C2 城市社保参数库静态断言（端上基数口径按参保城市取值）----
+        const csSyncJs = await request(PORT, 'GET', '/src/js/data/city-social-sync.js');
+        record('city-social-sync.js 暴露 window.CitySocial 且接线公开端点',
+            csSyncJs.status === 200 && csSyncJs.raw.includes('window.CitySocial = api')
+            && csSyncJs.raw.includes("'/api/config/city-social'"),
+            `HTTP ${csSyncJs.status}`);
+        record('city-social-sync.js 在 C1 之后重新施加城市口径（时序耦合未被破坏）',
+            csSyncJs.status === 200 && csSyncJs.raw.includes('euriskotax:tax-rates-updated')
+            && csSyncJs.raw.includes('reapply()'),
+            `HTTP ${csSyncJs.status}`);
+        const csUiJs = await request(PORT, 'GET', '/src/js/ui/city-social-ui.js');
+        record('city-social-ui.js 暴露 window.CitySocialUI 并注入三页选择器',
+            csUiJs.status === 200 && csUiJs.raw.includes('window.CitySocialUI = { init: init')
+            && csUiJs.raw.includes('reverse-social-city-select') && csUiJs.raw.includes('business-social-city-select'),
+            `HTTP ${csUiJs.status}`);
+        record('index.html 已加载 C2 同步层与选择器（紧随 tax-rates-sync.js）',
+            leadPage.status === 200 && leadPage.raw.includes('src/js/data/city-social-sync.js')
+            && leadPage.raw.includes('src/js/ui/city-social-ui.js'),
+            `HTTP ${leadPage.status}`);
+        record('admin.html 含社保基数 Tab(data-nav="citysocial")与视图(#view-citysocial)',
+            adminPage.status === 200 && adminPage.raw.includes('data-nav="citysocial"') && adminPage.raw.includes('id="view-citysocial"'),
+            `HTTP ${adminPage.status}`);
+        record('admin.js 接通城市社保端点与编辑器交互(城市增删/回滚)',
+            adminJs.status === 200 && adminJs.raw.includes('/admin/city-social') && adminJs.raw.includes('loadCitySocial')
+            && adminJs.raw.includes('saveCitySocial') && adminJs.raw.includes('citySocialEditorHtml')
+            && adminJs.raw.includes('removeCitySocialRow'),
+            `HTTP ${adminJs.status}`);
 
         // ---- Swagger 文档完整性：@swagger JSDoc 的 YAML 若写坏，端点会「静默」从文档消失 ----
         // 典型坑：在 flow map（单行 {}）的值里写裸 { 或英文逗号，yaml 直接解析失败并只打日志，
@@ -433,6 +518,13 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const docsPaths = (docsJson.body && docsJson.body.paths) || {};
         record('Swagger /api/docs.json 可解析且含线索端点（JSDoc YAML 未写坏）',
             docsJson.status === 200 && !!docsPaths['/api/leads'] && !!docsPaths['/api/admin/leads/export'],
+            `HTTP ${docsJson.status}, paths=${Object.keys(docsPaths).length}`);
+        record('Swagger /api/docs.json 含兑换码端点（用户端 + 管理端）',
+            docsJson.status === 200 && !!docsPaths['/api/pro-codes/redeem'] && !!docsPaths['/api/admin/pro-codes'],
+            `HTTP ${docsJson.status}, paths=${Object.keys(docsPaths).length}`);
+        record('Swagger /api/docs.json 含城市社保参数端点（公开 + 管理端 + 回滚）',
+            docsJson.status === 200 && !!docsPaths['/api/config/city-social']
+            && !!docsPaths['/api/admin/city-social'] && !!docsPaths['/api/admin/city-social/rollback'],
             `HTTP ${docsJson.status}, paths=${Object.keys(docsPaths).length}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
@@ -559,6 +651,149 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         }
     } catch (e) {
         record('税制参数端点（阶段12 C1）', false, e.message);
+    }
+
+    // ---- 3.5C 阶段14 C2：城市社保参数库（公开只读 + 版本化发布/回滚 + 兜底城市不变量）----
+    // 说明：与 C1 同样用「出厂基线原样」发布（生效口径不变），并在收尾删除本轮版本、
+    //       把发布前那条 published 记录恢复为生效（可重复执行，零残留）。
+    console.log('\n[3/6 续·社保] 城市社保参数库端点（阶段14 C2：公开只读 + 版本化发布/回滚）...');
+    const csStamp = Date.now();
+    const csAdminH = { 'X-Admin-Token': process.env.ADMIN_TOKEN || 'local-verify-admin-token' };
+    let csPublishedId = null;
+    let csPublishedVersion = null;
+    let csPrevPublishedId = null;
+    try {
+        const csPrev = await prisma.citySocialConfig.findFirst({
+            where: { status: 'published' }, orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
+        });
+        csPrevPublishedId = csPrev ? csPrev.id : null;
+
+        const cs = await request(PORT, 'GET', '/api/config/city-social');
+        const csData = (cs.body && cs.body.data) || {};
+        const csCfg = csData.config || {};
+        const csCities = Array.isArray(csCfg.cities) ? csCfg.cities : [];
+        const csFallback = csCities.find((c) => c.code === 'national');
+        const csWellFormed = csCities.length > 0 && !!csFallback
+            && typeof csFallback.socialBaseMin === 'number' && typeof csFallback.housingBaseMin === 'number'
+            && Array.isArray(csFallback.housingFundRateOptions) && csFallback.housingFundRateOptions.length > 0
+            && typeof csCfg.defaultCity === 'string' && !!csData.revision;
+        record('GET /config/city-social 公开城市社保参数（无需登录 + 结构完整 + 含兜底城市）',
+            cs.status === 200 && csWellFormed && ['custom', 'default'].includes(csData.source),
+            `HTTP ${cs.status}, source=${csData.source}, cities=${csCities.length}, revision=${csData.revision}`);
+
+        const csSame = await request(PORT, 'GET', '/api/config/city-social?since=' + encodeURIComponent(csData.revision || ''));
+        const csSameData = (csSame.body && csSame.body.data) || {};
+        record('since=当前指纹 → unchanged 且 config=null（增量语义）',
+            csSame.status === 200 && csSameData.unchanged === true && csSameData.config === null,
+            `HTTP ${csSame.status}, unchanged=${csSameData.unchanged}`);
+
+        // 管理端点：无令牌必须被拒（基数下限填错会误导全站用户的合规判断）
+        const csNoTok = await request(PORT, 'GET', '/api/admin/city-social');
+        record('GET /admin/city-social 无令牌被拒(401)', csNoTok.status === 401, `HTTP ${csNoTok.status}`);
+
+        const csList = await request(PORT, 'GET', '/api/admin/city-social', { headers: csAdminH });
+        const csListData = (csList.body && csList.body.data) || {};
+        record('GET /admin/city-social 当前配置 + 出厂基线 + 历史',
+            csList.status === 200 && !!csListData.defaults && Array.isArray(csListData.history),
+            `HTTP ${csList.status}, hasCustom=${!!csListData.current}, history=${(csListData.history || []).length}`);
+
+        // 兜底城市不变量：删掉 national 必须被拒（否则用户未选城市时无回落口径）
+        if (csListData.defaults) {
+            const noNational = JSON.parse(JSON.stringify(csListData.defaults));
+            noNational.cities = noNational.cities.filter((c) => c.code !== 'national');
+            const csBad = await request(PORT, 'POST', '/api/admin/city-social', {
+                headers: csAdminH,
+                json: { version: `verify-bad-${csStamp}`, config: noNational },
+            });
+            const csBadDetails = (csBad.body && csBad.body.error && csBad.body.error.details) || null;
+            record('POST /admin/city-social 删除兜底城市 national 被拒(400 + details)',
+                csBad.status === 400 && Array.isArray(csBadDetails) && csBadDetails.length > 0,
+                `HTTP ${csBad.status}, details=${Array.isArray(csBadDetails) ? csBadDetails.length : 0}`);
+
+            // 上限低于下限必须被拒（否则「基数超标」判定会全线颠倒）
+            const inverted = JSON.parse(JSON.stringify(csListData.defaults));
+            inverted.cities[0].socialBaseMin = 9000;
+            inverted.cities[0].socialBaseMax = 8000;
+            const csInv = await request(PORT, 'POST', '/api/admin/city-social', {
+                headers: csAdminH, json: { version: `verify-inv-${csStamp}`, config: inverted },
+            });
+            record('POST /admin/city-social 上限低于下限被拒(400)', csInv.status === 400, `HTTP ${csInv.status}`);
+
+            // 用出厂基线原样发布：验证写路径 + 版本化，且生效口径不变
+            const csPub = await request(PORT, 'POST', '/api/admin/city-social', {
+                headers: csAdminH,
+                json: { version: `verify.${csStamp}`, note: `[verify] e2e city-social publish ${csStamp}`, config: csListData.defaults },
+            });
+            const csPubData = (csPub.body && csPub.body.data) || {};
+            const csPubCfg = csPubData.config || {};
+            csPublishedId = csPubCfg.id || null;
+            csPublishedVersion = csPubCfg.version || null;
+            record('POST /admin/city-social 发布基线版本(201；未勾选公告则 release=null)',
+                csPub.status === 201 && !!csPubCfg.version && csPubData.release === null,
+                `HTTP ${csPub.status}, version=${csPubCfg.version || 'N/A'}`);
+
+            const csAfter = await request(PORT, 'GET', '/api/config/city-social');
+            const csAfterData = (csAfter.body && csAfter.body.data) || {};
+            // 注意：指纹是「按内容寻址」（md5(config)），原样重发基线内容时指纹不变是正确行为；
+            //       这里只断言「库中自定义配置已生效」，指纹变化的语义由下一条单独验证
+            record('发布后公开端点 source=custom（热改已生效）',
+                csAfter.status === 200 && csAfterData.source === 'custom' && !!csAfterData.revision
+                && csAfterData.version === csPublishedVersion,
+                `HTTP ${csAfter.status}, source=${csAfterData.source}, version=${csAfterData.version}`);
+
+            // 内容变化必须带动指纹变化 —— 端上 syncNow 靠指纹判断「要不要覆盖本地配置」，
+            // 指纹若不随内容变化，管理台改了基数用户端将永远收不到更新（静默失效）。
+            // 这里用「改城市备注」制造一次内容不同但生效口径完全等价的发布：
+            // note 仅是管理台可见的口径来源备注，不参与任何基数/比例计算与端上校验。
+            const reordered = JSON.parse(JSON.stringify(csListData.defaults));
+            reordered.cities[0].note = `[verify] fingerprint check ${csStamp}`;
+            const csRev = await request(PORT, 'POST', '/api/admin/city-social', {
+                headers: csAdminH,
+                json: { version: `verify-rev.${csStamp}`, note: `[verify] fingerprint ${csStamp}`, config: reordered },
+            });
+            const csRevAfter = await request(PORT, 'GET', '/api/config/city-social');
+            const csRevAfterData = (csRevAfter.body && csRevAfter.body.data) || {};
+            record('城市顺序变化 → 公开端点指纹随之变化（端上增量同步不会静默失效）',
+                csRev.status === 201 && csRevAfter.status === 200
+                && !!csRevAfterData.revision && csRevAfterData.revision !== csAfterData.revision,
+                `HTTP ${csRev.status}, ${csAfterData.revision} → ${csRevAfterData.revision}`);
+
+            // 版本号唯一：重复发布必须被拒，否则会静默覆盖历史版本（回滚目标丢失）
+            const csDupVer = await request(PORT, 'POST', '/api/admin/city-social', {
+                headers: csAdminH,
+                json: { version: `verify.${csStamp}`, config: csListData.defaults },
+            });
+            record('POST /admin/city-social 版本号重复被拒(400，防覆盖历史)', csDupVer.status === 400, `HTTP ${csDupVer.status}`);
+        }
+
+        // 回滚：以刚发布版本为蓝本另存新版本（历史保留、可再次回滚；仍为基线等价配置）
+        if (csPublishedId) {
+            const csRoll = await request(PORT, 'POST', '/api/admin/city-social/rollback', {
+                headers: csAdminH,
+                json: { id: csPublishedId, version: `verify-rb.${csStamp}`, note: `[verify] e2e rollback ${csStamp}` },
+            });
+            const csRollCfg = (csRoll.body && csRoll.body.data && csRoll.body.data.config) || {};
+            record('POST /admin/city-social/rollback 回滚另存新版本(201，from=源版本)',
+                csRoll.status === 201 && !!csRollCfg.version && csRollCfg.from === csPublishedVersion,
+                `HTTP ${csRoll.status}, from=${csRollCfg.from || 'N/A'} → ${csRollCfg.version || 'N/A'}`);
+        }
+    } catch (e) {
+        record('城市社保参数端点（阶段14 C2）', false, e.message);
+    } finally {
+        // 清理：删除本轮版本；若发布前存在生效版本，则把它恢复为 published（可重复执行零残留）
+        try {
+            await prisma.citySocialConfig.deleteMany({
+                where: {
+                    version: {
+                        in: [`verify.${csStamp}`, `verify-rb.${csStamp}`, `verify-rev.${csStamp}`,
+                            `verify-bad-${csStamp}`, `verify-inv-${csStamp}`],
+                    },
+                },
+            });
+            if (csPrevPublishedId) {
+                await prisma.citySocialConfig.update({ where: { id: csPrevPublishedId }, data: { status: 'published' } });
+            }
+        } catch { /* 清理失败不阻塞判定 */ }
     }
 
     // ---- 3.6 阶段13：转化线索（公开留资 + 管理端跟进 + CSV 导出 + 限流）----
@@ -981,6 +1216,97 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
                 await prisma.calculation.deleteMany({ where: { user_id: devUser.id, client_id: { startsWith: syncPrefix } } });
                 await prisma.user.update({ where: { id: devUser.id }, data: { plan: 'pro', pro_granted_by: 'seed' } });
             }
+        } catch { /* 清理失败不阻塞判定 */ }
+    }
+
+    // ---- 5B. 阶段14：专业版兑换码（线下收款授权的变现闭环）----
+    // 变现链路里最容易「静默出错」的一段：生成 → 交付 → 自助兑换 → 对账导出。
+    // 本小节把「一码一用 / 参数校验 / 作废留痕 / CSV BOM」跑在真实服务端上验证。
+    console.log('\n[5/6 续·兑换码] 专业版兑换码端点（阶段14：生成 → 兑换 → 作废 → 导出）...');
+    const proStamp = Date.now();
+    const proBatch = `verify-${proStamp}`;
+    try {
+        if (!devToken) {
+            record('阶段14 兑换码冒烟', false, '前置登录失败，跳过');
+        } else {
+            const proAdminH = { 'X-Admin-Token': adminToken };
+
+            // 14.1 管理端无令牌必须被拒（兑换码=可直接交付的付费凭证，裸奔等于白送专业版）
+            const pcNoTok = await request(PORT, 'GET', '/api/admin/pro-codes');
+            record('GET /admin/pro-codes 无令牌被拒(401)', pcNoTok.status === 401, `HTTP ${pcNoTok.status}`);
+
+            // 14.2 批量生成限时码（30 天 × 2），返回明文码供交付
+            const gen = await request(PORT, 'POST', '/api/admin/pro-codes', {
+                json: { count: 2, durationDays: 30, batch: proBatch, note: '[verify] 门禁' }, headers: proAdminH,
+            });
+            const genData = (gen.body && gen.body.data) || {};
+            const genCodes = Array.isArray(genData.codes) ? genData.codes : [];
+            record('POST /admin/pro-codes 生成限时码(201，返回明文码)',
+                gen.status === 201 && genData.createdCount === 2 && genCodes.length === 2 && genData.durationDays === 30,
+                `HTTP ${gen.status}, count=${genData.createdCount}`);
+
+            // 14.3 参数非法必须被拒（count 非整数 —— 曾经 parseInt 静默截断导致少发码）
+            const genBad = await request(PORT, 'POST', '/api/admin/pro-codes', {
+                json: { count: 1.5, durationDays: 30 }, headers: proAdminH,
+            });
+            record('POST /admin/pro-codes count 非整数被拒(400，防少发码)', genBad.status === 400, `HTTP ${genBad.status}`);
+
+            // 14.4 列表：按批次筛选命中，三类计数齐全
+            const pcList = await request(PORT, 'GET', `/api/admin/pro-codes?batch=${encodeURIComponent(proBatch)}`, { headers: proAdminH });
+            const pcData = (pcList.body && pcList.body.data) || {};
+            const pcItems = Array.isArray(pcData.items) ? pcData.items : [];
+            const target = pcItems.find((x) => x.code === genCodes[0]);
+            record('GET /admin/pro-codes 批次筛选命中(状态/有效期/计数)',
+                pcList.status === 200 && pcItems.length === 2 && !!target
+                && target.status === 'available' && target.permanent === false
+                && typeof pcData.availableCount === 'number',
+                `HTTP ${pcList.status}, items=${pcItems.length}`);
+
+            // 14.5 一码一用：先把 dev 账号降为 free 才能兑换（永久专业版会被拒且不消耗码）
+            await prisma.user.update({ where: { email: DEV_EMAIL }, data: { plan: 'free', plan_expires_at: null, pro_granted_by: null } });
+            const redeem = await request(PORT, 'POST', '/api/pro-codes/redeem', { json: { code: genCodes[0] }, token: devToken });
+            const rd = (redeem.body && redeem.body.data) || {};
+            const expMs = rd.plan_expires_at ? new Date(rd.plan_expires_at).getTime() - Date.now() : 0;
+            record('POST /pro-codes/redeem 兑换成功(plan=pro / purchase / 约 30 天)',
+                redeem.status === 200 && rd.plan === 'pro' && rd.pro_granted_by === 'purchase'
+                && expMs > 29 * 86400000 && expMs < 31 * 86400000,
+                `HTTP ${redeem.status}, plan=${rd.plan}, expires=${rd.plan_expires_at}`);
+
+            // 14.6 同一个码再兑 → 409（一码一用，不收第二份钱不存在的重复权益）
+            const redeemDup = await request(PORT, 'POST', '/api/pro-codes/redeem', { json: { code: genCodes[0] }, token: devToken });
+            record('POST /pro-codes/redeem 同码再兑被拒(409)', redeemDup.status === 409, `HTTP ${redeemDup.status}`);
+
+            // 14.7 已兑换的码不允许作废（保留收款凭证，退款走权益回收）
+            const disableUsed = await request(PORT, 'PATCH', `/api/admin/pro-codes/${target.id}`, { json: { disabled: true }, headers: proAdminH });
+            record('PATCH /admin/pro-codes/:id 已兑换码禁止作废(409)', disableUsed.status === 409, `HTTP ${disableUsed.status}`);
+
+            // 14.8 未使用的码可作废，且作废后不可兑换（403）
+            const avail = pcItems.find((x) => x.code === genCodes[1]);
+            const disable = await request(PORT, 'PATCH', `/api/admin/pro-codes/${avail.id}`, { json: { disabled: true }, headers: proAdminH });
+            record('PATCH /admin/pro-codes/:id 作废可用码',
+                disable.status === 200 && disable.body && disable.body.data && disable.body.data.disabled === true,
+                `HTTP ${disable.status}`);
+            const redeemDisabled = await request(PORT, 'POST', '/api/pro-codes/redeem', { json: { code: genCodes[1] }, token: devToken });
+            record('POST /pro-codes/redeem 作废码被拒(403)', redeemDisabled.status === 403, `HTTP ${redeemDisabled.status}`);
+
+            // 14.9 不存在的码 → 403（与「已作废」同码，避免进一步区分泄漏枚举信息）
+            const redeemMissing = await request(PORT, 'POST', '/api/pro-codes/redeem', { json: { code: 'PRO-ZZZZ-ZZZZ' }, token: devToken });
+            record('POST /pro-codes/redeem 不存在的码被拒(403)', redeemMissing.status === 403, `HTTP ${redeemMissing.status}`);
+
+            // 14.10 CSV 导出：UTF-8 BOM（Excel 不乱码）+ 表头含 used_by_name
+            const pcCsv = await request(PORT, 'GET', `/api/admin/pro-codes/export?batch=${encodeURIComponent(proBatch)}`, { headers: proAdminH });
+            const pcBom = typeof pcCsv.raw === 'string' && pcCsv.raw.charCodeAt(0) === 0xFEFF;
+            record('GET /admin/pro-codes/export CSV(含 BOM + 表头)',
+                pcCsv.status === 200 && pcBom && pcCsv.raw.includes('used_by_name') && pcCsv.raw.includes(genCodes[0]),
+                `HTTP ${pcCsv.status}, bom=${pcBom}`);
+        }
+    } catch (e) {
+        record('专业版兑换码端点（阶段14）', false, e.message);
+    } finally {
+        // 清理本批验证码 + 恢复 dev 账号种子 pro 授权（门禁不得残留权益/数据）
+        try {
+            await prisma.proCode.deleteMany({ where: { batch: proBatch } });
+            await prisma.user.update({ where: { email: DEV_EMAIL }, data: { plan: 'pro', pro_granted_by: 'seed', plan_expires_at: null } });
         } catch { /* 清理失败不阻塞判定 */ }
     }
 

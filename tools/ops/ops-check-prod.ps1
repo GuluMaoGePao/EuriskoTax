@@ -198,6 +198,21 @@ try {
     Add-Check "线索端点已上线(公开留资 + 管理端列表/统计/导出/更新)" $false $_.Exception.Message
 }
 
+# 阶段14：专业版兑换码端点指纹（读 Swagger 规格，只读零副作用 —— 不生成也不兑换任何码）
+# 必要性：兑换码是「线下收款 → 付费授权」的交付凭证，端点缺失等于「客户已付款却无法自助开通」；
+#         同样用 /api/docs.json 而非真实 POST，避免每次发版校验都写入真实兑换码并改动用户权益。
+try {
+    $pcDocsRaw = Fetch-Text "$BaseUrl/api/docs.json"
+    $pcDocs = $pcDocsRaw | ConvertFrom-Json
+    $pcPathNames = @($pcDocs.paths.PSObject.Properties.Name)
+    $proCodePaths = @('/api/pro-codes/redeem', '/api/pro-codes/mine', '/api/admin/pro-codes', '/api/admin/pro-codes/export', '/api/admin/pro-codes/{id}')
+    $pcMissing = @($proCodePaths | Where-Object { $pcPathNames -notcontains $_ -or $null -eq $pcDocs.paths.$_ })
+    Add-Check "兑换码端点已上线(用户端兑换/我的记录 + 管理端列表/生成/导出/作废)" ($pcMissing.Count -eq 0) `
+        $(if ($pcMissing.Count -gt 0) { "缺失: " + ($pcMissing -join ', ') } else { "5 个路径齐备" })
+} catch {
+    Add-Check "兑换码端点已上线(用户端兑换/我的记录 + 管理端列表/生成/导出/作废)" $false $_.Exception.Message
+}
+
 $fail = @($checks | Where-Object { -not $_.Ok })
 Write-Host ""
 foreach ($c in $checks) {

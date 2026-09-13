@@ -192,6 +192,14 @@ async function claimTrial() {
     return result;
 }
 
+// 兑换专业版兑换码（阶段14 变现）：线下收款后由运营发放，一码一用
+// 成功返回更新后的用户信息并同步本地会话，调用方据此刷新权益展示
+async function redeemProCode(code) {
+    const result = await apiRequest('/pro-codes/redeem', 'POST', { code }, true);
+    setCurrentUser(result);
+    return result;
+}
+
 async function getProfile() {
     return await apiRequest('/auth/profile', 'GET', null, true);
 }
@@ -365,6 +373,7 @@ const apiClient = {
     loginUser,
     logoutUser,
     claimTrial,
+    redeemProCode,
     getProfile,
     updateProfile,
     verifyPassword,

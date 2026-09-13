@@ -1,7 +1,9 @@
 
 
 // 社保/公积金缴费基数下限已抽离至 tax-constants.js（必须先于本文件加载）
-// TODO(C2 社保地区政策库)：现为全国平均值，应改为按参保城市参数化
+// 阶段14 C2：运行时由 tax-rates-sync.js（全国口径）与 city-social-sync.js（所选参保城市口径）
+// 依次覆盖，故这里必须直接读取全局变量，提示的数值即为当前城市口径。
+// 用户切换参保城市后由 city-social-ui.js 重新调用本函数刷新提示。
 
 // 验证社保缴费基数是否低于最低标准
 function validateSocialSecurityBase(prefix = '') {

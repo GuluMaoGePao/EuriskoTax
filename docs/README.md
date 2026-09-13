@@ -5,12 +5,12 @@
 
 ---
 
-## 当前状态（v1.12.0 · 2026-09-13）
+## 当前状态（v1.13.0 · 2026-09-13）
 
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 `https://euriskotax.zeabur.app`（Dockerfile 构建部署）
-- **主版本**：CHANGELOG 最新 **1.12.0**（阶段13 获客与转化：`Lead` 线索留资 + 管理台「线索」Tab 跟进状态机 + 一键结果分享图 + 转化漏斗埋点；上一版 1.11.1 = 管理台「税率」Tab 保存链路修复 + 缴费基数最低标准 7546 与表单默认基数对齐）。1.12.0 已上线并打标签 `v1.12.0`
-- **测试**：20 套件 412 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡 22 例）；发布门禁 `verify:local` **100/100** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
-- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）→ 当前工作：**阶段14 变现与可信度（`ProCode` 兑换码 + 线下收款 / C2 城市社保参数库 / 高商业意图 SEO 落地页）**，见 [development/development-plan.md](development/development-plan.md) 与 [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md)
+- **主版本**：CHANGELOG 最新 **1.13.0**（阶段14 变现与可信度：`ProCode` 专业版兑换码 —— 线下收款发码 → 用户自助兑换 → 权益即时生效 + 管理台「兑换码」Tab 批次对账；C2 城市社保参数库 —— 按参保城市校验社保/公积金基数下限，`CitySocialConfig` 版本化快照与一键回滚；上一版 1.12.0 = 阶段13 获客与转化）。1.13.0 已上线并打标签 `v1.13.0`
+- **测试**：26 套件 545 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 20 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 城市社保端上同步 27 例 + 版本号五处同步 4 例 + 文档口径守护 5 例）；发布门禁 `verify:local` **146/146** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练）
+- **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段15）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已完成并上线（v1.13.0）** —— 14A/14B/14C `ProCode` 兑换码（后端事务化一码一用 + 用户端自助兑换 + 管理台「兑换码」Tab）+ 14D/C2 城市社保参数库（按参保城市校验社保/公积金基数下限 + 管理台「社保基数」Tab；`verify:local` 146/146、单测 26 套件 545 例）→ 当前工作：**无进行中阶段**，仅剩待办「高商业意图 SEO 落地页」，见 [development/development-plan.md](development/development-plan.md)
 
 ---
 
@@ -59,7 +59,7 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范 v2.5（认证含邮箱验证码/邀请码、计税、历史记录、反馈、内容中心、税制参数、转化线索、管理员、运营统计） | 2026-09-12 |
+| [api/api-reference.md](api/api-reference.md) | 后端 REST API 接口规范 v2.8（认证含邮箱验证码/邀请码、计税、历史记录、反馈、内容中心、税制参数、城市社保参数、转化线索、专业版兑换码、管理员、运营统计） | 2026-09-13 |
 
 ### 开发规划
 
@@ -79,7 +79,7 @@ EuriskoTax/
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-08-05 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-07 |
 | [guides/development-workflow.md](guides/development-workflow.md) | 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-12 |
-| [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本三落点/自动打 tag/回滚） | 2026-09-08 |
+| [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 分支与版本发布策略（主干模型/命名/版本号五处同步/自动打 tag/回滚） | 2026-09-08 |
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-08-16 |
 | [guides/support-playbook.md](guides/support-playbook.md) | 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-12 |
 

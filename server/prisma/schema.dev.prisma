@@ -59,6 +59,24 @@ model InviteCode {
   @@index([used_by])
 }
 
+// 专业版兑换码（阶段14 变现）：线下收款后由运营批量生成并交付，一码一用
+// duration_days: null = 永久授权；>0 = 自兑换时刻起算 N 天（当前专业版仍在有效期内则叠加续期）
+// 与 InviteCode 的关键差异：兑换发生在已登录态且要发放权益，故需记录批次/备注便于对账与作废
+model ProCode {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  duration_days Int?
+  batch         String?
+  note          String    @default("")
+  disabled      Boolean   @default(false)
+  used_by       Int?
+  used_at       DateTime?
+  created_at    DateTime  @default(now())
+
+  @@index([used_by])
+  @@index([batch])
+}
+
 // 邮箱验证码（注册等场景）：存哈希不存明文，带过期时间与错误尝试计数
 model VerificationCode {
   id         Int      @id @default(autoincrement())
@@ -183,6 +201,24 @@ model SupportScript {
 model TaxRateConfig {
   id           Int      @id @default(autoincrement())
   version      String   @unique // 如 2026.2 / 2026.09.12-1
+  status       String   @default("published") // published / archived
+  payload      String   @default("{}")
+  note         String   @default("") // 变更说明
+  created_by   String   @default("admin")
+  published_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  @@index([status, published_at])
+}
+
+// 阶段14 C2：城市社保参数库（管理台热改各城市缴费基数口径）
+// payload 为 JSON 字符串，含 constantsVersion / defaultCity / cities[]（每城社保与公积金基数上下限 + 公积金可选比例）；
+// 每次保存生成一条 published 快照，旧版本保留（archived）供审计与回滚；公开端点取最新一条。
+// 约定：数组项 {code,name,socialBaseMin,socialBaseMax,housingBaseMin,housingBaseMax,housingFundRateOptions,note}，
+//       无上限的基数存 null（JSON 不支持 Infinity）；必须保留 code = 'national' 的兜底城市。
+model CitySocialConfig {
+  id           Int      @id @default(autoincrement())
+  version      String   @unique // 如 2026.09.13-1
   status       String   @default("published") // published / archived
   payload      String   @default("{}")
   note         String   @default("") // 变更说明
