@@ -14,6 +14,12 @@
  * 无法离线推导的部分（脚本里含 catch 分支回退断言，文本数 ≥ 实跑数，只能当「上限」夹逼）：
  *   - verify:local 门禁项数、ops-check-prod 线上指纹项数 —— 真实数值必须实跑一次才知道
  *
+ * 项数声明的「身份」靠版本标注判定（2026-09-13 加固，实现见「版本锚定」小节）：
+ *   - 等于当前口径 → 当前值；带 vX.Y.Z / [X.Y.Z] 标注（同一行或所在 `## ` 小节标题）→ 自证是历史基线
+ *   - 既不是当前口径、又没标注版本 → 判为「疑似旧口径残留」并指名 文件:行号
+ *   旧实现只校验「每份文件里数值最大的那一条」，同文件内其余出现既不校验、也不要求标注 ——
+ *   残留的旧口径只要不写得比当前值大，就能永久骗过断言（上一版靠人工 grep 才捞出 10 处）。
+ *
  * 消费方（同一份口径定义，避免第三份事实）：
  *   - tests/docs-metrics.test.js（随 npm test 跑，不一致当场变红）
  *   - tests/version-sync.test.js（五处版本落点）
@@ -80,24 +86,30 @@ const UNIT_SPOTS = [
     { file: 'CHANGELOG.md', scope: FIRST_SECTION, history: true },
 ];
 
-// 门禁断言数（verify:local）：只做「文档彼此一致 + 不超过脚本文本断言数」
+// 门禁断言数（verify:local）：逐条校验（等于当前口径，或带版本前缀自证是历史基线）
 const GATE_PATTERNS = [
     /verify:local`?\s*\**\s*(\d+)\s*\/\s*(\d+)/g,
     /verify:local`?\s*\**\s*(\d+)\s*项/g,
     /门禁\s*\**\s*(\d+)\s*\/\s*(\d+)/g,
+    /门禁\s*\**\s*(\d+)\s*项/g,
     /(\d+)\s*项断言/g,
     /同一套\s*(?:\*\*\s*)?(\d+)\s*项/g,
     /→\s*\**\s*(\d+)\s*项/g,
 ];
 
+// history: true = 该文件允许保留历史基线，但每条历史值都必须带版本前缀（否则视为漏改）；
+// 其余落点一律只写当前口径（出现历史值即红）—— 当前版本的 CHANGELOG 小节也按此从严。
 const GATE_SPOTS = [
     { file: 'README.md' },
     { file: 'docs/README.md' },
     { file: 'docs/guides/development-workflow.md' },
-    { file: 'docs/development/development-plan.md' },
+    { file: 'docs/development/development-plan.md', history: true },
     { file: 'CHANGELOG.md', scope: FIRST_SECTION },
     { file: 'tools/ops/README.md' },
     { file: 'tools/gui/README.md' },
+    // 旧口径残留的实际漏检面：脚本里的说明串同样对外宣称项数，纳入同一套逐条校验
+    { file: 'tools/ops/ops-verify-pg.ps1' },
+    { file: 'tools/gui/gui-dev-console.ps1' },
 ];
 
 // 线上指纹数（ops-check-prod）
@@ -110,7 +122,7 @@ const FINGERPRINT_PATTERNS = [
 
 const FINGERPRINT_SPOTS = [
     { file: 'docs/guides/development-workflow.md' },
-    { file: 'docs/development/development-plan.md' },
+    { file: 'docs/development/development-plan.md', history: true },
     { file: 'CHANGELOG.md', scope: FIRST_SECTION },
 ];
 
@@ -148,6 +160,86 @@ function extract(full, spot, patterns) {
 // 取作用域内「最大」的一条为当前口径（历史值必然更小）
 const currentHit = (hits, pick) => hits.reduce((a, b) => (pick(b) > pick(a) ? b : a));
 
+// ======================= 版本锚定（旧口径残留防护） =======================
+//
+// 加固（2026-09-13）：项数声明原先只校验「每份文件里数值最大的那一条」，同文件内其余出现
+// 既不校验、也不要求版本前缀 —— 只要旧口径不写得比当前值大，就能永久骗过断言
+// （上一版在 ops-verify-pg.ps1 / gui-dev-console.ps1 / development-workflow.md 里发现的
+// 10 处「152 项 / 156 项」残留，全靠人工 grep 才捞出来）。现在两条硬约束：
+//   ① 逐条校验：任何项数命中要么等于当前口径，要么**明确带版本前缀**
+//      （同一行或所在 `## ` 小节标题含 vX.Y.Z / [X.Y.Z]）自证是历史基线，否则判为「疑似旧口径残留」；
+//   ② 当前口径必须锚定当前版本：取「带当前版本标注」的那条，一条都没有即报红 ——
+//      不再靠「取最大」猜（项数下降的版本里历史值会比当前值大，取最大会取错）。
+
+const VERSION_RE = /\bv?\d+\.\d+\.\d+\b|\[\d+\.\d+\.\d+\]/;
+
+function lineText(full, index) {
+    const start = full.lastIndexOf('\n', index) + 1;
+    const end = full.indexOf('\n', index);
+    return full.slice(start, end === -1 ? full.length : end);
+}
+
+function sectionHeaderBefore(full, index) {
+    const lines = full.slice(0, index).split('\n');
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+        if (/^##[ \t]/.test(lines[i])) return lines[i];
+    }
+    return '';
+}
+
+// 命中是否带版本标注 / 是否带「当前版本」标注（看同一行与所在 `## ` 小节标题）
+function anchorInfo(full, hit, version) {
+    const text = `${sectionHeaderBefore(full, hit.index)}\n${lineText(full, hit.index)}`;
+    return { anchored: VERSION_RE.test(text), current: text.indexOf(version) !== -1 };
+}
+
+// 当前口径：优先取带当前版本标注的命中；历史落点一条都没有就报红并退回「最大一条」（其余校验照常跑）
+function pickCurrent(full, hits, pick, opts) {
+    const anchored = hits.filter((h) => anchorInfo(full, h, opts.version).current);
+    if (anchored.length) return currentHit(anchored, pick);
+    // 只有允许历史值的落点才强求「当前口径锚定当前版本」：这类文件里多个版本的口径共存，
+    // 不标注就分不清哪条是当前值（项数下降的版本里「取最大」会取到历史值）
+    if (opts.history) {
+        opts.issues.push(
+            `[${opts.file}] ${opts.span}当前口径未标注当前版本 v${opts.version}（同一行或所在 \`## \` 小节标题）——`
+            + '无法与历史值区分，请补版本标注后再发布'
+        );
+    }
+    return currentHit(hits, pick);
+}
+
+// 疑似旧口径残留：既不是当前口径、又没带版本前缀（只有 history 落点才允许留下历史值）；
+// 增量描述（「新增/移除/少 N 项」）本就不是总项数声明，在这里统一排除
+function findStaleMentions(full, patterns, opts) {
+    const filter = opts.filter || (() => true);
+    const isClaim = notDelta(full);
+    return extract(full, { scope: opts.scope }, patterns)
+        .filter((h) => filter(h) && isClaim(h))
+        .filter((h) => !opts.isCurrent(h) && !(opts.history && anchorInfo(full, h, opts.version).anchored));
+}
+
+function reportStaleMentions(issues, full, patterns, opts) {
+    findStaleMentions(full, patterns, opts).forEach((h) => {
+        issues.push(
+            `[${opts.file}:${h.line}] 疑似旧口径残留：${opts.span}「${h.raw.trim()}」既非${opts.currentText}，`
+            + '也未标注版本前缀（vX.Y.Z / [X.Y.Z]）——'
+            + (opts.history ? '历史基线请补版本前缀' : '本文件只写当前口径，请改成当前值')
+        );
+    });
+}
+
+// 「门禁 165/165」这类成对写法：两侧数字必须相同才算一条总项数声明
+const pairedSame = (h) => h.nums[1] === undefined || h.nums[1] === h.nums[0];
+
+// 「新增「城市改在留资里」5 项 / 移除 … 6 项断言 / 少 1 项」这类说的是**增量**而不是总项数：
+// 命中所在句（按 。；; 断句）的前半段出现增量词，就不算一条总项数声明 —— 否则变更列表会全员误报。
+const DELTA_WORDS_RE = /新增|移除|删除|下线|补强|净增|[少多增减]|±/;
+const notDelta = (full) => (h) => {
+    const line = lineText(full, h.index);
+    const before = line.slice(0, line.indexOf(h.raw)).split(/[。；;]/).pop();
+    return !DELTA_WORDS_RE.test(before);
+};
+
 // 门禁实跑快照：verify-local-auth.js 每次本地实跑都会写一份（gitignored）。
 // 有了它，「门禁项数」从「无从离线推导」变成「有实跑证据可对账」——
 // 2026-09-13 那次「文档写 142、实跑 146」能瞒过一切断言，正是因为文档里的数字
@@ -168,8 +260,9 @@ function checkMetrics() {
     const measured = measureCounts();
     const issues = [];
     const claims = { units: [], gate: [], fingerprints: [] };
+    const version = readVersionSpots().version;
 
-    // ---- 套件/用例数：每个落点必须等于实测 ----
+    // ---- 套件/用例数：当前口径必须等于实测；其余出现必须带版本前缀（见「版本锚定」）----
     UNIT_SPOTS.forEach((spot) => {
         const full = read(spot.file);
         const hits = extract(full, spot, [UNIT_PATTERN]);
@@ -177,31 +270,51 @@ function checkMetrics() {
             issues.push(`[${spot.file}] 解析不到「N 套件 M 例」口径声明（措辞被改写？更新 release-metrics.js 的 UNIT_SPOTS）`);
             return;
         }
-        const cur = currentHit(hits, (h) => h.nums[1]);
+        const cur = pickCurrent(full, hits, (h) => h.nums[1], {
+            file: spot.file, version, history: !!spot.history, span: '单测口径', issues,
+        });
         claims.units.push({ file: spot.file, line: cur.line, suite: cur.nums[0], cases: cur.nums[1] });
-        // 含历史记录的文件只校验「当前口径」（历史值本来就该保留）；
-        // 其余文件逐条校验 —— 同一文件里第二处漏改（如 README 命令区的「N 个」）也必须被抓住
-        (spot.history ? [cur] : hits).forEach((h) => {
-            if (h.nums[0] !== measured.suiteFiles || h.nums[1] !== measured.testCases) {
-                issues.push(
-                    `[${spot.file}:${h.line}] 声明「${h.nums[0]} 套件 ${h.nums[1]} 例」≠ 实测「${measured.suiteFiles} 套件 ${measured.testCases} 例」`
-                );
-            }
+        if (cur.nums[0] !== measured.suiteFiles || cur.nums[1] !== measured.testCases) {
+            issues.push(
+                `[${spot.file}:${cur.line}] 声明「${cur.nums[0]} 套件 ${cur.nums[1]} 例」≠ 实测「${measured.suiteFiles} 套件 ${measured.testCases} 例」`
+            );
+        }
+        // 逐条校验：非实测值必须带版本前缀自证是历史基线（同一文件里第二处漏改也必须被抓住）
+        reportStaleMentions(issues, full, [UNIT_PATTERN], {
+            scope: spot.scope,
+            file: spot.file,
+            version,
+            history: !!spot.history,
+            span: '单测口径',
+            currentText: `实测值（${measured.suiteFiles} 套件 ${measured.testCases} 例）`,
+            isCurrent: (h) => h.nums[0] === measured.suiteFiles && h.nums[1] === measured.testCases,
         });
     });
 
-    // ---- 门禁断言数：无从离线推导，只夹「文档彼此一致」+「不超过脚本文本断言数」----
+    // ---- 门禁断言数：无从离线推导，故逐条「等于当前口径或带版本前缀」+ 文档彼此一致 + 不超过脚本文本断言数 ----
     const gateValues = [];
     GATE_SPOTS.forEach((spot) => {
         const full = read(spot.file);
-        const hits = extract(full, spot, GATE_PATTERNS).filter((h) => (h.nums[1] === undefined || h.nums[1] === h.nums[0]));
+        const hits = extract(full, spot, GATE_PATTERNS).filter((h) => pairedSame(h) && notDelta(full)(h));
         if (!hits.length) {
             issues.push(`[${spot.file}] 解析不到 verify:local 门禁项数声明（措辞被改写？更新 release-metrics.js 的 GATE_SPOTS）`);
             return;
         }
-        const cur = currentHit(hits, (h) => h.nums[0]);
+        const cur = pickCurrent(full, hits, (h) => h.nums[0], {
+            file: spot.file, version, history: !!spot.history, span: 'verify:local 门禁项数', issues,
+        });
         claims.gate.push({ file: spot.file, line: cur.line, value: cur.nums[0] });
         gateValues.push(cur.nums[0]);
+        reportStaleMentions(issues, full, GATE_PATTERNS, {
+            scope: spot.scope,
+            filter: pairedSame,
+            file: spot.file,
+            version,
+            history: !!spot.history,
+            span: '门禁项数',
+            currentText: `当前口径（${cur.nums[0]} 项）`,
+            isCurrent: (h) => h.nums[0] === cur.nums[0],
+        });
     });
     const gateSet = Array.from(new Set(gateValues));
     if (gateSet.length > 1) {
@@ -220,18 +333,29 @@ function checkMetrics() {
         );
     }
 
-    // ---- 线上指纹数：同上，上界为 ops-check-prod 的 Add-Check 文本数 ----
+    // ---- 线上指纹数：同上逐条校验，上界为 ops-check-prod 的 Add-Check 文本数 ----
     const fpValues = [];
     FINGERPRINT_SPOTS.forEach((spot) => {
         const full = read(spot.file);
-        const hits = extract(full, spot, FINGERPRINT_PATTERNS);
+        const hits = extract(full, spot, FINGERPRINT_PATTERNS).filter(notDelta(full));
         if (!hits.length) {
             issues.push(`[${spot.file}] 解析不到线上指纹项数声明（措辞被改写？更新 release-metrics.js 的 FINGERPRINT_SPOTS）`);
             return;
         }
-        const cur = currentHit(hits, (h) => h.nums[0]);
+        const cur = pickCurrent(full, hits, (h) => h.nums[0], {
+            file: spot.file, version, history: !!spot.history, span: '线上指纹项数', issues,
+        });
         claims.fingerprints.push({ file: spot.file, line: cur.line, value: cur.nums[0] });
         fpValues.push(cur.nums[0]);
+        reportStaleMentions(issues, full, FINGERPRINT_PATTERNS, {
+            scope: spot.scope,
+            file: spot.file,
+            version,
+            history: !!spot.history,
+            span: '线上指纹项数',
+            currentText: `当前口径（${cur.nums[0]} 项）`,
+            isCurrent: (h) => h.nums[0] === cur.nums[0],
+        });
     });
     const fpSet = Array.from(new Set(fpValues));
     if (fpSet.length > 1) {
@@ -249,13 +373,17 @@ function checkMetrics() {
 function syncMetricNumbers(options) {
     const opts = options || {};
     const measured = measureCounts();
+    const version = readVersionSpots().version;
     const changes = [];
 
     UNIT_SPOTS.forEach((spot) => {
         const full = read(spot.file);
         const hits = extract(full, spot, [UNIT_PATTERN]);
         if (!hits.length) return;
-        const cur = currentHit(hits, (h) => h.nums[1]);
+        // 与 checkMetrics 同一套选取口径：只改「带当前版本标注」的当前值，绝不误改历史基线
+        const cur = pickCurrent(full, hits, (h) => h.nums[1], {
+            file: spot.file, version, history: !!spot.history, span: '单测口径', issues: [],
+        });
         const stale = { suite: cur.nums[0], cases: cur.nums[1] };
         if (stale.suite === measured.suiteFiles && stale.cases === measured.testCases
             && !hits.some((h) => h.nums[0] !== measured.suiteFiles || h.nums[1] !== measured.testCases)) return;
@@ -345,4 +473,10 @@ module.exports = {
     readVersionSpots,
     checkVersionSpots,
     readRecordedGateRun,
+    // 口径定义与「版本锚定」规则（供 tests/docs-metrics.test.js 直接驱动）
+    UNIT_PATTERN,
+    GATE_PATTERNS,
+    FINGERPRINT_PATTERNS,
+    anchorInfo,
+    findStaleMentions,
 };
