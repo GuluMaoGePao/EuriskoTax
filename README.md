@@ -53,7 +53,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 
 > 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **「第一次用：一键启动」**（新环境/刚拉代码）或 **「日常启动：快速启动」**（日常开发）开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md) 与 [开发工作流总览](docs/guides/development-workflow.md)。
 
-**本地测试账号**：`2649719969@qq.com` / `[REDACTED]`（由启动脚本自动重置）；登录页在 localhost 下会自动出现「开发环境：填入本地测试账号」入口（生产不显示）
+**本地测试账号**：默认 `dev@example.com` / `password`（由启动脚本自动重置）。本机想用自己账号，就在仓库根放一个 `dev-account.local.json`（已在 .gitignore，字段 `email` / `password`，可选 `username`）——登录页预填、GUI 复制按钮、门禁脚本都读它，**凭据不进版本库**；登录页在 localhost 下会自动出现「开发环境：填入本地测试账号」入口（生产不显示）
 
 > ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
 

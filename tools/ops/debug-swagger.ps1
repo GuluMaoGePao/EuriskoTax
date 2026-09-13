@@ -1,4 +1,6 @@
 ﻿$ErrorActionPreference = "Stop"
+# 本机测试账号（默认账号 / dev-account.local.json 覆盖；凭据不进版本库）
+. (Join-Path $PSScriptRoot 'dev-account.ps1')
 try {
     # 1. 检查 swagger 规范文档
     $json = Invoke-RestMethod -Uri "http://localhost:3000/api/docs.json" -TimeoutSec 5
@@ -20,7 +22,8 @@ try {
     }
 
     # 2. 测试实际登录+访问 profile 接口
-    $body = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
+    $dev = Get-DevAccount
+    $body = @{ email = $dev.Email; password = $dev.Password } | ConvertTo-Json
     $login = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 5
     $token = $login.data.token
     Write-Host "`n=== Test Profile API with Token ==="

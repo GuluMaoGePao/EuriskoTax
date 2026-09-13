@@ -23,6 +23,10 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $ToolsDir = Split-Path -Parent $ScriptDir
 $ServerDir = Join-Path $ProjectRoot "server"
 
+# 本机测试账号（默认账号 / dev-account.local.json 覆盖；凭据不进版本库）
+. (Join-Path $ScriptDir 'dev-account.ps1')
+$devAccount = Get-DevAccount
+
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  EuriskoTax 一键启动脚本" -ForegroundColor Cyan
@@ -111,7 +115,7 @@ if (-not $SkipResetUser) {
             npx prisma db push --schema prisma/schema.dev.prisma 2>&1 | Out-Host
             node scripts/reset-dev-user.js 2>&1 | Out-Host
         }
-        Write-Host "  [OK] dev 用户已就绪 (2649719969@qq.com / [REDACTED])" -ForegroundColor Green
+        Write-Host "  [OK] 本地测试账号已就绪 ($($devAccount.Email) / $($devAccount.Password))" -ForegroundColor Green
     } finally {
         Pop-Location
     }
@@ -280,7 +284,7 @@ Write-Host ""
 Write-Host "[$stepNum] 启动后端服务..." -ForegroundColor Yellow
 Write-Host "  前端访问地址: http://localhost:3000/" -ForegroundColor Cyan
 Write-Host "  API 文档地址:   http://localhost:3000/api/docs" -ForegroundColor Cyan
-Write-Host "  测试账号:       2649719969@qq.com / [REDACTED]" -ForegroundColor Cyan
+Write-Host "  测试账号:       $($devAccount.Email) / $($devAccount.Password)" -ForegroundColor Cyan
 
 # 获取内网 IP（方便局域网分享）
 try {

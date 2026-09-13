@@ -365,8 +365,8 @@ EuriskoTax/
 ### 开发账号
 
 - 用户名：devuser
-- 邮箱：2649719969@qq.com
-- 密码：[REDACTED]
+- 邮箱：dev@example.com（本机可用仓库根 `dev-account.local.json` 覆盖成自己的账号）
+- 密码：password（同上；凭据不进版本库）
 
 > 凭据以 [server/scripts/reset-dev-user.js](../../server/scripts/reset-dev-user.js) 为准，`ops-start-dev.ps1` 启动时会自动重置。**注意**：生产环境严禁保留此账号与 reset 脚本自动调用。
 

@@ -15,7 +15,8 @@
  *
  * 它会把「本地完整应用」真的跑起来做端到端验证：
  *   1. 数据库准备（SQLite: prisma generate:dev + db push；PostgreSQL: generate + migrate deploy + 种子）
- *   2. 确保本地测试账号 2649719969@qq.com / [REDACTED] 存在
+ *   2. 确保本地测试账号存在（默认 dev@example.com / password；本机可用仓库根
+ *      dev-account.local.json 覆盖成自己的账号，凭据不进版本库 → ./dev-account.js）
  *   3. 随机空闲端口启动后端（node src/app.js，同源托管前端+API）
  *   4. HTTP 级 e2e：
  *      - 前端资源冒烟：/ 含登录表单、auth-ui.js 含 dev-login-fill 且无 quick-login、SW 为 v8
@@ -39,6 +40,9 @@ const fs = require('fs');
 const net = require('net');
 const { spawn, spawnSync } = require('child_process');
 const http = require('http');
+
+// 本机测试账号：默认账号 / 本机覆盖文件（gitignored）统一从这里取，凭据不进版本库
+const { loadDevAccount } = require('./dev-account');
 
 const serverDir = path.resolve(__dirname, '..');   // …/server
 const envFile = path.join(serverDir, '.env');
@@ -276,11 +280,12 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         process.exit(1);
     }
 
-    // ---- 2. 确保本地测试账号存在（2649719969@qq.com / [REDACTED]） ----
+    // ---- 2. 确保本地测试账号存在（默认 dev@example.com / password；本机覆盖见 dev-account.js） ----
     const bcrypt = require('bcryptjs');
-    const DEV_EMAIL = '2649719969@qq.com';
-    const DEV_USERNAME = 'devuser';
-    const DEV_PASSWORD = '[REDACTED]';
+    const devAccount = loadDevAccount();
+    const DEV_EMAIL = devAccount.email;
+    const DEV_USERNAME = devAccount.username;
+    const DEV_PASSWORD = devAccount.password;
     try {
         const existing = await prisma.user.findUnique({ where: { email: DEV_EMAIL } });
         const hash = bcrypt.hashSync(DEV_PASSWORD, 10);

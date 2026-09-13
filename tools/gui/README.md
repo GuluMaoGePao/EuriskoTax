@@ -109,7 +109,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 | 按钮 | 执行命令 | 适用场景 |
 |------|---------|---------|
-| **👤 重置 dev 用户** | `node server/scripts/reset-dev-user.js` | 重新创建 dev 测试用户（密码重置为 [REDACTED]） |
+| **👤 重置 dev 用户** | `node server/scripts/reset-dev-user.js` | 原地重置本机测试账号密码（默认 dev@example.com，本机账号见 dev-account.local.json） |
 | **🔧 运行迁移** | `npx prisma migrate dev` | 修改 `schema.prisma` 后应用变更到数据库 |
 | **🎨 Prisma Studio** | `npx prisma studio` | 浏览器可视化查看/编辑数据库（端口 5555） |
 | **⚙️ 生成 Prisma Client** | `npx prisma generate` | 修改 schema 后必须执行，重新生成 Client |
@@ -266,9 +266,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 
 | 按钮 | 账号 / 用途 | 默认值 |
 |------|-------------|--------|
-| **👤 项目登录账号** | 前端登录用邮箱 | `2649719969@qq.com` |
-| **🔑 项目登录密码** | 前端登录密码（可重置） | `[REDACTED]` |
-| **📋 一键复制登录信息** | 邮箱 + 密码一次复制 | `2649719969@qq.com / [REDACTED]` |
+| **👤 项目登录账号** | 前端登录用邮箱 | 本机测试账号（默认 `dev@example.com`） |
+| **🔑 项目登录密码** | 前端登录密码（可重置） | 同上（默认 `password`） |
+| **📋 一键复制登录信息** | 邮箱 + 密码一次复制 | 取上两项拼接 |
 | **🔐 JWT Secret Key** | 后端 JWT 签名密钥（server/.env） | `dev-secret-key-change-in-production` |
 | **📧 QQ邮箱授权码** | 看门狗邮件通知（tools/ops/notify.config.json） | 自行配置 |
 
@@ -333,7 +333,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 2. 在「启动管理」Tab 点击 **日常启动：快速启动**（跳过依赖和用户重置）
 3. 等待输出区显示 `服务器运行在 http://localhost:3000`
 4. 点击 **🌐 打开浏览器** 或直接在浏览器访问 `http://localhost:3000/`
-5. 用 `2649719969@qq.com / [REDACTED]` 登录
+5. 用本机测试账号登录（默认 `dev@example.com / password`，可用仓库根 `dev-account.local.json` 覆盖）
 6. 调试完毕点击 **🛑 停止后端服务**
 
 ### 场景 2：改了后端代码后调试
@@ -351,7 +351,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 4. 卡片中也可随时点「复制」按钮 / 点卡片主体再次复制；点「📮 发邮件」按钮把新地址手动发给收件人
 5. 邮件**成功发送** / **失败/未发送**也会分别弹 1 个 MessageBox（各带 180s 去重）
 6. 守护脚本会自动重启异常进程；**地址变更**会再弹 1 个 MessageBox，并触发 URL_CHANGED 邮件
-7. 测试账号仍是 `2649719969@qq.com / [REDACTED]`
+7. 测试账号仍是本机测试账号（默认 `dev@example.com / password`）；**对外分享邮件里请填专门给测试员的账号，不要填本机凭据**
 
 > 🔁 **关于"为什么不重复弹窗"**：GUI 对 4 类事件（URL 首次 / URL 变更 / 邮件成功 / 邮件失败）均内置 180s 全局去重，且 outHandler 与公网卡片刷新函数通过 `PublicUrlLastSeen`、`UrlPopupMode` 做了职责互斥，同一件事不会被多个入口重复弹窗。如果你在 180s 内确实需要再看一次，可切换到「📋 日志查看」→ 看 events.log / notify.log，或直接点「🌐 公网地址速览」卡片即可重新复制。
 

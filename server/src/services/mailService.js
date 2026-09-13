@@ -2,7 +2,8 @@
 // 环境变量：SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM_NAME / SMTP_SECURE
 // 本地开发兜底：未配置真实 SMTP（或仅复制了 .env.example 的占位值）时，
 // 把验证码打印到后端控制台，保证"注册/找回→验证码→提交"全链路在本地可测；
-// 生产环境（NODE_ENV=production / 非 dev.db）未配置 SMTP 一律报错，不允许绕过。
+// 生产环境（NODE_ENV=production / 非 dev.db）未配置 SMTP 一律报错，不允许绕过；
+// 开发/测试环境即便配了真实 SMTP，发信失败也只告警不报错（验证码已打印到控制台，本地链路不依赖真实投递）。
 const nodemailer = require('nodemailer');
 
 let transporter = null;
@@ -117,12 +118,22 @@ async function sendVerificationCode(email, code, expireMinutes = 10, purpose = '
     </p>
 </div>`;
 
-    await client.sendMail({
-        from: `"${fromName}" <${from}>`,
-        to: email,
-        subject,
-        html
-    });
+    try {
+        await client.sendMail({
+            from: `"${fromName}" <${from}>`,
+            to: email,
+            subject,
+            html
+        });
+    } catch (err) {
+        // 开发/测试环境：验证码已打印到控制台，本地链路不依赖真实投递。
+        // 邮箱平台对 example.com 等保留域名、或因高频发信触发的反垃圾拦截（如 QQ 邮箱 550），
+        // 不应阻断本地门禁；生产环境（devConsole=false）仍必须发信成功，照常抛出。
+        if (!devConsole) {
+            throw err;
+        }
+        console.warn(`\n[开发模式] 验证码邮件未送达（已降级为控制台读取）：${err.message}\n`);
+    }
 }
 
 module.exports = {

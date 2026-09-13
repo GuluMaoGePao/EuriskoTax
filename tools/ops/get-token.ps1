@@ -1,6 +1,9 @@
 ﻿$ErrorActionPreference = "Stop"
+# 本机测试账号（默认账号 / dev-account.local.json 覆盖；凭据不进版本库）
+. (Join-Path $PSScriptRoot 'dev-account.ps1')
 try {
-    $body = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
+    $dev = Get-DevAccount
+    $body = @{ email = $dev.Email; password = $dev.Password } | ConvertTo-Json
     $r = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 5
     Write-Host "LOGIN OK"
     Write-Host "Token: $($r.token)"

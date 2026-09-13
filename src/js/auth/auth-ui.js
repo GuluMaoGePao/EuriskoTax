@@ -1745,6 +1745,25 @@ function togglePasswordVisibility(inputId, toggleId) {
 
 // 本地开发专用入口：仅 localhost / 127.0.0.1 显示"填入本地测试账号"。
 // 生产环境不注入该节点（开发/测试入口绝不泄漏到公网）；点击只填表不自动登录。
+// 账号值**不写进代码**：优先读本机 dev-account.local.json（仓库根，已 gitignore，
+// 见 server/scripts/dev-account.js），拿不到就回落仓库默认账号（由 verify:local 自动创建）。
+const DEV_ACCOUNT_FALLBACK = { email: 'dev@example.com', password: 'password' };
+const DEV_ACCOUNT_LOCAL_URL = '/dev-account.local.json';
+
+async function resolveDevAccount() {
+    if (typeof fetch !== 'function') return DEV_ACCOUNT_FALLBACK;
+    try {
+        const res = await fetch(DEV_ACCOUNT_LOCAL_URL, { cache: 'no-store' });
+        if (res && res.ok) {
+            const cfg = await res.json();
+            if (cfg && cfg.email && cfg.password) return cfg;
+        }
+    } catch (e) {
+        // 没有本机覆盖文件（生产 / 新 clone）时静默回落默认账号
+    }
+    return DEV_ACCOUNT_FALLBACK;
+}
+
 function setupDevLoginFill() {
     const host = window.location.hostname;
     if (host !== 'localhost' && host !== '127.0.0.1') return;
@@ -1756,12 +1775,13 @@ function setupDevLoginFill() {
     btn.type = 'button';
     btn.className = 'dev-login-fill mt-1 w-full text-center text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2';
     btn.textContent = '开发环境：填入本地测试账号';
-    btn.title = '自动填入 2649719969@qq.com / [REDACTED]，仍需手动点击「登录」';
-    btn.addEventListener('click', () => {
+    btn.title = '自动填入本机测试账号（dev-account.local.json 可覆盖），仍需手动点击「登录」';
+    btn.addEventListener('click', async () => {
         const emailInput = document.getElementById('login-email');
         const pwdInput = document.getElementById('login-password');
-        if (emailInput) emailInput.value = '2649719969@qq.com';
-        if (pwdInput) pwdInput.value = '[REDACTED]';
+        const account = await resolveDevAccount();
+        if (emailInput) emailInput.value = account.email;
+        if (pwdInput) pwdInput.value = account.password;
         showAlert('已填入本地测试账号，请点击「登录」', 'info');
     });
     form.appendChild(btn);

@@ -18,7 +18,7 @@ const { authenticateToken } = require('../middleware/auth');
  *             type: object
  *             required: [email]
  *             properties:
- *               email: { type: string, format: email, example: 2649719969@qq.com }
+ *               email: { type: string, format: email, example: dev@example.com }
  *     responses:
  *       '200': { description: 发送成功 }
  *       '400': { description: 邮箱格式错误 }
@@ -42,7 +42,7 @@ router.post('/send-code', authController.sendCode);
  *             type: object
  *             required: [email]
  *             properties:
- *               email: { type: string, format: email, example: 2649719969@qq.com }
+ *               email: { type: string, format: email, example: dev@example.com }
  *     responses:
  *       '200': { description: 发送成功 }
  *       '400': { description: 邮箱格式错误 }
@@ -67,7 +67,7 @@ router.post('/send-reset-code', authController.sendResetCode);
  *             type: object
  *             required: [email, verificationCode, newPassword]
  *             properties:
- *               email:            { type: string, format: email, example: 2649719969@qq.com }
+ *               email:            { type: string, format: email, example: dev@example.com }
  *               verificationCode: { type: string, example: "123456", description: 邮箱重置验证码（6位数字） }
  *               newPassword:      { type: string, minLength: 6, example: "newpassword123", description: 新密码（至少6位） }
  *     responses:
@@ -94,8 +94,8 @@ router.post('/reset-password', authController.resetPassword);
  *             required: [username, email, password, inviteCode, verificationCode]
  *             properties:
  *               username:         { type: string, example: devuser }
- *               email:            { type: string, format: email, example: 2649719969@qq.com }
- *               password:         { type: string, minLength: 6, example: [REDACTED] }
+ *               email:            { type: string, format: email, example: dev@example.com }
+ *               password:         { type: string, minLength: 6, example: password }
  *               phone:            { type: string, example: 13800138000 }
  *               inviteCode:       { type: string, example: EURISKO-ABCD-EFGH, description: 一机一码邀请码（向开发者获取，每码仅可注册一次） }
  *               verificationCode: { type: string, example: "123456", description: 邮箱验证码（6位数字） }
@@ -121,8 +121,8 @@ router.post('/register', authController.register);
  *             type: object
  *             required: [email, password]
  *             properties:
- *               email:    { type: string, format: email, example: 2649719969@qq.com }
- *               password: { type: string, example: [REDACTED] }
+ *               email:    { type: string, format: email, example: dev@example.com }
+ *               password: { type: string, example: password }
  *     responses:
  *       '200': { description: 登录成功，返回 JWT token }
  *       '400': { description: 邮箱或密码错误 }
@@ -208,7 +208,7 @@ router.delete('/profile', authenticateToken, authController.deleteProfile);
  *             type: object
  *             required: [currentPassword]
  *             properties:
- *               currentPassword: { type: string, example: [REDACTED], description: 当前登录密码 }
+ *               currentPassword: { type: string, example: password, description: 当前登录密码 }
  *     responses:
  *       '200': { description: 密码正确，data.valid 为 true }
  *       '400': { description: 未提供当前密码 }

@@ -193,7 +193,7 @@ node scripts/reset-dev-user.js
 cd ..
 ```
 
-测试账号：`2649719969@qq.com` / `[REDACTED]`
+测试账号：`dev@example.com` / `password`（对外分享邮件请另备测试账号，勿填本机凭据）
 
 ### 4.7 验证安装
 
@@ -683,7 +683,7 @@ Get-Process -Name "cpolar" -ErrorAction SilentlyContinue | Stop-Process -Force
 3. **开发配置不用于生产**：`JWT_SECRET=dev-secret-key-change-in-production` 仅限开发使用
 4. **QQ邮箱每日发信限制**：通常500封/天，开发环境足够
 5. **cpolar免费版限制**：公网URL每次重启都会变化，带宽有限制
-6. **测试账号密码明文**：`2649719969@qq.com / [REDACTED]` 仅限开发环境
+6. **测试账号密码明文**：`dev@example.com / password` 仅限开发环境（本机真实账号放 gitignored 的 `dev-account.local.json`，不进版本库）
 
 ---
 
@@ -722,8 +722,8 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $
 | 项目 | 值 |
 |------|-----|
 | 访问地址 | http://localhost:3000/ 或 cpolar公网地址 |
-| 测试账号 | 2649719969@qq.com |
-| 测试密码 | [REDACTED] |
+| 测试账号 | dev@example.com |
+| 测试密码 | password |
 
 ### 默认配置值
 

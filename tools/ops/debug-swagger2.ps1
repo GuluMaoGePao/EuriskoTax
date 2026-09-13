@@ -1,4 +1,6 @@
 ﻿$ErrorActionPreference = "Continue"
+# 本机测试账号（默认账号 / dev-account.local.json 覆盖；凭据不进版本库）
+. (Join-Path $PSScriptRoot 'dev-account.ps1')
 Write-Host "=== 1. Check /health ==="
 try {
     $h = Invoke-WebRequest -Uri "http://localhost:3000/health" -TimeoutSec 5 -UseBasicParsing
@@ -35,7 +37,8 @@ try {
 
 Write-Host "`n=== 4. Login test ==="
 try {
-    $body = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
+    $dev = Get-DevAccount
+    $body = @{ email = $dev.Email; password = $dev.Password } | ConvertTo-Json
     $r = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 8
     Write-Host "login OK: success=$($r.success), token length=$($r.data.token.Length)"
 } catch {

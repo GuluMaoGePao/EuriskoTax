@@ -153,8 +153,8 @@ function Test-AllowPopup {
 
 【测试员登录信息】
   访问地址：{newUrl}
-  测试账号：2649719969@qq.com
-  测试密码：[REDACTED]
+  测试账号：dev@example.com
+  测试密码：password
 
 ───────────────────────────────────
 EuriskoTax Watchdog | 自动发送
@@ -194,8 +194,8 @@ EuriskoTax Watchdog | 自动发送
 
 【测试员登录信息】
   访问地址：{newUrl}
-  测试账号：2649719969@qq.com
-  测试密码：[REDACTED]
+  测试账号：dev@example.com
+  测试密码：password
 
 【说明】
   cpolar 免费版公网地址在隧道重启或自动重连后可能发生变化。

@@ -24,6 +24,10 @@ tools/ops/deploy.config.json
 # Account credentials doc (contains all passwords/tokens)
 docs/admin/account-credentials.md
 
+# 本机测试账号覆盖（本机自己用的邮箱 / 密码只留在这台机器上，仓库里只放可用的默认账号）
+# 读取方：server/scripts/dev-account.js、tools/ops/dev-account.ps1、登录页预填、GUI 复制按钮
+dev-account.local.json
+
 # Logs
 logs/
 *.log

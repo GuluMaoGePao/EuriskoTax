@@ -96,6 +96,10 @@ $CpolarDir    = Join-Path $ToolsDir "cpolar"
 $ServerDir    = Join-Path $ProjectRoot "server"
 $FrontDir     = $ProjectRoot
 
+# 本机测试账号（默认账号 / 仓库根 dev-account.local.json 覆盖；凭据不进版本库）
+. (Join-Path $OpsDir "dev-account.ps1")
+$devAccount   = Get-DevAccount
+
 # ==============================================================================
 # 全局状态
 # ==============================================================================
@@ -743,7 +747,7 @@ function Open-ApiDocsAuto {
     Write-Log "[API文档] [步骤3/5] 自动登录获取 Bearer Token..." "INFO"
     $token = $null
     try {
-        $loginBody = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
+        $loginBody = @{ email = $devAccount.Email; password = $devAccount.Password } | ConvertTo-Json
         $resp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $loginBody -TimeoutSec 8
         if ($resp.success -and $resp.data.token) {
             $token = $resp.data.token
@@ -853,7 +857,7 @@ html,body{margin:0;font-family:'Microsoft YaHei',PingFang SC,Segoe UI,sans-serif
 </div>
 <div class="hint">
   <div class="row">👉 <b>你什么都不用做，接口已经能直接调试了！</b> 展开任意接口 → 点 <b>Try it out</b> → 点 <b>Execute</b> 即可。</div>
-  <div class="row">登录账号：<span class="mono">2649719969@qq.com</span> / 密码 <span class="mono">[REDACTED]</span> · Token 已自动复制到剪贴板</div>
+  <div class="row">登录账号：<span class="mono">$($devAccount.Email)</span> / 密码 <span class="mono">$($devAccount.Password)</span> · Token 已自动复制到剪贴板</div>
   <div class="row">Bearer Token 预览：<span class="mono">$tokenPreview</span> · 有效期 1 小时，过期后重新点 GUI 按钮</div>
 </div>
 <div id="swagger-ui"></div>
@@ -1495,7 +1499,7 @@ function Copy-PublicUrlToClipboard {
     }
     try {
         Set-Clipboard -Value $url
-        Show-GuiAlert -Title "✅ 已复制到剪贴板" -Message "公网地址已复制：`n`n  $url`n`n把这个链接粘贴发给朋友即可访问（配合 2649719969@qq.com / [REDACTED]）。"
+        Show-GuiAlert -Title "✅ 已复制到剪贴板" -Message "公网地址已复制：`n`n  $url`n`n把这个链接粘贴发给朋友即可访问（配合本机测试账号 $($devAccount.Email) / $($devAccount.Password)）。"
     } catch {
         Show-GuiAlert -Title "复制失败" -Message "剪贴板写入失败，请手动复制：$url" -Kind Error
     }
@@ -2623,7 +2627,7 @@ $healthCardInfo = @{
                 $dbOk = $false
                 if ($backendOk) {
                     try {
-                        $resp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"2649719969@qq.com","password":"[REDACTED]"}' -TimeoutSec 5
+                        $resp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body (@{ email = $devAccount.Email; password = $devAccount.Password } | ConvertTo-Json) -TimeoutSec 5
                         if ($resp.success) { $dbOk = $true; Write-Log "  ✅ 数据库连接正常（登录API成功）" "OK" }
                         else { Write-Log "  ⚠️ 登录API返回失败，可能数据库未初始化" "WARN" }
                     } catch {
@@ -2708,7 +2712,7 @@ Add-SectionCard -TabCtx $tab1Ctx `
     -Subtitle "根据使用场景选择启动方式" `
     -Description "详细说明：所有启动命令都会运行 ops-start-dev.ps1 脚本，在 server/ 目录执行。启动成功后会自动显示日志。" `
     -AccentColor $C_SUCCESS -Buttons @(
-    @{ Text = "第一次用：一键启动`n安装依赖 + 重置测试账号`n⭐推荐给新环境"; Desc = "完整流程：环境检查 → npm install 装依赖 → 重置测试账号(2649719969@qq.com/[REDACTED]) → 启动后端服务。如果你是第一次启动或者升级过代码，就点这个。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+    @{ Text = "第一次用：一键启动`n安装依赖 + 重置测试账号`n⭐推荐给新环境"; Desc = "完整流程：环境检查 → npm install 装依赖 → 重置测试账号($($devAccount.Email)/$($devAccount.Password)) → 启动后端服务。如果你是第一次启动或者升级过代码，就点这个。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1'" -WorkingDir $ProjectRoot -IsBackend } },
     @{ Text = "日常启动：快速启动`n跳过安装，跳过重置`n⭐推荐日常开发"; Desc = "直接启动后端服务，跳过依赖安装和用户重置。只适合之前已经成功启动过、依赖已装齐的情况。速度快很多。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "backend" -Command "& '$OpsDir\ops-start-dev.ps1' -SkipInstall -SkipResetUser" -WorkingDir $ProjectRoot -IsBackend } },
@@ -2810,9 +2814,9 @@ Add-SectionCard -TabCtx $tab2Ctx `
 Add-SectionCard -TabCtx $tab2Ctx `
     -Title "2. 数据管理" `
     -Subtitle "重置测试账号 · 强制重建数据库" `
-    -Description "详细说明：重置测试账号会恢复 2649719969@qq.com/[REDACTED] 默认账号。强制重建数据库会清空所有数据，谨慎操作。" `
+    -Description "详细说明：重置测试账号会把本机测试账号（$($devAccount.Email)）的密码原地重置为配置值（不删账号，避免连带删掉名下的计算记录）。强制重建数据库会清空所有数据，谨慎操作。" `
     -AccentColor $C_DANGER -Buttons @(
-    @{ Text = "重置开发测试账号`n2649719969@qq.com"; Desc = "执行 server/scripts/reset-dev-user.js，重置开发环境的测试用户账号（邮箱 2649719969@qq.com，密码 [REDACTED]）。"; Color = "85, 180, 110";
+    @{ Text = "重置开发测试账号`n$($devAccount.Email)"; Desc = "执行 server/scripts/reset-dev-user.js，把本机测试账号（$($devAccount.Email)）的密码原地重置为 $($devAccount.Password)（不删账号，避免连带删掉名下的计算记录）。"; Color = "85, 180, 110";
        OnClick = { Invoke-AsyncCommand -Name "resetuser" -Command "node scripts/reset-dev-user.js" -WorkingDir $ServerDir } },
     @{ Text = "⚠ 强制重建数据库`n所有数据将清空丢失"; Desc = "执行 prisma migrate reset --force，删除当前数据库并重建！！！所有数据会被清空，不可恢复。点前请三思。"; Color = "200, 85, 85";
        OnClick = {
@@ -3353,23 +3357,23 @@ Add-SectionCard -TabCtx $tab6bCtx `
     -Subtitle "所有需要登录/认证的账号密码统一列表（点击按钮可复制到剪贴板）" `
     -Description "详细说明：本项目开发环境涉及多种账号和密码，统一整理在此方便查阅。生产环境请自行替换为强密码。所有密码仅限本人使用，请勿外传。" `
     -AccentColor $C_PURPLE -ButtonsPerRow 3 -Buttons @(
-    @{ Text = "👤 项目登录账号`n2649719969@qq.com"; Desc = "前端登录用邮箱。启动后端后用此账号登录前端页面 http://localhost:3000/。点击复制。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = { Set-Clipboard -Value "2649719969@qq.com"; Write-Log "[账号] 已复制登录邮箱 2649719969@qq.com 到剪贴板" "OK" } },
-    @{ Text = "🔑 项目登录密码`n[REDACTED]"; Desc = "前端登录用密码。默认测试密码为 [REDACTED]。可在 数据库→重置账号 功能重置。点击复制。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = { Set-Clipboard -Value "[REDACTED]"; Write-Log "[账号] 已复制登录密码 [REDACTED] 到剪贴板" "OK" } },
-    @{ Text = "📋 一键复制登录信息`n邮箱+密码"; Desc = "同时复制邮箱和密码，格式：2649719969@qq.com / [REDACTED]，方便你直接粘贴。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
-       OnClick = { Set-Clipboard -Value "2649719969@qq.com / [REDACTED]"; Write-Log "[账号] 已复制登录信息 2649719969@qq.com / [REDACTED] 到剪贴板" "OK" } },
+    @{ Text = "👤 项目登录账号`n$($devAccount.Email)"; Desc = "前端登录用邮箱（仓库默认账号，或被仓库根 dev-account.local.json 覆盖成本机账号）。启动后端后用此账号登录前端页面 http://localhost:3000/。点击复制。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Set-Clipboard -Value $devAccount.Email; Write-Log "[账号] 已复制登录邮箱 $($devAccount.Email) 到剪贴板" "OK" } },
+    @{ Text = "🔑 项目登录密码`n$($devAccount.Password)"; Desc = "前端登录用密码（仓库默认账号，或被仓库根 dev-account.local.json 覆盖）。可在 数据库→重置账号 功能重置。点击复制。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Set-Clipboard -Value $devAccount.Password; Write-Log "[账号] 已复制登录密码 $($devAccount.Password) 到剪贴板" "OK" } },
+    @{ Text = "📋 一键复制登录信息`n邮箱+密码"; Desc = "同时复制邮箱和密码，格式：$($devAccount.Email) / $($devAccount.Password)，方便你直接粘贴。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
+       OnClick = { Set-Clipboard -Value "$($devAccount.Email) / $($devAccount.Password)"; Write-Log "[账号] 已复制登录信息 $($devAccount.Email) / $($devAccount.Password) 到剪贴板" "OK" } },
     @{ Text = "🔐 JWT Secret Key`ndev-secret-key..."; Desc = "后端 JWT 签名密钥，位于 server/.env。开发用：dev-secret-key-change-in-production。生产环境必须替换为强密钥！"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
        OnClick = { Start-Process (Join-Path $ServerDir ".env") } },
     @{ Text = "📧 QQ邮箱授权码`nSMTP邮件通知"; Desc = "看门狗邮件通知用的 QQ 邮箱授权码（非登录密码）。配置文件：tools/ops/notify.config.json。点击打开配置。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
        OnClick = { Start-Process (Join-Path $ToolsDir "ops\notify.config.json") } },
     @{ Text = "🌐 Cpolar Token`n内网穿透授权"; Desc = "公网分享用的 cpolar authtoken。需自行注册 cpolar 账号获取。配置命令：cpolar authtoken <你的token>。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "cpolar" -Command "& '$CpolarDir\cpolar.exe' authtoken" -WorkingDir $CpolarDir } },
-    @{ Text = "🔑 获取 Bearer Token`n登录API自动获取"; Desc = "自动用 2649719969@qq.com/[REDACTED] 调用登录API获取JWT Token，复制到剪贴板并显示在输出区。Token有效期1小时，过期后重新点此按钮获取。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+    @{ Text = "🔑 获取 Bearer Token`n登录API自动获取"; Desc = "自动用本机测试账号（$($devAccount.Email)）调用登录API获取JWT Token，复制到剪贴板并显示在输出区。Token有效期1小时，过期后重新点此按钮获取。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = {
             Write-Log "[Token] 正在调用登录API获取 Bearer Token..." "INFO"
             try {
-                $loginBody = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
+                $loginBody = @{ email = $devAccount.Email; password = $devAccount.Password } | ConvertTo-Json
                 $resp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $loginBody -TimeoutSec 10
                 if ($resp.success -and $resp.data.token) {
                     $token = $resp.data.token
@@ -3544,7 +3548,7 @@ $obGuide = New-OutBtn -Text "❓ 按钮说明" -Color "225, 165, 80" -W 104 -OnC
            "   跳过安装和重置，速度快很多。`n`n" + `
            "③ 启动成功后，底部状态会显示 ● 运行中，`n" + `
            "   然后点【打开前端 http://localhost:3000/】去玩！`n`n" + `
-           "登录：2649719969@qq.com  /  [REDACTED]`n`n" + `
+           "登录：$($devAccount.Email)  /  $($devAccount.Password)`n`n" + `
            "鼠标悬停任何按钮都有详细说明。"
     [System.Windows.Forms.MessageBox]::Show($msg, "按钮使用说明", "OK", "Information")
 }
@@ -3820,7 +3824,7 @@ $form.Add_Shown({
     Write-Log ""
     Write-Log "【账号密码统一管理：】" "OK"
     Write-Log "  👉 左侧导航 → 【🔐 Git & 账号】 → 【2. 账号 & 密码管理】 查看所有账号" "INFO"
-    Write-Log "  👉 一键复制登录邮箱 2649719969@qq.com  /  密码 [REDACTED]" "GRAY"
+    Write-Log "  👉 一键复制登录邮箱 $($devAccount.Email)  /  密码 $($devAccount.Password)" "GRAY"
     Write-Log "  👉 账号文档: docs/admin/account-credentials.md" "GRAY"
     Write-Log ""
     Write-Log "提示: 鼠标悬停任何按钮可查看详细说明。导航选中后左侧有蓝色指示条。" "INFO"
