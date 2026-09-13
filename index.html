@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.15.0';
+        window.__APP_VERSION__ = '1.17.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -2496,10 +2496,10 @@
                                     <div id="housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="housing-fund-rate" class="label">缴费比例：</label>
-                                        <select id="housing-fund-rate" class="input-field w-24">
-                                            <option value="5">5%</option>
-                                            <option value="7">7%</option>
-                                        </select>
+                                        <!-- 比例由用户自填（各地口径 5%~12% 不等，固定两档会让人选不到自己的比例），
+                                             默认 5% 只是初始值；留空/越界由 normalizeRateInput 失焦兜回 5% -->
+                                        <input type="number" id="housing-fund-rate" class="input-field w-24" value="5" min="0" max="100" step="0.1">
+                                        <span>%</span>
                                     </div>
                                     <label for="housing-fund" class="label mt-2">
                                         住房公积金 (元/月)
@@ -3575,10 +3575,9 @@
                                     <div id="reverse-housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="reverse-housing-fund-rate" class="label">缴费比例：</label>
-                                        <select id="reverse-housing-fund-rate" class="input-field w-24">
-                                            <option value="5">5%</option>
-                                            <option value="7">7%</option>
-                                        </select>
+                                        <!-- 比例由用户自填（各地口径 5%~12% 不等），默认 5% 只是初始值 -->
+                                        <input type="number" id="reverse-housing-fund-rate" class="input-field w-24" value="5" min="0" max="100" step="0.1">
+                                        <span>%</span>
                                     </div>
                                     <label for="reverse-housing-fund" class="label mt-2">
                                         住房公积金 (元/月)
@@ -4443,10 +4442,10 @@
                                     <div id="business-housing-fund-base-warning" class="hidden text-red-500 text-sm mt-1"></div>
                                     <div class="flex items-center space-x-2 mt-2">
                                         <label for="business-housing-fund-rate" class="label">缴费比例：</label>
-                                        <select id="business-housing-fund-rate" class="input-field w-24">
-                                            <option value="5">5%</option>
-                                            <option value="7">7%</option>
-                                        </select>
+                                        <!-- 比例由用户自填（各地口径 5%~12% 不等），默认 5% 只是初始值；
+                                             改基数或比例会重算下方「住房公积金 (元/月)」，之后也可再手改该金额 -->
+                                        <input type="number" id="business-housing-fund-rate" class="input-field w-24" value="5" min="0" max="100" step="0.1">
+                                        <span>%</span>
                                     </div>
                                     <label for="business-housing-fund" class="label mt-2">
                                         住房公积金 (元/月)
@@ -5609,7 +5608,7 @@
                         <ul class="space-y-2 text-sm text-gray-600">
                             <li><i class="fa fa-check text-green-500 mr-2"></i>综合 / 经营 / 分类所得全功能计算</li>
                             <li><i class="fa fa-check text-green-500 mr-2"></i>反向倒算、本地历史与税务档案</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>参保城市社保 / 公积金基数校验</li>
+                            <li><i class="fa fa-check text-green-500 mr-2"></i>社保 / 公积金基数达最低标准校验</li>
                             <li><i class="fa fa-check text-green-500 mr-2"></i>政策要点与更新公告</li>
                             <li><i class="fa fa-check text-green-500 mr-2"></i>JSON / CSV 导出 · 结果分享图</li>
                             <li><i class="fa fa-check text-green-500 mr-2"></i>测算结果 PDF（基础截图导出）</li>
@@ -5968,7 +5967,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.15.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.17.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6110,9 +6109,18 @@
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
                             <h4 class="text-xs font-bold text-gray-800">补充信息</h4>
-                            <span class="text-[11px] text-gray-400 ml-auto">选填，填了顾问更好准备</span>
+                            <span class="text-[11px] text-gray-400 ml-auto">城市必填，其余选填</span>
                         </div>
                         <div class="space-y-3">
+                            <!-- 所在城市：计算页不再让用户选参保城市（各地口径差异大，选错反而误导），
+                                 改为留资时收集，由顾问核对当地缴费基数口径后给结论 -->
+                            <div>
+                                <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-red-500">*</span></label>
+                                <div class="relative">
+                                    <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                    <input id="lead-city" type="text" maxlength="20" placeholder="如：上海（各地缴费基数口径不同）" autocomplete="address-level2" class="input-field" />
+                                </div>
+                            </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label for="lead-entity" class="block text-xs font-medium text-gray-600 mb-1">身份</label>
@@ -6192,12 +6200,6 @@
     <!-- 阶段12 C1：税制参数热更新同步层（管理台热改税率 → 校验后覆盖全局税率变量 + localStorage 缓存）。
          必须紧随 tax-constants.js，保证首屏计算即用最新值；离线时回退缓存/出厂基线 -->
     <script src="src/js/data/tax-rates-sync.js"></script>
-    <!-- 阶段14 C2：城市社保参数库同步层（按参保城市覆盖社保/公积金基数下限全局量）。
-         必须紧随 tax-rates-sync.js：C1 先写入全国口径，C2 再按所选城市覆盖；
-         同时监听 'euriskotax:tax-rates-updated' 在 C1 之后重新施加城市口径 -->
-    <script src="src/js/data/city-social-sync.js"></script>
-    <!-- 阶段14 C2：参保城市选择器（注入正向/反向/经营三页的社保区块，三处共享同一选择） -->
-    <script src="src/js/ui/city-social-ui.js"></script>
     <!-- auth-ui 由 app.js 在 DOMContentLoaded 后动态 import（统一 URL 避免双份加载与旧版本缓存） -->
     <script src="src/js/data/data-management.js"></script>
     <script src="src/js/data/field-hints.js"></script>

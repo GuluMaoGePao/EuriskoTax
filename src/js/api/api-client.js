@@ -275,6 +275,8 @@ async function submitLead(payload) {
         phone: p.phone || '',
         wechat: p.wechat || '',
         company: p.company || '',
+        // 城市改为留资时收集（参保城市选择已回退）：顾问据此核对当地缴费基数口径
+        city: p.city || '',
         entityType: p.entityType || 'unknown',
         need: p.need || 'other',
         source: p.source || 'unknown',

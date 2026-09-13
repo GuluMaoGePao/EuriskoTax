@@ -9,13 +9,14 @@ const SOURCES = [
     'result_business', 'result_settlement', 'result_budget',
     'home_banner', 'modal', 'notice_list', 'profile', 'share', 'unknown',
     // 阶段14 剩余项：SEO 落地页（页面按页给独立来源，便于判断哪个关键词页真的带来线索）
-    'seo_bonus', 'seo_salary',
+    'seo_bonus', 'seo_salary', 'seo_settlement',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
 const NAME_MAX = 50;
 const WECHAT_MAX = 64;
 const COMPANY_MAX = 100;
+const CITY_MAX = 20;
 const SCENE_MAX = 100;
 const NOTE_MAX = 1000;
 
@@ -63,6 +64,10 @@ const buildLead = (body) => {
 
     const companyRes = readText(src.company, COMPANY_MAX, 'company');
     if (companyRes.error) return { error: companyRes.error };
+    // 所在城市：计算页不再让用户选参保城市（2026-09 回退），改由留资时收集，
+    // 顾问据此核对当地社保/公积金缴费基数口径。选填（不阻断留资），后端只做长度约束。
+    const cityRes = readText(src.city, CITY_MAX, 'city');
+    if (cityRes.error) return { error: cityRes.error };
     const sceneRes = readText(src.scene, SCENE_MAX, 'scene');
     if (sceneRes.error) return { error: sceneRes.error };
     const noteRes = readText(src.note, NOTE_MAX, 'note');
@@ -74,6 +79,7 @@ const buildLead = (body) => {
             phone: phone || null,
             wechat: wechatRes.value || null,
             company: companyRes.value || null,
+            city: cityRes.value,
             entity_type: pickEnum(ENTITY_TYPES, src.entityType, 'unknown'),
             need: pickEnum(NEEDS, src.need, 'other'),
             source: pickEnum(SOURCES, src.source, 'unknown'),
@@ -119,6 +125,8 @@ const submitLead = async (req, res, next) => {
                         // 情境/归因以最新一次为准；备注追加保留首次诉求
                         source: data.source !== 'unknown' ? data.source : existing.source,
                         scene: data.scene || existing.scene,
+                        // 城市同情境：本次填了就以本次为准（用户纠正/补充更准确）
+                        city: data.city || existing.city,
                         note: noteMerged,
                         user_id: existing.user_id || userId
                     }
@@ -155,6 +163,7 @@ module.exports = {
         NAME_MAX,
         WECHAT_MAX,
         COMPANY_MAX,
+        CITY_MAX,
         SCENE_MAX,
         NOTE_MAX,
         DEDUPE_WINDOW_MS

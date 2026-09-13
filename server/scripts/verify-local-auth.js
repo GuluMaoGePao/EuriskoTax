@@ -26,7 +26,9 @@
  *        SYNC_MAX_RECORDS 上限拒绝、free 账号 403 PRO_REQUIRED
  *      - 阶段14 专业版兑换码：管理端生成/列表/作废/CSV 导出 + 用户端一码一用兑换
  *      - 阶段14 C2 城市社保参数库：公开只读（含兜底城市不变量 / since 增量）+ 管理端
- *        发布/回滚/版本号唯一/上限低于下限拒绝 + 前端同步层与选择器静态接线
+ *        发布/回滚/版本号唯一/上限低于下限拒绝（端上已回退为全国口径，用户不再选参保城市）
+ *      - 留资「所在城市」：静态接线（表单/弹窗/接口/管理台）+ e2e 落库、搜索命中、CSV 列
+ *      - 缴费比例：三页可输入数字框（默认 5%，不再是固定两档）+ 输入即时重算 / 留空越界兜底
  *      - 完整注册链路：申请邀请码(写库) → send-code(读后端控制台验证码) → register → 登录新号 → profile
  *   5. 清理（删临时账号/邀请码/关后端），输出 PASS/FAIL，失败时退出码非 0
  *
@@ -483,25 +485,57 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             authJs.status === 200 && authJs.raw.includes('handleRedeemProCode') && authJs.raw.includes('redeemProCode'),
             `HTTP ${authJs.status}`);
 
-        // ---- 阶段14 C2 城市社保参数库静态断言（端上基数口径按参保城市取值）----
-        const csSyncJs = await request(PORT, 'GET', '/src/js/data/city-social-sync.js');
-        record('city-social-sync.js 暴露 window.CitySocial 且接线公开端点',
-            csSyncJs.status === 200 && csSyncJs.raw.includes('window.CitySocial = api')
-            && csSyncJs.raw.includes("'/api/config/city-social'"),
-            `HTTP ${csSyncJs.status}`);
-        record('city-social-sync.js 在 C1 之后重新施加城市口径（时序耦合未被破坏）',
-            csSyncJs.status === 200 && csSyncJs.raw.includes('euriskotax:tax-rates-updated')
-            && csSyncJs.raw.includes('reapply()'),
-            `HTTP ${csSyncJs.status}`);
-        const csUiJs = await request(PORT, 'GET', '/src/js/ui/city-social-ui.js');
-        record('city-social-ui.js 暴露 window.CitySocialUI 并注入三页选择器',
-            csUiJs.status === 200 && csUiJs.raw.includes('window.CitySocialUI = { init: init')
-            && csUiJs.raw.includes('reverse-social-city-select') && csUiJs.raw.includes('business-social-city-select'),
-            `HTTP ${csUiJs.status}`);
-        record('index.html 已加载 C2 同步层与选择器（紧随 tax-rates-sync.js）',
-            leadPage.status === 200 && leadPage.raw.includes('src/js/data/city-social-sync.js')
-            && leadPage.raw.includes('src/js/ui/city-social-ui.js'),
+        // ---- 阶段14 C2 回退（2026-09）：端上不再让用户选参保城市，改在留资时收集 ----
+        // 保持断言：删掉的前端同步层/选择器不能再被 index.html 引用（防止半吊子回滚：
+        // 文件删了但页面还引着 → 用户拿到 404 脚本 + 口径静默退回全国）
+        record('index.html 不再引用已下线的城市社保同步层/选择器（回滚不残留半截）',
+            leadPage.status === 200 && !leadPage.raw.includes('city-social-sync.js')
+            && !leadPage.raw.includes('city-social-ui.js'),
             `HTTP ${leadPage.status}`);
+        record('index.html 留资表单含必填「所在城市」输入(#lead-city)',
+            leadPage.status === 200 && leadPage.raw.includes('id="lead-city"')
+            && leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>'),
+            `HTTP ${leadPage.status}`);
+        record('lead-modal.js 收集城市并做必填校验（未填不发请求）',
+            leadModalJs.status === 200 && leadModalJs.raw.includes("val('lead-city')")
+            && leadModalJs.raw.includes('请填写所在城市'),
+            `HTTP ${leadModalJs.status}`);
+        record('api-client.js 提交线索带上 city（与后端 buildLead 白名单一致）',
+            apiClientJs.status === 200 && apiClientJs.raw.includes('city: p.city'),
+            `HTTP ${apiClientJs.status}`);
+        record('admin.js 线索列表展示城市（顾问按城市核对当地基数口径）',
+            adminJs.status === 200 && adminJs.raw.includes('it.city'),
+            `HTTP ${adminJs.status}`);
+
+        // ---- 缴费比例：用户自填（各地 5%~12% 口径不同，固定两档会让用户选不到自己的比例）----
+        // 控件形态与「空值兜底」都要守住：清空输入若按 0 计算，公积金会静默变 0，用户会当成算错
+        const homeAppJs = await request(PORT, 'GET', '/src/js/app.js');
+        const helperFnJs = await request(PORT, 'GET', '/src/js/calculation/helper-functions.js');
+        const rateInputIds = ['housing-fund-rate', 'reverse-housing-fund-rate', 'business-housing-fund-rate'];
+        record('index.html 三页「缴费比例」为可输入数字框且默认 5%（不再是固定两档下拉）',
+            leadPage.status === 200
+            && rateInputIds.every((id) => !leadPage.raw.includes(`<select id="${id}"`)
+                && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw)),
+            `HTTP ${leadPage.status}`);
+        record('缴费比例输入即时重算 + 留空/越界回落默认值（清空后公积金不会静默变 0）',
+            helperFnJs.status === 200 && helperFnJs.raw.includes('function normalizeRateInput')
+            && homeAppJs.status === 200
+            && homeAppJs.raw.includes("document.getElementById('housing-fund-rate').addEventListener('input'")
+            && homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate').addEventListener('input'")
+            && homeAppJs.raw.includes('normalizeRateInput(this)'),
+            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
+        // 经营页的基数/比例原本一个事件都没接（改什么都不发生），且养老清空后若统一回落 5% 是错的
+        record('经营页「缴费基数 × 缴费比例」联动 + 低于下限提示接线（各险种回落自己的默认比例）',
+            helperFnJs.status === 200
+            && helperFnJs.raw.includes('function calculateBusinessInsurance')
+            && helperFnJs.raw.includes('function calculateBusinessSocialInsurance')
+            && helperFnJs.raw.includes('fallback: 8')
+            && homeAppJs.status === 200
+            && homeAppJs.raw.includes("['business-social-security-base', 'business-housing-fund-base']")
+            && homeAppJs.raw.includes("['business-pension-rate', 'business-medical-rate', 'business-unemployment-rate', 'business-housing-fund-rate']")
+            && homeAppJs.raw.includes("validateSocialSecurityBase('business')")
+            && homeAppJs.raw.includes("validateHousingFundBase('business')"),
+            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
         record('admin.html 含社保基数 Tab(data-nav="citysocial")与视图(#view-citysocial)',
             adminPage.status === 200 && adminPage.raw.includes('data-nav="citysocial"') && adminPage.raw.includes('id="view-citysocial"'),
             `HTTP ${adminPage.status}`);
@@ -541,7 +575,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('sitemap.xml 可访问且收录首页与全部落地页',
             sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
             && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -593,6 +628,32 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && salaryPage.raw.includes('>580.00<') && salaryPage.raw.includes('>9480.00<'), '');
         record('月薪个税落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             salaryPage.status === 200 && salaryPage.raw.includes('?source=seo_salary'), '');
+        // 第三张落地页「汇算清缴（退税/补税）」：前两张的守护照旧，另加一项本页独有的口径守护 ——
+        // 这一页的核心结论是一道减法（应退/应补 = 全年应纳税额 − 已预缴税额），
+        // 所以示例表里「差额 0 / 应补 9600」等数字必须能被爬虫读到，且年度税率表要与常量文件逐档一致。
+        const settlementPage = await request(PORT, 'GET', '/seo/annual-settlement.html');
+        record('汇算清缴落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            settlementPage.status === 200 && settlementPage.raw.includes('rel="canonical"')
+            && settlementPage.raw.includes('FAQPage')
+            && settlementPage.raw.includes('国家税务总局公告 2019 年第 44 号')
+            && settlementPage.raw.includes('6 月 30 日'),
+            `HTTP ${settlementPage.status}`);
+        const staleSettlementRows = comprehensiveRows.filter((r) => {
+            const pct = `${Math.round(r.rate * 1000) / 10}%`;   // 0.03 → '3%'（避开浮点 3.0000000000000004）
+            return !settlementPage.raw.includes(pct) || !settlementPage.raw.includes(`>${r.deduction}<`);
+        });
+        record('汇算清缴落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            settlementPage.status === 200 && comprehensiveRows.length === 7 && staleSettlementRows.length === 0
+            && settlementPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && settlementPage.raw.includes('/src/js/data/tax-rates-sync.js')
+            && settlementPage.raw.includes('/src/js/calculation/annual-settlement-quick.js'),
+            `常量 ${comprehensiveRows.length} 档, 与页面不一致 ${staleSettlementRows.length} 档`);
+        record('汇算清缴落地页静态示例表可被读到（应退应补 0 / 应补 9600，含 9480 与 19080 口径）',
+            settlementPage.status === 200 && settlementPage.raw.includes('>9480.00<')
+            && settlementPage.raw.includes('>3480.00<') && settlementPage.raw.includes('>19080.00<')
+            && settlementPage.raw.includes('>9600.00<'), '');
+        record('汇算清缴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            settlementPage.status === 200 && settlementPage.raw.includes('?source=seo_settlement'), '');
         const deadLocs = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;
@@ -889,7 +950,7 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 13.1 游客留资（无 JWT）必须成功 —— 绝大多数用户不会注册
         const guestLead = await request(PORT, 'POST', '/api/leads', {
             json: {
-                name: '验证用户', phone: leadPhone(1), company: '验证个体户',
+                name: '验证用户', phone: leadPhone(1), company: '验证个体户', city: '上海',
                 entityType: 'sole', need: 'settlement', source: 'result_business',
                 scene: '经营所得·汇算清缴', note: `[verify] e2e lead ${leadStamp}`, consent: true,
             },
@@ -931,17 +992,25 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const leadData = (leadList.body && leadList.body.data) || {};
         const leadItems = Array.isArray(leadData.items) ? leadData.items : [];
         const mineLead = leadItems.find((x) => x.id === verifyLeadId);
-        record('GET /admin/leads 列表含新线索(情境快照 + 主体类型 + byStatus)',
+        record('GET /admin/leads 列表含新线索(情境快照 + 主体类型 + 所在城市 + byStatus)',
             leadList.status === 200 && !!mineLead && mineLead.scene === '经营所得·汇算清缴'
-            && mineLead.entity_type === 'sole' && !!leadData.byStatus && typeof leadData.total === 'number',
+            && mineLead.entity_type === 'sole' && mineLead.city === '上海'
+            && !!leadData.byStatus && typeof leadData.total === 'number',
             `HTTP ${leadList.status}, total=${leadData.total}`);
 
-        // 13.6 关键词搜索：姓名/手机号/公司三字段 OR 匹配
+        // 13.6 关键词搜索：姓名/手机号/公司/城市四字段 OR 匹配
         const leadSearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent(leadPhone(1)), { headers: leadAdminH });
         const searchItems = (leadSearch.body && leadSearch.body.data && leadSearch.body.data.items) || [];
         record('GET /admin/leads 支持关键词搜索(手机号命中)',
             leadSearch.status === 200 && searchItems.some((x) => x.id === verifyLeadId),
             `HTTP ${leadSearch.status}, hits=${searchItems.length}`);
+
+        // 13.6b 按城市搜索：顾问按「本地口径」分派线索靠它（如上海私域），不搜城市只能人工翻页
+        const citySearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent('上海'), { headers: leadAdminH });
+        const cityItems = (citySearch.body && citySearch.body.data && citySearch.body.data.items) || [];
+        record('GET /admin/leads 支持按城市搜索命中',
+            citySearch.status === 200 && cityItems.some((x) => x.id === verifyLeadId),
+            `HTTP ${citySearch.status}, hits=${cityItems.length}`);
 
         // 13.7 漏斗统计（北极星指标 lead_submit / calc_done 的分子）
         const leadStatsResp = await request(PORT, 'GET', '/api/admin/leads/stats', { headers: leadAdminH });
@@ -971,8 +1040,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 13.9 CSV 导出：UTF-8 BOM + 中文表头（Excel 不乱码，销售可导进自有 CRM）
         const leadCsv = await request(PORT, 'GET', '/api/admin/leads/export?q=' + encodeURIComponent(leadPhone(1)), { headers: leadAdminH });
         const csvHasBom = typeof leadCsv.raw === 'string' && leadCsv.raw.charCodeAt(0) === 0xFEFF;
-        record('GET /admin/leads/export CSV(含 BOM + 中文表头)',
-            leadCsv.status === 200 && csvHasBom && leadCsv.raw.includes('手机号') && leadCsv.raw.includes('情境'),
+        record('GET /admin/leads/export CSV(含 BOM + 中文表头 + 城市列)',
+            leadCsv.status === 200 && csvHasBom && leadCsv.raw.includes('手机号') && leadCsv.raw.includes('情境')
+            && leadCsv.raw.includes('城市'),
             `HTTP ${leadCsv.status}, bom=${csvHasBom}`);
 
         // 13.10 限流：公开写入端点必须挡批量刷量（10 次/小时/IP）

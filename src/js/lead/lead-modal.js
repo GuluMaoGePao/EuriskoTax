@@ -161,6 +161,7 @@
             phone: val('lead-phone').trim(),
             wechat: val('lead-wechat').trim(),
             company: val('lead-company').trim(),
+            city: val('lead-city').trim(),
             entityType: val('lead-entity') || 'unknown',
             need: val('lead-need') || 'other',
             source: state.source,
@@ -172,6 +173,9 @@
 
     function validate(p) {
         if (!p.name) return '请填写您的称呼';
+        // 所在城市是顾问核对当地缴费基数口径的唯一依据：计算页已不再让用户选参保城市，
+        // 这里漏校验等于留资里「必填」的星号是假的，顾问拿到线索也不知道按哪套口径核。
+        if (!p.city) return '请填写所在城市（各地缴费基数口径不同，顾问要按当地核对）';
         if (!p.phone && !p.wechat) return '请至少填写手机号或微信号';
         if (p.phone && !PHONE_RE.test(p.phone)) return '手机号格式不正确，请检查后重试';
         if (!p.consent) return '请先勾选同意，我们才能与您联系';

@@ -3,7 +3,7 @@
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
 > **版本**: v2.8
-> **最后更新**: 2026年9月13日（阶段14 C2 城市社保参数库——`CitySocialConfig` 模型 + 运维后台「社保基数」Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（此前全站统一用全国平均 7546，会误报高/低基数城市用户的合规性）+ 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/city-social`（支持 `since` 增量指纹，见 §10.4）；管理端点 `GET/POST /api/admin/city-social`、`POST /api/admin/city-social/rollback`（见 §5.15）；阶段14 变现与可信度——专业版兑换码 `ProCode`（线下收款 → 运营发码 → 用户自助兑换）：用户端 `POST /api/pro-codes/redeem`（一码一用 / 事务内原子占用 / 限时码叠加续期，见 §2.10）与 `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /api/admin/pro-codes/:id`（已兑换码禁止作废）、`GET /api/admin/pro-codes/export`（CSV 含 BOM + 公式注入防护，见 §5.14）；阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **最后更新**: 2026年9月13日（阶段14 C2 城市社保参数库——`CitySocialConfig` 模型 + 运维后台「社保基数」Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（此前全站统一用全国平均 7546，会误报高/低基数城市用户的合规性）+ 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/city-social`（支持 `since` 增量指纹，见 §10.4）；管理端点 `GET/POST /api/admin/city-social`、`POST /api/admin/city-social/rollback`（见 §5.15）；**v1.17.0 变更**：端上「参保城市」选择已回退 —— 计算页不再让用户选城市，城市改由留资 `city` 收集（§11）并由顾问按当地口径人工核对，参数库与上述端点保留待「社保基数」SEO 落地页复用；阶段14 变现与可信度——专业版兑换码 `ProCode`（线下收款 → 运营发码 → 用户自助兑换）：用户端 `POST /api/pro-codes/redeem`（一码一用 / 事务内原子占用 / 限时码叠加续期，见 §2.10）与 `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /api/admin/pro-codes/:id`（已兑换码禁止作废）、`GET /api/admin/pro-codes/export`（CSV 含 BOM + 公式注入防护，见 §5.14）；阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -493,7 +493,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 ### 5.11 税制参数管理（管理员 · 阶段12 C1）
 
 > 税制参数（4 组税率表 + 2 个缴费基数下限）由运维后台「税率」Tab 维护，保存即对所有用户生效。
-> ⚠️ 两处会写同一对全局量的配置：这里维护的是**全国口径**兜底值；若用户已选参保城市，最终生效的是「社保基数」Tab 的城市口径（见 §5.15 / §10.4），此处改动仅在用户未选城市时可见。**改这两个下限优先改「社保基数」Tab。**
+> ⚠️ 这里维护的是**全国口径**兜底值，也是端上唯一生效的口径（v1.17.0 起计算页不再让用户选参保城市，见 §10.4）。「社保基数」Tab 的城市参数库仍在维护，但**仅供人工核对与后续 SEO 落地页使用、不参与端上校验** —— 用户被提示「低于最低标准」时，请先确认其实际参保城市再判断是否误报。
 > 版本化：每次保存写入一条 `published` 快照并把旧的置为 `archived`，历史保留可回滚；改动可选联动发布一条公告。
 > 端上由 `src/js/data/tax-rates-sync.js` 在启动/联网时拉取（公开端点见 §10.3）并覆盖本地税率变量；离线回退 localStorage 缓存或出厂基线。
 
@@ -551,7 +551,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 **GET** `/api/admin/leads?status=&source=&q=&offset=0&limit=50`
 
-列表，按 `created_at` 倒序，默认 50 条（`limit` 上限 200）；`q` 为姓名/手机号/公司子串匹配（忽略大小写）；`items` 关联 `user`（`{ id, username, email, plan } | null`）。
+列表，按 `created_at` 倒序，默认 50 条（`limit` 上限 200）；`q` 为姓名/手机号/公司/**城市**子串匹配（忽略大小写）—— 城市入搜索是为了顾问按「本地口径」分派线索（如上海私域），不搜城市只能人工翻页；`items` 关联 `user`（`{ id, username, email, plan } | null`），并含 `city`（留资时收集，见 §11）。
 
 响应（200）：
 
@@ -973,9 +973,11 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 
 **GET** `/api/config/city-social?since=<revision>`
 
-返回各参保城市的社保 / 公积金缴费基数上下限与公积金可选比例（运维后台「社保基数」Tab 热改后即时生效；库中无自定义配置时为出厂基线）。无需登录、**不按登录态分层**，响应头 `Cache-Control: no-store`。
+返回各城市的社保 / 公积金缴费基数上下限与公积金可选比例（运维后台「社保基数」Tab 热改后即时生效；库中无自定义配置时为出厂基线）。无需登录、**不按登录态分层**，响应头 `Cache-Control: no-store`。
 
-> 为什么需要它：各城市缴费基数下限差异极大（同一年度可相差一倍以上），此前全站统一用全国平均 7546，会让高基数城市用户被误告「基数合规」、低基数城市用户被误报「低于最低标准」。
+> **端上已不消费（v1.17.0）**：计算页不再让用户选「参保城市」（改由留资时收集、顾问人工核对），端上同步层与选择器已删除，基数提示统一走阶段12 C1 的全国口径。本端点保留给后续「社保基数」SEO 落地页与后台人工核对使用。
+
+> 为什么仍然保留这份城市数据：各城市缴费基数下限差异极大（同一年度可相差一倍以上），统一用全国平均 7546 会让高基数城市用户被误告「基数合规」、低基数城市用户被误报「低于最低标准」—— 数据本身有价值，只是不适合放在计算流程里让用户判断。
 
 响应：
 
@@ -1025,9 +1027,9 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 - 城市项字段：`code` 小写字母开头、仅 `a-z0-9_-`、长度 2-32（前后端契约与端上 `localStorage` 键的一部分）、`name` ≤50 字、`note` ≤200 字
 - 基数：`*BaseMin` 必填且 ≥ 0；`*BaseMax` 为 `null` 表示**不设上限**（JSON 不支持 `Infinity`，故不用 `Infinity` 传输）
 - `housingFundRateOptions`：公积金可选比例（百分比数值），去重升序，最多 6 项，缺省 `[5,7]`
-- `national` 是**兜底城市**且不可删除：用户未选择城市、或所选城市在新版本中被删除时端上回落于此。未命中时端上回落链为「所选城市 → `defaultCity` → `national` → 列表首项」
+- `national` 是**兜底城市**且不可删除（参数库自身的兜底锚点，也是后续 SEO 落地页在未指定城市时的取值）
 - 限流：60 次/分钟/IP
-- 端上应用：`window.CitySocial`（`src/js/data/city-social-sync.js`）按所选城市覆盖 `MIN_SOCIAL_SECURITY_BASE` / `MIN_HOUSING_FUND_BASE`，UI 见 §1 关联说明；离线回退 `localStorage` 缓存或出厂基线
+- 端上应用：**无**（v1.17.0 起端上不再消费本端点：`city-social-sync.js` / `city-social-ui.js` 已删除，`MIN_SOCIAL_SECURITY_BASE` / `MIN_HOUSING_FUND_BASE` 只由阶段12 C1 的全国口径覆盖）
 
 ---
 
@@ -1049,6 +1051,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 | `phone` | 二选一 | 与 `wechat` 至少提供一个；提供时须匹配 `^1[3-9]\d{9}$` |
 | `wechat` | 二选一 | 1–64 字符 |
 | `company` | — | ≤ 100 字符 |
+| `city` | — | 所在城市，≤ 20 字符。**前台表单必填**，接口层选填（兼容旧客户端与团队内部调用）；用于顾问核对当地社保/公积金缴费基数口径 —— 计算页已不再让用户选参保城市（v1.17.0） |
 | `entityType` | — | 枚举 `individual` / `sole` / `small` / `other` / `unknown`（非法回落 `unknown`） |
 | `need` | — | 枚举 `bookkeeping` / `settlement` / `declare_check` / `consult` / `other`（非法回落 `other`） |
 | `source` | — | 触点归因，枚举见下（非法回落 `unknown`） |
@@ -1061,7 +1064,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 响应：
 
 - **201** `{ "success": true, "data": { "id": 12, "merged": false } }` —— 新建成功
-- **200** `{ "success": true, "data": { "id": 12, "merged": true } }` —— 同手机号 24h 内重复提交为**幂等合并**：不新建记录，合并情境/归因并追加备注
+- **200** `{ "success": true, "data": { "id": 12, "merged": true } }` —— 同手机号 24h 内重复提交为**幂等合并**：不新建记录，合并情境/**城市**/归因并追加备注（城市以最新一次提交为准：用户第二次补充的城市通常更准确）
   > 刻意不返回 409：避免暴露「该号码已提交过」，同时避免脏数据堆积。
 - **400** —— 缺 `name` / 无联系方式 / 手机号格式错 / `consent` 非 `true` / 文本超长
 - **429** —— 提交过于频繁（`leadLimiter`：10 次/IP/小时）
@@ -1071,6 +1074,7 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
   "name": "张先生",
   "phone": "13900000000",
   "company": "某个体户",
+  "city": "上海",
   "entityType": "sole",
   "need": "settlement",
   "source": "result_business",

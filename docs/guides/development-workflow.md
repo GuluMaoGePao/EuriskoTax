@@ -1,6 +1,6 @@
 # EuriskoTax 开发工作流总览（WORKFLOW）
 
-> 最后更新：2026-09-12
+> 最后更新：2026-09-13
 > 面向对象：所有在本仓库开发/上线的人。
 > 一句话原则：**本地起服务 → 改代码 → 本地门禁全绿 → 唯一入口发布 → 线上核对**。
 > 本文档是「按钮名 / 命令 / 流程」的唯一权威定义。遇到与本文不符的描述，以本文为准。
@@ -37,10 +37,10 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 156 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝 + 前端同步层与选择器静态接线 → 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 165 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 156 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 28 套件 571 例（含版本号五处同步守护、文档口径守护） |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 165 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 28 套件 562 例（含版本号五处同步守护、文档口径守护） |
 | 发版前口径自检 | `npm run verify:release` | 一条命令列出**版本号五处落点**（含 `文件:行号`）+ **文档口径 vs 实测**（套件/用例数 / 门禁项数 / 线上指纹数）；不一致退出码 1。加 `-- --write` 只改「当前声明值」并自动同步套件/用例数（CHANGELOG 里「上一版基线 → 当前值」的历史值不会被误改）。口径定义与 `npm test` 里的守护同源：`tools/ops/release-metrics.js` |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
@@ -72,7 +72,7 @@
            │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
            ▼                                    ops-check-prod │
 │ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（156 项 e2e 门禁）                            │
+│    + verify:local（165 项 e2e 门禁）                            │
 │    └ 全绿 ───────────────────────────────────────────────────┘
 │ ③ 发布：GUI「安全发布」/ ops-publish
 │    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环
@@ -119,8 +119,13 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
   「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
   `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
-  再跑一遍同样的 156 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  再跑一遍同样的 165 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
   首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
+- **首次使用要准备的环境（Windows 11 家庭版实测路径）**：
+  1. **启用 WSL2**：`VirtualMachinePlatform` 与 WSL 可选功能**两项都要开**（管理员 `dism.exe /online /Enable-Feature /FeatureName:<功能名> /All /NoRestart`），**重启一次**生效。家庭版没有 Hyper-V，Docker Desktop 只能走 WSL2 后端；
+  2. **装并启动 Docker Desktop**：`winget install --id Docker.DockerDesktop -e`，重启后启动它（首次弹许可协议需人工接受），等鲸鱼图标稳定；
+  3. **确认引擎真起来了**：`docker version` 必须能打印 **Server** 段（只有 Client 段＝引擎没起来），`docker compose version` 为 v2 以上；
+  4. **拉不到镜像先修网络**：报 `dial tcp registry-1.docker.io:443` 超时或 EOF 时，在 `Settings → Docker Engine`（即 `~/.docker/daemon.json`）加 `registry-mirrors` 后重启 Desktop；**先用 `Test-NetConnection <来源域名> -Port 443` 实测源可用再写进去**，公开加速源失效很快。
 
 ### ④ 发布（只走安全发布）
 
@@ -163,7 +168,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 ```
 
 - 第 1️⃣ 步能否操作**以你 Zeabur 控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
-- 回退同样受门禁保护：revert 后必须重新通过 156 项 + 37 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
+- 回退同样受门禁保护：revert 后必须重新通过 165 项 + 37 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
 - 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
   `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
 
@@ -180,6 +185,8 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 | 登录页 JS 报 `Cannot read properties of null (reading "classList")` / 栈里有 `updateUIBtn` | **浏览器加载的是旧版 auth-ui**（v1.5.1 之前的老缓存） | `updateUIBtn` 是旧版特征函数名。v1.5.2 起已移除 `?v=` 版本指纹并改为 SW 网络优先瘦缓存，正常刷新即拉新版；仍旧则清一次缓存 / 无痕窗口验证 |
 | verify 卡在 `prisma generate ... EPERM` | `:3000` 后端锁着引擎 DLL | 停后端，或 `VERIFY_SKIP_GENERATE=1`（schema 未变更时）；发布用 `-SkipVerifyGenerate` |
 | `npm run verify:pg` 提示「未检测到 docker 命令」（退出码 2） | 本机没装 Docker Desktop / 没启动 | **不是代码问题**：日常继续用 `verify:local`；要启用演练就装 Docker Desktop 并启动后重跑（见 §2③） |
+| Docker Desktop 已启动，但 `docker info` 报 `Docker Desktop is unable to start` | WSL2 刚启用生效时，Docker Desktop 的启动前置检查（内部调 `C:\Windows\System32\wsl.exe --version`）抢在 WSL 就绪前跑，失败后它**不会自动重试** | 完全退出 Docker Desktop 再启动一次即可（在普通窗口里 `wsl --version` 能打印版本号，就说明 WSL 已就绪）；这不是配置问题 |
+| `docker pull` 报 `dial tcp registry-1.docker.io:443` 超时 / EOF | 本机直连 Docker Hub 不通（国内常见），且 Docker Desktop 没配代理 | 在 `Settings → Docker Engine`（即 `~/.docker/daemon.json`）加 `registry-mirrors` → 重启 Desktop → 重跑；**先用 `Test-NetConnection <来源域名> -Port 443` 实测源可用再写进去**，公开加速源失效很快 |
 | `npm run verify:pg` 报 `prisma migrate deploy` 失败 | 迁移本身有问题——**这正是上线会炸的点** | 修好迁移再发布（`cd server && npx prisma migrate dev` 修正 SQL）；演练库可 `docker compose -f docker-compose.postgres.yml down -v` 重置后重跑 |
 | 跑完 `verify:pg` 后 `verify:local`/本地启动报 Client provider 不匹配 | 演练把 Prisma Client 生成成了 PostgreSQL 版本 | 脚本收尾会自动恢复 SQLite Client；若恢复失败（引擎被占用）手动执行 `cd server && npm run prisma:generate:dev` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |

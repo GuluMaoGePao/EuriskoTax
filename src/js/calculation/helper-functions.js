@@ -1,9 +1,24 @@
 
 
 // 社保/公积金缴费基数下限已抽离至 tax-constants.js（必须先于本文件加载）
-// 阶段14 C2：运行时由 tax-rates-sync.js（全国口径）与 city-social-sync.js（所选参保城市口径）
-// 依次覆盖，故这里必须直接读取全局变量，提示的数值即为当前城市口径。
-// 用户切换参保城市后由 city-social-ui.js 重新调用本函数刷新提示。
+// 阶段12 C1：运行时由 tax-rates-sync.js 覆盖为管理台「税率」Tab 的全国口径（最终生效值），
+// 故这里必须直接读取全局变量，提示的数值即为当前生效口径。
+// 阶段14 C2 的「按参保城市分档」已于 v1.17.0 回退：城市改由留资/咨询时收集，由顾问人工核对。
+
+// 缴费比例（社保/公积金）是用户自填项：各地口径不同（上海 5/6/7、北京 5~12 整数），
+// 不给固定档位，只给默认初始值 5%，让用户按自己参保地改。
+// 兜底：留空 / 非数字 / 越界（<0 或 >100）一律回落默认值 —— 否则 parseFloat('')||0
+// 会让公积金静默算成 0，用户会当成算错了。仅在失焦时归一，避免打断用户输入过程。
+const RATE_FALLBACK = 5;
+function normalizeRateInput(input, fallback = RATE_FALLBACK) {
+    if (!input) return fallback;
+    const raw = parseFloat(input.value);
+    if (!Number.isFinite(raw) || raw < 0 || raw > 100) {
+        input.value = fallback;
+        return fallback;
+    }
+    return raw;
+}
 
 // 验证社保缴费基数是否低于最低标准
 function validateSocialSecurityBase(prefix = '') {
@@ -67,6 +82,40 @@ function calculateHousingFund() {
     
     // 更新输入字段
     document.getElementById('housing-fund').value = housingFundAmount.toFixed(2);
+}
+
+// 经营页的「缴费基数 / 缴费比例 / 月度金额」是三个并列输入框，但只有金额参与税额计算。
+// 用户改了基数或比例却看不到金额变化，会当成算错（这几个框此前压根没有接线，改什么都不发生）。
+// 这里照正向页口径补齐：基数 × 比例 → 月度金额（改基数/比例即覆盖金额，之后仍可手改金额）。
+// fallback = 该险种的默认比例，供失焦归一用（养老 8 / 医疗 2 / 失业 0.5 / 公积金 5）。
+const BUSINESS_INSURANCE_LINKS = [
+    { base: 'business-social-security-base', rate: 'business-pension-rate', amount: 'business-pension-insurance', fallback: 8 },
+    { base: 'business-social-security-base', rate: 'business-medical-rate', amount: 'business-medical-insurance', fallback: 2 },
+    { base: 'business-social-security-base', rate: 'business-unemployment-rate', amount: 'business-unemployment-insurance', fallback: 0.5 },
+    { base: 'business-housing-fund-base', rate: 'business-housing-fund-rate', amount: 'business-housing-fund', fallback: 5 }
+];
+
+// normalize 为真时先做失焦归一（留空 / 越界回落该险种默认比例，而非统一的 5%）
+function calculateBusinessInsurance(rateId, normalize) {
+    const link = BUSINESS_INSURANCE_LINKS.find(function(item) { return item.rate === rateId; });
+    if (!link) return;
+
+    const baseElement = document.getElementById(link.base);
+    const rateElement = document.getElementById(link.rate);
+    const amountElement = document.getElementById(link.amount);
+    if (!baseElement || !rateElement || !amountElement) return;
+
+    const rate = normalize ? normalizeRateInput(rateElement, link.fallback) : (parseFloat(rateElement.value) || 0);
+    amountElement.value = ((parseFloat(baseElement.value) || 0) * (rate / 100)).toFixed(2);
+}
+
+// 社保基数一改，养老 / 医疗 / 失业三项金额都要跟着重算（公积金基数是独立一项）
+function calculateBusinessSocialInsurance() {
+    BUSINESS_INSURANCE_LINKS.forEach(function(item) {
+        if (item.base === 'business-social-security-base') {
+            calculateBusinessInsurance(item.rate);
+        }
+    });
 }
 
 // 根据社保基数和保险金额计算缴费比例

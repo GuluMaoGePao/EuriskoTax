@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段14 剩余项）：高商业意图长尾词「个税汇算清缴 / 退税还是补税」。
+         设计约束（见 docs/development/seo-landing-plan.md）：
+           1) 页面必须自己有用（能算应退/应补），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（annual-settlement-quick.js + window.comprehensiveTaxRates），
+              页面上不出现第二份税率表；
+           3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
+    <title>个税汇算清缴怎么算 2026：你是退税还是补税？</title>
+    <meta name="description" content="输入月薪、任职月数与各项扣除，算出全年应纳税额，再与已预缴税额相减，得出应退或应补税额。含年度综合所得税率表、常见退税/补税情形与办理时间（3 月 1 日至 6 月 30 日）。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/annual-settlement.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="个税汇算清缴怎么算 2026：你是退税还是补税？">
+    <meta property="og:description" content="算全年应纳税额，与已预缴税额相减，得出应退或应补税额。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/annual-settlement.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 个税汇算清缴计算器",
+                "url": "https://euriskotax.zeabur.app/seo/annual-settlement.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按年度综合所得口径计算全年应纳税额，与已预缴税额相减得出应退或应补税额：输入月薪、任职月数、五险一金与专项附加扣除，可选填个税 App 中的已预缴税额。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "个税汇算清缴什么时候办理？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "综合所得年度汇算的办理期为次年 3 月 1 日至 6 月 30 日（在中国境内无住所的纳税人可在离境前办理）。例如 2025 年度的汇算，办理期是 2026 年 3 月 1 日至 6 月 30 日。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "什么情况必须办理汇算？什么情况可以免办？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "需要补税且年度综合所得收入超过 12 万元、补税金额超过 400 元的，需要办理汇算；已预缴税额大于年度应纳税额（可退税）的，需要申请退税才办理，也可自愿放弃。免于办理的情形包括：汇算需补税但年度综合所得收入不超过 12 万元、汇算需补税金额不超过 400 元，以及已预缴税额与年度应纳税额一致或不申请退税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "为什么预缴的税会比全年应纳税额多（能退税）？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "常见原因有三类：一是预缴时没有享受或没有足额享受扣除（例如专项附加扣除年中才填报、大病医疗只能在汇算时扣除、公益慈善捐赠未在预缴时扣除）；二是年中入职或跳槽，各扣缴单位分别按在本单位的任职月数累计减除费用，合并后与年度口径不一致；三是劳务报酬、稿酬、特许权使用费预扣率高于全年综合所得适用税率。以上都会在汇算时多退少补。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "年终奖会影响汇算结果吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整计算器对比差额。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为申报依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_settlement">打开完整计算器</a>
+    </div>
+
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>个税汇算清缴：你是退税还是补税？</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>汇算只做一道减法 —— <strong>应退/应补税额 = 全年应纳税额 − 全年已预缴税额</strong>。
+            结果是正数就要<strong>补税</strong>，是负数就<strong>退税</strong>。全年应纳税额按「全年收入 − 全年扣除」查年度税率表得出；
+            已预缴税额在<strong>个人所得税 App</strong>「收入纳税明细查询」里可以看到，把它填进下面的速算器就能算出你的应退/应补。
+            办理期：次年 <strong>3 月 1 日至 6 月 30 日</strong>。制度依据：《中华人民共和国个人所得税法》及其实施条例、
+            <strong>国家税务总局公告 2019 年第 44 号</strong>（综合所得汇算清缴）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">汇算应退/应补速算</h2>
+            <div class="calc-input-row">
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="salary-input">月薪（元，税前）</label>
+                    <input class="calc-input" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000" style="width:100%">
+                </div>
+                <div style="flex:0 1 150px;min-width:0">
+                    <label class="calc-label" for="months-input">任职月数</label>
+                    <input class="calc-input" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12" style="width:100%">
+                </div>
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="insurance-input">每月五险一金（元）</label>
+                    <input class="calc-input" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000" style="width:100%">
+                </div>
+                <div style="flex:1 1 200px;min-width:0">
+                    <label class="calc-label" for="special-input">每月专项附加扣除（元）</label>
+                    <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000" style="width:100%">
+                </div>
+                <div style="flex:1 1 220px;min-width:0">
+                    <label class="calc-label" for="prepaid-input">已预缴税额（元，选填）</label>
+                    <input class="calc-input" id="prepaid-input" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按累计预扣法推演" style="width:100%">
+                </div>
+                <button class="btn btn-primary" id="calc-reset" type="button" style="align-self:flex-end">重算</button>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                「已预缴税额」填 <strong>个人所得税 App → 收入纳税明细查询</strong> 里的合计已缴税额最准；留空时按累计预扣法推演
+                （全年等额月薪、扣除均已申报时，推演值就等于全年应纳税额，差额 0 —— 说明你本来就该补退为 0）。
+                本页只算<strong>工资薪金</strong>这一类综合所得；有劳务报酬、稿酬、特许权使用费或多处工资薪金时，请用
+                <a href="/?source=seo_settlement">完整计算器</a>分别录入。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">全年应纳税额</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">全年已预缴税额</div>
+                    <div class="v" id="r-prepaid">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k" id="r-diff-key">应退 / 应补税额</div>
+                    <div class="v" id="r-diff">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">适用年度税率（速算扣除数）</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、年度税率表与示例表手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>怎么算：先算年度税，再减已预缴</h2>
+        <ol>
+            <li><strong>算全年应纳税额</strong>：全年收入 = 月薪 × 任职月数；全年扣除 =（5000 + 五险一金 + 专项附加扣除）× 任职月数；应纳税所得额 = 全年收入 − 全年扣除（不足 0 按 0）；再查年度税率表。</li>
+            <li><strong>减掉已预缴税额</strong>：应退/应补 = 全年应纳税额 − 全年已预缴税额。<strong>正数 = 应补，负数 = 应退</strong>。</li>
+        </ol>
+        <p class="muted small">例：月薪 20000 元、全年任职 12 个月、每月五险一金 3000 元、每月专项附加扣除 2000 元 → 全年收入 240000 元，全年扣除 (5000 + 3000 + 2000) × 12 = 120000 元，应纳税所得额 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）→ 全年应纳税额 = 120000 × 10% − 2520 = 9480 元；若全年已预缴 9480 元，则应退应补为 0。</p>
+
+        <h2>年度综合所得税率表（汇算适用）</h2>
+        <div class="table-scroll">
+            <table id="rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">按「全年应纳税所得额」定档，即全年收入减去 6 万元基本减除费用、专项扣除、专项附加扣除等之后的余额</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>什么情况会退税，什么情况要补税</h2>
+        <p><strong>常见退税情形</strong>：预缴时未享受或未足额享受扣除（专项附加扣除年中才填报、大病医疗、公益慈善捐赠等只能在汇算时扣除）；年中入职、离职或跳槽导致扣除月数与年度口径不一致；劳务报酬、稿酬、特许权使用费的预扣率高于全年综合所得适用税率。</p>
+        <p><strong>常见补税情形</strong>：在两处及以上单位领取工资薪金，各单位分别按 5000 元/月重复减除费用、分别预扣，合并后适用档位更高；有劳务报酬等所得且预扣不足；一年内扣除项目发生变化而预缴未同步。</p>
+        <p class="muted small">所以「预缴多少」与「全年该缴多少」本来就可能不一致 —— 汇算就是把这两者对齐，多退少补，而不是重新征一次税。</p>
+
+        <h2>三种典型情形的汇算结果</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">均按每月五险一金 3000 元、每月专项附加扣除 2000 元测算；最后一列正数 = 应补，负数 = 应退（已预缴税额为示例值，实际请填个税 App 里的数字）</caption>
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">折算月薪（元）</th>
+                    <th scope="col">任职月数</th>
+                    <th scope="col">全年应纳税额（元）</th>
+                    <th scope="col">已预缴税额（元）</th>
+                    <th scope="col">应退（−）/应补（+）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>全年同一单位、扣除均已如实申报</td><td class="num">20000</td><td class="num">12</td><td class="num">9480.00</td><td class="num">9480.00</td><td class="num">0.00</td></tr>
+                <tr><td>年中入职，当年只任职 6 个月</td><td class="num">20000</td><td class="num">6</td><td class="num">3480.00</td><td class="num">3480.00</td><td class="num">0.00</td></tr>
+                <tr><td>两处工资薪金，合并后适用更高档位</td><td class="num">25000</td><td class="num">12</td><td class="num">19080.00</td><td class="num">9480.00</td><td class="num">9600.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/annual-settlement-quick.test.js</code> 逐行与 App 内核结果对拍守护。第三行是「主职按月薪 20000 预扣 9480 元、另一处工资薪金当年未预扣到税」的典型补税场景。</p>
+
+        <h2>办理时间与渠道</h2>
+        <p>办理期为次年 <strong>3 月 1 日至 6 月 30 日</strong>；在中国境内无住所的纳税人可以在离境前办理。渠道有三个：<strong>个人所得税 App</strong>（最常用，可预填收入与扣除、试算两种年终奖计税方式）、<strong>自然人电子税务局</strong>网页端，以及主管税务机关办税服务厅。申报后需要退税的，绑定本人银行卡即可；需要补税的，在 6 月 30 日前缴清，逾期会产生滞纳金。</p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>个税汇算清缴什么时候办理？</summary>
+            <p>综合所得年度汇算的办理期为次年 <strong>3 月 1 日至 6 月 30 日</strong>（在中国境内无住所的纳税人可在离境前办理）。例如 2025 年度的汇算，办理期是 2026 年 3 月 1 日至 6 月 30 日。</p>
+        </details>
+        <details>
+            <summary>什么情况必须办理汇算？什么情况可以免办？</summary>
+            <p>需要补税且年度综合所得收入超过 12 万元、补税金额超过 400 元的，需要办理汇算；已预缴税额大于年度应纳税额（可退税）的，需要申请退税才办理，也可自愿放弃。免于办理的情形包括：汇算需补税但年度综合所得收入不超过 12 万元、汇算需补税金额不超过 400 元，以及已预缴税额与年度应纳税额一致或不申请退税。</p>
+        </details>
+        <details>
+            <summary>为什么预缴的税会比全年应纳税额多（能退税）？</summary>
+            <p>常见原因有三类：一是预缴时没有享受或没有足额享受扣除（例如专项附加扣除年中才填报、大病医疗只能在汇算时扣除、公益慈善捐赠未在预缴时扣除）；二是年中入职或跳槽，各扣缴单位分别按在本单位的任职月数累计减除费用，合并后与年度口径不一致；三是劳务报酬、稿酬、特许权使用费预扣率高于全年综合所得适用税率。以上都会在汇算时多退少补。</p>
+        </details>
+        <details>
+            <summary>年终奖会影响汇算结果吗？</summary>
+            <p>年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整计算器对比差额。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为申报依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把工资、年终奖、劳务报酬一起算，看全年该退还是该补</h2>
+            <p>输入各项收入与扣除，App 会给出全年应纳税额、已预缴税额、应退/应补税额，并对比年终奖「单独计税」与「并入综合所得」两种方式的差额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_settlement">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/salary-tax.html">月薪个税计算器</a> · <a href="/seo/bonus-tax.html">年终奖个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂税率表（window.comprehensiveTaxRates）
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       annual-settlement-quick.js —— 与内核 computeDeductions + performTaxCalculation 等价的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/annual-settlement-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var salary = document.getElementById('salary-input');
+    var months = document.getElementById('months-input');
+    var insurance = document.getElementById('insurance-input');
+    var special = document.getElementById('special-input');
+    var prepaid = document.getElementById('prepaid-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoSettlementQuick;
+
+    function money(n) {
+        return Math.abs(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(rate) {
+        return (rate * 100).toFixed(rate * 100 % 1 === 0 ? 0 : 1) + '%';
+    }
+
+    function inputs() {
+        return {
+            income: Number(salary ? salary.value : NaN),
+            months: Number(months ? months.value : 12),
+            insurance: Number(insurance ? insurance.value : 0) || 0,   // 空值按 0，不当成非法
+            special: Number(special ? special.value : 0) || 0,
+            prepaid: Number(prepaid ? prepaid.value : NaN)             // 留空 = NaN → 走累计预扣推演
+        };
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.settlementOf !== 'function') {
+            // 计算脚本未加载（网络异常/被拦截）时不装作有结果
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方公式、年度税率表与示例表仍可手工估算。';
+            }
+            return;
+        }
+        var v = inputs();
+        if (!Number.isFinite(v.income) || v.income <= 0 || !Number.isFinite(v.months) || v.months <= 0) {
+            box.hidden = true;
+            if (hint) { hint.hidden = true; }
+            return;
+        }
+        var m = Math.min(12, Math.max(1, Math.floor(v.months)));
+        var r = quick.settlementOf(v.income, m, v.insurance, v.special, v.prepaid);
+
+        box.hidden = false;
+        document.getElementById('r-tax').textContent = money(r.annualTax) + ' 元';
+        document.getElementById('r-prepaid').textContent = money(r.prepaidTax) + ' 元';
+        document.getElementById('r-rate').textContent = r.bracket ? pct(r.bracket.rate) + '（' + money(r.bracket.deduction) + '）' : '—';
+        document.getElementById('r-diff').textContent = money(r.diff) + ' 元';
+        document.getElementById('r-diff-key').textContent = r.diff > 0.005 ? '预计应补税额' : (r.diff < -0.005 ? '预计应退税额' : '应退 / 应补税额');
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('全年收入 ' + money(r.annualIncome) + ' 元 − 全年扣除 ' + money(r.annualDeduction) +
+            ' 元 = 应纳税所得额 ' + money(r.annualTaxable) + ' 元。');
+        if (r.diff > 0.005) {
+            parts.push('预计<strong>应补 ' + money(r.diff) + ' 元</strong>，请在办理期内（6 月 30 日前）缴清。');
+        } else if (r.diff < -0.005) {
+            parts.push('预计<strong>应退 ' + money(r.diff) + ' 元</strong>，申报时绑定本人银行卡即可。');
+        } else {
+            parts.push('应退应补为 <strong>0 元</strong> —— 预缴税额与全年应纳税额一致。');
+        }
+        if (!r.providedPrepaid) {
+            parts.push('未填写已预缴税额，此处按累计预扣法推演 ' + money(r.autoPrepaid) +
+                ' 元；换成个税 App 里的实际已缴税额，结果会更贴近你的真实情况。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [salary, months, insurance, special, prepaid].forEach(function (el) {
+        if (el) el.addEventListener('input', render);
+    });
+    var reset = document.getElementById('calc-reset');
+    if (reset) {
+        reset.addEventListener('click', function () {
+            salary.value = '20000';
+            months.value = '12';
+            insurance.value = '3000';
+            special.value = '2000';
+            if (prepaid) prepaid.value = '';
+            render();
+        });
+    }
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>
