@@ -16,6 +16,7 @@
 | 登录/找回 | 邮箱登录（可勾选"保持登录状态"）、注册勾选协议、忘记密码**邮箱验证码自助找回** |
 | 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；计算完成即进入「工具 → 服务」转化闭环（留资线索 + 顾问跟进状态机 + 转化漏斗，北极星 `lead_submit / calc_done`）；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
 | SEO 落地页 | ✅ v1.14.0 [年终奖个税计算器](https://euriskotax.zeabur.app/seo/bonus-tax.html)（静态正文 + 同源口径速算器 + 六个临界点跳档提示）· ✅ v1.15.0 [月薪个税计算器](https://euriskotax.zeabur.app/seo/salary-tax.html)（累计预扣口径 + 七档预扣率表 + 12 个月逐月预扣示例表）· ✅ v1.16.0 [个税汇算清缴计算器](https://euriskotax.zeabur.app/seo/annual-settlement.html)（应退/应补 = 全年应纳税额 − 已预缴税额 + 七档年度税率表 + 三种典型情形示例表），配 `robots.txt` / `sitemap.xml`；方案与后续词条见 [docs/development/seo-landing-plan.md](docs/development/seo-landing-plan.md) |
+| 下一阶段 | ⏳ **阶段15 税务计算能力扩展（多税种）**（先 15A 个税纵深 → 后 15B 企业税种；纯前端、不依赖 ICP 备案）→ **阶段16 迁移与合规升级**（前置 ICP 备案；16D B 端 API 依赖 15B）；并行线：ICP 备案。方案见 [stage15-multi-tax-plan.md](docs/development/stage15-multi-tax-plan.md) / [stage16-migration-and-compliance-plan.md](docs/development/stage16-migration-and-compliance-plan.md) |
 | 测试 | ✅ 28 套件 570 个单元测试全通过（`npm test`，2026-09-13 复跑，含阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **167 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
 
 ---
