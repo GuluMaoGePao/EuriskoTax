@@ -39,8 +39,8 @@
 |------|----------------|------|
 | push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 165 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 165 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 28 套件 568 例（含版本号五处同步守护、文档口径守护） |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 167 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 28 套件 570 例（含版本号五处同步守护、文档口径守护） |
 | 发版前口径自检 | `npm run verify:release` | 一条命令列出**版本号五处落点**（含 `文件:行号`）+ **文档口径 vs 实测**（套件/用例数 / 门禁项数 / 线上指纹数）；不一致退出码 1。加 `-- --write` 只改「当前声明值」并自动同步套件/用例数（CHANGELOG 里「上一版基线 → 当前值」的历史值不会被误改）。**版本前缀约束**（2026-09-13 加固）：项数声明改为逐条校验 —— 非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`；「新增/移除/少 N 项」这类增量描述不计入总项数。口径定义与 `npm test` 里的守护同源：`tools/ops/release-metrics.js` |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
@@ -89,11 +89,11 @@
 打开 GUI（`tools/gui/EuriskoTax-Console.bat`）→ 「🚀 启动管理」→ 顶部有**快速开始指引**卡片按你的情况给出建议。
 
 - 判定口径很简单：
-  - **第一次用 / 刚拉取过代码 / 装过依赖** → 「第一次用：一键启动」（会自动 `npm install` + 重置 `dev@example.com/password`，首次约 1–3 分钟）
+  - **第一次用 / 刚拉取过代码 / 装过依赖** → 「第一次用：一键启动」（会自动 `npm install` + 重置 `2649719969@qq.com/[REDACTED]`，首次约 1–3 分钟）
   - **之前已成功启动过、依赖没变** → 「日常启动：快速启动」（秒起）
 
 - 启动成功的标志：输出区出现 `服务器运行在 http://localhost:3000`，随后打印一批邀请码。
-- 浏览器打开 `http://localhost:3000`，登录页在 localhost 下点「开发环境：填入本地测试账号」即可填入 `dev@example.com / password`。
+- 浏览器打开 `http://localhost:3000`，登录页在 localhost 下点「开发环境：填入本地测试账号」即可填入 `2649719969@qq.com / [REDACTED]`。
 
 ### ② 本地缓存策略（2026-09 起本地不再被缓存坑）
 
@@ -119,7 +119,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
   「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
   `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
-  再跑一遍同样的 165 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  再跑一遍同样的 167 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
   首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
 - **首次使用要准备的环境（Windows 11 家庭版实测路径）**：
   1. **启用 WSL2**：`VirtualMachinePlatform` 与 WSL 可选功能**两项都要开**（管理员 `dism.exe /online /Enable-Feature /FeatureName:<功能名> /All /NoRestart`），**重启一次**生效。家庭版没有 Hyper-V，Docker Desktop 只能走 WSL2 后端；

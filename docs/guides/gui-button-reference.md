@@ -46,7 +46,7 @@
 | L2593 | 生成 Prisma 客户端 | `npx prisma generate` | 重新生成 PrismaClient 类型 |
 | L2595 | 打开 Prisma Studio（db2） | `npx prisma studio` 独立进程 | |
 | L2601 | 编辑 schema.prisma | `Start-Process notepad.exe server/prisma/schema.prisma` | |
-| L2610 | 重置开发测试账号 | `node server/scripts/reset-dev-user.js` | 恢复 dev@example.com / password |
+| L2610 | 重置开发测试账号 | `node server/scripts/reset-dev-user.js` | 恢复 2649719969@qq.com / [REDACTED] |
 | L2612 | ⚠ 强制重建数据库 | `prisma migrate reset --force` + YesNo 确认 | 清空所有数据重放迁移，生产禁用 |
 
 ---
@@ -181,9 +181,9 @@
 
 | 行号 | 按钮文字 | 实现路径 | 关键行为 |
 |------|---------|---------|---------|
-| L3057 | 👤 项目登录账号复制 | `Set-Clipboard dev@example.com` | 默认账号 |
-| L3059 | 🔑 项目登录密码复制 | `Set-Clipboard password` | 默认密码 |
-| L3061 | 📋 一键复制邮箱+密码 | `Set-Clipboard "账号:\tdev@example.com`n密码:\tpassword"` | 排版好直接粘贴 |
+| L3057 | 👤 项目登录账号复制 | `Set-Clipboard 2649719969@qq.com` | 默认账号 |
+| L3059 | 🔑 项目登录密码复制 | `Set-Clipboard [REDACTED]` | 默认密码 |
+| L3061 | 📋 一键复制邮箱+密码 | `Set-Clipboard "账号:\t2649719969@qq.com`n密码:\t[REDACTED]"` | 排版好直接粘贴 |
 | L3063 | 🔐 JWT Secret Key | `Start-Process server/.env` | JWT_SECRET 变量 |
 | L3065 | 📧 QQ 邮箱授权码 | `Start-Process tools/ops/notify.config.json` | SMTP/AUTH_CODE |
 | L3067 | 🌐 Cpolar Token | `&cpolar.exe authtoken`（交互式输入）| |

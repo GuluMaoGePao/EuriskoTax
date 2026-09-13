@@ -1756,12 +1756,12 @@ function setupDevLoginFill() {
     btn.type = 'button';
     btn.className = 'dev-login-fill mt-1 w-full text-center text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2';
     btn.textContent = '开发环境：填入本地测试账号';
-    btn.title = '自动填入 dev@example.com / password，仍需手动点击「登录」';
+    btn.title = '自动填入 2649719969@qq.com / [REDACTED]，仍需手动点击「登录」';
     btn.addEventListener('click', () => {
         const emailInput = document.getElementById('login-email');
         const pwdInput = document.getElementById('login-password');
-        if (emailInput) emailInput.value = 'dev@example.com';
-        if (pwdInput) pwdInput.value = 'password';
+        if (emailInput) emailInput.value = '2649719969@qq.com';
+        if (pwdInput) pwdInput.value = '[REDACTED]';
         showAlert('已填入本地测试账号，请点击「登录」', 'info');
     });
     form.appendChild(btn);

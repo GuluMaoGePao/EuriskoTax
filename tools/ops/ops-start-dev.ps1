@@ -111,7 +111,7 @@ if (-not $SkipResetUser) {
             npx prisma db push --schema prisma/schema.dev.prisma 2>&1 | Out-Host
             node scripts/reset-dev-user.js 2>&1 | Out-Host
         }
-        Write-Host "  [OK] dev 用户已就绪 (dev@example.com / password)" -ForegroundColor Green
+        Write-Host "  [OK] dev 用户已就绪 (2649719969@qq.com / [REDACTED])" -ForegroundColor Green
     } finally {
         Pop-Location
     }
@@ -280,7 +280,7 @@ Write-Host ""
 Write-Host "[$stepNum] 启动后端服务..." -ForegroundColor Yellow
 Write-Host "  前端访问地址: http://localhost:3000/" -ForegroundColor Cyan
 Write-Host "  API 文档地址:   http://localhost:3000/api/docs" -ForegroundColor Cyan
-Write-Host "  测试账号:       dev@example.com / password" -ForegroundColor Cyan
+Write-Host "  测试账号:       2649719969@qq.com / [REDACTED]" -ForegroundColor Cyan
 
 # 获取内网 IP（方便局域网分享）
 try {

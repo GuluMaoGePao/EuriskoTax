@@ -235,8 +235,10 @@ model CitySocialConfig {
 //   2) scene 情境快照：记录用户从哪类计算结果进入（如「经营所得·汇算清缴」），顾问跟进可精准开场
 //   3) consent 显式同意：留资含收入相关敏感信息，个保法要求单独同意，必须留痕
 //   4) status 状态机：new → contacted → qualified → converted / dropped（管理台跟进用）
-//   5) city 所在城市：计算页不再让用户选参保城市（2026-09 回退 C2），
-//      改由留资时收集，顾问据此核对当地社保/公积金缴费基数口径
+//   5) province / city 所在省·市：计算页不再让用户选参保城市（2026-09 回退 C2），
+//      改由留资时收集，顾问据此核对当地社保/公积金缴费基数口径；
+//      省份与城市一起留：重名地市（吉林市 / 海南藏族自治州）只看市名会认错统筹区，
+//      顾问按「本地口径」分派线索（如江浙沪私域）也是先按省收敛
 model Lead {
   id          Int      @id @default(autoincrement())
   user_id     Int? // 可空：游客亦可留资
@@ -244,6 +246,7 @@ model Lead {
   phone       String?
   wechat      String?
   company     String? // 公司 / 个体户名称
+  province    String   @default("") // 所在省份 / 直辖市（留资时收集，与 city 同时落库）
   city        String   @default("") // 所在城市（留资时收集）
   entity_type String   @default("unknown") // individual / sole / small / other / unknown
   need        String   @default("") // 代理记账 / 汇算清缴 / 申报核对 / 咨询 / other

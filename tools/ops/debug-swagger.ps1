@@ -20,7 +20,7 @@ try {
     }
 
     # 2. 测试实际登录+访问 profile 接口
-    $body = @{ email = "dev@example.com"; password = "password" } | ConvertTo-Json
+    $body = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
     $login = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 5
     $token = $login.data.token
     Write-Host "`n=== Test Profile API with Token ==="

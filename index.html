@@ -6113,12 +6113,32 @@
                         </div>
                         <div class="space-y-3">
                             <!-- 所在城市：计算页不再让用户选参保城市（各地口径差异大，选错反而误导），
-                                 改为留资时收集，由顾问核对当地缴费基数口径后给结论 -->
+                                 改为留资时收集，由顾问核对当地缴费基数口径后给结论。
+                                 控件形态：省 + 市级联下拉 —— 手输城市名五花八门（上海 / 上海市 / 魔都），
+                                 顾问拿到线索还得猜是哪个统筹区；下拉选择才能保证城市名规范、可直接对表。
+                                 省级不是「只是筛选器」：省份也随表单提交（lead-modal.collectPayload），
+                                 顾问方可按省收敛分派、并按「省 + 市」认出重名地市（吉林市 / 海南藏族自治州）。
+                                 「其他 / 海外」与城市的「其他（手动输入）」项是兜底：行政区划不可能穷尽
+                                 （县级市 / 境外），不能把用户卡在本就必填的这一项上 -->
                             <div>
                                 <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-red-500">*</span></label>
-                                <div class="relative">
-                                    <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                    <input id="lead-city" type="text" maxlength="20" placeholder="如：上海（各地缴费基数口径不同）" autocomplete="address-level2" class="input-field" />
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="relative">
+                                        <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <select id="lead-province" aria-label="省份 / 直辖市" class="input-field">
+                                            <option value="">省份 / 直辖市</option>
+                                        </select>
+                                    </div>
+                                    <div id="lead-city-select-wrap" class="relative">
+                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <select id="lead-city" aria-label="城市" class="input-field" disabled>
+                                            <option value="">城市</option>
+                                        </select>
+                                    </div>
+                                    <div id="lead-city-input-wrap" class="relative hidden">
+                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <input id="lead-city-other" type="text" maxlength="20" placeholder="请填写城市（如：海外地区）" autocomplete="address-level2" class="input-field" />
+                                    </div>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -6238,6 +6258,8 @@
          { advisorName: '王某某', advisorTitle: '注册税务师 · 8 年企业财税' }），留空则弹窗不显示顾问行 ——
          真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来 -->
     <script>window.LEAD_CONFIG = { wecomQrUrl: '' };</script>
+    <!-- 留资「所在城市」的省市数据 —— 必须早于 lead-modal.js（弹窗打开时同步渲染省市级联，不做动态加载） -->
+    <script src="src/js/data/china-regions.js"></script>
     <!-- 阶段13B：咨询情境数据层 —— 必须早于 lead-modal.js（弹窗打开时同步取用，不做动态加载） -->
     <script src="src/js/lead/lead-context.js"></script>
     <!-- 阶段13B：留资弹窗（双通道）与结果页情境引导（分流白名单：谈薪页不出） -->

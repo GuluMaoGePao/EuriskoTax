@@ -3,7 +3,7 @@
 > **定位**: API 接口完整参考
 > **适用**: 开发者集成、前端对接
 > **版本**: v2.8
-> **最后更新**: 2026年9月13日（阶段14 C2 城市社保参数库——`CitySocialConfig` 模型 + 运维后台「社保基数」Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（此前全站统一用全国平均 7546，会误报高/低基数城市用户的合规性）+ 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/city-social`（支持 `since` 增量指纹，见 §10.4）；管理端点 `GET/POST /api/admin/city-social`、`POST /api/admin/city-social/rollback`（见 §5.15）；**v1.17.0 变更**：端上「参保城市」选择已回退 —— 计算页不再让用户选城市，城市改由留资 `city` 收集（§11）并由顾问按当地口径人工核对，参数库与上述端点保留待「社保基数」SEO 落地页复用；阶段14 变现与可信度——专业版兑换码 `ProCode`（线下收款 → 运营发码 → 用户自助兑换）：用户端 `POST /api/pro-codes/redeem`（一码一用 / 事务内原子占用 / 限时码叠加续期，见 §2.10）与 `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /api/admin/pro-codes/:id`（已兑换码禁止作废）、`GET /api/admin/pro-codes/export`（CSV 含 BOM + 公式注入防护，见 §5.14）；阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
+> **最后更新**: 2026年9月13日（阶段14 C2 城市社保参数库——`CitySocialConfig` 模型 + 运维后台「社保基数」Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（此前全站统一用全国平均 7546，会误报高/低基数城市用户的合规性）+ 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/city-social`（支持 `since` 增量指纹，见 §10.4）；管理端点 `GET/POST /api/admin/city-social`、`POST /api/admin/city-social/rollback`（见 §5.15）；**v1.17.0 变更**：端上「参保城市」选择已回退 —— 计算页不再让用户选城市，省·市改由留资 `province` + `city` 收集（§11）并由顾问按当地口径人工核对，参数库与上述端点保留待「社保基数」SEO 落地页复用；阶段14 变现与可信度——专业版兑换码 `ProCode`（线下收款 → 运营发码 → 用户自助兑换）：用户端 `POST /api/pro-codes/redeem`（一码一用 / 事务内原子占用 / 限时码叠加续期，见 §2.10）与 `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /api/admin/pro-codes/:id`（已兑换码禁止作废）、`GET /api/admin/pro-codes/export`（CSV 含 BOM + 公式注入防护，见 §5.14）；阶段13 E 转化漏斗埋点——公开端点 `POST /api/stats/funnel`（无需登录 / step 白名单 / 限流，见 §12）+ 管理端 `GET /api/admin/leads/funnel`（各步转化率 + 北极星，见 §5.13）；阶段13 A 获客与转化后端地基——`Lead` 模型 + 公开端点 `POST /api/leads`（游客可提交 / 10 次/IP/小时限流 / 同手机号 24h 幂等合并，见 §11）+ 管理端 `GET/PATCH /api/admin/leads`、`GET /api/admin/leads/stats`、`GET /api/admin/leads/export`（CSV 含 BOM + 公式注入防护，见 §5.12）；阶段12 C1 税制参数配置化——`TaxRateConfig` 模型 + 运维后台「税率」Tab 热改税率 + 版本化回滚 + 可选公告联动；公开只读端点 `GET /api/config/tax-rates`（见 §10.3）；管理端点 `GET/POST /api/admin/tax-rates`、`POST /api/admin/tax-rates/rollback`（见 §5.11）；阶段11 内容/公告中心——`ContentItem`/`ContentRelease` 模型 + 分层投放 audience(all/free/pro) + 时间窗 publish_at/expire_at；公开端点 `GET /api/content/tax-policy`（改为读库、增量 revision、全体用户可见）与 `GET /api/content/feed`；运维后台内容端点 `GET/POST /api/admin/content`、`PATCH/DELETE /api/admin/content/:id`、`GET/POST /api/admin/content/releases`（见 §5.9-5.10）；公开内容接口见 §10；v1.7.1；v1.7.0：阶段10 免费/专业版体系——`User.plan` / `plan_expires_at` / `pro_granted_by`、种子期授权 `SEED_GRANT_PRO`、云端历史同步 `POST /api/calculations/sync`；运维后台用户端点 `GET /api/admin/users`、`GET /api/admin/users/:id`、`PATCH /api/admin/users/:id/plan`（见 §5.6-5.8）；反馈附图 `attachments` 校验与返回；v1.6.1：一键缓存清洗页 + 弹窗健壮性 + 表单校验优化）
 
 ---
 
@@ -551,7 +551,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 **GET** `/api/admin/leads?status=&source=&q=&offset=0&limit=50`
 
-列表，按 `created_at` 倒序，默认 50 条（`limit` 上限 200）；`q` 为姓名/手机号/公司/**城市**子串匹配（忽略大小写）—— 城市入搜索是为了顾问按「本地口径」分派线索（如上海私域），不搜城市只能人工翻页；`items` 关联 `user`（`{ id, username, email, plan } | null`），并含 `city`（留资时收集，见 §11）。
+列表，按 `created_at` 倒序，默认 50 条（`limit` 上限 200）；`q` 为姓名/手机号/公司/**省份**/**城市**子串匹配（忽略大小写）—— 省市入搜索是为了顾问按「本地口径」分派线索（如江浙沪私域）：按省收敛比按市翻页快，且市名重名时（吉林市 / 海南藏族自治州）只有带上省份才认得出是哪个统筹区；`items` 关联 `user`（`{ id, username, email, plan } | null`），并含 `province` / `city`（留资时收集，见 §11）。
 
 响应（200）：
 
@@ -607,7 +607,7 @@ body：`{ "type": "comprehensive" | "business" | "classification" | "reverse" }`
 
 **GET** `/api/admin/leads/export?status=&source=&q=`
 
-CSV 导出（供销售导入自有 CRM）。筛选条件与列表一致，最多 5000 条；含 UTF-8 BOM（Excel 打开中文不乱码）；单元格做公式注入防护（`= + - @` 开头前置单引号）；`Content-Disposition` 文件名 `leads-YYYYMMDD.csv`，时间为北京时间。
+CSV 导出（供销售导入自有 CRM）。筛选条件与列表一致，最多 5000 条；含 UTF-8 BOM（Excel 打开中文不乱码）；单元格做公式注入防护（`= + - @` 开头前置单引号）；`Content-Disposition` 文件名 `leads-YYYYMMDD.csv`，时间为北京时间。所在地区拆 `省份` / `城市` 两列导出（顾问按省收敛分派、按市核对当地基数口径），列序与列表一致。
 
 典型错误：无 / 错误 `X-Admin-Token`（401）、参数非法（400）、线索不存在（404）。
 
@@ -1051,7 +1051,8 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 | `phone` | 二选一 | 与 `wechat` 至少提供一个；提供时须匹配 `^1[3-9]\d{9}$` |
 | `wechat` | 二选一 | 1–64 字符 |
 | `company` | — | ≤ 100 字符 |
-| `city` | — | 所在城市，≤ 20 字符。**前台表单必填**，接口层选填（兼容旧客户端与团队内部调用）；用于顾问核对当地社保/公积金缴费基数口径 —— 计算页已不再让用户选参保城市（v1.17.0） |
+| `province` | — | 所在省份 / 直辖市，≤ 20 字符。**前台表单必填**，接口层选填（兼容旧客户端与团队内部调用）；省份不能只是「筛选城市的中间态」—— 顾问要按省收敛分派（江浙沪私域），且市名重名时（吉林市 / 海南藏族自治州 vs 海南省）只有省 + 市组合才认得出统筹区 |
+| `city` | — | 所在城市，≤ 20 字符。**前台表单必填**，接口层选填（兼容旧客户端与团队内部调用）；用于顾问核对当地社保/公积金缴费基数口径 —— 计算页已不再让用户选参保城市（v1.17.0）。与 `province` 各自独立校验、独立落库（用户可能只改城市而省份没重选） |
 | `entityType` | — | 枚举 `individual` / `sole` / `small` / `other` / `unknown`（非法回落 `unknown`） |
 | `need` | — | 枚举 `bookkeeping` / `settlement` / `declare_check` / `consult` / `other`（非法回落 `other`） |
 | `source` | — | 触点归因，枚举见下（非法回落 `unknown`） |
@@ -1074,7 +1075,8 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
   "name": "张先生",
   "phone": "13900000000",
   "company": "某个体户",
-  "city": "上海",
+  "province": "江苏",
+  "city": "苏州市",
   "entityType": "sole",
   "need": "settlement",
   "source": "result_business",

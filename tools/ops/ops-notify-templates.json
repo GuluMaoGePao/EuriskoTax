@@ -5,12 +5,12 @@
 
   "URL_CREATED": {
     "subject": "【EuriskoTax】公网分享地址已生成",
-    "body": "公网隧道已启动，生成新的公网访问地址。\n\n新地址\n  {newUrl}\n\n生成时间\n  {timestamp}\n\n变更原因\n  {reason}\n\n请把下面链接和账号发给测试员直接访问即可，无需再 VPN 或连同一局域网：\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：dev@example.com\n  测试密码：password\n  一键登录：{newUrl}\n\n说明\n  cpolar 免费版公网地址在隧道重启/自动重连后会变化，如有变更会再次发送新邮件。\n  本邮件由 EuriskoTax 启动脚本 / 守护进程自动发送。"
+    "body": "公网隧道已启动，生成新的公网访问地址。\n\n新地址\n  {newUrl}\n\n生成时间\n  {timestamp}\n\n变更原因\n  {reason}\n\n请把下面链接和账号发给测试员直接访问即可，无需再 VPN 或连同一局域网：\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：2649719969@qq.com\n  测试密码：[REDACTED]\n  一键登录：{newUrl}\n\n说明\n  cpolar 免费版公网地址在隧道重启/自动重连后会变化，如有变更会再次发送新邮件。\n  本邮件由 EuriskoTax 启动脚本 / 守护进程自动发送。"
   },
 
   "URL_CHANGED": {
     "subject": "【EuriskoTax】公网测试地址已变更",
-    "body": "公网测试地址已变更\n\n新地址\n  {newUrl}\n\n旧地址\n  {oldUrl}\n\n变更原因\n  {reason}\n\n发生时间\n  {timestamp}\n\n请立即将新地址发送给测试员，通知所有正在测试的人员更换访问地址。\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：dev@example.com\n  测试密码：password\n\n说明\n  cpolar 免费版公网地址在隧道重启或自动重连后可能发生变化。\n  本邮件由 EuriskoTax Watchdog 自动发送。"
+    "body": "公网测试地址已变更\n\n新地址\n  {newUrl}\n\n旧地址\n  {oldUrl}\n\n变更原因\n  {reason}\n\n发生时间\n  {timestamp}\n\n请立即将新地址发送给测试员，通知所有正在测试的人员更换访问地址。\n\n测试员登录信息\n  访问地址：{newUrl}\n  测试账号：2649719969@qq.com\n  测试密码：[REDACTED]\n\n说明\n  cpolar 免费版公网地址在隧道重启或自动重连后可能发生变化。\n  本邮件由 EuriskoTax Watchdog 自动发送。"
   },
 
   "TEST": {

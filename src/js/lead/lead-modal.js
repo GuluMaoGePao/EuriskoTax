@@ -23,6 +23,11 @@
     var MODAL_ID = 'lead-modal';
     var PHONE_RE = /^1[3-9]\d{9}$/;
 
+    // 「所在城市」为省 + 市级联：这两个哨兵值表示用户落到了手输兜底
+    // （省份选「其他 / 海外」，或城市选「其他（手动输入）」），此时城市取 #lead-city-other
+    var PROVINCE_OTHER = '__other';
+    var CITY_OTHER = '__other';
+
     // 提交按钮的两个状态：成功后必须能还原成一模一样的初始态（含图标），
     // 所以用常量存 HTML 而不是各写一次字符串 —— 否则图标很容易在第二次提交后消失。
     // 文案与 index.html 的 #lead-submit-btn 保持一致：这里只做「把信息交出去」，不承诺「预约成功」
@@ -151,17 +156,102 @@
         err.classList.add('hidden');
     }
 
+    // ===== 省 + 市级联（「所在城市」）=====
+    // 数据来自 src/js/data/china-regions.js（中国省级行政区 + 地级行政区）。
+    // 未加载到数据时优雅降级：省份只剩「其他 / 海外」，用户改走手输 —— 宁可多打字，也别卡住留资。
+
+    function regionsApi() {
+        var api = window.ChinaRegions;
+        return (api && typeof api.citiesOf === 'function' && Array.isArray(api.list)) ? api : null;
+    }
+
+    // 城市下拉与手输框互斥：切到手输时清空旧值并聚焦（键盘弹出即为「请填写」的提示）
+    function showCityInput(show) {
+        var selectWrap = el('lead-city-select-wrap');
+        var inputWrap = el('lead-city-input-wrap');
+        var select = el('lead-city');
+        var other = el('lead-city-other');
+        if (selectWrap) selectWrap.classList.toggle('hidden', !!show);
+        if (inputWrap) inputWrap.classList.toggle('hidden', !show);
+        if (select) select.disabled = !!show;
+        if (other) {
+            other.value = '';
+            if (show) setTimeout(function () { other.focus(); }, 0);
+        }
+    }
+
+    // 省份 → 重建城市候选；选「其他 / 海外」直接落到手输，不再点一次城市下拉
+    function setCities(province) {
+        var select = el('lead-city');
+        if (!select) return;
+
+        if (!province) {
+            select.innerHTML = '<option value="">城市</option>';
+            showCityInput(false);
+            select.disabled = true;
+            return;
+        }
+
+        var api = regionsApi();
+        var cities = (province === PROVINCE_OTHER || !api) ? [] : api.citiesOf(province);
+        var html = '<option value="">请选择城市</option>';
+        cities.forEach(function (city) {
+            html += '<option value="' + escapeAttr(city) + '">' + escapeAttr(city) + '</option>';
+        });
+        // 行政区划不可能穷尽（县级市 / 境外）：留一个手输入口，避免用户选不到就没法提交
+        html += '<option value="' + CITY_OTHER + '">其他（手动输入）</option>';
+        select.innerHTML = html;
+        // 省份选「其他 / 海外」时直接落到手输，同时把城市下拉置为哨兵值，
+        // 否则 collectPayload 会从（隐藏的）下拉读到空值，用户在输入框里打的字被丢掉
+        if (province === PROVINCE_OTHER) select.value = CITY_OTHER;
+        showCityInput(province === PROVINCE_OTHER);
+    }
+
+    // 省份下拉是静态数据，构建一次即可；「其他 / 海外」恒在末位兜底
+    function renderProvinces() {
+        var select = el('lead-province');
+        if (!select) return;
+        var api = regionsApi();
+        var html = '<option value="">省份 / 直辖市</option>';
+        if (api) {
+            api.list.forEach(function (item) {
+                html += '<option value="' + escapeAttr(item.province) + '">' + escapeAttr(item.province) + '</option>';
+            });
+        }
+        html += '<option value="' + PROVINCE_OTHER + '">其他 / 海外</option>';
+        select.innerHTML = html;
+    }
+
+    // 每次打开弹窗复位：form.reset() 会把 select 拨回初始项，这里再把城市候选/手输态一并还原
+    function resetRegions() {
+        var province = el('lead-province');
+        if (province) province.value = '';
+        setCities('');
+    }
+
     function collectPayload() {
         function val(id) {
             var node = el(id);
             return node && typeof node.value === 'string' ? node.value : '';
         }
+        // 省 / 市一起提交：顾问按省收敛分派（江浙沪私域），按市核对当地缴费基数口径；
+        // 市名重名时（吉林市 / 海南藏族自治州）只有市名会认错统筹区。
+        // 「其他 / 海外」是筛选城市用的哨兵值、不是真实省份：透传下去顾问会看到 '__other'
+        var provinceSelect = el('lead-province');
+        var provinceRaw = provinceSelect ? provinceSelect.value : '';
+        var province = provinceRaw === PROVINCE_OTHER ? '' : provinceRaw.trim();
+        // 选中「其他（手动输入）」时城市落在手输框
+        var citySelect = el('lead-city');
+        var city = (citySelect && citySelect.value === CITY_OTHER)
+            ? val('lead-city-other').trim()
+            : val('lead-city').trim();
         return {
             name: val('lead-name').trim(),
             phone: val('lead-phone').trim(),
             wechat: val('lead-wechat').trim(),
             company: val('lead-company').trim(),
-            city: val('lead-city').trim(),
+            province: province,
+            city: city,
             entityType: val('lead-entity') || 'unknown',
             need: val('lead-need') || 'other',
             source: state.source,
@@ -341,6 +431,7 @@
 
         var form = el('lead-form');
         if (form) form.reset();
+        resetRegions();
         clearError();
         setView('form');
 
@@ -377,6 +468,22 @@
 
         var form = el('lead-form');
         if (form) form.addEventListener('submit', onSubmit);
+
+        // 省 + 市级联：省份决定城市候选；城市选「其他（手动输入）」时切换到手输框
+        var provinceSelect = el('lead-province');
+        renderProvinces();
+        if (provinceSelect) {
+            provinceSelect.addEventListener('change', function () {
+                setCities(provinceSelect.value);
+            });
+        }
+        var citySelect = el('lead-city');
+        if (citySelect) {
+            citySelect.addEventListener('change', function () {
+                showCityInput(citySelect.value === CITY_OTHER);
+            });
+        }
+        resetRegions();
 
         // 情境选择（仅无当前测算、且本地有历史时可见）：选中即作为留资情境上报
         var sceneSelect = el('lead-scene-select');

@@ -1,7 +1,7 @@
 // 阶段13 转化线索测试
 //   1) buildLead 归一化契约：必填项 / 联系方式二选一 / 手机号格式 / consent 强校验 /
 //      枚举白名单回落 / 长度上限 / trim（前后端字段契约，易静默失效）
-//      含 city（2026-09 回退端上「参保城市」选择后改为留资收集）：选填不阻断、trim、长度上限
+//      含 province + city（2026-09 回退端上「参保城市」选择后改为留资收集）：选填不阻断、trim、长度上限
 //   2) 管理端纯函数契约：buildWhere 筛选构造、csvCell 转义与公式注入防护
 //
 // 说明：两个 controller 顶层都会 new PrismaClient()，这里 mock 掉，
@@ -27,6 +27,7 @@ describe('阶段13 转化线索 - buildLead 归一化契约', () => {
         expect(data.phone).toBe('13800138000');
         expect(data.wechat).toBeNull();
         expect(data.company).toBeNull();
+        expect(data.province).toBe('');
         expect(data.city).toBe('');
         expect(data.entity_type).toBe('unknown');
         expect(data.need).toBe('other');
@@ -89,6 +90,19 @@ describe('阶段13 转化线索 - buildLead 归一化契约', () => {
         expect(data.company).toBe('xx公司');
     });
 
+    test('province 选填：缺省为空串，填了则 trim 后入库（与 city 一起才能认出重名地市的统筹区）', () => {
+        expect(buildLead(BASE).data.province).toBe('');
+        expect(buildLead({ ...BASE, province: '  广东  ' }).data.province).toBe('广东');
+        // 省 + 市各自独立落库：顾问要的是「广东省·深圳市」这种能对表的组合
+        expect(buildLead({ ...BASE, province: '广东', city: '深圳市' }).data)
+            .toMatchObject({ province: '广东', city: '深圳市' });
+    });
+
+    test('province 超长报错（防超长脏数据；边界值恰好通过）', () => {
+        expect(buildLead({ ...BASE, province: 'x'.repeat(leadInternals.PROVINCE_MAX) }).error).toBeUndefined();
+        expect(buildLead({ ...BASE, province: 'x'.repeat(leadInternals.PROVINCE_MAX + 1) }).error).toContain('province');
+    });
+
     test('city 选填：缺省为空串，填了则 trim 后入库（顾问据此核对当地缴费基数口径）', () => {
         expect(buildLead(BASE).data.city).toBe('');
         expect(buildLead({ ...BASE, city: '  上海  ' }).data.city).toBe('上海');
@@ -137,11 +151,11 @@ describe('阶段13 转化线索 - 管理端纯函数契约', () => {
         expect(buildWhere({ status: 'new', source: 'share' })).toEqual({ status: 'new', source: 'share' });
     });
 
-    test('buildWhere：q 生成 name / phone / company / city 四字段 OR 子串匹配', () => {
+    test('buildWhere：q 生成 name / phone / company / province / city 五字段 OR 子串匹配', () => {
         const where = buildWhere({ q: ' 王 ' });
         expect(Array.isArray(where.OR)).toBe(true);
-        expect(where.OR).toHaveLength(4);
-        expect(where.OR.map((c) => Object.keys(c)[0])).toEqual(['name', 'phone', 'company', 'city']);
+        expect(where.OR).toHaveLength(5);
+        expect(where.OR.map((c) => Object.keys(c)[0])).toEqual(['name', 'phone', 'company', 'province', 'city']);
     });
 
     test('buildWhere：q 为空串 / 纯空白不生成 OR（避免无谓的全字段扫描）', () => {

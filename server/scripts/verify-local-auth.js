@@ -15,7 +15,7 @@
  *
  * 它会把「本地完整应用」真的跑起来做端到端验证：
  *   1. 数据库准备（SQLite: prisma generate:dev + db push；PostgreSQL: generate + migrate deploy + 种子）
- *   2. 确保本地测试账号 dev@example.com / password 存在
+ *   2. 确保本地测试账号 2649719969@qq.com / [REDACTED] 存在
  *   3. 随机空闲端口启动后端（node src/app.js，同源托管前端+API）
  *   4. HTTP 级 e2e：
  *      - 前端资源冒烟：/ 含登录表单、auth-ui.js 含 dev-login-fill 且无 quick-login、SW 为 v8
@@ -27,7 +27,7 @@
  *      - 阶段14 专业版兑换码：管理端生成/列表/作废/CSV 导出 + 用户端一码一用兑换
  *      - 阶段14 C2 城市社保参数库：公开只读（含兜底城市不变量 / since 增量）+ 管理端
  *        发布/回滚/版本号唯一/上限低于下限拒绝（端上已回退为全国口径，用户不再选参保城市）
- *      - 留资「所在城市」：静态接线（表单/弹窗/接口/管理台）+ e2e 落库、搜索命中、CSV 列
+ *      - 留资「所在城市」：省 + 市级联下拉（含「其他」手输兜底）静态接线 + e2e 省市落库、按市/按省搜索命中、CSV 省市列
  *      - 缴费比例：三页可输入数字框（默认 5%，不再是固定两档）+ 输入即时重算 / 留空越界兜底
  *      - 完整注册链路：申请邀请码(写库) → send-code(读后端控制台验证码) → register → 登录新号 → profile
  *   5. 清理（删临时账号/邀请码/关后端），输出 PASS/FAIL，失败时退出码非 0
@@ -276,11 +276,11 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         process.exit(1);
     }
 
-    // ---- 2. 确保本地测试账号存在（dev@example.com / password） ----
+    // ---- 2. 确保本地测试账号存在（2649719969@qq.com / [REDACTED]） ----
     const bcrypt = require('bcryptjs');
-    const DEV_EMAIL = 'dev@example.com';
+    const DEV_EMAIL = '2649719969@qq.com';
     const DEV_USERNAME = 'devuser';
-    const DEV_PASSWORD = 'password';
+    const DEV_PASSWORD = '[REDACTED]';
     try {
         const existing = await prisma.user.findUnique({ where: { email: DEV_EMAIL } });
         const hash = bcrypt.hashSync(DEV_PASSWORD, 10);
@@ -492,19 +492,37 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             leadPage.status === 200 && !leadPage.raw.includes('city-social-sync.js')
             && !leadPage.raw.includes('city-social-ui.js'),
             `HTTP ${leadPage.status}`);
-        record('index.html 留资表单含必填「所在城市」输入(#lead-city)',
-            leadPage.status === 200 && leadPage.raw.includes('id="lead-city"')
-            && leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>'),
+        // 控件从「自由文本框」收紧为「省 + 市级联下拉」：手输城市名五花八门（上海 / 上海市 / 魔都），
+        // 顾问拿到线索还得猜是哪个统筹区；「其他 / 海外」+「其他（手动输入）」是兜底 ——
+        // 行政区划不可能穷尽（县级市 / 境外），不能把用户卡在本就必填的这一项上
+        record('index.html「所在城市」为省 + 市级联下拉(#lead-province/#lead-city)+手输兜底，且保留必填星号并引入省市数据',
+            leadPage.status === 200 && leadPage.raw.includes('id="lead-province"')
+            && leadPage.raw.includes('id="lead-city"') && leadPage.raw.includes('id="lead-city-other"')
+            && leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>')
+            && leadPage.raw.includes('src/js/data/china-regions.js'),
             `HTTP ${leadPage.status}`);
-        record('lead-modal.js 收集城市并做必填校验（未填不发请求）',
-            leadModalJs.status === 200 && leadModalJs.raw.includes("val('lead-city')")
-            && leadModalJs.raw.includes('请填写所在城市'),
+        const chinaRegionsJs = await request(PORT, 'GET', '/src/js/data/china-regions.js');
+        record('china-regions.js 提供省级行政区数据（直辖市/自治区/港澳台）供联动，lead-modal.js 做联动与必填校验',
+            chinaRegionsJs.status === 200 && chinaRegionsJs.raw.includes('citiesOf')
+            && chinaRegionsJs.raw.includes('北京') && chinaRegionsJs.raw.includes('新疆')
+            && chinaRegionsJs.raw.includes('香港')
+            && leadModalJs.status === 200 && leadModalJs.raw.includes('renderProvinces')
+            && leadModalJs.raw.includes('setCities') && leadModalJs.raw.includes('lead-city-other')
+            && leadModalJs.raw.includes("val('lead-city')") && leadModalJs.raw.includes('请填写所在城市'),
+            `HTTP ${chinaRegionsJs.status}/${leadModalJs.status}`);
+        // 省份不能只是「筛选城市的中间态」：顾问要按省收敛分派（江浙沪私域），后端也要拿到。
+        // 哨兵值必须剔除 —— 选「其他 / 海外」时下拉值是 '__other'，透传下去顾问会看到一行无意义的占位符
+        record('lead-modal.js 采集省份并剔除「其他 / 海外」哨兵值（省 + 市一起提交后端）',
+            leadModalJs.status === 200
+            && /province\s*=\s*provinceRaw\s*===\s*PROVINCE_OTHER/.test(leadModalJs.raw)
+            && leadModalJs.raw.includes('province: province,'),
             `HTTP ${leadModalJs.status}`);
-        record('api-client.js 提交线索带上 city（与后端 buildLead 白名单一致）',
-            apiClientJs.status === 200 && apiClientJs.raw.includes('city: p.city'),
+        record('api-client.js 提交线索带上 province + city（与后端 buildLead 白名单一致）',
+            apiClientJs.status === 200 && apiClientJs.raw.includes('province: p.province')
+            && apiClientJs.raw.includes('city: p.city'),
             `HTTP ${apiClientJs.status}`);
-        record('admin.js 线索列表展示城市（顾问按城市核对当地基数口径）',
-            adminJs.status === 200 && adminJs.raw.includes('it.city'),
+        record('admin.js 线索列表展示省 + 市（顾问按当地基数口径核对）',
+            adminJs.status === 200 && adminJs.raw.includes('it.province') && adminJs.raw.includes('it.city'),
             `HTTP ${adminJs.status}`);
 
         // ---- 缴费比例：用户自填（各地 5%~12% 口径不同，固定两档会让用户选不到自己的比例）----
@@ -950,7 +968,7 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 13.1 游客留资（无 JWT）必须成功 —— 绝大多数用户不会注册
         const guestLead = await request(PORT, 'POST', '/api/leads', {
             json: {
-                name: '验证用户', phone: leadPhone(1), company: '验证个体户', city: '上海',
+                name: '验证用户', phone: leadPhone(1), company: '验证个体户', province: '江苏', city: '苏州市',
                 entityType: 'sole', need: 'settlement', source: 'result_business',
                 scene: '经营所得·汇算清缴', note: `[verify] e2e lead ${leadStamp}`, consent: true,
             },
@@ -992,9 +1010,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const leadData = (leadList.body && leadList.body.data) || {};
         const leadItems = Array.isArray(leadData.items) ? leadData.items : [];
         const mineLead = leadItems.find((x) => x.id === verifyLeadId);
-        record('GET /admin/leads 列表含新线索(情境快照 + 主体类型 + 所在城市 + byStatus)',
+        record('GET /admin/leads 列表含新线索(情境快照 + 主体类型 + 所在省市 + byStatus)',
             leadList.status === 200 && !!mineLead && mineLead.scene === '经营所得·汇算清缴'
-            && mineLead.entity_type === 'sole' && mineLead.city === '上海'
+            && mineLead.entity_type === 'sole' && mineLead.province === '江苏' && mineLead.city === '苏州市'
             && !!leadData.byStatus && typeof leadData.total === 'number',
             `HTTP ${leadList.status}, total=${leadData.total}`);
 
@@ -1005,12 +1023,19 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             leadSearch.status === 200 && searchItems.some((x) => x.id === verifyLeadId),
             `HTTP ${leadSearch.status}, hits=${searchItems.length}`);
 
-        // 13.6b 按城市搜索：顾问按「本地口径」分派线索靠它（如上海私域），不搜城市只能人工翻页
-        const citySearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent('上海'), { headers: leadAdminH });
+        // 13.6b 按城市搜索：顾问按「本地口径」分派线索靠它（如江浙沪私域），不搜城市只能人工翻页
+        const citySearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent('苏州'), { headers: leadAdminH });
         const cityItems = (citySearch.body && citySearch.body.data && citySearch.body.data.items) || [];
         record('GET /admin/leads 支持按城市搜索命中',
             citySearch.status === 200 && cityItems.some((x) => x.id === verifyLeadId),
             `HTTP ${citySearch.status}, hits=${cityItems.length}`);
+
+        // 13.6c 按省份搜索：省是分派的上一级收敛维度（先筛省再挑市），且重名地市只有省份能区分
+        const provinceSearch = await request(PORT, 'GET', '/api/admin/leads?q=' + encodeURIComponent('江苏'), { headers: leadAdminH });
+        const provinceItems = (provinceSearch.body && provinceSearch.body.data && provinceSearch.body.data.items) || [];
+        record('GET /admin/leads 支持按省份搜索命中',
+            provinceSearch.status === 200 && provinceItems.some((x) => x.id === verifyLeadId),
+            `HTTP ${provinceSearch.status}, hits=${provinceItems.length}`);
 
         // 13.7 漏斗统计（北极星指标 lead_submit / calc_done 的分子）
         const leadStatsResp = await request(PORT, 'GET', '/api/admin/leads/stats', { headers: leadAdminH });
@@ -1040,9 +1065,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 13.9 CSV 导出：UTF-8 BOM + 中文表头（Excel 不乱码，销售可导进自有 CRM）
         const leadCsv = await request(PORT, 'GET', '/api/admin/leads/export?q=' + encodeURIComponent(leadPhone(1)), { headers: leadAdminH });
         const csvHasBom = typeof leadCsv.raw === 'string' && leadCsv.raw.charCodeAt(0) === 0xFEFF;
-        record('GET /admin/leads/export CSV(含 BOM + 中文表头 + 城市列)',
+        record('GET /admin/leads/export CSV(含 BOM + 中文表头 + 省份/城市列)',
             leadCsv.status === 200 && csvHasBom && leadCsv.raw.includes('手机号') && leadCsv.raw.includes('情境')
-            && leadCsv.raw.includes('城市'),
+            && leadCsv.raw.includes('省份') && leadCsv.raw.includes('城市'),
             `HTTP ${leadCsv.status}, bom=${csvHasBom}`);
 
         // 13.10 限流：公开写入端点必须挡批量刷量（10 次/小时/IP）
@@ -1077,15 +1102,18 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
     try {
         const login = await request(PORT, 'POST', '/api/auth/login', { json: { email: DEV_EMAIL, password: DEV_PASSWORD } });
         devToken = login.body && login.body.data && login.body.data.token;
-        record('登录 dev@example.com', login.status === 200 && !!devToken, `HTTP ${login.status}`);
+        record('登录本地测试账号', login.status === 200 && !!devToken, `HTTP ${login.status}`);
 
         if (devToken) {
             const profile = await request(PORT, 'GET', '/api/auth/profile', { token: devToken });
-            const name = profile.body && profile.body.data && profile.body.data.username;
-            record('GET /profile 身份校验', profile.status === 200 && name === DEV_USERNAME, `HTTP ${profile.status}, user=${name}`);
+            const me = (profile.body && profile.body.data) || {};
+            // 身份用邮箱（账号标识）比对，而不是用户名：测试账号可能早已存在，
+            // 用户名是用户自己设的昵称（可改），拿它比对会把「账号已存在」误判成链路故障
+            record('GET /profile 身份校验', profile.status === 200 && me.email === DEV_EMAIL,
+                `HTTP ${profile.status}, user=${me.username}`);
         }
     } catch (e) {
-        record('登录 dev 账号', false, e.message);
+        record('登录本地测试账号（请求异常）', false, e.message);
     }
 
     console.log('\n[4/6 续] 反馈落库 + 匿名埋点链路（dev 账号，阶段8）...');

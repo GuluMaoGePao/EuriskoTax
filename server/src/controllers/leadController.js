@@ -16,6 +16,7 @@ const SOURCES = [
 const NAME_MAX = 50;
 const WECHAT_MAX = 64;
 const COMPANY_MAX = 100;
+const PROVINCE_MAX = 20;
 const CITY_MAX = 20;
 const SCENE_MAX = 100;
 const NOTE_MAX = 1000;
@@ -64,8 +65,11 @@ const buildLead = (body) => {
 
     const companyRes = readText(src.company, COMPANY_MAX, 'company');
     if (companyRes.error) return { error: companyRes.error };
-    // 所在城市：计算页不再让用户选参保城市（2026-09 回退），改由留资时收集，
+    // 所在省 / 市：计算页不再让用户选参保城市（2026-09 回退），改由留资时收集，
     // 顾问据此核对当地社保/公积金缴费基数口径。选填（不阻断留资），后端只做长度约束。
+    // 省份与城市分开存：市名重名时（吉林市 / 海南藏族自治州）只有市名会让顾问认错统筹区。
+    const provinceRes = readText(src.province, PROVINCE_MAX, 'province');
+    if (provinceRes.error) return { error: provinceRes.error };
     const cityRes = readText(src.city, CITY_MAX, 'city');
     if (cityRes.error) return { error: cityRes.error };
     const sceneRes = readText(src.scene, SCENE_MAX, 'scene');
@@ -79,6 +83,7 @@ const buildLead = (body) => {
             phone: phone || null,
             wechat: wechatRes.value || null,
             company: companyRes.value || null,
+            province: provinceRes.value,
             city: cityRes.value,
             entity_type: pickEnum(ENTITY_TYPES, src.entityType, 'unknown'),
             need: pickEnum(NEEDS, src.need, 'other'),
@@ -125,7 +130,9 @@ const submitLead = async (req, res, next) => {
                         // 情境/归因以最新一次为准；备注追加保留首次诉求
                         source: data.source !== 'unknown' ? data.source : existing.source,
                         scene: data.scene || existing.scene,
-                        // 城市同情境：本次填了就以本次为准（用户纠正/补充更准确）
+                        // 省 / 市同情境：本次填了就以本次为准（用户纠正/补充更准确）；
+                        // 两项各自判断 —— 用户可能只改了城市而省份没重选
+                        province: data.province || existing.province,
                         city: data.city || existing.city,
                         note: noteMerged,
                         user_id: existing.user_id || userId
@@ -141,7 +148,9 @@ const submitLead = async (req, res, next) => {
         });
 
         // 落日志：生产环境可经 ops-notify.ps1 邮件转发，实现"有新线索即知会"
-        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} scene="${saved.scene}"`);
+        // 带上省·市：日志是「有新线索即知会」的转发源，顾问一眼就能看出该按哪套基数口径对接
+        const region = [saved.province, saved.city].filter(Boolean).join('·');
+        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} region="${region}" scene="${saved.scene}"`);
 
         res.status(201).json({
             success: true,
@@ -163,6 +172,7 @@ module.exports = {
         NAME_MAX,
         WECHAT_MAX,
         COMPANY_MAX,
+        PROVINCE_MAX,
         CITY_MAX,
         SCENE_MAX,
         NOTE_MAX,

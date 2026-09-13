@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function resetDevUser() {
-    const email = 'dev@example.com';
-    const password = 'password';
+    const email = '2649719969@qq.com';
+    const password = '[REDACTED]';
     const username = 'devuser';
     
     try {

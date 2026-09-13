@@ -35,7 +35,7 @@ try {
 
 Write-Host "`n=== 4. Login test ==="
 try {
-    $body = @{ email = "dev@example.com"; password = "password" } | ConvertTo-Json
+    $body = @{ email = "2649719969@qq.com"; password = "[REDACTED]" } | ConvertTo-Json
     $r = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 8
     Write-Host "login OK: success=$($r.success), token length=$($r.data.token.Length)"
 } catch {

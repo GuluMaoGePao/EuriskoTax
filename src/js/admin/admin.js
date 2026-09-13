@@ -2183,9 +2183,14 @@ function renderLeadsTable() {
             it.phone ? `<span class="mono">${esc(it.phone)}</span>` : '',
             it.wechat ? `微信 ${esc(it.wechat)}` : ''
         ].filter(Boolean).join(' · ');
-        // 城市：端上不再让用户选参保城市后，这里是顾问核对当地缴费基数口径的唯一入口
-        const cityLine = it.city
-            ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa fa-map-marker mr-1"></i>${esc(it.city)}</div>`
+        // 省 + 市：端上不再让用户选参保城市后，这里是顾问核对当地缴费基数口径的唯一入口。
+        // 直辖市 / 港澳会出现「北京 · 北京市」这类重复，城市名已含省份时只显示城市
+        const regionParts = [it.province, it.city].filter(Boolean);
+        const regionText = (regionParts.length === 2 && String(it.city).indexOf(String(it.province)) === 0)
+            ? it.city
+            : regionParts.join(' · ');
+        const cityLine = regionText
+            ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa fa-map-marker mr-1"></i>${esc(regionText)}</div>`
             : '';
         const userLine = it.user
             ? `<div class="text-[11px] text-blue-500 mt-0.5"><i class="fa fa-user-o mr-1"></i>${esc(it.user.username)}（${esc(it.user.email || '')}｜${esc(it.user.plan || '')}）</div>`

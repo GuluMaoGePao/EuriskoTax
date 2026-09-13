@@ -275,7 +275,10 @@ async function submitLead(payload) {
         phone: p.phone || '',
         wechat: p.wechat || '',
         company: p.company || '',
-        // 城市改为留资时收集（参保城市选择已回退）：顾问据此核对当地缴费基数口径
+        // 省 / 市改为留资时收集（参保城市选择已回退）：顾问据此核对当地缴费基数口径。
+        // 两项都传：市名重名时（吉林市 / 海南藏族自治州）只有市名会让顾问认错统筹区；
+        // 「其他 / 海外」这类前端哨兵值由 lead-modal 剔除后再进来，这里只做透传
+        province: p.province || '',
         city: p.city || '',
         entityType: p.entityType || 'unknown',
         need: p.need || 'other',

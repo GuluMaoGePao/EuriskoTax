@@ -60,6 +60,7 @@ const buildWhere = (query = {}) => {
             { name: kwContains(q) },
             { phone: kwContains(q) },
             { company: kwContains(q) },
+            { province: kwContains(q) },
             { city: kwContains(q) }
         ];
     }
@@ -76,8 +77,9 @@ const csvCell = (value) => {
 /**
  * 线索列表
  * GET /api/admin/leads?status=&source=&q=&limit=50&offset=0
- * q 匹配姓名 / 手机号 / 公司 / 城市（子串，忽略大小写）；默认按创建时间倒序
- * 城市入搜索：顾问跟进常按「本地口径」分派（如上海私域），不搜城市只能人工翻页
+ * q 匹配姓名 / 手机号 / 公司 / 省份 / 城市（子串，忽略大小写）；默认按创建时间倒序
+ * 省、市都入搜索：顾问跟进常按「本地口径」分派（如江浙沪私域），按省收敛比按市翻页快；
+ * 市名重名时（吉林市 / 海南藏族自治州）也只有带上省份才认得出是哪个统筹区
  */
 const listLeads = async (req, res, next) => {
     try {
@@ -317,7 +319,7 @@ const exportLeads = async (req, res, next) => {
         });
 
         const header = [
-            'ID', '提交时间(北京)', '姓名', '手机号', '微信号', '公司/个体户', '城市', '主体类型',
+            'ID', '提交时间(北京)', '姓名', '手机号', '微信号', '公司/个体户', '省份', '城市', '主体类型',
             '需求', '来源', '情境', '状态', '跟进人', '备注', '同意隐私'
         ];
         const lines = [header.map(csvCell).join(',')];
@@ -329,6 +331,7 @@ const exportLeads = async (req, res, next) => {
                 it.phone,
                 it.wechat,
                 it.company,
+                it.province,
                 it.city,
                 it.entity_type,
                 it.need,
