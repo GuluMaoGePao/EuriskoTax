@@ -356,6 +356,11 @@ EuriskoTax/
 - 反馈闭环（v1.6.0）：POST/GET /api/feedback 提交落库（`Feedback` 表）+ 个人中心"意见反馈"卡片；管理员 GET/PATCH /api/feedback/admin 列表与状态跟进（X-Admin-Token，`middleware/adminAuth.js` 共享校验）
 - PWA（阶段 9）：manifest + service-worker 已上线；SW 为网络优先「瘦缓存」策略（不预缓存整壳、在线永远最新、访问过后离线可算、发版无需手动清缓存），详见 CHANGELOG 1.5.2
 
+**商业与冷启动状态（2026-09-14 补记）**：
+- 产品已具备获客条件：转化链路（结果页引导 → 留资落库 → 顾问状态机 → 转化漏斗）+ 兑换码收款 + 三个 SEO 落地页均已上线，**尚未开始推广（0 用户 / 0 收入）**
+- 三个点火动作待执行：注册 `.com` 域名（**须公司名下**，买完需满 3 个自然日才能提交备案）→ 提交 ICP 备案（企业主体 · 有限责任公司，排队 3–5 周）→ 配置企业微信「联系我」活码（当前 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl` 为空，留资弹窗降级为仅留言通道）
+- 战略与财务测算见 [../marketing/business-plan-for-partners.md](../marketing/business-plan-for-partners.md)；90 天执行清单 / Go-NoGo / 线索 SOP 见 [../marketing/gtm-execution-plan.md](../marketing/gtm-execution-plan.md)
+
 **本地开发环境**：
 - 后端服务：http://localhost:3000
 - API文档：http://localhost:3000/api/docs

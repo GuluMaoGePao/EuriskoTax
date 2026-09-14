@@ -1,7 +1,8 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-13
+> 最后更新：2026-09-14
 > 维护原则：按用途分类存放，本文件为统一入口索引
+> 2026-09-14 新增：`docs/marketing/business-plan-for-partners.md`（合伙人版商业企划）与 `docs/marketing/gtm-execution-plan.md`（90 天落地执行手册）
 
 ---
 
@@ -11,6 +12,8 @@
 - **主版本**：CHANGELOG 最新 **1.17.0**（产品方向调整：计算页取消「参保城市」选择，回到「默认基数 + 用户自改」，城市改由留资时收集、顾问核对当地口径；上一版 1.16.0 = 阶段14 剩余项：高商业意图 SEO 落地页 —— 第三个页面 `/seo/annual-settlement.html` 个税汇算清缴：静态正文（汇算公式与手算示例 / 七档年度税率表 / 三种典型情形示例表 / 退税与补税情形清单 / 办理时间与渠道 / 5 条 FAQ）+ 同源口径速算器（与内核 `computeDeductions` + `performTaxCalculation` 逐点对拍，并与月薪页互相对拍），把汇算讲成「应退/应补 = 全年应纳税额 − 已预缴税额」一道减法；上一版 1.15.0 = 第二个页面 `/seo/salary-tax.html` 月薪个税，1.14.0 = 首个页面 `/seo/bonus-tax.html` 年终奖个税，1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 + C2 城市社保参数库）。线上正式发布锚点见 [分支与版本发布策略 §5.3](guides/branch-release-strategy.md)：本地标签最新 `v1.15.0`，1.16.0 / 1.17.0 的标签尚未登记
 - **测试**：28 套件 570 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **167/167** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练；本机 Docker 已就绪，2026-09-13 实跑 167/167 全绿）
 - **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段16）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 / v1.16.0 陆续交付三页「年终奖个税」「月薪个税」「汇算清缴」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库（端上「参保城市」下拉已于 v1.17.0 回退为「默认基数 + 用户自改」，参数库保留待 SEO 落地页复用）+ `/seo/bonus-tax.html` + `/seo/salary-tax.html` + `/seo/annual-settlement.html`（`verify:local` 167/167、单测 28 套件 570 例）→ **下一阶段：阶段15 税务计算能力扩展（多税种）** ⏳ 待开始（先 15A 个税纵深 → 后 15B 企业税种；纯前端、不依赖备案，收编待办落地页「社保基数」「税后工资」），见 [development/stage15-multi-tax-plan.md](development/stage15-multi-tax-plan.md)；其后 **阶段16 迁移与合规升级** ⏳ 待开始（前置 ICP 备案；16D B 端 API 依赖 15B），见 [development/stage16-migration-and-compliance-plan.md](development/stage16-migration-and-compliance-plan.md)；并行线：ICP 备案（3–5 周排队）
+
+- **商业与冷启动状态（2026-09-14 补记）**：产品已具备获客条件（转化链路 + 线索管理 + 兑换码收款 + 3 个 SEO 落地页），**尚未开始推广（0 用户 / 0 收入）**；三个点火动作待执行 —— 注册 `.com` 域名（须公司名下）→ 提交 ICP 备案（企业主体 · 有限责任公司，排队 3–5 周）→ 配置企业微信「联系我」活码（当前 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl` 为空，留资弹窗降级为仅留言通道）。战略与财务测算见 [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md)，执行清单见 [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md)
 
 ---
 
@@ -98,7 +101,11 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-13 |
+| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-14 |
+| [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md) | **合伙人版商业企划**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项） | 2026-09-14 |
+| [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md) | **商业模式落地执行手册**（Go/No-Go 检查表 · 第 0 周逐日点火 · 90 天周节奏 · 指标看板 · 线索跟进 SOP · 待办登记 · 单位经济学实测口径） | 2026-09-14 |
+| [marketing/business-plan-for-partners.docx](marketing/business-plan-for-partners.docx) | 企划书 **Word 发送版**（导出件 · 非真源，由 `tools/ops/ops-md2docx.py` 从同名 .md 导出） | 2026-09-14 |
+| [marketing/gtm-execution-plan.docx](marketing/gtm-execution-plan.docx) | 执行手册 **Word 发送版**（导出件 · 非真源，导出方式同上） | 2026-09-14 |
 
 ### 技术报告
 
