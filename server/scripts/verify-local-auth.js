@@ -599,7 +599,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
             && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -677,6 +678,43 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && settlementPage.raw.includes('>9600.00<'), '');
         record('汇算清缴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             settlementPage.status === 200 && settlementPage.raw.includes('?source=seo_settlement'), '');
+        // 第四张落地页「劳务报酬 / 稿酬 / 特许权使用费预扣预缴」（阶段15 15A-1）：
+        // 前三张的守护照旧，另加两项本页独有的口径守护 ——
+        //   ① 预扣率表（20/30/40，速算扣除 0/2000/7000）与常量逐档对账（不再硬编码在内核里）；
+        //   ② 政策依据文号来自税种注册表 tax-registry.js，页面不得自己写一份口径。
+        const withholdingPage = await request(PORT, 'GET', '/seo/labor-withholding.html');
+        record('劳务报酬落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('rel="canonical"')
+            && withholdingPage.raw.includes('FAQPage')
+            && withholdingPage.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${withholdingPage.status}`);
+        const laborBlock = (constantsJs.raw.match(/labor:\s*\[([\s\S]*?)\]/) || [])[1] || '';
+        const laborRows = Array.from(laborBlock.matchAll(/rate:\s*([\d.]+)\s*,\s*deduction:\s*(\d+)/g))
+            .map((m) => ({ rate: Number(m[1]), deduction: Number(m[2]) }));
+        const staleLaborRows = laborRows.filter((r) => {
+            const pct = `${Math.round(r.rate * 1000) / 10}%`;
+            return !withholdingPage.raw.includes(pct) || !withholdingPage.raw.includes(`>${r.deduction}<`);
+        });
+        record('劳务报酬落地页静态预扣率表与常量文件逐档一致（页面不维护第二份口径）',
+            withholdingPage.status === 200 && laborRows.length === 3 && staleLaborRows.length === 0
+            && withholdingPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && withholdingPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && withholdingPage.raw.includes('/src/js/data/tax-rates-sync.js')
+            && withholdingPage.raw.includes('/src/js/calculation/withholding-quick.js'),
+            `常量 ${laborRows.length} 档, 与页面不一致 ${staleLaborRows.length} 档`);
+        record('劳务报酬落地页静态示例表与年度税率表可读（1600 / 1120 / 8000 / 5600 + 七档税率）',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('>1600.00<')
+            && withholdingPage.raw.includes('>1120.00<') && withholdingPage.raw.includes('>8000.00<')
+            && withholdingPage.raw.includes('>5600.00<')
+            && ['3%', '10%', '20%', '25%', '30%', '35%', '45%'].every((p) => withholdingPage.raw.includes(`>${p}<`)), '');
+        record('劳务报酬落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('?source=seo_withholding'), '');
+        const registryJs = await request(PORT, 'GET', '/src/js/calculation/tax-registry.js');
+        record('税种注册表登记了劳务报酬页与政策文号（页面只呈现、不自己写口径）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'withholding'")
+            && registryJs.raw.includes("page: '/seo/labor-withholding.html'")
+            && registryJs.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;

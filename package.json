@@ -1,6 +1,6 @@
 {
   "name": "EuriskoTax",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build": "echo 'Build complete - all files ready to deploy'",
@@ -30,6 +30,8 @@
       "src/js/calculation/bonus-tax-quick.js",
       "src/js/calculation/salary-tax-quick.js",
       "src/js/calculation/annual-settlement-quick.js",
+      "src/js/calculation/withholding-quick.js",
+      "src/js/calculation/tax-registry.js",
       "src/js/data/scenario-store.js",
       "src/js/data/tax-rates-sync.js",
       "src/js/ui/scenario-ui.js",

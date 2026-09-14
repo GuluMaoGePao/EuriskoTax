@@ -7,8 +7,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const rateLimit = require('express-rate-limit');
 
 const logger = require('./middleware/logger');
-const { errorHandler, notFound } = require('./middleware/error');
-const authRoutes = require('./routes/auth');
+const { errorHandler, notFound } = require('./middleware/error');const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');

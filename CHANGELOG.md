@@ -7,11 +7,34 @@
 
 ---
 
+## [1.18.0] - 2026-09-14（阶段15 开局：15D-1 税种注册表 + 15A-1 第四个 SEO 落地页「劳务报酬 / 稿酬 / 特许权使用费预扣预缴」）
+
+> 门禁基线：**verify:local 172 项，实跑 172/172 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版新增 5 项断言：劳务报酬落地页可访问性与结构化数据 1 项 + 静态预扣率表与常量逐档对账 1 项 + 静态示例表与年度税率表可读 1 项 + CTA 归因 1 项 + 税种注册表登记页与政策文号 1 项；项数 167 → 172，以实跑为准。
+> 单测 **30 套件 595 例**（新增 `tests/withholding-quick.test.js` 16 例 + `tests/tax-registry.test.js` 9 例）。
+> 线上指纹 **37 项**（本版不改动指纹覆盖点）。
+> 本版不动税额算法：把 20/30/40 三档预扣率与「≤4000 减 800」规则从内核搬进 `tax-constants.js` 后，由逐点对拍证明内核结果未变（见下方「说明」）。
+
+### 新增
+- **第四个 SEO 落地页 `/seo/labor-withholding.html`（劳务报酬 / 稿酬 / 特许权使用费预扣预缴）**：瞄准「劳务报酬个税怎么算 / 800 元扣除 / 20%30%40% 预扣率 / 稿酬 14%」这一簇高商业意图长尾词；页面自带速算器（选择所得类型 + 输入金额 + 选择全年综合所得适用税率档 → 应纳税所得额 / 预扣预缴税额 / 预扣后到手 / 并入综合所得后的估算税负与应退或应补）
+- 把「预扣 vs 并入」讲成一道减法：**预扣预缴是支付方先扣的数，年度汇算时按收入额并入综合所得重新计税**，差额正应补、负应退；页面如实说明并入后的实际税负取决于全年收入与扣除，精确值需把全年收支填进 App（用「全年综合所得适用税率档」做估算，估算口径写在页面上而不是藏在代码里）
+- **15D-1 税种注册表 `src/js/calculation/tax-registry.js`**：单点定义各税种的适用范围、生效期、**到期日**与政策依据文号（当前登记综合所得、劳务/稿酬/特许权预扣、全年一次性奖金、汇算清缴四条），提供 `get` / `basisOf` / `resolveParams` / `statusOf` / `expiringWithin`；**数值仍留在 `tax-constants.js`**（出厂基线 + 管理台热改），注册表只记「参数在哪个全局量里」，避免为统一口径而复制出第二份数字；到期提醒（`expiringWithin`）让「年终奖单独计税执行至 2027-12-31」这类会过期的口径不再靠人记
+- 常量新增 `withholdingTaxRates`（20/30/40 三档 + 稿酬与特许权 20%）与 `otherIncomeRules`（费用扣除 + 稿酬七折 + 并入综合所得的收入额折算），供内核与落地页共用
+
+### 变更
+- 内核 `calculateOtherIncome` 改为读上述常量（原先硬编码 20% / 30% / 40% 与「≤4000 减 800」）；落地页走同源的 `withholding-quick.js` —— 两个页面从此不可能给出两种结论
+- `sitemap.xml` 收录 `/seo/labor-withholding.html`；`server/src/controllers/leadController.js` 的 `SOURCES` 白名单新增 `seo_withholding`（进 App 的链接带 `?source=seo_withholding`，留资可在管理台按来源区分）
+- 门禁新增 5 条断言（见上行基线说明），并把「sitemap 收录全部落地页」扩为含第四个页面；`verify:local` 的静态对账对象由「页面抄一份税率表」改为「页面表格 ←→ 常量文件」，抄错即红
+
+### 说明
+- **常量搬家以对拍证明等价**：`tests/withholding-quick.test.js` 在费用扣除临界点（800 / 4000）与预扣率分界（应纳税所得额 20000 / 50000，对应收入 25000 / 62500）及其 ±1 元、档内采样、非法输入上，把轻量实现与内核 `calculateOtherIncome` 逐点比对；三张静态表（预扣率表 / 年度税率表 / 示例表）也逐格回对常量与内核，页面不维护第二份口径
+- **政策文号与到期日不再散落在页面里**：`tests/tax-registry.test.js` 钉住「注册表 → 常量（params 声明的全局量必须取得到，写错常量名不会静默变 0）」「注册表 → 页面（登记了落地页的条目，页面正文至少含一条注册表里的政策文号）」「注册表 → sitemap（登记页必须已收录）」，以及年终奖页正文的到期日与注册表一致
+- 本次未把新常量纳入 `tax-rates-sync.js` 的后端热改字段（2019 年至今未调整，属长期稳定参数）；若调整，按 15D-3 多税种版本化扩进 `/api/config/tax-rates`
+
 ## [1.17.0] - 2026-09-13（产品方向调整：取消计算页「参保城市」选择，回到默认基数 + 用户自改；省市改由留资收集）
 
 > 门禁基线：**verify:local 167 项，实跑 167/167 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版新增：移除已下线前端模块的 6 项静态断言；新增「城市改在留资里」5 项 + 「省份随城市一起落库（采集剔除哨兵值 + 按省搜索命中）」2 项 + 「缴费比例可输入 / 留空越界兜底」2 项 + 「经营页基数 × 比例联动」1 项断言。**口径修正**：文档曾按「基线 + 新增项」推算为 164，与实跑不符（少 1 项），现按实跑值回填 —— 该项数一律以实跑快照为准，不做推算。
 > 生产等价演练：本版动过 `schema.prisma` 与 `server/prisma/migrations/`，按 `docs/guides/development-workflow.md` 属**必跑** `npm run verify:pg` 的范围 —— 已于 2026-09-13 在本机装好 Docker Desktop（4.90.0 / 引擎 29.7.2 / Compose v5.5.1，WSL2 后端）并**实跑通过：167/167 全绿**（与线上容器同序：`generate` → `migrate deploy` → 内容种子 → 起服务），迁移 `20260913_add_lead_city` 与 `20260913_add_lead_province` 均已在生产等价 PostgreSQL 上验收；此前记的「本机未装 Docker、尚未执行」按实跑结果更正。同批做的离线等价核对：两份 schema 各自 `prisma validate` 通过（`schema.prisma` 需给 PG 形状的 `DATABASE_URL`，本地 `.env` 的 `file:./dev.db` 会触发 URL 协议不匹配，属既有约定）、两份 `Lead` 模型逐字段一致（`province String @default("")` + `city String @default("")`）、两条迁移 SQL 都是纯加列语句（`ALTER TABLE "Lead" ADD COLUMN "city"/"province" TEXT NOT NULL DEFAULT ''`，带非空默认值，PG 对存量行安全 —— 存量线索的 `province` 落到空串，顾问侧表现为「只知城市、不知省份」，不会误判成某个省）；SQLite 侧的省 / 市落库、按城市与按省份搜索、CSV 省市两列已由 `verify:local` 实跑覆盖。**改动迁移时随时可重跑 `npm run verify:pg`**（全新库首部署场景用 `verify:pg:fresh`；演练库端口 55432、容器 `euriskotax-pg-drill`，跑完只停容器、数据卷 `pg_drill_data` 保留，彻底清理用 `docker compose -f docker-compose.postgres.yml down -v`）。注意 `verify:pg` 会把 Prisma Client 切成 PG 形态，收尾若报「恢复 SQLite Client 失败」需手动 `cd server && npm run prisma:generate:dev`（本次已手动恢复）。
-> 单测 **28 套件 570 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增省 / 市字段契约 4 例（城市 2 + 省份 2），搜索字段扩为五字段同步 1 例）。
+> 单测 **30 套件 595 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增省 / 市字段契约 4 例（城市 2 + 省份 2），搜索字段扩为五字段同步 1 例）。
 > 线上指纹 **37 项**（本版不改动指纹覆盖点）。
 > 本版不动税率与税额算法：只调整「谁来提供城市」与字段链路。
 

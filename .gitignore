@@ -32,6 +32,8 @@ dev-account.local.json
 logs/
 *.log
 npm-debug.log*
+# 本地起后端时重定向出来的输出（server-dev.log 已被 *.log 覆盖）
+server-dev.err
 
 # Build outputs
 dist/

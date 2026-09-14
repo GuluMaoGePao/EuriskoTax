@@ -59,6 +59,47 @@ var classificationTaxRates = {
     accidental: { rate: 0.20, name: '偶然所得' }
 };
 
+// 劳务报酬 / 稿酬 / 特许权使用费 —— 预扣预缴税率表（阶段15 15A-1）
+//
+// 政策依据：《个人所得税扣缴申报管理办法（试行）》（国家税务总局公告 2018 年第 61 号）第八条、第九条
+//   - 劳务报酬：按「应纳税所得额」适用 20% / 30% / 40% 三级超额累进（速算扣除数 0 / 2000 / 7000）
+//   - 稿酬、特许权使用费：预扣率固定 20%（单档，便于与劳务共用同一套查表代码）
+//
+// 为什么把「20/30/40」从 tax-calculator.js 里搬出来：
+//   阶段15 的落地页要在页面上算同一笔税，若页面抄一份、内核留一份，就是第二处口径。
+//   搬到这里后，内核 calculateOtherIncome 与 withholding-quick.js 读同一份，
+//   由 tests/withholding-quick.test.js 逐点对拍证明二者等价。
+//   （未纳入 tax-rates-sync.js 的后端热改字段：这三个预扣率自 2019 年起未调整，
+//     属「长期稳定参数」；若哪天调整，按 15D-3 的多税种版本化扩进 /api/config/tax-rates。）
+var withholdingTaxRates = {
+    labor: [
+        { max: 20000, rate: 0.20, deduction: 0 },
+        { max: 50000, rate: 0.30, deduction: 2000 },
+        { max: Infinity, rate: 0.40, deduction: 7000 }
+    ],
+    author: [
+        { max: Infinity, rate: 0.20, deduction: 0 }
+    ],
+    royalty: [
+        { max: Infinity, rate: 0.20, deduction: 0 }
+    ]
+};
+
+// 劳务报酬 / 稿酬 / 特许权使用费 —— 费用扣除与「并入综合所得」折算规则（阶段15 15A-1）
+//
+//   threshold / flat / ratio：预扣预缴阶段的费用扣除
+//       收入 ≤ 4000 → 减除费用 800；收入 > 4000 → 减除 20%
+//   postRatio：费用扣除后再打的折（稿酬再减按 70% 计算，即「打七折」）
+//   incomeRatio：年度汇算并入综合所得时的收入额折算（劳务 / 特许权 80%，稿酬 80% × 70% = 56%）
+//
+// 字段刻意拆开而不是直接写死 0.56：三个所得的差别只在 postRatio，
+//   拆分后内核与落地页共用同一个表达式，不会出现「页面按 56%、内核按 0.8×0.7」这类表述差异。
+var otherIncomeRules = {
+    labor: { name: '劳务报酬所得', threshold: 4000, flat: 800, ratio: 0.8, postRatio: 1, incomeRatio: 0.8 },
+    author: { name: '稿酬所得', threshold: 4000, flat: 800, ratio: 0.8, postRatio: 0.7, incomeRatio: 0.8 },
+    royalty: { name: '特许权使用费所得', threshold: 4000, flat: 800, ratio: 0.8, postRatio: 1, incomeRatio: 0.8 }
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -84,6 +125,8 @@ window.EuriskoTaxConstants = {
     bonusMonthlyTaxRates: bonusMonthlyTaxRates,
     businessTaxRates: businessTaxRates,
     classificationTaxRates: classificationTaxRates,
+    withholdingTaxRates: withholdingTaxRates,
+    otherIncomeRules: otherIncomeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

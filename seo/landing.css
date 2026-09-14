@@ -122,6 +122,9 @@ p { margin: 0 0 14px; }
 
 .calc-input:focus { outline: 2px solid #bfdbfe; border-color: var(--brand); }
 
+/* 下拉（劳务报酬页的「所得类型 / 全年适用税率档」）：与输入框同一视觉，去掉系统描边 */
+select.calc-input { appearance: none; -webkit-appearance: none; background: #fff; cursor: pointer; }
+
 .results {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

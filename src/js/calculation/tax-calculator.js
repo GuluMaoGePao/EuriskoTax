@@ -128,40 +128,58 @@ function safeSetClass(id, className) {
     }
 }
 
-// 计算劳务报酬、稿酬、特许权使用费所得
+// 计算劳务报酬、稿酬、特许权使用费所得（预扣预缴口径）
+//
+// 阶段15 15A-1：三档预扣率与费用扣除规则不再写在本函数里，改读 tax-constants.js 的
+//   withholdingTaxRates / otherIncomeRules —— 与 /seo/labor-withholding.html 的
+//   withholding-quick.js 同源（由 tests/withholding-quick.test.js 逐点对拍守护）。
+//   算法本身未变：≤4000 减 800、>4000 减 20%；稿酬在费用扣除后再减按 70% 计算。
 function calculateOtherIncome(annualLaborIncome, annualAuthorIncome, annualRoyaltyIncome) {
-    // 计算劳务报酬所得
-    const laborTaxableIncome = annualLaborIncome <= 4000 
-        ? Math.max(0, annualLaborIncome - 800) 
-        : Math.max(0, annualLaborIncome * 0.8);
-    let laborTax = 0;
-    if (laborTaxableIncome <= 20000) {
-        laborTax = laborTaxableIncome * 0.2;
-    } else if (laborTaxableIncome <= 50000) {
-        laborTax = laborTaxableIncome * 0.3 - 2000;
-    } else {
-        laborTax = laborTaxableIncome * 0.4 - 7000;
+    // 单一所得：费用扣除 →（稿酬再打七折）→ 查预扣率表
+    function withholdOf(amount, type) {
+        const rule = (typeof otherIncomeRules !== 'undefined' ? otherIncomeRules : {})[type];
+        const threshold = rule ? rule.threshold : 4000;
+        const flat = rule ? rule.flat : 800;
+        const ratio = rule ? rule.ratio : 0.8;
+        const postRatio = rule ? rule.postRatio : 1;
+        const incomeRatio = rule ? rule.incomeRatio : 0.8;
+        const income = Number(amount) || 0;
+        if (income <= 0) return { incomeAmount: 0, taxableIncome: 0, tax: 0 };
+
+        // 费用扣除（与常量同源：≤4000 减 800；>4000 减 20%）
+        const afterExpense = income <= threshold ? Math.max(0, income - flat) : Math.max(0, income * ratio);
+        const taxableIncome = Math.max(0, afterExpense * postRatio);
+        // 预扣率表：劳务 20/30/40 三档，稿酬与特许权使用费固定 20%
+        const rows = (typeof withholdingTaxRates !== 'undefined' ? withholdingTaxRates : {})[type] || [];
+        let tax = 0;
+        for (const bracket of rows) {
+            if (taxableIncome <= bracket.max) {
+                tax = taxableIncome * bracket.rate - bracket.deduction;
+                break;
+            }
+        }
+        return {
+            incomeAmount: income * incomeRatio * postRatio,   // 年度汇算并入综合所得的收入额
+            taxableIncome,
+            tax: Math.max(0, tax)
+        };
     }
 
-    // 计算稿酬所得
-    const authorTaxableIncome = annualAuthorIncome <= 4000 
-        ? Math.max(0, (annualAuthorIncome - 800) * 0.7) 
-        : Math.max(0, annualAuthorIncome * 0.8 * 0.7);
-    const authorTax = authorTaxableIncome * 0.2;
-
-    // 计算特许权使用费所得
-    const royaltyTaxableIncome = annualRoyaltyIncome <= 4000 
-        ? Math.max(0, annualRoyaltyIncome - 800) 
-        : Math.max(0, annualRoyaltyIncome * 0.8);
-    const royaltyTax = royaltyTaxableIncome * 0.2;
+    const labor = withholdOf(annualLaborIncome, 'labor');
+    const author = withholdOf(annualAuthorIncome, 'author');
+    const royalty = withholdOf(annualRoyaltyIncome, 'royalty');
 
     return {
-        laborTaxableIncome,
-        laborTax,
-        authorTaxableIncome,
-        authorTax,
-        royaltyTaxableIncome,
-        royaltyTax
+        laborTaxableIncome: labor.taxableIncome,
+        laborTax: labor.tax,
+        authorTaxableIncome: author.taxableIncome,
+        authorTax: author.tax,
+        royaltyTaxableIncome: royalty.taxableIncome,
+        royaltyTax: royalty.tax,
+        // 并入综合所得的收入额（劳务 / 特许权 80%，稿酬 56%）—— 年度汇算与展示共用
+        laborIncomeAmount: labor.incomeAmount,
+        authorIncomeAmount: author.incomeAmount,
+        royaltyIncomeAmount: royalty.incomeAmount
     };
 }
 
