@@ -34,8 +34,12 @@ EuriskoTax/
 │   │   ├─ stage10-free-pro-plan.md   ← 阶段10 免费/专业版实施方案（2026-09-07 新增）
 │   │   └─ file-management-policy.md  ← ⭐ 本文档（你正在看的这个）
 │   │
-│   ├─ marketing/                     ← 🟢 推广运营素材
-│   │   └─ cold-start-materials.md    ← 冷启动多渠道文案（注册引导随版本同步）
+│   ├─ marketing/                     ← 🟢 推广运营素材 / 商业企划
+│   │   ├─ cold-start-materials.md    ← 冷启动多渠道文案（注册引导随版本同步）
+│   │   ├─ business-plan-for-partners.md ← 合伙人版商业企划（战略 / 盈利模式 / 路线图 / 财务假设，2026-09-14 新增）
+│   │   ├─ gtm-execution-plan.md      ← 商业模式落地执行手册（Go/No-Go · 90 天节奏 · 指标看板 · 线索 SOP，2026-09-14 新增）
+│   │   ├─ business-plan-for-partners.docx ← 合伙人版 Word 发送版（**导出件、非真源**）
+│   │   └─ gtm-execution-plan.docx    ← 手册 Word 发送版（同上，由 `tools/ops/ops-md2docx.py` 导出；改内容改 `.md` 后重新导出，勿在 Word 里直接改）
 │   │
 │   ├─ reports/                       ← 测试报告 / 交付清单 / 性能
 │   │   ├─ test-report.md
@@ -75,6 +79,7 @@ EuriskoTax/
     └─ ops/                           ← ops-* 前缀：运维脚本
         ├─ ops-start-dev.ps1 / ops-watchdog.ps1 / ops-deploy.ps1 / ops-notify.ps1
         ├─ get-token.ps1 / debug-swagger.ps1 / __test-mail-spam-harness.ps1
+        ├─ ops-md2docx.py             ← Markdown → Word 发送版导出（Python，依赖 python-docx；真源是 .md）
         ├─ README.md                  ← 工具内 README
         ├─ ops-deploy.config.example.json / ops-notify-templates.json / ops-notify-reason-map.json
         └─ *.log                      ← ⚠ 历史遗留（过渡期保留，下次修改脚本迁到 logs/）
@@ -93,6 +98,7 @@ EuriskoTax/
 | 开发计划 / 规范 / 工程决策 | `docs/development/` | `<主题>-plan.md` / `<主题>-policy.md` | `file-management-policy.md` |
 | 测试 / 交付 / 性能**报告** | `docs/reports/` | `<主题>-report.md` / `<主题>-checklist.md` | `test-report.md`、`final-delivery-checklist.md` |
 | 技术专题 / 排查记录 / SOP | `docs/tech-reports/` | `<主题>-guide.md` / `<主题>-spec.md` / `debug-<主题>.md` | `watchdog-deployment-guide.md`、`watchdog-notification-and-event-log-spec.md` |
+| 商业企划 / 推广运营 | `docs/marketing/` | `<主题>-plan.md` / `<主题>-materials.md` | `business-plan-for-partners.md`、`gtm-execution-plan.md`、`cold-start-materials.md` |
 | 账号密码 / 密钥 / 部署凭证 | `docs/admin/` | `<主题>-credentials.md` | `account-credentials.md` |
 
 ### 2.2 允许的例外（.md 不在 docs/ 下的白名单）
@@ -147,6 +153,7 @@ EuriskoTax/
 | 临时诊断脚本 | 任意相关目录 | `diag-` 或 `__test-` | `images/diag-scrollbar.ps1`、`ops/__test-mail-spam-harness.ps1` |
 | 批处理入口 | `tools/gui/` / 根分发点 | 中文语义名，前缀 `EuriskoTax-` | `EuriskoTax-Console.bat`、`EuriskoTax-创建桌面快捷方式.bat` |
 | 图片构建脚本 | `images/` | `build-` / `diag-` | `images/build-zoomed-logo.ps1` |
+| 文档导出脚本 | `tools/ops/` | `ops-md2docx.py`（Python，非主项目依赖） | `ops-md2docx.py`（Markdown → Word 发送版） |
 
 ### 4.2 编码（Hard Constraints）
 
@@ -155,7 +162,7 @@ EuriskoTax/
 | `.ps1` (PowerShell) | **UTF-8 with BOM**（首 3 字节 `EF BB BF`） | PowerShell 5.1 无 BOM → 中文字符解码乱码 |
 | `.bat` / `.cmd` | **GBK**（ANSI/OEM，CP936） | Windows cmd.exe 默认 GBK 解析 |
 | `.json` | UTF-8 (无 BOM) | JSON 标准 |
-| `.md` / `.js` / `.html` / `.css` | UTF-8 (无 BOM) | 跨平台通用 |
+| `.md` / `.js` / `.html` / `.css` / `.py` | UTF-8 (无 BOM) | 跨平台通用 |
 
 ### 4.3 Edit 工具丢失 BOM 陷阱（⚠ 高优先级经验）
 
@@ -274,4 +281,6 @@ logs/
 | 2026-08-16 | 1.0 | 首次发布。固化目录结构；修复 4 份零散文件位置（`account-credentials.md → docs/admin/`、`debug-mail-spam.md → docs/tech-reports/`、清理根目录冗余 3 个 .log、建立 `logs/` 目录说明）；新增 `.ps1` BOM 验证 SOP；新增 GUI 按钮路径联动清单 |
 | 2026-09-06 | 1.1 | 目录树同步 v1.4.0 事实：~~`zeabur.json`~~ → `Dockerfile`（Zeabur 部署入口）、新增 `manifest.json` / `service-worker.js`（PWA）、新增 `docs/marketing/`、后端描述 Koa → Express |
 | 2026-09-07 | 1.2 | 目录树登记新文件：`docs/development/stage10-free-pro-plan.md`（阶段10 方案，属 `development/` 规划类）、`docs/guides/development-workflow.md`（guides 漏登记的历史遗漏一并补录）；`index.html` / `service-worker.js` 注释由"v1.4.0 PWA"更新为 v1.5.2+ 网络优先瘦缓存策略 |
+| 2026-09-14 | 1.4 | 登记导出工具 `tools/ops/ops-md2docx.py`（Markdown → Word 发送版，Python + python-docx）与两份 `.docx` 导出件（`business-plan-for-partners.docx` / `gtm-execution-plan.docx`，均为**非真源**）；§4.1/§4.2 补充 `.py` 脚本归属与编码规范；目录树 `marketing/` 与 `tools/ops/` 同步 |
 | 2026-09-07 | 1.3 | 文档去重合并：`debug-mail-spam.md` 内容并入 `docs/tech-reports/watchdog-notification-and-event-log-spec.md` §8（已知问题与排查，会话 OPEN），原文件删除；目录树与 §2.1 分类表示例同步；`watchdog-notification-and-event-log-spec.md` 升 v4.0、`watchdog-deployment-guide.md` 升 v1.3（通知策略与规范对齐为 URL_CREATED + URL_CHANGED 双事件） |
+| 2026-09-14 | 1.4 | 登记营销侧新增文档：`docs/marketing/business-plan-for-partners.md`（合伙人版商业企划）+ `docs/marketing/gtm-execution-plan.md`（90 天落地执行手册）；§2.1 分类表补 `docs/marketing/` 一行（该目录此前只存在于目录树、未入分类表）；目录树同步 |
