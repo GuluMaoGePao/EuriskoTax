@@ -18,6 +18,7 @@
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
+| `ops-md2docx.py` | **Markdown → Word 发送版导出**（`docs/marketing/*.md` → 同名 `.docx`；需 Python + `pip install python-docx`） | ✅ |
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
 | `ops-deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
@@ -120,6 +121,24 @@ npm run verify:pg:fresh
 > ④ 停掉本地 `:3000` 后端（会锁 Prisma 引擎 DLL，不停会 `EPERM`）。
 > 未装 Docker 时脚本**优雅退出（退出码 2）**并给出提示，不影响日常 `verify:local`。
 > 收尾会把 Prisma Client 自动恢复为 SQLite 版本，避免影响后续本地开发。
+
+### 导出 Word 发送版（对外发送用）
+
+```powershell
+# 导出合伙人版商业企划（默认输出同名 .docx）
+python tools\ops\ops-md2docx.py docs\marketing\business-plan-for-partners.md
+
+# 导出 90 天落地执行手册
+python tools\ops\ops-md2docx.py docs\marketing\gtm-execution-plan.md
+```
+
+> **真源是 `.md`**：`.docx` 永远是导出件 —— 改内容请改 Markdown 后重新导出，不要在 Word 里改。
+> 封面/目录/页眉页脚/表格样式/页码由脚本统一生成，保证两份文档风格一致。
+> 依赖：`pip install python-docx`（仅导出时需要，主项目运行不需要）。
+>
+> md 里可用三个可选标记控制导出结果：
+> `<!-- subtitle: 副标题 -->`、`<!-- notice: 封面底部提示 -->`、
+> `<!-- export:skip --> … <!-- /export:skip -->`（包住只在仓库里看、不进 Word 的内部元信息）。
 
 ### 一键部署到服务器
 
