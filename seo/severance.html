@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-3）：高商业意图长尾词「离职补偿金个税 / 经济补偿金怎么交税 / 经济补偿金免税额度」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（severance-quick.js + window.comprehensiveTaxRates
+              / window.severanceRules），页面上不出现第二份税率表；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页额外背一条「纠错」任务：网上大量计算器仍按国税发〔1999〕178 号把补偿金除以
+         工作年限（≤12）平均成月工资再计税，该做法自 2019 年起已不再执行，本页必须讲清。 -->
+    <title>离职补偿金个税计算器 2026：经济补偿金免税额度（3 倍社平工资）与超过部分怎么算</title>
+    <meta name="description" content="输入经济补偿金、其他一次性补助、当地上年职工年平均工资与工作年限，算出 3 倍社平工资免税额度、法定经济补偿上限（12 年 / 3 倍月工资封顶）与单独计税应纳税额，并对照「若并入当年综合所得」的差异。含年度税率表与公开案例。政策依据：财税〔2018〕164 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/severance.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="离职补偿金个税计算器 2026：经济补偿金免税额度与超过部分怎么算">
+    <meta property="og:description" content="输入补偿金额与当地社平工资，立即算出 3 倍社平工资免税额度与单独计税应纳税额。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/severance.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 离职补偿金个税计算器",
+                "url": "https://euriskotax.zeabur.app/seo/severance.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "计算解除劳动关系一次性补偿收入的 3 倍社平工资免税额度、法定经济补偿上限与单独计税应纳税额。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "离职补偿金（经济补偿金）怎么交个税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "个人与用人单位解除劳动关系取得一次性补偿收入（经济补偿金、生活补助费和其他补助费），在当地上年职工平均工资 3 倍数额以内的部分免征个人所得税；超过 3 倍数额的部分，不并入当年综合所得，单独适用综合所得税率表计算纳税，且不减除任何费用。依据财税〔2018〕164 号第五条第一项。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "免税的「3 倍社平工资」按年算还是按月算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "按当地上年职工年平均工资的 3 倍计算，不是月平均工资的 3 倍。各地公布口径不同：按年公布的直接用年值 × 3，按月公布的需先换算成年平均（月均值 × 12）再 × 3。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "「12 年」是怎么回事？是把补偿金除以 12 再算税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不是。12 年是《劳动合同法》第四十七条对经济补偿金本身的封顶：劳动者月工资高于当地上年度职工月平均工资 3 倍的，按 3 倍计，且支付年限不超过 12 年 —— 它决定你能合法拿多少补偿。计税时不再做任何平均：国税发〔1999〕178 号「按工作年限平均为月工资收入」的做法自 2019 年起已不再执行，超额部分直接按年度综合所得税率表计税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "超出法定标准发放的补偿（如违法解除的赔偿金）能享受免税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。免税额度只能抵「符合法定标准的补偿」部分；超出法定经济补偿标准发放的部分，无论是否超过 3 倍社平工资，都要照章计税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "一次性补偿收入要并入当年综合所得吗？会影响年终奖和汇算吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不并入。解除劳动关系取得的一次性补偿收入超过免税额度的部分，不并入当年综合所得，单独适用综合所得税率表计税，因此不会把你全年工资的适用档位推高，也不参与年终奖单独计税的选择；该笔税款由扣缴义务人单独申报缴纳。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；经济补偿的法定标准、当地社平工资口径若与主管税务机关认定不一致，以税务部门核定为准。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_severance">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>离职补偿金个税怎么算：3 倍社平工资免税额度与超过部分的单独计税</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>个人与用人单位<strong>解除劳动关系</strong>取得一次性补偿收入
+            （经济补偿金、生活补助费和其他补助费），在<strong>当地上年职工平均工资 3 倍</strong>数额以内的部分
+            <strong>免征个人所得税</strong>；<strong>超过 3 倍数额的部分，不并入当年综合所得，单独适用综合所得税率表</strong>
+            计算纳税，且<strong>不减除任何费用</strong>。
+            政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第五条第一项（<strong>财税〔2018〕164 号</strong>）。
+            另外两条最容易被搞混：<strong>「12 年」封的是补偿金本身，不是计税方法</strong>；
+            <strong>免税额度只能抵符合法定标准的补偿</strong> —— 详见下方两节。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">离职补偿金个税速算（免税额度 + 单独计税）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="eco-input">经济补偿金（元）</label>
+                    <input class="calc-input" id="eco-input" type="number" inputmode="decimal" min="0" step="10000" value="280000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="other-input">其他一次性补助（医疗补助费等，元）</label>
+                    <input class="calc-input" id="other-input" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="avgwage-input">当地上年职工年平均工资（元/年）</label>
+                    <input class="calc-input" id="avgwage-input" type="number" inputmode="decimal" min="0" step="10000" value="50000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="years-input">在本单位工作年限（年）</label>
+                    <input class="calc-input" id="years-input" type="number" inputmode="decimal" min="0" step="1" value="14" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="wage-input">离职前 12 个月月平均工资（元）</label>
+                    <input class="calc-input" id="wage-input" type="number" inputmode="decimal" min="0" step="1000" value="20000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 240px">
+                    <label class="calc-label" for="othertaxable-input">全年其他综合所得应纳税所得额（元，对照用）</label>
+                    <input class="calc-input" id="othertaxable-input" type="number" inputmode="decimal" min="0" step="10000" value="100000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                社平工资请填当地人社 / 统计部门公布的<strong>上年职工年平均工资</strong>（按月公布的请先 × 12）；
+                月平均工资用于判断《劳动合同法》的封顶，填 0 表示<strong>不校验法定上限</strong>（此时全额补偿视为符合法定标准）。
+                「并入综合所得」一栏是<strong>假设口径的对照值</strong> —— 现行政策是「不并入」，不是「可选并入」。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">补偿总额</div>
+                    <div class="v" id="r-amount">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">法定经济补偿上限（12 年 / 3 倍月工资封顶）</div>
+                    <div class="v" id="r-legalcap">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">免税额度（3 倍社平工资）</div>
+                    <div class="v" id="r-exemptcap">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">实际可免税金额</div>
+                    <div class="v" id="r-exemptused">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">应纳税所得额（超过免税部分）</div>
+                    <div class="v" id="r-taxable">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">适用税率 / 速算扣除数</div>
+                    <div class="v" id="r-bracket">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">应纳个人所得税</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">税后到手 / 实际税负率</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">若并入当年综合所得（对照）</div>
+                    <div class="v" id="r-merged">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">两者差额</div>
+                    <div class="v" id="r-gap">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三道 3 倍 / 12 年」「年度税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>三道「3 倍 / 12 年」别搞混</h2>
+        <div class="table-scroll">
+            <table id="cap-table">
+                <thead>
+                <tr>
+                    <th scope="col">规则</th>
+                    <th scope="col">依据</th>
+                    <th scope="col">作用</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>经济补偿的月工资上限：月工资高于当地上年度职工月平均工资 3 倍的按 3 倍计</td><td>《劳动合同法》第四十七条</td><td>决定你能<strong>合法拿多少</strong>经济补偿</td></tr>
+                <tr><td>经济补偿的支付年限上限：最高不超过 12 年</td><td>《劳动合同法》第四十七条</td><td>决定你能<strong>合法拿多少</strong>经济补偿</td></tr>
+                <tr><td>个税免税额度：当地上年职工<strong>年平均</strong>工资 × 3</td><td>财税〔2018〕164 号第五条第一项</td><td>决定<strong>多少不用交税</strong></td></tr>
+                <tr><td>旧计税方法：补偿金 ÷ 工作年限（最长 12）平均为月工资后再查月度税率表</td><td>国税发〔1999〕178 号</td><td><strong>自 2019 年起不再执行</strong>，不得再照抄</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            一句话记住：<strong>12 年封的是「补偿」，3 倍社平免的是「税」，计税时不做任何平均</strong>。
+            超额部分直接按下面的年度税率表定档。
+        </p>
+
+        <h2>年度综合所得税率表（超额部分就查这张表）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">超过免税额度的部分全额适用本表，按「应纳税所得额 × 税率 − 速算扣除数」计税，不减除费用</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：三种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">补偿总额（元）</th>
+                    <th scope="col">免税额度（元）</th>
+                    <th scope="col">应纳税所得额（元）</th>
+                    <th scope="col">应纳税额（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>补偿 6 万（10 年、月薪 6000），当地上年社平 5 万 —— 未超免税额度</td><td class="num">60000.00</td><td class="num">150000.00</td><td class="num">0.00</td><td class="num">0.00</td></tr>
+                <tr><td>经济补偿 12 万 + 医疗补助 10 万（20 年、月薪 6000），社平 5 万</td><td class="num">220000.00</td><td class="num">150000.00</td><td class="num">70000.00</td><td class="num">4480.00</td></tr>
+                <tr><td>经济补偿 28 万（14 年、月薪 2 万），社平 5 万 —— 月工资与年限双封顶</td><td class="num">280000.00</td><td class="num">150000.00</td><td class="num">130000.00</td><td class="num">10480.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），
+            并由 <code>tests/severance-quick.test.js</code> 与 App 内核逐点对拍守护。
+            第三种情形里，法定经济补偿上限（12500 × 12 = 15 万）远低于实际发放的 28 万，
+            超出的 13 万<strong>不享受免税额度</strong>，与免税额度一起正好落在这两个数上。
+        </p>
+
+        <h2>不并入 vs 并入：差额有多大</h2>
+        <p>
+            现行政策下一次性补偿收入<strong>不并入</strong>当年综合所得，所以下面这张表是<strong>对照</strong>：
+            以第三种情形（应纳税所得额 13 万）为例，假设当年其他综合所得应纳税所得额为 100000 元：
+        </p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr><th scope="col">口径</th><th scope="col">计算方式</th><th scope="col">应纳税额（元）</th></tr>
+                </thead>
+                <tbody>
+                <tr><td>不并入（现行）</td><td>补偿 13 万单独按年度表计税 + 其他综合所得 10 万按年度表计税</td><td class="num">17960.00</td></tr>
+                <tr><td>并入综合所得（对照）</td><td>合计 23 万按年度表一次计税</td><td class="num">29080.00</td></tr>
+                <tr><td>差额</td><td>并入后更高 —— 合并把全年应纳税所得额推到了 20% 档</td><td class="num">11120.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            结论方向：<strong>不并入通常更省</strong>，因为它不会把你全年工资的适用档位推高。
+            判断的关键仍是把两种口径都算一遍，<a href="/?source=seo_severance">在 App 里填一次全年收支</a>可以看到完整结果。
+        </p>
+
+        <h2>两条容易踩的口径</h2>
+        <h3>1. 免税额度只能抵「符合法定标准」的补偿</h3>
+        <p>
+            免税额度不是「总额减 3 倍社平」这么简单：<strong>超出法定经济补偿标准发放的部分</strong>
+            （例如违法解除按 2N 支付、或协商金额高于法定标准的部分），
+            <strong>无论是否超过 3 倍社平工资，都不得免税</strong>。
+            这也是本页把「经济补偿金」与「其他一次性补助」拆成两个输入框的原因 ——
+            其他补助费（医疗补助费、生活补助费等）法定只设下限，实际支付数通常按实际数认可。
+        </p>
+        <h3>2. 「÷ 工作年限平均」的旧算法已不再执行</h3>
+        <p>
+            <strong>国税发〔1999〕178 号</strong>曾允许把一次性补偿收入除以工作年限（超过 12 年按 12 年）
+            平均为月工资收入后计税；<strong>自 2019 年起该做法不再执行</strong> ——
+            财税〔2018〕164 号改为超额部分<strong>直接单独适用综合所得年度税率表</strong>。
+            因此照抄旧算法会明显低估税负：同样 13 万元，旧算法先除以 12 再定档几乎不交税，
+            现行口径下则是 130000 × 10% − 2520 = <strong>10480 元</strong>。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>离职补偿金（经济补偿金）怎么交个税？</summary>
+            <p>个人与用人单位解除劳动关系取得一次性补偿收入（经济补偿金、生活补助费和其他补助费），在当地上年职工平均工资 3 倍数额以内的部分免征个人所得税；超过 3 倍数额的部分，不并入当年综合所得，单独适用综合所得税率表计算纳税，且不减除任何费用。依据财税〔2018〕164 号第五条第一项。</p>
+        </details>
+        <details>
+            <summary>免税的「3 倍社平工资」按年算还是按月算？</summary>
+            <p>按当地上年职工年平均工资的 3 倍计算，不是月平均工资的 3 倍。各地公布口径不同：按年公布的直接用年值 × 3，按月公布的需先换算成年平均（月均值 × 12）再 × 3。</p>
+        </details>
+        <details>
+            <summary>「12 年」是怎么回事？是把补偿金除以 12 再算税吗？</summary>
+            <p>不是。12 年是《劳动合同法》第四十七条对经济补偿金本身的封顶：劳动者月工资高于当地上年度职工月平均工资 3 倍的，按 3 倍计，且支付年限不超过 12 年 —— 它决定你能合法拿多少补偿。计税时不再做任何平均：国税发〔1999〕178 号「按工作年限平均为月工资收入」的做法自 2019 年起已不再执行，超额部分直接按年度综合所得税率表计税。</p>
+        </details>
+        <details>
+            <summary>超出法定标准发放的补偿（如违法解除的赔偿金）能享受免税吗？</summary>
+            <p>不能。免税额度只能抵「符合法定标准的补偿」部分；超出法定经济补偿标准发放的部分，无论是否超过 3 倍社平工资，都要照章计税。</p>
+        </details>
+        <details>
+            <summary>一次性补偿收入要并入当年综合所得吗？会影响年终奖和汇算吗？</summary>
+            <p>不并入。解除劳动关系取得的一次性补偿收入超过免税额度的部分，不并入当年综合所得，单独适用综合所得税率表计税，因此不会把你全年工资的适用档位推高，也不参与年终奖单独计税的选择；该笔税款由扣缴义务人单独申报缴纳。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；经济补偿的法定标准、当地社平工资口径若与主管税务机关认定不一致，以税务部门核定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把工资、年终奖与一次性补偿一起算</h2>
+            <p>输入全年工资、社保公积金、专项附加扣除与一次性补偿收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_severance">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>政策依据：财税〔2018〕164 号第五条第一项（长期有效，非过渡性优惠）；经济补偿的封顶规则见《劳动合同法》第四十七条。经济补偿的法定标准与当地社平工资口径如与主管税务机关认定不一致，以税务部门核定为准。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/severance.html">离职补偿金个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js       —— 出厂税率表与一次性补偿规则（comprehensiveTaxRates / severanceRules）
+       tax-registry.js        —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js      —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       severance-quick.js     —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/severance-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var ecoInput = document.getElementById('eco-input');
+    var otherInput = document.getElementById('other-input');
+    var avgWageInput = document.getElementById('avgwage-input');
+    var yearsInput = document.getElementById('years-input');
+    var wageInput = document.getElementById('wage-input');
+    var otherTaxableInput = document.getElementById('othertaxable-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var rAmount = document.getElementById('r-amount');
+    var rLegalCap = document.getElementById('r-legalcap');
+    var rExemptCap = document.getElementById('r-exemptcap');
+    var rExemptUsed = document.getElementById('r-exemptused');
+    var rTaxable = document.getElementById('r-taxable');
+    var rBracket = document.getElementById('r-bracket');
+    var rTax = document.getElementById('r-tax');
+    var rNet = document.getElementById('r-net');
+    var rMerged = document.getElementById('r-merged');
+    var rGap = document.getElementById('r-gap');
+    var quick = window.EuriskoSeveranceQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「三道 3 倍 / 12 年」「年度税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var input = {
+            economic: ecoInput ? ecoInput.value : 0,
+            other: otherInput ? otherInput.value : 0,
+            avgWage: avgWageInput ? avgWageInput.value : 0,
+            years: yearsInput ? yearsInput.value : 0,
+            monthlyWage: wageInput ? wageInput.value : 0,
+            otherTaxable: otherTaxableInput ? otherTaxableInput.value : 0
+        };
+        var r = quick.compareOf(input);
+        if (!(r.amount > 0)) {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '请填写经济补偿金（或其他一次性补助）金额。';
+            }
+            return;
+        }
+        box.hidden = false;
+        rAmount.textContent = money(r.amount) + ' 元';
+        rLegalCap.textContent = r.legalCap === null ? '未校验（未填月工资 / 社平工资）' : money(r.legalCap) + ' 元';
+        rExemptCap.textContent = money(r.exemptCap) + ' 元';
+        rExemptUsed.textContent = money(r.exemptUsed) + ' 元';
+        rTaxable.textContent = money(r.taxable) + ' 元';
+        rBracket.textContent = (r.rate * 100).toFixed(0) + '% / ' + money(r.deduction) + ' 元';
+        rTax.textContent = money(r.tax) + ' 元';
+        rNet.textContent = money(r.net) + ' 元 / ' + (r.effectiveRate * 100).toFixed(2) + '%';
+        rMerged.textContent = money(r.mergedTotal) + ' 元';
+        rGap.textContent = (r.gap >= 0 ? '+' : '−') + money(Math.abs(r.gap)) + ' 元';
+
+        if (!hint) return;
+        var gap = Math.abs(r.gap);
+        var parts = [];
+        if (r.overLegal > 0) {
+            parts.push('其中 <strong>' + money(r.overLegal) + ' 元</strong>超出法定经济补偿标准，不享受免税额度。');
+        }
+        if (r.exemptCap > 0 && r.exemptUsed < r.exemptCap) {
+            parts.push('免税额度还剩 <strong>' + money(r.exemptCap - r.exemptUsed) + ' 元</strong>未用上（符合法定标准的补偿不足 3 倍社平）。');
+        }
+        if (r.taxable === 0) {
+            parts.push('这笔补偿<strong>全额免征个人所得税</strong>。');
+        } else {
+            parts.push('超过免税额度的 <strong>' + money(r.taxable) + ' 元</strong>按 ' + (r.rate * 100).toFixed(0)
+                + '% 单独计税（不并入当年综合所得、不减除费用）。');
+        }
+        if (r.otherTaxable > 0 && gap >= 0.005) {
+            parts.push('与「假设并入综合所得」相比，现行口径少交 <strong>' + money(gap) + ' 元</strong>。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [ecoInput, otherInput, avgWageInput, yearsInput, wageInput, otherTaxableInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>

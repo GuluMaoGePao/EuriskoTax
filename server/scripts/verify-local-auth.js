@@ -601,7 +601,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/severance.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -752,6 +753,44 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes('expiresOn: \'2027-12-31\'')
             && equityPage.raw.includes('不并入当年综合所得')
             && equityPage.raw.includes('2027 年 12 月 31 日'),
+            `HTTP ${registryJs.status}`);
+        // 第六张落地页「离职补偿金个税」（阶段15 15A-3）：
+        // 与股权激励页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 超额部分「单独适用年度税率表、不按工作年限平均」，
+        // 国税发〔1999〕178 号的平均法已不再执行，页面若照抄旧算法，这句断言就红。
+        const severancePage = await request(PORT, 'GET', '/seo/severance.html');
+        record('离职补偿金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            severancePage.status === 200 && severancePage.raw.includes('rel="canonical"')
+            && severancePage.raw.includes('FAQPage')
+            && severancePage.raw.includes('财税〔2018〕164 号')
+            && severancePage.raw.includes('劳动合同法》第四十七条'),
+            `HTTP ${severancePage.status}`);
+        const severanceAnnualBlock = (severancePage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const severanceAnnualRows = Array.from(severanceAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleSeveranceRows = severanceAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('离职补偿金落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            severancePage.status === 200 && severanceAnnualRows.length === 7 && staleSeveranceRows.length === 0
+            && severancePage.raw.includes('/src/js/calculation/tax-constants.js')
+            && severancePage.raw.includes('/src/js/calculation/tax-registry.js')
+            && severancePage.raw.includes('/src/js/calculation/severance-quick.js'),
+            `页面 ${severanceAnnualRows.length} 档, 与常量不一致 ${staleSeveranceRows.length} 档`);
+        record('离职补偿金落地页静态示例表与对照表可读（70000/4480、130000/10480、17960、29080、11120）',
+            severancePage.status === 200 && severancePage.raw.includes('>70000.00<')
+            && severancePage.raw.includes('>4480.00<') && severancePage.raw.includes('>130000.00<')
+            && severancePage.raw.includes('>10480.00<') && severancePage.raw.includes('>17960.00<')
+            && severancePage.raw.includes('>29080.00<') && severancePage.raw.includes('>11120.00<'), '');
+        record('离职补偿金落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            severancePage.status === 200 && severancePage.raw.includes('?source=seo_severance'), '');
+        record('税种注册表登记了离职补偿金页：长期政策（无到期日）+ 旧的平均法已不再执行 + 不并入',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'severance'")
+            && registryJs.raw.includes("page: '/seo/severance.html'")
+            && registryJs.raw.includes('expiresOn: null')
+            && severancePage.raw.includes('不并入当年综合所得')
+            && severancePage.raw.includes('国税发〔1999〕178 号')
+            && severancePage.raw.includes('不再执行'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

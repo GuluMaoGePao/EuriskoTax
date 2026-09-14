@@ -131,6 +131,35 @@ var equityIncentiveRules = {
     deferred: { rate: 0.2, name: '非上市公司符合条件的递延纳税（财税〔2016〕101 号）' }
 };
 
+// 解除劳动关系一次性补偿收入 —— 计税规则（阶段15 15A-3）
+//
+// 政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第五条第一项（财税〔2018〕164 号）
+//   个人与用人单位解除劳动关系取得一次性补偿收入（经济补偿金、生活补助费和其他补助费），
+//   在当地上年职工平均工资 3 倍数额以内的部分，免征个人所得税；超过 3 倍数额的部分，
+//   **不并入当年综合所得，单独适用综合所得税率表**计算纳税（不减除任何费用）。
+//
+// 「12 年」到底管什么（全网最常写错的一处，页面单列一节解释）：
+//   《劳动合同法》第四十七条封的是**经济补偿金本身**：月工资高于当地上年度职工月平均工资
+//   3 倍的按 3 倍计，且支付年限不超过 12 年 —— 这决定「你能合法拿多少」，不是计税方法。
+//   旧的计税方法是国税发〔1999〕178 号的「÷ 工作年限（最长 12）平均成月工资再查月度表」，
+//   该做法自 2019 年起**已不再执行**（164 号改为超额部分直接单独适用年度税率表）。
+//   所以本规则里的 capYears 只用于算「法定经济补偿上限」，计算税额时不做任何平均。
+//
+// 免税额度只能抵「符合法定标准的补偿」：
+//   超出法定标准发放的部分（如违法解除的赔偿金中超出经济补偿标准的部分），
+//   无论是否超过 3 倍社平工资都不得免税 —— 这也是为什么页面把「经济补偿金」与
+//   「其他补助费」拆成两个输入框。
+var severanceRules = {
+    rateTable: 'comprehensiveTaxRates',      // 超额部分单独适用**年度**综合所得税率表
+    exemptMultipleOfAverageWage: 3,          // 免税额度 = 当地上年职工年平均工资 × 3
+    capYears: 12,                            // 劳动合同法：经济补偿支付年限上限（超过 12 年按 12 年）
+    capMonthlyWageMultiple: 3,               // 劳动合同法：月工资封顶为当地上年度职工月平均工资 × 3
+    noDeduction: true,                       // 超额部分不减除任何费用（不扣 6 万元，也不扣专项附加）
+    notMergedIntoComprehensive: true,        // 不并入当年综合所得
+    noAveraging: true,                       // 不再按工作年限平均（国税发〔1999〕178 号做法已停止执行）
+    expiresOn: null                          // 非过渡性优惠，长期有效（无到期日）
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -159,6 +188,7 @@ window.EuriskoTaxConstants = {
     withholdingTaxRates: withholdingTaxRates,
     otherIncomeRules: otherIncomeRules,
     equityIncentiveRules: equityIncentiveRules,
+    severanceRules: severanceRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };
