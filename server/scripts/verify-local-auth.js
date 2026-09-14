@@ -600,7 +600,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -714,6 +715,43 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             registryJs.status === 200 && registryJs.raw.includes("id: 'withholding'")
             && registryJs.raw.includes("page: '/seo/labor-withholding.html'")
             && registryJs.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${registryJs.status}`);
+        // 第五张落地页「股权激励个税」（阶段15 15A-2）：
+        // 与劳务报酬页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 单独计税是「不并入」而非「可选并入」，
+        // 若哪天页面把「并入」写成可选，政策口径就错了，这里拦的是这句声明。
+        const equityPage = await request(PORT, 'GET', '/seo/equity-incentive.html');
+        record('股权激励落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            equityPage.status === 200 && equityPage.raw.includes('rel="canonical"')
+            && equityPage.raw.includes('FAQPage')
+            && equityPage.raw.includes('财政部 税务总局公告 2023 年第 25 号')
+            && equityPage.raw.includes('财税〔2018〕164 号'),
+            `HTTP ${equityPage.status}`);
+        const annualBlock = (equityPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const annualRows = Array.from(annualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnualRows = annualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('股权激励落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            equityPage.status === 200 && annualRows.length === 7 && staleAnnualRows.length === 0
+            && equityPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && equityPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && equityPage.raw.includes('/src/js/calculation/equity-incentive-quick.js'),
+            `页面 ${annualRows.length} 档, 与常量不一致 ${staleAnnualRows.length} 档`);
+        record('股权激励落地页静态示例表与对照表可读（100000/7480、200000/23080、600000/127080、14960、8120）',
+            equityPage.status === 200 && equityPage.raw.includes('>100000.00<')
+            && equityPage.raw.includes('>7480.00<') && equityPage.raw.includes('>200000.00<')
+            && equityPage.raw.includes('>127080.00<') && equityPage.raw.includes('>14960.00<')
+            && equityPage.raw.includes('>8120.00<'), '');
+        record('股权激励落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            equityPage.status === 200 && equityPage.raw.includes('?source=seo_equity'), '');
+        record('税种注册表登记了股权激励页：单独计税「不并入」而非可选并入 + 到期日 2027-12-31',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'equity-incentive'")
+            && registryJs.raw.includes("page: '/seo/equity-incentive.html'")
+            && registryJs.raw.includes('expiresOn: \'2027-12-31\'')
+            && equityPage.raw.includes('不并入当年综合所得')
+            && equityPage.raw.includes('2027 年 12 月 31 日'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

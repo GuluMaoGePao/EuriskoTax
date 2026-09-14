@@ -14,7 +14,7 @@
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
 | `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
-| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 172 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
+| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 177 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
@@ -67,6 +67,11 @@ GUI 内置 8 大功能面板（共 110+ 按钮），调用本目录下的 `ops-s
 .\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
+> ⚠️ **公网分享时的安全边界（v1.19.0 起）**
+> `-Share` 会把本机 `:3000` 暴露到公网，而后端是「静态托管仓库根」的，所以后端源码、本地数据库、`.git`、运维配置天生都在可访问路径上。
+> 现已加闸 `server/src/middleware/sensitiveFileGuard.js`：点文件段（`.git/**`、`.env`）、`server/` `tools/` `docs/` 顶层目录、`.db`/`.sqlite`/`.pem`/`.key` 等后缀 **一律 404**；`*.local.json`（本机测试账号的真实密码）**仅环回地址可读**，公网来源 404。
+> 也就是说：分享出去的是前端站点本身，不再包含源码与本地库 —— 但分享链接仍等于把本机应用开放给拿到链接的人，用完记得关掉。
+
 ### 单独启动守护脚本
 
 ```powershell
@@ -100,7 +105,7 @@ Send-TestNotification
 ### PostgreSQL 生产等价演练（动过 schema/迁移后必跑）
 
 ```powershell
-# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 172 项 e2e
+# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 177 项 e2e
 npm run verify:pg
 
 # 等价「全新库首次部署」：先删数据卷再跑

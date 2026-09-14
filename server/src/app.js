@@ -7,7 +7,11 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const rateLimit = require('express-rate-limit');
 
 const logger = require('./middleware/logger');
-const { errorHandler, notFound } = require('./middleware/error');const authRoutes = require('./routes/auth');
+const { errorHandler, notFound } = require('./middleware/error');
+// 后端源码 / 运维脚本 / 点文件 / 本地库与密钥一律不下发（.git、dev.db、server/src、tools 配置…）：
+// 静态托管的是仓库根，不设闸这些文件在公网分享 / 线上就是可下载资源
+const { sensitiveFileGuard } = require('./middleware/sensitiveFileGuard');
+const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
 const statsRoutes = require('./routes/stats');
@@ -266,6 +270,8 @@ app.get('/reset', (req, res) => {
 //   - 图片 / 字体 → public, max-age=604800（7 天）
 //   - 其他 → 不设，走浏览器默认
 const staticPath = path.join(__dirname, '../../');
+// 必须挂在静态托管之前：先拦掉敏感文件，再让 static 处理其余资源
+app.use(sensitiveFileGuard);
 app.use(express.static(staticPath, {
     setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();

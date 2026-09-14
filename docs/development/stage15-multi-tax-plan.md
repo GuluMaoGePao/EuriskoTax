@@ -98,7 +98,7 @@ graph LR
 | 编号 | 子任务 | 交付物 | 验收标准 |
 |---|---|---|---|
 | 15A-1 ✅ v1.18.0 | 劳务报酬 / 稿酬 / 特许权使用费**预扣预缴**单算器 | 新页 `/seo/labor-withholding.html` + `withholding-quick.js` | 与内核公式逐点对拍；含「并入综合所得 vs 单独」对比 |
-| 15A-2 | **股权激励个税**（股票期权 / 限制性股票 / 股票增值权 / 股权奖励） | 新页 `/seo/equity-incentive.html` + `equity-incentive-quick.js` | 与内核 `calculateTaxByTaxableIncome` 逐点对拍；同年内合并计税；「并入」只作政策到期后的对照；政策依据文号入注册表 |
+| 15A-2 ✅ v1.19.0 | **股权激励个税**（股票期权 / 限制性股票 / 股票增值权 / 股权奖励） | 新页 `/seo/equity-incentive.html` + `equity-incentive-quick.js` | 与内核 `calculateTaxByTaxableIncome` 逐点对拍；同年内合并计税；「并入」只作政策到期后的对照；政策依据文号入注册表 |
 | 15A-3 | **离职补偿金**免税额度测算（3 倍社平工资 + 12 年上限） | 新页 `/seo/severance.html` + `severance-quick.js` | 与内核 `calculateTaxByTaxableIncome` 逐点对拍；**超额部分「不并入当年综合所得、单独适用年度税率表」**（原验收标准写的「并入」有误，已更正）；免税额度只抵符合法定标准的补偿；页面写明「不再按工作年限平均」 |
 | 15A-4 | 专项附加扣除「年度确认 + 多抵多少」试算（12 月确认季流量） | 新页 / 试算卡 | 七项扣除组合试算 + 政策依据链接 |
 | 15A-5 | 个人养老金 / 税优健康险 / 企业年金**节税试算**（独立页） | 新页 | 与扣除项联动、与内核同源 |
@@ -178,4 +178,5 @@ graph LR
 | 日期 | 变更 | 决策 |
 |---|---|---|
 | 2026-09-13 | 新增阶段15「税务计算能力扩展」；原阶段15「迁移与合规升级」顺延为阶段16；确定 15A 个税纵深优先于 15B 企业税种 | 确认 |
+| 2026-09-14 | **15A-2 股权激励个税落地页随 v1.19.0 交付**：新页 `/seo/equity-incentive.html` + `equity-incentive-quick.js`；常量新增 `equityIncentiveRules`、注册表新增 `equity-incentive` 条目；门禁 172 → 177 项、单测 30 套件 595 例 → 31 套件 613 例 | 单独计税是「不并入」而非「可选并入」，页面上的「并入综合所得」只作**政策到期后（2028 年起）的对照**，不是让用户二选一；税率仍复用 `comprehensiveTaxRates`（不新增第二张表），对拍对象为内核 `calculateTaxByTaxableIncome` |
 | 2026-09-14 | **15D-1 税种注册表 `tax-registry.js` + 15A-1 劳务报酬/稿酬/特许权预扣预缴落地页随 v1.18.0 交付**；常量新增 `withholdingTaxRates` / `otherIncomeRules`，内核 `calculateOtherIncome` 与 `withholding-quick.js` 读同一份（对拍证明等价）；门禁 167 → 172 项、单测 28 套件 570 例 → 30 套件 595 例 | 注册表只存元数据（生效期/到期日/政策文号 + 参数在哪个全局量里），数值仍在 `tax-constants.js`；新常量暂不纳入 `tax-rates-sync.js` 后端热改字段，待 15D-3 多税种版本化统一扩 |

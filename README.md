@@ -9,7 +9,7 @@
 | 项 | 状态 |
 |---|---|
 | 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网地址 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线） |
-| 版本 | CHANGELOG 最新 **1.18.0**（阶段15 开局：15D-1 税种注册表 + 第四个页面 `/seo/labor-withholding.html`「劳务报酬预扣预缴」；上一版 1.17.0 产品方向调整：计算页取消「参保城市」选择，回到「默认基数 + 用户自改」，城市改由留资时收集、顾问核对当地口径；上一版 1.16.0 = 第三个 SEO 落地页 `/seo/annual-settlement.html`「汇算清缴计算器」，1.15.0 = `/seo/salary-tax.html`「月薪个税计算器」，1.14.0 = `/seo/bonus-tax.html`「年终奖个税计算器」，1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 —— 线下收款发码 → 用户自助兑换 → 权益即时生效，C2 城市社保参数库（参数库保留，端上分档已回退）；详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
+| 版本 | CHANGELOG 最新 **1.19.0**（阶段15 15A-2：第五个页面 `/seo/equity-incentive.html`「股权激励个税」+ 敏感文件守卫；上一版 1.18.0 = 第四个页面「劳务报酬预扣预缴」+ 税种注册表；更早 1.17.0 产品方向调整：计算页取消「参保城市」选择，回到「默认基数 + 用户自改」，城市改由留资时收集、顾问核对当地口径；上一版 1.16.0 = 第三个 SEO 落地页 `/seo/annual-settlement.html`「汇算清缴计算器」，1.15.0 = `/seo/salary-tax.html`「月薪个税计算器」，1.14.0 = `/seo/bonus-tax.html`「年终奖个税计算器」，1.13.0 = 阶段14 变现与可信度：`ProCode` 专业版兑换码 —— 线下收款发码 → 用户自助兑换 → 权益即时生效，C2 城市社保参数库（参数库保留，端上分档已回退）；详见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG） |
 | 免费/专业版 | ✅ 阶段10 已上线（v1.7.0）：计税能力永不锁定，登录仅解锁云端历史同步；运维后台（`admin.html`）可调用户权益 |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
 | 注册方式 | 邮箱验证码 + **一机一码邀请码**（公测期，需向开发者获取） |
@@ -17,7 +17,7 @@
 | 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；计算完成即进入「工具 → 服务」转化闭环（留资线索 + 顾问跟进状态机 + 转化漏斗，北极星 `lead_submit / calc_done`）；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
 | SEO 落地页 | ✅ v1.14.0 [年终奖个税计算器](https://euriskotax.zeabur.app/seo/bonus-tax.html)（静态正文 + 同源口径速算器 + 六个临界点跳档提示）· ✅ v1.15.0 [月薪个税计算器](https://euriskotax.zeabur.app/seo/salary-tax.html)（累计预扣口径 + 七档预扣率表 + 12 个月逐月预扣示例表）· ✅ v1.16.0 [个税汇算清缴计算器](https://euriskotax.zeabur.app/seo/annual-settlement.html)（应退/应补 = 全年应纳税额 − 已预缴税额 + 七档年度税率表 + 三种典型情形示例表），配 `robots.txt` / `sitemap.xml`；方案与后续词条见 [docs/development/seo-landing-plan.md](docs/development/seo-landing-plan.md) |
 | 下一阶段 | ⏳ **阶段15 税务计算能力扩展（多税种）**（先 15A 个税纵深 → 后 15B 企业税种；纯前端、不依赖 ICP 备案）→ **阶段16 迁移与合规升级**（前置 ICP 备案；16D B 端 API 依赖 15B）；并行线：ICP 备案。方案见 [stage15-multi-tax-plan.md](docs/development/stage15-multi-tax-plan.md) / [stage16-migration-and-compliance-plan.md](docs/development/stage16-migration-and-compliance-plan.md) |
-| 测试 | ✅ 30 套件 595 个单元测试全通过（`npm test`，2026-09-13 复跑，含阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **172 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
+| 测试 | ✅ 33 套件 632 个单元测试全通过（`npm test`，2026-09-13 复跑，含阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **177 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
 
 ---
 
@@ -59,7 +59,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 > ⚠️ 生产环境不创建 dev 账号；公测注册一律走「邮箱验证码 + 一机一码邀请码」。本地未配置 SMTP 时，注册验证码会打印到后端控制台（开发模式兜底）。
 
 **发布纪律（先本地验证，再部署）**：
-1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 172 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 税制参数公开只读+版本化发布/回滚 / 城市社保参数公开只读（兜底城市不变量+指纹增量）+管理端发布·回滚·版本号唯一（端上已回退：不再让用户选参保城市）/ 回滚不残留（`index.html` 不得再引用已下线模块）/ 留资「所在城市」（省 + 市级联下拉，省市两项都提交后端：表单必填 + 透传 + 列表展示/按省市搜索/CSV 省市列）静态与 e2e 核对 / 三页「缴费比例」可输入（默认 5% 初始值，留空/越界回落默认值）+ 经营页「基数 × 比例」联动与低于下限提示静态接线 / 邀请码+验证码注册新号登录 / 线索留资+管理端列表·统计·导出 / 前端转化触点（结果页分流·留资弹窗·个人中心卡片）静态指纹 / 运维后台「线索」Tab（漏斗·状态机·分配·导出）静态指纹 / SEO 落地页四页（年终奖 / 月薪 / 汇算清缴 / 劳务报酬预扣预缴：可访问性 + canonical/FAQPage 结构化数据 + 静态税率表逐档对账 + 示例表可读 + CTA 归因 + 税种注册表登记政策文号）/ 专业版兑换码端到端（生成·兑换·叠加续期·作废·导出）+ 兑换入口静态指纹）。**动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 时，还必须加跑 `npm run verify:pg`**——用本地 PostgreSQL 演练同一套断言（`generate` → `migrate deploy` → 起服务，与线上容器同序），专门拦「本地 SQLite 全绿、线上迁移才炸」的问题（需 Docker Desktop + WSL2 后端；本机已装并实跑 172/172 全绿，未装则优雅跳过）。
+1. 改代码后先跑 `npm test`（单元测试）与 `npm run verify:local`（本地真实后端 e2e，共 177 项断言：前端与 SW 网络优先策略冒烟 / 登录 dev 账号 / 反馈落库+附图+用户与管理员列表+状态跟进 / 匿名埋点+聚合统计可读 / 运维后台用户列表·详情·权益调档 / 税制参数公开只读+版本化发布/回滚 / 城市社保参数公开只读（兜底城市不变量+指纹增量）+管理端发布·回滚·版本号唯一（端上已回退：不再让用户选参保城市）/ 回滚不残留（`index.html` 不得再引用已下线模块）/ 留资「所在城市」（省 + 市级联下拉，省市两项都提交后端：表单必填 + 透传 + 列表展示/按省市搜索/CSV 省市列）静态与 e2e 核对 / 三页「缴费比例」可输入（默认 5% 初始值，留空/越界回落默认值）+ 经营页「基数 × 比例」联动与低于下限提示静态接线 / 邀请码+验证码注册新号登录 / 线索留资+管理端列表·统计·导出 / 前端转化触点（结果页分流·留资弹窗·个人中心卡片）静态指纹 / 运维后台「线索」Tab（漏斗·状态机·分配·导出）静态指纹 / SEO 落地页五页（年终奖 / 月薪 / 汇算清缴 / 劳务报酬预扣预缴 / 股权激励：可访问性 + canonical/FAQPage 结构化数据 + 静态税率表逐档对账 + 示例表可读 + CTA 归因 + 税种注册表登记政策文号）/ 专业版兑换码端到端（生成·兑换·叠加续期·作废·导出）+ 兑换入口静态指纹）。**动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/` 时，还必须加跑 `npm run verify:pg`**——用本地 PostgreSQL 演练同一套断言（`generate` → `migrate deploy` → 起服务，与线上容器同序），专门拦「本地 SQLite 全绿、线上迁移才炸」的问题（需 Docker Desktop + WSL2 后端；本机已装并实跑 177/177 全绿，未装则优雅跳过）。
 2. **上线只走安全发布流水线**（本地门禁不过就物理上推不出去）：
    - 命令行：`.\tools\ops\ops-publish.ps1`（内部 = verify:local 全绿 → git commit → push origin main → 自动轮询核对线上指纹）；
    - GUI：控制台「🔐 Git & 账号」→「🚀 安全发布」（或先点「🧪 安全发布试运行」零风险预演一次）。
@@ -127,10 +127,10 @@ Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 ## 测试
 
 ```bash
-npm test                    # 运行全部单元测试（30 套件 595 个，含覆盖率报告）
+npm test                    # 运行全部单元测试（33 套件 632 个，含覆盖率报告）
 npm run test:watch          # 监听模式
 npm run test:performance    # 计税性能基准
-npm run verify:local        # 本地登录链路验证门禁（172 项断言，push 前必跑，见上文"发布纪律"）
+npm run verify:local        # 本地登录链路验证门禁（177 项断言，push 前必跑，见上文"发布纪律"）
 npm run verify:pg           # 生产等价演练：同一套断言跑在本地 PostgreSQL（改了 schema/迁移后必跑）
 npm run verify:release      # 发版前自检：版本号五处 + 文档口径 vs 实测（不一致退出码 1；加 `-- --write` 自动同步数字）
 ```

@@ -100,6 +100,37 @@ var otherIncomeRules = {
     royalty: { name: '特许权使用费所得', threshold: 4000, flat: 800, ratio: 0.8, postRatio: 1, incomeRatio: 0.8 }
 };
 
+// 股权激励所得 —— 计税规则（阶段15 15A-2）
+//
+// 政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第二条（财税〔2018〕164 号）
+//            《关于延续实施上市公司股权激励个人所得税政策的公告》（财政部 税务总局公告 2023 年第 25 号）
+//   居民个人取得股票期权、股票增值权、限制性股票、股权奖励等股权激励，符合条件的，
+//   在 2027-12-31 前**不并入当年综合所得，全额单独适用综合所得税率表**计算纳税：
+//       应纳税额 = 股权激励收入 × 适用税率 − 速算扣除数（不减除任何费用）
+//
+// 为什么这里没有税率表：
+//   单独计税用的是**年度综合所得税率表**（comprehensiveTaxRates），不是另一套表 ——
+//   写成 rateTable 的名字而不是复制一张表，改税率时就只有一处要改（与 15D-1 同一原则）。
+//
+// 为什么 expiresOn 也写在这里：
+//   到期日既要在页面正文里「呈现」，也要能被注册表 expiringWithin() 复核；
+//   只写页面 = 到期了没人知道，只写注册表 = 页面上那句「执行至 2027 年底」仍是手抄的。
+var equityIncentiveRules = {
+    rateTable: 'comprehensiveTaxRates',   // 全额单独适用年度综合所得税率表
+    noDeduction: true,                    // 不减除费用、不扣 6 万元基本减除费用
+    combineWithinYear: true,              // 一个纳税年度内两次以上股权激励应合并计算
+    expiresOn: '2027-12-31',
+    // 四种激励的「股权激励收入」怎么算（types 只描述公式，不含数字）
+    types: {
+        option: { name: '股票期权', formula: '（行权日每股市场价 − 每股施权价）× 行权股票数量' },
+        restricted: { name: '限制性股票', formula: '（登记日市价 + 解禁日市价）÷ 2 × 解禁份数 − 该批次出资额' },
+        appreciation: { name: '股票增值权', formula: '（行权日每股价格 − 授权日每股价格）× 行权份数' },
+        award: { name: '股权奖励', formula: '（取得股票时的公平市场价格 − 每股实际出资额）× 取得股票数量' }
+    },
+    // 非上市公司符合条件的股权激励可递延纳税：行权时暂不缴，转让时按「财产转让所得」20% 计税
+    deferred: { rate: 0.2, name: '非上市公司符合条件的递延纳税（财税〔2016〕101 号）' }
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -127,6 +158,7 @@ window.EuriskoTaxConstants = {
     classificationTaxRates: classificationTaxRates,
     withholdingTaxRates: withholdingTaxRates,
     otherIncomeRules: otherIncomeRules,
+    equityIncentiveRules: equityIncentiveRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };
