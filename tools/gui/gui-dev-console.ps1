@@ -113,6 +113,9 @@ $script:StatusBar = $null
 $script:TabPanels = @{ }
 $script:TabCtxMap = @{ }
 
+# 文档导出（Markdown → Word）：记录最近一次导出的输出目录，供【打开上次导出目录】按钮使用
+$script:LastExportDir = $null
+
 # 公网地址面板控件引用（启动管理页 → 公网地址速览卡片）
 $script:PublicUrlCardLabel = $null   # 显示 URL 的大标签（可点击复制）
 $script:PublicUrlCardHint  = $null   # 小字状态提示（有/无地址、更新时间）
@@ -1100,6 +1103,138 @@ function Confirm-PgDrillPreconditions {
     }
     Write-Log "[WARN] 本地 :3000 后端仍在运行 —— 若演练在 generate 步骤报 EPERM，请停掉后端再重跑。" "WARN"
     return $true
+}
+
+# ==============================================================================
+# 辅助函数: 文档导出（Markdown / 文本 → Word）
+#   Get-PythonExe        —— 找本机真实可用的 python.exe（排除 Store 占位别名）
+#   Show-ExportFilePicker—— 选任意文件（可多选）的资源管理器对话框
+#   Invoke-Md2DocxExport —— 调 tools/ops/ops-md2docx.py 生成同名 .docx
+#
+#   设计约定：GUI 不重复实现转换逻辑，只负责「选文件 + 拉起 Python 脚本」。
+#   真源永远是 Markdown/文本源文件，.docx 是导出件（改内容改源文件后重新导出，
+#   不要在 Word 里改）。封面/目录/页眉页脚/页码由 Python 脚本统一生成。
+# ==============================================================================
+function Test-PythonUsable {
+    param([string]$Exe)
+    if ([string]::IsNullOrWhiteSpace($Exe)) { return $false }
+    if (-not (Test-Path -LiteralPath $Exe)) { return $false }
+    try {
+        $out = & $Exe -c "print('PYOK')" 2>$null
+        return ($LASTEXITCODE -eq 0 -and ("$out").Trim() -eq 'PYOK')
+    } catch {
+        return $false
+    }
+}
+
+function Get-PythonExe {
+    # 返回本机真实可用的 python.exe 绝对路径；没有则返回 $null
+    # 注意：WindowsApps\python.exe 是 Microsoft Store 的**占位别名** —— 没装 Python 时
+    #   运行它会返回 9009 并弹出商店页，所以只在「确认装了 Store 版 Python」时才允许测试它，
+    #   避免点一次导出按钮就被弹一次商店窗口。
+    $candidates = @()
+    foreach ($name in @("py", "python", "python3")) {
+        foreach ($c in @(Get-Command $name -All -ErrorAction SilentlyContinue)) {
+            if ($c -and $c.Source -and ($candidates -notcontains $c.Source)) { $candidates += $c.Source }
+        }
+    }
+    foreach ($dir in @((Join-Path $env:LOCALAPPDATA "Programs\Python"),
+                       "C:\Python313", "C:\Python312", "C:\Python311", "C:\Python310")) {
+        if (Test-Path -LiteralPath $dir) {
+            foreach ($hit in @(Get-ChildItem -LiteralPath $dir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue)) {
+                if ($candidates -notcontains $hit.FullName) { $candidates += $hit.FullName }
+            }
+        }
+    }
+
+    $hasStorePython = $false
+    try {
+        $hasStorePython = [bool](Get-AppxPackage -Name "*PythonSoftwareFoundation*" -ErrorAction SilentlyContinue)
+    } catch {
+        $hasStorePython = $false   # 非 Store 环境 / 命令不可用：按没装处理
+    }
+
+    foreach ($exe in $candidates) {
+        if ($exe -match 'WindowsApps' -and -not $hasStorePython) { continue }
+        if (Test-PythonUsable -Exe $exe) { return $exe }
+    }
+    return $null
+}
+
+function Show-ExportFilePicker {
+    # 打开资源管理器风格对话框，选任意要导出为 Word 的源文件（支持多选）
+    # 资源纪律：对话框必须 Dispose（与 Show-BranchPicker 同策略，见
+    #   tools/gui/tests/test-dialog-resource-leak.ps1 —— 不 Dispose 会泄漏 GDI 句柄）
+    param([string]$Title = "选择要导出为 Word 的文件（按住 Ctrl 可多选）")
+    $dlg = New-Object System.Windows.Forms.OpenFileDialog
+    try {
+        # 优先定位到最近一次导出目录，否则定位到 docs/marketing（企划书/手册所在）
+        $startDir = if ($script:LastExportDir -and (Test-Path -LiteralPath $script:LastExportDir)) {
+            $script:LastExportDir
+        } else { (Join-Path $ProjectRoot "docs\marketing") }
+        if (Test-Path -LiteralPath $startDir) { $dlg.InitialDirectory = $startDir }
+        $dlg.Title = $Title
+        $dlg.Filter = "Markdown 文件 (*.md;*.markdown)|*.md;*.markdown|文本文件 (*.txt;*.log)|*.txt;*.log|CSV 文件 (*.csv)|*.csv|所有文件 (*.*)|*.*"
+        $dlg.FilterIndex = 1
+        $dlg.CheckFileExists = $true
+        $dlg.Multiselect = $true
+        if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return @() }
+        return @($dlg.FileNames)
+    } finally {
+        if ($dlg) { $dlg.Dispose() }
+    }
+}
+
+function Invoke-Md2DocxExport {
+    # 把选中的源文件逐个导出为同名 .docx（输出到源文件所在目录）
+    param([Parameter(Mandatory = $true)][string[]]$Files)
+
+    $pyScript = Join-Path $OpsDir "ops-md2docx.py"
+    if (-not (Test-Path -LiteralPath $pyScript)) {
+        Show-GuiAlert -Title "导出脚本缺失" -Message "找不到导出脚本：$pyScript`n`n请确认文件是否存在（脚本位于 tools/ops/ops-md2docx.py）。" -Kind Error
+        return
+    }
+
+    $py = Get-PythonExe
+    if (-not $py) {
+        Write-Log "[导出] ✗ 未检测到可用的 Python 解释器（当前可能只有 Microsoft Store 的占位别名）。" "ERROR"
+        Show-GuiAlert -Title "缺少 Python 运行环境" -Message "本机没有检测到真实可用的 Python。导出脚本 ops-md2docx.py 需要 Python 运行。`n`n解决办法（任选其一）：`n  ① 到 https://www.python.org/downloads/ 下载安装，`n     安装时务必勾选 ✔ Add python.exe to PATH，装完重启本控制台；`n  ② Microsoft Store 搜索安装 Python（安装完成后本按钮自动生效）。`n`n提示：仅装依赖包不行，必须先生 Python 解释器本身。" -Kind Error
+        return
+    }
+
+    # 依赖检查：python-docx 是导出唯一的第三方包，缺失时引导安装
+    $dep = & $py -c "import docx; print('DOCX-OK')" 2>$null
+    if ($LASTEXITCODE -ne 0 -or ("$dep") -notmatch 'DOCX-OK') {
+        Write-Log "[导出] ✗ 依赖缺失：python-docx 未安装（Python: $py）。" "ERROR"
+        $r = [System.Windows.Forms.MessageBox]::Show(
+            "导出依赖 python-docx 未安装。`n`n现在用下面这条命令安装吗？`n  $py -m pip install python-docx`n`n（安装完成后，再次点击导出按钮即可）",
+            "缺少导出依赖 python-docx", "YesNo", "Question")
+        if ($r -eq [System.Windows.Forms.DialogResult]::Yes) {
+            Invoke-AsyncCommand -Name "md2docx" -Command "& '$py' -m pip install python-docx" -WorkingDir $ProjectRoot
+            Write-Log "[导出] 依赖安装已在输出区执行，装完后再点一次导出按钮。" "WARN"
+        }
+        return
+    }
+
+    $parts = @()
+    foreach ($f in $Files) {
+        if ([string]::IsNullOrWhiteSpace($f)) { continue }
+        if (-not (Test-Path -LiteralPath $f)) {
+            Write-Log "[导出] ✗ 文件不存在，已跳过：$f" "ERROR"
+            continue
+        }
+        $out = [System.IO.Path]::ChangeExtension($f, ".docx")
+        $script:LastExportDir = [System.IO.Path]::GetDirectoryName($out)
+        $parts += "& '$py' '$pyScript' '$f' '$out'"
+        Write-Log "[导出] ▶ 源文件: $f" "CMD"
+        Write-Log "[导出]   输出为: $out" "GRAY"
+    }
+    if ($parts.Count -eq 0) {
+        Write-Log "[导出] 没有可导出的文件。" "WARN"
+        return
+    }
+    Write-Log "[导出] Python 解释器: $py（若 .docx 正被 Word 占用会导出失败，请先关闭该 Word 文档）" "GRAY"
+    Invoke-AsyncCommand -Name "md2docx" -Command ($parts -join "; ") -WorkingDir $ProjectRoot
 }
 
 # ==============================================================================
@@ -3122,7 +3257,7 @@ Add-SectionCard -TabCtx $tab5Ctx `
 # ==============================================================================
 # ============ 标签页 6: 快捷入口 ============
 # ==============================================================================
-$tab6Ctx = New-TabPanel -HeaderText "📂  快捷入口" -HeaderTagline "文件夹 · 终端 · 浏览器 · 文档" -HeaderDesc "本页包含 2 个功能区：① 打开项目目录（8个目录快捷入口）  ② 终端和浏览器（PowerShell/前端/API/Prisma Studio）"
+$tab6Ctx = New-TabPanel -HeaderText "📂  快捷入口" -HeaderTagline "文件夹 · 终端 · 浏览器 · 文档 · 导出 Word" -HeaderDesc "本页包含 3 个功能区：① 打开项目目录（8个目录快捷入口）  ② 终端和浏览器（PowerShell/前端/API/Prisma Studio）  ③ 文档导出（任选文件 → Word，Markdown/文本均可）"
 
 Add-SectionCard -TabCtx $tab6Ctx `
     -Title "1. 打开项目目录" `
@@ -3168,6 +3303,41 @@ Add-SectionCard -TabCtx $tab6Ctx `
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\api\api-reference.md") } },
     @{ Text = "Markdown: README"; Desc = "打开项目根目录的 README.md 总说明。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
        OnClick = { Start-Process (Join-Path $ProjectRoot "README.md") } }
+)
+
+Add-SectionCard -TabCtx $tab6Ctx `
+    -Title "3. 文档导出（任选文件 → Word）" `
+    -Subtitle "脚本：tools/ops/ops-md2docx.py（Python + python-docx）" `
+    -Description "详细说明：点【选择任意文件导出 Word】会弹出文件选择器，选中后在**源文件所在目录**生成同名 .docx（自动加封面、目录、页眉页脚、页码）。支持 .md/.markdown，也能导出 .txt/.log/.csv 等纯文本（按 Markdown 规则渲染）；按住 Ctrl 可一次选多个。已存在的同名 .docx 会被覆盖，正被 Word 打开时会导出失败（先关闭再导）。真源是源文件 —— 改内容请改源文件后重新导出，不要在 Word 里改。" `
+    -AccentColor $C_PURPLE -ButtonsPerRow 3 -Buttons @(
+    @{ Text = "📄 选择任意文件导出 Word`n⭐推荐 · 支持多选"; Desc = "⭐核心按钮：弹出文件选择器，任选文件（Ctrl 可多选）→ 在源文件同目录生成同名 .docx。首次使用若缺 python-docx，会引导一键安装。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $picked = Show-ExportFilePicker
+            if ($picked.Count -gt 0) { Invoke-Md2DocxExport -Files $picked }
+            else { Write-Log "[导出] 已取消（未选择文件）。" "GRAY" }
+       } },
+    @{ Text = "📘 导出合伙人版商业企划`n→ docs/marketing"; Desc = "直接导出 docs/marketing/business-plan-for-partners.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\business-plan-for-partners.md") } },
+    @{ Text = "📗 导出 90 天落地执行手册`n→ docs/marketing"; Desc = "直接导出 docs/marketing/gtm-execution-plan.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\gtm-execution-plan.md") } },
+    @{ Text = "🔧 安装/升级导出依赖`npython-docx"; Desc = "执行 python -m pip install python-docx：导出脚本唯一的第三方依赖，换电脑或升级用它。"; Color = "75, 140, 230"; Width = $BTN_SMALL_W;
+       OnClick = {
+            $py = Get-PythonExe
+            if (-not $py) {
+                Write-Log "[导出] ✗ 未检测到可用的 Python 解释器。" "ERROR"
+                Show-GuiAlert -Title "缺少 Python 运行环境" -Message "本机没有检测到真实可用的 Python，无法安装依赖。`n`n请先到 https://www.python.org/downloads/ 安装 Python（务必勾选 ✔ Add python.exe to PATH），装完重启本控制台。" -Kind Error
+                return
+            }
+            Invoke-AsyncCommand -Name "md2docx" -Command "& '$py' -m pip install --upgrade python-docx" -WorkingDir $ProjectRoot
+       } },
+    @{ Text = "📝 查看/编辑导出脚本`nops-md2docx.py"; Desc = "用记事本打开导出脚本源码，可调整字体、页边距、emoji 替换表等样式细节。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = { Start-Process "notepad.exe" (Join-Path $OpsDir "ops-md2docx.py") } },
+    @{ Text = "📂 打开上次导出目录`n看生成的 .docx"; Desc = "在资源管理器中打开最近一次导出的输出目录（未导出过时打开 docs/marketing）。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = {
+            $dir = if ($script:LastExportDir -and (Test-Path -LiteralPath $script:LastExportDir)) { $script:LastExportDir } else { (Join-Path $ProjectRoot "docs\marketing") }
+            Write-Log "[导出] 打开目录: $dir" "GRAY"
+            Start-Process "explorer.exe" $dir
+       } }
 )
 
 # ==============================================================================

@@ -3,6 +3,7 @@
 > **最后审计基线**：2026-08-16 · 全量按钮 **110 个**（含 8 标签页 + 顶部导航 + 底部输出工具栏）
 > **审计结论**：100% 按钮有真实实现（无空壳/占位），其中 3 项 Bug 已于 2026-08-16 修复完毕
 > **2026-09-06 增量**：数据库 Tab 新增「邀请码管理」功能区（4 按钮：生成到生产/生成到本地/查看生产或本地/复制未使用码），不在 110 按钮审计基线内，实现见 `gui-dev-console.ps1` 数据库 Tab 面板（Invoke-InviteApi），管理说明见 tools/gui/README.md
+> **2026-09-14 增量**：快捷入口 Tab 新增「文档导出（任选文件 → Word）」功能区（6 按钮，见 §6.3）：选任意文件（可多选）→ 调 `tools/ops/ops-md2docx.py` 在同目录生成同名 `.docx`；含固定文档的企划书/执行手册一键导出、python-docx 依赖安装、打开上次导出目录
 
 ---
 
@@ -145,6 +146,23 @@
 | L2862 | 前端入口 index.html | `Start-Process index.html`（本地 file://） |
 | L2864 | Markdown · API 参考 | `Start-Process docs/api/api-reference.md` |
 | L2866 | Markdown · README | `Start-Process README.md` |
+
+### 6.3 文档导出（任选文件 → Word）· 2026-09-14 新增
+
+| 行号 | 按钮 | 实现路径 | 关键行为 |
+|------|------|---------|---------|
+| L3313 | 📄 选择任意文件导出 Word（⭐推荐 · 支持多选） | `Show-ExportFilePicker` → `Invoke-Md2DocxExport` | `OpenFileDialog`（多选、默认定位到上次导出目录 / `docs/marketing`）→ 逐个调 `python ops-md2docx.py <源文件> <同名.docx>`；**try/finally 保证 Dispose**（GDI 不泄漏，同 Show-BranchPicker 策略） |
+| L3319 | 📘 导出合伙人版商业企划 | `Invoke-Md2DocxExport -Files docs/marketing/business-plan-for-partners.md` | 免选择，一键导出固定文档 |
+| L3321 | 📗 导出 90 天落地执行手册 | `Invoke-Md2DocxExport -Files docs/marketing/gtm-execution-plan.md` | 同上一键导出 |
+| L3323 | 🔧 安装/升级导出依赖 | `python -m pip install --upgrade python-docx` | 异步任务名 `md2docx`；无 Python 时不执行任何命令，直接报错 + 引导安装页 |
+| L3333 | 📝 查看/编辑导出脚本 | `notepad tools/ops/ops-md2docx.py` | 改字体/页边距/emoji 替换表等样式细节 |
+| L3335 | 📂 打开上次导出目录 | `explorer $script:LastExportDir` | 未导出过时兜底打开 `docs/marketing` |
+
+> **依赖与环境**：需本机有**真实可用的 Python 解释器** + `python-docx`。
+> `Get-PythonExe` 会按 `py → python → python3 → 常见安装目录` 顺序探测，并**排除 `WindowsApps` 的 Microsoft Store 占位别名**
+> （没装 Python 时跑该别名会返回 9009 并弹出商店页；仅当探测到 Store 版 Python 的 Appx 包存在时才允许测试它）。
+> 缺少 `python-docx` 时弹 YesNo 引导安装（写入输出区执行），装完再点导出即可。
+> **转换逻辑不放 GUI**：GUI 只负责选文件 + 拉起脚本，脚本见 `tools/ops/ops-md2docx.py`；真源是 Markdown，`.docx` 永远是导出件。
 
 ---
 

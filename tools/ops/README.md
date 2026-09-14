@@ -139,6 +139,14 @@ python tools\ops\ops-md2docx.py docs\marketing\gtm-execution-plan.md
 > md 里可用三个可选标记控制导出结果：
 > `<!-- subtitle: 副标题 -->`、`<!-- notice: 封面底部提示 -->`、
 > `<!-- export:skip --> … <!-- /export:skip -->`（包住只在仓库里看、不进 Word 的内部元信息）。
+>
+> **不想敲命令行时**：开发控制台（GUI）→ 📂 快捷入口 Tab → 底部「3. 文档导出（任选文件 → Word）」卡片，
+> 点【📄 选择任意文件导出 Word】弹文件选择器（Ctrl 可多选），选完自动调用本脚本，在源文件同目录生成同名 `.docx`。
+> GUI 侧实现见 `tools/gui/gui-dev-console.ps1` 的 `Get-PythonExe` / `Show-ExportFilePicker` / `Invoke-Md2DocxExport`。
+>
+> **本机环境（2026-09-14 配置完成）**：Python 3.13.15（`%LOCALAPPDATA%\Programs\Python\Python313\`，已写入 User PATH，含 `py` 启动器）
+> + `python-docx 1.2.0`（附带 `lxml 6.1.3`）。GUI 即使从旧终端启动也能探测到 —— 除 PATH 外还会扫描
+> `%LOCALAPPDATA%\Programs\Python` 目录，并跳过 `WindowsApps` 下的 Store 占位别名。
 
 ### 一键部署到服务器
 

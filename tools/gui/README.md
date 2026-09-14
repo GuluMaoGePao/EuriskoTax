@@ -186,6 +186,26 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🌐 打开前端** | 浏览器打开 http://localhost:3000/ |
 | **📚 打开 API 文档（自动）** | 自定义 Swagger + 一键取 Token 授权，直接 Try it out |
 
+#### 6.1 📄 文档导出（任选文件 → Word）· 2026-09-14 新增
+
+本页底部第三个功能区，**不用记命令行**也能把任意文件转成 Word：
+
+| 按钮 | 做什么 | 什么时候点 |
+|------|--------|-----------|
+| **📄 选择任意文件导出 Word** ⭐ | 弹文件选择器（Ctrl 可多选）→ 在**源文件所在目录**生成同名 `.docx` | 任意 `.md/.markdown/.txt/.log/.csv` 要做成对外发送版（自动加封面/目录/页码） |
+| **📘 导出合伙人版商业企划** | 免选择，直接导出 `docs/marketing/business-plan-for-partners.md` | 企划书改完要发合伙人之前 |
+| **📗 导出 90 天落地执行手册** | 免选择，直接导出 `docs/marketing/gtm-execution-plan.md` | 手册改完要发送之前 |
+| **🔧 安装/升级导出依赖** | `python -m pip install --upgrade python-docx` | 换电脑首次使用、或升级依赖包 |
+| **📝 查看/编辑导出脚本** | 记事本打开 `tools/ops/ops-md2docx.py` | 想改字体、页边距、封面提示语、emoji 替换表 |
+| **📂 打开上次导出目录** | 打开最近一次输出目录（未导出过则打开 `docs/marketing`） | 导出完立刻去拿 `.docx` |
+
+> **环境要求**：本机需安装**真实可用的 Python**（不只是 Microsoft Store 的占位别名）+ `python-docx`。
+> GUI 会按顺序 `py → python → python3 → 常见安装目录` 自动探测解释器；**没装 Python 时不执行任何命令**，直接弹窗提示到
+> https://www.python.org/downloads/ 下载（安装务必勾选 ✔ **Add python.exe to PATH**，装完重启控制台）。缺少 `python-docx` 时弹窗问你要不要装，点【是】会在输出区跑 `pip install`。
+>
+> **两条纪律**：① **真源是 Markdown/源文件**，`.docx` 永远是导出件 —— 改内容改源文件后重新导出，不要在 Word 里改；
+> ② 导出的 `.docx` 若正被 Word 打开会写失败，先关闭该文档再导。转换逻辑全部在 `tools/ops/ops-md2docx.py`，GUI 不重复实现。
+
 ### 7. 🔐 Git & 账号
 
 > 本面板包含 **4 个功能卡片**：① 分支管理与版本切换  ② Git 操作与项目文档  ③ 账号密码管理  ④ 🚀 安全发布（Zeabur 唯一上线入口）
@@ -574,6 +594,7 @@ $ServerDir = Join-Path $ProjectRoot "server"                   # server/
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.4 | 2026-09-14 | 快捷入口 Tab 新增「文档导出（任选文件 → Word）」功能区（6 按钮：选任意文件导出 / 企划书 / 执行手册 / 安装 python-docx 依赖 / 编辑导出脚本 / 打开上次导出目录）；自动探测 Python 并排除 Store 占位别名 |
 | v1.3 | 2026-08-15 | 覆盖式滚动条 v3.2（超细5px+高透明+macOS风智能隐藏）；桌面图标放大1.5×；UTF8 BOM 自动修复；多项健壮性修复 |
 | v1.2 | 2026-04-15 | 公网地址速览卡片；事件弹窗通知（180s 去重）；cpolar 临时隧道统一；[GUI-EVENT] 双通道输出捕获 |
 | v1.0 | 2026-08-14 | 初始版本：6 大面板、30+ 按钮、实时输出、进程管理 |
