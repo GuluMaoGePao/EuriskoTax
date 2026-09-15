@@ -608,7 +608,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/vat.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/corporate-income-tax.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/corporate-income-tax.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/surtax-stamp-duty.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -1048,6 +1049,49 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes("page: '/seo/corporate-income-tax.html'")
             && registryJs.raw.includes('corporateIncomeTaxRules')
             && citPage.raw.includes('?source=seo_cit'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-3：企业税种第三页「附加税与印花税」——
+        // 这一页要钉住的是**计税依据**：附加税跟的是实际缴纳的增值税（为 0 则附加为 0），
+        // 印花税跟的是每张应税凭证（且不含列明的增值税）；六税两费减半到 2027-12-31。
+        const surtaxPage = await request(PORT, 'GET', '/seo/surtax-stamp-duty.html');
+        record('附加税与印花税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（城建税法 + 印花税法 + 2023 年第 12 号）',
+            surtaxPage.status === 200 && surtaxPage.raw.includes('rel="canonical"')
+            && surtaxPage.raw.includes('FAQPage')
+            && surtaxPage.raw.includes('主席令第 51 号')
+            && surtaxPage.raw.includes('主席令第 89 号')
+            && surtaxPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${surtaxPage.status}`);
+        const surtaxBlock = (surtaxPage.raw.split('id="surtax-rate-table"')[1] || '').split('</table>')[0];
+        const surtaxRows = Array.from(surtaxBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        // 城建税三档写在对象内行尾（`rate: 0.07 }`），两项附加是独立字段（`rate: 0.03,`），两种写法都要认
+        const staleSurtaxRows = surtaxRows.filter((p) => {
+            const v = (p / 100).toFixed(2);
+            return !(constantsJs.raw.includes(`rate: ${v},`) || constantsJs.raw.includes(`rate: ${v} }`));
+        });
+        record('附加税落地页静态税率表与常量文件逐档一致（7/5/1/3/2，页面不维护第二份口径）',
+            surtaxPage.status === 200 && surtaxRows.length === 5 && staleSurtaxRows.length === 0
+            && surtaxPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && surtaxPage.raw.includes('/src/js/calculation/surtax-stamp-quick.js'),
+            `${surtaxRows.length} 档, 与常量不一致 ${staleSurtaxRows.length} 档`);
+        const stampBlock = (surtaxPage.raw.split('id="stamp-rate-table"')[1] || '').split('</table>')[0];
+        const stampRows = Array.from(stampBlock.matchAll(/<td class="num">([\d.]+)‰<\/td>/g))
+            .map((m) => Math.round((Number(m[1]) / 1000) * 1e9) / 1e9);
+        const staleStampRows = stampRows.filter((r) => !constantsJs.raw.includes(`rate: ${r},`));
+        record('印花税落地页静态税目税率表与常量文件逐行一致（17 个税目，页面不维护第二份口径）',
+            surtaxPage.status === 200 && stampRows.length === 17 && staleStampRows.length === 0,
+            `${stampRows.length} 个税目, 与常量不一致 ${staleStampRows.length} 个`);
+        record('附加税与印花税落地页写明三条易错口径：附加跟增值税走、看凭证与列明金额、账簿只对增加部分',
+            surtaxPage.status === 200 && surtaxPage.raw.includes('附加税跟着增值税走，不是跟着收入走')
+            && surtaxPage.raw.includes('印花税看的是「凭证」和「列明的金额」')
+            && surtaxPage.raw.includes('营业账簿只对「增加部分」计税')
+            && surtaxPage.raw.includes('不包括列明的增值税税款')
+            && surtaxPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了附加税、印花税与六税两费减半三条（减半至 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'surtax'")
+            && registryJs.raw.includes("id: 'stamp-duty'")
+            && registryJs.raw.includes("id: 'surtax-stamp-halve'")
+            && registryJs.raw.includes('stampDutyRules')
+            && surtaxPage.raw.includes('?source=seo_surtax'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

@@ -355,6 +355,75 @@ var corporateIncomeTaxRules = {
     effectiveFrom: '2008-01-01'
 };
 
+// 附加税（阶段15 15B-3）—— 城市维护建设税 + 两项教育附加。计算由 surtax-stamp-quick.js 读这里。
+//
+// 2026 年现行口径（三处最容易搞混）：
+//   1. 城建税税率按**所在地**分三档：市区 7% / 县城、镇 5% / 其他 1%（城建税法第四条）。
+//      它**不是**对收入征的，计税依据是「依法实际缴纳的增值税、消费税税额」（城建税法第二条）——
+//      所以增值税免了，附加税跟着免；增值税是 0，附加税就是 0。
+//   2. 两项附加是全国统一费率：教育费附加 3%、地方教育附加 2%，与城建税同一计税依据。
+//      合计常说成「12% 附加」（市区 7% + 3% + 2%），县城 10%、其他 6%。
+//   3. 小规模纳税人 / 小型微利企业 / 个体工商户可享「六税两费」**减半**（2023 年第 12 号第二条，
+//      执行至 2027-12-31）—— 减半后市区合计 6%。证券交易印花税**不在**减半范围内。
+var surtaxRules = {
+    city: {
+        label: '城市维护建设税',
+        rates: [
+            { key: 'urban', label: '纳税人所在地在市区', rate: 0.07 },
+            { key: 'county', label: '纳税人所在地在县城、镇', rate: 0.05 },
+            { key: 'other', label: '纳税人所在地不在市区、县城或者镇', rate: 0.01 }
+        ],
+        baseNote: '以纳税人依法实际缴纳的增值税、消费税税额为计税依据',
+        effectiveFrom: '2021-09-01'
+    },
+    education: { key: 'education', label: '教育费附加', rate: 0.03 },
+    localEducation: { key: 'localEducation', label: '地方教育附加', rate: 0.02 },
+    halve: {
+        label: '“六税两费”减半',
+        ratio: 0.5,
+        scope: ['城市维护建设税', '教育费附加', '地方教育附加', '印花税（不含证券交易印花税）'],
+        excludeSecurities: true,
+        effectiveFrom: '2023-01-01',
+        expiresOn: '2027-12-31'
+    }
+};
+
+// 印花税（阶段15 15B-3）—— 《印花税法》（主席令第 89 号），2022-07-01 施行，原暂行条例同时废止。
+// 计算由 surtax-stamp-quick.js 读这里，页面 /seo/surtax-stamp-duty.html 读 quick。
+//
+// 2026 年现行口径（三处最容易搞混）：
+//   1. 计税依据**不包括列明的增值税税款**（第五条）：合同里单独列明增值税的，按不含税金额贴花；
+//      没列明的，按合同全额计征 —— 签合同时多写一行税额，能直接省下 13% 对应的印花税。
+//   2. 同一凭证载有两个以上税目事项：**分别列明金额**的分别计税，**未分别列明**的**从高**适用税率（第九条）。
+//   3. 营业账簿只对**增加部分**计税（第十一条）：按实收资本（股本）+ 资本公积的**增加额** × 0.25‰，
+//      不是每年按注册资本总额重贴一遍。
+var stampDutyRules = {
+    effectiveFrom: '2022-07-01',
+    excludeVat: true,             // 计税依据不包括列明的增值税税款
+    fromHigherWhenMixed: true,    // 同一凭证多个税目未分别列明金额：从高适用税率
+    accountBookOnlyIncrement: true,
+    items: [
+        { key: 'loan', name: '借款合同', rate: 0.00005, base: '借款金额', note: '银行业金融机构与借款人（不含同业拆借）' },
+        { key: 'financeLease', name: '融资租赁合同', rate: 0.00005, base: '租金' },
+        { key: 'sale', name: '买卖合同', rate: 0.0003, base: '价款', note: '不含个人书立的动产买卖合同' },
+        { key: 'contract', name: '承揽合同', rate: 0.0003, base: '报酬' },
+        { key: 'construction', name: '建设工程合同', rate: 0.0003, base: '价款' },
+        { key: 'transport', name: '运输合同', rate: 0.0003, base: '运输费用', note: '货运合同和多式联运合同（不含管道运输合同）' },
+        { key: 'technology', name: '技术合同', rate: 0.0003, base: '价款、报酬或者使用费', note: '不含专利权、专有技术使用权转让书据' },
+        { key: 'lease', name: '租赁合同', rate: 0.001, base: '租金' },
+        { key: 'custody', name: '保管合同', rate: 0.001, base: '保管费' },
+        { key: 'warehouse', name: '仓储合同', rate: 0.001, base: '仓储费' },
+        { key: 'insurance', name: '财产保险合同', rate: 0.001, base: '保险费', note: '不含再保险合同' },
+        { key: 'landTransfer', name: '土地使用权出让书据', rate: 0.0005, base: '价款' },
+        { key: 'propertyTransfer', name: '土地使用权、房屋等建筑物和构筑物所有权转让书据', rate: 0.0005, base: '价款', note: '不含土地承包经营权和土地经营权转移' },
+        { key: 'equityTransfer', name: '股权转让书据', rate: 0.0005, base: '价款', note: '不含应缴纳证券交易印花税的' },
+        { key: 'ipTransfer', name: '商标专用权、著作权、专利权、专有技术使用权转让书据', rate: 0.0003, base: '价款' },
+        { key: 'accountBook', name: '营业账簿', rate: 0.00025, base: '实收资本（股本）、资本公积合计金额', note: '按增加部分计算' },
+        { key: 'securities', name: '证券交易', rate: 0.001, base: '成交金额', note: '仅对出让方征收，不对受让方征收；不享受六税两费减半' }
+    ],
+    securitiesKey: 'securities'
+};
+
 // 增值税（阶段15 15B-1）—— 与个税不同源：这是流转税，本文件只存「法定档位与优惠参数」，
 // 计算由 vat-quick.js 读这里，页面 /seo/vat.html 读 quick，避免第二份口径。
 //
@@ -426,6 +495,8 @@ window.EuriskoTaxConstants = {
     earlyRetirementRules: earlyRetirementRules,
     vatRules: vatRules,
     corporateIncomeTaxRules: corporateIncomeTaxRules,
+    surtaxRules: surtaxRules,
+    stampDutyRules: stampDutyRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

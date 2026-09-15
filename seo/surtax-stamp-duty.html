@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15B-3）：企业税种第三页，长尾词「城建税 怎么算 / 教育费附加 3% /
+         地方教育附加 2% / 附加税 12% / 印花税 怎么算 / 印花税 税率表 / 买卖合同 万分之三 /
+         租赁合同 千分之一 / 营业账簿 万分之二点五 / 六税两费 减半」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 规则与税率复用 App 同源实现（surtax-stamp-quick.js + surtaxRules / stampDutyRules），
+              页面上不出现第二份口径；
+           3) 政策依据文号来自税种注册表 tax-registry.js，页面不自己维护文号；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背一条主线任务：**把「附加税跟着增值税走」和「印花税按凭证、按列明金额」讲清楚** ——
+         附加税的计税依据是**实际缴纳的增值税、消费税**，不是收入（增值税免了，附加税跟着免）；
+         印花税则是按**每张应税凭证**各自的税目计税，且计税依据**不包括列明的增值税税款**。 -->
+    <title>城建税及教育费附加、印花税怎么算 2026：市区 7% / 县城 5% / 其他 1% + 教育费附加 3% + 地方教育附加 2%，印花税税目税率表与六税两费减半计算器</title>
+    <meta name="description" content="按 2026 年现行政策算附加税与印花税：城市维护建设税按纳税人所在地分档（市区 7%、县城和镇 5%、其他 1%），以依法实际缴纳的增值税、消费税税额为计税依据，另加教育费附加 3%、地方教育附加 2%（市区合计 12%）；印花税按税目计税（借款 0.05‰、买卖 0.3‰、租赁 1‰、股权转让 0.5‰、营业账簿 0.25‰），计税依据不包括列明的增值税税款。小规模纳税人、小型微利企业和个体工商户可享六税两费减半，执行至 2027 年 12 月 31 日。政策依据：城建税法（主席令第 51 号）、印花税法（主席令第 89 号）、财政部 税务总局公告 2023 年第 12 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/surtax-stamp-duty.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="附加税与印花税怎么算：12% 附加从哪来，印花税按哪张凭证贴">
+    <meta property="og:description" content="附加税跟着实际缴纳的增值税走；印花税按每张应税凭证的税目计税，且不含列明的增值税。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/surtax-stamp-duty.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 附加税与印花税测算",
+                "url": "https://euriskotax.zeabur.app/seo/surtax-stamp-duty.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按纳税人所在地分档测算城市维护建设税及教育费附加、地方教育附加，并按税目测算印花税，支持六税两费减半。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "城建税及教育费附加怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "计税依据是纳税人依法实际缴纳的增值税、消费税税额，不是营业收入。城市维护建设税按所在地分档：市区 7%、县城和镇 5%、其他 1%；另加教育费附加 3%、地方教育附加 2%。市区合计为 12%（县城 10%、其他 6%）。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "增值税免了，附加税还要交吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不用。城建税与两项教育附加都以实际缴纳的增值税、消费税税额为计税依据，增值税为零时附加税也是零 —— 小规模纳税人季度销售额不超过 30 万元免征增值税时，对应的附加税同样为零。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "「六税两费」减半是什么？谁能享受？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "自 2023 年 1 月 1 日至 2027 年 12 月 31 日，对增值税小规模纳税人、小型微利企业和个体工商户减半征收资源税（不含水资源税）、城市维护建设税、房产税、城镇土地使用税、印花税（不含证券交易印花税）、耕地占用税和教育费附加、地方教育附加。按财政部 税务总局公告 2023 年第 12 号执行，减半后市区附加合计由 12% 降为 6%。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "印花税怎么算？计税依据含增值税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "应纳税额 = 计税依据 × 适用税率。应税合同的计税依据为合同所列金额，**不包括列明的增值税税款**：合同中单独列明增值税的按不含税金额贴花，未列明的按合同全额计征。同一凭证载有两个以上税目事项且未分别列明金额的，从高适用税率。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "营业账簿印花税每年都要按注册资本交一次吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不是。营业账簿按实收资本（股本）与资本公积合计金额的万分之二点五贴花，已缴纳印花税的营业账簿在以后年度只有合计金额比已缴纳时增加的部分才需要计税，不是每年按注册资本总额重贴一遍。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页按公开政策口径做测算，实际适用税率、所在地适用档位与优惠资格以主管税务机关认定为准，地方教育附加费率以所在省份规定为准。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_surtax">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>城建税及教育费附加、印花税怎么算：12% 附加从哪来，印花税按哪张凭证贴</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>附加税的计税依据是<strong>实际缴纳的增值税、消费税税额</strong>，
+            不是收入 —— 增值税免了，附加税跟着免。
+            <strong>城市维护建设税</strong>按纳税人<strong>所在地</strong>分三档：市区 <strong>7%</strong>、
+            县城和镇 <strong>5%</strong>、其他 <strong>1%</strong>；
+            再加<strong>教育费附加 3%</strong> 与<strong>地方教育附加 2%</strong>，
+            也就是常说的「市区 12% 附加」（县城 10%、其他 6%）。
+            <strong>印花税</strong>则是另一套逻辑：按<strong>每张应税凭证</strong>的税目计税，
+            借款合同 0.05‰、买卖合同 0.3‰、租赁合同 1‰、股权转让 0.5‰、营业账簿 0.25‰，
+            且计税依据<strong>不包括列明的增值税税款</strong>。
+            小规模纳税人、小型微利企业和个体工商户可享<strong>六税两费减半</strong>（至 2027-12-31），
+            减半后市区附加合计 <strong>6%</strong>。下面三个速算器分别实算。
+        </p>
+
+        <section class="card" aria-labelledby="surtax-title">
+            <h2 id="surtax-title" style="margin-top:0">速算一：城建税 + 教育费附加 + 地方教育附加</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：计税依据 = <strong>实际缴纳的增值税 + 消费税</strong>（不是营业收入）；
+                城建税按<strong>所在地</strong>分档；两项附加全国统一 3% 与 2%
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="s-vat">本期实际缴纳增值税（元）</label>
+                    <input class="calc-input" id="s-vat" type="number" inputmode="decimal" min="0" step="1000" value="10000" aria-describedby="surtax-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="s-consumption">本期实际缴纳消费税（元）</label>
+                    <input class="calc-input" id="s-consumption" type="number" inputmode="decimal" min="0" step="1000" value="0" aria-describedby="surtax-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="s-location">纳税人所在地</label>
+                    <select class="calc-input" id="s-location" aria-describedby="surtax-note">
+                        <option value="urban" selected>市区（城建税 7%）</option>
+                        <option value="county">县城、镇（城建税 5%）</option>
+                        <option value="other">不在市区、县城或镇（城建税 1%）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="s-halve">是否享受六税两费减半</label>
+                    <select class="calc-input" id="s-halve" aria-describedby="surtax-note">
+                        <option value="no" selected>否（全额）</option>
+                        <option value="yes">是（小规模 / 小微 / 个体户，减半）</option>
+                    </select>
+                </div>
+            </div>
+            <p class="small muted" id="surtax-note" style="margin-top:10px">
+                增值税为 0（如小规模季度销售额不超过 30 万元免征）时，这里的附加税同样为 <strong>0</strong>。
+                六税两费减半依据财政部 税务总局公告 2023 年第 12 号，<strong>执行至 2027 年 12 月 31 日</strong><span id="halve-expiry"></span>。
+            </p>
+            <div class="results" id="surtax-results" hidden>
+                <div class="result">
+                    <div class="k">城建税 7%（元）</div>
+                    <div class="v" id="r-s-city">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">教育费附加 3%（元）</div>
+                    <div class="v" id="r-s-edu">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">地方教育附加 2%（元）</div>
+                    <div class="v" id="r-s-local">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">附加税合计（元）</div>
+                    <div class="v" id="r-s-total">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">占增值税比例</div>
+                    <div class="v" id="r-s-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">减半省下（元）</div>
+                    <div class="v" id="r-s-saved">—</div>
+                </div>
+            </div>
+            <div class="hint" id="surtax-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="stamp-title">
+            <h2 id="stamp-title" style="margin-top:0">速算二：印花税（按税目，计税依据不含列明的增值税）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：<strong>应纳税额 = 计税依据 × 适用税率</strong>；
+                计税依据为凭证所列金额，<strong>不包括列明的增值税税款</strong>
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 280px">
+                    <label class="calc-label" for="p-item">应税凭证（税目）</label>
+                    <select class="calc-input" id="p-item" aria-describedby="stamp-note">
+                        <option value="sale" selected>买卖合同（万分之三）</option>
+                        <option value="loan">借款合同（万分之零点五）</option>
+                        <option value="financeLease">融资租赁合同（万分之零点五）</option>
+                        <option value="contract">承揽合同（万分之三）</option>
+                        <option value="construction">建设工程合同（万分之三）</option>
+                        <option value="transport">运输合同（万分之三）</option>
+                        <option value="technology">技术合同（万分之三）</option>
+                        <option value="lease">租赁合同（千分之一）</option>
+                        <option value="custody">保管合同（千分之一）</option>
+                        <option value="warehouse">仓储合同（千分之一）</option>
+                        <option value="insurance">财产保险合同（千分之一）</option>
+                        <option value="landTransfer">土地使用权出让书据（万分之五）</option>
+                        <option value="propertyTransfer">房屋等建筑物和构筑物所有权转让书据（万分之五）</option>
+                        <option value="equityTransfer">股权转让书据（万分之五）</option>
+                        <option value="ipTransfer">商标权、著作权、专利权、专有技术使用权转让书据（万分之三）</option>
+                        <option value="accountBook">营业账簿（万分之二点五，按增加部分）</option>
+                        <option value="securities">证券交易（千分之一，仅出让方）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="p-amount">凭证所列金额（元）</label>
+                    <input class="calc-input" id="p-amount" type="number" inputmode="decimal" min="0" step="100000" value="1000000" aria-describedby="stamp-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="p-vat">其中单独列明的增值税（元）</label>
+                    <input class="calc-input" id="p-vat" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="stamp-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="p-halve">是否享受六税两费减半</label>
+                    <select class="calc-input" id="p-halve" aria-describedby="stamp-note">
+                        <option value="no" selected>否（全额）</option>
+                        <option value="yes">是（小规模 / 小微 / 个体户，减半）</option>
+                    </select>
+                </div>
+            </div>
+            <p class="small muted" id="stamp-note" style="margin-top:10px">
+                合同里<strong>单独写一行增值税额</strong>，印花税就按不含税金额贴花；没列明则按合同全额计征 ——
+                同一份合同，写与不写能差出一笔真金白银。证券交易印花税<strong>不享受</strong>减半。
+            </p>
+            <div class="results" id="stamp-results" hidden>
+                <div class="result">
+                    <div class="k">适用税率</div>
+                    <div class="v" id="r-p-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">计税依据（元）</div>
+                    <div class="v" id="r-p-base">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">应纳印花税（元）</div>
+                    <div class="v" id="r-p-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">未列明增值税对照（元）</div>
+                    <div class="v" id="r-p-full">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">减半省下（元）</div>
+                    <div class="v" id="r-p-saved">—</div>
+                </div>
+            </div>
+            <div class="hint" id="stamp-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="bundle-title">
+            <h2 id="bundle-title" style="margin-top:0">速算三：同一期间多张凭证合计（不同税目分别计税）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：每张凭证<strong>各按自己的税目</strong>计税后加总；
+                若一份合同混载多个税目却<strong>未分别列明金额</strong>，则<strong>从高</strong>适用税率
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-sale">买卖合同金额（元）</label>
+                    <input class="calc-input" id="b-sale" type="number" inputmode="decimal" min="0" step="100000" value="1000000" aria-describedby="bundle-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-lease">租赁合同金额（元）</label>
+                    <input class="calc-input" id="b-lease" type="number" inputmode="decimal" min="0" step="10000" value="300000" aria-describedby="bundle-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-loan">借款合同金额（元）</label>
+                    <input class="calc-input" id="b-loan" type="number" inputmode="decimal" min="0" step="100000" value="5000000" aria-describedby="bundle-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="b-book">营业账簿增加额（元）</label>
+                    <input class="calc-input" id="b-book" type="number" inputmode="decimal" min="0" step="100000" value="2000000" aria-describedby="bundle-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="b-halve">是否享受六税两费减半</label>
+                    <select class="calc-input" id="b-halve" aria-describedby="bundle-note">
+                        <option value="no" selected>否（全额）</option>
+                        <option value="yes">是（小规模 / 小微 / 个体户，减半）</option>
+                    </select>
+                </div>
+            </div>
+            <p class="small muted" id="bundle-note" style="margin-top:10px">
+                营业账簿填的是<strong>实收资本（股本）+ 资本公积的增加额</strong>，不是注册资本总额 ——
+                只在比上次已贴花金额<strong>增加</strong>时才计税。
+            </p>
+            <div class="results" id="bundle-results" hidden>
+                <div class="result">
+                    <div class="k">买卖合同（元）</div>
+                    <div class="v" id="r-b-sale">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">租赁合同（元）</div>
+                    <div class="v" id="r-b-lease">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">借款合同（元）</div>
+                    <div class="v" id="r-b-loan">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">营业账簿（元）</div>
+                    <div class="v" id="r-b-book">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">印花税合计（元）</div>
+                    <div class="v" id="r-b-total">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">减半省下（元）</div>
+                    <div class="v" id="r-b-saved">—</div>
+                </div>
+            </div>
+            <div class="hint" id="bundle-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方税率表与示例表手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>示例：本期缴增值税 1 万元，附加税要交多少</h2>
+        <div class="table-scroll">
+            <table id="surtax-example-table">
+                <thead>
+                <tr>
+                    <th scope="col">纳税人所在地</th>
+                    <th scope="col">城建税（元）</th>
+                    <th scope="col">教育费附加（元）</th>
+                    <th scope="col">地方教育附加（元）</th>
+                    <th scope="col">合计（元）</th>
+                    <th scope="col">减半后（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>市区（7%）</td><td class="num">700.00</td><td class="num">300.00</td><td class="num">200.00</td><td class="num">1200.00</td><td class="num">600.00</td></tr>
+                <tr><td>县城、镇（5%）</td><td class="num">500.00</td><td class="num">300.00</td><td class="num">200.00</td><td class="num">1000.00</td><td class="num">500.00</td></tr>
+                <tr><td>其他（1%）</td><td class="num">100.00</td><td class="num">300.00</td><td class="num">200.00</td><td class="num">600.00</td><td class="num">300.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            注意这三项的计税依据是同一个数：<strong>实际缴纳的增值税 1 万元</strong>（不是收入、也不是利润）。
+            所以「12% 附加」说的是「增值税的 12%」，与销售额无关。
+        </p>
+
+        <h2>示例：常见凭证的印花税</h2>
+        <div class="table-scroll">
+            <table id="stamp-example-table">
+                <thead>
+                <tr>
+                    <th scope="col">应税凭证</th>
+                    <th scope="col">金额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">印花税（元）</th>
+                    <th scope="col">减半后（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>买卖合同</td><td class="num">1000000.00</td><td class="num">0.3‰</td><td class="num">300.00</td><td class="num">150.00</td></tr>
+                <tr><td>租赁合同</td><td class="num">1000000.00</td><td class="num">1‰</td><td class="num">1000.00</td><td class="num">500.00</td></tr>
+                <tr><td>借款合同</td><td class="num">10000000.00</td><td class="num">0.05‰</td><td class="num">500.00</td><td class="num">250.00</td></tr>
+                <tr><td>营业账簿（增加额）</td><td class="num">10000000.00</td><td class="num">0.25‰</td><td class="num">2500.00</td><td class="num">1250.00</td></tr>
+                <tr><td>股权转让书据</td><td class="num">5000000.00</td><td class="num">0.5‰</td><td class="num">2500.00</td><td class="num">1250.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            同一笔 100 万元：买卖合同贴 300 元、租赁合同贴 1000 元 ——
+            差在<strong>税目</strong>，不在金额。这也是为什么审合同时先看「这是什么合同」。
+        </p>
+
+        <h2>城建税及附加税率表（2026 年现行）</h2>
+        <div class="table-scroll">
+            <table id="surtax-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">计税依据：依法实际缴纳的增值税、消费税税额（城建税法第二条）</caption>
+                <thead>
+                <tr>
+                    <th scope="col">项目</th>
+                    <th scope="col">税率 / 费率</th>
+                    <th scope="col">适用</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>城市维护建设税</td><td class="num">7%</td><td>纳税人所在地在市区</td></tr>
+                <tr><td>城市维护建设税</td><td class="num">5%</td><td>纳税人所在地在县城、镇</td></tr>
+                <tr><td>城市维护建设税</td><td class="num">1%</td><td>纳税人所在地不在市区、县城或者镇</td></tr>
+                <tr><td>教育费附加</td><td class="num">3%</td><td>全国统一费率（国务院令第 60 号）</td></tr>
+                <tr><td>地方教育附加</td><td class="num">2%</td><td>全国统一费率（财综〔2010〕98 号）</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>印花税税目税率表（2022-07-01 起施行）</h2>
+        <div class="table-scroll">
+            <table id="stamp-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 计税依据 × 适用税率；计税依据不包括列明的增值税税款</caption>
+                <thead>
+                <tr>
+                    <th scope="col">税目</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">计税依据</th>
+                    <th scope="col">备注</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>借款合同</td><td class="num">0.05‰</td><td>借款金额</td><td>不含同业拆借</td></tr>
+                <tr><td>融资租赁合同</td><td class="num">0.05‰</td><td>租金</td><td></td></tr>
+                <tr><td>买卖合同</td><td class="num">0.3‰</td><td>价款</td><td>不含个人书立的动产买卖合同</td></tr>
+                <tr><td>承揽合同</td><td class="num">0.3‰</td><td>报酬</td><td></td></tr>
+                <tr><td>建设工程合同</td><td class="num">0.3‰</td><td>价款</td><td></td></tr>
+                <tr><td>运输合同</td><td class="num">0.3‰</td><td>运输费用</td><td>不含管道运输合同</td></tr>
+                <tr><td>技术合同</td><td class="num">0.3‰</td><td>价款、报酬或者使用费</td><td>不含专利权、专有技术使用权转让书据</td></tr>
+                <tr><td>租赁合同</td><td class="num">1‰</td><td>租金</td><td></td></tr>
+                <tr><td>保管合同</td><td class="num">1‰</td><td>保管费</td><td></td></tr>
+                <tr><td>仓储合同</td><td class="num">1‰</td><td>仓储费</td><td></td></tr>
+                <tr><td>财产保险合同</td><td class="num">1‰</td><td>保险费</td><td>不含再保险合同</td></tr>
+                <tr><td>土地使用权出让书据</td><td class="num">0.5‰</td><td>价款</td><td></td></tr>
+                <tr><td>土地使用权、房屋等建筑物和构筑物所有权转让书据</td><td class="num">0.5‰</td><td>价款</td><td>不含土地承包经营权和土地经营权转移</td></tr>
+                <tr><td>股权转让书据</td><td class="num">0.5‰</td><td>价款</td><td>不含应缴纳证券交易印花税的</td></tr>
+                <tr><td>商标专用权、著作权、专利权、专有技术使用权转让书据</td><td class="num">0.3‰</td><td>价款</td><td></td></tr>
+                <tr><td>营业账簿</td><td class="num">0.25‰</td><td>实收资本（股本）、资本公积合计金额</td><td>按增加部分计算</td></tr>
+                <tr><td>证券交易</td><td class="num">1‰</td><td>成交金额</td><td>仅对出让方征收；不享受六税两费减半</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 附加税跟着增值税走，不是跟着收入走</h3>
+        <p>
+            城建税与两项附加的计税依据是<strong>依法实际缴纳的增值税、消费税税额</strong>。
+            增值税免了、或者本期留抵没有实际缴税，附加税就是 <strong>0</strong> ——
+            所以小规模纳税人季度销售额不超过 30 万元免征增值税时，附加税同样为 0，不需要再算一遍。
+        </p>
+        <h3>2. 印花税看的是「凭证」和「列明的金额」</h3>
+        <p>
+            印花税按<strong>每张应税凭证</strong>的税目计税，同一份 100 万元的凭证，买卖合同 300 元、租赁合同 1000 元。
+            计税依据<strong>不包括列明的增值税税款</strong>：合同里单独写一行税额，就按不含税金额贴花；没列明则按全额计征。
+            同一凭证混载多个税目又<strong>未分别列明金额</strong>的，<strong>从高</strong>适用税率 —— 拆开来写能省税。
+        </p>
+        <h3>3. 营业账簿只对「增加部分」计税</h3>
+        <p>
+            营业账簿按实收资本（股本）与资本公积合计金额的 <strong>0.25‰</strong> 贴花，
+            但已贴花的账簿以后年度只有<strong>比已缴纳时增加的部分</strong>才需要计税，
+            不是每年按注册资本总额重贴一遍 —— 这是最常被多缴的一处。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>城建税及教育费附加怎么算？</summary>
+            <p>计税依据是纳税人依法实际缴纳的增值税、消费税税额，不是营业收入。城市维护建设税按所在地分档：市区 7%、县城和镇 5%、其他 1%；另加教育费附加 3%、地方教育附加 2%。市区合计为 12%（县城 10%、其他 6%）。</p>
+        </details>
+        <details>
+            <summary>增值税免了，附加税还要交吗？</summary>
+            <p>不用。城建税与两项教育附加都以实际缴纳的增值税、消费税税额为计税依据，增值税为零时附加税也是零 —— 小规模纳税人季度销售额不超过 30 万元免征增值税时，对应的附加税同样为零。</p>
+        </details>
+        <details>
+            <summary>「六税两费」减半是什么？谁能享受？</summary>
+            <p>自 2023 年 1 月 1 日至 2027 年 12 月 31 日，对增值税小规模纳税人、小型微利企业和个体工商户减半征收资源税（不含水资源税）、城市维护建设税、房产税、城镇土地使用税、印花税（不含证券交易印花税）、耕地占用税和教育费附加、地方教育附加。按财政部 税务总局公告 2023 年第 12 号执行，减半后市区附加合计由 12% 降为 6%。</p>
+        </details>
+        <details>
+            <summary>印花税怎么算？计税依据含增值税吗？</summary>
+            <p>应纳税额 = 计税依据 × 适用税率。应税合同的计税依据为合同所列金额，<strong>不包括列明的增值税税款</strong>：合同中单独列明增值税的按不含税金额贴花，未列明的按合同全额计征。同一凭证载有两个以上税目事项且未分别列明金额的，从高适用税率。</p>
+        </details>
+        <details>
+            <summary>营业账簿印花税每年都要按注册资本交一次吗？</summary>
+            <p>不是。营业账簿按实收资本（股本）与资本公积合计金额的万分之二点五贴花，已缴纳印花税的营业账簿在以后年度只有合计金额比已缴纳时增加的部分才需要计税，不是每年按注册资本总额重贴一遍。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页按公开政策口径做测算，实际适用税率、所在地适用档位与优惠资格以主管税务机关认定为准，地方教育附加费率以所在省份规定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把个人与企业的税放在一处看</h2>
+            <p>本页算的是附加税与印花税；增值税、企业所得税与个人工资、年度汇算可在 App 里一起看。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_surtax">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
+        <p>政策依据：《中华人民共和国城市维护建设税法》（主席令第 51 号，2021-09-01 施行）、《征收教育费附加的暂行规定》（国务院令第 60 号，2011 年修订）、《关于统一地方教育附加政策有关问题的通知》（财综〔2010〕98 号）、《中华人民共和国印花税法》（主席令第 89 号，2022-07-01 施行）、《关于进一步支持小微企业和个体工商户发展有关税费政策的公告》（财政部 税务总局公告 2023 年第 12 号，六税两费减半执行至 2027 年 12 月 31 日）。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/vat.html">增值税测算</a> · <a href="/seo/corporate-income-tax.html">企业所得税测算</a> · <a href="/seo/surtax-stamp-duty.html">附加税与印花税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂税率表与规则（surtaxRules / stampDutyRules）
+       tax-registry.js    —— 税种注册表（15D-1）：政策依据文号、生效期与到期日
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       surtax-stamp-quick.js —— 与常量同源的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/surtax-stamp-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var quick = window.EuriskoSurtaxQuick;
+
+    function money(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fail(hint, msg) {
+        if (hint) {
+            hint.innerHTML = msg;
+            hint.hidden = false;
+        }
+    }
+
+    // 到期提醒只读注册表：页面不自己算日期（与增值税、企业所得税页同一套做法）
+    function renderExpiry() {
+        var el = document.getElementById('halve-expiry');
+        if (!el || !window.EuriskoTaxRegistry) return;
+        var s = window.EuriskoTaxRegistry.statusOf('surtax-stamp-halve');
+        if (!s || !s.expiresOn) return;
+        if (s.expired) {
+            el.innerHTML = ' —— <strong>本优惠已过期</strong>，请按现行规定确认减半口径。';
+        } else if (s.daysLeft !== null) {
+            el.innerHTML = '（距今约 ' + s.daysLeft + ' 天，剩余 ' + Math.round(s.daysLeft / 365 * 10) / 10 + ' 年）。';
+        }
+    }
+
+    function renderSurtax() {
+        var box = document.getElementById('surtax-results');
+        var hint = document.getElementById('surtax-hint');
+        if (!box) return;
+        if (!quick || typeof quick.surtaxOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方税率表与示例表仍可手工估算。');
+            return;
+        }
+        var halve = document.getElementById('s-halve').value === 'yes';
+        var r = quick.surtaxOf({
+            vat: document.getElementById('s-vat').value,
+            consumption: document.getElementById('s-consumption').value,
+            location: document.getElementById('s-location').value,
+            halve: halve
+        });
+
+        document.getElementById('r-s-city').textContent = money(r.cityTax) + ' 元';
+        document.getElementById('r-s-edu').textContent = money(r.educationTax) + ' 元';
+        document.getElementById('r-s-local').textContent = money(r.localEducationTax) + ' 元';
+        document.getElementById('r-s-total').textContent = money(r.total) + ' 元';
+        document.getElementById('r-s-rate').textContent = (Math.round(r.effectiveRate * 1000) / 10) + '%';
+        document.getElementById('r-s-saved').textContent = money(r.saved) + ' 元';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        if (r.base <= 0) {
+            parts.push('本期实际缴纳的增值税、消费税为 0 —— 附加税也是 <strong>0</strong>：'
+                + '计税依据是「实际缴纳的增值税、消费税税额」，不是收入。增值税免征时附加税同样免。');
+        } else {
+            parts.push('计税依据 = 实际缴纳增值税 ' + money(r.vat) + ' 元 + 消费税 ' + money(r.consumption)
+                + ' 元 = <strong>' + money(r.base) + ' 元</strong>；' + r.locationLabel + '，'
+                + '城建税 ' + (r.cityRate * 100) + '% + 教育费附加 3% + 地方教育附加 2% = '
+                + (Math.round(r.statutoryRate * 1000) / 10) + '%，应交 <strong>' + money(r.total)
+                + ' 元</strong>' + (r.halve ? '（已按六税两费减半）' : '') + '。');
+            var c = r.compare;
+            parts.push('三档对照：市区 ' + money(c.urban.total) + ' 元 / 县城、镇 ' + money(c.county.total)
+                + ' 元 / 其他 ' + money(c.other.total) + ' 元。');
+            if (r.saved > 0.005) {
+                parts.push('若不享受减半为 ' + money(r.statutoryTotal) + ' 元 —— <strong>减半省下 '
+                    + money(r.saved) + ' 元</strong>。');
+            }
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    function renderStamp() {
+        var box = document.getElementById('stamp-results');
+        var hint = document.getElementById('stamp-hint');
+        if (!box) return;
+        if (!quick || typeof quick.stampDutyOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方税目税率表仍可手工估算。');
+            return;
+        }
+        var r = quick.stampDutyOf({
+            item: document.getElementById('p-item').value,
+            amount: document.getElementById('p-amount').value,
+            vat: document.getElementById('p-vat').value,
+            halve: document.getElementById('p-halve').value === 'yes'
+        });
+
+        document.getElementById('r-p-rate').textContent = r.rateText + '（' + (r.rate * 1000) + '‰）';
+        document.getElementById('r-p-base').textContent = money(r.base) + ' 元';
+        document.getElementById('r-p-tax').textContent = money(r.tax) + ' 元';
+        document.getElementById('r-p-saved').textContent = money(r.saved) + ' 元';
+        box.hidden = false;
+
+        var full = quick.stampDutyOf({
+            item: document.getElementById('p-item').value,
+            amount: document.getElementById('p-amount').value,
+            vat: 0,
+            halve: document.getElementById('p-halve').value === 'yes'
+        });
+        document.getElementById('r-p-full').textContent = money(full.tax) + ' 元';
+
+        if (!hint) return;
+        var parts = [];
+        if (r.amount <= 0) {
+            parts.push('请填写凭证所列金额，否则无法估算。');
+        } else {
+            parts.push(r.name + ' 按 <strong>' + r.rateText + '</strong> 计税，'
+                + (r.vat > 0 ? '金额 ' + money(r.amount) + ' 元中列明增值税 ' + money(r.vat)
+                    + ' 元，计税依据 <strong>' + money(r.base) + ' 元</strong>' : '计税依据 ' + money(r.base) + ' 元')
+                + '，应交 <strong>' + money(r.tax) + ' 元</strong>'
+                + (r.halveApplicable ? '（已减半）' : '') + '。');
+            if (r.vat > 0) {
+                parts.push('若合同<strong>未列明</strong>增值税，同一份合同要按全额 '
+                    + money(r.amount) + ' 元计税 = ' + money(full.tax) + ' 元 —— '
+                    + '<strong>多写一行税额省下 ' + money(full.tax - r.tax) + ' 元</strong>。');
+            }
+            if (r.isSecurities) {
+                parts.push('证券交易印花税仅对<strong>出让方</strong>征收，且<strong>不享受</strong>六税两费减半。');
+            }
+            if (r.key === 'accountBook') {
+                parts.push('营业账簿只对<strong>增加部分</strong>计税：已贴花后再次增加的才补缴。');
+            }
+            if (r.saved > 0.005) {
+                parts.push('未减半为 ' + money(r.statutoryTax) + ' 元 —— <strong>减半省下 '
+                    + money(r.saved) + ' 元</strong>。');
+            }
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    function renderBundle() {
+        var box = document.getElementById('bundle-results');
+        var hint = document.getElementById('bundle-hint');
+        if (!box) return;
+        if (!quick || typeof quick.stampDutySumOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方税目税率表仍可手工估算。');
+            return;
+        }
+        var halve = document.getElementById('b-halve').value === 'yes';
+        var r = quick.stampDutySumOf({
+            halve: halve,
+            entries: [
+                { item: 'sale', amount: document.getElementById('b-sale').value },
+                { item: 'lease', amount: document.getElementById('b-lease').value },
+                { item: 'loan', amount: document.getElementById('b-loan').value },
+                { item: 'accountBook', amount: document.getElementById('b-book').value }
+            ]
+        });
+
+        function rowOf(key) {
+            for (var i = 0; i < r.rows.length; i++) {
+                if (r.rows[i].key === key) return r.rows[i];
+            }
+            return null;
+        }
+        ['sale', 'lease', 'loan', 'accountBook'].forEach(function (key) {
+            var row = rowOf(key);
+            var id = { sale: 'r-b-sale', lease: 'r-b-lease', loan: 'r-b-loan', accountBook: 'r-b-book' }[key];
+            document.getElementById(id).textContent = money(row ? row.tax : 0) + ' 元';
+        });
+        document.getElementById('r-b-total').textContent = money(r.total) + ' 元';
+        document.getElementById('r-b-saved').textContent = money(r.saved) + ' 元';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        if (!r.rows.length) {
+            parts.push('请至少填写一张凭证的金额，否则无法估算。');
+        } else {
+            var lines = r.rows.map(function (row) {
+                return row.name + ' ' + money(row.tax) + ' 元（' + row.rateText + '）';
+            });
+            parts.push(lines.join(' + ') + ' = <strong>合计 ' + money(r.total) + ' 元</strong>'
+                + (halve ? '（已按六税两费减半）' : '') + '。');
+            if (r.highest) {
+                parts.push('其中税率最高的是<strong>' + r.highest.name + '（' + r.highest.rateText
+                    + '）</strong>：若把这些事项写进同一份合同又<strong>未分别列明金额</strong>，'
+                    + '要从高适用税率 —— 拆开来写更省。');
+            }
+            if (r.saved > 0.005) {
+                parts.push('未减半为 ' + money(r.statutoryTotal) + ' 元 —— <strong>减半省下 '
+                    + money(r.saved) + ' 元</strong>。');
+            }
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    ['s-vat', 's-consumption', 's-location', 's-halve'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderSurtax);
+        el.addEventListener('change', renderSurtax);
+    });
+    ['p-item', 'p-amount', 'p-vat', 'p-halve'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderStamp);
+        el.addEventListener('change', renderStamp);
+    });
+    ['b-sale', 'b-lease', 'b-loan', 'b-book', 'b-halve'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderBundle);
+        el.addEventListener('change', renderBundle);
+    });
+    renderExpiry();
+    renderSurtax();
+    renderStamp();
+    renderBundle();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', function () {
+        renderExpiry();
+        renderSurtax();
+        renderStamp();
+        renderBundle();
+    });
+});
+</script>
+</body>
+</html>
