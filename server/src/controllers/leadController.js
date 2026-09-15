@@ -14,6 +14,8 @@ const SOURCES = [
     'seo_withholding', 'seo_equity', 'seo_severance', 'seo_special', 'seo_pension', 'seo_expat', 'seo_earlyretire',
     // 阶段15 15B：企业税种落地页（增值税、企业所得税、附加税与印花税）
     'seo_vat', 'seo_cit', 'seo_surtax', 'seo_social', 'seo_netsalary',
+    // 阶段15 15C-3：企业用工成本（15C 收尾项，为 15B / 16D 铺垫）
+    'seo_employercost',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）

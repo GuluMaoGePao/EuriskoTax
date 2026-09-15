@@ -1175,6 +1175,51 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && netPage.raw.includes('/src/js/calculation/net-salary-quick.js')
             && netPage.raw.includes('?source=seo_netsalary'),
             `HTTP ${netPage.status}`);
+        // 阶段15 15C-3：第十六个落地页「企业用工成本」——
+        // 这一页要钉住的是**成本倍数不是常数**：工资越低倍数越高（缴费基数按社平 60% 保底），
+        // 工资越高倍数越低（300% 封顶后单位部分不再增加）；配套钉住涨薪传递率
+        // （企业多付 1395 元、员工全年只多拿约 9000 元，封顶后传递率反而升高）。
+        const costPage = await request(PORT, 'GET', '/seo/employer-cost.html');
+        record('企业用工成本落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（社会保险法 + 公积金管理条例 + 国办发〔2019〕13 号 + 财税〔2006〕10 号）',
+            costPage.status === 200 && costPage.raw.includes('rel="canonical"')
+            && costPage.raw.includes('FAQPage')
+            && costPage.raw.includes('主席令第 35 号')
+            && costPage.raw.includes('国务院令第 262 号')
+            && costPage.raw.includes('国办发〔2019〕13 号')
+            && costPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${costPage.status}`);
+        record('企业用工成本落地页静态成本表可读：13950.00/4896.00/59480.00、保底 4800.00 与封顶 24000.00、到手 7697.50',
+            costPage.status === 200 && ['>13950.00<', '>4896.00<', '>59480.00<', '>4800.00<', '>24000.00<',
+                '>1896.00<', '>9480.00<', '>167400.00<', '>7697.50<']
+                .every((n) => costPage.raw.includes(n)),
+            `HTTP ${costPage.status}`);
+        const raiseTable = (costPage.raw.split('id="raise-example-table"')[1] || '').split('</table>')[0];
+        record('企业用工成本落地页涨薪表可读：未封顶 1395.00/16740.00/9021.00、封顶后 1000.00/9600.00/8370.00',
+            costPage.status === 200 && ['>1395.00<', '>16740.00<', '>9021.00<', '>1000.00<', '>9600.00<', '>8370.00<']
+                .every((n) => raiseTable.includes(n)),
+            `HTTP ${costPage.status}`);
+        const budgetTable = (costPage.raw.split('id="budget-example-table"')[1] || '').split('</table>')[0];
+        record('企业用工成本落地页倒推表可读：预算 13950→10000.00、20000→14336.91、50000→40520.00',
+            costPage.status === 200 && ['>10000.00<', '>14336.91<', '>40520.00<', '>5734.77<']
+                .every((n) => budgetTable.includes(n)),
+            `HTTP ${costPage.status}`);
+        record('企业用工成本落地页写明三条易错口径：倍数不是常数、涨薪传递率、只算法定五险一金',
+            costPage.status === 200 && costPage.raw.includes('成本倍数不是常数：工资越低，倍数越高')
+            && costPage.raw.includes('涨薪 1000 元 ≠ 企业多花 1000 元，员工更拿不到 1000 元')
+            && costPage.raw.includes('公积金是双边的，且这一页只算法定五险一金')
+            && costPage.raw.includes('传递率'),
+            `HTTP ${costPage.status}`);
+        // 线索来源必须进白名单：没进白名单的 source 会被 Lead 接口静默回落成 unknown，
+        // 页面上看着有归因参数，后台却分不清线索来自哪一页 —— 这种错只在看数据时才会被发现。
+        const leadSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'controllers', 'leadController.js'), 'utf8');
+        record('企业用工成本落地页复用同源脚本（常量 + 五险一金 + 用工成本），线索来源已入白名单，CTA 带归因参数',
+            costPage.status === 200
+            && costPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && costPage.raw.includes('/src/js/calculation/social-insurance-quick.js')
+            && costPage.raw.includes('/src/js/calculation/employer-cost-quick.js')
+            && leadSrc.includes("'seo_employercost'")
+            && costPage.raw.includes('?source=seo_employercost'),
+            `HTTP ${costPage.status}`);
         const deadLocs = [];
         // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
         // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
@@ -1197,8 +1242,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             orphanPages.length === 0, orphanPages.join(', '));
         const indexPage = await request(PORT, 'GET', '/seo/index.html');
         const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
-        record('工具总目录列出全部 15 个落地页（卡片 + ItemList 结构化数据）',
-            indexPage.status === 200 && toolCards === 15 && indexPage.raw.includes('"numberOfItems": 15'),
+        record('工具总目录列出全部 16 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 16 && indexPage.raw.includes('"numberOfItems": 16'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
         record('App 首页底部有落地页总目录入口（防 App 内无通路）',
