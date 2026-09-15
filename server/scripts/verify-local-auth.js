@@ -604,7 +604,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/severance.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -868,6 +869,46 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes('privatePensionRules')
             && pensionPage.raw.includes('不划算')
             && pensionPage.raw.includes('净优惠为 0'),
+            `HTTP ${registryJs.status}`);
+        // 第九张落地页「外籍个人津补贴免税」（阶段15 15A-6）：
+        // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加两条本页独有的口径断言 ——
+        //   ① 津补贴免税与专项附加扣除是**二选一**（不得同时享受、年度内不得变更）；
+        //   ② 本政策**有到期日 2027-12-31**：到期提醒必须接入注册表 statusOf，页面必须写明 2028 年起如何衔接。
+        const expatPage = await request(PORT, 'GET', '/seo/expat-allowance.html');
+        record('外籍个人津补贴落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            expatPage.status === 200 && expatPage.raw.includes('rel="canonical"')
+            && expatPage.raw.includes('FAQPage')
+            && expatPage.raw.includes('2023 年第 29 号')
+            && expatPage.raw.includes('财税字〔1994〕020 号'),
+            `HTTP ${expatPage.status}`);
+        const expatAnnualBlock = (expatPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const expatAnnualRows = Array.from(expatAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleExpatRows = expatAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('外籍个人津补贴落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            expatPage.status === 200 && expatAnnualRows.length === 7 && staleExpatRows.length === 0
+            && expatPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && expatPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && expatPage.raw.includes('/src/js/calculation/expat-allowance-quick.js'),
+            `页面 ${expatAnnualRows.length} 档, 与常量不一致 ${staleExpatRows.length} 档`);
+        record('外籍个人津补贴落地页八项免税项目表与静态示例表可读（11600/7200/4400、1200/4880/3680、29000）',
+            expatPage.status === 200 && expatPage.raw.includes('探亲费')
+            && expatPage.raw.includes('以非现金形式或实报实销形式取得')
+            && expatPage.raw.includes('>11600.00<') && expatPage.raw.includes('>7200.00<')
+            && expatPage.raw.includes('>4880.00<') && expatPage.raw.includes('>29000.00<'), '');
+        record('外籍个人津补贴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            expatPage.status === 200 && expatPage.raw.includes('?source=seo_expat'), '');
+        record('税种注册表登记了外籍个人津补贴页：二选一不得叠加 + 到期日 2027-12-31 且页面写明 2028 年起衔接',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'expat-allowance'")
+            && registryJs.raw.includes("page: '/seo/expat-allowance.html'")
+            && registryJs.raw.includes("expiresOn: '2027-12-31'")
+            && registryJs.raw.includes('expatAllowanceRules')
+            && expatPage.raw.includes('不得同时享受')
+            && expatPage.raw.includes('一个纳税年度内不得变更')
+            && expatPage.raw.includes('2028 年起'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

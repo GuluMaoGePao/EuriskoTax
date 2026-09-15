@@ -38,6 +38,7 @@
 | 离职补偿金个税 / 经济补偿金怎么交税 | `/seo/severance.html` | 3 倍社平工资免税额度 + 法定经济补偿上限（12 年 / 3 倍月工资封顶）+ 单独计税速算（并入仅作对照） | ✅ v1.20.0（阶段15 15A-3） |
 | 专项附加扣除标准 / 专项附加扣除能少交多少税 | `/seo/special-deduction.html` | 七项扣除合计速算 + 分摊与互斥（房贷/房租二选一）+ 年度确认提醒 + 「扣的是应纳税所得额」纠偏 | ✅ v1.21.0（阶段15 15A-4） |
 | 个人养老金能抵多少税 / 每年 12000 / 领取 3% | `/seo/private-pension.html` | 缴费税前扣除速算 + 三环节处理表 + 净优惠与回本线 + 「不是所有人都划算」判断 | ✅ v1.22.0（阶段15 15A-5） |
+| 外籍个人 津补贴 免税 / 住房补贴 免税 个税 | `/seo/expat-allowance.html` | 津补贴免税 vs 专项附加扣除「二选一」速算 + 八项免税项目与条件 + 政策到期提醒（接入注册表 statusOf，执行至 2027-12-31） | ✅ v1.23.0（阶段15 15A-6） |
 | 社保基数 / 公积金基数上下限 | `/seo/social-base.html` | 按城市查基数区间与个人扣缴额 | 待办（并入阶段15 15C-1） |
 
 待办页面的推荐顺序：`social-base`（与 C2 城市社保参数库天然对口）→ `net-salary`。（`annual-settlement` 已于 v1.16.0 交付，`salary-tax` 已于 v1.15.0 交付）
@@ -59,7 +60,7 @@
 
 ## 5. 验收与守护
 
-`npm run verify:local` 前端冒烟段新增 39 条断言（v1.14.0 六条 + v1.15.0 四条 + v1.16.0 四条 + v1.18.0 五条 + v1.19.0 五条 + v1.20.0 五条 + v1.21.0 五条 + v1.22.0 五条）：
+`npm run verify:local` 前端冒烟段新增 44 条断言（v1.14.0 六条 + v1.15.0 四条 + v1.16.0 四条 + v1.18.0 五条 + v1.19.0 五条 + v1.20.0 五条 + v1.21.0 五条 + v1.22.0 五条 + v1.23.0 五条）：
 
 1. `robots.txt` 允许抓取公开页、屏蔽 `/api/`、声明 sitemap
 2. `sitemap.xml` 收录首页与**全部**落地页
@@ -100,8 +101,13 @@
 37. 个人养老金落地页三环节处理表与静态示例表可读（12000 元/年 / 3% / 暂不征税、840 / 20400 / 3240）
 38. 个人养老金落地页 CTA 带 `?source=seo_pension`
 39. 税种注册表登记了个人养老金页：领取按 3% 单独计税 + 必须写明「不是所有人都划算」
+40. 外籍个人津补贴落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（2023 年第 29 号 + 财税字〔1994〕020 号）
+41. 外籍个人津补贴落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）
+42. 外籍个人津补贴落地页八项免税项目表与静态示例表可读（11600/7200/4400、1200/4880/3680、29000）
+43. 外籍个人津补贴落地页 CTA 带 `?source=seo_expat`
+44. 税种注册表登记了外籍个人津补贴页：二选一不得叠加 + 到期日 2027-12-31 且页面写明 2028 年起衔接
 
-单元测试：`tests/bonus-tax-quick.test.js`（12 例）+ `tests/salary-tax-quick.test.js`（13 例）+ `tests/annual-settlement-quick.test.js`（16 例）+ `tests/withholding-quick.test.js`（16 例）+ `tests/tax-registry.test.js`（9 例，阶段15 15D-1：注册表 → 常量 → 页面 → sitemap 三向自洽）+ `tests/equity-incentive-quick.test.js`（18 例，15A-2：与内核 `calculateTaxByTaxableIncome` 逐点对拍 + 合并计税 + 到期日不手抄）+ `tests/severance-quick.test.js`（19 例，15A-3：与内核 `calculateTaxByTaxableIncome` 逐点对拍 + 免税额度只能抵法定补偿 + 12 年 / 3 倍月工资封顶 + 旧的平均法已不再执行）+ `tests/special-deduction-quick.test.js`（23 例，15A-4：节税额与内核「两段计税之差」逐点对拍 + 七项标准与分摊/互斥 + 大病医疗起扣线与限额 + 页面必须写明「扣的是应纳税所得额」与每年 12 月确认）+ `tests/private-pension-quick.test.js`（19 例，15A-5：缴费少交的税与内核「两段计税之差」逐点对拍 + 超过限额不可扣不结转 + 领取按全额 3% + 3% 档净优惠为 0 必须判为「不划算」）—— 均与内核在临界点/档位分界点上逐点对拍、覆盖非法输入，并把页面正文静态表与常量文件、内核结果逐档对照；页面引用的同源脚本加载不抛错。汇算页另加两条本页独有的守护：与 `salary-tax-quick.js` 的「已预缴」推演互相对拍（两个页面不可能给出两种口径）、示例表必须同时覆盖「差额 0 / 应退 / 应补」三种结论方向。
+单元测试：`tests/bonus-tax-quick.test.js`（12 例）+ `tests/salary-tax-quick.test.js`（13 例）+ `tests/annual-settlement-quick.test.js`（16 例）+ `tests/withholding-quick.test.js`（16 例）+ `tests/tax-registry.test.js`（9 例，阶段15 15D-1：注册表 → 常量 → 页面 → sitemap 三向自洽）+ `tests/equity-incentive-quick.test.js`（18 例，15A-2：与内核 `calculateTaxByTaxableIncome` 逐点对拍 + 合并计税 + 到期日不手抄）+ `tests/severance-quick.test.js`（19 例，15A-3：与内核 `calculateTaxByTaxableIncome` 逐点对拍 + 免税额度只能抵法定补偿 + 12 年 / 3 倍月工资封顶 + 旧的平均法已不再执行）+ `tests/special-deduction-quick.test.js`（23 例，15A-4：节税额与内核「两段计税之差」逐点对拍 + 七项标准与分摊/互斥 + 大病医疗起扣线与限额 + 页面必须写明「扣的是应纳税所得额」与每年 12 月确认）+ `tests/private-pension-quick.test.js`（19 例，15A-5：缴费少交的税与内核「两段计税之差」逐点对拍 + 超过限额不可扣不结转 + 领取按全额 3% + 3% 档净优惠为 0 必须判为「不划算」）+ `tests/expat-allowance-quick.test.js`（17 例，15A-6：两条路径的少交税额与内核「两段计税之差」逐点对拍 + 八项免税项目与条件 + 到期日 2027-12-31 由注册表 statusOf 判定（2028-01-01 起 expired）+ 页面必须写明「二选一、不得同时享受、年度内不得变更」与 2028 年起衔接）—— 均与内核在临界点/档位分界点上逐点对拍、覆盖非法输入，并把页面正文静态表与常量文件、内核结果逐档对照；页面引用的同源脚本加载不抛错。汇算页另加两条本页独有的守护：与 `salary-tax-quick.js` 的「已预缴」推演互相对拍（两个页面不可能给出两种口径）、示例表必须同时覆盖「差额 0 / 应退 / 应补」三种结论方向。
 
 ## 6. 风险与合规
 

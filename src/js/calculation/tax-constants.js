@@ -243,6 +243,40 @@ var privatePensionRules = {
     expiresOn: null                       // 长期制度，无到期日（缴费上限可动态调整）
 };
 
+// 外籍个人津补贴免税 —— 与专项附加扣除二选一（阶段15 15A-6）
+//
+// 政策依据：《关于延续实施外籍个人有关津补贴个人所得税政策的公告》
+//           （财政部 税务总局公告 2023 年第 29 号，**执行至 2027-12-31**）：
+//   符合居民个人条件的外籍个人，可以选择享受个人所得税专项附加扣除，也可以选择按
+//   财税字〔1994〕020 号、国税发〔1997〕54 号、财税〔2004〕29 号的规定享受
+//   住房补贴、语言训练费、子女教育费等津补贴免税优惠，**但不得同时享受**；
+//   一经选择，在一个纳税年度内不得变更。
+//
+// 口径要点（页面 / 速算 / App 必须同源，改这里一处即可）：
+//   1. 这是**二选一**而不是叠加：不能一边扣专项附加扣除、一边把津补贴当免税；
+//   2. 「免税」同样是通过降低应纳税所得额来少交税（与专项附加扣除同一条纠偏），
+//      所以两条路径的「少交的税」都要按 T(x) − T(x − 金额) 算，而不是「金额 × 税率」；
+//   3. 免税补贴须**以非现金形式或实报实销形式**取得（或按合理标准、经税务机关审核批准）；
+//   4. **有到期日**：执行至 2027-12-31。到期提醒由注册表 statusOf / expiringWithin 统一给出，
+//      页面不允许把「执行至 X 年」写成写完就忘的装饰。
+var expatAllowanceRules = {
+    rateTable: 'comprehensiveTaxRates',   // 两条路径都按**年度**综合所得税率表计税
+    exclusiveWithSpecialDeduction: true,  // 与专项附加扣除二选一，不得同时享受
+    changeNotAllowedInYear: true,         // 一经选择，一个纳税年度内不得变更
+    appliesTo: '符合居民个人条件的外籍个人（含港澳台居民，见财税〔2004〕29 号）',
+    items: [
+        { label: '住房补贴', condition: '以非现金形式或实报实销形式取得' },
+        { label: '伙食补贴', condition: '以非现金形式或实报实销形式取得' },
+        { label: '搬迁费', condition: '以非现金形式或实报实销形式取得' },
+        { label: '洗衣费', condition: '以非现金形式或实报实销形式取得' },
+        { label: '境内、外出差补贴', condition: '按合理标准取得' },
+        { label: '探亲费', condition: '经当地税务机关审核批准为合理的部分（每年不超过 2 次）' },
+        { label: '语言训练费', condition: '经当地税务机关审核批准为合理的部分' },
+        { label: '子女教育费', condition: '经当地税务机关审核批准为合理的部分' }
+    ],
+    expiresOn: '2027-12-31'               // 29 号公告执行期限；到期提醒由注册表统一计算
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -274,6 +308,7 @@ window.EuriskoTaxConstants = {
     severanceRules: severanceRules,
     specialDeductionRules: specialDeductionRules,
     privatePensionRules: privatePensionRules,
+    expatAllowanceRules: expatAllowanceRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };
