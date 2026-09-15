@@ -311,6 +311,42 @@ var earlyRetirementRules = {
     expiresOn: null                           // 长期政策，无到期日
 };
 
+// 增值税（阶段15 15B-1）—— 与个税不同源：这是流转税，本文件只存「法定档位与优惠参数」，
+// 计算由 vat-quick.js 读这里，页面 /seo/vat.html 读 quick，避免第二份口径。
+//
+// 2026 年现行口径（三处最容易搞混）：
+//   1. 2026-01-01 起施行《中华人民共和国增值税法》（主席令第四十一号），同时废止原暂行条例：
+//      一般纳税人税率档 13% / 9% / 6% / 0%；小规模纳税人适用简易计税方法，征收率 3%
+//      （小规模标准：年应征增值税销售额 500 万元以下）。
+//   2. 小规模纳税人的「月 10 万 / 季 30 万以下免征」与「3% 减按 1%」是**阶段性优惠**
+//      （财政部 税务总局公告 2023 年第 19 号，执行至 2027-12-31），不是法定征收率本身 ——
+//      到期日登记在注册表 vat-small-scale 条目上，页面只读 statusOf，不自己算日期。
+//   3. 免征判断用的是**不含税**销售额，且按**全部**销售额判断：一旦超过额度就**全额**计税，
+//      不是只对超出部分 —— 所以「季度 30 万」是真正的临界点（多 1 分钱多缴约 3000 元）。
+var vatRules = {
+    smallScale: {
+        levyRate: 0.03,              // 法定征收率（增值税法：小规模简易计税 3%）
+        reducedRate: 0.01,           // 现行优惠：3% 减按 1%（2023 年第 19 号）
+        monthlyThreshold: 100000,    // 按月纳税：月销售额 10 万元（含本数）以下免征
+        quarterlyThreshold: 300000,  // 按季纳税：季度销售额 30 万元（含本数）以下免征
+        annualSalesCap: 5000000,     // 小规模纳税人标准：年应征增值税销售额 500 万元以下
+        thresholdInclusive: true,    // 含本数（≤ 即免征）
+        thresholdBasis: 'exclusive'  // 以不含税销售额判断
+    },
+    general: {
+        rates: [
+            { rate: 0.13, label: '销售货物 / 加工修理修配服务 / 有形动产租赁服务 / 进口货物' },
+            { rate: 0.09, label: '交通运输 / 邮政 / 基础电信 / 建筑 / 不动产租赁 / 销售不动产 / 转让土地使用权 / 农产品等' },
+            { rate: 0.06, label: '其他服务 / 无形资产' },
+            { rate: 0, label: '出口货物 / 跨境销售规定范围内的服务与无形资产' }
+        ],
+        simplifiedRate: 0.03,        // 一般纳税人的简易计税项目：征收率 3%，且不得抵扣进项
+        inputCredit: true            // 一般计税：应纳税额 = 销项税额 − 进项税额（凭票抵扣）
+    },
+    effectiveFrom: '2026-01-01',     // 增值税法施行日（原暂行条例同日废止）
+    reducedUntil: '2027-12-31'       // 小规模减免优惠执行至（到期判定由注册表 statusOf 统一给出）
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -344,6 +380,7 @@ window.EuriskoTaxConstants = {
     privatePensionRules: privatePensionRules,
     expatAllowanceRules: expatAllowanceRules,
     earlyRetirementRules: earlyRetirementRules,
+    vatRules: vatRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

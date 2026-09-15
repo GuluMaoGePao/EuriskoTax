@@ -606,7 +606,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/vat.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -970,6 +971,45 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && earlyPage.raw.includes('真分摊')
             && earlyPage.raw.includes('只定档')
             && earlyPage.raw.includes('只适用于与用人单位解除劳动关系取得的一次性补偿收入'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-1：企业税种第一页「增值税」——
+        // 与个税页最大的不同是：增值税是**价外税**，页面必须把「含税价先分离」和
+        // 「30 万是临界点（含本数、超过即全额计税）」讲清楚，否则算出来的数就是错的。
+        const vatPage = await request(PORT, 'GET', '/seo/vat.html');
+        record('增值税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（增值税法 + 2023 年第 19 号）',
+            vatPage.status === 200 && vatPage.raw.includes('rel="canonical"')
+            && vatPage.raw.includes('FAQPage')
+            && vatPage.raw.includes('主席令第四十一号')
+            && vatPage.raw.includes('国务院令第 826 号')
+            && vatPage.raw.includes('财政部 税务总局公告 2023 年第 19 号'),
+            `HTTP ${vatPage.status}`);
+        const vatRateBlock = (vatPage.raw.split('id="vat-rate-table"')[1] || '').split('</table>')[0];
+        const vatRateRows = Array.from(vatRateBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        // 常量里写作 rate: 0.13 / 0.09 / 0.06 / 0（9% 与 6% 要补前导零，否则查不到）
+        const staleVatRows = vatRateRows.filter((p) => !constantsJs.raw.includes(
+            p === 0 ? 'rate: 0,' : `rate: ${(p / 100).toFixed(2)},`
+        ));
+        record('增值税落地页静态税率表与常量文件逐档一致（13/9/6/0，页面不维护第二份口径）',
+            vatPage.status === 200 && vatRateRows.length === 4 && staleVatRows.length === 0
+            && vatPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && vatPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && vatPage.raw.includes('/src/js/calculation/vat-quick.js'),
+            `${vatRateRows.length} 档, 与常量不一致 ${staleVatRows.length} 档`);
+        record('增值税落地页静态示例表可读（小规模 3000.00/5000.00/15000.00/10000.00，一般纳税人 13000.00/6000.00）',
+            vatPage.status === 200 && vatPage.raw.includes('>3000.00<') && vatPage.raw.includes('>5000.00<')
+            && vatPage.raw.includes('>15000.00<') && vatPage.raw.includes('>10000.00<')
+            && vatPage.raw.includes('>13000.00<') && vatPage.raw.includes('>6000.00<'), '');
+        record('增值税落地页写明三条易错口径：价外税先分离、30 万含本数且超过全额计税、进项留抵不倒欠',
+            vatPage.status === 200 && vatPage.raw.includes('价外税')
+            && vatPage.raw.includes('含本数') && vatPage.raw.includes('全额')
+            && vatPage.raw.includes('留抵') && vatPage.raw.includes('不得抵扣进项')
+            && vatPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了增值税页（本体长期有效 + 小规模减免到 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'vat'")
+            && registryJs.raw.includes("id: 'vat-small-scale'")
+            && registryJs.raw.includes("page: '/seo/vat.html'")
+            && registryJs.raw.includes('vatRules')
+            && vatPage.raw.includes('?source=seo_vat'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

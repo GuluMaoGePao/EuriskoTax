@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15B-1）：企业税种第一页，长尾词「增值税怎么算 / 小规模纳税人 1% 怎么算 /
+         一般纳税人 增值税 销项 进项 / 含税价 不含税价 换算 / 小规模 30 万 免征」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 规则与税率复用 App 同源实现（vat-quick.js + window.vatRules），页面上不出现第二份口径；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面不自己维护文号；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背一条主线任务：**把「价外税」这件事讲清楚** —— 增值税算的是不含税销售额上的税，
+         合同里的含税价必须先分离；而小规模的免征额度按**全部销售额**判断，超过一分钱就全额计税。 -->
+    <title>增值税怎么算 2026：小规模（季度 30 万免征 / 3% 减按 1%）与一般纳税人（销项−进项）计算器</title>
+    <meta name="description" content="按 2026 年现行政策算增值税：小规模纳税人季销售额 30 万（月 10 万）以下免征、适用 3% 征收率的减按 1%；一般纳税人按「销项税额 − 进项税额」计税，含税价可一键分离。含公式、示例表、税率表与三条易错口径。政策依据：增值税法（主席令第四十一号，2026-01-01 施行）、财政部 税务总局公告 2023 年第 19 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/vat.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="增值税怎么算：小规模与一般纳税人两套口径">
+    <meta property="og:description" content="价外税先分离：含税价 ÷ (1+税率)；小规模季度 30 万是临界点，一般纳税人算销项减进项。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/vat.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 增值税测算",
+                "url": "https://euriskotax.zeabur.app/seo/vat.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "分别按小规模纳税人与一般纳税人的口径测算增值税，并做含税价与不含税价的价税分离。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "小规模纳税人的增值税怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "按不含税销售额乘以征收率计算，不得抵扣进项。2023 年第 19 号公告规定：适用 3% 征收率的应税销售收入减按 1% 征收，月销售额 10 万元以下（按季纳税 30 万元以下）免征增值税，执行至 2027 年 12 月 31 日。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "季度销售额刚好 30 万元要不要交税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不要。免征额度是「含本数」的，季度不含税销售额不超过 30 万元即免征。但它是临界点：一旦超过（哪怕只多 1 分钱），就不再免征，而要按全部销售额乘以 1% 计税，也就是多 1 分钱约多缴 3000 元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "含税价怎么换算成不含税价？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不含税销售额 = 含税销售额 ÷（1 + 税率或征收率），税额 = 含税销售额 − 不含税销售额。增值税是价外税，直接用含税价乘税率会多算：含税 113000 元、税率 13% 时，正确的销项税额是 13000 元，直接相乘会得到 14690 元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "一般纳税人的增值税怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "适用一般计税方法的，应纳税额 = 当期销项税额 − 当期进项税额。销项税额 = 不含税销售额 × 税率（13% / 9% / 6% / 0%）；进项税额凭增值税专用发票等合规扣税凭证抵扣，当期抵不完的留抵下期继续抵扣，不会倒欠。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "小规模纳税人可以抵扣进项吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不可以。小规模纳税人适用简易计税方法，直接按不含税销售额乘以征收率计算应纳税额，进项税额不得抵扣；这也是「小规模税率低但拿不到进项」的由来。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页按公开政策口径做测算，实际适用税率、征收率、进项抵扣与免征额度口径以主管税务机关认定为准。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_vat">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>增值税怎么算：小规模 vs 一般纳税人，含税价怎么分离</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>增值税是<strong>价外税</strong>，算税前必须先把含税价分离成
+            「<strong>不含税销售额</strong> + 税额」—— 不含税销售额 = 含税价 ÷（1 + 税率）。
+            <strong>小规模纳税人</strong>：按不含税销售额 × 征收率（法定 3%，现行优惠<strong>减按 1%</strong>），
+            <strong>不得抵扣进项</strong>；按月纳税月销售额 10 万元以下、按季纳税季度 30 万元以下<strong>免征</strong>。
+            <strong>一般纳税人</strong>：应纳税额 = <strong>销项税额 − 进项税额</strong>，税率 13% / 9% / 6% / 0%，
+            进项抵不完的<strong>留抵下期</strong>、不会倒欠。下面三个速算器分别实算。
+        </p>
+
+        <section class="card" aria-labelledby="small-title">
+            <h2 id="small-title" style="margin-top:0">速算一：小规模纳税人（征收率 3% 减按 1%，季度 30 万以下免征）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：<strong>不含税销售额 × 征收率</strong>；免征额度按<strong>全部销售额</strong>判断（含本数），
+                超过即<strong>全额</strong>计税，不是只对超出部分
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="s-sales">本期销售额（元）</label>
+                    <input class="calc-input" id="s-sales" type="number" inputmode="decimal" min="0" step="10000" value="300000" aria-describedby="small-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="s-period">纳税期</label>
+                    <select class="calc-input" id="s-period" aria-describedby="small-note">
+                        <option value="quarter" selected>按季（30 万元以下免征）</option>
+                        <option value="month">按月（10 万元以下免征）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="s-included">销售额是否含税</label>
+                    <select class="calc-input" id="s-included" aria-describedby="small-note">
+                        <option value="no" selected>不含税</option>
+                        <option value="yes">含税（按 1% 分离）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="s-special">其中开具专票的不含税金额（元）</label>
+                    <input class="calc-input" id="s-special" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="small-note">
+                </div>
+            </div>
+            <p class="small muted" id="small-note" style="margin-top:10px">
+                小规模纳税人<strong>不得抵扣进项税额</strong>。免征适用范围是普通发票部分 ——
+                <strong>开具增值税专用发票的部分不免税</strong>，需按票面征收率缴纳。
+                现行「3% 减按 1%」与免征额度依据财政部 税务总局公告 2023 年第 19 号，
+                <strong>执行至 2027 年 12 月 31 日</strong><span id="small-expiry"></span>。
+            </p>
+            <div class="results" id="small-results" hidden>
+                <div class="result">
+                    <div class="k">不含税销售额（元）</div>
+                    <div class="v" id="r-s-exclusive">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">免征额度（元）</div>
+                    <div class="v" id="r-s-threshold">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">适用征收率</div>
+                    <div class="v" id="r-s-rate">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">应纳增值税（元）</div>
+                    <div class="v" id="r-s-tax">—</div>
+                </div>
+            </div>
+            <div class="hint" id="small-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="general-title">
+            <h2 id="general-title" style="margin-top:0">速算二：一般纳税人（销项税额 − 进项税额）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：<strong>销项税额 = 不含税销售额 × 税率</strong>；<strong>应纳税额 = 销项税额 − 进项税额</strong>；
+                当期进项大于销项时留抵下期，应纳税额为 0
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="g-output">销售额（元）</label>
+                    <input class="calc-input" id="g-output" type="number" inputmode="decimal" min="0" step="10000" value="113000" aria-describedby="general-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="g-rate">适用税率</label>
+                    <select class="calc-input" id="g-rate" aria-describedby="general-note">
+                        <option value="0.13" selected>13%（销售货物 / 加工修理修配 / 有形动产租赁）</option>
+                        <option value="0.09">9%（交通运输 / 建筑 / 不动产租赁 / 不动产）</option>
+                        <option value="0.06">6%（其他服务 / 无形资产）</option>
+                        <option value="0">0%（出口货物 / 规定跨境服务）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="g-included">销售额是否含税</label>
+                    <select class="calc-input" id="g-included" aria-describedby="general-note">
+                        <option value="yes" selected>含税</option>
+                        <option value="no">不含税</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="g-input">当期进项税额（元）</label>
+                    <input class="calc-input" id="g-input" type="number" inputmode="decimal" min="0" step="1000" value="8000" aria-describedby="general-note">
+                </div>
+            </div>
+            <p class="small muted" id="general-note" style="margin-top:10px">
+                进项税额须凭<strong>增值税专用发票</strong>等合规扣税凭证抵扣；抵不完的部分<strong>留抵下期</strong>，
+                本页按 0 元列示（不是欠税）。同一笔业务若适用简易计税（3%），<strong>不得抵扣进项</strong>，
+                页面一并给出对照。
+            </p>
+            <div class="results" id="general-results" hidden>
+                <div class="result">
+                    <div class="k">不含税销售额（元）</div>
+                    <div class="v" id="r-g-exclusive">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">销项税额（元）</div>
+                    <div class="v" id="r-g-output-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">进项税额 / 留抵（元）</div>
+                    <div class="v" id="r-g-input">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">应纳增值税（元）</div>
+                    <div class="v" id="r-g-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">实际税负率</div>
+                    <div class="v" id="r-g-burden">—</div>
+                </div>
+            </div>
+            <div class="hint" id="general-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="split-title">
+            <h2 id="split-title" style="margin-top:0">速算三：价税分离（含税价 ⇄ 不含税价）</h2>
+            <p class="small muted" style="margin-top:0">
+                含税 → 不含税：<strong>不含税价 = 含税价 ÷（1 + 税率）</strong>；不含税 → 含税：<strong>含税价 = 不含税价 ×（1 + 税率）</strong>
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="p-amount">金额（元）</label>
+                    <input class="calc-input" id="p-amount" type="number" inputmode="decimal" min="0" step="1000" value="113000" aria-describedby="split-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="p-rate">税率 / 征收率</label>
+                    <select class="calc-input" id="p-rate" aria-describedby="split-note">
+                        <option value="0.13" selected>13%</option>
+                        <option value="0.09">9%</option>
+                        <option value="0.06">6%</option>
+                        <option value="0.03">3%（法定征收率）</option>
+                        <option value="0.01">1%（小规模现行优惠）</option>
+                        <option value="0">0%</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="p-mode">换算方向</label>
+                    <select class="calc-input" id="p-mode" aria-describedby="split-note">
+                        <option value="in" selected>含税价 → 不含税价 + 税额</option>
+                        <option value="ex">不含税价 → 含税价 + 税额</option>
+                    </select>
+                </div>
+            </div>
+            <p class="small muted" id="split-note" style="margin-top:10px">
+                增值税是价外税：<strong>直接用含税价乘税率会多算税</strong> ——
+                含税 113000 元、13% 税率下正确的是 13000 元，直接相乘会得到 14690 元（多算 1690 元）。
+            </p>
+            <div class="results" id="split-results" hidden>
+                <div class="result">
+                    <div class="k">不含税价（元）</div>
+                    <div class="v" id="r-p-exclusive">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">税额（元）</div>
+                    <div class="v" id="r-p-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">含税价（元）</div>
+                    <div class="v" id="r-p-inclusive">—</div>
+                </div>
+            </div>
+            <div class="hint" id="split-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、税率表与示例表手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>示例：小规模纳税人（按季纳税，不含税销售额）</h2>
+        <div class="table-scroll">
+            <table id="small-example-table">
+                <thead>
+                <tr>
+                    <th scope="col">季度销售额（元）</th>
+                    <th scope="col">是否免征</th>
+                    <th scope="col">适用征收率</th>
+                    <th scope="col">应纳增值税（元）</th>
+                    <th scope="col">法定 3% 对照（元）</th>
+                    <th scope="col">优惠省下（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">200000.00</td><td>免征</td><td class="num">1%</td><td class="num">0.00</td><td class="num">6000.00</td><td class="num">6000.00</td></tr>
+                <tr><td class="num">300000.00</td><td>免征（含本数）</td><td class="num">1%</td><td class="num">0.00</td><td class="num">9000.00</td><td class="num">9000.00</td></tr>
+                <tr><td class="num">300000.01</td><td>超过额度（全额计税）</td><td class="num">1%</td><td class="num">3000.00</td><td class="num">9000.00</td><td class="num">6000.00</td></tr>
+                <tr><td class="num">500000.00</td><td>超过额度（全额计税）</td><td class="num">1%</td><td class="num">5000.00</td><td class="num">15000.00</td><td class="num">10000.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            第二行与第三行只差<strong>一分钱</strong>，税额从 0 元变成约 3000 元 ——
+            这就是「按<strong>全部</strong>销售额判断、超过即全额计税」的临界点效应。
+            开票与确认收入的时点必须算清楚，否则多开一张票就可能多缴几千元。
+        </p>
+
+        <h2>示例：一般纳税人（含税销售额 10 万元档的三种税率）</h2>
+        <div class="table-scroll">
+            <table id="general-example-table">
+                <thead>
+                <tr>
+                    <th scope="col">含税销售额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">不含税销售额（元）</th>
+                    <th scope="col">销项税额（元）</th>
+                    <th scope="col">进项税额（元）</th>
+                    <th scope="col">应纳增值税（元）</th>
+                    <th scope="col">实际税负率</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">113000.00</td><td class="num">13%</td><td class="num">100000.00</td><td class="num">13000.00</td><td class="num">8000.00</td><td class="num">5000.00</td><td class="num">5.0%</td></tr>
+                <tr><td class="num">109000.00</td><td class="num">9%</td><td class="num">100000.00</td><td class="num">9000.00</td><td class="num">3000.00</td><td class="num">6000.00</td><td class="num">6.0%</td></tr>
+                <tr><td class="num">106000.00</td><td class="num">6%</td><td class="num">100000.00</td><td class="num">6000.00</td><td class="num">9000.00</td><td class="num">0.00</td><td class="num">0.0%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            第三行进项 9000 元大于销项 6000 元，应纳税额为 <strong>0 元</strong>，
+            差额 3000 元<strong>留抵下期</strong>继续抵扣 —— 这不是「多缴了」，也不是欠税。
+        </p>
+
+        <h2>一般纳税人税率表（2026 年现行）</h2>
+        <div class="table-scroll">
+            <table id="vat-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">销项税额 = 不含税销售额 × 税率；应纳税额 = 销项税额 − 进项税额</caption>
+                <thead>
+                <tr>
+                    <th scope="col">税率</th>
+                    <th scope="col">适用范围</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">13%</td><td>销售货物、加工修理修配服务、有形动产租赁服务、进口货物</td></tr>
+                <tr><td class="num">9%</td><td>交通运输、邮政、基础电信、建筑、不动产租赁服务、销售不动产、转让土地使用权，以及农产品、自来水、暖气、图书、饲料化肥等货物</td></tr>
+                <tr><td class="num">6%</td><td>除上述以外的其他服务与无形资产</td></tr>
+                <tr><td class="num">0%</td><td>出口货物，以及境内单位和个人跨境销售国务院规定范围内的服务、无形资产</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>小规模纳税人与征收率</h2>
+        <div class="table-scroll">
+            <table id="small-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">小规模纳税人标准：年应征增值税销售额未超过 500 万元；应纳税额 = 不含税销售额 × 征收率，不得抵扣进项</caption>
+                <thead>
+                <tr>
+                    <th scope="col">征收率</th>
+                    <th scope="col">适用</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">3%</td><td>法定征收率（简易计税方法）</td></tr>
+                <tr><td class="num">1%</td><td>现行优惠：适用 3% 征收率的应税销售收入减按 1% 征收，执行至 2027 年 12 月 31 日</td></tr>
+                <tr><td class="num">0</td><td>月销售额 10 万元以下（按季 30 万元以下）免征增值税</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 价外税：含税价不能直接用</h3>
+        <p>
+            合同写的是含税价时，必须先做<strong>价税分离</strong>：不含税销售额 = 含税价 ÷（1 + 税率）。
+            直接拿含税价乘税率会<strong>多算税</strong>（含税 113000 元、13%：正确 13000 元，直接乘得 14690 元）。
+        </p>
+        <h3>2. 30 万是临界点，不是起征点</h3>
+        <p>
+            小规模纳税人的免征额度按<strong>全部不含税销售额</strong>判断，且<strong>含本数</strong>：
+            季度不超过 30 万元即免征；一旦超过，是<strong>全额</strong>按征收率计税，而不是只对超出部分计税 ——
+            所以多 1 分钱可能多缴约 3000 元。开专票的部分<strong>不享受免征</strong>。
+        </p>
+        <h3>3. 进项不是「想抵就抵」，也不是抵不完就退</h3>
+        <p>
+            进项税额须凭<strong>合规扣税凭证</strong>（主要是增值税专用发票）抵扣，且只有<strong>一般纳税人</strong>
+            适用一般计税时才有进项概念 —— 小规模适用简易计税，<strong>不得抵扣进项</strong>。
+            当期进项大于销项时形成<strong>留抵</strong>，结转下期继续抵扣，本页按 0 元列示。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>小规模纳税人的增值税怎么算？</summary>
+            <p>按不含税销售额乘以征收率计算，不得抵扣进项。2023 年第 19 号公告规定：适用 3% 征收率的应税销售收入减按 1% 征收，月销售额 10 万元以下（按季纳税 30 万元以下）免征增值税，执行至 2027 年 12 月 31 日。</p>
+        </details>
+        <details>
+            <summary>季度销售额刚好 30 万元要不要交税？</summary>
+            <p>不要。免征额度是「含本数」的，季度不含税销售额不超过 30 万元即免征。但它是临界点：一旦超过（哪怕只多 1 分钱），就不再免征，而要按全部销售额乘以 1% 计税，也就是多 1 分钱约多缴 3000 元。</p>
+        </details>
+        <details>
+            <summary>含税价怎么换算成不含税价？</summary>
+            <p>不含税销售额 = 含税销售额 ÷（1 + 税率或征收率），税额 = 含税销售额 − 不含税销售额。增值税是价外税，直接用含税价乘税率会多算：含税 113000 元、税率 13% 时，正确的销项税额是 13000 元，直接相乘会得到 14690 元。</p>
+        </details>
+        <details>
+            <summary>一般纳税人的增值税怎么算？</summary>
+            <p>适用一般计税方法的，应纳税额 = 当期销项税额 − 当期进项税额。销项税额 = 不含税销售额 × 税率（13% / 9% / 6% / 0%）；进项税额凭增值税专用发票等合规扣税凭证抵扣，当期抵不完的留抵下期继续抵扣，不会倒欠。</p>
+        </details>
+        <details>
+            <summary>小规模纳税人可以抵扣进项吗？</summary>
+            <p>不可以。小规模纳税人适用简易计税方法，直接按不含税销售额乘以征收率计算应纳税额，进项税额不得抵扣；这也是「小规模税率低但拿不到进项」的由来。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页按公开政策口径做测算，实际适用税率、征收率、进项抵扣与免征额度口径以主管税务机关认定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把个人与企业的税放在一处看</h2>
+            <p>本页算的是企业流转税；个人工资、年终奖与年度汇算可在 App 里一起测算。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_vat">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
+        <p>政策依据：《中华人民共和国增值税法》（主席令第四十一号，2026-01-01 起施行）、《中华人民共和国增值税法实施条例》（国务院令第 826 号）、《关于增值税小规模纳税人减免增值税政策的公告》（财政部 税务总局公告 2023 年第 19 号，执行至 2027 年 12 月 31 日）。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/annual-settlement.html">个税汇算清缴</a> · <a href="/seo/vat.html">增值税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂税率表与规则（vatRules）
+       tax-registry.js    —— 税种注册表（15D-1）：政策依据文号、生效期与到期日
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       vat-quick.js       —— 与常量同源的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/vat-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var quick = window.EuriskoVatQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(rate) {
+        return Math.round(rate * 1000) / 10 + '%';
+    }
+
+    function fail(hint, msg) {
+        if (hint) {
+            hint.innerHTML = msg;
+            hint.hidden = false;
+        }
+    }
+
+    // 到期提醒只读注册表：页面不自己算日期（与外籍个人页 / 年终奖页同一套做法）
+    function renderExpiry() {
+        var el = document.getElementById('small-expiry');
+        if (!el || !window.EuriskoTaxRegistry) return;
+        var s = window.EuriskoTaxRegistry.statusOf('vat-small-scale');
+        if (!s || !s.expiresOn) return;
+        if (s.expired) {
+            el.innerHTML = ' —— <strong>本优惠已过期</strong>，请按现行规定确认征收率与免征额度。';
+        } else if (s.daysLeft !== null) {
+            el.innerHTML = '（距今约 ' + s.daysLeft + ' 天，剩余 ' + Math.round(s.daysLeft / 365 * 10) / 10 + ' 年）。';
+        }
+    }
+
+    function renderSmall() {
+        var box = document.getElementById('small-results');
+        var hint = document.getElementById('small-hint');
+        if (!box) return;
+        if (!quick || typeof quick.smallScaleOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方公式、税率表与示例表仍可手工估算。');
+            return;
+        }
+        var r = quick.smallScaleOf({
+            sales: document.getElementById('s-sales').value,
+            period: document.getElementById('s-period').value,
+            taxIncluded: document.getElementById('s-included').value === 'yes',
+            specialInvoice: document.getElementById('s-special').value
+        });
+
+        document.getElementById('r-s-exclusive').textContent = money(r.exclusive) + ' 元';
+        document.getElementById('r-s-threshold').textContent = money(r.threshold) + ' 元';
+        document.getElementById('r-s-rate').textContent = pct(r.rate) + '（法定 ' + pct(r.levyRate) + '）';
+        document.getElementById('r-s-tax').textContent = money(r.tax) + ' 元';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        if (r.exempt) {
+            parts.push('不含税销售额 ' + money(r.exclusive) + ' 元，未超过' + (r.period === 'month' ? '月' : '季')
+                + '度免征额度 ' + money(r.threshold) + ' 元，<strong>免征增值税</strong>。');
+            if (r.specialInvoice > 0.005) {
+                parts.push('其中开具专用发票的 ' + money(r.specialInvoice) + ' 元<strong>不享受免征</strong>，'
+                    + '按 ' + pct(r.rate) + ' 缴纳 <strong>' + money(r.tax) + ' 元</strong>。');
+            }
+            if (r.cliffTax > 0.005) {
+                parts.push('注意这是<strong>临界点</strong>：销售额再多 0.01 元就不再免征，'
+                    + '需按全额缴纳约 <strong>' + money(r.cliffTax) + ' 元</strong>。');
+            }
+        } else {
+            parts.push('不含税销售额 ' + money(r.exclusive) + ' 元，已超过'
+                + (r.period === 'month' ? '月' : '季') + '度免征额度 ' + money(r.threshold)
+                + ' 元，按<strong>全额</strong>适用 ' + pct(r.rate) + '，应交 <strong>'
+                + money(r.tax) + ' 元</strong>（不是只对超出部分计税）。');
+        }
+        if (r.saving > 0.005) {
+            parts.push('若无法定优惠、按 3% 征收率计算为 ' + money(r.statutoryTax)
+                + ' 元 —— <strong>减按 1% 省下 ' + money(r.saving) + ' 元</strong>。');
+        }
+        if (r.sales <= 0) {
+            parts.push('请填写本期销售额，否则无法估算。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    function renderGeneral() {
+        var box = document.getElementById('general-results');
+        var hint = document.getElementById('general-hint');
+        if (!box) return;
+        if (!quick || typeof quick.generalOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方公式、税率表与示例表仍可手工估算。');
+            return;
+        }
+        var r = quick.generalOf({
+            output: document.getElementById('g-output').value,
+            rate: document.getElementById('g-rate').value,
+            taxIncluded: document.getElementById('g-included').value === 'yes',
+            input: document.getElementById('g-input').value
+        });
+
+        document.getElementById('r-g-exclusive').textContent = money(r.exclusive) + ' 元';
+        document.getElementById('r-g-output-tax').textContent = money(r.outputTax) + ' 元';
+        document.getElementById('r-g-input').textContent = money(r.inputTax) + ' 元'
+            + (r.credit > 0.005 ? '（留抵 ' + money(r.credit) + ' 元）' : '');
+        document.getElementById('r-g-tax').textContent = money(r.tax) + ' 元';
+        document.getElementById('r-g-burden').textContent = (Math.round(r.burden * 1000) / 10) + '%';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('不含税销售额 ' + money(r.exclusive) + ' 元，销项税额 ' + money(r.outputTax)
+            + ' 元，减进项 ' + money(r.inputTax) + ' 元后，应交 <strong>' + money(r.tax) + ' 元</strong>。');
+        if (r.credit > 0.005) {
+            parts.push('进项大于销项 <strong>' + money(r.credit) + ' 元</strong>，本期应纳税额为 0，'
+                + '差额<strong>留抵下期</strong>继续抵扣（不是多缴、也不是欠税）。');
+        }
+        parts.push('实际税负率 ' + (Math.round(r.burden * 1000) / 10) + '%；若该项目适用简易计税（'
+            + pct(r.simplifiedRate) + '、<strong>不得抵扣进项</strong>），税额为 '
+            + money(r.simplifiedTax) + ' 元。');
+        if (r.output <= 0) {
+            parts.push('请填写销售额，否则无法估算。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    function renderSplit() {
+        var box = document.getElementById('split-results');
+        var hint = document.getElementById('split-hint');
+        if (!box) return;
+        if (!quick || typeof quick.priceSplitOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方公式与示例表仍可手工换算。');
+            return;
+        }
+        var r = quick.priceSplitOf({
+            amount: document.getElementById('p-amount').value,
+            rate: document.getElementById('p-rate').value,
+            taxIncluded: document.getElementById('p-mode').value === 'in'
+        });
+
+        document.getElementById('r-p-exclusive').textContent = money(r.exclusive) + ' 元';
+        document.getElementById('r-p-tax').textContent = money(r.tax) + ' 元';
+        document.getElementById('r-p-inclusive').textContent = money(r.inclusive) + ' 元';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        if (r.taxIncluded) {
+            parts.push('含税 ' + money(r.amount) + ' 元 ÷（1 + ' + pct(r.rate) + '）= 不含税 <strong>'
+                + money(r.exclusive) + ' 元</strong>，税额 <strong>' + money(r.tax) + ' 元</strong>。');
+            var naive = r.amount * r.rate;
+            if (Math.abs(naive - r.tax) > 0.005) {
+                parts.push('若误用「含税价 × 税率」会得到 ' + money(naive) + ' 元，'
+                    + '<strong>多算 ' + money(naive - r.tax) + ' 元</strong>。');
+            }
+        } else {
+            parts.push('不含税 ' + money(r.amount) + ' 元 ×（1 + ' + pct(r.rate) + '）= 含税 <strong>'
+                + money(r.inclusive) + ' 元</strong>，税额 <strong>' + money(r.tax) + ' 元</strong>。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    ['s-sales', 's-period', 's-included', 's-special'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderSmall);
+        el.addEventListener('change', renderSmall);
+    });
+    ['g-output', 'g-rate', 'g-included', 'g-input'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderGeneral);
+        el.addEventListener('change', renderGeneral);
+    });
+    ['p-amount', 'p-rate', 'p-mode'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', renderSplit);
+        el.addEventListener('change', renderSplit);
+    });
+    renderExpiry();
+    renderSmall();
+    renderGeneral();
+    renderSplit();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', function () {
+        renderExpiry();
+        renderSmall();
+        renderGeneral();
+        renderSplit();
+    });
+});
+</script>
+</body>
+</html>
