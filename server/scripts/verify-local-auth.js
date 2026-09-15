@@ -607,7 +607,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/vat.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/vat.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/corporate-income-tax.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -1010,6 +1011,43 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes("page: '/seo/vat.html'")
             && registryJs.raw.includes('vatRules')
             && vatPage.raw.includes('?source=seo_vat'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-2：企业税种第二页「企业所得税」——
+        // 这一页要钉住的是**乘出来的 5%** 与 **300 万的悬崖**：
+        // 小微优惠是「减按 25% 计入 × 20% 税率」，三个门槛是「且」的关系且超过即全额 25%。
+        const citPage = await request(PORT, 'GET', '/seo/corporate-income-tax.html');
+        record('企业所得税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（税法 + 2023 年第 12 号）',
+            citPage.status === 200 && citPage.raw.includes('rel="canonical"')
+            && citPage.raw.includes('FAQPage')
+            && citPage.raw.includes('主席令第 63 号')
+            && citPage.raw.includes('国务院令第 512 号')
+            && citPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${citPage.status}`);
+        const citRateBlock = (citPage.raw.split('id="cit-rate-table"')[1] || '').split('</table>')[0];
+        const citRateRows = Array.from(citRateBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        const staleCitRows = citRateRows.filter((p) => !constantsJs.raw.includes(`rate: ${(p / 100).toFixed(2)},`));
+        record('企业所得税落地页静态税率表与常量文件逐档一致（25/20/15/20，页面不维护第二份口径）',
+            citPage.status === 200 && citRateRows.length === 4 && staleCitRows.length === 0
+            && citPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && citPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && citPage.raw.includes('/src/js/calculation/corporate-income-tax-quick.js'),
+            `${citRateRows.length} 档, 与常量不一致 ${staleCitRows.length} 档`);
+        record('企业所得税落地页静态示例表可读（三档 50000/150000/250000，临界点 150000 → 752500）',
+            citPage.status === 200 && citPage.raw.includes('>50000.00<') && citPage.raw.includes('>150000.00<')
+            && citPage.raw.includes('>250000.00<') && citPage.raw.includes('>752500.00<')
+            && citPage.raw.includes('>760000.00<') && citPage.raw.includes('>600000.00<'), '');
+        record('企业所得税落地页写明三条易错口径：5% 是乘出来的、300 万是悬崖不累进、分红再交 20%',
+            citPage.status === 200 && citPage.raw.includes('5% 是乘出来的，不是税率')
+            && citPage.raw.includes('300 万是悬崖，不是累进')
+            && citPage.raw.includes('企业交完税，分红还要再交一次')
+            && citPage.raw.includes('0.25 × 0.20 = 0.05')
+            && citPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了企业所得税页（税法长期有效 + 小微优惠到 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'corporate-income-tax'")
+            && registryJs.raw.includes("id: 'corporate-small-low-profit'")
+            && registryJs.raw.includes("page: '/seo/corporate-income-tax.html'")
+            && registryJs.raw.includes('corporateIncomeTaxRules')
+            && citPage.raw.includes('?source=seo_cit'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

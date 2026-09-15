@@ -311,6 +311,50 @@ var earlyRetirementRules = {
     expiresOn: null                           // 长期政策，无到期日
 };
 
+// 企业所得税（阶段15 15B-2）—— 与个税、增值税都不同源：这是对企业**利润**征的税，
+// 计算由 corporate-income-tax-quick.js 读这里，页面 /seo/corporate-income-tax.html 读 quick。
+//
+// 2026 年现行口径（三处最容易踩）：
+//   1. 法定税率 25%（企业所得税法）。高新技术企业减按 15%（税法第二十八条）。
+//   2. 小型微利企业优惠（财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31）：
+//      减按 **25% 计入应纳税所得额**，再按 20% 税率 → **实际税负 5%**。
+//      注意是「先打折计入、再乘 20%」，不是「税率 5%」—— 两档相乘才是 5%。
+//   3. 小微门槛**三条同时满足**且是**临界点**：年应纳税所得额 ≤ 300 万元、从业人数 ≤ 300 人、
+//      资产总额 ≤ 5000 万元、从事国家非限制和禁止行业。任一超标就**全部**按 25%，
+//      不是只对超出部分 —— 所以 300 万是真正的悬崖（300 万交 15 万，301 万交 75.25 万）。
+var corporateIncomeTaxRules = {
+    statutoryRate: 0.25,          // 法定税率 25%
+    rates: [
+        { rate: 0.25, label: '一般企业（法定税率）' },
+        { rate: 0.20, label: '小型微利企业（减按 25% 计入应纳税所得额后按 20% 税率，实际税负 5%）' },
+        { rate: 0.15, label: '高新技术企业（减按 15%）' },
+        { rate: 0.20, label: '非居民企业取得本法第三条第三款所得（预提所得税，实际减按 10% 征收）' }
+    ],
+    small: {
+        taxableCap: 3000000,      // 年应纳税所得额不超过 300 万元
+        staffCap: 300,            // 从业人数不超过 300 人
+        assetsCap: 50000000,      // 资产总额不超过 5000 万元
+        includedRatio: 0.25,      // 减按 25% 计入应纳税所得额
+        rate: 0.20,               // 按 20% 的税率
+        effectiveRate: 0.05,      // 实际税负 = 25% × 20% = 5%
+        requireAll: true,         // 三个条件须**同时**满足
+        needNotRestricted: true,  // 从事国家非限制和禁止行业
+        effectiveFrom: '2023-01-01',
+        expiresOn: '2027-12-31'
+    },
+    highTechRate: 0.15,           // 高新技术企业：减按 15%
+    dividend: { rate: 0.20 },     // 税后利润分红给个人股东：股息红利个税 20%
+    limits: {
+        // 业务招待费：按发生额的 60% 扣除，但最高不得超过当年销售（营业）收入的 5‰
+        entertainment: { ratioOfAmount: 0.6, capOfRevenue: 0.005, carryForward: false },
+        // 广告费和业务宣传费：不超过当年销售（营业）收入 15% 的部分准予扣除，超过部分结转以后年度
+        advertising: { capOfRevenue: 0.15, carryForward: true },
+        // 公益性捐赠：在年度利润总额 12% 以内扣除，超过部分结转以后三年
+        donation: { capOfProfit: 0.12, carryForwardYears: 3 }
+    },
+    effectiveFrom: '2008-01-01'
+};
+
 // 增值税（阶段15 15B-1）—— 与个税不同源：这是流转税，本文件只存「法定档位与优惠参数」，
 // 计算由 vat-quick.js 读这里，页面 /seo/vat.html 读 quick，避免第二份口径。
 //
@@ -381,6 +425,7 @@ window.EuriskoTaxConstants = {
     expatAllowanceRules: expatAllowanceRules,
     earlyRetirementRules: earlyRetirementRules,
     vatRules: vatRules,
+    corporateIncomeTaxRules: corporateIncomeTaxRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };
