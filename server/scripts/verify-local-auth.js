@@ -1220,6 +1220,51 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && leadSrc.includes("'seo_employercost'")
             && costPage.raw.includes('?source=seo_employercost'),
             `HTTP ${costPage.status}`);
+        // 阶段15 15B-5：第十七个落地页「个体工商户经营所得：核定 vs 查账」。
+        // 这一页要钉住的是**核定不等于少交税**：核定税额是一条与利润无关的水平线
+        // （收入 × 应税所得率），只有实际净利率高于「核定所得率 + 6 万 ÷ 年营收」时才划算；
+        // 以及减半只减「不超过 200 万那部分」的税额，减免额在 200 万处封顶为 317250 元。
+        const bizPage = await request(PORT, 'GET', '/seo/business-income.html');
+        record('个体工商户经营所得落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（个税法 + 实施条例 + 个体工商户计税办法 + 2023 年第 12 号公告）',
+            bizPage.status === 200 && bizPage.raw.includes('rel="canonical"')
+            && bizPage.raw.includes('FAQPage')
+            && bizPage.raw.includes('主席令第九号')
+            && bizPage.raw.includes('国务院令第 707 号')
+            && bizPage.raw.includes('国家税务总局令第 35 号')
+            && bizPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${bizPage.status}`);
+        const bizCompareTable = (bizPage.raw.split('id="compare-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页静态对比表可读：核定 2250.00 与查账 0.00/750.00/3750.00/6750.00/12750.00（含临界行 20%）',
+            bizPage.status === 200 && ['>2250.00<', '>0.00<', '>750.00<', '>3750.00<', '>6750.00<', '>12750.00<', '20%（临界）']
+                .every((n) => bizCompareTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizCompTable = (bizPage.raw.split('id="comprehensive-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页「另有工资」对比表可读：查账 450.00/750.00/3750.00/18750.00（临界降到 10%）',
+            bizPage.status === 200 && ['>450.00<', '>750.00<', '>3750.00<', '>6750.00<', '>18750.00<', '10%（临界）']
+                .every((n) => bizCompTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizBreakTable = (bizPage.raw.split('id="breakeven-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页临界净利率速查表可读：25.00%/20.00%/15.00%/12.50%/35.00%（= 核定所得率 + 6 万 ÷ 年营收）',
+            bizPage.status === 200 && ['>25.00%<', '>20.00%<', '>15.00%<', '>12.50%<', '>35.00%<']
+                .every((n) => bizBreakTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizHalveTable = (bizPage.raw.split('id="halve-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页减半表可读：14750.00/317250.00/667250.00/1367250.00（减免额在 200 万处封顶）',
+            bizPage.status === 200 && ['>14750.00<', '>317250.00<', '>667250.00<', '>1367250.00<', '>32.2%<', '>18.8%<']
+                .every((n) => bizHalveTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        record('经营所得落地页写明四条易错口径（核定不等于少交税、三不、减半不是全额、五级表不是七级表），复用同源脚本且线索来源已入白名单',
+            bizPage.status === 200
+            && bizPage.raw.includes('核定不等于少交税')
+            && bizPage.raw.includes('不扣成本、不扣 6 万、不弥补亏损')
+            && bizPage.raw.includes('只减「不超过 200 万那部分」的税额')
+            && bizPage.raw.includes('不是工资那张七级表')
+            && bizPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && bizPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && bizPage.raw.includes('/src/js/calculation/business-income-quick.js')
+            && leadSrc.includes("'seo_bizincome'")
+            && bizPage.raw.includes('?source=seo_bizincome'),
+            `HTTP ${bizPage.status}`);
         const deadLocs = [];
         // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
         // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
@@ -1242,8 +1287,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             orphanPages.length === 0, orphanPages.join(', '));
         const indexPage = await request(PORT, 'GET', '/seo/index.html');
         const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
-        record('工具总目录列出全部 16 个落地页（卡片 + ItemList 结构化数据）',
-            indexPage.status === 200 && toolCards === 16 && indexPage.raw.includes('"numberOfItems": 16'),
+        record('工具总目录列出全部 17 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 17 && indexPage.raw.includes('"numberOfItems": 17'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
         record('App 首页底部有落地页总目录入口（防 App 内无通路）',

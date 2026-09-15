@@ -500,6 +500,52 @@ var vatRules = {
     reducedUntil: '2027-12-31'       // 小规模减免优惠执行至（到期判定由注册表 statusOf 统一给出）
 };
 
+// 经营所得（个体工商户 / 个人独资企业 / 合伙企业自然人合伙人）—— 阶段15 15B-5
+//
+// 这一组数字存在的理由：**核定与查账不是「哪个更省」，而是「你的实际利润率 vs 核定的应税所得率」**。
+//   核定征收按「收入 × 应税所得率」算税 —— 成本费用再多也不看，业主 6 万费用扣除与专项附加
+//   同样不能扣，核定期间发生的亏损也不得弥补；查账征收按「利润 − 各项扣除」算税，能扣但要求账证健全。
+//   所以当**实际利润率低于核定应税所得率**时，核定反而多交税（反过来则是查账吃亏）。
+//
+// 数字来源与口径：
+//   · halve：个体工商户年应纳税所得额**不超过 200 万元的部分减半**征收
+//     （财政部 税务总局公告 2023 年第 12 号，2023-01-01 至 2027-12-31）；
+//     不区分征收方式 —— 核定与查账都能享受，减的是「不超过 200 万那部分对应的税额」的一半；
+//     到期日同时登记在注册表 business-income-halve 条目上，页面只读 statusOf。
+//   · audited：业主本人费用扣除 5000 元/月（= 6 万/年）。**只有没有工资薪金等综合所得**
+//     时才可在经营所得中扣除 —— 同一笔 6 万一年只能扣一次，专项附加扣除同理。
+//   · assessed.profitRatioByIndustry：应税所得率**参考幅度**（幅度取自国税发〔2008〕30 号
+//     第八条行业幅度；个体户核定由各地税务局在幅度内确定具体值）。页面默认取 defaultProfitRatio，
+//     实际以主管税务机关的核定为准 —— 这是本页唯一一个「必须提示以当地为准」的参数。
+var businessIncomeRules = {
+    rateTable: 'businessTaxRates',
+    halve: {
+        threshold: 2000000,   // 减半上限：年应纳税所得额 200 万元
+        ratio: 0.5,           // 减免比例：不超过上限部分的应纳税额 × 50%
+        effectiveFrom: '2023-01-01',
+        expiresOn: '2027-12-31'
+    },
+    audited: {
+        investorMonthlyDeduction: 5000,  // 业主本人费用扣除（无综合所得时可扣）
+        investorAnnualCap: 60000,        // 折算全年 6 万，与综合所得的基本减除费用同源、不重复享受
+        note: '业主费用扣除 5000 元/月，只在没有综合所得时可扣；专项附加扣除同理（不可两处重复扣）'
+    },
+    assessed: {
+        defaultProfitRatio: 0.1,         // 页面默认应税所得率（各地核定，可改）
+        profitRatioByIndustry: [
+            { key: 'agriculture', name: '农、林、牧、渔业', min: 0.03, max: 0.10 },
+            { key: 'manufacturing', name: '制造业', min: 0.05, max: 0.15 },
+            { key: 'wholesale', name: '批发和零售贸易业', min: 0.04, max: 0.15 },
+            { key: 'transport', name: '交通运输业', min: 0.07, max: 0.15 },
+            { key: 'construction', name: '建筑业', min: 0.08, max: 0.20 },
+            { key: 'catering', name: '饮食业', min: 0.08, max: 0.25 },
+            { key: 'entertainment', name: '娱乐业', min: 0.15, max: 0.30 },
+            { key: 'other', name: '其他行业', min: 0.10, max: 0.30 }
+        ],
+        note: '核定征收按「收入 × 应税所得率」计税：不扣成本费用、不扣业主 6 万费用、不扣专项附加，核定期间的亏损也不得弥补'
+    }
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -538,6 +584,7 @@ window.EuriskoTaxConstants = {
     surtaxRules: surtaxRules,
     stampDutyRules: stampDutyRules,
     socialInsuranceRules: socialInsuranceRules,
+    businessIncomeRules: businessIncomeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

@@ -16,6 +16,8 @@ const SOURCES = [
     'seo_vat', 'seo_cit', 'seo_surtax', 'seo_social', 'seo_netsalary',
     // 阶段15 15C-3：企业用工成本（15C 收尾项，为 15B / 16D 铺垫）
     'seo_employercost',
+    // 阶段15 15B-5：个体工商户经营所得「核定 vs 查账」
+    'seo_bizincome',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
