@@ -602,7 +602,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/severance.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/severance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -791,6 +792,44 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && severancePage.raw.includes('不并入当年综合所得')
             && severancePage.raw.includes('国税发〔1999〕178 号')
             && severancePage.raw.includes('不再执行'),
+            `HTTP ${registryJs.status}`);
+        // 第七张落地页「专项附加扣除」（阶段15 15A-4）：
+        // 与离职补偿金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 「扣的是应纳税所得额，不是直接减税额」：
+        // 页面若照抄「扣除额 × 税率」的天真算法，这句断言就红。
+        const specialPage = await request(PORT, 'GET', '/seo/special-deduction.html');
+        record('专项附加扣除落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            specialPage.status === 200 && specialPage.raw.includes('rel="canonical"')
+            && specialPage.raw.includes('FAQPage')
+            && specialPage.raw.includes('国发〔2018〕41 号')
+            && specialPage.raw.includes('国发〔2023〕13 号'),
+            `HTTP ${specialPage.status}`);
+        const specialAnnualBlock = (specialPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const specialAnnualRows = Array.from(specialAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleSpecialRows = specialAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('专项附加扣除落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            specialPage.status === 200 && specialAnnualRows.length === 7 && staleSpecialRows.length === 0
+            && specialPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && specialPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && specialPage.raw.includes('/src/js/calculation/special-deduction-quick.js'),
+            `页面 ${specialAnnualRows.length} 档, 与常量不一致 ${staleSpecialRows.length} 档`);
+        record('专项附加扣除落地页静态示例表与对照表可读（36000/5480/1880/3600、72200/43080/28640/14440、12000/400）',
+            specialPage.status === 200 && specialPage.raw.includes('>36000.00<')
+            && specialPage.raw.includes('>5480.00<') && specialPage.raw.includes('>1880.00<')
+            && specialPage.raw.includes('>3600.00<') && specialPage.raw.includes('>72200.00<')
+            && specialPage.raw.includes('>43080.00<') && specialPage.raw.includes('>14440.00<')
+            && specialPage.raw.includes('>12000.00<') && specialPage.raw.includes('>400.00<'), '');
+        record('专项附加扣除落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            specialPage.status === 200 && specialPage.raw.includes('?source=seo_special'), '');
+        record('税种注册表登记了专项附加扣除页：扣的是应纳税所得额而非直接减税 + 长期制度（无到期日）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'special-deduction'")
+            && registryJs.raw.includes("page: '/seo/special-deduction.html'")
+            && registryJs.raw.includes('specialDeductionRules')
+            && specialPage.raw.includes('扣的是「应纳税所得额」')
+            && specialPage.raw.includes('两段计税相减'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {

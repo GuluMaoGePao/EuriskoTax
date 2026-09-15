@@ -160,6 +160,64 @@ var severanceRules = {
     expiresOn: null                          // 非过渡性优惠，长期有效（无到期日）
 };
 
+// 个人所得税专项附加扣除 —— 七项标准（阶段15 15A-4）
+//
+// 政策依据：
+//   《个人所得税专项附加扣除暂行办法》（国发〔2018〕41 号，2019-01-01 起施行）
+//   《关于提高个人所得税有关专项附加扣除标准的通知》（国发〔2023〕13 号）：
+//     自 2023-01-01 起，3 岁以下婴幼儿照护与子女教育 1000 → 2000 元/月、
+//     赡养老人 2000 → 3000 元/月（独生子女）；非独生子女与兄弟姐妹分摊，每人不超过 1500 元/月。
+//
+// 口径要点（页面 / 速算 / App 必须同源，改这里一处即可）：
+//   1. 除大病医疗按「年度据实、限额 8 万」外，其余各项均按**月**定额扣除：全年扣除 = 月标准 × 享受月数；
+//   2. 分摊：子女教育与婴幼儿照护可由父母一方按 100% 扣除、或双方各按 50% 扣除（选定后一个年度内不得变更）；
+//      赡养老人非独生子女分摊每人不超过 monthlyCapPerPerson；
+//   3. 互斥：住房贷款利息与住房租金**同一纳税年度只能二选一**（exclusive），不可叠加；
+//   4. 大病医疗：医保目录内个人自付累计超过 threshold 的部分才可扣，年度限额 annualCap，
+//      且只能在**年度汇算**时办理（平时预扣预缴不扣）；
+//   5. 每年 annualConfirmMonth（12 月）需确认次年信息；未及时确认的，扣缴单位自次年 1 月起暂停扣除，
+//      但可在汇算清缴时补充扣除 —— 所以「忘了确认」不会少扣税，只是当月到手变少。
+var specialDeductionRules = {
+    rateTable: 'comprehensiveTaxRates',   // 节税额按**年度**综合所得税率表估算（扣除降低的是应纳税所得额）
+    annualConfirmMonth: 12,               // 每年 12 月确认次年享受的专项附加扣除信息
+    items: {
+        infantCare: {
+            label: '3 岁以下婴幼儿照护', monthly: 2000, months: 12,
+            unit: '每个婴幼儿', sharable: true
+        },
+        childrenEducation: {
+            label: '子女教育', monthly: 2000, months: 12,
+            unit: '每个子女', sharable: true
+        },
+        continuingEducationDegree: {
+            label: '继续教育（学历 / 学位）', monthly: 400, maxMonths: 48,
+            unit: '同一学历（学位）继续教育期间'
+        },
+        continuingEducationCert: {
+            label: '继续教育（职业资格）', annual: 3600, oneOff: true,
+            unit: '取得相关证书当年'
+        },
+        seriousIllness: {
+            label: '大病医疗', threshold: 15000, annualCap: 80000, annualOnly: true,
+            unit: '医保目录内个人自付累计'
+        },
+        housingLoan: {
+            label: '住房贷款利息', monthly: 1000, maxMonths: 240,
+            unit: '首套住房贷款'
+        },
+        housingRent: {
+            label: '住房租金', monthlyByCityTier: [1500, 1100, 800], months: 12,
+            unit: '直辖市 / 省会等 1500，市辖区户籍人口超 100 万 1100，不超 100 万 800'
+        },
+        elderlySupport: {
+            label: '赡养老人', monthly: 3000, monthlyCapPerPerson: 1500, months: 12,
+            unit: '被赡养人年满 60 岁'
+        }
+    },
+    exclusive: [['housingLoan', 'housingRent']],   // 同一纳税年度二选一，不可叠加
+    expiresOn: null                                // 长期制度，无到期日
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -189,6 +247,7 @@ window.EuriskoTaxConstants = {
     otherIncomeRules: otherIncomeRules,
     equityIncentiveRules: equityIncentiveRules,
     severanceRules: severanceRules,
+    specialDeductionRules: specialDeductionRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

@@ -10,8 +10,8 @@ const SOURCES = [
     'home_banner', 'modal', 'notice_list', 'profile', 'share', 'unknown',
     // 阶段14 剩余项：SEO 落地页（页面按页给独立来源，便于判断哪个关键词页真的带来线索）
     'seo_bonus', 'seo_salary', 'seo_settlement',
-    // 阶段15 15A：个税纵深落地页（劳务报酬 / 稿酬 / 特许权使用费预扣预缴、股权激励、离职补偿金）
-    'seo_withholding', 'seo_equity', 'seo_severance',
+    // 阶段15 15A：个税纵深落地页（劳务报酬 / 稿酬 / 特许权使用费预扣预缴、股权激励、离职补偿金、专项附加扣除）
+    'seo_withholding', 'seo_equity', 'seo_severance', 'seo_special',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
