@@ -218,6 +218,31 @@ var specialDeductionRules = {
     expiresOn: null                                // 长期制度，无到期日
 };
 
+// 个人养老金 —— 税前扣除与领取环节计税（阶段15 15A-5）
+//
+// 政策依据：《关于个人养老金有关个人所得税政策的公告》（财政部 税务总局公告 2024 年第 21 号）：
+//   自 2024-01-01 起在**全国范围**实施 —— 缴费环节按 12000 元/年的限额标准在综合所得或经营所得中
+//   据实扣除；投资环节收益暂不征收个人所得税；领取环节按 3% 单独计税（不并入综合所得）。
+//   （此前：财政部 税务总局公告 2022 年第 34 号，自 2022-01-01 起仅在先行城市 / 地区实施。）
+//
+// 口径要点（页面 / 速算 / App 必须同源，改这里一处即可）：
+//   1. 缴费扣的是**应纳税所得额**，所以「少交多少税」= T(x) − T(x − min(缴费额, 限额))，
+//      不是「12000 × 税率」—— 跨档时后者必然高估（与专项附加扣除页同一条纠偏）；
+//   2. 领取时按 **领取额全额**（本金 + 收益）乘 3%，不扣除任何费用、不与综合所得合并；
+//   3. 净优惠 = 缴费环节少交的税 − 领取环节交的 3%。只有适用税率 **高于 3%** 才划算：
+//      落在 3% 档（全年应纳税所得额 ≤ 36000）的人「省 3% 交 3%」，等于白锁流动性；
+//   4. 缴费上限由人社部、财政部根据经济社会发展水平与多层次养老保险体系发展情况**适时调整**，
+//      本页按现行 12000 元/年（月均 1000 元）计算。
+var privatePensionRules = {
+    rateTable: 'comprehensiveTaxRates',   // 缴费环节少交的税按**年度**综合所得税率表算（与内核同一张表）
+    annualLimit: 12000,                   // 每年税前扣除限额（缴费超过部分当年不可扣，也不能结转）
+    withdrawRate: 0.03,                   // 领取环节单独计税税率（不并入综合所得）
+    withdrawIsSeparate: true,             // 领取时单独计税，不与当年综合所得合并、不参与汇算
+    investmentTaxFree: true,              // 投资环节收益暂不征税
+    effectiveFrom: '2024-01-01',          // 21 号公告起全国实施
+    expiresOn: null                       // 长期制度，无到期日（缴费上限可动态调整）
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -248,6 +273,7 @@ window.EuriskoTaxConstants = {
     equityIncentiveRules: equityIncentiveRules,
     severanceRules: severanceRules,
     specialDeductionRules: specialDeductionRules,
+    privatePensionRules: privatePensionRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

@@ -603,7 +603,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/severance.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -830,6 +831,43 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes('specialDeductionRules')
             && specialPage.raw.includes('扣的是「应纳税所得额」')
             && specialPage.raw.includes('两段计税相减'),
+            `HTTP ${registryJs.status}`);
+        // 第八张落地页「个人养老金」（阶段15 15A-5）：
+        // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 「不是所有人都划算」：
+        // 适用税率 3% 的人省 3%、领取时再交 3%，页面必须能算出净优惠为 0 并提示不划算。
+        const pensionPage = await request(PORT, 'GET', '/seo/private-pension.html');
+        record('个人养老金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            pensionPage.status === 200 && pensionPage.raw.includes('rel="canonical"')
+            && pensionPage.raw.includes('FAQPage')
+            && pensionPage.raw.includes('2024 年第 21 号')
+            && pensionPage.raw.includes('2022 年第 34 号'),
+            `HTTP ${pensionPage.status}`);
+        const pensionAnnualBlock = (pensionPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const pensionAnnualRows = Array.from(pensionAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const stalePensionRows = pensionAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('个人养老金落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            pensionPage.status === 200 && pensionAnnualRows.length === 7 && stalePensionRows.length === 0
+            && pensionPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && pensionPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && pensionPage.raw.includes('/src/js/calculation/private-pension-quick.js'),
+            `页面 ${pensionAnnualRows.length} 档, 与常量不一致 ${stalePensionRows.length} 档`);
+        record('个人养老金落地页三环节处理表与静态示例表可读（12000 元/年 / 3% / 暂不征税、840 / 20400 / 3240）',
+            pensionPage.status === 200 && pensionPage.raw.includes('12000 元/年')
+            && pensionPage.raw.includes('暂不征收个人所得税')
+            && pensionPage.raw.includes('>840.00<') && pensionPage.raw.includes('>20400.00<')
+            && pensionPage.raw.includes('>3240.00<') && pensionPage.raw.includes('>97080.00<'), '');
+        record('个人养老金落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            pensionPage.status === 200 && pensionPage.raw.includes('?source=seo_pension'), '');
+        record('税种注册表登记了个人养老金页：领取按 3% 单独计税 + 必须写明「不是所有人都划算」',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'private-pension'")
+            && registryJs.raw.includes("page: '/seo/private-pension.html'")
+            && registryJs.raw.includes('privatePensionRules')
+            && pensionPage.raw.includes('不划算')
+            && pensionPage.raw.includes('净优惠为 0'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {
