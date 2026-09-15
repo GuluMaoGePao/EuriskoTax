@@ -1265,6 +1265,52 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && leadSrc.includes("'seo_bizincome'")
             && bizPage.raw.includes('?source=seo_bizincome'),
             `HTTP ${bizPage.status}`);
+        // 阶段15 15B-6：第十八个落地页「残保金与工会经费」。
+        // 这一页要钉住的是**两个「不是」**：残保金不是「工资总额 × 1.5%」，而是差额人数 × 年平均工资
+        // （招 1 个残疾人省的是一个人的年平均工资）；封顶是社平 **2 倍**而不是社保那个 300%。
+        // 以及 **30 人是临界点**：30 人免征、31 人按全部 31 人算，不是只对超出的 1 人算。
+        const dfundPage = await request(PORT, 'GET', '/seo/disability-fund.html');
+        record('残保金与工会经费落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税 72 号 + 2019 年 2015 号方案 + 98 号公告 + 工会法 + 512 号令）',
+            dfundPage.status === 200 && dfundPage.raw.includes('rel="canonical"')
+            && dfundPage.raw.includes('FAQPage')
+            && dfundPage.raw.includes('财税〔2015〕72 号')
+            && dfundPage.raw.includes('发改价格规〔2019〕2015 号')
+            && dfundPage.raw.includes('财政部公告 2019 年第 98 号')
+            && dfundPage.raw.includes('国务院令第 512 号'),
+            `HTTP ${dfundPage.status}`);
+        const dfundHeadTable = (dfundPage.raw.split('id="headcount-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页人数临界表可读：30 人 0.00（免征）vs 31 人 41850.00（按全部人数算），应缴费额 46500.00/135000.00',
+            dfundPage.status === 200 && ['>0.00<', '>46500.00<', '>41850.00<', '>45000.00<', '>135000.00<', '>270000.00<']
+                .every((n) => dfundHeadTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundDisabledTable = (dfundPage.raw.split('id="disabled-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页「招残疾人」表可读：162000.00 → 30000.00 → 0.00（第一个省 132000.00，边际递减）',
+            dfundPage.status === 200 && ['>180000.00<', '>60000.00<', '>162000.00<', '>30000.00<', '>0.00<', '×90%', '×50%']
+                .every((n) => dfundDisabledTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundWageTable = (dfundPage.raw.split('id="wage-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页工资封顶表可读：192000.00 封顶后实缴恒为 259200.00（社平 2 倍，不是社保 300%）',
+            dfundPage.status === 200 && ['>192000.00<', '>288000.00<', '>259200.00<', '>81000.00<', '>202500.00<', '已封顶']
+                .every((n) => dfundWageTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundUnionTable = (dfundPage.raw.split('id="union-example-table"')[1] || '').split('</table>')[0];
+        record('工会经费表可读：100 万 → 20000.00（上缴 8000.00 / 留存 12000.00）、3000 万 → 600000.00，按工资总额不是社保基数',
+            dfundPage.status === 200 && ['>20000.00<', '>8000.00<', '>12000.00<', '>60000.00<', '>600000.00<']
+                .every((n) => dfundUnionTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        record('残保金落地页写明四条易错口径（不是工资总额乘比例、30 人临界、2 倍不是 300%、按工资总额不是社保基数），复用同源脚本且线索来源已入白名单',
+            dfundPage.status === 200
+            && dfundPage.raw.includes('不是「工资总额 × 1.5%」')
+            && dfundPage.raw.includes('30 人是临界点')
+            && dfundPage.raw.includes('不是只对超出的 1 人算')
+            && dfundPage.raw.includes('社保缴费基数的上限是社平 300%')
+            && dfundPage.raw.includes('不是社保缴费基数')
+            && dfundPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && dfundPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && dfundPage.raw.includes('/src/js/calculation/disability-fund-quick.js')
+            && leadSrc.includes("'seo_disabilityfund'")
+            && dfundPage.raw.includes('?source=seo_disabilityfund'),
+            `HTTP ${dfundPage.status}`);
         const deadLocs = [];
         // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
         // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
@@ -1287,8 +1333,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             orphanPages.length === 0, orphanPages.join(', '));
         const indexPage = await request(PORT, 'GET', '/seo/index.html');
         const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
-        record('工具总目录列出全部 17 个落地页（卡片 + ItemList 结构化数据）',
-            indexPage.status === 200 && toolCards === 17 && indexPage.raw.includes('"numberOfItems": 17'),
+        record('工具总目录列出全部 18 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 18 && indexPage.raw.includes('"numberOfItems": 18'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
         record('App 首页底部有落地页总目录入口（防 App 内无通路）',

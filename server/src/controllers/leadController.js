@@ -18,6 +18,8 @@ const SOURCES = [
     'seo_employercost',
     // 阶段15 15B-5：个体工商户经营所得「核定 vs 查账」
     'seo_bizincome',
+    // 阶段15 15B-6：残保金与工会经费
+    'seo_disabilityfund',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
