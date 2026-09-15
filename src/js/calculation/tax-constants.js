@@ -277,6 +277,40 @@ var expatAllowanceRules = {
     expiresOn: '2027-12-31'               // 29 号公告执行期限；到期提醒由注册表统一计算
 };
 
+// 提前退休 / 内部退养一次性收入 —— 与「离职补偿金」是三套不同口径（阶段15 15A-7）
+//
+// 政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》（财税〔2018〕164 号）第五条：
+//   （二）提前退休：一次性补贴收入按**办理提前退休手续至法定退休年龄之间实际年度数**平均分摊，
+//        确定适用税率和速算扣除数，**单独适用综合所得税率表**计算纳税。
+//        应纳税额 = {〔(一次性补贴收入 ÷ 实际年度数) − 费用扣除标准〕× 适用税率 − 速算扣除数} × 实际年度数
+//   （三）内部退养：按《国家税务总局关于个人所得税有关政策问题的通知》（国税发〔1999〕58 号）第一条：
+//        一次性收入按**办理内部退养手续后至法定离退休年龄之间的所属月份**进行平均，
+//        **与领取当月的工资薪金合并后减除当月费用扣除标准**，以余额为基数确定适用税率；
+//        再将当月工资薪金加上一次性收入、减去费用扣除标准，按适用税率计征。
+//
+// 三处最容易混淆的地方（页面 / 速算 / App 必须同源，改这里一处即可）：
+//   1. 提前退休是**真的分摊计税**（先按年减 6 万、算完再乘回年数），
+//      而内部退养的「平均」**只用来定档**，计税基数仍是当月工资 + 一次性收入的全额；
+//   2. 提前退休用**年度**综合所得税率表、减 6 万/年；内部退养用**月度**税率表、减 5000 元/月，
+//      并且要**与当月工资合并**定档 —— 当月工资越高，一次性收入适用的税率越高；
+//   3. 这与「离职补偿金」（15A-3）不是一回事：离职补偿有 **3 倍社平工资免税额度**、超额部分
+//      单独适用年度税率表且**不做分摊**；提前退休**没有免税额度**但**按年分摊**。
+var earlyRetirementRules = {
+    early: {
+        rateTable: 'comprehensiveTaxRates',   // 年度综合所得税率表（与 App 内核同一张表）
+        annualDeduction: 60000,               // 分摊后每年减 60000 元费用扣除标准
+        spread: true                          // 真分摊：算完每年税额再乘回实际年度数
+    },
+    internal: {
+        rateTable: 'bonusMonthlyTaxRates',    // 月度税率表（与年终奖单独计税同一张表）
+        monthlyDeduction: 5000,               // 当月费用扣除标准 5000 元/月
+        averageOnlyForRate: true,             // 平均只为定档，计税基数不摊
+        mergeWithMonthlySalary: true          // 与领取当月工资薪金合并后定档
+    },
+    effectiveFrom: '2019-01-01',              // 164 号文执行起始
+    expiresOn: null                           // 长期政策，无到期日
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -309,6 +343,7 @@ window.EuriskoTaxConstants = {
     specialDeductionRules: specialDeductionRules,
     privatePensionRules: privatePensionRules,
     expatAllowanceRules: expatAllowanceRules,
+    earlyRetirementRules: earlyRetirementRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

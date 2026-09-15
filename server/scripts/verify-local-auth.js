@@ -605,7 +605,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/severance.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -909,6 +910,49 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && expatPage.raw.includes('不得同时享受')
             && expatPage.raw.includes('一个纳税年度内不得变更')
             && expatPage.raw.includes('2028 年起'),
+            `HTTP ${registryJs.status}`);
+        // 第十张落地页「提前退休 / 内部退养一次性收入」（阶段15 15A-7）：
+        // 与外籍个人页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 三套「一次性收入」口径必须分开：
+        //   提前退休**真分摊**、内部退养**平均只为定档**（税基是全额）、
+        //   而「3 倍社平工资免税」**只属于**离职补偿金，不能套到前两者上。
+        const earlyPage = await request(PORT, 'GET', '/seo/early-retirement.html');
+        record('提前退休/内部退养落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            earlyPage.status === 200 && earlyPage.raw.includes('rel="canonical"')
+            && earlyPage.raw.includes('FAQPage')
+            && earlyPage.raw.includes('财税〔2018〕164 号')
+            && earlyPage.raw.includes('国税发〔1999〕58 号'),
+            `HTTP ${earlyPage.status}`);
+        const earlyAnnualBlock = (earlyPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const earlyAnnualRows = Array.from(earlyAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const earlyMonthlyBlock = (earlyPage.raw.split('id="monthly-rate-table"')[1] || '').split('</table>')[0];
+        const earlyMonthlyRows = Array.from(earlyMonthlyBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleEarlyRows = earlyAnnualRows.concat(earlyMonthlyRows).filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('提前退休/内部退养落地页静态税率表（年度 + 月度）与常量文件逐档一致（页面不维护第二份口径）',
+            earlyPage.status === 200 && earlyAnnualRows.length === 7 && earlyMonthlyRows.length === 7
+            && staleEarlyRows.length === 0
+            && earlyPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && earlyPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && earlyPage.raw.includes('/src/js/calculation/early-retirement-quick.js'),
+            `年度 ${earlyAnnualRows.length} 档 / 月度 ${earlyMonthlyRows.length} 档, 与常量不一致 ${staleEarlyRows.length} 档`);
+        record('提前退休/内部退养落地页静态示例表可读（1800/4440/17400、3630/11890/20090）',
+            earlyPage.status === 200 && earlyPage.raw.includes('>1800.00<')
+            && earlyPage.raw.includes('>4440.00<') && earlyPage.raw.includes('>17400.00<')
+            && earlyPage.raw.includes('>3630.00<') && earlyPage.raw.includes('>11890.00<')
+            && earlyPage.raw.includes('>20090.00<'), '');
+        record('提前退休/内部退养落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            earlyPage.status === 200 && earlyPage.raw.includes('?source=seo_earlyretire'), '');
+        record('税种注册表登记了提前退休/内部退养页：三套一次性收入口径必须分开（真分摊 / 只定档 / 3 倍社平免税只归离职补偿）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'early-retirement'")
+            && registryJs.raw.includes("page: '/seo/early-retirement.html'")
+            && registryJs.raw.includes('earlyRetirementRules')
+            && earlyPage.raw.includes('真分摊')
+            && earlyPage.raw.includes('只定档')
+            && earlyPage.raw.includes('只适用于与用人单位解除劳动关系取得的一次性补偿收入'),
             `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {
