@@ -229,7 +229,8 @@ describe('落地页静态表格 ≡ 税率常量与内核（页面不维护第�
     test('JSON-LD 的 FAQ 与页面正文问答一一对应（避免结构化数据与正文漂移）', () => {
         const questions = Array.from(html.matchAll(/<summary>([^<]+)<\/summary>/g)).map((m) => m[1].trim());
         const ldQuestions = Array.from(html.matchAll(/"name":\s*"([^"]+)",\s*"acceptedAnswer"/g)).map((m) => m[1].trim());
-        expect(questions.length).toBe(5);
+        // 阶段15 15A-8：正文新增「多处任职 / 年中跳槽」三条问答后由 5 条变 8 条
+        expect(questions.length).toBe(8);
         expect(ldQuestions).toEqual(questions);
     });
 
@@ -249,5 +250,176 @@ describe('落地页静态表格 ≡ 税率常量与内核（页面不维护第�
         scripts.forEach((src) => expect(() => loadSource(src.replace(/^\//, ''))).not.toThrow());
         expect(window.TaxRates).toBeDefined();
         expect(window.EuriskoSettlementQuick).toBeDefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// 多处任职 / 年中跳槽（阶段15 15A-8）：覆盖「差额 ≠ 0」的典型场景
+//
+// 对拍逻辑：本段与上方单单位速算器**唯一**的口径差异是减除费用 ——
+// 汇算清缴按**全年定额 60000 元**，单单位速算器按 5000 × 任职月数估算预扣。
+// 因此两者在「任职满 12 个月」时必须完全一致，这构成干净的对拍点：
+//   · 单段 12 个月 → 年度应纳税额 / 已预缴 / 差额 三者都相等；
+//   · 多段月数合计 12 且月薪相同 → 年度应纳税额相等，但**已预缴更少**（档位重置），差额 > 0。
+// 后者正是这一页存在的理由：同一个人在一家单位干满全年不补税，拆成两段就要补。
+const MULTI_BOUNDARIES = [36000, 144000, 300000, 420000, 660000, 960000];
+
+describe('多处任职 / 年中跳槽：与单单位口径对拍（减除费用 6 万定额）', () => {
+    test('单段 12 个月：多段实现与单单位实现在年度税额、预缴、差额上完全一致', () => {
+        const q = window.EuriskoSettlementQuick;
+        for (const b of MULTI_BOUNDARIES) {
+            for (const taxable of [b - 1, b, b + 1]) {
+                // 反推：月薪 × 12 − (60000 + 五险一金 × 12 + 专项附加 × 12) = 目标应纳税所得额
+                const insurance = 3000;
+                const special = 2000;
+                const salary = (taxable + 60000 + insurance * 12 + special * 12) / 12;
+                const multi = q.multiJobSettlementOf({
+                    jobs: [{ monthlyIncome: salary, months: 12, monthlyInsurance: insurance, monthlySpecial: special }]
+                });
+                const single = q.settlementOf(salary, 12, insurance, special, null);
+                expect(multi.annualTaxable).toBeCloseTo(taxable, 6);
+                expect(multi.annualTax).toBeCloseTo(single.annualTax, 8);
+                expect(multi.autoPrepaid).toBeCloseTo(single.autoPrepaid, 8);
+                expect(multi.diff).toBeCloseTo(single.diff, 8);
+            }
+        }
+    });
+
+    test('月薪相同、拆成两段（月数合计 12）：年度税额不变，但预缴更少 → 必须补税', () => {
+        const q = window.EuriskoSettlementQuick;
+        const salary = 20000;
+        const insurance = 3000;
+        const special = 2000;
+        const single = q.settlementOf(salary, 12, insurance, special, null);
+        const multi = q.multiJobSettlementOf({
+            jobs: [
+                { monthlyIncome: salary, months: 6, monthlyInsurance: insurance, monthlySpecial: special },
+                { monthlyIncome: salary, months: 6, monthlyInsurance: insurance, monthlySpecial: special }
+            ]
+        });
+        expect(multi.annualTax).toBeCloseTo(single.annualTax, 8);          // 汇算时合并，年度税额不变
+        expect(multi.autoPrepaid).toBeLessThan(single.autoPrepaid);         // 预扣被拆成两段，速算扣除数扣了两次
+        expect(multi.diff).toBeGreaterThan(0);                              // 于是要补税
+        expect(multi.duplicatedBasic).toBe(0);                              // 但基本减除费用没有重复扣
+    });
+
+    test('示例① 年中跳槽：两段各 6 个月、月薪均 2 万 → 年度 9480、预缴 6960、补 2520', () => {
+        const r = window.EuriskoSettlementQuick.multiJobSettlementOf({
+            jobs: [
+                { monthlyIncome: 20000, months: 6, monthlyInsurance: 3000, monthlySpecial: 2000 },
+                { monthlyIncome: 20000, months: 6, monthlyInsurance: 3000, monthlySpecial: 2000 }
+            ]
+        });
+        expect(r.totalIncome).toBeCloseTo(240000, 6);
+        expect(r.annualTax).toBeCloseTo(9480, 6);
+        expect(r.autoPrepaid).toBeCloseTo(6960, 6);
+        expect(r.diff).toBeCloseTo(2520, 6);
+    });
+
+    test('示例② 多处任职：两处并行 12 个月（1.2 万 + 0.8 万）→ 补 7512，基本减除费用重复扣 6 万', () => {
+        const r = window.EuriskoSettlementQuick.multiJobSettlementOf({
+            jobs: [
+                { monthlyIncome: 12000, months: 12, monthlyInsurance: 1800, monthlySpecial: 2000 },
+                { monthlyIncome: 8000, months: 12, monthlyInsurance: 1200, monthlySpecial: 0 }
+            ]
+        });
+        expect(r.totalIncome).toBeCloseTo(240000, 6);
+        expect(r.annualTax).toBeCloseTo(9480, 6);
+        expect(r.autoPrepaid).toBeCloseTo(1968, 6);
+        expect(r.diff).toBeCloseTo(7512, 6);
+        expect(r.duplicatedBasic).toBeCloseTo(60000, 6);
+    });
+
+    test('示例③ 跳槽 + 空档：1-6 月 2 万、10-12 月 2.5 万 → 补 1020（汇算仍减 6 万定额）', () => {
+        const r = window.EuriskoSettlementQuick.multiJobSettlementOf({
+            jobs: [
+                { monthlyIncome: 20000, months: 6, monthlyInsurance: 3000, monthlySpecial: 2000 },
+                { monthlyIncome: 25000, months: 3, monthlyInsurance: 3000, monthlySpecial: 2000 }
+            ]
+        });
+        expect(r.totalIncome).toBeCloseTo(195000, 6);
+        expect(r.annualTax).toBeCloseTo(6480, 6);
+        expect(r.autoPrepaid).toBeCloseTo(5460, 6);
+        expect(r.diff).toBeCloseTo(1020, 6);
+        expect(r.basicDeduction).toBe(60000);
+    });
+
+    test('示例④ 年中入职：7-12 月 1.5 万 → 年度税额 0、预缴 810、**退税 810**（定额 6 万 vs 预扣只减 3 万）', () => {
+        const r = window.EuriskoSettlementQuick.multiJobSettlementOf({
+            jobs: [{ monthlyIncome: 15000, months: 6, monthlyInsurance: 2500, monthlySpecial: 3000 }]
+        });
+        expect(r.annualTax).toBeCloseTo(0, 6);
+        expect(r.autoPrepaid).toBeCloseTo(810, 6);
+        expect(r.diff).toBeCloseTo(-810, 6);
+        // 对照：按「5000 × 任职月数」折算减除费用的口径会算出 810 元税、差额 0 —— 汇算口径才是 6 万定额
+        const byMonths = window.EuriskoSettlementQuick.settlementOf(15000, 6, 2500, 3000, null);
+        expect(byMonths.annualTax).toBeCloseTo(810, 6);
+        expect(byMonths.diff).toBeCloseTo(0, 8);
+    });
+
+    test('专项附加扣除重复申报：填「全年只能扣一份」后给出被重复的金额', () => {
+        const q = window.EuriskoSettlementQuick;
+        const jobs = [
+            { monthlyIncome: 12000, months: 12, monthlyInsurance: 1800, monthlySpecial: 2000 },
+            { monthlyIncome: 8000, months: 12, monthlyInsurance: 1200, monthlySpecial: 2000 }
+        ];
+        const dup = q.multiJobSettlementOf({ jobs: jobs });
+        expect(dup.duplicatedSpecial).toBe(0);                       // 不填则按各段申报合计扣
+        const fixed = q.multiJobSettlementOf({ jobs: jobs, annualSpecial: 24000 });
+        expect(fixed.duplicatedSpecial).toBeCloseTo(24000, 6);       // 两处都申报 → 多申报 24000
+        expect(fixed.annualTax).toBeGreaterThan(dup.annualTax);
+    });
+
+    test('手填已预缴税额优先；非法输入按 0 处理', () => {
+        const q = window.EuriskoSettlementQuick;
+        const r = q.multiJobSettlementOf({
+            jobs: [{ monthlyIncome: 20000, months: 6, monthlyInsurance: 3000, monthlySpecial: 2000 }],
+            prepaidTax: 5000
+        });
+        expect(r.providedPrepaid).toBe(true);
+        expect(r.prepaidTax).toBe(5000);
+
+        const bad = q.multiJobSettlementOf({ jobs: [{ monthlyIncome: 'abc', months: -3 }] });
+        expect(bad.totalIncome).toBe(0);
+        expect(bad.annualTax).toBe(0);
+        expect(bad.diff).toBe(0);
+
+        const empty = q.multiJobSettlementOf({});
+        expect(empty.totalIncome).toBe(0);
+        expect(empty.jobs).toEqual([]);
+    });
+});
+
+describe('汇算页「多处任职 / 年中跳槽」段落：页面声明（爬虫不执行 JS 也能读全）', () => {
+    const multiHtml = fs.readFileSync(path.join(__dirname, '..', 'seo', 'annual-settlement.html'), 'utf8');
+
+    test('页面新增多段速算器与四种典型情形示例表（2520 / 7512 / 1020 / 810）', () => {
+        expect(multiHtml).toContain('id="multi-title"');
+        expect(multiHtml).toContain('id="multi-example-table"');
+        expect(multiHtml).toContain('>9480.00<');
+        expect(multiHtml).toContain('>6960.00<');
+        expect(multiHtml).toContain('>1968.00<');
+        expect(multiHtml).toContain('>6480.00<');
+        expect(multiHtml).toContain('>5460.00<');
+        expect(multiHtml).toContain('>810.00<');
+        expect(multiHtml).toContain('补 2520.00');
+        expect(multiHtml).toContain('补 7512.00');
+        expect(multiHtml).toContain('补 1020.00');
+        expect(multiHtml).toContain('退 810.00');
+    });
+
+    test('页面写明两种补税机制与「减除费用按全年 6 万定额、不按任职月数折算」', () => {
+        expect(multiHtml).toContain('档位重置');
+        expect(multiHtml).toContain('速算扣除数被扣了两次');
+        expect(multiHtml).toContain('全年定额 60000 元');
+        expect(multiHtml).toContain('不按任职月数折算');
+        expect(multiHtml).toContain('专项附加扣除同一项目只能扣一份');
+        expect(multiHtml).toContain('只能扣一份');
+    });
+
+    test('新增三条常见问题：跳槽补税原因、两处任职重复扣 6 万、年中入职 6 万定额', () => {
+        expect(multiHtml).toContain('一年内在两家公司上过班（年中跳槽），为什么汇算要补税？');
+        expect(multiHtml).toContain('同时在两家公司领工资，会重复扣 6 万元吗？');
+        expect(multiHtml).toContain('年中入职只上了半年，6 万元减除费用怎么算？');
     });
 });

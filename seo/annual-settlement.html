@@ -47,6 +47,30 @@
                 "mainEntity": [
                     {
                         "@type": "Question",
+                        "name": "一年内在两家公司上过班（年中跳槽），为什么汇算要补税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为新单位不掌握你在上一家的收入与已预缴税额，累计预扣法从 0 重新开始：同一年的收入被拆成两段分别适用更低的档位，速算扣除数也扣了两次，所以合并后要补。这与多扣了 6 万元减除费用无关 —— 无缝跳槽（两段月数合计 12）时基本减除费用一份没多扣，仍会补税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "同时在两家公司领工资，会重复扣 6 万元吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "预扣环节会：两家单位各自每月扣 5000 元基本减除费用，一年扣了两份 6 万；而汇算清缴时基本减除费用是年定额 60000 元、只减一份。多减的那一份要在汇算时补回来，这也是多处任职最常见的补税原因。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "年中入职只上了半年，6 万元减除费用怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "汇算清缴时按全年定额 60000 元减除，不按实际任职月数折算。所以年中入职的人往往能退税：预扣环节只按 5000 元乘实际任职月数减除，汇算时减满 6 万元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
                         "name": "个税汇算清缴什么时候办理？",
                         "acceptedAnswer": {
                             "@type": "Answer",
@@ -168,6 +192,115 @@
             </noscript>
         </section>
 
+        <section class="card" aria-labelledby="multi-title">
+            <h2 id="multi-title" style="margin-top:0">多处任职 / 年中跳槽：为什么你会补税</h2>
+            <p class="small muted" style="margin-top:0">
+                两个机制，别混为一谈：<strong>① 多处任职（并行）</strong> —— 两家单位各自按累计预扣法预扣，
+                <strong>各自</strong>每月扣 5000 元基本减除费用，一年扣了两份 6 万，而汇算只减一份；
+                <strong>② 年中跳槽（前后衔接）</strong> —— 新单位<strong>不掌握</strong>上一家的收入与已预缴，
+                累计预扣从 0 重新开始，同一年的收入被拆成两段分别适用更低的档位、
+                <strong>速算扣除数被扣了两次</strong>。
+            </p>
+            <div class="calc-input-row" style="margin-bottom:6px">
+                <div style="flex:1 1 160px;min-width:0">
+                    <label class="calc-label" for="m1-salary">第一段月薪（元）</label>
+                    <input class="calc-input" id="m1-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000" style="width:100%">
+                </div>
+                <div style="flex:0 1 120px;min-width:0">
+                    <label class="calc-label" for="m1-months">月数</label>
+                    <input class="calc-input" id="m1-months" type="number" inputmode="numeric" min="1" max="12" step="1" value="6" style="width:100%">
+                </div>
+                <div style="flex:1 1 150px;min-width:0">
+                    <label class="calc-label" for="m1-insurance">五险一金/月（元）</label>
+                    <input class="calc-input" id="m1-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
+                </div>
+                <div style="flex:1 1 150px;min-width:0">
+                    <label class="calc-label" for="m1-special">专项附加/月（元）</label>
+                    <input class="calc-input" id="m1-special" type="number" inputmode="decimal" min="0" step="500" value="2000" style="width:100%">
+                </div>
+            </div>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 160px;min-width:0">
+                    <label class="calc-label" for="m2-salary">第二段月薪（元）</label>
+                    <input class="calc-input" id="m2-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000" style="width:100%">
+                </div>
+                <div style="flex:0 1 120px;min-width:0">
+                    <label class="calc-label" for="m2-months">月数</label>
+                    <input class="calc-input" id="m2-months" type="number" inputmode="numeric" min="0" max="12" step="1" value="6" style="width:100%">
+                </div>
+                <div style="flex:1 1 150px;min-width:0">
+                    <label class="calc-label" for="m2-insurance">五险一金/月（元）</label>
+                    <input class="calc-input" id="m2-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
+                </div>
+                <div style="flex:1 1 150px;min-width:0">
+                    <label class="calc-label" for="m2-special">专项附加/月（元）</label>
+                    <input class="calc-input" id="m2-special" type="number" inputmode="decimal" min="0" step="500" value="2000" style="width:100%">
+                </div>
+            </div>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 260px;min-width:0">
+                    <label class="calc-label" for="m-annual-special">全年专项附加扣除合计（元，选填）</label>
+                    <input class="calc-input" id="m-annual-special" type="number" inputmode="decimal" min="0" step="1000" placeholder="两处都申报了同一项目时填「只能扣一份」" style="width:100%">
+                </div>
+                <div style="flex:1 1 220px;min-width:0">
+                    <label class="calc-label" for="m-prepaid">全年已预缴税额（元，选填）</label>
+                    <input class="calc-input" id="m-prepaid" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按各段累计预扣法推演" style="width:100%">
+                </div>
+                <button class="btn btn-primary" id="m-reset" type="button" style="align-self:flex-end">重算</button>
+            </div>
+            <p class="small muted" style="margin-top:10px">
+                第二段月数填 <strong>0</strong> 即按单一任职计算。本段按<strong>汇算口径</strong>：
+                减除费用按<strong>全年定额 60000 元</strong>（不按任职月数折算）；
+                上方单单位速算器按 5000 × 任职月数估算（用于估算预扣），
+                <strong>两者在任职满 12 个月时完全一致</strong>。
+            </p>
+            <div class="results" id="m-results" hidden>
+                <div class="result">
+                    <div class="k">合并后全年应纳税额</div>
+                    <div class="v" id="m-r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">各段预缴合计</div>
+                    <div class="v" id="m-r-prepaid">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k" id="m-r-diff-key">应退 / 应补税额</div>
+                    <div class="v" id="m-r-diff">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">重复减除的基本减除费用</div>
+                    <div class="v" id="m-r-dup">—</div>
+                </div>
+            </div>
+            <div class="hint" id="m-hint" hidden></div>
+        </section>
+
+        <h2>示例：四种典型情形的汇算结果（差额 ≠ 0）</h2>
+        <div class="table-scroll">
+            <table id="multi-example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">全年收入（元）</th>
+                    <th scope="col">年度应纳税额（元）</th>
+                    <th scope="col">各段预缴合计（元）</th>
+                    <th scope="col">应退 / 应补（元）</th>
+                    <th scope="col">差额从哪来</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>年中跳槽：两段各 6 个月、月薪均 2 万</td><td class="num">240000.00</td><td class="num">9480.00</td><td class="num">6960.00</td><td>补 2520.00</td><td>档位重置：速算扣除数扣了两次</td></tr>
+                <tr><td>多处任职：两处并行 12 个月（1.2 万 + 0.8 万）</td><td class="num">240000.00</td><td class="num">9480.00</td><td class="num">1968.00</td><td>补 7512.00</td><td>基本减除费用重复扣 60000 + 档位重置</td></tr>
+                <tr><td>跳槽 + 空档：1-6 月 2 万、10-12 月 2.5 万</td><td class="num">195000.00</td><td class="num">6480.00</td><td class="num">5460.00</td><td>补 1020.00</td><td>档位重置；汇算仍减 6 万定额</td></tr>
+                <tr><td>年中入职：7-12 月 1.5 万，扣除高</td><td class="num">90000.00</td><td class="num">0.00</td><td class="num">810.00</td><td>退 810.00</td><td>汇算减 6 万定额，预扣只减了 3 万</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（税率表取自 App 常量，可被运营在后台热改后同步），
+            并由 <code>tests/annual-settlement-quick.test.js</code> 与 App 内核逐点对拍守护。
+        </p>
+
         <h2>怎么算：先算年度税，再减已预缴</h2>
         <ol>
             <li><strong>算全年应纳税额</strong>：全年收入 = 月薪 × 任职月数；全年扣除 =（5000 + 五险一金 + 专项附加扣除）× 任职月数；应纳税所得额 = 全年收入 − 全年扣除（不足 0 按 0）；再查年度税率表。</li>
@@ -203,6 +336,25 @@
         <p><strong>常见补税情形</strong>：在两处及以上单位领取工资薪金，各单位分别按 5000 元/月重复减除费用、分别预扣，合并后适用档位更高；有劳务报酬等所得且预扣不足；一年内扣除项目发生变化而预缴未同步。</p>
         <p class="muted small">所以「预缴多少」与「全年该缴多少」本来就可能不一致 —— 汇算就是把这两者对齐，多退少补，而不是重新征一次税。</p>
 
+        <h2>三条最容易踩的口径（多处任职 / 跳槽时特别注意）</h2>
+        <h3>1. 跳槽补税不一定是因为「多扣了 6 万」</h3>
+        <p>
+            无缝跳槽（月数合计 12）时，基本减除费用一份没多扣，<strong>照样会补税</strong> ——
+            补的是<strong>档位重置</strong>的差额：新单位从 0 重新开始累计，同一笔收入被拆成两段各适用一次低档税率、
+            速算扣除数也扣了两次。示例里「两段各 6 个月、月薪均 2 万」就要补 2520 元。
+        </p>
+        <h3>2. 减除费用按全年 6 万定额，不按任职月数折算</h3>
+        <p>
+            汇算清缴时基本减除费用是<strong>年定额 60000 元</strong>。年中入职只干了半年，预扣环节只减了 3 万，
+            汇算时仍减 6 万 —— 这正是很多人年中入职会<strong>退税</strong>的原因（示例：7-12 月月薪 1.5 万、扣除较高，退 810 元）。
+        </p>
+        <h3>3. 专项附加扣除同一项目只能扣一份</h3>
+        <p>
+            在两处任职并<strong>两边都申报了同一个项目</strong>（如子女教育、住房租金）的，汇算时只能扣一份，
+            重复申报的部分要补回来。速算器里的「全年专项附加扣除合计」就是为这个场景准备的 ——
+            填「只能扣一份」的那个数，页面会算出被重复申报的金额。
+        </p>
+
         <h2>三种典型情形的汇算结果</h2>
         <div class="table-scroll">
             <table id="example-table">
@@ -230,6 +382,18 @@
         <p>办理期为次年 <strong>3 月 1 日至 6 月 30 日</strong>；在中国境内无住所的纳税人可以在离境前办理。渠道有三个：<strong>个人所得税 App</strong>（最常用，可预填收入与扣除、试算两种年终奖计税方式）、<strong>自然人电子税务局</strong>网页端，以及主管税务机关办税服务厅。申报后需要退税的，绑定本人银行卡即可；需要补税的，在 6 月 30 日前缴清，逾期会产生滞纳金。</p>
 
         <h2>常见问题</h2>
+        <details>
+            <summary>一年内在两家公司上过班（年中跳槽），为什么汇算要补税？</summary>
+            <p>因为新单位不掌握你在上一家的收入与已预缴税额，累计预扣法从 0 重新开始：同一年的收入被拆成两段分别适用更低的档位，速算扣除数也扣了两次，所以合并后要补。这与「多扣了 6 万」无关 —— 无缝跳槽（两段月数合计 12）时基本减除费用一份没多扣，仍会补税。</p>
+        </details>
+        <details>
+            <summary>同时在两家公司领工资，会重复扣 6 万元吗？</summary>
+            <p>预扣环节会：两家单位各自每月扣 5000 元基本减除费用，一年扣了两份 6 万；而汇算清缴时基本减除费用是年定额 60000 元、只减一份。多减的那一份要在汇算时补回来，这也是多处任职最常见的补税原因。</p>
+        </details>
+        <details>
+            <summary>年中入职只上了半年，6 万元减除费用怎么算？</summary>
+            <p>汇算清缴时按全年定额 60000 元减除，不按实际任职月数折算。所以年中入职的人往往能退税：预扣环节只按 5000 × 实际任职月数减除，汇算时减满 6 万。</p>
+        </details>
         <details>
             <summary>个税汇算清缴什么时候办理？</summary>
             <p>综合所得年度汇算的办理期为次年 <strong>3 月 1 日至 6 月 30 日</strong>（在中国境内无住所的纳税人可在离境前办理）。例如 2025 年度的汇算，办理期是 2026 年 3 月 1 日至 6 月 30 日。</p>
@@ -362,9 +526,106 @@ document.addEventListener('DOMContentLoaded', function () {
             render();
         });
     }
+    // 多处任职 / 年中跳槽（阶段15 15A-8）：各段独立累计预扣，汇算时合并、减除费用按 6 万定额
+    var mIds = ['m1-salary', 'm1-months', 'm1-insurance', 'm1-special',
+        'm2-salary', 'm2-months', 'm2-insurance', 'm2-special', 'm-annual-special', 'm-prepaid'];
+
+    function renderMulti() {
+        var box = document.getElementById('m-results');
+        var hint = document.getElementById('m-hint');
+        if (!box || !quick || typeof quick.multiJobSettlementOf !== 'function') return;
+
+        var annualSpecialRaw = document.getElementById('m-annual-special').value;
+        var annualSpecial = Number(annualSpecialRaw);
+        var r = quick.multiJobSettlementOf({
+            jobs: [
+                {
+                    monthlyIncome: document.getElementById('m1-salary').value,
+                    months: document.getElementById('m1-months').value,
+                    monthlyInsurance: document.getElementById('m1-insurance').value,
+                    monthlySpecial: document.getElementById('m1-special').value
+                },
+                {
+                    monthlyIncome: document.getElementById('m2-salary').value,
+                    months: document.getElementById('m2-months').value,
+                    monthlyInsurance: document.getElementById('m2-insurance').value,
+                    monthlySpecial: document.getElementById('m2-special').value
+                }
+            ],
+            annualSpecial: (Number.isFinite(annualSpecial) && annualSpecial >= 0) ? annualSpecial : null,
+            prepaidTax: document.getElementById('m-prepaid').value
+        });
+
+        if (!r.totalIncome) {
+            box.hidden = true;
+            if (hint) hint.hidden = true;
+            return;
+        }
+
+        box.hidden = false;
+        document.getElementById('m-r-tax').textContent = money(r.annualTax) + ' 元';
+        document.getElementById('m-r-prepaid').textContent = money(r.prepaidTax) + ' 元';
+        document.getElementById('m-r-diff').textContent = money(Math.abs(r.diff)) + ' 元';
+        document.getElementById('m-r-diff-key').textContent = r.diff > 0.005 ? '预计应补税额'
+            : (r.diff < -0.005 ? '预计应退税额' : '应退 / 应补税额');
+        document.getElementById('m-r-dup').textContent = r.duplicatedBasic > 0
+            ? money(r.duplicatedBasic) + ' 元' : '无（0 元）';
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('合并后全年收入 ' + money(r.totalIncome) + ' 元 − 全年扣除 ' + money(r.annualDeduction)
+            + ' 元（含 6 万定额减除） = 应纳税所得额 ' + money(r.annualTaxable) + ' 元。');
+        if (r.diff > 0.005) {
+            parts.push('预计<strong>应补 ' + money(r.diff) + ' 元</strong>，请在办理期内（6 月 30 日前）缴清。');
+        } else if (r.diff < -0.005) {
+            parts.push('预计<strong>应退 ' + money(Math.abs(r.diff)) + ' 元</strong>，申报时绑定本人银行卡即可。');
+        } else {
+            parts.push('应退应补为 <strong>0 元</strong>。');
+        }
+        if (r.duplicatedBasic > 0.005) {
+            parts.push('预扣环节各段<strong>重复减除基本减除费用 ' + money(r.duplicatedBasic)
+                + ' 元</strong>（多处任职并行才会这样；年中跳槽且月数合计 12 时为 0）。');
+        } else if (r.jobs.length > 1 && r.jobs.every(function (j) { return j.months > 0; })) {
+            parts.push('本例没有重复减除基本减除费用；若仍有差额，来自新单位<strong>累计预扣从 0 重新开始</strong>（档位重置，速算扣除数被扣了两次）。');
+        }
+        if (r.duplicatedSpecial > 0.005) {
+            parts.push('专项附加扣除被<strong>重复申报 ' + money(r.duplicatedSpecial) + ' 元</strong>，汇算时只能扣一份。');
+        }
+        if (!r.providedPrepaid) {
+            parts.push('未填写已预缴税额，此处按各段累计预扣法推演合计 ' + money(r.autoPrepaid) + ' 元。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    mIds.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', renderMulti);
+    });
+    var mReset = document.getElementById('m-reset');
+    if (mReset) {
+        mReset.addEventListener('click', function () {
+            document.getElementById('m1-salary').value = '20000';
+            document.getElementById('m1-months').value = '6';
+            document.getElementById('m1-insurance').value = '3000';
+            document.getElementById('m1-special').value = '2000';
+            document.getElementById('m2-salary').value = '20000';
+            document.getElementById('m2-months').value = '6';
+            document.getElementById('m2-insurance').value = '3000';
+            document.getElementById('m2-special').value = '2000';
+            document.getElementById('m-annual-special').value = '';
+            document.getElementById('m-prepaid').value = '';
+            renderMulti();
+        });
+    }
+
     render();
+    renderMulti();
     // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
-    document.addEventListener('euriskotax:tax-rates-updated', render);
+    document.addEventListener('euriskotax:tax-rates-updated', function () {
+        render();
+        renderMulti();
+    });
 });
 </script>
 </body>

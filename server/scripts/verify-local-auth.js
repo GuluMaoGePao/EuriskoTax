@@ -684,6 +684,23 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && settlementPage.raw.includes('>9600.00<'), '');
         record('汇算清缴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             settlementPage.status === 200 && settlementPage.raw.includes('?source=seo_settlement'), '');
+        // 阶段15 15A-8：汇算页增强「多处任职 / 年中跳槽」深度版 ——
+        // 这一段的价值在于把「跳槽补税」与「重复扣 6 万」两个机制分开讲清楚，
+        // 所以守护要能读到：多段速算器、四种典型场景的示例表数字、两条关键口径、三条新增 FAQ。
+        record('汇算页多处任职/跳槽段落：多段速算器与四种示例表可读（补 2520 / 补 7512 / 补 1020 / 退 810）',
+            settlementPage.status === 200 && settlementPage.raw.includes('id="multi-title"')
+            && settlementPage.raw.includes('id="multi-example-table"')
+            && settlementPage.raw.includes('>6960.00<') && settlementPage.raw.includes('>1968.00<')
+            && settlementPage.raw.includes('补 7512.00') && settlementPage.raw.includes('退 810.00'), '');
+        record('汇算页写明档位重置、减除费用全年定额 60000 元、专项附加同一项目只能扣一份',
+            settlementPage.status === 200 && settlementPage.raw.includes('档位重置')
+            && settlementPage.raw.includes('全年定额 60000 元')
+            && settlementPage.raw.includes('专项附加扣除同一项目只能扣一份'), '');
+        record('汇算页新增三条多处任职/跳槽常见问题（跳槽补税、重复扣 6 万、年中入职 6 万定额）',
+            settlementPage.status === 200
+            && settlementPage.raw.includes('一年内在两家公司上过班（年中跳槽），为什么汇算要补税？')
+            && settlementPage.raw.includes('同时在两家公司领工资，会重复扣 6 万元吗？')
+            && settlementPage.raw.includes('年中入职只上了半年，6 万元减除费用怎么算？'), '');
         // 第四张落地页「劳务报酬 / 稿酬 / 特许权使用费预扣预缴」（阶段15 15A-1）：
         // 前三张的守护照旧，另加两项本页独有的口径守护 ——
         //   ① 预扣率表（20/30/40，速算扣除 0/2000/7000）与常量逐档对账（不再硬编码在内核里）；
