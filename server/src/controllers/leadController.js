@@ -13,7 +13,7 @@ const SOURCES = [
     // 阶段15 15A：个税纵深落地页（劳务报酬 / 稿酬 / 特许权使用费预扣预缴、股权激励、离职补偿金、专项附加扣除、个人养老金、外籍个人津补贴、提前退休与内部退养）
     'seo_withholding', 'seo_equity', 'seo_severance', 'seo_special', 'seo_pension', 'seo_expat', 'seo_earlyretire',
     // 阶段15 15B：企业税种落地页（增值税、企业所得税、附加税与印花税）
-    'seo_vat', 'seo_cit', 'seo_surtax', 'seo_social',
+    'seo_vat', 'seo_cit', 'seo_surtax', 'seo_social', 'seo_netsalary',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15C-2）：税后工资 / 谈薪倒算，长尾词「税后工资 计算器 /
+         到手 10000 税前多少 / 税前工资 反推 / 谈薪 倒算 / 加薪 到手 多多少 / 税后 反推 税前」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 规则与费率复用 App 同源实现（net-salary-quick.js → social-insurance-quick.js →
+              tax-constants.js），页面上不出现第二份口径；
+           3) 政策依据文号来自注册表 tax-registry.js，页面不自己维护文号；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背一条主线任务：**把「倒算不能除以到手率」讲清楚** ——
+         到手率不是常数（累计预扣分档 + 社保公积金封顶），所以只能用二分求解逼近；
+         且「每月到手 X」这句话本身有两种口径，谈薪前不先定口径就会谈错。 -->
+    <title>税后工资计算器 2026：月到手 1 万税前要多少？谈薪倒算与加薪试算（累计预扣 + 五险一金封顶）</title>
+    <meta name="description" content="按 2026 年现行口径倒算税前工资：月到手 10000 元，全年口径需税前 13175.62 元、首月口径需 13062.86 元（差 112.76 元）；月到手 20000 元需税前 27137.50 元。倒算不能「除以到手率」—— 到手率随工资变（累计预扣分档 + 社保公积金按社平工资 3 倍封顶）。含加薪试算：税前再加 1000 元，月到手实际只多 697.5~800 元（边际到手率 65%~80%）。政策依据：个人所得税法（主席令第九号）、国家税务总局公告 2018 年第 61 号、社会保险法（主席令第 35 号）、住房公积金管理条例（国务院令第 262 号）、财税〔2006〕10 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/net-salary.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax">
+    <meta property="og:title" content="税后工资倒算：月到手 1 万，税前要谈多少？">
+    <meta property="og:description" content="倒算不能除以到手率 —— 到手率随工资变。先定口径（全年 / 首月），再看边际到手率。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/net-salary.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 税后工资倒算与谈薪测算",
+                "url": "https://euriskotax.zeabur.app/seo/net-salary.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "由期望到手工资倒算所需税前月薪，并按累计预扣法与五险一金口径给出加薪试算与企业用工成本。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "月到手 10000 元，税前要多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "取决于「月到手」按哪种口径说：按全年到手平均每月 10000 元（全年口径），需税前月薪 13175.62 元；按第 1 个月到手 10000 元（首月口径），只需 13062.86 元 —— 两者差 112.76 元。社平工资 8000 元、公积金 12%、专项附加扣除 1000 元/月的口径下测算。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "为什么不能直接用「到手 ÷ 到手率」倒算税前？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为到手率不是常数：个人所得税按累计预扣法分档爬坡（3%~45%），社保公积金又按当地社平工资的 300% 封顶 —— 封顶之后工资再涨，五险一金不再增加，到手率反而不降略升。所以倒算要用二分法逐次逼近，而不是拿一个固定比例去除。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "加薪 1000 元，到手能多多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "看落在哪一档：税前 13175 元附近加 1000 元，全年到手多 8370 元（合每月 697.5 元，边际到手率 69.75%）；税前 27137 元附近多 9600 元（每月 800 元，80%）；税前 39853 元附近多 9000 元（每月 750 元，75%）；税前 68077 元附近只多 7800 元（每月 650 元，边际到手率 65%）。加薪之前先算边际到手率。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "倒算结果含年终奖吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不含。全年一次性奖金有单独计税口径（与月薪分两段计算，政策延续至 2027-12-31），本页只倒算每月固定工资部分。谈「13 薪 / 年终奖」时要另算一笔。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "企业为这个税前工资要花多少钱？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "用工成本 = 税前工资 + 单位缴纳的五险一金。按常见费率（养老 16%、医疗约 9.8%、失业 0.5%、工伤与生育由单位缴、公积金同比例），月到手 10000 元对应的税前 13175.62 元，企业月成本约 18379.98 元。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_netsalary">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>税后工资倒算：月到手 1 万，税前要谈多少？（谈薪前先定口径）</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>倒算<strong>不能拿「到手 ÷ 一个固定到手率」</strong> ——
+            到手率不是常数：个税按<strong>累计预扣</strong>分档爬坡（3%~45%），社保公积金又按当地社平工资
+            <strong>300% 封顶</strong>，所以只能逐次逼近求解。
+            社平工资 8000 元、公积金 12%、专项附加扣除 1000 元/月的口径下：
+            <strong>月到手 1 万 → 税前 13175.62 元</strong>（全年口径）或 <strong>13062.86 元</strong>（首月口径）；
+            <strong>月到手 2 万 → 税前 27137.50 元</strong>。
+            加薪也要算边际：税前再加 1000 元，月到手实际只多 <strong>697.5~800 元</strong>。
+            下面两个速算器分别实算：倒推税前、加薪试算。
+        </p>
+
+        <section class="card" aria-labelledby="reverse-title">
+            <h2 id="reverse-title" style="margin-top:0">速算一：由到手倒推税前（谈薪倒算）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：应纳税所得额 = 税前 − 5000 − 个人社保 − <strong>免税部分</strong>公积金 − 专项附加扣除；
+                个税按<strong>累计预扣法</strong>逐月爬档，五险一金按社平工资 60% 保底 / 300% 封顶
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="n-target">期望每月到手（元）</label>
+                    <input class="calc-input" id="n-target" type="number" inputmode="decimal" min="0" step="1000" value="10000" aria-describedby="reverse-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="n-mode">到手口径</label>
+                    <select class="calc-input" id="n-mode" aria-describedby="reverse-note">
+                        <option value="annual">全年平均（全年到手 ÷ 12）</option>
+                        <option value="first">入职首月（第 1 月到手）</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="n-avg">当地上年度月社平工资（元）</label>
+                    <input class="calc-input" id="n-avg" type="number" inputmode="decimal" min="0" step="500" value="8000" aria-describedby="reverse-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="n-rate">公积金缴存比例（%）</label>
+                    <input class="calc-input" id="n-rate" type="number" inputmode="decimal" min="5" max="12" step="1" value="12" aria-describedby="reverse-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="n-special">专项附加扣除（元/月）</label>
+                    <input class="calc-input" id="n-special" type="number" inputmode="decimal" min="0" step="500" value="1000" aria-describedby="reverse-note">
+                </div>
+            </div>
+            <p class="small muted" id="reverse-note" style="margin-top:10px">
+                全年口径 = 全年到手 ÷ 12（谈薪时最常用的「月平均到手」）；
+                首月口径只保证第 1 个月拿到目标数 —— 之后档位爬升，到手逐月变少。
+                单位费率取常见值（养老 16%、医疗 9.8%、失业 0.5%、工伤 0.4%、生育 0.8%）。
+            </p>
+            <div class="results" id="reverse-results" hidden>
+                <div class="result highlight">
+                    <div class="k">需谈税前月薪（元）</div>
+                    <div class="v" id="r-gross">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">报价取整到百元（元）</div>
+                    <div class="v" id="r-gross-hundred">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">个人五险一金（元）</div>
+                    <div class="v" id="r-personal">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">全年个税（元）</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">月均到手（元）</div>
+                    <div class="v" id="r-net-avg">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">首月到手（元）</div>
+                    <div class="v" id="r-net1">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">12 月到手（元）</div>
+                    <div class="v" id="r-net12">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">到手率</div>
+                    <div class="v" id="r-net-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">企业月成本（元）</div>
+                    <div class="v" id="r-cost">—</div>
+                </div>
+            </div>
+            <div class="hint" id="reverse-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="raise-title">
+            <h2 id="raise-title" style="margin-top:0">速算二：加薪试算（税前多 X 元，到手多多少）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：<strong>边际到手率</strong> = 新增税前中真正落到手的比例 —— 涨薪不是按当前到手率等比放大
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="m-step">税前再加（元/月）</label>
+                    <input class="calc-input" id="m-step" type="number" inputmode="decimal" min="0" step="500" value="1000" aria-describedby="raise-note">
+                </div>
+            </div>
+            <p class="small muted" id="raise-note" style="margin-top:10px">
+                以速算一算出的税前月薪为基准；目标到手与社保参数沿用上面的输入。
+            </p>
+            <div class="results" id="raise-results" hidden>
+                <div class="result">
+                    <div class="k">加薪后税前（元）</div>
+                    <div class="v" id="r-raise-gross">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">全年到手多（元）</div>
+                    <div class="v" id="r-raise-annual">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">每月到手多（元）</div>
+                    <div class="v" id="r-raise-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">边际到手率</div>
+                    <div class="v" id="r-marginal">—</div>
+                </div>
+            </div>
+            <div class="hint" id="raise-hint" hidden></div>
+        </section>
+
+        <h2>示例：目标月到手 → 需要多少税前（社平 8000、公积金 12%、专项附加 1000）</h2>
+        <div class="table-scroll">
+            <table id="net-example-table">
+                <thead>
+                    <tr><th>目标月到手（元）</th><th>需税前月薪（元）</th><th>五险一金（元）</th><th>全年个税（元）</th><th>首月到手（元）</th><th>12 月到手（元）</th><th>企业月成本（元）</th><th>再加 1000 元全年多到手（元）</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">5000.00</td><td class="num">6451.61</td><td class="num">1451.61</td><td class="num">0.00</td><td class="num">5000.00</td><td class="num">5000.00</td><td class="num">9000.00</td><td class="num">9300.00</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">13175.62</td><td class="num">2964.51</td><td class="num">2533.30</td><td class="num">10084.78</td><td class="num">9790.00</td><td class="num">18379.98</td><td class="num">8370.00</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">27137.50</td><td class="num">5400.00</td><td class="num">20850.01</td><td class="num">21265.37</td><td class="num">18590.00</td><td class="num">36617.50</td><td class="num">9600.00</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">39853.33</td><td class="num">5400.00</td><td class="num">53440.00</td><td class="num">33599.73</td><td class="num">27340.00</td><td class="num">49333.33</td><td class="num">8999.99</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">68076.92</td><td class="num">5400.00</td><td class="num">152123.07</td><td class="num">59529.23</td><td class="num">44667.69</td><td class="num">77556.92</td><td class="num">7800.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            第三行起五险一金停在 <strong>5400.00 元</strong>：税前 27137.50 元已超过社平工资 3 倍（24000 元），
+            <strong>基数封顶后工资再涨，五险一金不再增加</strong>。
+            最后一列是边际：税前再加 1000 元，全年到手只多 7800~9600 元（每月 650~800 元），
+            不是按当前到手率等比放大。
+        </p>
+
+        <h2>同一句「月到手 X」，两种口径差多少</h2>
+        <div class="table-scroll">
+            <table id="mode-example-table">
+                <thead>
+                    <tr><th>目标月到手（元）</th><th>全年口径税前（元）</th><th>首月口径税前（元）</th><th>税前差（元/月）</th><th>按首月口径定薪全年少拿（元）</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">10000.00</td><td class="num">13175.62</td><td class="num">13062.86</td><td class="num">112.76</td><td class="num">943.83</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">27137.50</td><td class="num">25833.00</td><td class="num">1304.50</td><td class="num">12523.19</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">39853.33</td><td class="num">36142.27</td><td class="num">3711.06</td><td class="num">33554.16</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            首月口径只保证第 1 个月拿到目标数，之后档位爬升、到手逐月变少 ——
+            目标越高，两种口径差得越多（月到手 3 万时一年差 <strong>33554.16 元</strong>）。
+            谈薪时把口径说清楚，比多争几百块更值钱。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 倒算不能「除以到手率」—— 到手率不是常数</h3>
+        <p>
+            个税按累计预扣分档爬坡（3%~45%），社保公积金又按社平工资 300% 封顶，
+            所以到手率随工资变化，甚至<b>不单调</b>：月到手 2 万时到手率 73.7%，月到手 3 万时反而是 75.3% ——
+            因为税前 27137.50 元已经封顶，工资再涨五险一金（5400 元）不再增加，占比被摊薄。
+            所以倒算只能用<strong>二分法逐次逼近</strong>（本页每次求解 80 次迭代，精确到分），
+            拿一个固定比例去除必然算错。
+        </p>
+        <h3>2. 涨薪 1000 元不等于到手多 1000 元：看边际到手率</h3>
+        <p>
+            新增的 1000 元要再过两道：五险一金（未封顶时约 22.5%）和累进个税。
+            税前 13175 元附近加 1000 元，全年到手只多 <strong>8370 元</strong>（每月 697.5 元）；
+            税前 68077 元附近只多 <strong>7800 元</strong>（每月 650 元，边际到手率 65%）。
+            谈薪时问「加到手多少」而不是「涨多少」，才是在谈钱。
+        </p>
+        <h3>3. 倒算只对月薪负责：年终奖另算，保底也会咬人</h3>
+        <p>
+            全年一次性奖金有<strong>单独计税</strong>口径（与月薪分两段，政策延续至 2027-12-31），
+            本页结果不含年终奖 —— 谈「13 薪 / 年终奖」时这笔要另算。
+            另一头：想拿很低的到手时，<strong>保底</strong>会咬人 ——
+            目标月到手 3000 元，税前需 4080 元，但社保并不按 4080 元缴，而是按<strong>下限 4800 元</strong>缴 1080 元。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>月到手 10000 元，税前要多少？</summary>
+            <p>取决于「月到手」按哪种口径说：按全年到手平均每月 10000 元（全年口径），需税前月薪 13175.62 元；按第 1 个月到手 10000 元（首月口径），只需 13062.86 元 —— 两者差 112.76 元。社平工资 8000 元、公积金 12%、专项附加扣除 1000 元/月的口径下测算。</p>
+        </details>
+        <details>
+            <summary>为什么不能直接用「到手 ÷ 到手率」倒算税前？</summary>
+            <p>因为到手率不是常数：个人所得税按累计预扣法分档爬坡（3%~45%），社保公积金又按当地社平工资的 300% 封顶 —— 封顶之后工资再涨，五险一金不再增加，到手率反而不降略升。所以倒算要用二分法逐次逼近，而不是拿一个固定比例去除。</p>
+        </details>
+        <details>
+            <summary>加薪 1000 元，到手能多多少？</summary>
+            <p>看落在哪一档：税前 13175 元附近加 1000 元，全年到手多 8370 元（合每月 697.5 元，边际到手率 69.75%）；税前 27137 元附近多 9600 元（每月 800 元，80%）；税前 39853 元附近多 9000 元（每月 750 元，75%）；税前 68077 元附近只多 7800 元（每月 650 元，边际到手率 65%）。加薪之前先算边际到手率。</p>
+        </details>
+        <details>
+            <summary>倒算结果含年终奖吗？</summary>
+            <p>不含。全年一次性奖金有单独计税口径（与月薪分两段计算，政策延续至 2027-12-31），本页只倒算每月固定工资部分。谈「13 薪 / 年终奖」时要另算一笔。</p>
+        </details>
+        <details>
+            <summary>企业为这个税前工资要花多少钱？</summary>
+            <p>用工成本 = 税前工资 + 单位缴纳的五险一金。按常见费率（养老 16%、医疗约 9.8%、失业 0.5%、工伤与生育由单位缴、公积金同比例），月到手 10000 元对应的税前 13175.62 元，企业月成本约 18379.98 元。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为谈薪或报税依据吗？</summary>
+            <p>不能。本页按公开政策口径做测算，实际缴费基数上下限、单位费率与个税口径以当地社保、公积金与税务机关的认定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把到手工资与个税放在一处看</h2>
+            <p>本页算的是由到手倒推税前；年度汇算、年终奖、专项附加扣除与各项个税测算可在 App 里一起看。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_netsalary">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
+        <p id="policy-basis">政策依据：《中华人民共和国个人所得税法》（主席令第九号，2018 年修正）、《个人所得税扣缴申报管理办法（试行）》（国家税务总局公告 2018 年第 61 号，累计预扣法）、《中华人民共和国社会保险法》（主席令第 35 号）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
+        <p>© 2026 EuriskoTax · <a href="/">首页</a> · <a href="/seo/social-base.html">社保公积金</a> · <a href="/seo/salary-tax.html">工资个税测算</a> · <a href="/seo/annual-settlement.html">年度汇算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂费率与基数规则（socialInsuranceRules）
+       tax-registry.js    —— 税种注册表（15D-1）：政策依据文号
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       salary-tax-quick.js —— 工资薪金累计预扣（同一张综合所得税率表）
+       social-insurance-quick.js —— 五险一金（含 60% 保底 / 300% 封顶与公积金免税上限）
+       net-salary-quick.js —— 反向求解：二分逼近税前（到手随税前单调不减） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/salary-tax-quick.js" defer></script>
+<script src="/src/js/calculation/social-insurance-quick.js" defer></script>
+<script src="/src/js/calculation/net-salary-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var quick = window.EuriskoNetSalaryQuick;
+
+    function money(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function percent(n) {
+        if (n === null || n === undefined) return '—';
+        return (Math.round(Number(n) * 1000) / 10) + '%';
+    }
+    function text(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+    function fail(hint, msg) {
+        if (hint) {
+            hint.innerHTML = msg;
+            hint.hidden = false;
+        }
+    }
+    function val(id) {
+        var el = document.getElementById(id);
+        return el ? el.value : '';
+    }
+
+    function inputs() {
+        return {
+            targetMonthly: val('n-target'),
+            mode: val('n-mode'),
+            socialAverage: val('n-avg'),
+            housingRate: Number(val('n-rate')) / 100,
+            specialMonthly: val('n-special')
+        };
+    }
+
+    // 政策依据只读注册表：页面不自己维护文号（与增值税、附加税、社保页同一套做法）
+    function renderBasis() {
+        var el = document.getElementById('policy-basis');
+        if (!el || !window.EuriskoTaxRegistry) return;
+        var parts = [];
+        ['comprehensive', 'social-insurance', 'housing-fund'].forEach(function (id) {
+            window.EuriskoTaxRegistry.basisOf(id).forEach(function (b) {
+                parts.push(b.title.replace(/（[^）]*$/, '') + '（' + b.doc + '）');
+            });
+        });
+        if (parts.length) el.textContent = '政策依据：' + parts.join('、') + '。';
+    }
+
+    function renderReverse() {
+        var box = document.getElementById('reverse-results');
+        var hint = document.getElementById('reverse-hint');
+        if (!box) return null;
+        if (!quick || typeof quick.solveOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方示例表仍可手工估算。');
+            return null;
+        }
+        var input = inputs();
+        var r = quick.solveOf(input);
+        if (!r.converged) {
+            box.hidden = true;
+            fail(hint, '请填写期望每月到手金额（大于 0）后再算。');
+            return null;
+        }
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('r-gross', money(r.gross));
+        text('r-gross-hundred', money(r.grossHundred));
+        text('r-personal', money(r.personalTotal));
+        text('r-tax', money(r.annualTax));
+        text('r-net-avg', money(r.monthlyNetAverage));
+        text('r-net1', money(r.net1));
+        text('r-net12', money(r.net12));
+        text('r-net-rate', percent(r.netRate));
+        text('r-cost', money(r.employerMonthly));
+
+        if (hint) {
+            var msg = [];
+            if (r.mode === 'first') {
+                msg.push('当前是<strong>首月口径</strong>：只保证第 1 个月到手 ' + money(r.targetMonthly)
+                    + ' 元，之后档位爬升、到手逐月变少（12 月 ' + money(r.net12) + ' 元）。');
+            }
+            if (r.social.clamped === 'below') {
+                msg.push('税前低于下限：社保按当地社平工资 60%（' + money(r.social.baseMin) + ' 元）<strong>保底</strong>计缴，不是按税前 ' + money(r.gross) + ' 元。');
+            } else if (r.social.clamped === 'above') {
+                msg.push('税前已高于上限：五险一金按社平工资 300%（' + money(r.social.baseMax) + ' 元）<strong>封顶</strong>，之后再涨薪五险一金也不再增加。');
+            }
+            var cmp = quick.compareOf(input);
+            if (cmp.annual.converged && cmp.first.converged && r.mode === 'annual') {
+                msg.push('换成<strong>首月口径</strong>只需税前 ' + money(cmp.first.gross) + ' 元（少 '
+                    + money(cmp.grossGap) + ' 元/月），但全年会少拿 ' + money(Math.abs(cmp.annualNetGap)) + ' 元。');
+            }
+            if (msg.length) {
+                hint.innerHTML = msg.join(' ');
+                hint.hidden = false;
+            }
+        }
+        return r;
+    }
+
+    function renderRaise(base) {
+        var box = document.getElementById('raise-results');
+        var hint = document.getElementById('raise-hint');
+        if (!box) return;
+        if (!quick || typeof quick.marginalOf !== 'function' || !base) {
+            box.hidden = true;
+            fail(hint, '先在速算一填好期望到手金额，这里才能算加薪试算。');
+            return;
+        }
+        var m = quick.marginalOf(inputs(), val('m-step'));
+        if (!m.base.converged) {
+            box.hidden = true;
+            fail(hint, '先在速算一填好期望到手金额，这里才能算加薪试算。');
+            return;
+        }
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('r-raise-gross', money(m.gross));
+        text('r-raise-annual', money(m.extraNet));
+        text('r-raise-monthly', money(m.extraNetMonthly));
+        text('r-marginal', percent(m.marginalRate));
+    }
+
+    function renderAll() {
+        renderRaise(renderReverse());
+    }
+
+    ['n-target', 'n-mode', 'n-avg', 'n-rate', 'n-special', 'm-step'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', renderAll);
+    });
+
+    renderBasis();
+    renderAll();
+});
+</script>
+</body>
+</html>

@@ -1141,6 +1141,40 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes('socialInsuranceRules')
             && socialPage.raw.includes('?source=seo_social'),
             `HTTP ${registryJs.status}`);
+        // 阶段15 15C-2：第十五个落地页「税后工资 / 谈薪倒算」——
+        // 这一页要钉住的是**倒算不能除以到手率**：到手率不是常数（累计预扣分档 + 社保公积金 300% 封顶），
+        // 且「每月到手 X」本身有两种口径（全年平均 / 首月），谈薪前不先定口径就会谈错。
+        const netPage = await request(PORT, 'GET', '/seo/net-salary.html');
+        record('税后工资落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（个税法 + 2018 年第 61 号累计预扣 + 社保与公积金口径）',
+            netPage.status === 200 && netPage.raw.includes('rel="canonical"')
+            && netPage.raw.includes('FAQPage')
+            && netPage.raw.includes('主席令第九号')
+            && netPage.raw.includes('2018 年第 61 号')
+            && netPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页静态示例表可读：税前 6451.61/13175.62/27137.50/39853.33/68076.92、封顶 5400.00、边际 8370.00、企业成本 18379.98',
+            netPage.status === 200 && ['>6451.61<', '>13175.62<', '>27137.50<', '>39853.33<', '>68076.92<',
+                '>5400.00<', '>8370.00<', '>9600.00<', '>7800.00<', '>18379.98<']
+                .every((n) => netPage.raw.includes(n)),
+            `HTTP ${netPage.status}`);
+        const modeTable = (netPage.raw.split('id="mode-example-table"')[1] || '').split('</table>')[0];
+        record('税后工资落地页两口径对照表可读：首月口径 13062.86/25833.00/36142.27 与全年少拿 12523.19/33554.16',
+            netPage.status === 200 && ['>13062.86<', '>25833.00<', '>36142.27<', '>12523.19<', '>33554.16<']
+                .every((n) => modeTable.includes(n)),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页写明三条易错口径：到手率不是常数、边际到手率、年终奖另算与社保保底',
+            netPage.status === 200 && netPage.raw.includes('倒算不能「除以到手率」—— 到手率不是常数')
+            && netPage.raw.includes('涨薪 1000 元不等于到手多 1000 元：看边际到手率')
+            && netPage.raw.includes('倒算只对月薪负责：年终奖另算，保底也会咬人')
+            && netPage.raw.includes('边际到手率'),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页复用同源脚本（常量 + 五险一金 + 反向求解），CTA 带归因参数',
+            netPage.status === 200 && registryJs.raw.includes("id: 'comprehensive'")
+            && netPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && netPage.raw.includes('/src/js/calculation/social-insurance-quick.js')
+            && netPage.raw.includes('/src/js/calculation/net-salary-quick.js')
+            && netPage.raw.includes('?source=seo_netsalary'),
+            `HTTP ${netPage.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;
