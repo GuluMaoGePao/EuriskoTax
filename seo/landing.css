@@ -200,6 +200,41 @@ details p { margin: 10px 0 2px; color: var(--muted); }
 .cta .btn-primary { background: #fff; color: var(--brand); }
 .cta .btn-primary:hover { background: #eef2ff; }
 
+/* ---------- 工具聚合（/seo/index.html：15 个落地页的总目录） ---------- */
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    margin: 0 0 6px;
+}
+
+.tool-card {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.tool-card:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(30, 64, 175, .08); }
+.tool-card .t { font-weight: 700; color: var(--brand); font-size: 16px; }
+.tool-card .d { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin-top: 4px; }
+.tool-card.is-new .t::after {
+    content: "新";
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: 1px;
+}
+
 /* ---------- 页脚 ---------- */
 .site-footer {
     border-top: 1px solid var(--line);

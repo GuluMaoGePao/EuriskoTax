@@ -1176,15 +1176,34 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && netPage.raw.includes('?source=seo_netsalary'),
             `HTTP ${netPage.status}`);
         const deadLocs = [];
+        // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
+        // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
+        // 页面数还在涨，这条断言用来防止新页面继续变成孤岛。
+        const orphanPages = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;
             try { pathname = new URL(loc).pathname; } catch { /* 非绝对 URL：直接按路径探测 */ }
             // eslint-disable-next-line no-await-in-loop
             const probe = await request(PORT, 'GET', pathname);
             if (probe.status !== 200) deadLocs.push(`${pathname}=${probe.status}`);
+            if (/^\/seo\/[a-z-]+\.html$/.test(pathname) && pathname !== '/seo/index.html'
+                && !probe.raw.includes('href="/seo/index.html"')) {
+                orphanPages.push(pathname);
+            }
         }
         record('sitemap 内每条 URL 均可访问（防收录 404）',
             sitemapLocs.length > 0 && deadLocs.length === 0, deadLocs.join(', '));
+        record('已收录的每个落地页都能回到工具总目录 /seo/index.html（防新页面变孤岛）',
+            orphanPages.length === 0, orphanPages.join(', '));
+        const indexPage = await request(PORT, 'GET', '/seo/index.html');
+        const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
+        record('工具总目录列出全部 15 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 15 && indexPage.raw.includes('"numberOfItems": 15'),
+            `HTTP ${indexPage.status}, cards=${toolCards}`);
+        const appHome = await request(PORT, 'GET', '/');
+        record('App 首页底部有落地页总目录入口（防 App 内无通路）',
+            appHome.status === 200 && appHome.raw.includes('/seo/index.html?source=app_footer'),
+            `HTTP ${appHome.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }

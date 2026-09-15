@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.30.0';
+        window.__APP_VERSION__ = '1.31.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -5967,7 +5967,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.30.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.31.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6743,8 +6743,11 @@
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
                     © 2026 EuriskoTax | 基于2026年个人所得税计算规则手册 · 仅供参考
                 </div>
-
-            </div>
+                <!-- 阶段15：App 内通往 15 个落地页的唯一入口（此前站内完全没有路径，
+                     已装 App 的用户看不到年终奖 / 社保 / 增值税等单页工具） -->
+                <div class="text-sm">
+                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">更多测算工具：年终奖 / 社保公积金 / 增值税…（15 个）→</a>
+                </div>
         </div>
     </footer>
 
