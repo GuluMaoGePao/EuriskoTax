@@ -424,6 +424,46 @@ var stampDutyRules = {
     securitiesKey: 'securities'
 };
 
+// 社保公积金（阶段15 15C-1）—— 五险一金。计算由 social-insurance-quick.js 读这里。
+//
+// 2026 年现行口径（三处最容易搞混）：
+//   1. **缴费基数不是工资**：本人上年度月平均工资，低于当地上年度社平工资 **60%** 的按 60% 保底，
+//      高于 **300%** 的按 300% 封顶 —— 所以工资 3000 元也要按下限缴，工资 5 万元只按 3 倍封顶数缴。
+//      上下限由各统筹地区按年度公布，页面默认给「社平工资 × 60% / ×300%」的通用算法，允许改社平工资。
+//   2. **工伤、生育个人不缴**：只有单位缴（生育已与职工医保合并实施）；算「到手工资」时不要把这两项扣掉。
+//   3. **公积金不是全额免税**：在比例不超过 **12%**、且基数不超过设区城市上年度职工月平均工资 **3 倍**
+//      的范围内免征个税（财税〔2006〕10 号），超出部分要并回工资计税 —— 缴得多的那部分并不都能税前扣除。
+//   另：养老单位 16% 自 2019-05-01 起执行（国办发〔2019〕13 号）；失业总费率 1%（单位、个人各 0.5%）
+//   为阶段性降费，各地执行期限不同；医疗、工伤、生育的单位费率由统筹地区确定，此处取常见值并允许改。
+var socialInsuranceRules = {
+    effectiveFrom: '2019-05-01',
+    base: {
+        label: '缴费基数',
+        lowerRatio: 0.6,
+        upperRatio: 3,
+        note: '本人上年度月平均工资；低于当地上年度社平工资 60% 的按 60% 保底，高于 300% 的按 300% 封顶'
+    },
+    items: [
+        { key: 'pension', name: '养老保险', personalRate: 0.08, employerRate: 0.16, note: '单位 16%（国办发〔2019〕13 号，2019-05-01 起）；个人 8% 全部计入个人账户' },
+        { key: 'medical', name: '医疗保险', personalRate: 0.02, employerRate: 0.098, note: '个人 2%；单位费率由统筹地区确定（多数 6%~10%），此处取常见值 9.8%' },
+        { key: 'unemployment', name: '失业保险', personalRate: 0.005, employerRate: 0.005, note: '阶段性总费率 1%（单位、个人各 0.5%），各地执行期限不同' },
+        { key: 'injury', name: '工伤保险', personalRate: 0, employerRate: 0.004, note: '按行业基准费率 0.2%~1.9% 由单位缴纳，**个人不缴**' },
+        { key: 'maternity', name: '生育保险', personalRate: 0, employerRate: 0.008, note: '已与职工医保合并实施，由单位缴纳，**个人不缴**' }
+    ],
+    housingFund: {
+        key: 'housing',
+        name: '住房公积金',
+        minRate: 0.05,
+        maxRate: 0.12,
+        defaultRate: 0.12,
+        note: '单位与职工缴存比例一致，均不低于 5%、不高于 12%（《住房公积金管理条例》第十八条）',
+        taxFreeRateCap: 0.12,      // 免税比例上限
+        taxFreeBaseCapRatio: 3,    // 免税基数上限 = 上年度职工月平均工资 × 3
+        taxFreeNote: '在不超过 12% 且基数不超过设区城市上年度职工月平均工资 3 倍的部分内免征个人所得税（财税〔2006〕10 号）'
+    },
+    basicDeduction: 5000           // 与工资薪金累计预扣同源（EuriskoSalaryQuick.BASIC_DEDUCTION）
+};
+
 // 增值税（阶段15 15B-1）—— 与个税不同源：这是流转税，本文件只存「法定档位与优惠参数」，
 // 计算由 vat-quick.js 读这里，页面 /seo/vat.html 读 quick，避免第二份口径。
 //
@@ -497,6 +537,7 @@ window.EuriskoTaxConstants = {
     corporateIncomeTaxRules: corporateIncomeTaxRules,
     surtaxRules: surtaxRules,
     stampDutyRules: stampDutyRules,
+    socialInsuranceRules: socialInsuranceRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
     MIN_HOUSING_FUND_BASE: MIN_HOUSING_FUND_BASE
 };

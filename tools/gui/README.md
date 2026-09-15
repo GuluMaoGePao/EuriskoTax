@@ -138,13 +138,13 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🛑 停止监听模式** | `Stop-Job testwatch` | 停止 test:watch 任务 |
 | **📁 打开 tests 目录** | 资源管理器 | 在文件管理器中打开 tests 目录 |
 
-> **发布门禁卡片**：本面板底部还含 **✅ 本地登录链路验证（verify:local）** = `npm run verify:local`（`server/scripts/verify-local-auth.js`）。部署前**必须跑绿**（共 220 项断言）：真实起本地后端验证 前端与 SW 网络优先特征冒烟 → 登录 dev 账号 → 反馈落库 + 附图（含非法附图 400）+ 用户/管理员列表 + 状态跟进 → 匿名埋点 + 聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一（端上已回退：不再选参保城市）+ 回滚不残留（页面不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录身份 → 线索留资 + 管理端列表/按省市搜索/统计/状态机/CSV 省市导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出。失败显示红字，此时**禁止发布**。
+> **发布门禁卡片**：本面板底部还含 **✅ 本地登录链路验证（verify:local）** = `npm run verify:local`（`server/scripts/verify-local-auth.js`）。部署前**必须跑绿**（共 225 项断言）：真实起本地后端验证 前端与 SW 网络优先特征冒烟 → 登录 dev 账号 → 反馈落库 + 附图（含非法附图 400）+ 用户/管理员列表 + 状态跟进 → 匿名埋点 + 聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一（端上已回退：不再选参保城市）+ 回滚不残留（页面不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录身份 → 线索留资 + 管理端列表/按省市搜索/统计/状态机/CSV 省市导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出。失败显示红字，此时**禁止发布**。
 >
 > 同一卡片还含两个 **PostgreSQL 生产等价演练** 按钮（2026-09-12 新增，脚本 `tools/ops/ops-verify-pg.ps1`）：
 >
 > | 按钮 | 执行命令 | 适用场景 |
 > |------|---------|---------|
-> | **🐘 PostgreSQL 演练门禁** | `.\tools\ops\ops-verify-pg.ps1`（= `npm run verify:pg`） | 改动 `server/prisma/schema.prisma` 或 `migrations/` 后**必跑**：Docker 起临时 PostgreSQL（端口 55432、独立数据卷）→ `prisma generate` → `prisma migrate deploy` → 内容种子 → 同一套 **220 项**断言。与线上容器启动同序，专拦「本地 SQLite 全绿、线上迁移才炸」 |
+> | **🐘 PostgreSQL 演练门禁** | `.\tools\ops\ops-verify-pg.ps1`（= `npm run verify:pg`） | 改动 `server/prisma/schema.prisma` 或 `migrations/` 后**必跑**：Docker 起临时 PostgreSQL（端口 55432、独立数据卷）→ `prisma generate` → `prisma migrate deploy` → 内容种子 → 同一套 **225 项**断言。与线上容器启动同序，专拦「本地 SQLite 全绿、线上迁移才炸」 |
 > | **🔄 全新库演练** | `.\tools\ops\ops-verify-pg.ps1 -Fresh`（= `npm run verify:pg:fresh`） | 等价「线上全新库首次部署」：先删演练数据卷再跑一遍，验证从零建表的路径 |
 >
 > 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。Windows 首次准备环境：① 启用 WSL2（`VirtualMachinePlatform` + WSL 可选功能两项，重启生效；家庭版无 Hyper-V，只能走 WSL2 后端）；② `docker version` 要能看到 **Server** 段、`docker compose version` 为 v2 以上（否则是引擎没起来，重启一次 Docker Desktop）；③ 拉 `postgres:16-alpine` 若报 `registry-1.docker.io` 超时，在 `Settings → Docker Engine` 配 `registry-mirrors`（配前先 `Test-NetConnection` 实测源可用）。两个按钮都会先做前置检查：本机有 Docker 且 `:3000` 有进程在监听时，先弹一次警告二次确认（可取消，取消则一个命令都不执行）；未装 Docker 时不做该检查，直接由脚本以**返回码 2** 优雅退出——按钮输出「未检测到 docker 命令，已跳过」，GUI 再打印橙色「[跳过] …这不是代码问题」说明，并弹一次「是否打开 Docker Desktop 下载页」的引导窗（同一提示 180s 内去重，连点两个演练按钮不会被弹两次）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。

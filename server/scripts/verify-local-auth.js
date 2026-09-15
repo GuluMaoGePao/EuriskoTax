@@ -1093,6 +1093,54 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && registryJs.raw.includes('stampDutyRules')
             && surtaxPage.raw.includes('?source=seo_surtax'),
             `HTTP ${registryJs.status}`);
+        // 阶段15 15C-1：第十四个落地页「社保公积金」——
+        // 这一页要钉住的是**缴费基数**：不是当月工资，60% 保底 / 300% 封顶；
+        // 工伤、生育个人不缴；公积金只有「12% 且基数 ≤ 社平 3 倍」的部分免征个税。
+        const socialPage = await request(PORT, 'GET', '/seo/social-base.html');
+        record('社保公积金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（社会保险法 + 公积金管理条例 + 国办发〔2019〕13 号 + 财税〔2006〕10 号）',
+            socialPage.status === 200 && socialPage.raw.includes('rel="canonical"')
+            && socialPage.raw.includes('FAQPage')
+            && socialPage.raw.includes('主席令第 35 号')
+            && socialPage.raw.includes('国务院令第 262 号')
+            && socialPage.raw.includes('国办发〔2019〕13 号')
+            && socialPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${socialPage.status}`);
+        const socialTable = (socialPage.raw.split('id="social-rate-table"')[1] || '').split('</table>')[0];
+        // 费率表：五个险种的个人/单位比例 + 公积金区间（页面不维护第二份费率）
+        const pctText = (rate) => `${String(Math.round(rate * 1000) / 10)}%`;
+        const staleSocialRows = [
+            { name: '养老保险', personal: pctText(0.08), employer: pctText(0.16) },
+            { name: '医疗保险', personal: pctText(0.02), employer: pctText(0.098) },
+            { name: '失业保险', personal: pctText(0.005), employer: pctText(0.005) },
+            { name: '工伤保险', personal: '不缴', employer: pctText(0.004) },
+            { name: '生育保险', personal: '不缴', employer: pctText(0.008) }
+        ].filter((row) => !(socialTable.includes(row.name)
+            && socialTable.includes(`>${row.personal}<`) && socialTable.includes(`>${row.employer}<`)));
+        record('社保落地页静态费率表与常量逐项一致（养老 8/16、医疗 2/9.8、失业 0.5/0.5、工伤生育个人不缴）',
+            socialPage.status === 200 && staleSocialRows.length === 0
+            && socialTable.includes('住房公积金') && socialTable.includes('5%~12%')
+            && socialPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && socialPage.raw.includes('/src/js/calculation/social-insurance-quick.js'),
+            `与常量不一致 ${staleSocialRows.length} 项`);
+        record('社保落地页静态示例表可读：保底 4800/1080/2920、封顶 24000/5400/33020、用工成本 13950',
+            socialPage.status === 200 && ['>4000.00<', '>4800.00<', '>1080.00<', '>2920.00<',
+                '>2250.00<', '>7697.50<', '>630.00<', '>13950.00<',
+                '>4500.00<', '>15215.00<', '>14550.00<', '>8880.00<',
+                '>24000.00<', '>5400.00<', '>43260.00<', '>33020.00<', '>86040.00<']
+                .every((n) => socialPage.raw.includes(n)),
+            `HTTP ${socialPage.status}`);
+        record('社保落地页写明三条易错口径：60% 保底 300% 封顶、工伤生育个人不缴与公积金免税上限、累计预扣逐月变少',
+            socialPage.status === 200 && socialPage.raw.includes('缴费基数不是工资：60% 保底、300% 封顶')
+            && socialPage.raw.includes('工伤、生育个人不缴；公积金不是缴多少都免税')
+            && socialPage.raw.includes('到手工资逐月变少是累计预扣，企业成本是工资的 1.3~1.4 倍')
+            && socialPage.raw.includes('45024')
+            && socialPage.raw.includes('累计预扣法'), '');
+        record('税种注册表登记了社会保险与住房公积金两条（均长期有效），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'social-insurance'")
+            && registryJs.raw.includes("id: 'housing-fund'")
+            && registryJs.raw.includes('socialInsuranceRules')
+            && socialPage.raw.includes('?source=seo_social'),
+            `HTTP ${registryJs.status}`);
         const deadLocs = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;
