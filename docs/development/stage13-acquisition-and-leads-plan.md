@@ -8,11 +8,11 @@
 > 门禁 `verify:local` 100/100、单测 20 套件 412 例全绿）。
 > 待办输入：企业微信「联系我」活码（`window.LEAD_CONFIG.wecomQrUrl`），未配置前自动降级为仅留言通道。
 
-> 🚨 **开跑前置 P0（2026-09-14 登记 · 未完成）**：企业微信「联系我」活码是**冷启动开跑的唯一功能性缺口**。
-> 当前配置点在 `index.html` 底部 `window.LEAD_CONFIG = { wecomQrUrl: '' }`（空字符串），因此留资弹窗只剩留言表单通道，
-> 顾问只能等用户填表后回电，而「扫码即进私域」才是线索承接的主通道（未配置时控制台会打
-> `[LeadModal] 未配置企业微信活码（window.LEAD_CONFIG.wecomQrUrl），本次仅展示留言通道。` 的警告）。
-> 开跑前必须完成：①生成活码 → ②填入 `index.html` → ③真机验证弹窗出现活码位。
+> ✅ **开跑前置 P0（2026-09-14 登记 · 2026-09-16 已完成）**：企业微信「联系我」活码已配置 ——
+> `index.html` 底部 `window.LEAD_CONFIG = { wecomQrUrl: 'https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0' }`，
+> 留资弹窗「立即通道」已生效：链接型活码由 `qrcode-generator` 现场生码，二维码整块可点（手机点一下进企微添加页），
+> 生码失败则降级为「点此联系顾问」，不留裂图。
+> 收尾动作：真机确认二维码可扫、可点（形态判错不会报错，只会静默裂图，故由 `tests/lead-wecom-qr.test.js` 盯着）。
 > 同批可一并配置 `advisorName` / `advisorTitle`（**未配置真实顾问信息就不显示，宁可少一行也不编资质**）。
 > 完整的 Go/No-Go 检查表与逐日点火清单见 [../marketing/gtm-execution-plan.md](../marketing/gtm-execution-plan.md)。
 > 商业前提：本公司是会计/税务申报服务公司，本工具的核心价值是**为企业服务引流获客**，

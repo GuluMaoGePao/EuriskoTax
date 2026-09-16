@@ -10,6 +10,13 @@
  *   <script>window.LEAD_CONFIG = { wecomQrUrl: 'images/lead-wecom-qr.png' };</script>
  * 未配置时优雅降级为「仅留言通道」，并在控制台提示一次，不影响主流程。
  *
+ * wecomQrUrl 两种形态都收（见 isImageLikeUrl / renderQr）：
+ *   ① 图片 —— 后台下载的活码 PNG / 企微图床地址，直接当 <img src>；
+ *   ② 链接 —— work.weixin.qq.com/kfid/... 「联系我」页面地址，**不是图片**，
+ *      直接塞进 src 只会得到一张裂图，所以这里用分享图同款的 qrcode-generator 现场生码。
+ *      换客服不换码、也不必维护一张会过期的 png，是更稳的形态。
+ * 二维码一律可点：手机上点一下直接进企微添加页，桌面端扫码。
+ *
  * 顾问背书同样走配置（advisorName / advisorTitle）：填真实信息才显示，留空则整行隐藏。
  * 写进弹窗的资质是要能被追问的，宁可少一行，也不编一个「从业 10 年」。
  *
@@ -41,6 +48,11 @@
         advisorTitle: ''
     };
 
+    // 链接型活码现场生码：弹窗里二维码显示 112px（w-28），这里按 5 倍生图，
+    // 高分屏放大也不糊；4 模块留白是扫码成功率的保底（同分享图口径）
+    var QR_LINK_TARGET_PX = 560;
+    var QR_QUIET_MODULES = 4;
+
     var state = { source: 'modal', scene: '', type: '', submitting: false, warnedNoQr: false, successTimer: 0 };
 
     function el(id) {
@@ -63,6 +75,61 @@
     function wecomQrUrl() {
         var url = config().wecomQrUrl;
         return typeof url === 'string' ? url.trim() : '';
+    }
+
+    // 是「图片」还是「链接」：企微活码两种产物都可能被填进来，判错就会得到一张裂图。
+    // 企微图床（wework.qpic.cn）没有扩展名，需单独认下来。
+    function isImageLikeUrl(url) {
+        var u = String(url || '').trim();
+        return /^data:image\//i.test(u)
+            || /\.(png|jpe?g|gif|webp|svg|bmp)(\?|#|$)/i.test(u)
+            || /wework\.qpic\.cn/i.test(u);
+    }
+
+    // 把「联系我」链接现场生码（与分享图共用 qrcode-generator）
+    function qrDataUrl(text) {
+        try {
+            if (typeof window.qrcode !== 'function') return '';
+            var qr = window.qrcode(0, 'M'); // 0 = 按内容长度自动选版本
+            qr.addData(text);
+            qr.make();
+            var total = qr.getModuleCount() + QR_QUIET_MODULES * 2;
+            var cell = Math.max(2, Math.round(QR_LINK_TARGET_PX / total));
+            // qrcode-generator 1.4.x 的 margin 单位是像素而非模块，故传 4 个模块的像素宽
+            return qr.createDataURL(cell, QR_QUIET_MODULES * cell);
+        } catch (err) {
+            console.warn('[LeadModal] 活码二维码生成失败，降级为点链接进入:', err);
+            return '';
+        }
+    }
+
+    // 立即通道的渲染：图片型直接用 src，链接型现场生码；
+    // 生成不出来也不让通道废掉（CDN 挂了 / 老浏览器）—— 退化成可点的「点此联系顾问」。
+    function renderQr() {
+        var url = wecomQrUrl();
+        var qr = el('lead-wecom-qr');
+        var link = el('lead-wecom-link');
+        var fallback = el('lead-wecom-fallback');
+        if (!url || !qr) return false;
+
+        if (link) {
+            link.setAttribute('href', url);
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener');
+        }
+
+        var src = isImageLikeUrl(url) ? url : qrDataUrl(url);
+        if (src) {
+            qr.src = src;
+            qr.classList.remove('hidden');
+            if (fallback) fallback.classList.add('hidden');
+        } else {
+            // 拿不到图就留白，不要裂图：点击入口仍在，通道不残废
+            qr.removeAttribute('src');
+            qr.classList.add('hidden');
+            if (fallback) fallback.classList.remove('hidden');
+        }
+        return true;
     }
 
     // openModal / closeModal 由 auth-ui.js（动态 import）注入，脚本加载顺序不保证，
@@ -420,10 +487,8 @@
         renderScene(opts);
         renderAdvisor();
 
-        // 立即通道：配置了活码才渲染二维码
-        var qr = el('lead-wecom-qr');
-        var hasQr = !!wecomQrUrl();
-        if (qr && hasQr) qr.src = wecomQrUrl();
+        // 立即通道：配置了活码才渲染二维码（图片型直接用，链接型现场生码）
+        var hasQr = renderQr();
         if (!hasQr && !state.warnedNoQr) {
             state.warnedNoQr = true;
             console.warn('[LeadModal] 未配置企业微信活码（window.LEAD_CONFIG.wecomQrUrl），本次仅展示留言通道。');
@@ -508,5 +573,6 @@
         init();
     }
 
-    window.LeadModal = { open: open, close: close };
+    // _wecom 只给测试用：活码形态判定与生码是「配错就裂图、但没有报错」的地方，必须有断言盯着
+    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr } };
 })();
