@@ -39,7 +39,8 @@ const LEAD_SOURCE_LABEL = {
     profile: '个人中心', share: '分享图', unknown: '未知'
 };
 const LEAD_ENTITY_LABEL = { individual: '个人', sole: '个体户/独资', small: '小微企业主', other: '其他', unknown: '未说明' };
-const LEAD_NEED_LABEL = { bookkeeping: '记账报税', settlement: '汇算/退税', declare_check: '申报核对', consult: '财税咨询', other: '其他' };
+// 标签文案与对外表单选项保持一致（备案内容限定为「在线测算工具」，不含记账报税 / 税务代理类服务）
+const LEAD_NEED_LABEL = { bookkeeping: '社保基数口径', settlement: '汇算/退税', declare_check: '测算结果看不懂', consult: '其他使用问题', other: '其他（备注）' };
 const LEAD_FUNNEL = ['new', 'contacted', 'qualified', 'converted'];
 const LEAD_BAR_CLS = { new: 'bg-amber-400', contacted: 'bg-blue-400', qualified: 'bg-indigo-400', converted: 'bg-green-500' };
 // 阶段13E 转化漏斗步骤（与后端 leadAdminController.FUNNEL_STEPS + Lead 表口径一致）
