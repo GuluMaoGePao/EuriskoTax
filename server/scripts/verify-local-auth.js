@@ -860,8 +860,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             `HTTP ${registryJs.status}`);
         // 第八张落地页「个人养老金」（阶段15 15A-5）：
         // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
-        // 另加一条本页独有的口径断言 —— 「不是所有人都划算」：
-        // 适用税率 3% 的人省 3%、领取时再交 3%，页面必须能算出净优惠为 0 并提示不划算。
+        // 另加一条本页独有的口径断言 —— 3% 档「税收净优惠为零」：
+        // 适用税率 3% 的人省 3%、领取时再交 3%，页面必须算出净优惠为 0；
+        // 同时按备案承诺书（不涉及投资理财）要求，页面必须自己写明「不构成投资建议」。
         const pensionPage = await request(PORT, 'GET', '/seo/private-pension.html');
         record('个人养老金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
             pensionPage.status === 200 && pensionPage.raw.includes('rel="canonical"')
@@ -888,12 +889,12 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && pensionPage.raw.includes('>3240.00<') && pensionPage.raw.includes('>97080.00<'), '');
         record('个人养老金落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             pensionPage.status === 200 && pensionPage.raw.includes('?source=seo_pension'), '');
-        record('税种注册表登记了个人养老金页：领取按 3% 单独计税 + 必须写明「不是所有人都划算」',
+        record('税种注册表登记了个人养老金页：领取按 3% 单独计税 + 必须写明 3% 档净优惠为零且不构成投资建议',
             registryJs.status === 200 && registryJs.raw.includes("id: 'private-pension'")
             && registryJs.raw.includes("page: '/seo/private-pension.html'")
             && registryJs.raw.includes('privatePensionRules')
-            && pensionPage.raw.includes('不划算')
-            && pensionPage.raw.includes('净优惠为 0'),
+            && pensionPage.raw.includes('税收净优惠为 0')
+            && pensionPage.raw.includes('不构成投资建议'),
             `HTTP ${registryJs.status}`);
         // 第九张落地页「外籍个人津补贴免税」（阶段15 15A-6）：
         // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
@@ -1319,7 +1320,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 与个人养老金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / 易错口径 / CTA 归因），
         // 各加两条本页独有的口径断言 ——
         //   健康险：① 保险赔款免征个税（没有领取税，与个人养老金的 3% 对照）；
-        //           ② 节税上限 2400 × 45% = 1080 元/年，页面必须写明「不足以成为购买理由」；
+        //           ② 节税上限 2400 × 45% = 1080 元/年，页面只给这个上限并写明「不构成购买建议」
+        //              （「值不值得买」属消费与理财判断，备案承诺书不承接）；
         //   年金：  ① 个人免税上限 = 计税基数 × 4%（社平 300% 封顶），超 4% 部分税后扣缴；
         //           ② 领取按全额（含单位缴费）单独计税，能算出「净优惠为负」的另一面。
         const hiPage = await request(PORT, 'GET', '/seo/health-insurance.html');
@@ -1348,10 +1350,10 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && hiRuleBlock.includes('免征个人所得税')
             && hiPage.raw.includes('>240.00<') && hiPage.raw.includes('>480.00<')
             && hiPage.raw.includes('>1080.00<') && hiPage.raw.includes('>79.00<'), '');
-        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、节税不足以成为购买理由），线索来源已入白名单',
+        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、只给节税上限且不构成购买建议），线索来源已入白名单',
             hiPage.status === 200
             && hiPage.raw.includes('少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额')
-            && hiPage.raw.includes('不足以成为购买理由')
+            && hiPage.raw.includes('本页不构成购买建议')
             && hiPage.raw.includes('税优识别码')
             && leadSrc.includes("'seo_health_insurance'")
             && hiPage.raw.includes('?source=seo_health_insurance'),

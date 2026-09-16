@@ -239,10 +239,10 @@ describe('企业年金落地页：静态口径与页面声明（爬虫不执行 
         });
     });
 
-    test('页面写明「净优惠为负」的情形与「单位缴费白得」的另一面', () => {
-        expect(html).toContain('不划算');
-        expect(html).toContain('为负');
+    test('页面写明「税收净优惠为负」的情形与「单位缴费递延计税」的另一面', () => {
+        expect(html).toContain('税收净优惠为负');
         expect(html).toContain('单位缴费');
+        expect(html).toContain('不构成是否参加企业年金的建议');
     });
 
     test('页面含 canonical / FAQPage 结构化数据、政策文号、同源脚本与 CTA 归因参数', () => {

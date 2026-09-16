@@ -144,7 +144,7 @@ describe('个人养老金：领取环节 3% 与净优惠', () => {
         expect(r.netBenefit).toBeCloseTo(20400, 6);
     });
 
-    test('示例③ 3% 档：省 3% 交 3%，净优惠为 0 —— 必须判定为「不划算」', () => {
+    test('示例③ 3% 档：省 3% 交 3%，净优惠为 0 —— 必须判定为税收净优惠为零', () => {
         const r = window.EuriskoPrivatePensionQuick.compareOf(CASE_3PCT);
         expect(r.rate).toBe(0.03);
         expect(r.taxSaved).toBeCloseTo(360, 6);
@@ -213,10 +213,11 @@ describe('个人养老金落地页：静态口径与页面声明（爬虫不执�
         });
     });
 
-    test('页面写明「扣的是应纳税所得额」与「不是所有人都划算」两处纠偏', () => {
+    test('页面写明「扣的是应纳税所得额」与「3% 档税收净优惠为零」两处纠偏', () => {
         expect(html).toContain('少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额');
-        expect(html).toContain('不划算');
-        expect(html).toContain('净优惠为 0');
+        expect(html).toContain('税收净优惠为 0');
+        // 备案内容只到「测算」为止：页面必须自己声明不构成投资建议
+        expect(html).toContain('不构成投资建议');
         expect(html).toContain('不超过 36000 元');
     });
 
