@@ -2,7 +2,7 @@
  * 阶段13 B：留资弹窗（工具 → 服务转化的核心动作）
  *
  * 双通道设计（见阶段13 方案 §4）：
- *   ① 立即通道 —— 扫描企业微信「联系我」活码，当场加顾问好友（意向最强的用户走这条）；
+ *   ① 立即通道 —— 扫描企微活码，当场咨询顾问（意向最强的用户走这条）；
  *   ② 留言通道 —— 留下手机号/微信号，顾问在工作时间回访（覆盖面最广）。
  *
  * 活码不硬编码：由公司在企业微信后台生成「联系我」活码后，
@@ -15,7 +15,12 @@
  *   ② 链接 —— work.weixin.qq.com/kfid/... 「联系我」页面地址，**不是图片**，
  *      直接塞进 src 只会得到一张裂图，所以这里用分享图同款的 qrcode-generator 现场生码。
  *      换客服不换码、也不必维护一张会过期的 png，是更稳的形态。
- * 二维码一律可点：手机上点一下直接进企微添加页，桌面端扫码。
+ * 二维码一律可点：手机上点一下直接进企微会话，桌面端扫码。
+ *
+ * 渠道分流（见 wecomQrByChannel / channelOfSource）：一个入口可以配一个专属码，
+ * 企微侧据此区分「留资弹窗 / 分享图 / 落地页」来源，并分派接待人员与欢迎语。
+ * **不要**手工在客服链接后拼 `?from=xxx`：企微规定客服链接不可改写、参数不可复制到别的链接，
+ * 拼了页面照开，但「进入会话事件」的参数校验会失败 —— 回调里拿不到来源，等于白做。
  *
  * 顾问背书同样走配置（advisorName / advisorTitle）：填真实信息才显示，留空则整行隐藏。
  * 写进弹窗的资质是要能被追问的，宁可少一行，也不编一个「从业 10 年」。
@@ -44,16 +49,25 @@
     // 触点归因白名单需与后端 leadController.SOURCES 保持一致（非法值后端会回落 unknown）
     var DEFAULTS = {
         wecomQrUrl: '',
+        wecomQrByChannel: {},
         advisorName: '',
         advisorTitle: ''
     };
+
+    // 入口 → 专属活码的渠道白名单（见 wecomQrUrl）：
+    //   modal   —— 站内留资弹窗（结果页 / 个人中心）
+    //   share   —— 分享图带来的访客（分享图上的码是回流站点的，他们最终仍从弹窗进企微，
+    //              所以「分享图来源」靠的是给这批访客换一个码，而不是改掉分享图的码）
+    //   landing —— 站外落地页 / SEO 页（source 含 seo_ / landing）
+    // 白名单是刻意的：渠道名会流进埋点与 DOM，未知值不能透传。
+    var QR_CHANNELS = ['modal', 'share', 'landing'];
 
     // 链接型活码现场生码：弹窗里二维码显示 112px（w-28），这里按 5 倍生图，
     // 高分屏放大也不糊；4 模块留白是扫码成功率的保底（同分享图口径）
     var QR_LINK_TARGET_PX = 560;
     var QR_QUIET_MODULES = 4;
 
-    var state = { source: 'modal', scene: '', type: '', submitting: false, warnedNoQr: false, successTimer: 0 };
+    var state = { source: 'modal', scene: '', type: '', wecomChannel: '', submitting: false, warnedNoQr: false, successTimer: 0 };
 
     function el(id) {
         return document.getElementById(id);
@@ -72,9 +86,30 @@
         return (window.LEAD_CONFIG && typeof window.LEAD_CONFIG === 'object') ? window.LEAD_CONFIG : DEFAULTS;
     }
 
-    function wecomQrUrl() {
-        var url = config().wecomQrUrl;
+    // 按入口取活码。
+    // 为什么要分码：企微客服链接**不允许自行改写或复制参数**（官方文档「获取客服账号链接」），
+    // 手工拼 `?from=share` 能打开页面，但「进入会话事件」的参数校验过不了 —— 回调里拿不到来源。
+    // 看起来能用、实际没数据，比不做更糟。所以来源只能靠「一个入口一个码」来区分。
+    // 未配或配空的入口一律回落到兜底码 wecomQrUrl：少配一个入口不会让通道消失。
+    function wecomQrUrl(channel) {
+        var cfg = config();
+        if (channel && QR_CHANNELS.indexOf(channel) !== -1) {
+            var byChannel = cfg.wecomQrByChannel;
+            if (byChannel && typeof byChannel === 'object') {
+                var own = byChannel[channel];
+                if (typeof own === 'string' && own.trim()) return own.trim();
+            }
+        }
+        var url = cfg.wecomQrUrl;
         return typeof url === 'string' ? url.trim() : '';
+    }
+
+    // source（已有触点归因）→ 渠道归类：不新增归因字段，复用后端已认可的 source 字符串
+    function channelOfSource(source) {
+        var s = String(source || '');
+        if (/share/i.test(s)) return 'share';
+        if (/seo_|landing/i.test(s)) return 'landing';
+        return 'modal';
     }
 
     // 是「图片」还是「链接」：企微活码两种产物都可能被填进来，判错就会得到一张裂图。
@@ -105,8 +140,8 @@
 
     // 立即通道的渲染：图片型直接用 src，链接型现场生码；
     // 生成不出来也不让通道废掉（CDN 挂了 / 老浏览器）—— 退化成可点的「点此联系顾问」。
-    function renderQr() {
-        var url = wecomQrUrl();
+    function renderQr(channel) {
+        var url = wecomQrUrl(channel);
         var qr = el('lead-wecom-qr');
         var link = el('lead-wecom-link');
         var fallback = el('lead-wecom-fallback');
@@ -487,8 +522,9 @@
         renderScene(opts);
         renderAdvisor();
 
-        // 立即通道：配置了活码才渲染二维码（图片型直接用，链接型现场生码）
-        var hasQr = renderQr();
+        // 立即通道：按入口取码 —— 未配专属码则回落兜底码（图片型直接用，链接型现场生码）
+        state.wecomChannel = channelOfSource(state.source);
+        var hasQr = renderQr(state.wecomChannel);
         if (!hasQr && !state.warnedNoQr) {
             state.warnedNoQr = true;
             console.warn('[LeadModal] 未配置企业微信活码（window.LEAD_CONFIG.wecomQrUrl），本次仅展示留言通道。');
@@ -511,7 +547,7 @@
         }
 
         document.dispatchEvent(new CustomEvent('euriskotax:lead-click', {
-            detail: { source: state.source, scene: state.scene }
+            detail: { source: state.source, scene: state.scene, wecomChannel: state.wecomChannel }
         }));
     }
 
@@ -574,5 +610,5 @@
     }
 
     // _wecom 只给测试用：活码形态判定与生码是「配错就裂图、但没有报错」的地方，必须有断言盯着
-    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr } };
+    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr, wecomQrUrl: wecomQrUrl, channelOfSource: channelOfSource } };
 })();

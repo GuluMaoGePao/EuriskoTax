@@ -106,3 +106,43 @@ describe('阶段13B 活码渲染（链接型 vs 图片型）', () => {
         expect(LeadModal._wecom.renderQr()).toBe(false);
     });
 });
+
+describe('阶段13B 按入口分码（一个入口一个码）', () => {
+    beforeEach(() => {
+        setupDom();
+        window.qrcode = fakeQrcode('data:image/gif;base64,QR');
+    });
+
+    test('入口 → 渠道归类：分享图来的走 share，落地页走 landing，其余走 modal', () => {
+        expect(LeadModal._wecom.channelOfSource('share')).toBe('share');
+        expect(LeadModal._wecom.channelOfSource('seo_salary')).toBe('landing');
+        expect(LeadModal._wecom.channelOfSource('result_settlement')).toBe('modal');
+        expect(LeadModal._wecom.channelOfSource('')).toBe('modal');
+    });
+
+    test('配了专属码的入口用专属码，没配的回落兜底码 —— 少配一个入口不会让通道消失', () => {
+        window.LEAD_CONFIG = {
+            wecomQrUrl: KFID,
+            wecomQrByChannel: { modal: 'https://work.weixin.qq.com/kfid/CHANNEL_MODAL', share: '   ' }
+        };
+        expect(LeadModal._wecom.wecomQrUrl('modal')).toBe('https://work.weixin.qq.com/kfid/CHANNEL_MODAL');
+        expect(LeadModal._wecom.wecomQrUrl('share')).toBe(KFID);   // 空白串视同未配
+        expect(LeadModal._wecom.wecomQrUrl('landing')).toBe(KFID); // 压根没配
+    });
+
+    test('未知渠道值不透传，一律回落兜底码（渠道名会流进埋点与 DOM）', () => {
+        window.LEAD_CONFIG = { wecomQrUrl: KFID, wecomQrByChannel: { modal: 'https://work.weixin.qq.com/kfid/M' } };
+        expect(LeadModal._wecom.wecomQrUrl('<script>')).toBe(KFID);
+        expect(LeadModal._wecom.wecomQrUrl('__proto__')).toBe(KFID);
+        expect(LeadModal._wecom.wecomQrUrl(undefined)).toBe(KFID);
+    });
+
+    test('分享来源的弹窗渲染 share 专属码：二维码与点击入口都指向它', () => {
+        const shareKf = 'https://work.weixin.qq.com/kfid/CHANNEL_SHARE';
+        window.LEAD_CONFIG = { wecomQrUrl: KFID, wecomQrByChannel: { share: shareKf } };
+
+        expect(LeadModal._wecom.renderQr(LeadModal._wecom.channelOfSource('share'))).toBe(true);
+        expect(document.getElementById('lead-wecom-qr').getAttribute('src')).toBe('data:image/gif;base64,QR');
+        expect(document.getElementById('lead-wecom-link').getAttribute('href')).toBe(shareKf);
+    });
+});

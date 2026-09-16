@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.37.2';
+        window.__APP_VERSION__ = '1.37.3';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -6068,7 +6068,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.37.2</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.37.3</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6155,21 +6155,21 @@
                      #lead-advisor 由 LEAD_CONFIG 的 advisorName / advisorTitle 驱动，未配置则隐藏 —— 真实背书可以少，但不能编 -->
                 <div id="lead-wecom-channel" class="hidden mb-4">
                     <div class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3.5">
-                        <!-- 二维码整块可点：手机点一下直接进企微「添加顾问」页，桌面端扫码。
-                             href 由 lead-modal.js 按 LEAD_CONFIG.wecomQrUrl 写入 -->
+                        <!-- 二维码整块可点：手机点一下直接进企微会话，桌面端扫码。
+                             href 由 lead-modal.js 按入口取码写入（wecomQrByChannel → wecomQrUrl 兜底） -->
                         <div class="shrink-0">
                             <a id="lead-wecom-link" href="#" target="_blank" rel="noopener"
-                               title="扫码或点此添加顾问企业微信"
+                               title="扫码或点此咨询顾问"
                                class="block rounded-lg border border-gray-200 bg-white p-1">
-                                <img id="lead-wecom-qr" src="" alt="企业微信顾问二维码"
+                                <img id="lead-wecom-qr" src="" alt="顾问微信客服二维码"
                                      class="w-28 h-28 rounded-lg bg-white object-contain" />
                             </a>
                             <p id="lead-wecom-fallback" class="hidden text-[11px] text-blue-600 mt-1 text-center">点此联系顾问 →</p>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-sm font-semibold text-gray-800">扫码添加顾问企业微信</p>
+                            <p class="text-sm font-semibold text-gray-800">扫码咨询顾问</p>
                             <p id="lead-advisor" class="hidden text-[11px] text-blue-600 mt-1"></p>
-                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">添加后把疑问发过来就行，顾问会结合您的测算情况给出核对意见。</p>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，顾问会结合您的测算情况给出核对意见。</p>
                             <p class="text-[11px] text-gray-400 mt-1.5">服务时间：工作日 9:00–18:00</p>
                         </div>
                     </div>
@@ -6395,15 +6395,32 @@
     <script src="src/js/data/scenario-store.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>
     <script src="src/js/app.js"></script>
-    <!-- 阶段13B：企业微信「联系我」活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
+    <!-- 阶段13B：企业微信活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
          留空则留资弹窗自动降级为「仅留言通道」并打印一次控制台提示，不影响主流程。
          两种形态都收（lead-modal.js 自动识别）：
            ① 链接（推荐）：https://work.weixin.qq.com/kfid/xxxx —— 现场生成二维码，换客服不换码；
            ② 图片：后台下载的活码 PNG 或企微图床地址（wework.qpic.cn），直接当图片用。
+         按入口分码（wecomQrByChannel）：要在企微侧区分「留资弹窗 / 分享图 / 落地页」来源，
+         就在企微后台为各入口**各建一个客服账号**（一账号一链接），把链接填进对应字段；
+         留空即回落到下面的兜底码，通道不会因少配而失效。
+         ⚠ 不要手工给客服链接拼 ?from=xxx：企微规定客服链接不可改写、参数不可复制到别的链接，
+         拼了页面照开，但「进入会话事件」参数校验失败、回调拿不到来源 —— 看着能用，实际没数据。
+         后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/wecom-channel-playbook.md。
          可选背书：advisorName / advisorTitle 填**真实**顾问信息（如
          { advisorName: '王某某', advisorTitle: '注册税务师 · 8 年企业财税' }），留空则弹窗不显示顾问行 ——
          真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来 -->
-    <script>window.LEAD_CONFIG = { wecomQrUrl: 'https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0' };</script>
+    <script>
+        window.LEAD_CONFIG = {
+            // 兜底码：所有未单独配置专属码的入口都用它
+            wecomQrUrl: 'https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0',
+            // 按入口的专属码：填企微后台为各入口单独建的客服账号链接，留空即用兜底码
+            wecomQrByChannel: {
+                modal: '',    // 站内留资弹窗（结果页 / 个人中心）
+                share: '',    // 分享图带来的访客（从分享码进站后，其弹窗改用这个码）
+                landing: ''   // 站外落地页 / SEO 页（source 含 seo_ / landing）
+            }
+        };
+    </script>
     <!-- 留资「所在城市」的省市数据 —— 必须早于 lead-modal.js（弹窗打开时同步渲染省市级联，不做动态加载） -->
     <script src="src/js/data/china-regions.js"></script>
     <!-- 阶段13B：咨询情境数据层 —— 必须早于 lead-modal.js（弹窗打开时同步取用，不做动态加载） -->
