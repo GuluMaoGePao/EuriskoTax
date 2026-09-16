@@ -7,10 +7,33 @@
 
 ---
 
+## [1.37.1] - 2026-09-16（脚本编码守卫：把「含中文的 .ps1 必须带 UTF-8 BOM」从口头纪律变成会红的单测）
+
+> 门禁基线：**verify:local 259 项，实跑 259/259 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版**不改项数**（只动脚本编码、测试与文档，未碰服务端契约与前端产物）。
+> 单测 **52 套件 1019 例**（新增 `tests/ps1-encoding-guard.test.js`，6 例：扫描覆盖下限 / 含中文的脚本必须带 BOM / 正文无重复 U+FEFF / 内容是合法 UTF-8 / 关键运维脚本仍在扫描范围 / GUI 启动 bat 的兜底仍在）。
+> 线上指纹 **37 项**（本版不改动指纹覆盖点）。
+
+### 修复
+- **`ops-verify-pg.ps1` 与 `gui-dev-console.ps1` 被存成了 UTF-8 无 BOM**：Windows PowerShell 5.1 对无 BOM 文件按系统 ANSI(GBK) 解码，中文字节被误解码后会把后面的引号一起吞掉 —— 两个脚本都在前一百多行就「字符串缺少终止符」直接解析失败（`[Parser]::ParseFile` 复现，即 PS 执行脚本文件时的同一条编码判定）。后果不是断言失败，而是**脚本根本没跑**：`npm run verify:pg` 的「生产等价演练」环节整个消失（单测全绿、毫无征兆）；GUI 开发控制台则是一直靠 `EuriskoTax-Console.bat` 里的 BOM 自检每次启动补字节才没炸。两处补 BOM 后解析通过
+
+### 新增
+- **`tests/ps1-encoding-guard.test.js` 脚本编码守卫**（随 `npm test` 跑）：扫描仓库内所有 `.ps1`（排除 `node_modules` / `.git`），含非 ASCII 却无 BOM、正文出现重复 `U+FEFF`、或内容不是合法 UTF-8，都会红灯并**直接点名文件**
+  - 断言非恒真：已反向验证 —— 临时放入一个「含中文无 BOM」的脚本，测试立刻红灯点名该文件；移除后转绿
+  - 带扫描覆盖下限（脚本数 / 含中文脚本数 / 带 BOM 数），防「路径写错导致空跑全绿」；关键运维脚本名单（`ops-publish` / `ops-verify-pg` / `ops-check-prod` / `ops-start-dev` / `gui-dev-console`）改名或挪目录同样会红
+
+### 变更
+- `docs/development/file-management-policy.md`：§4.3 补记 v1.37.0 的两次复发（`ops-verify-pg.ps1` 真炸、`gui-dev-console.ps1` 被 bat 兜底），§4.4 明确这条纪律已由单测强制，不再依赖「记得手动 ParseFile」
+- `docs/guides/development-workflow.md` §5 排障行指向新守护测试
+
+### 这一版钉住的口径（一条）
+- **兜底不算防线**：启动 bat 的 BOM 自检让一个本该打不开的脚本一直能用，于是没人去修根因。凡是有兜底的地方，都要补一条会红的检查 —— 否则「能用」会把「已经坏了」长期伪装成正常
+
+---
+
 ## [1.37.0] - 2026-09-15（阶段16 收尾：速算器「保存 + 导出」补齐 —— 形态差异不再是卖点，「深度测算」组名退休）
 
 > 门禁基线：**verify:local 259 项，实跑 259/259 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版**不改项数**（纯前端能力下放，未动服务端契约）。
-> 单测 **51 套件 1013 例**（新增 `tests/quick-report.test.js` 11 项：文件名 / 输入回显 / 文档编排 / 条件字段 / 转义 / 政策时效 / 导出入口；`tests/tool-registry.test.js` +1 项：组名不再叫「深度测算」且不再拿保存导出当卖点；`tests/toolbox-ui.test.js` +2 项：导出按钮接线、组件缺失时不假成功）。
+> 单测 **52 套件 1019 例**（新增 `tests/quick-report.test.js` 11 项：文件名 / 输入回显 / 文档编排 / 条件字段 / 转义 / 政策时效 / 导出入口；`tests/tool-registry.test.js` +1 项：组名不再叫「深度测算」且不再拿保存导出当卖点；`tests/toolbox-ui.test.js` +2 项：导出按钮接线、组件缺失时不假成功）。
 > 线上指纹 **37 项**（本版不改动指纹覆盖点）。
 
 ### 新增

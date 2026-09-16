@@ -183,6 +183,8 @@ if (-not $hasBom) {
 
 已两次受害：`ops-start-dev.ps1`、`_create_shortcut.ps1`
 
+v1.37.0 后又复发两次：`ops-verify-pg.ps1`（**真炸** —— 演练脚本整段无法解析，`npm run verify:pg` 直接消失）、`gui-dev-console.ps1`（同样无 BOM，只是被启动 bat 里的「BOM 自检」兜住才没炸）。所以本节的「记得手动重存」已升级为**测试强制**（见 §4.4）。
+
 ### 4.4 验证：每次修改 .ps1 后的语法检查
 
 ```powershell
@@ -192,6 +194,8 @@ $tokens=$null; $errors=$null
 )
 # $errors.Count 必须 = 0
 ```
+
+这条纪律已由单测自动守门：`tests/ps1-encoding-guard.test.js`（随 `npm test` 跑）扫描仓库内所有 `.ps1` —— 含中文却无 BOM、正文出现重复 `U+FEFF`、或不是合法 UTF-8，都会红灯并**直接点名文件**，不再依赖「记得手动 ParseFile」。
 
 ---
 
