@@ -521,7 +521,7 @@
                 var betterText = { allowance: '选津补贴免税', special: '选专项附加扣除', same: '两者相同' }[r.better] || '—';
                 var pick = r.better === 'special' ? r.special.saved : r.allowance.saved;
                 return {
-                    primary: { label: '建议方案可少交个税', value: pick, kind: 'money' },
+                    primary: { label: '两种口径差额（测算值）', value: pick, kind: 'money' },
                     rows: [
                         { label: '建议', value: betterText, kind: 'text' },
                         { label: '选津补贴免税可省', value: r.allowance.saved, kind: 'money' },

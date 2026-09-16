@@ -40,18 +40,18 @@
                 '</div>' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex items-center gap-2 flex-wrap">' +
-                        '<h3 class="font-bold text-gray-800 text-sm">申报前先核对，避免多缴或漏扣</h3>' +
+                        '<h3 class="font-bold text-gray-800 text-sm">算完先看这三项，参数别填错</h3>' +
                         '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">免费</span>' +
                     '</div>' +
-                    '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">下面这三项最容易被忽略，申报前建议先过一遍：</p>' +
+                    '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">下面这三项最容易被填错，建议对照自查：</p>' +
                     '<ul class="mt-2 space-y-1 text-xs text-gray-600 leading-relaxed">' +
                         '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>专项附加扣除有没有漏填、还能不能补扣</li>' +
                         '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>社保公积金、年终奖选哪种算法更划算</li>' +
-                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>退税 / 补税的结论对不对、依据全不全</li>' +
+                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>退税 / 补税的测算依据是否填全</li>' +
                     '</ul>' +
                     '<div class="flex flex-wrap items-center gap-2 mt-3">' +
                         '<button type="button" class="lead-result-cta btn btn-primary text-xs px-4 py-2 rounded-lg"' +
-                            ' data-source="' + source + '" data-type="' + type + '">免费咨询</button>' +
+                            ' data-source="' + source + '" data-type="' + type + '">免费协助</button>' +
                         '<span class="text-[11px] text-gray-400">不采集收入金额 · 测算结果仅供参考</span>' +
                     '</div>' +
                 '</div>' +

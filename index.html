@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.37.7';
+        window.__APP_VERSION__ = '1.37.8';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -6047,7 +6047,7 @@
                             <div class="bg-blue-50 p-3 rounded-lg text-center">
                                 <i class="fa fa-user text-primary text-xl mb-2 block"></i>
                                 <p class="font-semibold text-gray-800 text-sm">对个人</p>
-                                <p class="text-xs text-gray-600 mt-1">薪酬规划 · 合理节税</p>
+                                <p class="text-xs text-gray-600 mt-1">薪酬结构 · 税负测算</p>
                             </div>
                             <div class="bg-indigo-50 p-3 rounded-lg text-center">
                                 <i class="fa fa-building text-primary text-xl mb-2 block"></i>
@@ -6068,7 +6068,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.37.7</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.37.8</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6119,11 +6119,11 @@
                         class="absolute top-4 right-4 z-10 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                     <i class="fa fa-times"></i>
                 </button>
-                <p class="relative text-[11px] font-semibold tracking-widest text-white/70">财税顾问 · 一对一</p>
-                <h3 id="lead-modal-title" class="relative text-lg font-bold mt-1.5 pr-10">申报前先核对，该退的税别漏掉</h3>
-                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，顾问帮您逐项查一遍，确认没问题再申报。</p>
+                <p class="relative text-[11px] font-semibold tracking-widest text-white/70">使用协助 · 有问必答</p>
+                <h3 id="lead-modal-title" class="relative text-lg font-bold mt-1.5 pr-10">算完先自查，该退的税别漏掉</h3>
+                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，这三项最容易填错 —— 有疑问可以发给我们，协助您核对填写的参数。</p>
                 <ul class="relative flex flex-wrap gap-1.5 mt-3 text-[11px] text-white/90">
-                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-check-circle"></i>咨询免费</li>
+                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-check-circle"></i>免费使用</li>
                     <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-lock"></i>不采集收入金额</li>
                     <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-clock-o"></i>1 个工作日内回复</li>
                 </ul>
@@ -6159,17 +6159,17 @@
                              href 由 lead-modal.js 按入口取码写入（wecomQrByChannel → wecomQrUrl 兜底） -->
                         <div class="shrink-0">
                             <a id="lead-wecom-link" href="#" target="_blank" rel="noopener"
-                               title="扫码或点此咨询顾问"
+                               title="扫码或点此联系客服"
                                class="block rounded-lg border border-gray-200 bg-white p-1">
-                                <img id="lead-wecom-qr" src="" alt="顾问微信客服二维码"
+                                <img id="lead-wecom-qr" src="" alt="客服二维码"
                                      class="w-28 h-28 rounded-lg bg-white object-contain" />
                             </a>
-                            <p id="lead-wecom-fallback" class="hidden text-[11px] text-blue-600 mt-1 text-center">点此联系顾问 →</p>
+                            <p id="lead-wecom-fallback" class="hidden text-[11px] text-blue-600 mt-1 text-center">点此联系客服 →</p>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-sm font-semibold text-gray-800">扫码咨询顾问</p>
+                            <p class="text-sm font-semibold text-gray-800">扫码联系客服</p>
                             <p id="lead-advisor" class="hidden text-[11px] text-blue-600 mt-1"></p>
-                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，顾问会结合您的测算情况给出核对意见。</p>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，客服会协助您核对填写的参数是否有误。</p>
                             <p class="text-[11px] text-gray-400 mt-1.5">服务时间：工作日 9:00–18:00</p>
                         </div>
                     </div>
@@ -6177,7 +6177,7 @@
 
                 <div id="lead-divider" class="hidden text-center text-[11px] text-gray-400 mb-4">
                     <span class="inline-flex items-center gap-3 w-full">
-                        <span class="h-px bg-gray-200 flex-1"></span>也可以留下联系方式，顾问会在 1 个工作日内联系您<span class="h-px bg-gray-200 flex-1"></span>
+                        <span class="h-px bg-gray-200 flex-1"></span>也可以留下联系方式，客服会在 1 个工作日内联系您<span class="h-px bg-gray-200 flex-1"></span>
                     </span>
                 </div>
 
@@ -6266,10 +6266,10 @@
                                     <label for="lead-need" class="block text-xs font-medium text-gray-600 mb-1">想了解</label>
                                     <select id="lead-need" class="input-field !pl-3">
                                         <option value="settlement" selected>年度汇算 / 退税补税</option>
-                                        <option value="bookkeeping">记账报税</option>
-                                        <option value="declare_check">申报核对</option>
-                                        <option value="consult">其他财税咨询</option>
-                                        <option value="other">其他</option>
+                                        <option value="bookkeeping">社保基数口径</option>
+                                        <option value="declare_check">测算结果看不懂</option>
+                                        <option value="consult">其他使用问题</option>
+                                        <option value="other">其他（备注里说明）</option>
                                     </select>
                                 </div>
                             </div>
@@ -6307,11 +6307,11 @@
                 <p id="lead-form-error" class="hidden text-xs text-red-600 mb-2"></p>
                 <label class="flex items-start gap-2 cursor-pointer">
                     <input id="lead-consent" type="checkbox" form="lead-form" class="mt-0.5" />
-                    <span class="text-[11px] text-gray-500 leading-relaxed">我已阅读并同意：顾问通过电话或微信与我联系。</span>
+                    <span class="text-[11px] text-gray-500 leading-relaxed">我已阅读并同意<a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>，并同意客服通过电话或微信与我联系。</span>
                 </label>
                 <p class="text-[11px] text-gray-400 mt-1.5 pl-6 leading-relaxed">不采集收入金额 · 测算结果仅供参考，不构成税务建议</p>
                 <button type="submit" form="lead-form" id="lead-submit-btn" class="btn btn-primary w-full mt-3 py-2.5 rounded-lg font-semibold"><i class="fa fa-paper-plane-o mr-1.5"></i>提交信息</button>
-                <p class="text-[11px] text-gray-400 mt-2 text-center leading-relaxed">提交后由后台顾问与您联系反馈，无需其他操作</p>
+                <p class="text-[11px] text-gray-400 mt-2 text-center leading-relaxed">提交后客服会与您联系，无需其他操作</p>
             </div>
         </div>
     </div>
@@ -6411,9 +6411,13 @@
          ⚠ 不要手工给客服链接拼 ?from=xxx：企微规定客服链接不可改写、参数不可复制到别的链接，
          拼了页面照开，但「进入会话事件」参数校验失败、回调拿不到来源 —— 看着能用，实际没数据。
          后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/wecom-channel-playbook.md。
-         可选背书：advisorName / advisorTitle 填**真实**顾问信息（如
-         { advisorName: '王某某', advisorTitle: '注册税务师 · 8 年企业财税' }），留空则弹窗不显示顾问行 ——
-         真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来 -->
+         可选背书：advisorName / advisorTitle 填**真实**客服信息（如
+         { advisorName: '王某某', advisorTitle: '客服 · 熟悉个税测算' }），留空则弹窗不显示该行 ——
+         真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来。
+         ⚠ ICP 备案后**不要**填「注册税务师 / 税务师 / 财税顾问 / 一对一」这类资质或身份措辞：
+           那是**涉税专业服务**话术，与页脚「仅供参考，不构成税务建议」自相矛盾，
+           还可能超出备案时填报的服务内容 —— 真要提供涉税服务，须先完成涉税专业服务实名
+           并能在页面公示信用码（见 docs/marketing/wecom-channel-playbook.md） -->
     <script>
         window.LEAD_CONFIG = {
             // 兜底码：微信客服 kfid —— 未单独配码的入口都用它（站内弹窗走这条）

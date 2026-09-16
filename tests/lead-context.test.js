@@ -204,7 +204,7 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
     });
 
     test('「提交后会有人联系」只留一句话，成功态只确认「收到了」', () => {
-        expect(INDEX_HTML).toContain('提交后由后台顾问与您联系反馈');
+        expect(INDEX_HTML).toContain('提交后客服会与您联系');
         const start = INDEX_HTML.indexOf('id="lead-success"');
         const end = INDEX_HTML.indexOf('id="lead-modal-footer"', start);
         expect(start).toBeGreaterThan(-1);
@@ -253,7 +253,36 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
             expect(src).not.toContain('首次免费');
             expect(src).not.toContain('把漏填项找出来');
         });
-        // 触点承诺的是一次免费咨询，不是「顾问替你完成申报」
-        expect(readSrc('src/js/lead/lead-touchpoints.js')).toContain('免费咨询');
+        // 触点承诺的是一次免费协助（协助核对参数），不是「替你完成申报」
+        expect(readSrc('src/js/lead/lead-touchpoints.js')).toContain('免费协助');
+    });
+
+    // v1.37.8 ICP 备案内容合规：下面这些是**涉税专业服务**话术 —— 与页脚「仅供参考，不构成税务建议」
+    // 自相矛盾，且可能超出备案时填报的服务内容。谁把它们改回来，这条会红。
+    test('留资与触点文案不含涉税专业服务话术（备案后红线）', () => {
+        const touchpoints = readSrc('src/js/lead/lead-touchpoints.js');
+        [
+            '财税顾问 · 一对一',
+            '确认没问题再申报',
+            '>记账报税<',
+            '>申报核对<',
+            '>其他财税咨询<',
+            '提交后由后台顾问'
+        ].forEach((phrase) => {
+            expect(INDEX_HTML).not.toContain(phrase);
+        });
+        ['免费咨询', '申报前先核对', '避免多缴或漏扣'].forEach((phrase) => {
+            expect(touchpoints).not.toContain(phrase);
+        });
+    });
+
+    test('留资同意行带《隐私政策》入口（收集个人信息却无政策入口 = PIPL 告知-同意缺失）', () => {
+        const start = INDEX_HTML.indexOf('id="lead-modal-footer"');
+        const end = INDEX_HTML.indexOf('id="lead-submit-btn"', start);
+        expect(start).toBeGreaterThan(-1);
+        expect(end).toBeGreaterThan(start);
+        const block = INDEX_HTML.slice(start, end);
+        expect(block).toContain('隐私政策');
+        expect(block).toContain('openPolicyModal');
     });
 });

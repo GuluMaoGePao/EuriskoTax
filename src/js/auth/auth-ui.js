@@ -762,8 +762,8 @@ const PROFILE_CARDS_CONFIG = [
         group: 'service',
         icon: 'fa-handshake-o',
         title: '财税服务',
-        desc: '个税汇算核对 / 记账报税，留下联系方式由顾问免费评估',
-        tag: '顾问咨询',
+        desc: '个税汇算测算与工具使用问题，留下联系方式由客服协助',
+        tag: '在线客服',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-handshake-o text-xl text-blue-600'
     },
@@ -808,7 +808,7 @@ const PROFILE_CARDS_CONFIG = [
 // 分组标题：key 与卡片配置的 group 对应，数组顺序即分组展示顺序
 const PROFILE_CARD_GROUPS = [
     { key: 'tools', title: '常用功能', desc: '测算记录、档案与数据' },
-    { key: 'service', title: '服务与支持', desc: '咨询、反馈与帮助' }
+    { key: 'service', title: '服务与支持', desc: '客服、反馈与帮助' }
 ];
 
 // 单张功能卡片（横向紧凑式：图标 + 标题/说明 + 箭头）

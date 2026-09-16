@@ -240,7 +240,7 @@
             return;
         }
         var title = typeof cfg.advisorTitle === 'string' ? cfg.advisorTitle.trim() : '';
-        node.textContent = '顾问：' + name + (title ? ' · ' + title : '');
+        node.textContent = '客服：' + name + (title ? ' · ' + title : '');
         node.classList.remove('hidden');
     }
 
@@ -367,7 +367,7 @@
         if (!p.name) return '请填写您的称呼';
         // 所在城市是顾问核对当地缴费基数口径的唯一依据：计算页已不再让用户选参保城市，
         // 这里漏校验等于留资里「必填」的星号是假的，顾问拿到线索也不知道按哪套口径核。
-        if (!p.city) return '请填写所在城市（各地缴费基数口径不同，顾问要按当地核对）';
+        if (!p.city) return '请填写所在城市（各地缴费基数口径不同，便于按当地参数核对）';
         if (!p.phone && !p.wechat) return '请至少填写手机号或微信号';
         if (p.phone && !PHONE_RE.test(p.phone)) return '手机号格式不正确，请检查后重试';
         if (!p.consent) return '请先勾选同意，我们才能与您联系';
@@ -401,8 +401,8 @@
             var sub = el('lead-success-sub');
             if (sub) {
                 sub.textContent = (data && data.merged)
-                    ? '已收到您的补充信息，顾问会尽快联系您。'
-                    : '顾问会在 1 个工作日内联系您，请留意来电或微信。';
+                    ? '已收到您的补充信息，客服会尽快联系您。'
+                    : '客服会在 1 个工作日内联系您，请留意来电或微信。';
             }
             setView('success');
             document.dispatchEvent(new CustomEvent('euriskotax:lead-submit', {
@@ -476,7 +476,7 @@
         if (scene) {
             state.scene = scene;
             if (textEl) textEl.textContent = '参考您的测算：' + scene;
-            if (hintEl) hintEl.textContent = '顾问会提前看到，沟通时无需重复说明。';
+            if (hintEl) hintEl.textContent = '客服会提前看到，沟通时无需重复说明。';
             if (pickerEl) pickerEl.classList.add('hidden');
             sceneEl.classList.remove('hidden');
             return;
