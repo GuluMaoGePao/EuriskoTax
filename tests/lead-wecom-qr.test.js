@@ -53,6 +53,22 @@ describe('阶段13B 活码配置（index.html）', () => {
         expect(INDEX_HTML).toContain('id="lead-wecom-link"');
         expect(INDEX_HTML).toContain('id="lead-wecom-fallback"');
     });
+
+    // 加好友活码只有图片形态（后台给的是一张 PNG），路径写错的话静态托管照常 200，
+    // 浏览器里就是一张裂图 —— 而弹窗只有真正点开才加载，等人肉眼发现往往已经过了很久。
+    test('分码里填的本地图片必须在磁盘上存在（填错路径 = 线上裂图，且不报错）', () => {
+        const block = INDEX_HTML.match(/wecomQrByChannel\s*:\s*\{([\s\S]*?)\}/);
+        expect(block).not.toBeNull();
+
+        // 只取 `键: '值'` 的值：直接扫裸引号会把 modal: '' 的空引号连同后面的注释一起吞进来
+        const values = Array.from(block[1].matchAll(/:\s*'([^']*)'/g))
+            .map((m) => m[1])
+            .filter(Boolean);
+        values.forEach((v) => {
+            if (/^https?:\/\//i.test(v)) return; // 外链形态交给运行时，这里只盯本地文件
+            expect(fs.existsSync(path.join(ROOT, v))).toBe(true);
+        });
+    });
 });
 
 describe('阶段13B 活码渲染（链接型 vs 图片型）', () => {

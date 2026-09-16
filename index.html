@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.37.5';
+        window.__APP_VERSION__ = '1.37.6';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -6068,7 +6068,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.37.5</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.37.6</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6398,11 +6398,16 @@
     <!-- 阶段13B：企业微信活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
          留空则留资弹窗自动降级为「仅留言通道」并打印一次控制台提示，不影响主流程。
          两种形态都收（lead-modal.js 自动识别）：
-           ① 链接（推荐）：https://work.weixin.qq.com/kfid/xxxx —— 现场生成二维码，换客服不换码；
-           ② 图片：后台下载的活码 PNG 或企微图床地址（wework.qpic.cn），直接当图片用。
-         按入口分码（wecomQrByChannel）：要在企微侧区分「留资弹窗 / 分享图 / 落地页」来源，
-         就在企微后台为各入口**各建一个客服账号**（一账号一链接），把链接填进对应字段；
-         留空即回落到下面的兜底码，通道不会因少配而失效。
+           ① 链接：微信客服 kfid（work.weixin.qq.com/kfid/...）或客户联系「联系我」链接
+              —— 现场生成二维码，点击可直达，换人不换图，是更稳的形态；
+           ② 图片：后台下载的活码 PNG 或企微图床地址（wework.qpic.cn），直接当 <img src> 显示。
+              ⚠ 图片形态下「点击」只能打开这张图（手机上长按可识别），没有可跳转的加好友链接；
+                 哪天在后台看到「复制链接」，优先换回链接形态。
+         按入口分码（wecomQrByChannel），留空即回落到下面的兜底码，通道不会因少配而失效。
+         目前是两条线并存（取舍见 docs/marketing/wecom-channel-playbook.md 第 5 节）：
+           · 站内弹窗 → 微信客服 kfid：不加好友、门槛低，欢迎语可按客服账号分别配；
+           · 分享图 / 落地页 → 客户联系「联系我」加好友活码（images/weworkQR.png）：
+             加好友沉淀长期关系、可打标签，代价是多了「加好友」这一步。
          ⚠ 不要手工给客服链接拼 ?from=xxx：企微规定客服链接不可改写、参数不可复制到别的链接，
          拼了页面照开，但「进入会话事件」参数校验失败、回调拿不到来源 —— 看着能用，实际没数据。
          后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/wecom-channel-playbook.md。
@@ -6411,13 +6416,13 @@
          真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来 -->
     <script>
         window.LEAD_CONFIG = {
-            // 兜底码：所有未单独配置专属码的入口都用它
+            // 兜底码：微信客服 kfid —— 未单独配码的入口都用它（站内弹窗走这条）
             wecomQrUrl: 'https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0',
-            // 按入口的专属码：填企微后台为各入口单独建的客服账号链接，留空即用兜底码
+            // 按入口的专属码：留空即回落到上面的兜底码，通道不会因少配而失效
             wecomQrByChannel: {
-                modal: '',    // 站内留资弹窗（结果页 / 个人中心）
-                share: '',    // 分享图带来的访客（从分享码进站后，其弹窗改用这个码）
-                landing: ''   // 站外落地页 / SEO 页（source 含 seo_ / landing）
+                modal: '',                     // 站内留资弹窗（结果页 / 个人中心）→ 用兜底微信客服，扫码即聊、不加好友
+                share: 'images/weworkQR.png',  // 分享图带来的访客 → 客户联系「联系我」加好友活码（图片形态）
+                landing: 'images/weworkQR.png' // 站外落地页 / SEO 页（source 含 seo_ / landing）
             }
         };
     </script>
