@@ -444,12 +444,14 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-card.js')
             && leadPage.raw.includes('src/js/export/capture.js') && leadPage.raw.includes('qrcode'), `HTTP ${leadPage.status}`);
         const shareLandingJs = await request(PORT, 'GET', '/src/js/share/share-landing.js');
+        // 落地首屏锚点跟着信息架构走：原「开始计算」卡片已移入工具页，
+        // 首页第一屏是「我是谁」场景入口，分享落地 CTA 也改指这里（#home-scenarios）
         record('share-landing.js 提供分享落地首屏引导(?source=share)',
             shareLandingJs.status === 200 && shareLandingJs.raw.includes('source=share')
-            && shareLandingJs.raw.includes('home-start-card'), `HTTP ${shareLandingJs.status}`);
-        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-start-card)',
+            && shareLandingJs.raw.includes('home-scenarios'), `HTTP ${shareLandingJs.status}`);
+        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-scenarios)',
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-landing.js')
-            && leadPage.raw.includes('id="home-start-card"'), `HTTP ${leadPage.status}`);
+            && leadPage.raw.includes('id="home-scenarios"'), `HTTP ${leadPage.status}`);
         const captureJs = await request(PORT, 'GET', '/src/js/export/capture.js');
         record('capture.js 暴露 window.Capture.captureHtml（PDF 与分享图共用截图层）',
             captureJs.status === 200 && captureJs.raw.includes('window.Capture') && captureJs.raw.includes('captureHtml'), `HTTP ${captureJs.status}`);
@@ -609,7 +611,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/vat.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/corporate-income-tax.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/surtax-stamp-duty.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/surtax-stamp-duty.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/health-insurance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/enterprise-annuity.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -1311,6 +1315,90 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && leadSrc.includes("'seo_disabilityfund'")
             && dfundPage.raw.includes('?source=seo_disabilityfund'),
             `HTTP ${dfundPage.status}`);
+        // 第十九、二十个落地页「税优健康险 + 企业年金」（阶段15 15A-5 尾巴收尾）：
+        // 与个人养老金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / 易错口径 / CTA 归因），
+        // 各加两条本页独有的口径断言 ——
+        //   健康险：① 保险赔款免征个税（没有领取税，与个人养老金的 3% 对照）；
+        //           ② 节税上限 2400 × 45% = 1080 元/年，页面必须写明「不足以成为购买理由」；
+        //   年金：  ① 个人免税上限 = 计税基数 × 4%（社平 300% 封顶），超 4% 部分税后扣缴；
+        //           ② 领取按全额（含单位缴费）单独计税，能算出「净优惠为负」的另一面。
+        const hiPage = await request(PORT, 'GET', '/seo/health-insurance.html');
+        record('税优健康险落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税〔2017〕39 号 + 个税法第四条）',
+            hiPage.status === 200 && hiPage.raw.includes('rel="canonical"')
+            && hiPage.raw.includes('FAQPage')
+            && hiPage.raw.includes('财税〔2017〕39 号')
+            && hiPage.raw.includes('免征个人所得税'),
+            `HTTP ${hiPage.status}`);
+        const hiAnnualBlock = (hiPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const hiAnnualRows = Array.from(hiAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleHiRows = hiAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('税优健康险落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            hiPage.status === 200 && hiAnnualRows.length === 7 && staleHiRows.length === 0
+            && hiPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && hiPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && hiPage.raw.includes('/src/js/calculation/health-insurance-quick.js'),
+            `页面 ${hiAnnualRows.length} 档, 与常量不一致 ${staleHiRows.length} 档`);
+        const hiRuleBlock = (hiPage.raw.split('id="hi-rule-table"')[1] || '').split('</table>')[0];
+        record('税优健康险落地页限额处理表与静态示例表可读（2400 元/年、200 元/月、赔款免税；240 / 480 / 1080 / 79）',
+            hiPage.status === 200 && hiRuleBlock.includes('2400 元/年')
+            && hiRuleBlock.includes('200 元/月')
+            && hiRuleBlock.includes('免征个人所得税')
+            && hiPage.raw.includes('>240.00<') && hiPage.raw.includes('>480.00<')
+            && hiPage.raw.includes('>1080.00<') && hiPage.raw.includes('>79.00<'), '');
+        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、节税不足以成为购买理由），线索来源已入白名单',
+            hiPage.status === 200
+            && hiPage.raw.includes('少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额')
+            && hiPage.raw.includes('不足以成为购买理由')
+            && hiPage.raw.includes('税优识别码')
+            && leadSrc.includes("'seo_health_insurance'")
+            && hiPage.raw.includes('?source=seo_health_insurance'),
+            `HTTP ${hiPage.status}`);
+        const annuityPage = await request(PORT, 'GET', '/seo/enterprise-annuity.html');
+        record('企业年金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税〔2013〕103 号 + 人社部令第 36 号）',
+            annuityPage.status === 200 && annuityPage.raw.includes('rel="canonical"')
+            && annuityPage.raw.includes('FAQPage')
+            && annuityPage.raw.includes('财税〔2013〕103 号')
+            && annuityPage.raw.includes('第 36 号'),
+            `HTTP ${annuityPage.status}`);
+        const annAnnualBlock = (annuityPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const annAnnualRows = Array.from(annAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnRows = annAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        const annMonthlyBlock = (annuityPage.raw.split('id="monthly-rate-table"')[1] || '').split('</table>')[0];
+        const annMonthlyRows = Array.from(annMonthlyBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnMonthly = annMonthlyRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('企业年金落地页静态年度税率表与月度税率表均与常量文件逐档一致（页面不维护第二份口径）',
+            annuityPage.status === 200 && annAnnualRows.length === 7 && staleAnnRows.length === 0
+            && annMonthlyRows.length === 7 && staleAnnMonthly.length === 0
+            && annuityPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && annuityPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && annuityPage.raw.includes('/src/js/calculation/annuity-quick.js'),
+            `年度 ${annAnnualRows.length} 档(不一致 ${staleAnnRows.length}), 月度 ${annMonthlyRows.length} 档(不一致 ${staleAnnMonthly.length})`);
+        const annRuleBlock = (annuityPage.raw.split('id="annuity-rule-table"')[1] || '').split('</table>')[0];
+        record('企业年金落地页三环节表与静态示例表可读（4% / 8% / 12% / 300% 封顶 / 全额单独计税；10560 / 750 / 930 / −276）',
+            annuityPage.status === 200 && annRuleBlock.includes('4%')
+            && annRuleBlock.includes('8%') && annRuleBlock.includes('12%')
+            && annRuleBlock.includes('300%') && annRuleBlock.includes('全额')
+            && annuityPage.raw.includes('>10560.00<') && annuityPage.raw.includes('>750.00<')
+            && annuityPage.raw.includes('>930.00<') && annuityPage.raw.includes('>-276.00<'), '');
+        record('企业年金落地页写明三条易错口径（4% 封顶且基数 300% 封顶、领取全额含单位缴费、3% 档净优惠为负但单位缴费白得），线索来源已入白名单',
+            annuityPage.status === 200
+            && annuityPage.raw.includes('300%')
+            && annuityPage.raw.includes('税后工资扣')
+            && annuityPage.raw.includes('不并入综合所得')
+            && annuityPage.raw.includes('为负')
+            && annuityPage.raw.includes('单位缴费')
+            && leadSrc.includes("'seo_annuity'")
+            && annuityPage.raw.includes('?source=seo_annuity'),
+            `HTTP ${annuityPage.status}`);
         const deadLocs = [];
         // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
         // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
@@ -1333,8 +1421,8 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             orphanPages.length === 0, orphanPages.join(', '));
         const indexPage = await request(PORT, 'GET', '/seo/index.html');
         const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
-        record('工具总目录列出全部 18 个落地页（卡片 + ItemList 结构化数据）',
-            indexPage.status === 200 && toolCards === 18 && indexPage.raw.includes('"numberOfItems": 18'),
+        record('工具总目录列出全部 20 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 20 && indexPage.raw.includes('"numberOfItems": 20'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
         record('App 首页底部有落地页总目录入口（防 App 内无通路）',

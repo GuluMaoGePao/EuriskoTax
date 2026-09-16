@@ -398,14 +398,17 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 
 // 导出PDF
 // opts（可选，阶段10B 专业版汇算清缴报告复用）：
-//   { contentBuilder, beforeCapture, filename }
+//   { contentBuilder, beforeCapture, filename, skipResultCheck }
 //     contentBuilder  () => HTML 字符串，覆盖默认的 generateWordDocumentContent(title) 内容
 //     beforeCapture   (container) => void，html2canvas 截图前回调（如绘制 Chart 图表后等待就绪）
 //     filename        自定义保存文件名（不含扩展名差异，直接作为 doc.save 参数）
+//     skipResultCheck 跳过「请先进行计算」守卫（阶段16：速算器结果不走深度流程的全局结果变量，
+//                     它自带 tool / values / out，由 quick-report 直接给出文档内容）
 function exportToPDF(elementId, title, opts) {
     opts = opts || {};
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0 &&
+    if (!opts.skipResultCheck &&
+        Object.keys(calculationResults).length === 0 &&
         Object.keys(reverseCalculationResults).length === 0 &&
         Object.keys(businessCalculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');

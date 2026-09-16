@@ -329,7 +329,9 @@
             comprehensive: { name: '综合所得', icon: 'fa-calculator', color: 'text-primary' },
             business: { name: '经营所得', icon: 'fa-briefcase', color: 'text-accent' },
             classification: { name: '分类所得', icon: 'fa-list-alt', color: 'text-success' },
-            reverse: { name: '反向倒算', icon: 'fa-refresh', color: 'text-secondary' }
+            reverse: { name: '反向倒算', icon: 'fa-refresh', color: 'text-secondary' },
+            // 20 个单页速算器保存的结果（toolbox-ui 写入 type: 'quick'）
+            quick: { name: '速算器', icon: 'fa-bolt', color: 'text-primary' }
         };
 
         container.innerHTML = sorted.map(item => {

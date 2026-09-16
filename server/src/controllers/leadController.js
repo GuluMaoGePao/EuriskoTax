@@ -20,6 +20,8 @@ const SOURCES = [
     'seo_bizincome',
     // 阶段15 15B-6：残保金与工会经费
     'seo_disabilityfund',
+    // 阶段15 15A-5 尾巴收尾：税优健康险、企业年金
+    'seo_health_insurance', 'seo_annuity',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）

@@ -1,0 +1,688 @@
+/* 工具箱与通用速算器页样式（纯 CSS，不依赖 Tailwind JIT，便于独立维护）
+   深色模式沿用项目约定：html.dark 下覆盖。 */
+
+/* ====== 搜索框 ====== */
+.tool-search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.tool-search-wrap .tool-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.tool-search {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f9fafb;
+    outline: none;
+    transition: border-color .2s, background .2s;
+}
+
+.tool-search:focus {
+    border-color: #1e40af;
+    background: #fff;
+}
+
+/* ====== 分组 ====== */
+.tool-group {
+    margin-bottom: 14px;
+}
+
+.tool-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.tool-group-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.tool-group-desc {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.tool-grid-1 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+@media (min-width: 768px) {
+    .tool-grid-1 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* ====== 工具条目 ====== */
+.tool-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: box-shadow .2s, border-color .2s, transform .15s;
+}
+
+.tool-entry:hover {
+    border-color: #c7d7fb;
+    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    transform: translateY(-1px);
+}
+
+.tool-entry-icon {
+    flex: 0 0 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(30, 64, 175, .08);
+    color: #1e40af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.tool-entry-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tool-entry-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.tool-entry-desc {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-entry-arrow {
+    color: #d1d5db;
+    font-size: 15px;
+}
+
+/* ====== 徽标 ====== */
+.tool-badge {
+    font-size: 10px;
+    line-height: 1.4;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tool-badge-deep {
+    background: rgba(30, 64, 175, .1);
+    color: #1e40af;
+}
+
+.tool-badge-native {
+    background: rgba(16, 185, 129, .12);
+    color: #047857;
+}
+
+.tool-badge-seo {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.tool-badge-ok {
+    background: rgba(16, 185, 129, .12);
+    color: #047857;
+}
+
+.tool-badge-warn {
+    background: rgba(245, 158, 11, .14);
+    color: #b45309;
+}
+
+.tool-badge-danger {
+    background: rgba(239, 68, 68, .12);
+    color: #b91c1c;
+}
+
+.tool-empty {
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+/* ====== 速算器表单 ====== */
+.tool-field {
+    margin-bottom: 12px;
+}
+
+.tool-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.tool-input-wrap {
+    position: relative;
+}
+
+.tool-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+    color: #1f2937;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-input:focus {
+    border-color: #1e40af;
+    box-shadow: 0 0 0 3px rgba(30, 64, 175, .12);
+}
+
+.tool-input-unit {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.tool-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #374151;
+}
+
+.tool-field-hint {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #9ca3af;
+    line-height: 1.5;
+}
+
+/* ====== 结果区 ====== */
+.tool-result-primary {
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1e40af, #3b82f6);
+    color: #fff;
+}
+
+.tool-result-primary-label {
+    font-size: 12px;
+    opacity: .85;
+}
+
+.tool-result-primary-value {
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 2px;
+    letter-spacing: .5px;
+}
+
+.tool-result-rows {
+    margin-top: 10px;
+}
+
+.tool-result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px dashed #eef0f3;
+    font-size: 13px;
+}
+
+.tool-result-row:last-child {
+    border-bottom: none;
+}
+
+.tool-result-label {
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tool-result-hint {
+    color: #d1d5db;
+    cursor: help;
+}
+
+.tool-result-value {
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.tool-result-note {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 11.5px;
+    line-height: 1.7;
+    color: #6b7280;
+}
+
+/* ====== 易错口径 ====== */
+.tool-pitfall-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b45309;
+    margin-bottom: 6px;
+}
+
+.tool-pitfall ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.tool-pitfall li {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #6b7280;
+}
+
+/* ====== 分组图标（工具页「完整测算」组复用 tool-group-head） ====== */
+.tool-group-icon {
+    color: #1e40af;
+    font-size: 12px;
+    position: relative;
+    top: -1px;
+}
+
+/* ====== 首页「最近使用」列表 ====== */
+.tool-entry-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+@media (min-width: 640px) {
+    .tool-entry-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ====== 首页搜索入口（看起来是搜索框，点开进工具页并聚焦） ====== */
+.tool-search-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-search-entry:hover {
+    border-color: #c7d7fb;
+    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+}
+
+.tool-search-entry-icon {
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.tool-search-entry-text {
+    flex: 1 1 auto;
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+.tool-search-entry-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+    white-space: nowrap;
+}
+
+/* ====== 首页「我是谁」场景卡 ====== */
+.scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+@media (min-width: 768px) {
+    .scenario-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .scenario-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+.scenario-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .2s, box-shadow .2s, transform .15s;
+}
+
+.scenario-card:hover {
+    border-color: #c7d7fb;
+    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    transform: translateY(-1px);
+}
+
+.scenario-card .fa {
+    font-size: 15px;
+    color: #1e40af;
+    margin-bottom: 2px;
+}
+
+.scenario-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.scenario-desc {
+    font-size: 11px;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+/* ====== 工具页：按身份筛选的提示条 ====== */
+.tool-scenario-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(30, 64, 175, .07);
+    font-size: 12px;
+    color: #1e40af;
+}
+
+.tool-chip-clear {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e40af;
+    white-space: nowrap;
+}
+
+/* ====== 结果页「下一步」====== */
+.tool-next-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.tool-next-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+@media (min-width: 640px) {
+    .tool-next-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.tool-next-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: #374151;
+    text-align: left;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-next-item:hover {
+    border-color: #c7d7fb;
+    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+}
+
+.tool-next-item .fa:first-child {
+    color: #1e40af;
+}
+
+.tool-next-item .fa:last-child {
+    margin-left: auto;
+    color: #d1d5db;
+}
+
+.tool-next-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tool-next-btn {
+    padding: 7px 14px;
+    border: 1px solid #c7d7fb;
+    border-radius: 8px;
+    background: #fff;
+    color: #1e40af;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+}
+
+.tool-next-btn:hover {
+    background: rgba(30, 64, 175, .06);
+}
+
+.tool-next-btn:disabled {
+    color: #047857;
+    border-color: #a7f3d0;
+    cursor: default;
+}
+
+/* ====== 底部 Tab 栏（只在顶层页显示） ====== */
+.bottom-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    display: flex;
+    border-top: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 7px 0 6px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.bottom-tab .fa {
+    font-size: 17px;
+}
+
+.bottom-tab.active {
+    color: #1e40af;
+}
+
+/* Tab 栏显示时为页面留出底部空间（避免遮住最后一张卡片） */
+body.has-tabbar #mode-selection-page .max-w-5xl,
+body.has-tabbar #tools-page .max-w-3xl {
+    padding-bottom: 64px;
+}
+
+/* ====== 深色模式 ====== */
+.dark .tool-search {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark .tool-group-title,
+.dark .tool-entry-title,
+.dark .tool-result-value,
+.dark .tool-label {
+    color: #e5e7eb;
+}
+
+.dark .tool-entry {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .tool-entry:hover {
+    border-color: #3b82f6;
+}
+
+.dark .tool-entry-desc,
+.dark .tool-result-label,
+.dark .tool-field-hint,
+.dark .tool-pitfall li {
+    color: #9ca3af;
+}
+
+.dark .tool-entry-icon {
+    background: rgba(59, 130, 246, .15);
+    color: #60a5fa;
+}
+
+.dark .tool-result-row {
+    border-bottom-color: #374151;
+}
+
+.dark .tool-result-note {
+    background: #111827;
+    color: #9ca3af;
+}
+
+.dark .tool-input {
+    background: #111827;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark .tool-badge-seo {
+    background: #374151;
+    color: #d1d5db;
+}
+
+.dark .tool-group-icon {
+    color: #60a5fa;
+}
+
+.dark .tool-search-entry,
+.dark .scenario-card,
+.dark .tool-next-item {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .tool-search-entry:hover,
+.dark .scenario-card:hover,
+.dark .tool-next-item:hover {
+    border-color: #3b82f6;
+}
+
+.dark .scenario-name,
+.dark .tool-next-head {
+    color: #e5e7eb;
+}
+
+.dark .scenario-desc,
+.dark .tool-search-entry-text {
+    color: #9ca3af;
+}
+
+.dark .scenario-card .fa,
+.dark .tool-next-item .fa:first-child,
+.dark .tool-search-entry-count {
+    color: #60a5fa;
+}
+
+.dark .tool-next-item {
+    color: #d1d5db;
+}
+
+.dark .tool-next-btn {
+    background: #1f2937;
+    border-color: #3b82f6;
+    color: #60a5fa;
+}
+
+.dark .tool-scenario-chip {
+    background: rgba(59, 130, 246, .14);
+    color: #93c5fd;
+}
+
+.dark .tool-chip-clear {
+    color: #93c5fd;
+}
+
+.dark .bottom-tabbar {
+    background: rgba(17, 24, 39, .96);
+    border-top-color: #374151;
+}
+
+.dark .bottom-tab.active {
+    color: #60a5fa;
+}

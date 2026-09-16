@@ -1,0 +1,202 @@
+// 工具注册表（App 内多税种入口）的一致性测试
+//
+// 这个文件要钉住的是「目录层」而不是「算法层」的算法正确性（算法由各 *-quick.test.js 对拍）：
+//   ① 数量与口径：20 个速算器 + 4 个深度流程 —— 目录页、App 工具箱、测试三方必须同数；
+//   ② 落地页真实存在：注册表里写的 seoPath 不能指向 404（曾经出现过「目录写了 20 个、
+//      正文文案还写 18 个」这类口径漂移，这里用文件系统兜底）；
+//   ③ 政策依据必须是 tax-registry 里**已登记**的 id —— 防止随手写一个拼错的 key，
+//      导致页面上的「政策有效期」永远显示不出来（到期了没人知道比写错数字更危险）；
+//   ④ native 工具必须真能算：字段 schema 与 compute() 对得上，默认输入下结果有限且非负。
+const fs = require('fs');
+const path = require('path');
+const { loadSource } = require('./helpers/load-source');
+
+const ROOT = path.join(__dirname, '..');
+
+// 顺序与 index.html 保持一致（social-insurance 被 net-salary / employer-cost 依赖，
+// bonus-tax 被 early-retirement 依赖），顺序错了这里会先红，起到「加载顺序」的守护作用。
+const QUICK_MODULES = [
+    'social-insurance-quick.js',
+    'salary-tax-quick.js',
+    'bonus-tax-quick.js',
+    'net-salary-quick.js',
+    'special-deduction-quick.js',
+    'annual-settlement-quick.js',
+    'withholding-quick.js',
+    'equity-incentive-quick.js',
+    'severance-quick.js',
+    'early-retirement-quick.js',
+    'expat-allowance-quick.js',
+    'private-pension-quick.js',
+    'health-insurance-quick.js',
+    'annuity-quick.js',
+    'employer-cost-quick.js',
+    'disability-fund-quick.js',
+    'surtax-stamp-quick.js',
+    'business-income-quick.js',
+    'vat-quick.js',
+    'corporate-income-tax-quick.js'
+];
+
+beforeAll(() => {
+    loadSource('src/js/calculation/tax-constants.js');
+    // 部分 quick 模块（special-deduction / expat / private-pension 等）的节税对照
+    // 直接复用内核的 calculateTaxByTaxableIncome，测试里必须先加载
+    loadSource('src/js/calculation/tax-calculator.js');
+    loadSource('src/js/calculation/helper-functions.js');
+    loadSource('src/js/calculation/tax-registry.js');
+    QUICK_MODULES.forEach((f) => loadSource('src/js/calculation/' + f));
+    loadSource('src/js/data/tool-registry.js');
+});
+
+const R = () => window.EuriskoToolRegistry;
+
+describe('工具注册表：数量与分组', () => {
+    test('20 个速算器 + 4 个深度流程', () => {
+        expect(R().all()).toHaveLength(20);
+        expect(R().deep()).toHaveLength(4);
+    });
+
+    test('每个速算器都归属一个已声明的分组', () => {
+        const groupIds = R().groups().map((g) => g.id);
+        R().all().forEach((tool) => {
+            expect(groupIds).toContain(tool.group);
+        });
+    });
+
+    test('id 唯一（深度流程与速算器不重号）', () => {
+        const ids = R().all().map((t) => t.id).concat(R().deep().map((t) => t.id));
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+});
+
+describe('工具注册表：落地页真实存在', () => {
+    test('所有 seoPath 都能在磁盘上找到', () => {
+        const missing = R()
+            .all()
+            .filter((tool) => !tool.seoPath)
+            .map((t) => t.id)
+            .concat(
+                R()
+                    .all()
+                    .filter((tool) => tool.seoPath && !fs.existsSync(path.join(ROOT, tool.seoPath.replace(/^\//, ''))))
+                    .map((t) => t.id + ' → ' + t.seoPath)
+            );
+        expect(missing).toEqual([]);
+    });
+});
+
+describe('工具注册表：政策依据登记在案', () => {
+    test('每个工具的 policyKey 都能被 tax-registry 识别', () => {
+        const bad = R()
+            .all()
+            .filter((tool) => tool.policyKey)
+            .filter((tool) => !window.EuriskoTaxRegistry.statusOf(tool.policyKey))
+            .map((t) => t.id + ' → ' + t.policyKey);
+        expect(bad).toEqual([]);
+    });
+});
+
+describe('工具注册表：App 内速算器（native）可用', () => {
+    const natives = () => R().all().filter((t) => t.status === 'native');
+
+    test('20 个工具全部 App 内置（不再有「网页版」跳站态）', () => {
+        // 阶段16：之前 14 个工具只能跳 /seo 落地页，App 内点开就跳出 PWA。
+        // 现在 20 个全部内置，落地页退回纯粹的 SEO / 分享入口。
+        const notNative = R().all().filter((t) => t.status !== 'native').map((t) => t.id);
+        expect(notNative).toEqual([]);
+        expect(natives()).toHaveLength(20);
+    });
+
+    test('native 工具都有字段 schema、易错口径与 compute', () => {
+        natives().forEach((tool) => {
+            expect(Array.isArray(tool.fields)).toBe(true);
+            expect(tool.fields.length).toBeGreaterThan(0);
+            expect(typeof tool.compute).toBe('function');
+            expect(Array.isArray(tool.pitfalls)).toBe(true);
+            expect(tool.pitfalls.length).toBeGreaterThan(0);
+        });
+    });
+
+    test('用默认值计算：结果有限、非负，且带 primary 与 rows', () => {
+        natives().forEach((tool) => {
+            const values = {};
+            tool.fields.forEach((f) => { values[f.key] = f.default; });
+            const out = tool.compute(values);
+            expect(out).toBeTruthy();
+            expect(out.error).toBeUndefined();
+            expect(out.primary).toBeDefined();
+            expect(Number.isFinite(Number(out.primary.value))).toBe(true);
+            expect(Number(out.primary.value)).toBeGreaterThanOrEqual(0);
+            expect(Array.isArray(out.rows)).toBe(true);
+            out.rows.forEach((row) => {
+                if (row.kind === 'money' || row.kind === 'percent') {
+                    expect(Number.isFinite(Number(row.value))).toBe(true);
+                }
+            });
+        });
+    });
+
+    test('增值税切换计税场景后仍能算（条件字段不影响求解）', () => {
+        const vat = R().get('vat');
+        ['small', 'general', 'split'].forEach((variant) => {
+            const values = {};
+            vat.fields.forEach((f) => { values[f.key] = f.default; });
+            values.variant = variant;
+            const out = vat.compute(values);
+            expect(out.error).toBeUndefined();
+            expect(Number.isFinite(Number(out.primary.value))).toBe(true);
+        });
+    });
+});
+
+describe('工具注册表：信息架构（场景 / 相关工具）', () => {
+    test('5 个身份场景，引用的工具都存在', () => {
+        expect(R().scenarios()).toHaveLength(5);
+        const bad = [];
+        R().scenarios().forEach((s) => {
+            s.tools.forEach((id) => { if (!R().get(id)) bad.push(s.id + ' → ' + id); });
+        });
+        expect(bad).toEqual([]);
+    });
+
+    test('nextTools 指向的工具都存在（结果页「下一步」不能是死链）', () => {
+        const bad = [];
+        R().all().concat(R().deep()).forEach((t) => {
+            if (!Array.isArray(t.nextTools) || !t.nextTools.length) { bad.push(t.id + ' → 缺 nextTools'); return; }
+            t.nextTools.forEach((id) => { if (!R().get(id)) bad.push(t.id + ' → ' + id); });
+        });
+        expect(bad).toEqual([]);
+    });
+
+    test('完整测算是一个独立分组，不混进按场景的 5 个组', () => {
+        // 混排会让同组出现两个「算工资」的入口，用户更懵 —— 填多填少的差别只放在最后一组
+        const groupIds = R().groups().map((g) => g.id);
+        expect(groupIds).not.toContain(R().deepGroup().id);
+        expect(R().deepGroup().id).toBe('deep');
+        R().deep().forEach((t) => { expect(t.status).toBe('deep'); });
+    });
+
+    test('分组名不再叫「深度测算」：保存与导出已下放，形态不该出现在组名里', () => {
+        // 阶段16 之前这组叫「深度测算」（按实现形态起名，用户心里没有「深度」这回事），
+        // 卖点还是「可保存 / 可导出」—— 现在 20 个速算器都能存能导出，这个说法就过期了
+        const g = R().deepGroup();
+        expect(g.name).not.toBe('深度测算');
+        expect(g.desc).not.toMatch(/可保存|可导出/);
+    });
+});
+
+describe('工具注册表：搜索', () => {
+    test('中文名与别名都能命中', () => {
+        expect(R().search('增值税').tools.map((t) => t.id)).toContain('vat');
+        expect(R().search('年终奖').tools.map((t) => t.id)).toContain('bonus-tax');
+        expect(R().search('残保金').tools.map((t) => t.id)).toContain('disability-fund');
+        expect(R().search('反向').deep.map((t) => t.id)).toContain('reverse');
+    });
+
+    test('空关键词返回全量，且不标记为搜索态', () => {
+        const result = R().search('');
+        expect(result.matched).toBe(false);
+        expect(result.tools).toHaveLength(20);
+    });
+});

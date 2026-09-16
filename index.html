@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1e40af">
-    <meta name="description" content="EuriskoTax 个人所得税预算规划工具 - 综合所得、经营所得、分类所得计算与反向倒算，离线可用。">
+    <meta name="description" content="EuriskoTax 税费计算器 - 个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 20 个税种在线测算，计算在浏览器本地完成，离线可用；结果仅供参考，不构成税务建议。">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/images/icon-192.png">
     <link rel="apple-touch-icon" href="/images/icon-192.png">
-    <title>EuriskoTax - 个人所得税预算规划工具</title>
+    <title>EuriskoTax 税费计算器 - 个税 / 企业税 / 社保在线测算</title>
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时版本号需同步**五处**：package.json / 本页 window.__APP_VERSION__ / 关于弹窗「版本 x.y.z」
          / 根目录 version.json / CHANGELOG 最新条目。
@@ -16,7 +16,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.34.0';
+        window.__APP_VERSION__ = '1.37.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -55,6 +55,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 工具箱与通用速算器页样式（不依赖 Tailwind JIT，独立维护） -->
+    <link rel="stylesheet" href="src/css/toolbox.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <!-- jsPDF for PDF export -->
@@ -1153,7 +1155,9 @@
 
         .assistant-shortcuts {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            /* 快捷功能已增至 5 个（新增「全部工具」）：用 auto-fit 让它按抽屉宽度自适应排布，
+               窄屏仍 4 个一行、第 5 个换行，宽屏一行放下 5 个 —— 比写死 4 列多一个孤零零的第二行好 */
+            grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
             gap: 8px;
             margin-bottom: 16px;
         }
@@ -2049,16 +2053,117 @@
                     </div>
                 </div>
 
-                <!-- 卡片2：开始计算（4模式） -->
-                <div id="home-start-card" class="home-card">
+                <!-- 卡片2：搜索入口（24 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
+                <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
+                    <i class="fa fa-search tool-search-entry-icon"></i>
+                    <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
+                    <span class="tool-search-entry-count">24 个 ›</span>
+                </button>
+
+                <!-- 卡片3：我是谁（先认身份再选工具 —— 用户不知道年终奖归哪一类，但知道自己是上班族） -->
+                <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
-                            <i class="fa fa-calculator text-primary mr-2"></i>
-                            <span>开始计算</span>
+                            <i class="fa fa-user-circle-o text-primary mr-2"></i>
+                            <span>我是谁</span>
                         </div>
-                        <span class="text-xs text-gray-400">选择计税模式</span>
+                        <span class="text-xs text-gray-400">按身份挑工具</span>
                     </div>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div id="home-scenarios" class="scenario-grid">
+                        <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
+                    </div>
+                </div>
+
+                <!-- 卡片4：最近使用（跨形态：速算器与深度流程混排） -->
+                <div id="home-recent-tools-card" class="home-card hidden">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-clock-o text-primary mr-2"></i>
+                            <span>最近使用</span>
+                        </div>
+                        <button id="home-recent-tools-clear" type="button" class="text-xs text-gray-400 hover:text-primary">清空</button>
+                    </div>
+                    <div id="home-recent-tools" class="tool-entry-list"></div>
+                </div>
+
+                <!-- 卡片5：最近计算 -->
+                <div class="home-card">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-history text-purple-500 mr-2"></i>
+                            <span>最近计算</span>
+                        </div>
+                        <a href="#" id="home-view-all-history" class="text-xs text-primary hover:underline">全部 ›</a>
+                    </div>
+                    <div id="home-recent-list" class="recent-scroll">
+                        <!-- 由 home-ui.js 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 卡片6：税务日历提醒 -->
+                <div class="home-card">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-calendar text-orange-500 mr-2"></i>
+                            <span>税务提醒</span>
+                        </div>
+                        <span class="text-xs text-gray-400" id="home-calendar-year">2026</span>
+                    </div>
+                    <div id="home-calendar-list" class="space-y-1">
+                        <!-- 由 home-ui.js 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 卡片5：税务小贴士 -->
+                <div class="home-card">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
+                            <span>税务小贴士</span>
+                        </div>
+                        <button id="home-next-tip" class="text-xs text-primary hover:underline">换一条 ›</button>
+                    </div>
+                    <div id="home-tip-content" class="text-sm text-gray-600 leading-relaxed">
+                        <!-- 由 home-ui.js 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 关于本站（口径说明：多税种 + 纯前端计算） -->
+                <div class="mt-2 p-4 bg-blue-50 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fa fa-info-circle text-primary mt-0.5 mr-2"></i>
+                        <div>
+                            <h4 class="font-medium text-primary mb-1 text-sm">关于本站</h4>
+                            <p class="text-xs text-gray-600">EuriskoTax 税费计算器：覆盖个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 <strong>20 个速算器</strong>，外加 4 个多步骤完整测算（按年填全、出完整预算表），<strong>共 24 个入口全部内置</strong>。先按身份选场景，找不到就搜（「年终奖」「增值税」「残保金」），每个结果都给出拆解、易错口径与政策依据，也都能保存与导出 PDF。全部计算在你的浏览器本地完成，不上传任何数据；结果仅供参考，实际纳税请以税务部门核算为准。</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 工具页：24 个入口只按「人/场景」分一套类。
+             早期把「深度测算」与「工具箱」并列，那是实现形态的分界（向导 vs 一屏算完），
+             不是用户心智的分界 —— 现在形态差异降为最后一组的一行说明。 -->
+        <div id="tools-page" class="page hidden">
+            <div class="max-w-3xl mx-auto py-4 px-4">
+                <div class="tool-search-wrap">
+                    <i class="fa fa-search tool-search-icon"></i>
+                    <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
+                </div>
+                <div id="toolbox-scenario-chip" class="tool-scenario-chip hidden"></div>
+                <div id="toolbox-groups">
+                    <!-- 由 toolbox-ui.js 按 tool-registry.js 渲染（5 个场景组 + 搜索结果） -->
+                </div>
+
+                <!-- 完整测算：按年填全、出完整预算表（保存/导出已不是它的专利，全都支持），排在最后 -->
+                <div id="toolbox-deep" class="tool-group">
+                    <div class="tool-group-head">
+                        <i class="fa fa-list-ol tool-group-icon"></i>
+                        <span class="tool-group-title">完整测算</span>
+                        <span class="tool-group-desc">按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快</span>
+                    </div>
+                    <div id="deep-mode-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- 综合所得 -->
                         <div class="mode-card mode-card-primary" id="forward-mode-card">
                             <button class="mode-card-info-btn" data-mode-info="forward" title="了解更多">
@@ -2109,60 +2214,56 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <!-- 卡片3：最近计算 -->
+        <!-- 通用速算器页（20 个税种共用：表单由 tool-registry 的 schema 渲染，计算调用 *-quick.js） -->
+        <div id="quick-calculator-page" class="page hidden">
+            <div class="max-w-3xl mx-auto py-4 px-4">
+                <!-- 顶部：返回 + 标题 + 政策时效 -->
+                <div class="flex items-start gap-3 mb-3">
+                    <button id="quick-back-btn" class="mt-1 text-gray-400 hover:text-primary" title="返回首页">
+                        <i class="fa fa-arrow-left"></i>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <h2 id="quick-title" class="text-lg font-bold"></h2>
+                        <p id="quick-subtitle" class="text-xs text-gray-500 mt-0.5"></p>
+                    </div>
+                    <div id="quick-policy-badge" class="flex-shrink-0"></div>
+                </div>
+
+                <!-- 输入区 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
-                            <i class="fa fa-history text-purple-500 mr-2"></i>
-                            <span>最近计算</span>
+                            <i class="fa fa-pencil-square-o text-primary mr-2"></i>
+                            <span>填写参数</span>
                         </div>
-                        <a href="#" id="home-view-all-history" class="text-xs text-primary hover:underline">全部 ›</a>
+                        <span class="text-xs text-gray-400">改动即时重算</span>
                     </div>
-                    <div id="home-recent-list" class="recent-scroll">
-                        <!-- 由 home-ui.js 动态填充 -->
-                    </div>
+                    <div id="quick-form" class="grid sm:grid-cols-2 gap-x-4"></div>
                 </div>
 
-                <!-- 卡片4：税务日历提醒 -->
-                <div class="home-card">
+                <!-- 结果区 -->
+                <div class="home-card mt-3">
                     <div class="home-card-header">
                         <div class="home-card-title">
-                            <i class="fa fa-calendar text-orange-500 mr-2"></i>
-                            <span>税务提醒</span>
-                        </div>
-                        <span class="text-xs text-gray-400" id="home-calendar-year">2026</span>
-                    </div>
-                    <div id="home-calendar-list" class="space-y-1">
-                        <!-- 由 home-ui.js 动态填充 -->
-                    </div>
-                </div>
-
-                <!-- 卡片5：税务小贴士 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
-                            <span>税务小贴士</span>
-                        </div>
-                        <button id="home-next-tip" class="text-xs text-primary hover:underline">换一条 ›</button>
-                    </div>
-                    <div id="home-tip-content" class="text-sm text-gray-600 leading-relaxed">
-                        <!-- 由 home-ui.js 动态填充 -->
-                    </div>
-                </div>
-
-                <!-- 关于本小程序（保留原信息条） -->
-                <div class="mt-2 p-4 bg-blue-50 rounded-lg">
-                    <div class="flex items-start">
-                        <i class="fa fa-info-circle text-primary mt-0.5 mr-2"></i>
-                        <div>
-                            <h4 class="font-medium text-primary mb-1 text-sm">关于本小程序</h4>
-                            <p class="text-xs text-gray-600">根据2026年个人所得税计算规则手册设计，支持正向计税和反向倒算，生成标准化年度个税预算表。仅供学习参考，实际纳税请以税务部门核算为准。</p>
+                            <i class="fa fa-line-chart text-primary mr-2"></i>
+                            <span>测算结果</span>
                         </div>
                     </div>
+                    <div id="quick-result"></div>
                 </div>
 
+                <!-- 易错口径 -->
+                <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
+
+                <!-- 算完还能干什么：相关工具 + 保存历史（结果页不该是终点） -->
+                <div id="quick-next" class="home-card mt-3 hidden"></div>
+
+                <div class="mt-3 mb-6 text-xs text-center">
+                    <a id="quick-seo-link" href="/seo/index.html" target="_blank" rel="noopener" class="text-primary hover:underline">查看完整说明与静态税率表 →</a>
+                </div>
             </div>
         </div>
 
@@ -5967,7 +6068,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.34.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.37.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6237,6 +6338,37 @@
     <script src="src/js/ui/home-ui.js"></script>
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
+    <!-- 阶段15D / 16：App 内多税种入口。
+         加载顺序有依赖，不要再随手调整：
+           tax-registry（政策时效判定）→ social-insurance（被 net-salary / employer-cost 依赖）
+           → bonus-tax（被 early-retirement 依赖）→ 其余 quick 模块 → 工具注册表 → 工具箱 UI。
+         quick 模块均为纯计算、暴露全局对象，与 /seo 落地页用的是同一份实现（口径同源，不复制）。
+         20 个工具已全部 App 内置，落地页只作 SEO 与分享入口。 -->
+    <script src="src/js/calculation/tax-registry.js"></script>
+    <script src="src/js/calculation/social-insurance-quick.js"></script>
+    <script src="src/js/calculation/salary-tax-quick.js"></script>
+    <script src="src/js/calculation/bonus-tax-quick.js"></script>
+    <script src="src/js/calculation/net-salary-quick.js"></script>
+    <script src="src/js/calculation/special-deduction-quick.js"></script>
+    <script src="src/js/calculation/annual-settlement-quick.js"></script>
+    <script src="src/js/calculation/withholding-quick.js"></script>
+    <script src="src/js/calculation/equity-incentive-quick.js"></script>
+    <script src="src/js/calculation/severance-quick.js"></script>
+    <script src="src/js/calculation/early-retirement-quick.js"></script>
+    <script src="src/js/calculation/expat-allowance-quick.js"></script>
+    <script src="src/js/calculation/private-pension-quick.js"></script>
+    <script src="src/js/calculation/health-insurance-quick.js"></script>
+    <script src="src/js/calculation/annuity-quick.js"></script>
+    <script src="src/js/calculation/employer-cost-quick.js"></script>
+    <script src="src/js/calculation/disability-fund-quick.js"></script>
+    <script src="src/js/calculation/surtax-stamp-quick.js"></script>
+    <script src="src/js/calculation/business-income-quick.js"></script>
+    <script src="src/js/calculation/vat-quick.js"></script>
+    <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
+    <script src="src/js/data/tool-registry.js"></script>
+    <script src="src/js/ui/toolbox-ui.js"></script>
+    <!-- 备案信息（ICP / 公安）：备案号为空时不渲染，下发后只改 site-filing-ui.js 的配置 -->
+    <script src="src/js/ui/site-filing-ui.js"></script>
     <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
     <script src="src/js/auth/plan.js"></script>
     <script src="src/js/data/history-sync.js"></script>
@@ -6246,6 +6378,8 @@
     <script src="src/js/ui/content-center-ui.js"></script>
     <!-- 阶段10B：专业版汇算清缴报告 PDF（免费/专业分流导出入口） -->
     <script src="src/js/export/final-report.js"></script>
+    <!-- 阶段16：速算器结果导出 PDF（把「可保存 / 可导出」从多步骤流程下放到 20 个速算器） -->
+    <script src="src/js/export/quick-report.js"></script>
     <!-- 计算引擎命名空间：聚合纯计算函数（仅引用、不承载逻辑），供方案对比/单测复用 -->
     <script src="src/js/calculation/engine.js"></script>
     <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
@@ -6741,15 +6875,37 @@
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    © 2026 EuriskoTax | 基于2026年个人所得税计算规则手册 · 仅供参考
+                    © 2026 EuriskoTax | 个税 / 企业税 / 社保等 20 个税种速算器 · 仅供参考，不构成税务建议
                 </div>
                 <!-- 阶段15：App 内通往 15 个落地页的唯一入口（此前站内完全没有路径，
                      已装 App 的用户看不到年终奖 / 社保 / 增值税等单页工具） -->
                 <div class="text-sm">
-                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">更多测算工具：年终奖 / 社保公积金 / 增值税…（15 个）→</a>
+                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">测算工具总目录（20 个）→</a>
                 </div>
+                <!-- 备案信息：ICP 号与公安联网备案号。
+                     备案号**下发后**才渲染（未备案时展示备案号同样违规），
+                     所以这里留空容器，只改 src/js/ui/site-filing-ui.js 里的配置即可生效。 -->
+                <div id="site-filing" class="text-xs text-gray-400 w-full text-center md:text-left mt-2"></div>
         </div>
     </footer>
+
+    <!-- ====== 底部 Tab 栏 ======
+         只在顶层页出现（首页 / 工具 / 助手 / 我的）：计算页有自己的预览条与返回逻辑，
+         两层底栏会打架，也会把「结果」按钮顶出屏幕。显隐由 toolbox-ui 的 updateTabBar 统一控制。 -->
+    <nav id="bottom-tabbar" class="bottom-tabbar hidden" aria-label="主导航">
+        <button type="button" class="bottom-tab" data-tab="mode-selection-page">
+            <i class="fa fa-home"></i><span>首页</span>
+        </button>
+        <button type="button" class="bottom-tab" data-tab="tools-page">
+            <i class="fa fa-th-large"></i><span>工具</span>
+        </button>
+        <button type="button" class="bottom-tab" data-tab="assistant">
+            <i class="fa fa-comments"></i><span>助手</span>
+        </button>
+        <button type="button" class="bottom-tab" data-tab="profile-page">
+            <i class="fa fa-user"></i><span>我的</span>
+        </button>
+    </nav>
 
     <!-- ====== 悬浮税助手 ====== -->
     <button id="tax-assistant-fab" class="assistant-fab" title="税务助手" aria-label="打开税务助手">

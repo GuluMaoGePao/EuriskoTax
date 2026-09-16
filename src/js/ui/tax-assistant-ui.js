@@ -239,16 +239,16 @@
         const container = document.getElementById('assistant-categories');
         if (!container) return;
 
-        const categories = ['all', '综合所得', '经营所得', '分类所得', '反向倒算', '汇算清缴', '政策法规'];
-        const labels = {
-            'all': '全部',
-            '综合所得': '综合所得',
-            '经营所得': '经营所得',
-            '分类所得': '分类所得',
-            '反向倒算': '反向倒算',
-            '汇算清缴': '汇算清缴',
-            '政策法规': '政策法规'
-        };
+        // 分类不再纯写死：以 QA 数据里实际出现的 category 为准，写死的 BASE 只负责「顺序」与空数据兜底。
+        // 以前这里是一份写死数组，运营在 tax-assistant.js 里加了新分类，筛选栏不会跟着长出来 —— 改成并集。
+        const BASE_CATEGORIES = ['all', '综合所得', '经营所得', '分类所得', '反向倒算', '汇算清缴', '政策法规'];
+        const categories = BASE_CATEGORIES.slice();
+        (window.TAX_ASSISTANT_QA || []).forEach(function (item) {
+            var c = item && item.category;
+            if (c && categories.indexOf(c) === -1) categories.push(c);
+        });
+        const labels = {};
+        categories.forEach(function (c) { labels[c] = (c === 'all' ? '全部' : c); });
 
         let html = categories.map(function (cat) {
             const active = (!favMode && cat === currentCategory) ? 'assistant-cat-active' : '';
@@ -623,12 +623,24 @@
                     showRateTable();
                     break;
                 case 'goBonusCalc':
-                    // 跳转到综合所得计算页面，再切换到步骤1（参数入口）
+                    // 年终奖已经有了「一屏算完」的速算器（工具页 → 一次性收入 → 年终奖）：
+                    // 能一屏算完就不要把人推进多步骤向导，这里优先开速算器，旧向导只作兜底。
+                    if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                        window.EuriskoToolbox.openTool('bonus-tax');
+                        break;
+                    }
+                    // 兜底：工具箱未初始化时，跳综合所得页并切到步骤1（参数入口）
                     if (typeof showPage === 'function') {
                         showPage('forward-calculation-page');
                     }
                     if (typeof goToStep === 'function') {
                         goToStep(1);
+                    }
+                    break;
+                case 'goTools':
+                    // 看了答案要去算：交给工具页（24 个入口，按身份/场景分类 + 搜索）
+                    if (typeof showPage === 'function') {
+                        showPage('tools-page');
                     }
                     break;
                 case 'goHistory':

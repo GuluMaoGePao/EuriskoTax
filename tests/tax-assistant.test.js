@@ -795,3 +795,46 @@ describe('悬浮税助手 - 悬浮球半隐 / 隐藏 / 唤出', () => {
         expect(fab.classList.contains('assistant-fab--hidden')).toBe(false);
     });
 });
+
+// 阶段16：工具页成为 24 个入口的唯一入口之后，助手必须能把手递过去 ——
+// 否则「看完问题想算一算」的用户还得自己回首页翻分类。
+describe('悬浮税助手 - 与工具页的衔接（阶段16）', () => {
+    test('快捷功能「全部工具」直达工具页', () => {
+        window.TAX_ASSISTANT_SHORTCUTS = [
+            { id: 'tools', icon: 'fa-th-large', label: '全部工具', action: 'goTools' }
+        ];
+        global.showPage = jest.fn();
+
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+        const btn = document.querySelector('.assistant-shortcut[data-action="goTools"]');
+        expect(btn).not.toBeNull();
+
+        // 快捷功能是「先关抽屉再跳转」，所以有 300ms 延时
+        jest.useFakeTimers();
+        try {
+            btn.click();
+            jest.advanceTimersByTime(400);
+        } finally {
+            jest.useRealTimers();
+        }
+        expect(global.showPage).toHaveBeenCalledWith('tools-page');
+    });
+
+    test('分类标签从 QA 数据推导：数据里新增分类会自动出现在筛选栏', () => {
+        // 以前分类是写死的数组，运营在 tax-assistant.js 里加了新分类，筛选栏不会跟着长出来
+        window.TAX_ASSISTANT_QA = MOCK_QA.concat([
+            { id: 'test_4', category: '公积金', question: '公积金缴存上限是多少？', answer: '按社平 3 倍、比例 12% 封顶。' }
+        ]);
+
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+
+        const labels = Array.from(document.querySelectorAll('.assistant-cat')).map((c) => c.textContent);
+        expect(labels).toContain('公积金');
+        // 全部 + 6 个内置分类 + 新增的 1 个 + 收藏
+        expect(document.querySelectorAll('.assistant-cat').length).toBe(9);
+    });
+});

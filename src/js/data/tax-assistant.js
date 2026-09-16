@@ -253,6 +253,8 @@ const TAX_ASSISTANT_QA = [
 const TAX_ASSISTANT_SHORTCUTS = [
     { id: 'rate_table', icon: 'fa-table', label: '税率表速查', action: 'showRateTable' },
     { id: 'bonus_calc', icon: 'fa-gift', label: '年终奖测算', action: 'goBonusCalc' },
+    // 「全部工具」= 看完问题直接去算：进工具页，而不是只丢一个入口
+    { id: 'tools', icon: 'fa-th-large', label: '全部工具', action: 'goTools' },
     { id: 'history', icon: 'fa-history', label: '历史记录', action: 'goHistory' },
     { id: 'help', icon: 'fa-question-circle', label: '使用帮助', action: 'showHelp' }
 ];
