@@ -382,7 +382,9 @@
 ## 5. 计算器模块响应式规则（1 项）
 
 > 涉及文件：`index.html`
-> 页面 ID：`#forward-calculation-page`、`#reverse-calculation-page`、`#business-calculation-page`、`#classification-calculation-page`
+> 页面 ID：`#forward-calculation-page`、`#classification-calculation-page`
+> （`#reverse-calculation-page` 于 v1.48.0、`#business-calculation-page` 于 v1.47.0 随页面删除，
+> 其分步 UI 改由 `#deep-wizard-page` 通用向导渲染 —— 按钮组规则随之移至向导）
 
 ### 规则 5.1 — 步骤操作按钮组
 
@@ -396,6 +398,8 @@
 | 说明 | 原 `flex justify-between` 在窄屏将「上一步 / 重置 / 下一步」挤压变形、文字折行；现小屏逐行堆叠全宽、宽屏水平排列，按钮统一 `whitespace-nowrap` 防止折行 |
 
 涉及 8 处：综合所得 3 处、反向倒算 2 处、经营所得 2 处、分类所得 1 处。
+其中反向倒算 2 处、经营所得 2 处已随各自旧页面删除（v1.48.0 / v1.47.0），**现役 4 处**：
+综合所得 3 处 + 分类所得 1 处；向导侧的同一套规则由 `deep-wizard-ui.css` 保持。
 
 ---
 

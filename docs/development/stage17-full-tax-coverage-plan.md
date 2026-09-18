@@ -58,10 +58,10 @@
 | page | 位置 | 硬编码量级 |
 |---|---|---|
 | `forward-calculation-page` | L691 起 | 约 810 行 |
-| `reverse-calculation-page` | L1660 起 | 约 740 行 |
-| `business-calculation-page` | L2714 起 | 约 390 行 |
+| `reverse-calculation-page` | L1660 起 | 约 740 行（**v1.48.0 已删**） |
+| `business-calculation-page` | L2714 起 | 约 390 行（**v1.47.0 已删**） |
 | `classification-calculation-page` | L3567 起 | 约 330 行 |
-| **合计** | | **约 2270 行，占 index.html 约 40%** |
+| **合计** | | **约 2270 行，占 index.html 约 40%**（已清偿约 1,900 行） |
 
 按当前写法线性外推，再铺 5 类税种约等于**再手写 2800 行**。这就是本阶段必须先做 spec 的量化理由，不是架构洁癖。
 
@@ -310,3 +310,4 @@ UI 排版规范评审通过（前置中的前置）
 | 2026-09-18 | **17B-1 交付**（v1.46.0）：business 由页面式迁到 spec 驱动，**页面式 4 → 3** | 三条经验，后 3 个页面照抄：① **先抽内核再写 spec** —— 从 `calculateBusinessTax` 抽出纯函数 `calculateBusinessTaxCore`，页面版与 spec 版共用，否则经营所得会多出第 6 份同形实现；② **对拍测试与迁移同版交付**（`tests/business-migration.test.js`：页面版读 DOM 渲染出的数 vs spec 版 compute，3 组输入 × 9 字段逐点一致），「功能还在但数字变了」只能靠这个抓；③ **卡片点击会优先复用 `mode-btn`** —— 不把 spec 判断提到 `mode-btn` 之前，就会被 `business-mode-btn` 带回旧页面。另：旧页面 HTML 仍在但已无人可达，v1.47.0 清理 |
 | 2026-09-18 | **17B-1 收尾**（v1.47.0）：经营所得旧页面死代码清理完毕（约 1,150 行） | 三类cherry-pick经验：① **不是所有引用都能一删了之** —— 历史回填 / 取值口径 / 税务助手关联入口 / 留资归因 / 分享图 / 漏斗埋点都是「改」，其中历史取值要同时兼容旧结构 `incomeDetails/taxDetails` 与向导的 `{values, primary, rows}`；② **通用渲染器必须做归属归因** —— 向导的 `dw-result-card` 被所有 spec 工具复用，加了 `data-tool-id` / `data-dw-row` / `dw-result-primary` 三个锚点，否则算增值税会被记成经营所得线索（线索表里看不出来的错）；③ **静态 HTML 契约会失效** —— 「selector 必须在 index.html 存在」对运行时渲染的节点不成立，改由向导端到端用例守护。对拍测试也顺势转为**按税法口径独立重算**的回归（页面版没了，左式不复存在）；④ **页面私有联动要沉淀成 spec 钩子，不能跟着页面一起删** —— 删时才被告警（`verify:local` 2 项转红）发现「基数 × 缴费比例 → 月缴额」这组便利输入只存在于 app.js / helper-functions.js 的私有函数里，SPEC 迁移时静默丢了。补法是在 `tool-registry.js` 加 `deriveFrom` / `derive()` / `warnings()`，动作交给 `deep-wizard-ui.js`（`applyDerived` / `bindDerivedSources` / `renderWarnings`），reverse / forward / classification 迁移时先自查一遍同类辅助输入 |
 | 2026-09-18 | **17B-1 收尾的经验**：删 page 前先问「这个页面独有的便利输入有哪些」 | 用户手里有的是**社保缴费基数**，不是「每月扣了多少养老金」—— 这类辅助不参与计税，所以不受口径守护，删起来毫无告警。17B-2（reverse）开工前应对 `reverse-calculation-page` 做一次同样的盘点 |
+| 2026-09-18 | **17B-2 交付**（v1.48.0）：reverse（反向倒算 / 谈薪）由页面式迁到 spec 驱动，**页面式 3 → 2**（只剩 forward 与 classification） | ① **便利输入这次是删之前补的** —— 迁移前就把「基数 × 比例 → 月缴额」登记进 reverse spec，并与 business 共用一份 `INSURANCE_DERIVE_FROM` / `insuranceDerive` / `socialBaseWarnings`（两边逻辑本来就是同一份，抄两遍迟早只改一遍）。**唯一没补的是页面版反向的「手填月缴额 → 反算比例」**：两个方向互相写对方的值，在同一张表单上必然抖动；② **`dw-result-card` 第二次带来「同容器不同模板」的问题** —— 谈薪卡走 negotiation 模板、经营所得卡走 income，共用容器后必须按 `容器:工具Id`（`dw-result-card:reverse`）再分一路 + `sourceKey()` 认人，否则谈薪结果会被截成一张经营所得卡；③ **对拍用例要区分 conservative 与 balanced** —— conservative 取档位下限，它在扣除变化时会**跳档**，不随扣除单调；钉单调性必须用 balanced（解方程的那个值）；④ ui-result-compliance 少一个页面条目 = 少一处免责守护，接盘的端到端用例与本次同版交付（见 `tests/reverse-migration.test.js`） |

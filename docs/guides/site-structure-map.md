@@ -80,14 +80,14 @@ EuriskoTax
 │   │   ├── social 社保与用工 ....... 3（社保公积金/企业用工成本/残保金）
 │   │   └── corp 企业与经营 ......... 4（增值税/企业所得税/附加税印花/个体经营所得）
 │   └── 【完整测算】6 个 ── status:deep
-│       ├── 页面式 4 个（各有独立页 + 私有分步逻辑，17B 待反向迁移）
+│       ├── 页面式 2 个（各有独立页 + 私有分步逻辑，17B 待迁移的最后两个）
 │       │   ├── forward        综合所得计税（①基本参数 ②收入明细 ③扣除明细 ④结果）
-│       │   ├── business       经营所得计税（①收入成本 ②扣除明细 ③结果）
-│       │   ├── classification 分类所得计税（①所得信息 ②结果）
-│       │   └── reverse        反向倒算   （①基本参数 ②扣除明细 ③结果）
-│       └── spec 驱动 2 个（阶段17 新增：无独立页，共用 P15 `#deep-wizard-page`）
-│           ├── vat-deep          增值税      （①纳税人身份 ②本期数据 ③结果）
-│           └── surtax-stamp-deep 附加税印花税（①税种选择 ②计税依据 ③结果）
+│       │   └── classification 分类所得计税（①所得信息 ②结果）
+│       └── spec 驱动 7 个（无独立页，共用 P15 `#deep-wizard-page`）
+│           ├── 17B 反向迁移回来的：business 经营所得 / reverse 反向倒算（谈薪）
+│           └── 17C 新增的 5 个：vat-deep 增值税 / corporate-income-tax-deep 企业所得税
+│               / social-base-deep 社保公积金 / surtax-stamp-deep 附加税印花税
+│               / disability-fund-deep 残保金
 ├── 横向分发：5 张身份卡 → 按人找工具（employee/freelance/owner/finance/executive）
 ├── 政策依据库：27 条 / 6 类（iit 15、vat 2、cit 2、附加+印花 3、社保 2、规费 3）
 └── SEO 落地层：21 个 HTML（每个工具 1 页，源自同一份 tool-registry）
@@ -95,7 +95,7 @@ EuriskoTax
 
 **要点**
 
-- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP `49-85`（6 个：4 页面式 + 2 spec 驱动）
+- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP（9 个：2 页面式 + 7 spec 驱动，见 `tests/tool-registry.test.js` 的分口径断言）
 - `X-deep` 自动复用 `X` 的 `fields` / `compute`（**同一对象引用**，`tool-registry.js:1219-1237`）；
   由 `tests/tool-registry.test.js` 断言守护 —— 这是「同一个税种不会算出两个数」的机器保证
 - `tax-registry.js`：27 条政策依据 —— 这是**政策库**，与 20 个工具**不是同一份东西**，画图时勿混
@@ -115,8 +115,8 @@ EuriskoTax
 
 【路径 B｜完整测算：值钱的深任务】
 工具页 → 「完整测算」组 → 6 个入口之一
-                          ├ 页面式 4 张 mode-card → 各自深度页（①…④，底部常驻预览条）
-                          └ spec 驱动 2 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
+                          ├ 页面式 2 张 mode-card → 各自深度页（①…④，底部常驻预览条）
+                          └ spec 驱动 7 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
        → 深度页多步向导（①…④，底部常驻实时预览条）
        → 结果区（推导链 / 明细 / 预算表 / 优化建议）
        → 保存 · 导出 PDF/Word · 留资引导（reverse 被硬排除）
@@ -266,19 +266,15 @@ EuriskoTax
 
 ---
 
-### P6 `reverse-calculation-page` — 反向倒算（`index.html:1660`）
+### P6 `reverse` — 反向倒算（**v1.48.0 起无独立页**，走 P15 通用向导）
 
-```
-┌ ← 返回 1666 │ 保存 1675 │ 重置 1678 ──────────────────────────┐
-│ 步骤条 1684：① 基本参数 1706 → ② 扣除明细 2013 → ③ 结果 2470 │
-│ 结果：倒算结果 2476 │ 三模式对比 2512 │ 收入构成分析 2575      │
-│       预算表 2584 │ 保守/均衡/进取 2616/2638/2660              │
-│       推导链 #formula-steps-panel-reverse 2548                 │
-│ 导出 PDF 2564 / Word 2567                                      │
-│ 禁 永不出服务引导（BLOCKED_TYPES，lead-touchpoints.js:19-21）   │
-│ 预览条 #reverse-preview-bar 2693                                │
-└───────────────────────────────────────────────────────────────┘
-```
+17B-2：整页（约 1,050 行）已删，原来的三步（基本参数 / 扣除明细 / 结果）改由
+`tool-registry.js` 的 reverse spec 驱动，渲染见 P15。产品约束没变：
+
+- **永不出服务引导**（`BLOCKED_TYPES`，`lead-touchpoints.js`）；
+- **分享图是它唯一的转化出口**，且走 negotiation（谈薪）模板 —— 它与经营所得共用 `dw-result-card`，
+  靠 `data-tool-id="reverse"` 认人（`share-card.js` 的 `dw-result-card:reverse` 一路）；
+- **按钮保留**：首页卡片的点击最终仍落到 `#reverse-mode-btn`，点击即打开向导。
 
 ---
 
@@ -311,8 +307,10 @@ EuriskoTax
 > 这正是 `deep-wizard-ui-spec.md` 要把它抽成**通用渲染器**的原因（现状是 4 份手写复制）。
 >
 > **2026-09-18 回刷：通用渲染器已落地** —— `src/js/ui/deep-wizard-ui.js` 按注册表的 `steps` / `fields`
-> 渲染任意税种的向导，P15 `#deep-wizard-page` 承接。现状因此变成「两套并存」：
-> P5–P8 仍是手写页（17B 待迁移），**新增税种一律走 P15，不再写新页面**。
+> 渲染任意税种的向导，P15 `#deep-wizard-page` 承接。现状因此变成「两套并存」。
+>
+> **2026-09-18 回刷（17B-2 / v1.48.0）**：P6（reverse）已删除并由 P15 承接，P7（business）早在
+> v1.47.0 删除 —— 手写页只剩 P5（forward）与 P8（classification），**新增税种一律走 P15，不再写新页面**。
 
 ---
 

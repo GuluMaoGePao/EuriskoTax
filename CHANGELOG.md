@@ -7,9 +7,70 @@
 
 ---
 
+## [1.48.0] - 2026-09-18（阶段17 17B-2：反向倒算（谈薪）改由 spec 驱动，旧页面约 1,050 行删除）
+
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **69 套件 1235 例**（静态计数口径；jest 实测 1239，
+> 差额来自 4 条 `test.each` 数据驱动用例）；线上指纹 **37 项**（不改动指纹覆盖点）。
+
+### 先补再删：这次没让便利输入跟着页面走
+
+v1.47.0 的教训是「删页面 → 门禁变红 → 才发现便利输入还在私有函数里」。所以这次**迁移前**就把
+反向倒算那组「社保基数 × 比例 → 月缴额」登记进 reverse spec（社保/公积金基数 + 四项比例），并把它抽成
+**两个完整测算共用的一份**：`INSURANCE_DERIVE_FROM` / `insuranceDerive()` / `socialBaseWarnings()`
+（`tool-registry.js` 顶部）。抽共用不是洁癖 —— 两边逻辑本来就是同一份，抄两遍迟早只改其中一遍。
+
+唯一**故意没补**的是页面版反向的那一路「手填月缴额 → 反算比例」：两个方向互相写对方的值，
+在同一张表单上必然抖动（改额 → 改比例 → 再改额）。留单向的「基数 → 月缴额」，手填月缴额也照收。
+
+### 删了什么（约 1,050 行）
+
+- **页面**：index.html 的 `reverse-calculation-page`（含那段只服务于它的内联 `<script>`）。
+- **接线**：app.js 约 400 行旧表单逻辑（三个逆推入口 × 三种口径的 DOM 联动）与导出 PDF/Word、
+  保存、重置、新建的按钮绑定；`reverse-mode-btn` 与 `#reverse-mode-card` **保留**，点击即打开向导
+  —— 首页静态卡片的点击最终落到它身上，删按钮等于让两处入口点空。
+- **计算/渲染层**：helper-functions 的 7 个、utils 的 3 个（预算表 / 收入构成图）、tax-calculator 那几个
+  只读表单的（`readReverseDeductionValues` / `collectReverseInputData` / `saveReverseCalculation*`）、
+  navigation-ui 的 `showReverseStep` 与预览条分支、draft-store 的 reverse 草稿流、field-hints 的 `reverse_*` 键。
+- **导出**：export-utils 的反向分支 —— `generateWordDocumentContent` 原本三选一（正向/经营所得/反向），
+  三种结果的形状并不通用（反向那套 `incomeDetails` 里大半是为对齐结构补上去的 0），现在只剩正向；
+  `generateMonthlyData` 同理；优化建议里每条都挂着的 `!isReverseCalculation &&` 一并摘掉。
+- **历史回填**：data-management 不再把二十来个字段填回旧页面 DOM —— 页面没了，改为打开向导接着算。
+
+### 同一个向导容器第二次出现「认不出工具」
+
+`dw-result-card` 会被所有 spec 工具轮着用。17B-1 已经在 `business` 上踩过一次：不认的话，
+算了增值税也会被记成一次经营所得 calc_done。这次它的形态稍微变了一点 ——
+**同一张卡、两个工具、模板还不同**（经营所得 → income，谈薪 → negotiation）：
+
+- `share-card.js`：新增 `dw-result-card:reverse` 一路 + `sourceKey()` 按此刻结果卡上的
+  `data-tool-id` 落到对应配置；照 id 直接查，谈薪结果会被截成一张经营所得卡（数值来自别的口径，比空图更难发现）。
+- `lead-touchpoints.js`：reverse 仍然显式挂钩、**仍然被 `BLOCKED_TYPES` 拦截**（谈薪受众是求职者，
+  不该推企业服务）—— 转到向导下一步上；顺手修掉 business 那行随旧页面删除却没人改的 `containerId`
+  （结果是经营所得走完向导，引导因为找不到容器而从不出现：静默失败，没人觉得不对）。
+- `funnel-tracking.js`：reverse 的 calc_done 改认 `toolId: 'reverse'`。
+
+### 测试怎么跟着改的
+
+- `tests/reverse-migration.test.js` 的对拍留下，但**修了一条把两种口径看混的用例**：
+  `conservative` 取的是「所在档位的下限」，它在扣除变化时**会跳档**，因此**不随扣除单调** ——
+  钉「扣得多则所需税前少」必须用 `balanced`（解方程得到的那个值）。
+  另补两条：到手目标低于扣除合计时回落到 0 税下界（二分求解器留了约 0.005 元的小数尾巴，
+  别写成 `toBe(0)` —— 那是把精度要求说成了业务要求）；走向导的端到端（主结果 / 推导链 /
+  免责声明 / `data-tool-id=reverse`），用来接住 ui-result-compliance 少掉的那个页面条目
+  —— **少一个页面条目 = 少一处免责守护**，移动的守护必须与删除同版交付。
+- `tests/interaction.test.js` 丢掉 5 条页面接线用例（步骤包装函数、扣除项 toggle、未算先保存的提示）；
+  `tests/formula-steps-flows.test.js` 的「三个推导链面板」改为「剩一个静态面板 + 注册表接两条」。
+
+### 没做的
+
+classification（分类所得）是唯一含有动态增删所得条目列表的页面，spec 目前承载不了，
+加 repeater 能力之前不能迁。**顺序仍是 reverse → forward → classification 殿后**。
+
+---
+
 ## [1.47.0] - 2026-09-18（阶段17 17B-1 收尾：清理经营所得旧页面的死代码）
 
-> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **69 套件 1238 例**；线上指纹 **37 项**（不改动指纹覆盖点）。
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **69 套件 1235 例**；线上指纹 **37 项**（不改动指纹覆盖点）。
 
 ### 删了什么（约 1,150 行）
 

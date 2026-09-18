@@ -320,9 +320,9 @@ seo/              index.html         工具总目录（20 个卡片）
 | **Tab 3** | `profile-page` | 我的：卡片发射台 |
 | 二级 ×4 | `quick-calculator-page` | 20 个速算器共用一个壳 |
 | 二级 ×4 | `forward-calculation-page` | 综合所得，4 步向导 |
-| | `business-calculation-page` | 经营所得，3 步 |
+| | `business-calculation-page` | 经营所得，3 步（**v1.47.0 删除**，改 §12 向导） |
 | | `classification-calculation-page` | 分类所得，2 步 |
-| | `reverse-calculation-page` | 反向倒算，3 步 |
+| | `reverse-calculation-page` | 反向倒算，3 步（**v1.48.0 删除**，改 §12 向导） |
 | 三级 ×5 | `profile-settings-page` | 账户设置 |
 | | `profile-tax-page` | 税务档案 |
 | | `profile-data-page` | 数据管理 |
@@ -494,9 +494,13 @@ seo/              index.html         工具总目录（20 个卡片）
 | 页 | 步数 | step-pane id |
 |---|---|---|
 | `forward-calculation-page` | 4 | `step-parameters` → `step-income` → `step-deductions` → `step-result` |
-| `business-calculation-page` | 3 | `business-step-income-cost` → `business-step-deductions` → `business-step-result` |
-| `reverse-calculation-page` | 3 | `reverse-step-parameters` → `reverse-step-deductions` → `reverse-step-result` |
+| `business-calculation-page` | 3 | ~~各有独立 step-pane~~ **v1.47.0 删除**：改由 `deep-wizard-page` 按 spec 的 `steps` 渲染 |
+| `reverse-calculation-page` | 3 | ~~各有独立 step-pane~~ **v1.48.0 删除**：同上（`reverse-step-*` 已不存在） |
 | `classification-calculation-page` | 2 | `classification-step-info` → `classification-step-result` |
+
+> 17B 反向迁移的验收口径：**页面式的最终归零**。迁移过的工具在 `index.html` 里不再有私有的
+> `step-pane`，只剩下入口 `#*-mode-btn`（卡片点击还会落到它身上）—— 存续的稳定锚点是
+> 向导的三个通用节点：`#dw-next` / `#dw-result-card[data-tool-id]` / `#dw-formula-panel`。
 
 三件必须配套做的事（否则分步就是负优化）：
 1. **降输入成本**：合理默认值 + 上年结转预填 + 非必填可跳过；
