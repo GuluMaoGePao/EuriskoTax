@@ -14,6 +14,35 @@ function showLoginPage() {
     if (loginPage) loginPage.classList.remove('hidden');
 }
 
+// === 游客会话（免登录使用）===
+// 状态本身在 src/js/auth/guest-session.js（session 级：关掉标签页即失效，下次仍给登录页）——
+// 这里只做**能不能用主应用**的判断与呈现，UI 无关的逻辑不放在这个文件里便于断言。
+function isGuestSession() {
+    return !!(window.EuriskoGuestSession && window.EuriskoGuestSession.isGuest());
+}
+
+function enterGuestSession() {
+    if (window.EuriskoGuestSession) window.EuriskoGuestSession.enter();
+    updateAuthUI();
+}
+
+// 登录成功 / 退出登录都要摘掉游客会话：前者已是真登录态，后者必须真的回到登录页
+function exitGuestSession() {
+    if (window.EuriskoGuestSession) window.EuriskoGuestSession.exit();
+}
+
+/** 能否使用主应用：已登录，或本次会话选择了「免登录使用」 */
+function canUseApp() {
+    const loggedIn = !!(apiClient && typeof apiClient.isLoggedIn === 'function' && apiClient.isLoggedIn());
+    return loggedIn || isGuestSession();
+}
+
+/** 游客会话下顶栏的「登录」入口：只有真处于游客态才出现，避免多一个入口稀释登录 */
+function toggleGuestLoginButton(show) {
+    const guestLoginBtn = document.getElementById('guest-login-btn');
+    if (guestLoginBtn) guestLoginBtn.classList.toggle('hidden', !show);
+}
+
 function updateAuthUI() {
     if (apiClient.isLoggedIn()) {
         showApp();
@@ -24,12 +53,16 @@ function updateAuthUI() {
         if (userMenu) userMenu.classList.remove('hidden');
         const userName = document.getElementById('user-name');
         if (userName) userName.textContent = user?.username || '用户';
+        toggleGuestLoginButton(false);
     } else {
-        showLoginPage();
+        // 游客会话继续留在主应用（口径：不强制登录前置）；其余未登录情形仍回登录页 ——
+        // 退出登录依赖「登录页重现」作为明确反馈，这条路径不能省
+        if (isGuestSession()) showApp(); else showLoginPage();
         const authSection = document.getElementById('auth-section');
         if (authSection) authSection.classList.remove('hidden');
         const userMenu = document.getElementById('user-menu');
         if (userMenu) userMenu.classList.add('hidden');
+        toggleGuestLoginButton(isGuestSession());
     }
     renderPlanBadges(); // 阶段10/11：顶栏版本徽标（基础版/体验版/专业版）随登录态刷新
 }
@@ -42,6 +75,10 @@ function clearLocalUserData() {
     localStorage.removeItem('taxCalculationHistory');    // 主页/个人中心共用 key
     localStorage.removeItem('tax_profile');
     localStorage.removeItem('taxSyncMeta');              // 阶段10：云同步元数据（墓碑/cloudIds）随会话清理，防换号残留
+    // Phase 1：多步流程草稿含收入 / 扣除等敏感个人信息，退出登录随本地数据一并清除
+    if (window.EuriskoDraft && typeof window.EuriskoDraft.clearAll === 'function') {
+        window.EuriskoDraft.clearAll();
+    }
     // 阶段11：内容中心缓存（政策覆盖层 + 公告 feed + 各处 seen 状态）随会话清理，退出/注销后不残留他人更新提示
     if (window.TaxPolicy && typeof window.TaxPolicy.clearState === 'function') {
         window.TaxPolicy.clearState();
@@ -99,6 +136,7 @@ async function handleLogin() {
         setLoading(btn, true);
         await apiClient.loginUser(email, password, rememberMe);
         clearPageHistory();
+        exitGuestSession(); // 已变成真登录态，游客会话标记就该摘掉
         updateAuthUI();
         // 阶段10：登录即自动开启云同步（PRO 后台拉取云端/上传本端增量，不阻塞登录流程）
         if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
@@ -530,7 +568,9 @@ async function handleLogout() {
         window.EuriskoSync.afterLogout();
     }
     clearPageHistory();
-    // updateAuthUI 会自动回到登录页，登录页重现即为退出成功的明确反馈，无需再弹确认框
+    // updateAuthUI 会自动回到登录页，登录页重现即为退出成功的明确反馈，无需再弹确认框。
+    // 前提是先摘掉游客会话标记 —— 否则「退出后仍停在应用内」，换账号共用浏览器时等于没退干净。
+    exitGuestSession();
     updateAuthUI();
 }
 
@@ -654,7 +694,9 @@ async function loadProfile() {
 
 // === 个人中心统计卡片配置 ===
 // 注意：所有 Tailwind 类名必须为完整静态字符串，避免动态拼接（${color}）
-// 因为 cdn.tailwindcss.com 的 JIT 会监听 DOM 变化，动态类名会触发重扫和实时生成，造成卡顿。
+// 因为 Tailwind 自 1.38.0 起是构建期编译（见 tailwind.config.js 的 content 扫描）：
+// 运行期拼出来的类名扫不到，产物里根本没有对应规则 —— 表现是「这条样式整条消失」，
+// 而不是旧 CDN 运行时那样「慢一点但还有」。
 const PROFILE_STATS_CONFIG = [
     {
         id: 'profile-stats-calculations',
@@ -1295,6 +1337,7 @@ async function deleteAccount() {
             window.EuriskoSync.afterLogout();
         }
         clearPageHistory();
+        exitGuestSession(); // 账号都没了，游客标记自然不能留
         updateAuthUI();
         showAlert('账号已注销，感谢您的使用', 'success');
     } catch (error) {
@@ -1447,6 +1490,8 @@ function planNoteText(user) {
     const tier = planTierOf(user);
     if (!tier) return '';
     if (tier.key === 'free') {
+        // 已过期的付费用户与到期的免费体验是两类人：前者付过钱，不能只说「可再次免费领取」
+        if (tier.expiredPro) return `专业版权益已于 ${fmtDate(tier.expireAt)} 到期`;
         return tier.expiredTrial
             ? `专业版体验已于 ${fmtDate(tier.expireAt)} 到期，可再次免费领取`
             : '基础版 · 可免费领取 14 天专业版体验';
@@ -1545,8 +1590,9 @@ function renderCloudSyncPanel() {
     if (!tier || tier.key === 'free') {
         setTierChip('free', '基础版');
         if (statusEl) { statusEl.textContent = '免费版'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
-        if (noteEl) noteEl.textContent = tier && tier.expiredTrial
-            ? '您的专业版体验已到期，云端同步暂不可用；随时可再次免费领取新一轮 14 天体验。'
+        // 文案交给 plan.js 按档位统一取词：这里再手写一份分支，就是同一句话两个出处，必然漂移
+        if (noteEl) noteEl.textContent = planLib.featureHintFor
+            ? planLib.featureHintFor(user)
             : planLib.PRO_FEATURE_HINT;
         disableSyncBtn(true);
         if (accountEl) accountEl.textContent = `当前账号：${user.email}（基础版）`;
@@ -1568,6 +1614,17 @@ function renderCloudSyncPanel() {
     if (accountEl) accountEl.textContent = `当前账号：${user.email}`;
 }
 
+// Phase 3.5 缺口 3：专业版权益续期入口。
+// ⚠️ 合规（零购买语义）：站内不出现「购买 / 续费 / 支付 / 价格」，
+//    一律走「留资 → 运营线下发码」，与 final-report.js 的精装版报告钩子共用同一条站外收款路径。
+function openRenewLead() {
+    if (window.LeadModal && typeof window.LeadModal.open === 'function') {
+        window.LeadModal.open({ source: 'renew_pro' });
+        return;
+    }
+    showAlert('请联系我们，我们会为您延续专业版权益。');
+}
+
 // === 版本权益弹窗：按档位渲染 hero + 领取 CTA ===
 function upgradeHeroHtml(user) {
     const planLib = (typeof window !== 'undefined' && window.EuriskoPlan) ? window.EuriskoPlan : null;
@@ -1575,6 +1632,10 @@ function upgradeHeroHtml(user) {
     const trialDays = (planLib && planLib.TRIAL_DAYS) || 14;
     const claimBtn = (label) =>
         '<button id="upgrade-claim-btn" type="button" class="mt-3 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-5 py-2 text-sm shadow"><i class="fa fa-gift mr-2"></i>' + label + '</button>';
+    // 续期入口复用于「即将到期」与「已到期」两处：抽成 helper，避免同一份按钮 HTML 写两遍后各自漂移。
+    // ⚠️ 合规：走「留资 → 运营线下发码」，与 final-report.js 的精装版报告钩子共用同一条站外收款路径。
+    const renewBtn = (label) =>
+        '<button id="upgrade-renew-btn" type="button" class="mt-3 inline-flex items-center rounded-lg bg-amber-500 hover:bg-amber-400 text-white font-semibold px-4 py-2 text-sm shadow"><i class="fa fa-envelope mr-2"></i>' + label + '</button>';
 
     if (!user) {
         return '<div class="text-center">' +
@@ -1583,6 +1644,17 @@ function upgradeHeroHtml(user) {
             claimBtn('登录领取体验') + '</div>';
     }
     if (!tier || tier.key === 'free') {
+        // 已过期的付费用户（expiredPro）：这是复购意向最强的一类人，
+        // 不能落进下面「免费领取体验」的通用文案——那等于把已付费的人当用户重新养一遍。
+        // 语气上不写「欢迎回来」这类空话：他刚失去的是掏钱才有的东西，只说事实 + 给恢复路径。
+        if (tier && tier.expiredPro) {
+            return '<div class="flex items-start">' +
+                '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0">' +
+                '<i class="fa fa-clock-o text-amber-600 text-xl"></i></div>' +
+                '<div class="flex-1"><p class="text-amber-700 font-bold text-base">专业版权益已于 ' + fmtDate(tier.expireAt) + ' 到期</p>' +
+                '<p class="text-gray-500 text-xs mt-1">云端同步、汇算清缴 PDF 报告等功能暂不可用，您的本地计税数据不受影响。留下联系方式，我们会为您恢复权益。</p>' +
+                renewBtn('联系我们恢复权益') + '</div></div>';
+        }
         const expired = !!(tier && tier.expiredTrial);
         return '<div class="flex">' +
             '<div class="flex-1">' +
@@ -1605,6 +1677,17 @@ function upgradeHeroHtml(user) {
             (warn ? '体验即将到期：请确认云端数据已同步。到期后自动回到基础版，仍可再次免费领取。' : '专业版全功能体验中：云同步与汇算 PDF 报告均已解锁。到期后自动回到基础版，可再次免费领取。') + '</p></div>';
     }
     // 专业版：seed/正式授权均落此态；正式上线前不向用户明示"永久专业版授权"，用通用权益文案呈现
+    // Phase 3.5 缺口 3：到期前提醒 + 续期入口（此前只有一句「有效期至 X」，既无倒计时也无去处）。
+    // ⚠️ 合规：零购买语义 —— 不出现「购买 / 续费 / 支付 / 价格」，只说「留下联系方式，我们为您延续权益」。
+    const RENEW_REMIND_DAYS = 7;
+    if (!tier.permanent && tier.daysLeft > 0 && tier.daysLeft <= RENEW_REMIND_DAYS) {
+        return '<div class="flex items-start">' +
+            '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0">' +
+            '<i class="fa fa-clock-o text-amber-600 text-xl"></i></div>' +
+            '<div class="flex-1"><p class="text-amber-700 font-bold text-base">专业版权益 ' + tier.daysLeft + ' 天后到期</p>' +
+            '<p class="text-gray-500 text-xs mt-1">到期后将回到基础版，需要保留的云端历史请提前同步。留下联系方式，我们会为您延续权益。</p>' +
+            renewBtn('联系我们延续权益') + '</div></div>';
+    }
     const trailing = tier.permanent
         ? '您已开通专业版，云同步、汇算清缴 PDF 报告等全部专业功能均可用。'
         : '专业版有效期至 ' + fmtDate(tier.expireAt) + '，云同步、汇算清缴 PDF 报告等全部专业功能随时可用。';
@@ -1795,6 +1878,17 @@ function setupAuthEventListeners() {
 
     const loginSubmit = document.getElementById('login-submit');
     if (loginSubmit) loginSubmit.addEventListener('click', handleLogin);
+    // 游客会话：登录页的「免登录使用」→ 放行主应用；顶栏的「登录」→ 回到登录页。
+    // 两条路都必须存在，否则游客要么没有出口、要么进来就再也登不了录。
+    const guestEntry = document.getElementById('guest-entry-btn');
+    if (guestEntry) guestEntry.addEventListener('click', enterGuestSession);
+    const guestLogin = document.getElementById('guest-login-btn');
+    if (guestLogin) {
+        guestLogin.addEventListener('click', () => {
+            exitGuestSession();
+            showLoginPage();
+        });
+    }
     // 忘记密码 → 打开重置密码面板（自助找回）
     const forgotPassword = document.getElementById('forgot-password');
     if (forgotPassword) {
@@ -2006,6 +2100,12 @@ function setupAuthEventListeners() {
                 if (redeemBtn) {
                     e.preventDefault();
                     handleRedeemProCode(redeemBtn);
+                    return;
+                }
+                const renewBtn = e.target.closest('#upgrade-renew-btn');
+                if (renewBtn) {
+                    e.preventDefault();
+                    openRenewLead();
                 }
             });
             // 兑换码输入框回车即兑换（少一次移动鼠标，兑换码场景高频操作）
@@ -2311,6 +2411,14 @@ let isGoingBack = false;
 
 function showPage(pageId) {
     const start = performance.now();
+
+    // 阶段14：任务页固定层预算 —— 必须放在**两个分支之前**：
+    // 分支A（初始导航 / 深链直达）会在下面直接 return，够不到常规的阶段2回调。
+    // 这里只标记「当前页是不是多步任务」，窄屏怎么折叠由 CSS 与 task-mode.js 决定。
+    if (window.TaskMode && typeof window.TaskMode.sync === 'function') {
+        window.TaskMode.sync(pageId);
+    }
+
     const wasInitial = isInitialNavigation;
     ProfilePerf.log('showPage → 开始', 0, {
         pageId,
@@ -2361,6 +2469,12 @@ function showPage(pageId) {
                 pushed: currentPageId,
                 newLength: pageHistory.length
             });
+            // Phase 1.5：每前进一次就同步建一条真实 history 条目。
+            // 不建条目 → PWA standalone（加到主屏幕、无地址栏）里安卓返回手势会**一步退出应用**，
+            // 填到一半的流程就此蒸发。配对逻辑见 src/js/utils/page-history.js。
+            if (window.EuriskoPageHistory && typeof window.EuriskoPageHistory.push === 'function') {
+                window.EuriskoPageHistory.push(currentPageId, pageId);
+            }
         } else {
             ProfilePerf.log('showPage → 跳过历史栈', 0, {
                 currentPageId,
@@ -2401,11 +2515,15 @@ function showPage(pageId) {
         if (pageId === 'login-page') {
             loginPage.classList.remove('hidden');
             loginPage.classList.add('page-transition', 'active');
-            document.querySelector('.app-container')?.classList.add('hidden');
+            document.getElementById('app-container')?.classList.add('hidden');
             pageFound = true;
         } else {
             loginPage?.classList.add('hidden');
-            document.querySelector('.app-container')?.classList.remove('hidden');
+            // 这里原本按 class 取主容器 —— 全库没有叫这个名字的 class，`?.` 又抹掉了报错，
+            // 于是「放行主容器」这件事从未发生过。改为按 id 取，并把登录墙的判断**显式写在这里**。
+            if (canUseApp()) {
+                document.getElementById('app-container')?.classList.remove('hidden');
+            }
             const page = document.getElementById(pageId);
             if (page) {
                 page.classList.remove('hidden');
@@ -2438,7 +2556,9 @@ function showPage(pageId) {
     isGoingBack = false;
 }
 
-function goBack() {
+// 回到上一页：UI 返回按钮与系统返回手势（popstate）**共用这一个实现** ——
+// 两条通路走向不同的判断是「按了返回却跳到早已离开的页面」的根因。
+function applyBack() {
     if (pageHistory.length > 0) {
         isGoingBack = true;
         const previousPage = pageHistory.pop();
@@ -2446,6 +2566,17 @@ function goBack() {
     } else {
         showPage('mode-selection-page');
     }
+}
+
+function goBack() {
+    // 优先把这次返回交给浏览器：popstate 兜一圈仍回到 applyBack()，
+    // 一来一回计数严格配对，两套表示无需额外对账。
+    if (window.EuriskoPageHistory && typeof window.EuriskoPageHistory.back === 'function'
+        && window.EuriskoPageHistory.back()) {
+        return;
+    }
+    // 兜底：history 不可用（个别受限容器 / file://）时退回纯内部栈，行为与改造前一致
+    applyBack();
 }
 
 function clearPageHistory() {
@@ -2490,6 +2621,15 @@ function initAuth() {
 window.deleteHistoryItem = deleteHistoryItem;
 window.showPage = showPage;
 window.goBack = goBack;
+
+// Phase 1.5：把「系统返回 / 返回手势」接到与 UI 返回按钮同一个动作上。
+// 在此之前站点一条 history 条目都不产生，PWA standalone 里按返回 = 退出应用。
+if (window.EuriskoPageHistory && typeof window.EuriskoPageHistory.configure === 'function') {
+    window.EuriskoPageHistory.configure({
+        onBack: applyBack,
+        homeId: 'mode-selection-page'
+    });
+}
 window.showAlert = showAlert;
 
 // === 意见反馈附图：压缩 + 预览管理（随反馈文本一起提交，最多 3 张） ===

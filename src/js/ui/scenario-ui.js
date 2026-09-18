@@ -128,9 +128,11 @@
 
     function proHint() {
         const planLib = (typeof window !== 'undefined') ? window.EuriskoPlan : null;
-        return (planLib && planLib.PRO_FEATURE_HINT)
-            ? planLib.PRO_FEATURE_HINT
-            : '方案数量上限为专业版（PRO）功能。';
+        if (!planLib) return '方案数量上限为专业版（PRO）功能。';
+        // 同一个上限提示，不同身份的人看到的下一句应不同：
+        // 尤其是「付过钱但权益已到期」的用户 —— 让他回去领免费体验是明显的降级话术。
+        if (planLib.featureHintFor) return planLib.featureHintFor(getCurrentUser());
+        return planLib.PRO_FEATURE_HINT || '方案数量上限为专业版（PRO）功能。';
     }
 
     // ======================= DOM 渲染 =======================

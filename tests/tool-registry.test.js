@@ -52,9 +52,32 @@ beforeAll(() => {
 const R = () => window.EuriskoToolRegistry;
 
 describe('工具注册表：数量与分组', () => {
-    test('20 个速算器 + 4 个深度流程', () => {
+    // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
+    // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
+    // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
+    test('20 个速算器 + 深度流程（4 个页面式 + 2 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
-        expect(R().deep()).toHaveLength(4);
+        const deep = R().deep();
+        const pageBased = deep.filter((t) => !!t.pageId);   // forward / business / classification / reverse
+        const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
+        expect(pageBased).toHaveLength(4);   // 17B 完成后应归零
+        // vat-deep（17C-1）与 surtax-stamp-deep（17C-4）：后者跟着前者，因为附加税的计税依据
+        // 就是实缴增值税 —— 这两条是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
+        expect(specDriven).toEqual(['surtax-stamp-deep', 'vat-deep']);
+    });
+
+    // 用测试钉住 17A-5 的硬约束：spec 驱动的完整测算**不许**自带一份 fields / compute，
+    // 必须与同口径速算器是**同一个对象引用**（toBe 而非 toEqual）。
+    // 复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
+    // 而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
+    test('spec 驱动的完整测算复用速算器的字段与计算（不是复制）', () => {
+        R().deep().filter((t) => !t.pageId).forEach((t) => {
+            const twin = R().all().find((n) => n.compute === t.compute);
+            expect(twin !== undefined && twin !== null).toBe(true);   // 必须能在速算器里找到同口径孪生项
+            expect(t.fields).toBe(twin.fields);     // 同一对象引用，不是结构相等
+            expect(t.steps).toBe(twin.steps);
+            expect(t.compute).toBe(twin.compute);
+        });
     });
 
     test('每个速算器都归属一个已声明的分组', () => {

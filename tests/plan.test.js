@@ -100,6 +100,34 @@ describe('EuriskoPlan 三档体系（基础版/体验版/专业版）档位描�
         expect(t.expireAt).toBe(iso);
     });
 
+    // 曾经这里落下过一个坑：付费专业版过期后被当成普通免费用户，且 expireAt 被丢弃，
+    // 于是这类「已经证明愿意付费」的人看到的是「免费领取体验」，连自己权益什么时候到期都无从得知。
+    test('付费专业版已过期 = 基础版权限，但标记 expiredPro 且保留到期时间', () => {
+        const iso = pastISO(3);
+        const t = planLib().getTier('pro', iso, 'purchase');
+        expect(t.key).toBe('free');
+        expect(t.label).toBe('基础版');
+        expect(t.expiredPro).toBe(true);
+        // 与「免费体验到期」是两类人，两者互斥，UI 话术不同
+        expect(t.expiredTrial).toBeFalsy();
+        // 到期时间不能丢：UI 要靠它说清「权益已于 X 到期」
+        expect(t.expireAt).toBe(iso);
+    });
+
+    test('兑换码开通的专业版过期后同样标记 expiredPro', () => {
+        expect(planLib().getTier('pro', pastISO(1), 'redeem').expiredPro).toBe(true);
+    });
+
+    test('永久授权（无过期时间）永不会被当作 expiredPro', () => {
+        expect(planLib().getTier('pro', null, 'seed').expiredPro).toBeFalsy();
+    });
+
+    test('免费用户既不 expiredTrial 也不 expiredPro', () => {
+        const t = planLib().getTier('free', null, null);
+        expect(t.expiredTrial).toBeFalsy();
+        expect(t.expiredPro).toBeFalsy();
+    });
+
     test('体验版剩余天数边界：不足 1 天按 1 天、永久/免费为 0', () => {
         const t1 = planLib().getTier('pro', new Date(Date.now() + 30 * 60 * 1000).toISOString(), 'trial');
         expect(t1.daysLeft).toBe(1);
@@ -184,6 +212,87 @@ describe('「版本与权益」弹窗的档位口径', () => {
         ['云端同步', '汇算清缴 PDF 完整报告', '方案对比库'].forEach((name) => {
             expect({ name, inHint: hint.includes(name) }).toEqual({ name, inHint: true });
             expect({ name, inProCol: proCol.includes(name) }).toEqual({ name, inProCol: true });
+        });
+    });
+});
+
+// gate 提示一度对所有人都是同一句（「基础版可免费领取 14 天体验」），对三类人是错的：
+// 付费权益过期的人被降级、体验中的人被当成没在用、体验过期的人没被告知还能再领。
+// 这里守住「一句话对一个身份」，以及那份能力清单只有一处、不会随档位漂移。
+describe('gate 提示按档位取词', () => {
+    const userOf = (plan, expiresAt, grantedBy) => ({ plan, plan_expires_at: expiresAt, pro_granted_by: grantedBy });
+    const hintOf = (plan, expiresAt, grantedBy) => planLib().featureHintFor(userOf(plan, expiresAt, grantedBy));
+
+    test('未登录 / 无会话 → 回落默认文案（任何情况下文案都不退化）', () => {
+        expect(planLib().featureHintFor(null)).toBe(planLib().PRO_FEATURE_HINT);
+        expect(planLib().featureHintFor(undefined)).toBe(planLib().PRO_FEATURE_HINT);
+    });
+
+    test('基础版 = 默认文案（同时保留免费体验与兑换码两条路径）', () => {
+        expect(hintOf('free', null, null)).toBe(planLib().PRO_FEATURE_HINT);
+    });
+
+    test('体验进行中：不再叫他去领取体验（他已经在体验期内了）', () => {
+        const hint = hintOf('pro', futureISO(10), 'trial');
+        expect(hint).toBe(planLib().TRIAL_ACTIVE_HINT);
+        expect(hint).not.toContain('可免费领取');
+    });
+
+    test('体验已到期：明确告知还能再领一轮', () => {
+        const hint = hintOf('pro', pastISO(2), 'trial');
+        expect(hint).toBe(planLib().EXPIRED_TRIAL_HINT);
+        expect(hint).toContain('再次免费领取');
+    });
+
+    test('付费权益已到期：给恢复入口，而不是把他推回免费体验', () => {
+        const hint = hintOf('pro', pastISO(2), 'purchase');
+        expect(hint).toBe(planLib().EXPIRED_PRO_HINT);
+        expect(hint).toContain('恢复权益');
+        // 这条最关键：付过钱的人收到的不该只是「再去领一轮免费体验」
+        expect(hint).not.toContain('可免费领取');
+    });
+
+    test('兑换码开通的权益过期后，同样按付费口径处理', () => {
+        expect(hintOf('pro', pastISO(2), 'redeem')).toBe(planLib().EXPIRED_PRO_HINT);
+    });
+
+    test('四种身份对应四条各不相同的提示（口径没被合并掉）', () => {
+        const hints = [
+            hintOf('free', null, null),
+            hintOf('pro', futureISO(10), 'trial'),
+            hintOf('pro', pastISO(2), 'trial'),
+            hintOf('pro', pastISO(2), 'purchase')
+        ];
+        expect(new Set(hints).size).toBe(4);
+    });
+
+    test('能力清单不随档位漂移：四条提示共用同一份能力描述', () => {
+        [
+            planLib().PRO_FEATURE_HINT,
+            planLib().TRIAL_ACTIVE_HINT,
+            planLib().EXPIRED_TRIAL_HINT,
+            planLib().EXPIRED_PRO_HINT
+        ].forEach((hint) => {
+            expect({ start: hint.startsWith(planLib().GATE_CAPABILITIES) }).toEqual({ start: true });
+            ['云端同步', '汇算清缴 PDF 完整报告', '方案对比库', '对所有用户开放'].forEach((name) => {
+                expect({ name, inHint: hint.includes(name) }).toEqual({ name, inHint: true });
+            });
+        });
+    });
+
+    test('所有身份的 gate 提示都不出现购买语义（站内零购买语义）', () => {
+        const cases = [
+            null,
+            userOf('free', null, null),
+            userOf('pro', futureISO(10), 'trial'),
+            userOf('pro', pastISO(2), 'trial'),
+            userOf('pro', pastISO(2), 'purchase'),
+            userOf('pro', null, 'seed')
+        ];
+        ['购买', '续费', '支付', '价格', '付款'].forEach((word) => {
+            cases.forEach((user) => {
+                expect({ word, hit: planLib().featureHintFor(user).includes(word) }).toEqual({ word, hit: false });
+            });
         });
     });
 });

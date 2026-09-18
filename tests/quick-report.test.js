@@ -44,6 +44,31 @@ const OUT = {
 
 const VALUES = { bonus: 36000, variant: 'separate', withSocial: true, rate: 13 };
 
+describe('政策依据（与结果页同源）', () => {
+    const saved = window.EuriskoTaxRegistry;
+    afterEach(() => {
+        if (saved) window.EuriskoTaxRegistry = saved;
+        else delete window.EuriskoTaxRegistry;
+    });
+
+    test('报告带登记的政策文号，且不给任何链接（打印件点不了链接）', () => {
+        window.EuriskoTaxRegistry = {
+            basisOf: () => [{ doc: '财税〔2018〕164 号', title: '个人所得税法修改后有关优惠政策衔接问题' }]
+        };
+        const html = QR().pure.buildDocHtml(TOOL, VALUES, OUT);
+        expect(html).toContain('政策依据');
+        expect(html).toContain('财税〔2018〕164 号');
+        expect(html).not.toMatch(/<a\s/);
+    });
+
+    test('registry 未加载时不拖累导出：只是没有这一节', () => {
+        delete window.EuriskoTaxRegistry;
+        const html = QR().pure.buildDocHtml(TOOL, VALUES, OUT);
+        expect(html).toContain('¥3,390');
+        expect(html).not.toContain('政策依据');
+    });
+});
+
 describe('文件名', () => {
     test('带工具名与日期，不会因为多次导出互相覆盖', () => {
         expect(QR().pure.filename(TOOL, new Date(2026, 8, 15)))

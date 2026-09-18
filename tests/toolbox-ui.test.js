@@ -12,7 +12,11 @@
  *
  * @jest-environment jsdom
  */
+const fs = require('fs');
+const path = require('path');
 const { loadSource } = require('./helpers/load-source');
+
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 const QUICK_MODULES = [
     'social-insurance-quick.js',
@@ -70,12 +74,22 @@ beforeEach(() => {
         <div id="quick-form"></div>
         <div id="quick-result"></div>
         <div id="quick-pitfalls"></div>
+        <details id="quick-policy-basis" class="hidden">
+            <div id="quick-policy-basis-body"></div>
+            <button type="button" id="quick-basis-copy">复制政策文号</button>
+        </details>
         <div id="quick-next" class="hidden"></div>
         <a id="quick-seo-link"></a>
         <button id="quick-back-btn"></button>
         <nav id="bottom-tabbar" class="hidden">
             <button class="bottom-tab" data-tab="mode-selection-page"></button>
             <button class="bottom-tab" data-tab="tools-page"></button>
+            <button class="bottom-tab" data-tab="profile-page"></button>
+        </nav>
+        <nav id="top-tabbar" class="hidden">
+            <button class="top-tab" data-tab="mode-selection-page"></button>
+            <button class="top-tab" data-tab="tools-page"></button>
+            <button class="top-tab" data-tab="profile-page"></button>
         </nav>
     `;
     // 显式传 null：清掉上一个用例可能设置的身份筛选，保证每个用例都从完整工具页开始
@@ -216,7 +230,7 @@ describe('深度流程入口', () => {
     });
 });
 
-describe('底部 Tab 栏', () => {
+describe('导航双形态（手机底栏 + 桌面顶栏）', () => {
     test('顶层页显示，计算页隐藏（计算页有自己的预览条）', () => {
         window.EuriskoToolbox.updateTabBar();
         expect(document.getElementById('bottom-tabbar').classList.contains('hidden')).toBe(false);
@@ -225,6 +239,63 @@ describe('底部 Tab 栏', () => {
         document.getElementById('quick-calculator-page').classList.add('active');
         window.EuriskoToolbox.updateTabBar();
         expect(document.getElementById('bottom-tabbar').classList.contains('hidden')).toBe(true);
+    });
+
+    // 两端各有一套 DOM，但是**同一份状态**的两种投影。这条断言防止日后两端各自维护
+    // 显隐逻辑、出现「手机上高亮首页、桌面上却没收起」这类不同步。
+    test('两端同步：底栏与顶栏的显隐和激活态始终一致', () => {
+        window.EuriskoToolbox.syncNav();
+        const bar = document.getElementById('bottom-tabbar');
+        const top = document.getElementById('top-tabbar');
+        expect(bar.classList.contains('hidden')).toBe(false);
+        expect(top.classList.contains('hidden')).toBe(false);
+        expect(document.querySelector('#bottom-tabbar .bottom-tab.active').dataset.tab).toBe('mode-selection-page');
+        expect(document.querySelector('#top-tabbar .top-tab.active').dataset.tab).toBe('mode-selection-page');
+
+        document.getElementById('mode-selection-page').classList.remove('active');
+        document.getElementById('profile-page').classList.add('active');
+        window.EuriskoToolbox.syncNav();
+        expect(document.querySelector('#bottom-tabbar .bottom-tab.active').dataset.tab).toBe('profile-page');
+        expect(document.querySelector('#top-tabbar .top-tab.active').dataset.tab).toBe('profile-page');
+
+        document.getElementById('profile-page').classList.remove('active');
+        document.getElementById('quick-calculator-page').classList.add('active');
+        window.EuriskoToolbox.syncNav();
+        expect(bar.classList.contains('hidden')).toBe(true);
+        expect(top.classList.contains('hidden')).toBe(true);
+    });
+
+    // 助手是情境动作而非目的地，不占导航位 —— 两个 Tab 位给真正的主目的地。
+    test('助手不再占导航位（情境入口由悬浮球与结果页承担）', () => {
+        expect(document.querySelector('.bottom-tab[data-tab="assistant"]')).toBeNull();
+        expect(document.querySelector('.top-tab[data-tab="assistant"]')).toBeNull();
+    });
+
+    test('updateTabBar 与 syncNav 等价（兼容旧调用点）', () => {
+        expect(window.EuriskoToolbox.updateTabBar).toBe(window.EuriskoToolbox.syncNav);
+    });
+});
+
+// S2（底栏避让）与 S5（容器加宽）的交叉点。这条 padding 原本写在 `#tools-page .max-w-3xl` 上，
+// S5 把容器加宽到 max-w-5xl 之后它立刻匹配不到任何元素，工具页最后一张卡被底栏压住。
+// jsdom 没有布局引擎，纯 DOM 断言发现不了这种「选择器静默失效」，只能钉在源码层面。
+describe('底栏避让 padding 的锚点', () => {
+    const css = fs.readFileSync(path.join(PROJECT_ROOT, 'src/css/toolbox.css'), 'utf8');
+    const html = fs.readFileSync(path.join(PROJECT_ROOT, 'index.html'), 'utf8');
+
+    test('避让规则锚在结构上，不锚在宽度工具类上', () => {
+        // 剥掉注释再查：本文件用注释记着这次踩坑的经过，那段文字里必然出现 `.max-w-3xl`
+        const declarationsOnly = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        expect(declarationsOnly).toContain('body.has-tabbar [data-page-container]');
+        // 宽度是会被反复调的排版决策：它一旦出现在选择器里，就是下一颗同样的雷
+        expect(declarationsOnly).not.toMatch(/\.max-w-/);
+    });
+
+    test('两个顶层页各自标出一个 data-page-container', () => {
+        ['mode-selection-page', 'tools-page'].forEach((id) => {
+            const fromPage = html.slice(html.indexOf(`id="${id}"`));
+            expect(fromPage.slice(0, 600)).toContain('data-page-container');
+        });
     });
 });
 
@@ -235,5 +306,49 @@ describe('最近使用', () => {
         window.EuriskoToolbox.renderToolbox('');
         const titles = Array.from(document.querySelectorAll('#toolbox-groups .tool-group-title')).map((el) => el.textContent);
         expect(titles).toContain('最近使用');
+    });
+});
+
+describe('政策依据：页内展开，不外跳', () => {
+    // 微信 / PWA standalone 里外链会被拦或直接跳出应用 —— 结果页自证其说的最后一环就断了。
+    // 这类约束改一次 UI 就可能悄悄退回去，只能钉成断言。
+    test('有登记政策的工具渲染出依据，且默认折叠（不抢结果区的视线）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const wrap = document.getElementById('quick-policy-basis');
+        expect(wrap.classList.contains('hidden')).toBe(false);
+        expect(wrap.open).toBe(false);
+        expect(document.querySelectorAll('#quick-policy-basis-body .tool-basis-item').length).toBeGreaterThan(0);
+        // 文号里必有阿拉伯数字：整块没有数字基本就是渲染空了（数据没取到却又不报错）
+        expect(wrap.textContent).toMatch(/\d/);
+    });
+
+    test('一条 <a> 都不许给：外链在这两个容器里等于流失', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(document.querySelectorAll('#quick-policy-basis a')).toHaveLength(0);
+        expect(document.getElementById('quick-policy-basis').innerHTML).not.toMatch(/target\s*=\s*["']_blank/);
+    });
+
+    test('数据源只有一处：取的就是 registry 的 basisOf', () => {
+        const viaUi = window.EuriskoToolbox.policyBasisOf({ policyKey: 'vat' });
+        expect(viaUi).toEqual(window.EuriskoTaxRegistry.basisOf('vat'));
+    });
+
+    test('复制文本是「文号 —— 标题」的可读形状（可直接粘进报告或聊天）', () => {
+        const basis = [{ doc: '财政部 税务总局公告 2023 年第 19 号', title: '增值税小规模纳税人减免' }];
+        expect(window.EuriskoToolbox.policyBasisText(basis))
+            .toBe('财政部 税务总局公告 2023 年第 19 号 —— 增值税小规模纳税人减免');
+    });
+
+    test('registry 缺失 / 工具没登记政策：不渲染也不炸，不拖累计算与导出', () => {
+        const saved = window.EuriskoTaxRegistry;
+        try {
+            delete window.EuriskoTaxRegistry;
+            expect(window.EuriskoToolbox.policyBasisOf({ policyKey: 'vat' })).toEqual([]);
+        } finally {
+            window.EuriskoTaxRegistry = saved;
+        }
+        expect(window.EuriskoToolbox.policyBasisOf({})).toEqual([]);
+        expect(window.EuriskoToolbox.policyBasisOf(null)).toEqual([]);
+        expect(() => window.EuriskoToolbox.policyBasisText([])).not.toThrow();
     });
 });

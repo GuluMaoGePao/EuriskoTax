@@ -1506,19 +1506,17 @@ function formatFormulaValue(value, format) {
     if (format === 'percent') {
         return (Number(value || 0) * 100).toFixed(0) + '%';
     }
+    if (format === 'text') {
+        return String(value == null ? '' : value);
+    }
     return '¥' + Number(value || 0).toFixed(2);
 }
 
-// 渲染计算过程面板
-function updateFormulaSteps(results) {
-    const panel = document.getElementById('formula-steps-panel');
-    const body = document.getElementById('formula-steps-body');
-    if (!panel || !body) return;
-
-    const steps = buildFormulaSteps(results);
-
-    body.innerHTML = steps.map(function (step) {
-        const rowsHtml = step.rows.map(function (row) {
+// 步骤数组 → 面板 HTML（纯函数，供各流程推导链与速算器渲染共用，不写第二套）
+function renderFormulaStepsHtml(steps) {
+    if (!Array.isArray(steps) || !steps.length) return '';
+    return steps.map(function (step) {
+        const rowsHtml = (step.rows || []).map(function (row) {
             const noteHtml = row.note
                 ? '<span class="block text-xs text-gray-500">' + row.note + '</span>'
                 : '';
@@ -1538,13 +1536,451 @@ function updateFormulaSteps(results) {
             + rowsHtml
             + '<div class="flex justify-between px-3 py-2 text-sm font-medium text-gray-800 border-t border-gray-200">'
             + '<span>' + step.totalLabel + '</span>'
-            + '<span class="text-primary">' + formatFormulaValue(step.totalValue) + '</span>'
+            + '<span class="text-primary">' + formatFormulaValue(step.totalValue, step.format) + '</span>'
             + '</div>'
             + footnoteHtml
             + '</div>';
     }).join('');
+}
+
+// 通用渲染入口：把任意流程的 steps 数组渲染进指定面板（台账 C —— 四个完整测算页共用一套实现）
+function showFormulaStepsPanel(steps, panelId, bodyId) {
+    const panel = document.getElementById(panelId || 'formula-steps-panel');
+    const body = document.getElementById(bodyId || 'formula-steps-body');
+    if (!panel || !body) return;
+
+    body.innerHTML = renderFormulaStepsHtml(steps);
 
     panel.classList.remove('hidden');
+}
+
+// 渲染计算过程面板（综合所得正向页 —— 既有行为不变）
+function updateFormulaSteps(results) {
+    showFormulaStepsPanel(buildFormulaSteps(results));
+}
+
+// ===== 台账 C：其余三个完整测算流程的推导链（纯函数，结构沿用 buildFormulaSteps 的 step schema）=====
+
+// 经营所得推导链：输入 calculateBusinessTax 产出的 businessCalculationResults
+function buildBusinessFormulaSteps(results) {
+    const income = results.incomeDetails;
+    const deduction = results.deductionDetails;
+    const tax = results.taxDetails;
+    const steps = [];
+
+    // 第一步：经营利润
+    steps.push({
+        title: '第一步：计算经营利润',
+        rows: [
+            { label: '经营收入', note: '', value: income.businessIncome },
+            { label: '减：经营成本', note: '', value: income.businessCost },
+            { label: '减：营业费用', note: '', value: income.businessExpenses },
+            { label: '减：税金及附加', note: '', value: income.businessTaxes },
+            { label: '减：营业外支出（含损失）', note: '', value: income.businessLosses + income.businessOtherExpenses }
+        ],
+        totalLabel: '经营利润',
+        totalValue: income.businessProfit,
+        footnote: income.businessProfit <= 0 && income.businessIncome > 0
+            ? '收入未覆盖成本费用，经营利润按 0 计' : ''
+    });
+
+    // 第二步：弥补以前年度亏损（无亏损时跳过）
+    if (income.businessPreviousLosses > 0) {
+        steps.push({
+            title: '第二步：弥补以前年度亏损',
+            rows: [
+                { label: '经营利润', note: '', value: income.businessProfit },
+                { label: '减：以前年度亏损', note: '', value: income.businessPreviousLosses }
+            ],
+            totalLabel: '弥补亏损后所得',
+            totalValue: income.businessProfit - income.businessPreviousLosses,
+            footnote: '可结转弥补的亏损以 5 年为限'
+        });
+    }
+
+    // 第三步：汇总扣除额
+    const deductionRows = [];
+    if (deduction.investorDeduction > 0) {
+        deductionRows.push({
+            label: '投资者减除费用',
+            note: deduction.hasComprehensiveIncome
+                ? '5000 元/月 —— 本处按无综合所得情形展示（有综合所得时已在综合所得侧扣除）'
+                : '5000 元/月 × 工作月数（无综合所得时方可扣除）',
+            value: deduction.investorDeduction
+        });
+    }
+    if (deduction.specialDeduction.deductible > 0) {
+        deductionRows.push({
+            label: '专项扣除（三险一金）',
+            note: '无综合所得时方可在经营所得侧扣除',
+            value: deduction.specialDeduction.deductible
+        });
+    }
+    if (deduction.specialAdditionalDeduction.total > 0) {
+        deductionRows.push({
+            label: '专项附加扣除',
+            note: '子女教育 / 赡养老人 / 住房 / 继续教育 / 大病医疗等',
+            value: deduction.specialAdditionalDeduction.total
+        });
+    }
+    if (deduction.otherDeduction.total > 0) {
+        deductionRows.push({
+            label: '其他扣除（含公益性捐赠）',
+            note: '个人养老金 / 企业年金 / 商业健康险；捐赠以应纳税所得额 30% 为限',
+            value: deduction.otherDeduction.total
+        });
+    }
+    if (deductionRows.length) {
+        steps.push({
+            title: '第三步：汇总扣除额',
+            rows: deductionRows,
+            totalLabel: '扣除额合计',
+            totalValue: deduction.total,
+            footnote: ''
+        });
+    }
+
+    // 第四步：应纳税所得额
+    steps.push({
+        title: '第四步：计算应纳税所得额',
+        rows: [
+            { label: '弥补亏损后所得', note: '', value: tax.netIncome },
+            { label: '减：扣除额合计', note: '', value: deduction.total }
+        ],
+        totalLabel: '应纳税所得额',
+        totalValue: tax.taxableIncome,
+        footnote: tax.netIncome <= deduction.total
+            ? '所得未超过扣除额合计，应纳税所得额按 0 计' : ''
+    });
+
+    // 第五步：适用税率与税额（减半前）
+    const ratePercent = (tax.applicableRate * 100).toFixed(0);
+    steps.push({
+        title: '第五步：适用税率与应纳税额',
+        rows: [
+            { label: '适用税率', note: '按应纳税所得额查经营所得税率表（五级）', value: tax.applicableRate, format: 'percent' },
+            { label: '速算扣除数', note: '', value: tax.applicableDeduction }
+        ],
+        totalLabel: '减半征收前应纳税额',
+        totalValue: tax.totalTaxBeforeHalving,
+        footnote: tax.taxableIncome.toFixed(2) + ' × ' + ratePercent + '% − '
+            + tax.applicableDeduction.toFixed(2) + ' = ' + tax.totalTaxBeforeHalving.toFixed(2)
+    });
+
+    // 第六步：减半征收与实际应纳税额
+    steps.push({
+        title: '第六步：减半征收优惠与实际应纳税额',
+        rows: [
+            { label: '减半征收前应纳税额', note: '', value: tax.totalTaxBeforeHalving },
+            { label: '减：减半征收减免税额', note: '年应纳税所得额不超过 200 万元的部分减半征收', value: tax.taxReduction }
+        ],
+        totalLabel: '实际应纳税额',
+        totalValue: tax.totalTax,
+        footnote: '政策依据：财政部 税务总局公告 2023 年第 12 号（个体工商户年应纳税所得额不超过 200 万元部分减半征收个人所得税）'
+    });
+
+    // 第七步：预缴与补退
+    steps.push({
+        title: '第七步：预缴税额与补退',
+        rows: [
+            { label: '实际应纳税额', note: '', value: tax.totalTax },
+            { label: '减：累计已预缴税额', note: '', value: tax.prepaidTax }
+        ],
+        totalLabel: tax.refundTax >= 0 ? '应补税额' : '应退税额',
+        totalValue: Math.abs(tax.refundTax),
+        footnote: '应退/应补 = 应纳税额 − 已预缴税额'
+    });
+
+    // 最后一步：税后经营所得
+    steps.push({
+        title: '最后一步：计算税后经营所得',
+        rows: [
+            { label: '弥补亏损后所得', note: '', value: tax.netIncome },
+            { label: '减：实际应纳税额', note: '', value: tax.totalTax }
+        ],
+        totalLabel: '税后经营所得',
+        totalValue: tax.netIncomeAfterTax,
+        footnote: ''
+    });
+
+    return steps;
+}
+
+// 分类所得推导链：输入 calculateClassificationTaxTotal 产出的 classificationCalculationResults
+function buildClassificationFormulaSteps(results) {
+    const items = results.items || [];
+    const steps = [];
+
+    const typeNames = {
+        interest: '利息所得',
+        accidental: '偶然所得',
+        rent: '财产租赁所得',
+        transfer: '财产转让所得'
+    };
+
+    // 每个条目一步：收入 → 应纳税所得额 → 税额
+    items.forEach(function (item, idx) {
+        let taxableNote = '按 ' + (item.taxRate * 100).toFixed(0) + '% 比例税率，不减除任何费用';
+        if (item.type === 'rent') {
+            taxableNote = item.income <= 4000
+                ? '收入 ≤ 4000：减除费用 800 元' + (item.deduction ? ' 及修缮费等' : '')
+                : '收入 > 4000：减除 20% 费用' + (item.deduction ? ' 及修缮费等' : '');
+        } else if (item.type === 'transfer') {
+            taxableNote = '按财产原值与合理费用减除后计税';
+        }
+
+        const rows = [
+            { label: '收入', note: '', value: item.income }
+        ];
+        if (item.income !== item.taxableIncome) {
+            rows.push({ label: '减：费用减除', note: taxableNote, value: item.income - item.taxableIncome });
+        }
+
+        steps.push({
+            title: '第' + (idx + 1) + '步：' + (item.typeName || typeNames[item.type] || item.type),
+            rows: rows,
+            totalLabel: '应纳税额',
+            totalValue: item.totalTax,
+            footnote: item.taxableIncome.toFixed(2) + ' × ' + (item.taxRate * 100).toFixed(0) + '% = '
+                + item.totalTax.toFixed(2) + '（分类所得按次/按项单独计税，不并入综合所得）'
+        });
+    });
+
+    // 汇总
+    steps.push({
+        title: '最后一步：分类所得汇总',
+        rows: [
+            { label: '收入合计', note: '', value: results.totalIncome },
+            { label: '应纳税所得额合计', note: '', value: results.totalTaxableIncome }
+        ],
+        totalLabel: '应纳税额合计',
+        totalValue: results.totalTax,
+        footnote: '分类所得各自独立计税，汇总额为各条目税额直接相加'
+    });
+
+    return steps;
+}
+
+// 反向倒算推导链：输入 saveReverseCalculationResult 产出的 reverseCalculationResults
+function buildReverseFormulaSteps(results) {
+    const income = results.incomeDetails;
+    const deduction = results.deductionDetails;
+    const tax = results.taxDetails;
+    const steps = [];
+
+    const reverseTypeNames = { rate: '按目标税率倒算', monthly: '按月度税后收入倒算', tax: '按目标税额倒算' };
+    const incomeTypeNames = { comprehensive: '综合所得（工资薪金）', business: '经营所得' };
+
+    // 第一步：目标（倒算的已知量）
+    let goalRow;
+    if (results.reverseType === 'rate') {
+        goalRow = { label: '目标税率档', note: '求收入落在该档位的区间', value: tax.applicableRate, format: 'percent' };
+    } else if (results.reverseType === 'monthly') {
+        goalRow = { label: '月度税后收入目标', note: '× ' + results.workMonths + ' 个月为年度目标', value: tax.monthlyNet };
+    } else {
+        goalRow = { label: '目标税额', note: '', value: tax.targetTax };
+    }
+    steps.push({
+        title: '第一步：倒算目标',
+        rows: [
+            { label: '倒算方式', note: incomeTypeNames[results.incomeType] || results.incomeType, value: reverseTypeNames[results.reverseType] || results.reverseType, format: 'text' },
+            goalRow
+        ],
+        totalLabel: '目标口径',
+        totalValue: results.reverseType === 'rate' ? tax.applicableRate : (results.reverseType === 'monthly' ? tax.monthlyNet : tax.targetTax),
+        footnote: '反向倒算由目标出发反推收入，以下步骤给出推导路径',
+        format: 'text'
+    });
+
+    // 第二步：年度扣除额合计
+    const deductionRows = [];
+    if (deduction.basic > 0) {
+        deductionRows.push({
+            label: '基本减除费用',
+            note: deduction.basic.toFixed(2) + ' × ' + results.workMonths + ' 个月',
+            value: deduction.basic * results.workMonths
+        });
+    }
+    if (deduction.specialDeductionTotal > 0) {
+        deductionRows.push({ label: '专项扣除（三险一金）', note: '个人缴纳部分全年合计', value: deduction.specialDeductionTotal });
+    }
+    if (deduction.specialAdditionalTotal > 0) {
+        deductionRows.push({ label: '专项附加扣除', note: '子女教育 / 赡养老人 / 住房 / 继续教育等', value: deduction.specialAdditionalTotal });
+    }
+    if (deduction.otherTotal > 0) {
+        deductionRows.push({ label: '其他扣除', note: '个人养老金 / 企业年金 / 商业健康险 / 公益捐赠等', value: deduction.otherTotal });
+    }
+    steps.push({
+        title: '第二步：汇总年度扣除额',
+        rows: deductionRows.length ? deductionRows : [{ label: '未填写扣除项', note: '', value: 0 }],
+        totalLabel: '年度扣除额合计',
+        totalValue: results.totalDeduction,
+        footnote: ''
+    });
+
+    // 第三步：应纳税所得额（由目标反推）
+    steps.push({
+        title: '第三步：反推应纳税所得额',
+        rows: [
+            { label: '适用税率', note: '按倒算结果查税率表', value: tax.applicableRate, format: 'percent' },
+            { label: '速算扣除数', note: '', value: tax.applicableDeduction }
+        ],
+        totalLabel: '应纳税所得额',
+        totalValue: tax.taxableIncome,
+        footnote: '由目标税额/税后收入反解：应纳税所得额 = (目标税额 + 速算扣除数) ÷ 适用税率'
+    });
+
+    // 第四步：年度应纳税额
+    steps.push({
+        title: '第四步：年度应纳税额',
+        rows: [
+            { label: '应纳税所得额', note: '', value: tax.taxableIncome },
+            { label: '年终奖单独计税税额', note: results.bonusIncome > 0 ? '单独计税部分，不并入综合所得' : '', value: results.bonusTax }
+        ],
+        totalLabel: '年度应纳税额合计',
+        totalValue: results.totalTax,
+        footnote: ''
+    });
+
+    // 第五步：反推所需收入（核心结果）
+    steps.push({
+        title: '第五步：反推所需税前收入',
+        rows: [
+            { label: '应纳税所得额', note: '', value: tax.taxableIncome },
+            { label: '加：年度扣除额合计', note: '', value: results.totalDeduction }
+        ],
+        totalLabel: '所需税前收入',
+        totalValue: income.total,
+        footnote: results.reverseType === 'rate'
+            ? '按目标税率倒算时，落在该档位的收入是一个区间（相邻档位边界之间）'
+            : ''
+    });
+
+    // 最后一步：验证税后收入（闭合校验）
+    steps.push({
+        title: '最后一步：验证（正向重算税后收入）',
+        rows: [
+            { label: '所需税前收入', note: '', value: income.total },
+            { label: '减：年度应纳税额', note: '', value: results.totalTax }
+        ],
+        totalLabel: '税后收入（正向验算）',
+        totalValue: tax.netIncome,
+        footnote: '用反推结果正向重算税后收入，与目标一致说明推导闭合'
+    });
+
+    return steps;
+}
+
+// ===== Phase 2：结果页「结论 / 一句话理由 / 注意点」=====
+// 放在这里的原因：buildFormulaSteps 已在本文件消费同一份 results，
+// 叙述与推导链必须同口径，否则「结论说退税、推导链算出补税」的漂移没人把关。
+var REFUND_EPSILON = 0.005;
+
+// 三种结论对应的「下一步动作」。汇算期口径：次年 3 月 1 日—6 月 30 日（个税法实施条例）；
+// 这句话是结果页唯一告诉用户「要做什么」的地方，不能只给数字。
+// 理由的「后半句」：解释这个方向是怎么来的（预缴 vs 应纳税额的大小关系）
+var RESULT_REASON_TAIL = {
+    owe: '预缴少于应纳税额，差额部分需要补缴。',
+    refund: '预缴多于应纳税额，多缴部分可以退回。',
+    even: '预缴与应纳税额刚好持平。'
+};
+
+var RESULT_ACTIONS = {
+    owe: '汇算期（次年 3 月 1 日—6 月 30 日）内完成申报补缴，逾期按日加收万分之五滞纳金',
+    refund: '汇算期内申请退税，退税款将退至你绑定的银行卡',
+    even: '全年预缴与应纳税额一致，无需办理汇算'
+};
+
+function buildResultNarrative(results) {
+    const tax = results.taxDetails || {};
+    const refundTax = Number(tax.refundTax) || 0;
+    const direction = Math.abs(refundTax) < REFUND_EPSILON ? 'even' : (refundTax > 0 ? 'owe' : 'refund');
+    return {
+        direction: direction,
+        action: RESULT_ACTIONS[direction],
+        reason: buildResultReason(results, direction),
+        pitfalls: buildResultPitfalls(results, direction)
+    };
+}
+
+function yuan(value) {
+    return '¥' + (Number(value) || 0).toFixed(2);
+}
+
+// 一句话理由：先说税负水平，再说「最影响这个结果的那一个变量」。
+// 不铺陈公式（公式在推导链），也不重复 Hero 已有的税后金额。
+function buildResultReason(results, direction) {
+    const tax = results.taxDetails || {};
+    const income = results.incomeDetails || {};
+    const preTax = Number(income.preTaxTotal) || 0;
+    const rate = preTax > 0 ? (Number(tax.totalTax) || 0) / preTax * 100 : 0;
+    const head = '税前 ' + yuan(preTax) + '，全年税额 ' + yuan(tax.totalTax) + '，实际税负 ' + rate.toFixed(1) + '%。';
+    const tail = RESULT_REASON_TAIL[direction] || '';
+    return head + tail;
+}
+
+// 注意点：只留「会影响这笔钱」的 2-3 条，且必须是本结果触发的，不是通用免责。
+// 排序原则：越可能导致用户实际损失越靠前（补税逾期 > 年终奖方式 > 数据口径）。
+function buildResultPitfalls(results, direction) {
+    const list = [];
+    if (direction === 'owe') {
+        list.push('6 月 30 日之后补缴会产生滞纳金，金额较大时可先在「个人所得税」App 预约办理。');
+    }
+    const income = results.incomeDetails || {};
+    if (Number(income.bonus) > 0) {
+        list.push('年终奖按' + (income.bonusInclude ? '并入综合所得' : '单独计税') + '测算；两种方式差额可能很大，建议两种都算一遍再决定。');
+    }
+    if (direction === 'refund') {
+        list.push('退税需要本人银行卡信息已在「个人所得税」App 完成核验，否则会卡在退库环节。');
+    }
+    return list;
+}
+
+var RESULT_DETAILS_OPEN_KEY = 'euriskoResultDetailsOpen';
+
+function bindRememberCollapse(panelId, storageKey) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    if (window.localStorage.getItem(storageKey) === '1') panel.open = true;
+    panel.addEventListener('toggle', function () {
+        window.localStorage.setItem(storageKey, panel.open ? '1' : '0');
+    });
+}
+
+// 只在首次渲染时挂一次监听（updateResultNarrative 每次计算都会跑）
+function bindResultCollapseOnce() {
+    const panel = document.getElementById('result-details-panel');
+    if (!panel || panel.dataset.collapseBound === '1') return;
+    panel.dataset.collapseBound = '1';
+    bindRememberCollapse('result-details-panel', RESULT_DETAILS_OPEN_KEY);
+}
+
+function updateResultNarrative(results) {
+    bindResultCollapseOnce();
+    const narrative = buildResultNarrative(results || {});
+    const box = document.getElementById('result-conclusion');
+    if (box) {
+        box.classList.remove('is-even', 'is-owe', 'is-refund');
+        box.classList.add('is-' + narrative.direction);
+    }
+    const actionEl = document.getElementById('result-conclusion-action');
+    if (actionEl) actionEl.textContent = narrative.action;
+    const reasonEl = document.getElementById('result-reason');
+    if (reasonEl) reasonEl.textContent = narrative.reason;
+    renderResultPitfalls(narrative.pitfalls);
+}
+
+function renderResultPitfalls(pitfalls) {
+    const box = document.getElementById('result-pitfalls');
+    const ul = document.getElementById('result-pitfall-list');
+    if (!box || !ul) return;
+    if (!pitfalls || !pitfalls.length) {
+        box.classList.add('hidden');
+        ul.innerHTML = '';
+        return;
+    }
+    box.classList.remove('hidden');
+    ul.innerHTML = pitfalls.map(function (t) { return '<li>' + t + '</li>'; }).join('');
 }
 
 

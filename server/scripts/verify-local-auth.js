@@ -501,21 +501,25 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             `HTTP ${leadPage.status}`);
         // 控件从「自由文本框」收紧为「省 + 市级联下拉」：手输城市名五花八门（上海 / 上海市 / 魔都），
         // 顾问拿到线索还得猜是哪个统筹区；「其他 / 海外」+「其他（手动输入）」是兜底 ——
-        // 行政区划不可能穷尽（县级市 / 境外），不能把用户卡在本就必填的这一项上
-        record('index.html「所在城市」为省 + 市级联下拉(#lead-province/#lead-city)+手输兜底，且保留必填星号并引入省市数据',
+        // 行政区划不可能穷尽（县级市 / 境外）。
+        // 2026-09 口径变更：城市由「必填」改为「选填（只收不验）」，与后端 buildLead
+        // 「选填、不阻断留资」对齐 —— 前端过去多拦一道，等于在 lead_submit 上凭空丢弃线索。
+        // 断言因此同时扣住「必填标记不得复活」，防止半吊子回滚（改了 UI 忘了改这里，或反之）。
+        record('index.html「所在城市」为省 + 市级联下拉(#lead-province/#lead-city)+手输兜底，引入省市数据且**无**必填星号',
             leadPage.status === 200 && leadPage.raw.includes('id="lead-province"')
             && leadPage.raw.includes('id="lead-city"') && leadPage.raw.includes('id="lead-city-other"')
-            && leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>')
+            && !leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>')
             && leadPage.raw.includes('src/js/data/china-regions.js'),
             `HTTP ${leadPage.status}`);
         const chinaRegionsJs = await request(PORT, 'GET', '/src/js/data/china-regions.js');
-        record('china-regions.js 提供省级行政区数据（直辖市/自治区/港澳台）供联动，lead-modal.js 做联动与必填校验',
+        record('china-regions.js 提供省级行政区数据（直辖市/自治区/港澳台）供联动，lead-modal.js 做联动采集且**不**因城市阻断提交',
             chinaRegionsJs.status === 200 && chinaRegionsJs.raw.includes('citiesOf')
             && chinaRegionsJs.raw.includes('北京') && chinaRegionsJs.raw.includes('新疆')
             && chinaRegionsJs.raw.includes('香港')
             && leadModalJs.status === 200 && leadModalJs.raw.includes('renderProvinces')
             && leadModalJs.raw.includes('setCities') && leadModalJs.raw.includes('lead-city-other')
-            && leadModalJs.raw.includes("val('lead-city')") && leadModalJs.raw.includes('请填写所在城市'),
+            && leadModalJs.raw.includes("val('lead-city')") && leadModalJs.raw.includes('city: city')
+            && !leadModalJs.raw.includes('请填写所在城市'),
             `HTTP ${chinaRegionsJs.status}/${leadModalJs.status}`);
         // 省份不能只是「筛选城市的中间态」：顾问要按省收敛分派（江浙沪私域），后端也要拿到。
         // 哨兵值必须剔除 —— 选「其他 / 海外」时下拉值是 '__other'，透传下去顾问会看到一行无意义的占位符

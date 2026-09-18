@@ -42,7 +42,19 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// Zeabur 等平台的 PORT 变量必须是合法数字；若被误填为 ${WEB_PORT} 之类字面量，
+// Node 会把它当成命名管道路径，导致容器不监听 TCP 端口而 502。
+function resolvePort() {
+    const raw = process.env.PORT || '3000';
+    const num = parseInt(raw, 10);
+    if (Number.isNaN(num) || num <= 0 || num > 65535) {
+        console.error(`[FATAL] PORT 环境变量不是合法端口号（当前值="${raw}"），将回退到 3000`);
+        return 3000;
+    }
+    return num;
+}
+const PORT = resolvePort();
 
 // 信任 Zeabur 网关的一层反代，使 req.ip 为真实客户端IP
 // 否则限流会把所有用户算作同一个网关IP，10次/15分钟的配额被全站共享

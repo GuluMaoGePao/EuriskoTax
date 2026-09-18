@@ -48,6 +48,8 @@ beforeAll(() => {
 // 每个测试前重置 DOM 与 localStorage（收藏/反馈/历史/FAB位置 隔离）
 beforeEach(() => {
     localStorage.clear();
+    // body 自身的 class 不会被 innerHTML 重置，上一例若在打开态结束会把标记带进下一例
+    document.body.classList.remove('assistant-open');
     document.body.innerHTML = `
         <button id="tax-assistant-fab" class="assistant-fab" style="display:flex;">
             <i class="fa fa-comments"></i>
@@ -120,6 +122,41 @@ describe('悬浮税助手 - 初始化与开关', () => {
         const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
         document.dispatchEvent(escEvent);
         expect(document.getElementById('tax-assistant-drawer').classList.contains('assistant-drawer-open')).toBe(false);
+    });
+
+    // 桌面「推开」形态交给 CSS 决定（见 index.html 的 @media (min-width: 1280px)）；
+    // JS 这一侧的全部责任只是把这个标记打上 / 摘掉 —— 漏摘一次，内容区就永久留白一整个侧栏的宽度。
+    test('打开时应给 body 打上 assistant-open 标记（桌面推开的唯一开关）', () => {
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+
+        expect(document.body.classList.contains('assistant-open')).toBe(true);
+    });
+
+    test('三条关闭路径（关闭按钮 / 遮罩 / ESC）都应摘掉标记', () => {
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        document.getElementById('tax-assistant-fab').click();
+        document.getElementById('assistant-close').click();
+        expect(document.body.classList.contains('assistant-open')).toBe(false);
+
+        document.getElementById('tax-assistant-fab').click();
+        document.getElementById('tax-assistant-overlay').click();
+        expect(document.body.classList.contains('assistant-open')).toBe(false);
+
+        document.getElementById('tax-assistant-fab').click();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(document.body.classList.contains('assistant-open')).toBe(false);
+    });
+
+    test('toggle 一开一关后不残留标记', () => {
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        window.TaxAssistant.toggle();
+        window.TaxAssistant.toggle();
+
+        expect(document.body.classList.contains('assistant-open')).toBe(false);
     });
 });
 
@@ -327,6 +364,38 @@ describe('悬浮税助手 - 全局 API', () => {
 
         window.TaxAssistant.toggle();
         expect(drawer.classList.contains('assistant-drawer-open')).toBe(false);
+    });
+});
+
+// 手机形态下底部 Tab 栏常驻 52px，而悬浮球默认停在距底 24px —— 正好落在 Tab 栏上，
+// 加上层级表里球(60) 高于 Tab 栏(45)，表现就是「税助手压住导航按钮」。
+// 这里钉住的是「预留量随底栏实测状态走」这条契约：有底栏要抬，切走底栏必须放开。
+describe('悬浮税助手 - 悬浮球避让底部 Tab 栏', () => {
+    // jsdom 没有布局引擎，offsetHeight 恒为 0 —— 手动伪造实测值即可验证契约本身
+    function mountTabbar(height, hidden) {
+        var bar = document.createElement('nav');
+        bar.id = 'bottom-tabbar';
+        bar.className = hidden ? 'bottom-tabbar hidden' : 'bottom-tabbar';
+        Object.defineProperty(bar, 'offsetHeight', { value: height, configurable: true });
+        document.body.appendChild(bar);
+        return bar;
+    }
+
+    test('底栏可见时，默认停靠位置避开底栏高度（否则球压在导航按钮上）', () => {
+        mountTabbar(52, false);
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        // 默认距底 24px，有底栏时须再抬升底栏高度
+        const top = parseFloat(document.getElementById('tax-assistant-fab').style.top);
+        expect(top).toBe(window.innerHeight - 44 - 24 - 52);
+    });
+
+    test('底栏切走（计算页/桌面）时不额外留白：预留量必须跟 DOM 状态走，不能写死', () => {
+        mountTabbar(52, true);
+        loadSource('src/js/ui/tax-assistant-ui.js');
+
+        const top = parseFloat(document.getElementById('tax-assistant-fab').style.top);
+        expect(top).toBe(window.innerHeight - 44 - 24);
     });
 });
 

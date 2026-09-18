@@ -1,8 +1,11 @@
 {
   "name": "EuriskoTax",
-  "version": "1.37.11",
+  "version": "1.41.1",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
+    "build:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --minify && tailwindcss -i src/css/admin.src.css -o src/css/admin.css --minify",
+    "watch:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --watch",
+    "prebuild": "npm run build:css",
     "build": "echo 'Build complete - all files ready to deploy'",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
@@ -14,7 +17,8 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
+    "jest-environment-jsdom": "^29.7.0",
+    "tailwindcss": "^3.4.17"
   },
   "jest": {
     "testEnvironment": "jsdom",

@@ -54,29 +54,29 @@
         if (!Social || !target) return empty;
 
         // 上界：先按「到手率不会低于 50%」给个起点，不够就翻倍（覆盖 45% 档与封顶区间）
-        var lo = 0;
-        var hi = Math.max(target * 3, 10000);
+        var Solver = window.EuriskoSolver;
         var iterations = 0;
-        while (monthlyNetAt(hi, input, mode) < target && iterations < 60) {
-            hi *= 2;
-            iterations += 1;
-        }
-        if (monthlyNetAt(hi, input, mode) < target) {
+        var expanded = Solver.expandUpperBound({
+            start: Math.max(target * 3, 10000),
+            target: target,
+            maxExpansions: 60,
+            at: function (wage) { return monthlyNetAt(wage, input, mode); }
+        });
+        iterations += expanded.iterations;
+        if (!expanded.reached) {
             return Object.assign(empty, { iterations: iterations });
         }
 
-        // 二分到分（80 次足够覆盖 1e20 量级区间）
-        for (var i = 0; i < 80 && hi - lo > 0.01; i++) {
-            var mid = (lo + hi) / 2;
-            if (monthlyNetAt(mid, input, mode) >= target) {
-                hi = mid;
-            } else {
-                lo = mid;
-            }
-            iterations += 1;
-        }
+        // 二分到分（上限 80 次：够覆盖 1e20 量级区间，同时是防不收敛时死循环的闸门）
+        var solved = Solver.solveMonotone({
+            lo: 0,
+            hi: expanded.hi,
+            maxIterations: 80,
+            increase: function (wage) { return monthlyNetAt(wage, input, mode) < target; }
+        });
+        iterations += solved.iterations;
 
-        var gross = round(Math.ceil(hi * 100) / 100);
+        var gross = round(Math.ceil(solved.hi * 100) / 100);
         var net = Social.netSalaryOf(Object.assign({}, input, { wage: gross }));
         var employer = Social.employerCostOf(Object.assign({}, input, { wage: gross }));
 

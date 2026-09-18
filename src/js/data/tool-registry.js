@@ -66,6 +66,21 @@
             id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推收入',
             icon: 'fa-refresh', status: 'deep', pageId: 'reverse-calculation-page',
             nextTools: ['net-salary', 'salary-tax', 'employer-cost']
+        },
+        // 阶段17 17C-1：第一个**由 spec 驱动**的完整测算 —— 此前 4 个 deep 各有独立页面与私有逻辑，
+        // 每加一个税种就要再写一页 HTML；本条目没有 pageId，内容由 deep-wizard-ui.js 按 spec 渲染。
+        // 字段与计算不在这里重复声明，见文件末尾「与 vat 速算器共享同一份 fields / compute」。
+        {
+            id: 'vat-deep', name: '增值税', subtitle: '小规模 / 一般纳税人，分步填本期数据',
+            icon: 'fa-shopping-cart', status: 'deep',
+            nextTools: ['surtax-stamp', 'corporate-income-tax', 'business-income']
+        },
+        // 阶段17 17C-4：附加税印花税的完整测算。排在 vat deep 之后 ——
+        // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。
+        {
+            id: 'surtax-stamp-deep', name: '附加税与印花税', subtitle: '城建税 + 教育费附加 + 印花税，分步核计税依据',
+            icon: 'fa-tags', status: 'deep',
+            nextTools: ['vat', 'corporate-income-tax', 'business-income']
         }
     ];
 
@@ -135,6 +150,47 @@
                         { label: '到手合计', value: net, kind: 'money' },
                         { label: '实际税负率', value: gross > 0 ? tax / gross : 0, kind: 'percent' }
                     ],
+                    // 台账 C 打样：速算器推导链（结构同 buildFormulaSteps 的 step schema，由 toolbox-ui 复用同一套渲染）
+                    steps: (function () {
+                        var perMonthTaxable = Q.monthlyTaxableOf(v.monthlyIncome, v.monthlyInsurance, v.monthlySpecialAdditional);
+                        var cumulative = Q.cumulativeTaxableOf(v.monthlyIncome, m, v.monthlyInsurance, v.monthlySpecialAdditional);
+                        var bracket = Q.bracketOf(cumulative);
+                        if (!bracket) return undefined; // 无应纳税所得额（如月薪低于起征点）时不展示
+                        var ratePct = (bracket.rate * 100).toFixed(0);
+                        return [
+                            {
+                                title: '第一步：每月应纳税所得额',
+                                rows: [
+                                    { label: '税前月薪', note: '', value: v.monthlyIncome },
+                                    { label: '减：基本减除费用（起征点）', note: '', value: Q.BASIC_DEDUCTION },
+                                    { label: '减：五险一金（个人）', note: '', value: v.monthlyInsurance },
+                                    { label: '减：专项附加扣除', note: '', value: v.monthlySpecialAdditional }
+                                ],
+                                totalLabel: '每月应纳税所得额',
+                                totalValue: perMonthTaxable,
+                                footnote: '月薪 − 5000 − 五险一金 − 专项附加，不足 0 按 0'
+                            },
+                            {
+                                title: '第二步：累计应纳税所得额',
+                                rows: [
+                                    { label: '每月应纳税所得额', note: '逐月相加 × ' + m + ' 个月（与内核浮点逐位一致）', value: perMonthTaxable }
+                                ],
+                                totalLabel: '累计应纳税所得额',
+                                totalValue: cumulative,
+                                footnote: ''
+                            },
+                            {
+                                title: '第三步：适用预扣率与累计应纳税额',
+                                rows: [
+                                    { label: '适用预扣率', note: '按累计应纳税所得额查综合所得年度税率表', value: bracket.rate, format: 'percent' },
+                                    { label: '速算扣除数', note: '', value: bracket.deduction }
+                                ],
+                                totalLabel: m + ' 个月累计应纳税额',
+                                totalValue: tax,
+                                footnote: cumulative.toFixed(2) + ' × ' + ratePct + '% − ' + bracket.deduction.toFixed(2) + ' = ' + tax.toFixed(2)
+                            }
+                        ];
+                    })(),
                     note: '每月应纳税所得额 = 月薪 − 5000 − 五险一金 − 专项附加扣除；累计应纳税额按七级年度表查，本月税额 = 截至本月累计 − 截至上月累计。'
                 };
             }
@@ -850,16 +906,24 @@
             group: 'corp', icon: 'fa-shopping-cart', status: 'native', seoPath: '/seo/vat.html',
             policyKey: 'vat-small-scale',
             nextTools: ['surtax-stamp', 'corporate-income-tax', 'business-income'],
+            // 阶段17 分步编排（17A-1）：`step` 引用下方 `steps` 的 key。
+            // 纯增量声明 —— 速算器页（status:'native'）不读 steps，行为与改动前完全一致，
+            // 20 个既有工具零影响；只有通用 deep 渲染器会消费它。
+            // 结果步由渲染器自动追加（所有完整测算都有，「计算结果」不在此重复声明）。
             fields: [
-                { key: 'variant', label: '计税场景', type: 'select', default: 'small', options: [{ value: 'small', label: '小规模纳税人' }, { value: 'general', label: '一般纳税人' }, { value: 'split', label: '价税分离' }] },
-                { key: 'sales', label: '本期销售额', type: 'money', default: 280000, when: { key: 'variant', in: ['small'] } },
-                { key: 'period', label: '纳税期', type: 'select', default: 'quarter', options: [{ value: 'quarter', label: '按季' }, { value: 'month', label: '按月' }], when: { key: 'variant', in: ['small'] } },
-                { key: 'specialInvoice', label: '其中专票销售额', type: 'money', default: 0, when: { key: 'variant', in: ['small'] }, hint: '免征只覆盖普票，专票部分照缴' },
-                { key: 'output', label: '销售额', type: 'money', default: 113000, when: { key: 'variant', in: ['general'] } },
-                { key: 'inputTax', label: '当期进项税额', type: 'money', default: 8000, when: { key: 'variant', in: ['general'] } },
-                { key: 'rate', label: '适用税率', type: 'select', default: 0.13, options: [{ value: 0.13, label: '13%' }, { value: 0.09, label: '9%' }, { value: 0.06, label: '6%' }, { value: 0.03, label: '3%（简易）' }], when: { key: 'variant', in: ['general', 'split'] } },
-                { key: 'amount', label: '金额', type: 'money', default: 113000, when: { key: 'variant', in: ['split'] } },
-                { key: 'taxIncluded', label: '金额为含税价', type: 'switch', default: true, when: { key: 'variant', in: ['small', 'general', 'split'] } }
+                { key: 'variant', step: 'identity', label: '计税场景', type: 'select', default: 'small', options: [{ value: 'small', label: '小规模纳税人' }, { value: 'general', label: '一般纳税人' }, { value: 'split', label: '价税分离' }] },
+                { key: 'sales', step: 'data', label: '本期销售额', type: 'money', default: 280000, when: { key: 'variant', in: ['small'] } },
+                { key: 'period', step: 'data', label: '纳税期', type: 'select', default: 'quarter', options: [{ value: 'quarter', label: '按季' }, { value: 'month', label: '按月' }], when: { key: 'variant', in: ['small'] } },
+                { key: 'specialInvoice', step: 'data', label: '其中专票销售额', type: 'money', default: 0, when: { key: 'variant', in: ['small'] }, hint: '免征只覆盖普票，专票部分照缴' },
+                { key: 'output', step: 'data', label: '销售额', type: 'money', default: 113000, when: { key: 'variant', in: ['general'] } },
+                { key: 'inputTax', step: 'data', label: '当期进项税额', type: 'money', default: 8000, when: { key: 'variant', in: ['general'] } },
+                { key: 'rate', step: 'data', label: '适用税率', type: 'select', default: 0.13, options: [{ value: 0.13, label: '13%' }, { value: 0.09, label: '9%' }, { value: 0.06, label: '6%' }, { value: 0.03, label: '3%（简易）' }], when: { key: 'variant', in: ['general', 'split'] } },
+                { key: 'amount', step: 'data', label: '金额', type: 'money', default: 113000, when: { key: 'variant', in: ['split'] } },
+                { key: 'taxIncluded', step: 'data', label: '金额为含税价', type: 'switch', default: true, when: { key: 'variant', in: ['small', 'general', 'split'] } }
+            ],
+            steps: [
+                { key: 'identity', title: '纳税人身份', why: '决定用哪种计税方法：小规模按「不含税销售额 × 征收率」，一般纳税人按「销项税额 − 进项税额」' },
+                { key: 'data', title: '本期数据', why: '增值税按纳税期申报；先确认金额是否为含税价 —— 价外税必须价税分离后再计税' }
             ],
             pitfalls: [
                 '增值税是**价外税**：含税价必须先分离，直接「含税价 × 税率」会多算',
@@ -968,12 +1032,16 @@
             group: 'corp', icon: 'fa-tags', status: 'native', seoPath: '/seo/surtax-stamp-duty.html',
             policyKey: 'surtax',
             nextTools: ['vat', 'corporate-income-tax', 'business-income'],
+            // 阶段17 分步编排（17A-1）：`step` 引用下方 `steps` 的 key，与 vat 同一套约定。
+            // 纯增量声明 —— 速算器页不读 steps，20 个既有工具行为不变。
+            // 分步顺序刻意把「计税依据」放在最后：附加税的计税依据是实缴增值税，
+            // 先弄清是对什么征、再看数字，比一上来填数更不容易搞错基数。
             fields: [
-                { key: 'variant', label: '算哪一项', type: 'select', default: 'surtax', options: [{ value: 'surtax', label: '附加税（城建 + 教育费附加）' }, { value: 'stamp', label: '印花税' }] },
-                { key: 'vat', label: '实际缴纳的增值税', type: 'money', default: 100000, when: { key: 'variant', in: ['surtax'] } },
-                { key: 'consumption', label: '实际缴纳的消费税', type: 'money', default: 0, when: { key: 'variant', in: ['surtax'] } },
-                { key: 'location', label: '所在地', type: 'select', default: 'urban', options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }], when: { key: 'variant', in: ['surtax'] } },
-                { key: 'item', label: '税目', type: 'select', default: 'sale', options: [
+                { key: 'variant', step: 'identity', label: '算哪一项', type: 'select', default: 'surtax', options: [{ value: 'surtax', label: '附加税（城建 + 教育费附加）' }, { value: 'stamp', label: '印花税' }] },
+                { key: 'location', step: 'basis', label: '所在地', type: 'select', default: 'urban', options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }], when: { key: 'variant', in: ['surtax'] } },
+                { key: 'vat', step: 'basis', label: '实际缴纳的增值税', type: 'money', default: 100000, when: { key: 'variant', in: ['surtax'] }, hint: '计税依据是**实缴**税额，不是销售额 —— 增值税为零时附加税也为零' },
+                { key: 'consumption', step: 'basis', label: '实际缴纳的消费税', type: 'money', default: 0, when: { key: 'variant', in: ['surtax'] } },
+                { key: 'item', step: 'basis', label: '税目', type: 'select', default: 'sale', options: [
                     { value: 'sale', label: '买卖合同（万分之三）' },
                     { value: 'loan', label: '借款合同（万分之零点五）' },
                     { value: 'financeLease', label: '融资租赁合同（万分之零点五）' },
@@ -992,9 +1060,13 @@
                     { value: 'accountBook', label: '营业账簿（万分之二点五）' },
                     { value: 'securities', label: '证券交易（千分之一，不减半）' }
                 ], when: { key: 'variant', in: ['stamp'] } },
-                { key: 'amount', label: '凭证金额', type: 'money', default: 1000000, when: { key: 'variant', in: ['stamp'] } },
-                { key: 'stampVat', label: '单独列明的增值税', type: 'money', default: 0, when: { key: 'variant', in: ['stamp'] }, hint: '单独列明的可从计税依据中扣除' },
-                { key: 'halve', label: '享受六税两费减半', type: 'switch', default: true }
+                { key: 'amount', step: 'basis', label: '凭证金额', type: 'money', default: 1000000, when: { key: 'variant', in: ['stamp'] } },
+                { key: 'stampVat', step: 'basis', label: '单独列明的增值税', type: 'money', default: 0, when: { key: 'variant', in: ['stamp'] }, hint: '单独列明的可从计税依据中扣除' },
+                { key: 'halve', step: 'basis', label: '享受六税两费减半', type: 'switch', default: true }
+            ],
+            steps: [
+                { key: 'identity', title: '税种选择', why: '附加税与印花税的计税依据完全不同：前者跟着增值税走，后者按凭证金额走 —— 先定是哪个' },
+                { key: 'basis', title: '计税依据', why: '这一步反复核对的依据：附加税看实际缴纳的增值税与消费税，印花税看凭证金额且不含单独列明的增值税' }
             ],
             pitfalls: [
                 '附加税的计税依据是**实际缴纳的增值税 + 消费税**，不是销售额，也不是申报表的应纳数',
@@ -1151,6 +1223,26 @@
         }
         return { deep: DEEP.filter(hit), tools: TOOLS.filter(hit), matched: true };
     }
+
+    // ====== spec 驱动的完整测算自动与同名速算器配对（阶段17 17A-5 / 17C-*） ======
+    // 约定：`X-deep` 自动复用 `X` 的 fields / steps / compute / pitfalls / policyKey，
+    // 且指向**同一个对象**，不是复制两份。一旦复制，就会出现「同一个税种、速算器与完整测算
+    // 算出两个数」的口径漂移 —— 增值税漂一点还会顺着依赖链放大到附加税印花税上。
+    //
+    // 这段约定本身才是阶段17 的交付物：**新增一个完整测算 = 在 DEEP 里加一条 spec**，
+    // 不必改本文件的共享逻辑、不必改 index.html、不必写任何渲染代码。
+    // （原先是硬编码 vat → vat-deep 一对；改成按后缀配对，是第二个税种落地时逼出来的。）
+    (function () {
+        var SHARED = ['fields', 'steps', 'compute', 'pitfalls', 'policyKey'];
+        DEEP.forEach(function (t) {
+            if (t.pageId) return;                    // 页面式 deep 有各自 HTML，不参与配对
+            var twinId = t.id.replace(/-deep$/, '');
+            if (twinId === t.id) return;             // 不是 X-deep 形式，没有孪生速算器
+            var twin = get(twinId);
+            if (!twin) return;
+            SHARED.forEach(function (k) { t[k] = twin[k]; });
+        });
+    })();
 
     window.EuriskoToolRegistry = {
         groups: groups,

@@ -504,6 +504,27 @@ function exportToPDF(elementId, title, opts) {
             const fileName = (typeof opts.filename === 'string' && opts.filename.trim())
                 ? opts.filename
                 : `${title}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+            // Phase 1.5 交付兜底：微信 / App 内置浏览器里 doc.save() 会被拦或静默失败，
+            // 用户表现为「点了导出没反应」—— 而微信正是当前唯一真实可达渠道，等于链路不闭环。
+            // 降级链：下载 → 结果长图（长按保存）→ 复制结果文本，保证总有出路。
+            const envLib = window.EuriskoEnv;
+            const env = envLib && typeof envLib.currentEnv === 'function' ? envLib.currentEnv() : null;
+            const delivery = env && typeof envLib.pickDelivery === 'function'
+                ? envLib.pickDelivery(env, { image: true })
+                : { way: 'download', fallbacks: [] };
+
+            if (delivery.way !== 'download' && typeof envLib.openFallbackPanel === 'function') {
+                envLib.openFallbackPanel({
+                    imageDataUrl: canvas.toDataURL('image/png'),
+                    text: envLib.htmlToPlainText(docContent),
+                    hint: envLib.deliveryHint(env, delivery.way),
+                    // 仍留一条手动尝试下载的口子：某些容器实际能下载，不该替用户判死刑
+                    onRetryDownload: function () { doc.save(fileName); }
+                });
+                return;
+            }
+
             doc.save(fileName);
         })
         .catch(error => {

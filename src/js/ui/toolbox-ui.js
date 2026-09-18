@@ -78,6 +78,63 @@
         }
     }
 
+    // ====== 政策依据（页内展开，不外跳）======
+    // 为什么这里一条 <a> 都不给：微信 / PWA standalone 里外链要么被拦、要么把用户带出应用，
+    // 结果页自证其说的最后一环就断了。改成就地展开 + 一键复制文号 —— 文号能直接粘进
+    // 报告或微信对话（这正是「给老板看」的场景），也不依赖网络跳转。
+    // 口径仍然单一来源：只问 tax-registry 的 basisOf，页面从不自己抄文号。
+    function policyBasisOf(tool) {
+        var reg = window.EuriskoTaxRegistry;
+        if (!tool || !tool.policyKey || !reg || typeof reg.basisOf !== 'function') return [];
+        try {
+            return reg.basisOf(tool.policyKey) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // 复制出去的形状：一行一条，「文号 —— 标题」（顾问与 HR 直接可读）
+    function policyBasisText(basis) {
+        return (basis || []).map(function (b) {
+            var doc = b.doc || '';
+            var title = b.title || '';
+            if (doc && title) return doc + ' —— ' + title;
+            return doc || title;
+        }).filter(Boolean).join('\n');
+    }
+
+    function renderPolicyBasis(tool) {
+        var wrap = document.getElementById('quick-policy-basis');
+        var body = document.getElementById('quick-policy-basis-body');
+        var copyBtn = document.getElementById('quick-basis-copy');
+        if (!wrap || !body) return;
+
+        var basis = policyBasisOf(tool);
+        if (!basis.length) {
+            wrap.classList.add('hidden');
+            return;
+        }
+        wrap.classList.remove('hidden');
+        body.innerHTML = basis.map(function (b) {
+            return '<div class="tool-basis-item">' +
+                (b.doc ? '<div class="text-gray-700 font-medium">' + esc(b.doc) + '</div>' : '') +
+                (b.title ? '<div>' + esc(b.title) + '</div>' : '') +
+                '</div>';
+        }).join('');
+
+        if (copyBtn) {
+            copyBtn.onclick = function () {
+                var lib = window.EuriskoEnv;
+                var ok = lib && typeof lib.copyToClipboard === 'function'
+                    ? lib.copyToClipboard(policyBasisText(basis))
+                    : false;
+                var old = copyBtn.textContent;
+                copyBtn.textContent = ok ? '已复制文号' : '复制失败，请长按选择';
+                setTimeout(function () { copyBtn.textContent = old; }, 2000);
+            };
+        }
+    }
+
     // ====== 最近使用 ======
     function pushRecent(id) {
         try {
@@ -221,7 +278,30 @@
             if (hideDeep) deepBox.classList.add('hidden');
             else deepBox.classList.remove('hidden');
         }
+        renderDeepEntries();
         renderScenarioChip();
+    }
+
+    // ====== 完整测算：增量接线（为阶段17「deep 工具 > 4 个」铺路） ======
+    // 既有 4 张 mode-card 是静态 HTML，卡片内的隐藏按钮（${id}-mode-btn）在 app.js / home-ui.js
+    // 已被绑定了一整套页面初始化逻辑 —— 绝不能用 innerHTML 重建它们，否则事件会全部丢失。
+    // 因此这里**只对注册表中尚无静态卡片的 deep 工具做追加式渲染**：
+    //   现在 deep 恰好 4 个且全都有静态卡 → 动态区渲染 0 张且容器 hidden，所见与改动前完全一致；
+    //   阶段17 新增 deep 税种后 → 自动出现在「完整测算」组，不必再改 index.html。
+    function renderDeepEntries() {
+        var host = document.getElementById('toolbox-deep-extra');
+        if (!host || !R()) return;
+        var extra = (R().deep() || []).filter(function (t) {
+            return !document.getElementById(t.id + '-mode-card');
+        });
+        if (!extra.length) {
+            host.innerHTML = '';
+            host.classList.add('hidden');
+            return;
+        }
+        host.classList.remove('hidden');
+        host.innerHTML = extra.map(function (t) { return cardHtml(t, true); }).join('');
+        bindEntries(host);
     }
 
     function openScenario(id) {
@@ -239,8 +319,13 @@
         if (tool.status === 'deep') {
             // 原有深度流程：复用工具页那张卡片里的隐藏按钮，保证与既有初始化逻辑完全一致
             var btn = document.getElementById(tool.id + '-mode-btn');
-            if (btn) btn.click();
-            else showPageFn(tool.pageId);
+            if (btn) { btn.click(); return; }
+            // 阶段17：spec 驱动的完整测算（没有独立页面）—— 交给通用向导按注册表渲染。
+            // 放在 pageId 分支之前：这类工具本就没有 pageId，多一层判断也不会误伤原有 4 个 deep。
+            var W = window.EuriskoDeepWizard;
+            if (W && W.has(tool) && W.open(tool.id)) return;
+            // 目标页面若尚未落地则**不跳转**：否则 showPage 会切到一个不存在的 DOM，留下白屏。
+            if (tool.pageId && document.getElementById(tool.pageId)) showPageFn(tool.pageId);
             return;
         }
         if (tool.status === 'seo') {
@@ -327,12 +412,30 @@
                 '</div>';
         }).join('');
 
+        // 台账 C：速算器推导链（compute 返回可选 steps；渲染复用 utils.js 的同一套实现，不写第二套）
+        var stepsHtml = '';
+        if (out.steps && out.steps.length) {
+            if (typeof renderFormulaStepsHtml === 'function') {
+                stepsHtml = '<details class="mt-4 tool-formula-panel">' +
+                    '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
+                    '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
+                    '<span class="text-xs text-gray-500">每一步都可核对</span>' +
+                    '</summary>' +
+                    '<div class="mt-3">' + renderFormulaStepsHtml(out.steps) + '</div>' +
+                    '</details>';
+            } else {
+                // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
+                console.warn('[toolbox] renderFormulaStepsHtml 未加载（utils.js），推导链面板被跳过');
+            }
+        }
+
         box.innerHTML = '' +
             '<div class="tool-result-primary">' +
             '<div class="tool-result-primary-label">' + esc(out.primary.label) + '</div>' +
             '<div class="tool-result-primary-value">' + fmtValue(out.primary.value, out.primary.kind) + '</div>' +
             '</div>' +
             '<div class="tool-result-rows">' + rowsHtml + '</div>' +
+            stepsHtml +
             (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + esc(out.note) + '</div>' : '');
 
         renderNextSteps(tool, values, out);
@@ -434,6 +537,9 @@
                 : '';
         }
 
+        // 政策依据与结果同屏出现（默认折叠，展开与否由用户决定），不外跳
+        renderPolicyBasis(tool);
+
         if (!formEl) return;
 
         function build() {
@@ -456,39 +562,64 @@
         build();
     }
 
-    // ====== 底部 Tab 栏 ======
-    function updateTabBar() {
-        var bar = document.getElementById('bottom-tabbar');
-        if (!bar) return;
+    // ====== 导航：底部 Tab 栏（手机）+ 顶部 Tab 行（桌面） ======
+    // 两套 DOM 是**同一份状态的两种投影**，由 syncNav() 统一驱动，
+    // 绝不各自维护显隐逻辑 —— 否则两端迟早不同步。
+    function syncNav() {
         var activeEl = document.querySelector('.page.active');
         var activeId = activeEl ? activeEl.id : null;
         var visible = TAB_PAGES.indexOf(activeId) !== -1;
-        if (visible) bar.classList.remove('hidden');
-        else bar.classList.add('hidden');
-        // 让页面底部留出 Tab 栏的高度，避免遮住最后一张卡片
+
+        // 底部 Tab 栏（<768px）：显式切 hidden 类，不只依赖 media query ——
+        // tests/toolbox-ui.test.js 断言的正是这个类，只靠 CSS 控制会让测试失去意义。
+        var bar = document.getElementById('bottom-tabbar');
+        if (bar) {
+            if (visible) bar.classList.remove('hidden');
+            else bar.classList.add('hidden');
+            bar.querySelectorAll('.bottom-tab').forEach(function (btn) {
+                var t = btn.getAttribute('data-tab');
+                if (t === activeId) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
+        // 顶部 Tab 行（≥768px）：小屏形态由 CSS 折叠，这里只管「该不该出现」
+        var top = document.getElementById('top-tabbar');
+        if (top) {
+            if (visible) top.classList.remove('hidden');
+            else top.classList.add('hidden');
+            top.querySelectorAll('.top-tab').forEach(function (btn) {
+                var t = btn.getAttribute('data-tab');
+                if (t === activeId) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
+        // 让页面底部留出 Tab 栏的高度，避免遮住最后一张卡片（仅手机形态生效）
         if (visible) document.body.classList.add('has-tabbar');
         else document.body.classList.remove('has-tabbar');
-        bar.querySelectorAll('.bottom-tab').forEach(function (btn) {
-            var t = btn.getAttribute('data-tab');
-            if (t === activeId) btn.classList.add('active');
-            else btn.classList.remove('active');
-        });
     }
 
+    // 兼容旧调用点与 tests/toolbox-ui.test.js 的既有入口
+    var updateTabBar = syncNav;
+
     function initTabBar() {
-        var bar = document.getElementById('bottom-tabbar');
-        if (!bar) return;
-        bar.querySelectorAll('.bottom-tab').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var t = this.getAttribute('data-tab');
-                if (t === 'assistant') {
-                    // 助手是抽屉不是页面：唤起悬浮球即可，不切换页面
-                    var fab = document.getElementById('tax-assistant-fab');
-                    if (fab) fab.click();
-                    return;
-                }
-                showPageFn(t);
-                updateTabBar();
+        // 两端同一个选择器集合：新增/删 Tab 只改这里，不用记着改两处
+        ['#bottom-tabbar .bottom-tab', '#top-tabbar .top-tab'].forEach(function (sel) {
+            document.querySelectorAll(sel).forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var t = this.getAttribute('data-tab');
+                    if (t === 'assistant') {
+                        // 助手是抽屉不是页面：唤起悬浮球即可，不切换页面。
+                        // 助手 Tab 已从两端导航移除（它是情境动作，不是目的地），
+                        // 这里保留该分支仅为兼容历史 DOM 残留。
+                        var fab = document.getElementById('tax-assistant-fab');
+                        if (fab) fab.click();
+                        return;
+                    }
+                    showPageFn(t);
+                    syncNav();
+                });
             });
         });
         // showPage 是全局唯一的路由实现（auth-ui.js），这里不侵入它，
@@ -497,11 +628,11 @@
             var timer = null;
             var observer = new window.MutationObserver(function () {
                 if (timer) return;
-                timer = setTimeout(function () { timer = null; updateTabBar(); }, 30);
+                timer = setTimeout(function () { timer = null; syncNav(); }, 30);
             });
             observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
         }
-        updateTabBar();
+        syncNav();
     }
 
     // ====== 初始化 ======
@@ -556,11 +687,23 @@
 
     window.EuriskoToolbox = {
         init: init,
+        // 阶段17 17A-5：字段渲染 / 读值 / 条件显隐是速算器与多步向导的**公共部分**。
+        // 暴露给 deep-wizard-ui.js 复用 —— 明令不许再抄一份（抄了必漂移；
+        // 20 个既有工具的字段渲染单测就是防它退化的回归网）。
+        fieldHtml: fieldHtml,
+        readValues: readValues,
+        visibleFields: visibleFields,
+        fmtValue: fmtValue,
         renderToolbox: renderToolbox,
         renderScenarios: renderScenarios,
         openTool: openTool,
         openScenario: openScenario,
-        updateTabBar: updateTabBar
+        updateTabBar: updateTabBar,   // 兼容旧名，等价于 syncNav
+        syncNav: syncNav,
+        // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
+        policyBasisOf: policyBasisOf,
+        policyBasisText: policyBasisText,
+        renderPolicyBasis: renderPolicyBasis
     };
 
     if (document.readyState === 'loading') {

@@ -1,0 +1,85 @@
+# =============================================================================
+# EuriskoTax 生产部署（腾讯云轻量服务器，Docker CE 镜像）
+#
+# 三个服务：
+#   db     postgres:16-alpine —— 只在 compose 内网监听，不映射公网端口
+#   app    仓库根 Dockerfile 构建（node:22-slim，启动时自动 prisma migrate deploy）
+#   nginx  80/443 反代 app:3000；443 块默认注释，备案下来签发证书后再启用
+#
+# 用法（服务器上，/opt/euriskotax 目录）：
+#   cp deploy/lighthouse/.env.example deploy/lighthouse/.env   # 填好密钥
+#   docker compose -f deploy/lighthouse/docker-compose.yml up -d --build
+#   curl http://127.0.0.1/health
+#
+# 注意：
+#   - 首次部署前若要导入 Zeabur 的老数据，先看
+#     docs/tech-reports/lighthouse-deployment-guide.md 第 3 节（先导数据再起 app）
+#   - app 的 build 上下文是仓库根（context: ../..），别移动本文件的位置
+# =============================================================================
+name: euriskotax
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: eurisko
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: euriskotax
+      TZ: UTC
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eurisko -d euriskotax"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://eurisko:${POSTGRES_PASSWORD}@db:5432/euriskotax
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 里设置 JWT_SECRET}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?请在 .env 里设置 ADMIN_TOKEN}
+      # 同源访问不触发 CORS；签发正式域名后收紧为 https://euriskotax.com
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-EuriskoTax}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # 证书签发用（webroot 模式 + 证书目录），现在挂上不影响 80 端口
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - app
+
+  # 备案下来、域名解析生效后签发证书用：
+  #   docker compose -f deploy/lighthouse/docker-compose.yml --profile tls run --rm certbot \
+  #     certonly --webroot -w /var/www/certbot -d euriskotax.com --email <你的邮箱> --agree-tos --no-eff-email
+  certbot:
+    image: certbot/certbot
+    profiles: ["tls"]
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+
+volumes:
+  pg_data:

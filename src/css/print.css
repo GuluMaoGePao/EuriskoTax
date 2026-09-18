@@ -1,0 +1,66 @@
+/* 打印样式（双端 UI 地基 S8）
+ *
+ * 只做一件事：让 Ctrl+P / 右键「打印」出来的纸面可读。
+ *   屏幕上的外壳（导航、Tab 栏、悬浮球、助手抽屉、横幅、按钮）印到纸上是纯噪音；
+ *   反过来，屏幕上被折叠进滚动容器 / max-height 里的内容，在纸上必须摊开 —— 纸没有滚动条。
+ *
+ * 为什么这里几乎每条都带 !important：
+ *   要盖的是 Tailwind 工具类（sticky / max-height / overflow …），而 src/css/tailwind.css
+ *   排在**本文件之后**加载（见 index.html：打印样式在 head 前段，Tailwind 产物在末尾），
+ *   同为单类选择器时后者胜出 —— 「打印时把 sticky 改回 static」这类覆盖会直接失效。
+ *   调顺序能解，但那等于把整份工具类压到打印样式之前，牵一发动全身；提前抬权重更稳。
+ *
+ * 深色模式不在这里处理：见 index.html 的 beforeprint / afterprint（打印前临时摘掉 .dark）。
+ *   为什么不能在这里兜底：浏览器默认**不打印背景色**，深色模式下浅色文字会直接印在白纸上变隐形；
+ *   而 Tailwind 的 dark: 变体是 `.dark 后代`选择器，从 CSS 侧没有干净的「整体失效」写法，
+ *   逐条列举 dark: 类既写不全也必然漏。在打印前摘类，一整页同时回到浅色，afterprint 再还原。
+ */
+
+/* 页边距交给 @page：写在 body 上的 padding 只作用于第一页顶部与最后一页底部，中间页不受控 */
+@page { margin: 14mm 12mm; }
+
+@media print {
+    /* 1) 屏幕外壳不进纸面 */
+    .compact-nav,
+    #top-tabbar,
+    #bottom-tabbar,
+    #tax-assistant-fab,
+    #tax-assistant-hotzone,
+    #tax-assistant-overlay,
+    #tax-assistant-drawer,
+    #init-splash,
+    #offline-banner,
+    #sw-update-banner,
+    #content-home-banner,
+    #share-card-cta { display: none !important; }
+
+    /* 2) 交互控件在纸上按不动，留着只是噪音。
+          input / select / textarea 反而要留 —— 印出来的是用户填好的值（浏览器会连同值一起印）。 */
+    button,
+    .tool-search-wrap { display: none !important; }
+
+    /* 3) 纸面不留滚动条：被 max-height / overflow 折叠的内容必须摊开，否则等于直接丢内容。
+          固定层在纸上还会重复出现在每一页，一并打回静态流。 */
+    [class*="sticky"],
+    [class*="fixed"] { position: static !important; }
+    [class*="overflow-"] { overflow: visible !important; }
+    [class*="max-h-"] { max-height: none !important; }
+
+    /* 4) 版心：A4 约 718px，Tailwind 的 .container 断点上限（sm 640 / md 768）会把纸面白白占掉两栏，
+          改为铺满 —— 页边距已由 @page 负责。 */
+    .container {
+        max-width: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    /* 顶部 16px 是给 sticky 导航让位的，导航都没了，让位也该撤 */
+    #app-container > .container { padding-top: 0 !important; }
+
+    /* 5) 分页：跨页断开的结果行会读断句；长表的表头每页重复一次，翻到第二页还知道列是什么 */
+    .tool-result-row,
+    .tool-result-primary,
+    tr,
+    img { break-inside: avoid; }
+    thead { display: table-header-group; }
+    h1, h2, h3, h4 { break-after: avoid; }
+}

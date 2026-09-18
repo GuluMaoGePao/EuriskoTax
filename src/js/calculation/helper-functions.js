@@ -1104,6 +1104,22 @@ function updateClassificationResultDisplay() {
             { income: totalIncome, tax: totalTax, netIncome, effectiveRate: effectiveRate.toFixed(2) + '%' },
             { durationMs: classRenderDuration });
     }
+
+    // 台账 C：分类所得推导链（与综合所得同一套实现，utils.js 提供；未加载时跳过）
+    // 传函数内刚汇总的 totals（而非全局 results），保证面板与结果区逐位一致
+    if (typeof buildClassificationFormulaSteps === 'function' && typeof showFormulaStepsPanel === 'function'
+        && classificationItems.length > 0) {
+        showFormulaStepsPanel(
+            buildClassificationFormulaSteps({
+                items: classificationItems,
+                totalIncome: totalIncome,
+                totalTaxableIncome: totalTaxableIncome,
+                totalTax: totalTax
+            }),
+            'formula-steps-panel-classification',
+            'formula-steps-body-classification'
+        );
+    }
 }
 
 // 计算分类所得税

@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- viewport-fit=cover：不加它 env(safe-area-inset-*) 恒为 0，
+         已有的那些 env() 留白（底栏 / 提示条）全是空操作（见 src/css/runtime-env.css）。 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1e40af">
     <meta name="description" content="EuriskoTax 税费计算器 - 个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 20 个税种在线测算，计算在浏览器本地完成，离线可用；结果仅供参考，不构成税务建议。">
     <link rel="manifest" href="/manifest.json">
@@ -16,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.37.11';
+        window.__APP_VERSION__ = '1.41.1';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -51,12 +53,16 @@
                 .catch(function () { /* 离线或 404 时静默放行 */ });
         })();
     </script>
-    <!-- Tailwind CSS v3 -->
-    <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 设计令牌唯一真源（必须在所有样式之前，供下面所有 CSS 消费） -->
+    <link rel="stylesheet" href="src/css/tokens.css">
     <!-- 工具箱与通用速算器页样式（不依赖 Tailwind JIT，独立维护） -->
     <link rel="stylesheet" href="src/css/toolbox.css">
+    <!-- Phase 1.5：运行时形态适配（刘海 / 手势条 / PWA 独立窗口的留白） -->
+    <link rel="stylesheet" href="src/css/runtime-env.css">
+    <!-- 打印样式（S8）：只含 @page 与 @media print 两个块，屏幕态零副作用 -->
+    <link rel="stylesheet" href="src/css/print.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <!-- jsPDF for PDF export -->
@@ -66,6 +72,23 @@
     <!-- 阶段13D：分享图二维码（qrcode-generator；与 jspdf / html2canvas 同为 cdnjs + SW cache-first）。
          加载失败不阻断：分享图会退化为「域名文字」，仅失去扫码入口 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <!-- 打印前临时摘掉深色模式（S8）
+         为什么必须在 JS 里做：浏览器默认**不打印背景色**，深色模式的浅色文字会印成「白纸上的白字」；
+         而 Tailwind 的 dark: 变体是 `.dark 后代`选择器，CSS 侧没有「整体失效」的干净写法
+         （逐条覆盖 dark: 类既写不全也必然漏）。打印前摘类，一整页同时回到浅色，打印完再还原。
+         beforeprint 万一不触发（个别老浏览器），最多是维持现状 —— 不会比不加这段更差。 -->
+    <script>
+        (function () {
+            var wasDark = false;
+            window.addEventListener('beforeprint', function () {
+                wasDark = document.documentElement.classList.contains('dark');
+                if (wasDark) document.documentElement.classList.remove('dark');
+            });
+            window.addEventListener('afterprint', function () {
+                if (wasDark) document.documentElement.classList.add('dark');
+            });
+        })();
+    </script>
     <!-- 统一的 Tailwind 配置 -->
     <script>
         // 防止主题闪烁：在页面渲染前应用保存的主题
@@ -75,1681 +98,20 @@
                 document.documentElement.classList.add('dark');
             }
         })();
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#1e40af',
-                        secondary: '#3b82f6',
-                        accent: '#60a5fa',
-                        success: '#10b981',
-                        warning: '#f59e0b',
-                        danger: '#ef4444',
-                        light: '#f3f4f6',
-                        dark: '#1f2937'
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
-                    boxShadow: {
-                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                    }
-                }
-            }
-        }
+        // 色值 / 字号 / 间距的统一取值来源见 src/css/tokens.css。
+        // Tailwind 主题（含同值的 hex 副本、boxShadow / fontFamily 扩展）已迁到仓库根的
+        // tailwind.config.js —— 改色仍需与 tokens.css 同步改两处。
+        // 保留 hex 而非引用 CSS 变量：全站大量使用透明度修饰符（bg-primary/90、
+        // focus:ring-primary/50），变量化后一旦编译器不支持 <alpha-value> 会静默失效。
     </script>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .content-auto {
-                content-visibility: auto;
-            }
-            .transition-all-300 {
-                transition: all 0.3s ease;
-            }
-            .card {
-                @apply bg-white rounded-lg shadow-card px-6 pt-6 pb-4 transition-all-300 flex flex-col;
-            }
-            .card-content {
-                @apply flex-grow;
-            }
-            .card:hover {
-                @apply shadow-card-hover;
-            }
-            .btn {
-                @apply px-4 py-2 rounded-md font-medium transition-all-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
-            }
-            .btn-primary {
-                @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
-            }
-            .btn-secondary {
-                @apply bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/50;
-            }
-            .btn-success {
-                @apply bg-success text-white hover:bg-success/90 focus:ring-success/50;
-            }
-            .input-field {
-                @apply w-full pr-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
-            }
-            .input-field.input-error {
-                @apply border-danger focus:ring-danger/50 focus:border-danger;
-            }
-            .label {
-                @apply block text-sm font-medium text-gray-700 mb-1;
-            }
-            .form-group {
-                @apply mb-4;
-            }
-            .tooltip {
-                @apply relative inline-flex items-center cursor-pointer;
-            }
-            .tooltip .tooltip-text {
-                @apply invisible absolute z-50 bg-gray-800 text-white text-xs rounded-md px-3 py-1.5 w-52 opacity-0 transition-opacity duration-200;
-                top: calc(100% + 6px);
-                left: 50%;
-                transform: translateX(-50%);
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                pointer-events: none;
-            }
-            .dark .tooltip .tooltip-text {
-                @apply bg-gray-700;
-            }
-            .tooltip .tooltip-text::before {
-                content: '';
-                position: absolute;
-                top: -4px;
-                left: 50%;
-                transform: translateX(-50%) rotate(45deg);
-                width: 8px;
-                height: 8px;
-                background: inherit;
-            }
-            .tooltip.is-open .tooltip-text {
-                @apply visible opacity-100;
-                pointer-events: auto;
-            }
-            .tab {
-                @apply px-4 py-2 font-medium border-b-2 cursor-pointer transition-all-300;
-            }
-            .tab-active {
-                @apply border-primary text-primary;
-            }
-            .tab-inactive {
-                @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
-            }
-            /* 页面 Logo 样式 */
-            .login-logo {
-                width: 250px;
-                height: 250px;
-                margin-top: -50px;
-                margin-bottom: -50px;
-            }
-            .modal-logo {
-                width: 200px;
-                height: 200px;
-                margin-top: -40px;
-                margin-bottom: -40px;
-            }
-            /* 提示卡片图标 */
-            .tip-icon-wrapper {
-                background-color: rgba(30, 64, 175, 0.1);
-            }
-            .dark .tip-icon-wrapper {
-                background-color: rgba(59, 130, 246, 0.15);
-            }
-            .tip-icon {
-                color: #1e40af;
-                font-size: 1.1rem;
-            }
-            .dark .tip-icon {
-                color: #60a5fa;
-            }
-            .slider {
-                @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
-            }
-            .slider::-webkit-slider-thumb {
-                @apply appearance-none w-4 h-4 rounded-full bg-primary;
-            }
-            .badge {
-                @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-            }
-            .badge-success {
-                @apply bg-success/20 text-success;
-            }
-            .badge-danger {
-                @apply bg-danger/20 text-danger;
-            }
-            .badge-warning {
-                @apply bg-warning/20 text-warning;
-            }
-            .step-indicator {
-                @apply flex items-center py-2 overflow-x-auto;
-                -webkit-overflow-scrolling: touch;
-            }
-            .step-indicator::-webkit-scrollbar { display: none; }
-            .step {
-                @apply flex items-center flex-shrink-0;
-            }
-            .step-number {
-                @apply w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 transition-all-300;
-            }
-            .step-number.active {
-                @apply bg-primary text-white;
-            }
-            .step-number.completed {
-                @apply bg-success text-white;
-            }
-            .step-title {
-                @apply ml-1.5 text-xs font-medium text-gray-500 whitespace-nowrap;
-            }
-            .step-title.active {
-                @apply text-primary;
-            }
-            .step-title.completed {
-                @apply text-success;
-            }
-            .step-line {
-                @apply flex-1 h-0.5 bg-gray-200 mx-2 min-w-4;
-            }
-            .step-line.active {
-                @apply bg-primary;
-            }
-            .step-line.completed {
-                @apply bg-success;
-            }
-            @media (max-width: 640px) {
-                .step-title { display: none; }
-                .step-title.active { display: inline; }
-                .calc-page-subtitle { display: none; }
-            }
-            .tax-budget-table {
-                @apply w-full border-collapse border border-gray-200 shadow-sm;
-                min-width: 700px;
-            }
-            /* 正向主表新增「税后到手」「累计收入」两列，需单独放宽最小宽度避免列被挤压 */
-            #tax-budget-table {
-                min-width: 900px;
-            }
-            /* 表头单行不折行，数据统一等宽数字，提升可读性 */
-            .tax-budget-table th {
-                @apply px-4 py-3.5 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200 leading-relaxed whitespace-nowrap;
-            }
-            .tax-budget-table td {
-                @apply px-4 py-3.5 text-sm text-gray-900 text-center border border-gray-200 leading-relaxed transition-colors hover:bg-blue-50/30;
-                font-variant-numeric: tabular-nums;
-            }
-            .tax-budget-table tr:nth-child(even) {
-                @apply bg-gray-50/50;
-            }
-            .tax-budget-table .section-title {
-                @apply font-semibold text-gray-800 bg-gray-100 py-2;
-            }
-            .tax-budget-table .highlight {
-                @apply font-bold text-primary;
-            }
-            .tax-budget-table .negative {
-                @apply text-danger font-medium;
-            }
-            .tax-budget-table .positive {
-                @apply text-success font-medium;
-            }
-            .overflow-x-auto {
-                overflow-x: auto;
-                overflow-y: hidden;
-                border-radius: 0.5rem;
-            }
-            .page-transition {
-                transition: opacity 0.2s ease, transform 0.2s ease;
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            .page-transition.active {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            .help-modal-scrollbar::-webkit-scrollbar {
-                width: 6px;
-            }
-            .help-modal-scrollbar::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            .help-modal-scrollbar::-webkit-scrollbar-thumb {
-                background-color: #cbd5e1;
-                border-radius: 3px;
-                border: 2px solid transparent;
-                background-clip: content-box;
-            }
-            .help-modal-scrollbar::-webkit-scrollbar-thumb:hover {
-                background-color: #94a3b8;
-            }
-            .help-modal-scrollbar {
-                scrollbar-width: thin;
-                scrollbar-color: #cbd5e1 transparent;
-            }
-            .loading-spinner {
-                border: 3px solid #f3f3f3;
-                border-top: 3px solid #3b82f6;
-                border-radius: 50%;
-                width: 24px;
-                height: 24px;
-                animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            .loading-overlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(255, 255, 255, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 0.5rem;
-                z-index: 10;
-            }
-            .dark .loading-overlay {
-                background: rgba(31, 41, 55, 0.8);
-            }
-            .btn:disabled {
-                @apply opacity-50 cursor-not-allowed;
-            }
-            .profile-card-hover {
-                @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5;
-            }
-            .menu-item-active {
-                @apply bg-primary/10 text-primary font-medium;
-            }
-
-            /* === 个人中心子页面顶栏 === */
-            .profile-sub-nav {
-                @apply sticky top-14 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 transition-all duration-200;
-                padding: 0.625rem 1rem;
-            }
-            .profile-sub-nav-inner {
-                @apply flex items-center relative max-w-4xl mx-auto;
-            }
-            .profile-sub-nav-back {
-                @apply flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-150 font-medium text-sm py-1.5 px-3 rounded-lg hover:bg-primary/5 cursor-pointer;
-            }
-            .profile-sub-nav-back:active {
-                @apply scale-95;
-            }
-            .profile-sub-nav-title {
-                @apply absolute left-1/2 -translate-x-1/2 text-gray-700 font-semibold text-sm pointer-events-none;
-                max-width: 70%;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .dark .profile-sub-nav {
-                @apply bg-gray-800/95 border-gray-700;
-            }
-            .dark .profile-sub-nav-title {
-                @apply text-gray-200;
-            }
-
-            /* 个人中心子页面顶栏：手机窄屏适配（加大返回热区、收紧留白） */
-            @media (max-width: 640px) {
-                .profile-sub-nav {
-                    padding: 0.5rem 0.5rem;
-                }
-                .profile-sub-nav-back {
-                    min-height: 40px;
-                    min-width: 40px;
-                    padding: 0.375rem 0.75rem;
-                }
-                .profile-sub-nav-back span {
-                    display: none;
-                }
-            }
-
-            /* === 个人中心主页（banner 与模块卡片用内联 Tailwind 工具类，避免维护重复 CSS） === */
-            /* 用户信息横幅上的头像圆角大块 */
-            .profile-avatar-tile {
-                @apply w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0;
-                box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
-            }
-
-            /* 页面切换过渡动画 */
-            .page-enter {
-                @apply animate-fade-in;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(4px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in {
-                animation: fadeIn 0.2s ease-out;
-            }
-
-            /* 用户下拉菜单入场右对齐（从右上角展开） */
-            @keyframes dropdownIn {
-                from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-                to { opacity: 1; transform: translateY(0) scale(1); }
-            }
-            .animate-dropdown {
-                animation: dropdownIn 0.16s ease-out;
-            }
-
-            /* === 阶段1：紧凑顶栏 + 首页卡片流 === */
-            .compact-nav { height: 56px; }
-            .compact-nav .nav-logo { height: 66px; width: auto; margin: -5px 0; }
-            .compact-nav .brand-name {
-                font-size: 1.05rem;
-                font-weight: 700;
-                letter-spacing: -0.01em;
-            }
-            .compact-nav .nav-icon-btn {
-                @apply p-2 rounded-full hover:bg-primary/80 transition-all-300;
-            }
-
-            /* 首页卡片 */
-            .home-card {
-                @apply bg-white rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 mb-3 sm:mb-4 transition-all-300;
-            }
-            .home-card-header {
-                @apply flex items-center justify-between mb-3;
-            }
-            .home-card-title {
-                @apply flex items-center text-sm font-medium text-gray-500;
-            }
-
-            /* 模式卡片 */
-            .mode-card {
-                @apply rounded-xl shadow-card cursor-pointer transition-all-300 flex flex-col items-center text-center relative overflow-hidden;
-                border: 1px solid transparent;
-                padding: 0.875rem 0.75rem 0.75rem;
-            }
-            @media (min-width: 640px) {
-                .mode-card {
-                    padding: 1.25rem 1rem 1rem;
-                }
-            }
-            .mode-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 3px;
-                transition: height 0.3s ease;
-            }
-            .mode-card:hover {
-                @apply shadow-card-hover;
-                transform: translateY(-3px);
-            }
-            .mode-card:hover::before { height: 5px; }
-            .mode-card:active {
-                transform: translateY(-1px) scale(0.97);
-                transition: transform 0.1s ease;
-            }
-
-            /* 4色变体：渐变背景 + 顶部彩条 */
-            .mode-card-primary { background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%); }
-            .mode-card-primary::before { background: #1e40af; }
-            .mode-card-accent { background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 70%); }
-            .mode-card-accent::before { background: #60a5fa; }
-            .mode-card-success { background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 70%); }
-            .mode-card-success::before { background: #10b981; }
-            .mode-card-secondary { background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%); }
-            .mode-card-secondary::before { background: #3b82f6; }
-
-            .dark .mode-card-primary,
-            .dark .mode-card-accent,
-            .dark .mode-card-success,
-            .dark .mode-card-secondary {
-                background: linear-gradient(135deg, rgba(30,41,59,0.6) 0%, #1f2937 70%);
-            }
-
-            /* 大图标 - 渐变填充 */
-            .mode-card-icon {
-                @apply w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3 text-xl sm:text-2xl text-white;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                transition: transform 0.3s ease;
-            }
-            .mode-card:hover .mode-card-icon { transform: scale(1.08); }
-            .mode-card-icon-primary { background: linear-gradient(135deg, #1e40af, #3b82f6); }
-            .mode-card-icon-accent { background: linear-gradient(135deg, #60a5fa, #93c5fd); }
-            .mode-card-icon-success { background: linear-gradient(135deg, #10b981, #34d399); }
-            .mode-card-icon-secondary { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
-
-            .mode-card-title {
-                @apply text-sm font-bold text-gray-800 mb-1;
-            }
-            .dark .mode-card-title { @apply text-gray-100; }
-            .mode-card-subtitle {
-                @apply text-xs text-gray-500;
-            }
-            .dark .mode-card-subtitle { @apply text-gray-400; }
-            .mode-card-info-btn {
-                @apply absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:bg-white hover:text-primary transition-all-300 z-10;
-            }
-            .dark .mode-card-info-btn { @apply hover:bg-gray-700; }
-
-            /* 最近计算横向滑动 */
-            .recent-scroll {
-                display: flex;
-                gap: 0.75rem;
-                overflow-x: auto;
-                scroll-snap-type: x mandatory;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: 0.5rem;
-            }
-            .recent-scroll::-webkit-scrollbar { height: 4px; }
-            .recent-scroll::-webkit-scrollbar-track { background: transparent; }
-            .recent-scroll::-webkit-scrollbar-thumb {
-                background: #cbd5e1;
-                border-radius: 2px;
-            }
-            .dark .recent-scroll::-webkit-scrollbar-thumb { background: #475569; }
-            .recent-card {
-                flex: 0 0 160px;
-                scroll-snap-align: start;
-                @apply bg-gray-50 rounded-lg p-3 cursor-pointer transition-all-300 border border-transparent;
-            }
-            @media (min-width: 640px) {
-                .recent-card { flex-basis: 180px; }
-            }
-            .dark .recent-card { @apply bg-gray-700; }
-            .recent-card:hover {
-                @apply bg-blue-50 shadow-md;
-                border-color: rgba(30, 64, 175, 0.2);
-            }
-            .dark .recent-card:hover { @apply bg-gray-600; }
-
-            /* 税务提醒项 */
-            .tax-reminder-item {
-                @apply flex items-start py-2 px-3 rounded-lg transition-colors cursor-pointer;
-            }
-            .tax-reminder-item:hover {
-                @apply bg-blue-50;
-            }
-            .dark .tax-reminder-item:hover { @apply bg-gray-700; }
-            .tax-reminder-dot {
-                @apply w-2 h-2 rounded-full mt-2 mr-3 flex-shrink-0;
-            }
-
-            /* 小贴士卡片 */
-            .tip-card {
-                @apply bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100;
-            }
-            .dark .tip-card {
-                @apply from-gray-700 to-gray-800 border-gray-600;
-            }
-
-            /* 卡片入场动画 */
-            @keyframes homeFadeInUp {
-                from { opacity: 0; transform: translateY(12px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .home-card {
-                animation: homeFadeInUp 0.4s ease-out backwards;
-            }
-            #mode-selection-page .home-card:nth-child(1) { animation-delay: 0.05s; }
-            #mode-selection-page .home-card:nth-child(2) { animation-delay: 0.1s; }
-            #mode-selection-page .home-card:nth-child(3) { animation-delay: 0.15s; }
-            #mode-selection-page .home-card:nth-child(4) { animation-delay: 0.2s; }
-            #mode-selection-page .home-card:nth-child(5) { animation-delay: 0.25s; }
-
-            /* 通知红点 */
-            .notification-dot {
-                position: absolute;
-                top: 6px;
-                right: 6px;
-                width: 8px;
-                height: 8px;
-                background: #ef4444;
-                border-radius: 50%;
-                border: 2px solid #1e40af;
-            }
-
-            /* 空状态 */
-            .home-empty-state {
-                @apply text-center py-6 text-gray-400 text-sm;
-            }
-            .home-empty-state i {
-                @apply text-3xl mb-2 block opacity-40;
-            }
-            .home-empty-state p {
-                @apply text-xs;
-            }
-            .home-empty-state .empty-hint {
-                @apply mt-2 inline-flex items-center text-[11px] text-primary/70 bg-primary/5 rounded-full px-3 py-1;
-            }
-
-            /* === 阶段2：计算页紧凑顶栏 + sticky预览条 === */
-            .calc-sticky-header {
-                @apply sticky top-14 z-30 bg-white/95 backdrop-blur border-b border-gray-100;
-                position: sticky;
-            }
-            /* 顶栏/底栏白底铺满视口宽度：此前白底只占容器宽度，
-               比下方卡片宽出一截又夹着灰缝，视觉上像悬空的独立白块，与卡片衔接生硬。
-               用负边距 + 补偿内边距铺满，内容位置保持不变。 */
-            .calc-sticky-header,
-            .calc-preview-bar {
-                margin-left: calc(50% - 50vw);
-                margin-right: calc(50% - 50vw);
-                padding-left: calc(50vw - 50%);
-                padding-right: calc(50vw - 50%);
-            }
-
-            .calc-top-row {
-                @apply flex items-center justify-between py-2 gap-2;
-            }
-            .calc-back-btn {
-                @apply w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-primary transition-all-300 flex-shrink-0;
-            }
-            .dark .calc-back-btn { @apply hover:bg-gray-700; }
-            .calc-title-wrap {
-                @apply ml-2 min-w-0 flex-1;
-            }
-            .calc-page-title {
-                @apply text-base font-bold text-gray-800 leading-tight truncate;
-            }
-            .dark .calc-page-title { @apply text-gray-100; }
-            .calc-page-subtitle {
-                @apply text-xs text-gray-500 leading-tight truncate;
-            }
-            .calc-action-btn {
-                @apply w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-primary transition-all-300 flex-shrink-0;
-            }
-            .dark .calc-action-btn { @apply hover:bg-gray-700; }
-
-            /* sticky 预览条 */
-            .calc-preview-bar {
-                @apply sticky bottom-0 bg-white z-30;
-                box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
-                border-top: 2px solid transparent;
-                border-image: linear-gradient(90deg, #1e40af 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
-            }
-            .calc-preview-grid {
-                @apply grid grid-cols-3 gap-2 py-2.5 px-4;
-            }
-            .calc-preview-item {
-                @apply text-center px-1;
-            }
-            .calc-preview-label {
-                @apply text-xs text-gray-500 mb-0.5;
-            }
-            .calc-preview-value {
-                @apply text-sm font-bold whitespace-nowrap;
-            }
-            .calc-preview-income { @apply text-primary; }
-            .calc-preview-deduction { @apply text-warning; }
-            .calc-preview-tax { @apply text-danger; }
-            .calc-preview-bar.is-result-step { @apply hidden; }
-
-            /* === 结果页视觉层次 === */
-            .result-hero {
-                @apply bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-5 text-center;
-            }
-            .result-hero-label { @apply text-sm text-gray-500 mb-1; }
-            .result-hero-value { @apply text-3xl font-bold text-primary; }
-            .result-hero-sub { @apply text-xs text-gray-500 mt-2 flex items-center justify-center gap-2; }
-            .result-hero-divider { @apply text-gray-300; }
-            .result-tax-bar { @apply mt-4; }
-            .result-tax-bar-track { @apply h-3 bg-gray-200 rounded-full overflow-hidden; }
-            .result-tax-bar-fill { @apply h-full bg-gradient-to-r from-blue-400 to-primary rounded-full transition-all duration-500; }
-            .dark .result-tax-bar-track { @apply bg-gray-700; }
-            .result-metric { @apply rounded-lg p-3 text-center; }
-            .result-metric-danger { @apply bg-red-50 border border-red-200; }
-            .result-metric-info { @apply bg-blue-50 border border-blue-200; }
-            .result-metric-success { @apply bg-green-50 border border-green-200; }
-            .dark .result-metric-danger { @apply bg-red-900/30 border-red-800; }
-            .dark .result-metric-info { @apply bg-blue-900/30 border-blue-800; }
-            .dark .result-metric-success { @apply bg-green-900/30 border-green-800; }
-            .result-metric-label { @apply text-xs text-gray-500 mb-1; }
-            .result-metric-value { @apply text-lg font-bold; }
-            .result-detail-list { @apply border rounded-lg overflow-hidden; }
-            .result-detail-row { @apply flex justify-between items-center px-4 py-2.5 text-sm border-b border-gray-100 last:border-b-0; }
-            .dark .result-detail-list { @apply border-gray-700; }
-            .dark .result-detail-row { @apply border-gray-700; }
-
-            @media (max-width: 640px) {
-                .calc-preview-value { @apply text-xs; }
-                .calc-preview-label { @apply text-[10px]; }
-                .calc-preview-grid { @apply py-2; }
-            }
-
-            /* 步骤内容增加上下留白：顶部与顶栏拉开呼吸感，底部避开预览条 */
-            .step-content { @apply pt-4 pb-4; }
-            .has-preview-bar .step-content { @apply pb-20; }
-
-            /* 宽屏下为计算页主体增加左右留白，避免步骤条与卡片紧贴屏幕边缘 */
-            @media (min-width: 640px) {
-                .step-content.max-w-5xl,
-                .calc-sticky-header > .max-w-5xl,
-                .calc-preview-bar > .max-w-5xl {
-                    padding-left: 1.5rem;
-                    padding-right: 1.5rem;
-                }
-            }
-
-            /* === 移动端创意细节优化 === */
-            @media (max-width: 640px) {
-                /* 输入框加大触摸区 */
-                .input-field {
-                    @apply py-2.5;
-                    min-height: 40px;
-                }
-                select.input-field {
-                    min-height: 40px;
-                }
-                /* 步骤数字加大触摸区 */
-                .step-number {
-                    @apply w-7 h-7;
-                }
-                /* 顶栏按钮加大 */
-                .calc-back-btn, .calc-action-btn {
-                    @apply w-9 h-9;
-                }
-                /* 预览条数值加大字重 */
-                .calc-preview-value {
-                    @apply font-bold;
-                }
-                /* 卡片圆角缩小 */
-                .home-card {
-                    @apply rounded-lg;
-                }
-                /* 模式卡片更紧凑 */
-                .mode-card {
-                    @apply rounded-lg;
-                }
-            }
-
-            /* 步骤进度文字（移动端显示） */
-            .step-progress-text {
-                @apply hidden;
-            }
-            @media (max-width: 640px) {
-                .step-progress-text {
-                    @apply inline-block text-[10px] text-gray-400 ml-auto;
-                }
-            }
-
-            /* 输入框聚焦增强 */
-            .input-field:focus {
-                box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.12);
-                border-color: #1e40af;
-            }
-            .dark .input-field:focus {
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-            }
-
-            /* 按钮按下反馈 */
-            .btn:active {
-                transform: scale(0.97);
-                transition: transform 0.1s ease;
-            }
-
-            /* 注册表单：必填星号与字段校验错误提示 */
-            .req-star {
-                font-style: normal;
-                margin-left: 2px;
-                color: inherit;
-            }
-            .label-danger,
-            .label-danger .req-star {
-                color: #dc2626 !important;
-            }
-            .field-error {
-                color: #dc2626;
-                @apply text-xs mt-1.5;
-            }
-        }
-
-        /* === 留资弹窗（阶段13B+）：成功态入场 ===
-           弹窗曾有一块原生 <details> 折叠的「顾虑答疑」，按要求已整体移除 ——
-           用户只需要填完信息等联系，不需要先读完三问三答；对应样式一并清掉，不留死代码 */
-        @keyframes lead-pop-in {
-            from { opacity: 0; transform: translateY(8px) scale(0.97); }
-            to { opacity: 1; transform: none; }
-        }
-        .lead-pop-in {
-            animation: lead-pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-        }
-        /* 尊重「减少动态效果」偏好：动画只是锦上添花 */
-        @media (prefers-reduced-motion: reduce) {
-            .lead-pop-in {
-                animation: none;
-            }
-        }
-
-        /* 铺满视口的顶栏/底栏会向两侧溢出，用 clip 裁掉溢出的几像素。
-           clip 不产生滚动容器，因此不会破坏 position: sticky；旧浏览器不支持时自动忽略。 */
-        @supports (overflow-x: clip) {
-            body { overflow-x: clip; }
-        }
-
-        /* 暗色模式基础样式 */
-        .dark body {
-            @apply bg-gray-900 text-gray-100;
-        }
-        .dark .card {
-            @apply bg-gray-800 text-gray-100;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-        }
-        .dark .input-field {
-            @apply border-gray-600 text-gray-100 placeholder-gray-500;
-            background-color: #374151;
-        }
-        .dark .input-field:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-            background-color: #374151;
-        }
-        .dark .label {
-            @apply text-gray-200;
-        }
-        .dark .text-gray-800 { @apply text-gray-100; }
-        .dark .text-gray-700 { @apply text-gray-200; }
-        .dark .text-gray-600 { @apply text-gray-300; }
-        .dark .text-gray-500 { @apply text-gray-400; }
-        .dark .bg-white { @apply bg-gray-800; }
-        .dark .bg-gray-50 { @apply bg-gray-900; }
-        .dark .bg-gray-100 { @apply bg-gray-700; }
-        .dark .bg-gray-200 { @apply bg-gray-700; }
-        .dark .border-gray-200 { @apply border-gray-700; }
-        .dark .border-gray-300 { @apply border-gray-600; }
-        .dark .hover\:bg-gray-100:hover { @apply hover:bg-gray-700; }
-        .dark .hover\:bg-gray-50:hover { @apply hover:bg-gray-700; }
-        .dark .hover\:text-gray-700:hover { @apply hover:text-gray-200; }
-        .dark .tax-budget-table th {
-            @apply bg-gray-700 text-gray-100 border-gray-600;
-        }
-        .dark .tax-budget-table td {
-            @apply text-gray-200 border-gray-600;
-        }
-        .dark .tax-budget-table tr:nth-child(even) {
-            @apply bg-gray-700/50;
-        }
-        .dark .tax-budget-table .section-title {
-            @apply text-gray-100 bg-gray-700;
-        }
-
-        /* === 深色模式增强：对比度与阴影（轻盈版） === */
-        .dark .home-card {
-            @apply bg-gray-800 border border-gray-700;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-        }
-        .dark .home-card:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        .dark .home-card-title {
-            @apply text-gray-200;
-        }
-        .dark .mode-card {
-            @apply bg-gray-800 border border-gray-700;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-        }
-        .dark .mode-card:hover {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2), 0 0 0 1px rgba(59,130,246,0.25);
-        }
-        .dark .recent-card {
-            @apply bg-gray-700 border border-gray-600;
-        }
-        .dark .recent-card:hover {
-            background-color: #4b5563;
-        }
-        .dark .calc-sticky-header {
-            @apply bg-gray-800/95 border-gray-700;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 1px 6px rgba(0,0,0,0.2);
-        }
-        .dark .calc-preview-bar {
-            @apply bg-gray-800;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.18);
-            border-image: linear-gradient(90deg, #3b82f6 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
-        }
-        .dark .calc-preview-value {
-            @apply text-gray-50;
-        }
-        .dark .calc-preview-label {
-            @apply text-gray-400;
-        }
-        .dark .step-number.active {
-            @apply bg-blue-600 text-white;
-            box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
-        }
-        .dark .step-number.completed {
-            @apply bg-green-700 text-white;
-        }
-        .dark .step-line {
-            @apply bg-gray-600;
-        }
-        .dark .tooltip .tooltip-text {
-            @apply bg-gray-700 text-gray-100 border border-gray-600;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        .dark .tooltip.is-open .tooltip-text {
-            @apply visible opacity-100;
-            pointer-events: auto;
-        }
-        .dark .btn-secondary {
-            @apply bg-gray-700 text-gray-100 border border-gray-600;
-        }
-        .dark .btn-secondary:hover {
-            @apply bg-gray-600;
-        }
-
-        /* 移动端深色模式：更轻盈的阴影 */
-        @media (max-width: 640px) {
-            .dark .home-card {
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-            }
-            .dark .mode-card {
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-            }
-            .dark .calc-sticky-header {
-                box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            }
-            .dark .calc-preview-bar {
-                box-shadow: 0 -1px 6px rgba(0,0,0,0.15);
-            }
-        }
-
-        /* ====== 悬浮税助手样式 ====== */
-        /* 44px 圆球：默认贴边半隐（只露月牙），hover/点击后完整滑出，可完全隐藏 */
-        .assistant-fab {
-            position: fixed;
-            left: auto;
-            top: auto;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: #ffffff;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
-            border: none;
-            font-size: 18px;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
-            /* 半隐位移由 JS 写入 --peek-x(px)，缩放叠加在其上，避免 transform 互相覆盖 */
-            --peek-x: 0px;
-            transform: translateX(var(--peek-x)) scale(1);
-            transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
-                        box-shadow 0.25s ease,
-                        opacity 0.25s ease;
-        }
-        .assistant-fab:hover {
-            transform: translateX(var(--peek-x)) scale(1.08);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-        }
-        .assistant-fab:active {
-            transform: translateX(var(--peek-x)) scale(0.95);
-        }
-        .assistant-fab.dragging {
-            transition: none !important;
-            transform: translateX(var(--peek-x)) scale(1.1);
-            cursor: grabbing;
-            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.55);
-        }
-        .assistant-fab-logo {
-            width: 32px;
-            height: 32px;
-            object-fit: contain;
-            border-radius: 50%;
-            pointer-events: none;
-        }
-        /* 半隐态：贴边只露月牙，稍降不透明度弱化存在感 */
-        .assistant-fab.assistant-fab--peek {
-            opacity: 0.5;
-        }
-        /* 完全隐藏态：移出视线，仅保留边缘热区可唤出 */
-        .assistant-fab.assistant-fab--hidden {
-            opacity: 0;
-            pointer-events: none;
-            transform: translateX(var(--peek-x)) scale(0.6);
-        }
-        /* 恢复热区：完全隐藏后仅此处可唤出悬浮球，位置与停靠边对齐 */
-        .assistant-fab-hotzone {
-            position: fixed;
-            width: 16px;
-            border-radius: 4px;
-            background: transparent;
-            z-index: 99;
-            display: none;
-        }
-        .assistant-fab-hotzone.active {
-            display: block;
-            cursor: pointer;
-        }
-        .assistant-fab-hotzone.active:hover {
-            background: rgba(59, 130, 246, 0.12);
-        }
-
-        .assistant-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            z-index: 200;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-        .assistant-overlay.assistant-overlay-visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .assistant-drawer {
-            position: fixed;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            width: 480px;
-            max-width: 100%;
-            background: white;
-            z-index: 201;
-            transform: translateX(100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
-        }
-        .assistant-drawer.assistant-drawer-open {
-            transform: translateX(0);
-        }
-        .dark .assistant-drawer {
-            background: #1f2937;
-        }
-
-        .assistant-header {
-            padding: 16px 20px;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            color: white;
-            flex-shrink: 0;
-        }
-        .assistant-header-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
-        .assistant-header-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .assistant-title {
-            font-size: 18px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .assistant-close {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-        .assistant-close:hover {
-            background: rgba(255, 255, 255, 0.35);
-        }
-
-        .assistant-search-wrap {
-            position: relative;
-        }
-        .assistant-search {
-            width: 100%;
-            padding: 10px 34px 10px 38px;
-            border-radius: 8px;
-            border: none;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.95);
-            color: #1f2937;
-            outline: none;
-            box-sizing: border-box;
-        }
-        .assistant-search::placeholder {
-            color: #9ca3af;
-        }
-        .assistant-search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            font-size: 14px;
-        }
-
-        .assistant-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px 20px;
-        }
-        .assistant-body::-webkit-scrollbar {
-            width: 5px;
-        }
-        .assistant-body::-webkit-scrollbar-thumb {
-            background: #d1d5db;
-            border-radius: 3px;
-        }
-        .dark .assistant-body::-webkit-scrollbar-thumb {
-            background: #4b5563;
-        }
-
-        .assistant-shortcuts {
-            display: grid;
-            /* 快捷功能已增至 5 个（新增「全部工具」）：用 auto-fit 让它按抽屉宽度自适应排布，
-               窄屏仍 4 个一行、第 5 个换行，宽屏一行放下 5 个 —— 比写死 4 列多一个孤零零的第二行好 */
-            grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .assistant-shortcut {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px 4px;
-            border-radius: 10px;
-            background: #f3f4f6;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 11px;
-            color: #4b5563;
-            gap: 4px;
-        }
-        .assistant-shortcut:hover {
-            background: #e5e7eb;
-            transform: translateY(-1px);
-        }
-        .assistant-shortcut i {
-            font-size: 18px;
-            color: #3b82f6;
-        }
-        .dark .assistant-shortcut {
-            background: #374151;
-            color: #d1d5db;
-        }
-        .dark .assistant-shortcut:hover {
-            background: #4b5563;
-        }
-
-        .assistant-categories {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
-        /* 阶段10B：政策要点更新提示条 */
-        .assistant-policy-banner {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            margin-bottom: 10px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1d4ed8;
-            font-size: 12px;
-            line-height: 1.6;
-        }
-        .assistant-policy-banner > i {
-            margin-top: 2px;
-            flex-shrink: 0;
-        }
-        .assistant-policy-banner > span {
-            flex: 1;
-        }
-        .assistant-policy-banner-close {
-            background: none;
-            border: none;
-            color: #60a5fa;
-            font-size: 12px;
-            cursor: pointer;
-            padding: 2px 4px;
-            flex-shrink: 0;
-        }
-        .assistant-policy-banner-close:hover {
-            color: #1e40af;
-        }
-        .dark .assistant-policy-banner {
-            background: #172554;
-            border-color: #1e3a8a;
-            color: #bfdbfe;
-        }
-        .dark .assistant-policy-banner-close {
-            color: #93c5fd;
-        }
-        .dark .assistant-policy-banner-close:hover {
-            color: #dbeafe;
-        }
-
-        .assistant-cat {
-            padding: 5px 12px;
-            border-radius: 16px;
-            border: 1px solid #e5e7eb;
-            background: white;
-            color: #6b7280;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .assistant-cat:hover {
-            border-color: #3b82f6;
-            color: #3b82f6;
-        }
-        .assistant-cat.assistant-cat-active {
-            background: #3b82f6;
-            border-color: #3b82f6;
-            color: white;
-        }
-        .dark .assistant-cat {
-            background: #374151;
-            border-color: #4b5563;
-            color: #d1d5db;
-        }
-        .dark .assistant-cat.assistant-cat-active {
-            background: #3b82f6;
-            border-color: #3b82f6;
-            color: white;
-        }
-
-        .assistant-qa-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .assistant-qa-item {
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            overflow: hidden;
-            transition: border-color 0.2s;
-        }
-        .assistant-qa-item:hover {
-            border-color: #93c5fd;
-        }
-        .dark .assistant-qa-item {
-            border-color: #4b5563;
-        }
-        .dark .assistant-qa-item:hover {
-            border-color: #60a5fa;
-        }
-
-        .assistant-qa-q {
-            display: flex;
-            align-items: center;
-            padding: 12px 14px;
-            cursor: pointer;
-            gap: 8px;
-            background: #f9fafb;
-            transition: background 0.2s;
-        }
-        .assistant-qa-q:hover {
-            background: #f3f4f6;
-        }
-        .dark .assistant-qa-q {
-            background: #374151;
-        }
-        .dark .assistant-qa-q:hover {
-            background: #4b5563;
-        }
-        .assistant-qa-icon {
-            color: #3b82f6;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        .assistant-qa-q-text {
-            flex: 1;
-            font-size: 13px;
-            font-weight: 500;
-            color: #1f2937;
-            line-height: 1.5;
-        }
-        .dark .assistant-qa-q-text {
-            color: #f3f4f6;
-        }
-        .assistant-qa-arrow {
-            font-size: 12px;
-            color: #9ca3af;
-            transition: transform 0.2s;
-            flex-shrink: 0;
-        }
-        .assistant-qa-a {
-            padding: 12px 14px;
-            font-size: 13px;
-            color: #4b5563;
-            line-height: 1.7;
-            background: white;
-            border-top: 1px solid #f3f4f6;
-        }
-        .dark .assistant-qa-a {
-            color: #d1d5db;
-            background: #1f2937;
-            border-top-color: #374151;
-        }
-        .assistant-mark {
-            background: #fef08a;
-            color: #1f2937;
-            padding: 0 2px;
-            border-radius: 2px;
-        }
-        .dark .assistant-mark {
-            background: #854d0e;
-            color: #fef3c7;
-        }
-
-        .assistant-empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: #9ca3af;
-        }
-        .assistant-empty i {
-            font-size: 36px;
-            margin-bottom: 12px;
-            display: block;
-        }
-        .assistant-empty p {
-            font-size: 14px;
-            margin-bottom: 4px;
-        }
-        .assistant-empty-hint {
-            font-size: 12px;
-            color: #d1d5db;
-        }
-
-        /* 搜索清空按钮 */
-        .assistant-search-clear {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #9ca3af;
-            font-size: 16px;
-            padding: 2px;
-            line-height: 1;
-        }
-        .assistant-search-clear:hover {
-            color: #6b7280;
-        }
-
-        /* 搜索历史 / 联想下拉 */
-        .assistant-suggest {
-            position: absolute;
-            top: calc(100% + 4px);
-            left: 20px;
-            right: 20px;
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            z-index: 50;
-            max-height: 260px;
-            overflow-y: auto;
-        }
-        .assistant-suggest-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            font-size: 11px;
-            color: #9ca3af;
-            border-bottom: 1px solid #f3f4f6;
-        }
-        .assistant-suggest-clear {
-            background: none;
-            border: none;
-            color: #3b82f6;
-            font-size: 11px;
-            cursor: pointer;
-            padding: 0;
-        }
-        .assistant-suggest-item {
-            padding: 9px 12px;
-            font-size: 13px;
-            color: #374151;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.15s;
-        }
-        .assistant-suggest-item:hover,
-        .assistant-suggest-item.suggest-active {
-            background: #eff6ff;
-            color: #1d4ed8;
-        }
-        .assistant-suggest-item i {
-            color: #9ca3af;
-            font-size: 12px;
-            flex-shrink: 0;
-        }
-        .assistant-suggest-item .sg-text {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .dark .assistant-suggest {
-            background: #1f2937;
-            border-color: #4b5563;
-        }
-        .dark .assistant-suggest-head {
-            border-bottom-color: #374151;
-        }
-        .dark .assistant-suggest-item {
-            color: #d1d5db;
-        }
-        .dark .assistant-suggest-item:hover,
-        .dark .assistant-suggest-item.suggest-active {
-            background: #374151;
-            color: #93c5fd;
-        }
-
-        /* 热门问题区 */
-        .assistant-hot {
-            margin-bottom: 14px;
-        }
-        .assistant-hot-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #6b7280;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .assistant-hot-title i {
-            color: #ef4444;
-        }
-        .assistant-hot-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-        .assistant-hot-chip {
-            padding: 5px 11px;
-            border-radius: 14px;
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #b91c1c;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .assistant-hot-chip:hover {
-            background: #fee2e2;
-            transform: translateY(-1px);
-        }
-        .dark .assistant-hot-title {
-            color: #9ca3af;
-        }
-        .dark .assistant-hot-chip {
-            background: rgba(239, 68, 68, 0.12);
-            border-color: rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-        }
-        .dark .assistant-hot-chip:hover {
-            background: rgba(239, 68, 68, 0.2);
-        }
-
-        /* 收藏筛选 chip（带星标） */
-        .assistant-cat.assistant-cat-fav {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .assistant-cat.assistant-cat-fav i {
-            font-size: 11px;
-        }
-        .assistant-cat.assistant-cat-fav.assistant-cat-active {
-            background: #f59e0b;
-            border-color: #f59e0b;
-            color: white;
-        }
-
-        /* Q&A 答案底部操作栏 */
-        .assistant-qa-footer {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 12px;
-            padding-top: 10px;
-            border-top: 1px dashed #e5e7eb;
-            flex-wrap: wrap;
-        }
-        .assistant-fav-btn {
-            background: none;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 4px 10px;
-            font-size: 12px;
-            color: #6b7280;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.2s;
-        }
-        .assistant-fav-btn:hover {
-            border-color: #f59e0b;
-            color: #f59e0b;
-        }
-        .assistant-fav-btn.fav-active {
-            background: #fef3c7;
-            border-color: #f59e0b;
-            color: #b45309;
-        }
-        .assistant-fav-btn.fav-active i {
-            color: #f59e0b;
-        }
-        .assistant-feedback {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: #9ca3af;
-        }
-        .assistant-fb-btn {
-            background: none;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 4px 10px;
-            font-size: 12px;
-            color: #6b7280;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.2s;
-        }
-        .assistant-fb-btn:hover {
-            border-color: #3b82f6;
-            color: #3b82f6;
-        }
-        .assistant-fb-btn.fb-clicked {
-            background: #eff6ff;
-            border-color: #3b82f6;
-            color: #1d4ed8;
-        }
-        .assistant-fb-btn.fb-clicked.fb-bad {
-            background: #fef2f2;
-            border-color: #ef4444;
-            color: #b91c1c;
-        }
-        .assistant-fb-count {
-            font-size: 11px;
-            color: #9ca3af;
-        }
-        .assistant-related-btn {
-            margin-left: auto;
-            background: #3b82f6;
-            border: none;
-            border-radius: 14px;
-            padding: 5px 12px;
-            font-size: 12px;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.2s;
-        }
-        .assistant-related-btn:hover {
-            background: #2563eb;
-            transform: translateY(-1px);
-        }
-
-        /* API 同步中指示器：按钮半透明 + 脉冲动画 + 小转圈 */
-        .api-syncing {
-            opacity: 0.65;
-            pointer-events: none;
-            position: relative;
-        }
-        .api-syncing::after {
-            content: '';
-            position: absolute;
-            right: 6px;
-            top: 50%;
-            width: 8px;
-            height: 8px;
-            margin-top: -4px;
-            border: 1.5px solid currentColor;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: api-spin 0.6s linear infinite;
-        }
-        @keyframes api-spin {
-            to { transform: rotate(360deg); }
-        }
-        .dark .assistant-qa-footer {
-            border-top-color: #374151;
-        }
-        .dark .assistant-fav-btn,
-        .dark .assistant-fb-btn {
-            border-color: #4b5563;
-            color: #9ca3af;
-        }
-        .dark .assistant-fav-btn.fav-active {
-            background: rgba(245, 158, 11, 0.15);
-            color: #fbbf24;
-        }
-        .dark .assistant-fb-btn.fb-clicked {
-            background: rgba(59, 130, 246, 0.15);
-            color: #93c5fd;
-        }
-
-        /* 移动端适配 */
-        @media (max-width: 640px) {
-            .assistant-drawer {
-                width: 100%;
-            }
-            .assistant-header {
-                padding: 12px 16px;
-            }
-            .assistant-title {
-                font-size: 16px;
-            }
-            .assistant-body {
-                padding: 12px 16px;
-            }
-            .assistant-suggest {
-                left: 16px;
-                right: 16px;
-                max-height: 200px;
-            }
-            .assistant-shortcuts {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            /* 修复：iOS Safari 对 font-size < 16px 的 input 会自动缩放页面 */
-            .assistant-search {
-                font-size: 16px;
-            }
-            /* 修复：快捷功能文字过小 */
-            .assistant-shortcut {
-                font-size: 12px;
-            }
-            /* 修复：触摸区偏小，增大 padding 至接近 44px 触摸标准 */
-            .assistant-cat {
-                padding: 8px 14px;
-            }
-            .assistant-hot-chip {
-                padding: 8px 13px;
-            }
-            .assistant-fav-btn {
-                padding: 6px 12px;
-            }
-            .assistant-fb-btn {
-                padding: 6px 12px;
-            }
-            .assistant-related-btn {
-                padding: 7px 14px;
-            }
-        }
-
-        /* 深色模式 */
-        .dark .assistant-fab {
-            background: linear-gradient(135deg, #2563eb, #4f46e5);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-        }
-        .dark .assistant-overlay {
-            background: rgba(0, 0, 0, 0.6);
-        }
-
-        /* 初始化遮罩：auth-ui 加载完成前隐藏登录页和应用容器，防止旧UI闪现 */
-        body:not(.auth-ready) #login-page,
-        body:not(.auth-ready) #app-container {
-            visibility: hidden !important;
-        }
-        body.auth-ready #init-splash {
-            display: none !important;
-        }
-        #init-splash {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #2563eb, #4f46e5);
-        }
-        #init-splash .splash-content {
-            text-align: center;
-        }
-        #init-splash .splash-logo {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
-            animation: splash-pulse 1.2s ease-in-out infinite;
-        }
-        @keyframes splash-pulse {
-            0%, 100% { opacity: 0.7; transform: scale(0.95); }
-            50% { opacity: 1; transform: scale(1.05); }
-        }
-    </style>
+    <!-- Tailwind v3 产物：构建期编译（npm run build:css），不再走 cdn.tailwindcss.com 运行时。
+         为什么必须离线编译：Play CDN 把 config 交给编译器那一步在本项目实测失效
+         （运行时 window.tailwind.config 恒为 {}），于是 `@apply shadow-card` 解析不到
+         主题扩展而抛 CssSyntaxError；而它一遇 @apply 失败就**整份样式表不注入** ——
+         用户看到的是「整页裸奔」而不是「少几条样式」，控制台只留一行，极难定位。
+         位置放在 head 末尾是为了与旧运行时一致（Play CDN 同样是 append 到 head 尾部），
+         换位置会改变 tokens.css / toolbox.css 与工具类之间的先后关系。 -->
+    <link rel="stylesheet" href="src/css/tailwind.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 初始化遮罩：auth-ui 加载完成后自动隐藏，防止旧UI闪现 -->
@@ -1960,6 +322,14 @@
                     <button type="button" id="reset-submit" class="btn btn-primary w-full py-3 text-lg">
                         重置密码
                     </button>
+                    <!-- 阶段10 口径：游客（未登录）= 免费版全功能，不做登录前置 ——
+                         入口做得克制但明确：不替代登录，只是给「先算一次」留出一条路 -->
+                    <div class="mt-5 pt-4 border-t border-gray-100 text-center">
+                        <button type="button" id="guest-entry-btn" class="text-sm text-gray-600 hover:text-primary transition-colors">
+                            免登录使用 →
+                        </button>
+                        <p class="text-xs text-gray-400 mt-1.5">不注册也能用全部计税功能，数据仅存本机</p>
+                    </div>
                 </div>
                 
             </div>
@@ -1999,6 +369,13 @@
                     <button id="help-btn" class="nav-icon-btn" title="使用帮助">
                         <i class="fa fa-question-circle"></i>
                     </button>
+                    <!-- 游客会话（免登录使用）时唯一的登录入口：非游客一律隐藏。
+                         此前 index.html 里没有 auth-section，登录墙被拆掉后必须补一个回来的路 -->
+                    <button id="guest-login-btn" type="button"
+                            class="hidden inline-flex items-center gap-1.5 rounded-full border border-white/40 px-3 py-1.5 text-xs text-white hover:bg-white/10 transition-colors"
+                            title="登录 / 注册">
+                        <i class="fa fa-user-o"></i><span>登录</span>
+                    </button>
                     <div id="user-menu" class="ml-2">
                         <div class="relative flex items-center gap-1.5">
                             <button id="topbar-plan-badge" type="button" title="查看版本与权益" class="hidden items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold leading-none"></button>
@@ -2022,11 +399,26 @@
             </div>
         </nav>
 
+        <!-- ====== 顶部 Tab 行（桌面形态，≥768px） ======
+             与底部 Tab 栏共用同一份数据与显隐规则（toolbox-ui 的 syncNav() 统一驱动），
+             两套 DOM 是同一状态的两种投影 —— 为什么不用一套：手机放底部才在拇指热区，
+             桌面放底部是横贯 1440px 的通栏，既浪费横向空间也违背桌面「导航在上」的惯例。
+             小屏由 md:block 隐藏（纯展示层折叠），显隐逻辑仍由 syncNav() 判断，两者不冲突。 -->
+        <nav id="top-tabbar" class="top-tabbar hidden md:block sticky top-14 z-40 bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700" aria-label="主导航">
+            <div class="container mx-auto px-4 h-11 flex items-center gap-1">
+                <button type="button" class="top-tab" data-tab="mode-selection-page">首页</button>
+                <button type="button" class="top-tab" data-tab="tools-page">工具</button>
+                <button type="button" class="top-tab" data-tab="profile-page">我的</button>
+            </div>
+        </nav>
+
         <!-- 主内容区 -->
         <div class="container mx-auto px-4 pt-4">
         <!-- 工作台首页（卡片流） -->
         <div id="mode-selection-page" class="page active">
-            <div class="max-w-5xl mx-auto pt-2 pb-6">
+            <!-- data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。
+                 别改成用宽度工具类选择容器 —— 宽度会被反复调，锚点不能跟着漂。 -->
+            <div class="max-w-5xl mx-auto pt-2 pb-6" data-page-container>
 
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
@@ -2146,7 +538,13 @@
              早期把「深度测算」与「工具箱」并列，那是实现形态的分界（向导 vs 一屏算完），
              不是用户心智的分界 —— 现在形态差异降为最后一组的一行说明。 -->
         <div id="tools-page" class="page hidden">
-            <div class="max-w-3xl mx-auto py-4 px-4">
+            <!-- 容器原为 max-w-3xl(768px)：20 个速算器挤在窄栏里纵向排开，
+                 桌面右侧白白空出一条。改 max-w-5xl(1024px)，与首页同一栅格 ——
+                 换页时留白不跳，视觉上才像同一个 App。
+                 反向提醒：速算器页不要跟着加宽。它是表单，要守 65–75 字符行宽，
+                 令牌 --c-narrow(720px) 就是为它设的。列表宜宽、表单宜窄，不是同一件事。
+                 data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。 -->
+            <div class="max-w-5xl mx-auto py-4 px-4" data-page-container>
                 <div class="tool-search-wrap">
                     <i class="fa fa-search tool-search-icon"></i>
                     <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
@@ -2213,11 +611,21 @@
                             <button id="reverse-mode-btn" class="hidden"></button>
                         </div>
                     </div>
+                    <!-- 阶段17「通用多步测算向导」接线位：
+                         注册表中「尚无静态卡片」的 deep 工具由 renderDeepEntries() 动态追加至此。
+                         当前 deep 恰好 4 个且全部已有静态卡 → 本容器恒为空且不占位，
+                         所见即所得与改动前完全一致；新增 deep 税种后无需再改本文件。 -->
+                    <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
                 </div>
             </div>
         </div>
 
         <!-- 通用速算器页（20 个税种共用：表单由 tool-registry 的 schema 渲染，计算调用 *-quick.js） -->
+        <!-- 阶段17：通用多步测算向导容器 —— 所有 status:'deep' 且**没有独立 pageId** 的税种共用此容器，
+             内容由 deep-wizard-ui.js 按注册表的 steps / fields 渲染。
+             今后新增一个完整测算只需在 tool-registry.js 加一条 spec，不必再改本文件。 -->
+        <div id="deep-wizard-page" class="page hidden has-preview-bar"></div>
+
         <div id="quick-calculator-page" class="page hidden">
             <div class="max-w-3xl mx-auto py-4 px-4">
                 <!-- 顶部：返回 + 标题 + 政策时效 -->
@@ -2253,10 +661,32 @@
                         </div>
                     </div>
                     <div id="quick-result"></div>
+                    <!-- 免责声明（Phase 2 补齐：结果页就地声明，不藏在页脚）
+                         此前 20 个速算器的屏幕上没有免责，而导出报告与分享图都有 ——
+                         可带走的东西有声明、看得最久的那一屏反而没有。文案与 SEO 落地页同源。 -->
+                    <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
                 </div>
 
                 <!-- 易错口径 -->
                 <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
+
+                <!-- 政策依据（页内展开，不外跳）
+                     微信 / PWA standalone 里打开外部链接会被拦，或直接跳出应用 —— 用户等于拿不到依据。
+                     而「这个数按哪条政策算的」恰恰是财务 HR 要带走给老板的那一句，只能就地读完。
+                     数据来自 tax-registry 的 basisOf（页面从不自己写文号），缺省隐藏、有则展开。 -->
+                <details id="quick-policy-basis" class="home-card mt-3 hidden">
+                    <summary class="cursor-pointer list-none flex items-center justify-between">
+                        <span class="flex items-center text-sm font-medium text-gray-700">
+                            <i class="fa fa-book text-primary mr-2"></i>政策依据
+                        </span>
+                        <i class="fa fa-angle-down text-gray-400 text-xs"></i>
+                    </summary>
+                    <div class="mt-2">
+                        <div id="quick-policy-basis-body" class="text-xs text-gray-600 space-y-2"></div>
+                        <!-- 给复制而不是给外链：文号可直接粘进报告或聊天，且不依赖网络跳转 -->
+                        <button type="button" id="quick-basis-copy" class="mt-2 text-[11px] text-primary hover:underline">复制政策文号</button>
+                    </div>
+                </details>
 
                 <!-- 算完还能干什么：相关工具 + 保存历史（结果页不该是终点） -->
                 <div id="quick-next" class="home-card mt-3 hidden"></div>
@@ -2982,20 +1412,42 @@
                                 </div>
                             </div>
 
-                            <!-- 关键指标卡片 -->
-                            <div class="grid grid-cols-2 gap-3 mt-4">
-                                <div class="result-metric result-metric-danger">
-                                    <div class="result-metric-label">年度应纳税额</div>
-                                    <div class="result-metric-value text-danger" id="result-total-tax">¥0</div>
-                                </div>
-                                <div class="result-metric result-metric-info">
-                                    <div class="result-metric-label">应退/应补税额</div>
-                                    <div class="result-metric-value text-primary" id="result-refund-tax">¥0</div>
-                                </div>
+                            <!-- 结论（Phase 2）：补 / 退 / 不退不补 + 下一步动作 -->
+                            <div id="result-conclusion" class="result-conclusion is-even mt-4">
+                                    <!-- 结论 head：文本格式被 lead-context / 分享图依赖，不可改 -->
+                                    <div class="result-conclusion-head" id="result-refund-tax">¥0</div>
+                                    <div class="result-conclusion-sub" id="result-conclusion-action"></div>
                             </div>
 
-                            <!-- 次要指标 -->
-                            <div class="result-detail-list mt-4">
+                            <!-- 一句话理由（Phase 2）：为什么是这个结论 -->
+                            <p id="result-reason" class="result-reason"></p>
+
+                            <!-- 推导链（折叠，默认收起） -->
+                            <details id="formula-steps-panel" class="mt-4 hidden">
+                                <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                    <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
+                                    <span class="text-xs text-gray-500">每一步都可核对</span>
+                                </summary>
+                                <div id="formula-steps-body" class="mt-3"></div>
+                            </details>
+
+                            <!-- pitfalls（Phase 2）：本次结果最该注意的 2-3 条 -->
+                            <div id="result-pitfalls" class="result-pitfall hidden">
+                                <div class="result-pitfall-head"><i class="fa fa-exclamation-triangle mr-2"></i>注意</div>
+                                <ul id="result-pitfall-list"></ul>
+                            </div>
+
+                            <!-- 明细（Phase 2：默认折叠，展开状态本地记忆） -->
+                            <details id="result-details-panel" class="mt-4">
+                                <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                    <span><i class="fa fa-list mr-2"></i>查看明细</span>
+                                    <span class="text-xs text-gray-500">应纳税额与扣除来源</span>
+                                </summary>
+                                <div class="result-detail-list mt-3">
+                                <div class="result-detail-row">
+                                    <span class="text-gray-600">年度应纳税额</span>
+                                    <span class="font-medium text-danger" id="result-total-tax">¥0</span>
+                                </div>
                                 <div class="result-detail-row">
                                     <span class="text-gray-600">应纳税所得额</span>
                                     <span class="font-medium" id="result-taxable-income">¥0</span>
@@ -3012,16 +1464,11 @@
                                     <span class="text-gray-600">全年累计已预缴税额</span>
                                     <span class="font-medium" id="result-prepaid-tax">¥0</span>
                                 </div>
-                            </div>
-
-                            <!-- 计算过程透明化：逐步展示公式与数据来源（阶段12 A2） -->
-                            <details id="formula-steps-panel" class="mt-4 hidden">
-                                <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
-                                    <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
-                                    <span class="text-xs text-gray-500">每一步都可核对</span>
-                                </summary>
-                                <div id="formula-steps-body" class="mt-3"></div>
+                                </div>
                             </details>
+
+                            <!-- 免责声明（Phase 2）：结果页就地声明，不藏在页脚 -->
+                            <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
 
                             <div class="mt-6">
                                 <button id="save-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
@@ -4106,6 +2553,18 @@
                                     <span class="font-medium text-success text-lg" id="reverse-result-net-income">¥0</span>
                                 </div>
                             </div>
+
+                            <!-- 计算过程透明化：台账 C —— 四个完整测算页共用一套推导链实现 -->
+                            <details id="formula-steps-panel-reverse" class="mt-4 hidden">
+                                <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                    <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
+                                    <span class="text-xs text-gray-500">每一步都可核对</span>
+                                </summary>
+                                <div id="formula-steps-body-reverse" class="mt-3"></div>
+                            </details>
+
+                            <!-- 免责声明（Phase 2 补齐：四处结果页就地声明，不藏在页脚） -->
+                            <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
                         </div>
                         
                         <div class="mt-6">
@@ -5034,6 +3493,18 @@
                                     </div>
                                 </div>
 
+                                <!-- 计算过程透明化：台账 C —— 四个完整测算页共用一套推导链实现 -->
+                                <details id="formula-steps-panel-business" class="mt-4 hidden">
+                                    <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                        <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
+                                        <span class="text-xs text-gray-500">每一步都可核对</span>
+                                    </summary>
+                                    <div id="formula-steps-body-business" class="mt-3"></div>
+                                </details>
+
+                                <!-- 免责声明（Phase 2 补齐：四处结果页就地声明，不藏在页脚） -->
+                                <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
+
                                 <div class="mt-6">
                                     <button id="save-business-result-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
                                         <i class="fa fa-save mr-2"></i>保存计算结果
@@ -5320,6 +3791,18 @@
                                         <span class="font-medium" id="classification-result-taxable-income">¥0</span>
                                     </div>
                                 </div>
+
+                                <!-- 计算过程透明化：台账 C —— 四个完整测算页共用一套推导链实现 -->
+                                <details id="formula-steps-panel-classification" class="mt-4 hidden">
+                                    <summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">
+                                        <span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>
+                                        <span class="text-xs text-gray-500">每一步都可核对</span>
+                                    </summary>
+                                    <div id="formula-steps-body-classification" class="mt-3"></div>
+                                </details>
+
+                                <!-- 免责声明（Phase 2 补齐：四处结果页就地声明，不藏在页脚） -->
+                                <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
 
                                 <div class="mt-6">
                                     <button id="save-classification-calculation-btn" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">
@@ -5989,7 +4472,8 @@
                 <p><strong>一、信息收集</strong></p>
                 <p>1. 注册信息：邮箱（用于登录和验证码）、用户名、密码（加密存储）、手机号（选填）。</p>
                 <p>2. 使用数据：您的计算记录默认仅保存在浏览器本地（localStorage），支持离线使用与本地历史查询，本应用不会自动将计算记录上传至服务器。登录状态下，为改进产品体验，我们会匿名记录您使用的计算功能类型与次数（例如"综合所得 / 经营所得 / 反向倒算"），不含任何收入、扣除额等具体输入数据，且不与您的账号画像关联。</p>
-                <p>3. 本应用不收集您的位置信息、设备标识或其他敏感个人信息。</p>
+                <p>3. 填写草稿：多步计税过程中已填写的内容（含月收入、各项扣除等）会自动暂存为<strong>本地草稿</strong>，仅供您下一次进入同一流程时接着填写；草稿<strong>仅保存在您本机浏览器（localStorage），不会上传服务器，也不会进入云同步</strong>，距上次填写超过 7 天自动清除。您可在页面顶部的草稿提示条上一键「清除重填」，退出登录时草稿随本地数据一并清除。</p>
+                <p>4. 本应用不收集您的位置信息、设备标识或其他敏感个人信息。</p>
 
                 <p><strong>二、信息使用</strong></p>
                 <p>1. 注册信息仅用于账号管理和身份验证。</p>
@@ -6068,7 +4552,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.37.11</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.41.1</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -6219,7 +4703,7 @@
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
                             <h4 class="text-xs font-bold text-gray-800">补充信息</h4>
-                            <span class="text-[11px] text-gray-400 ml-auto">城市必填，其余选填</span>
+                            <span class="text-[11px] text-gray-400 ml-auto">全部选填</span>
                         </div>
                         <div class="space-y-3">
                             <!-- 所在城市：计算页不再让用户选参保城市（各地口径差异大，选错反而误导），
@@ -6229,9 +4713,12 @@
                                  省级不是「只是筛选器」：省份也随表单提交（lead-modal.collectPayload），
                                  顾问方可按省收敛分派、并按「省 + 市」认出重名地市（吉林市 / 海南藏族自治州）。
                                  「其他 / 海外」与城市的「其他（手动输入）」项是兜底：行政区划不可能穷尽
-                                 （县级市 / 境外），不能把用户卡在本就必填的这一项上 -->
+                                 （县级市 / 境外）。
+                                 必填 → 选填（2026-09）：城市对顾问有用，但不值得用它卡住提交 ——
+                                 后端 buildLead 本就只做长度约束，前端过去多拦一道等于凭空丢弃 lead_submit。
+                                 控件位置与建议文案保留（大多数人仍会顺手选），只是不再阻断。 -->
                             <div>
-                                <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-red-500">*</span></label>
+                                <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-gray-400 text-[11px]">选填，便于按当地口径核对</span></label>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div class="relative">
                                         <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -6336,8 +4823,17 @@
     <!-- 阶段13D：DOM 截图公共层（PDF 导出与分享图共用；必须早于 navigation-ui.js 加载） -->
     <script src="src/js/export/capture.js"></script>
     <script src="src/js/data/tax-assistant.js"></script>
+    <!-- Phase 2.5 ①：通用单调求解器（solver.js）。零算法分支、零税务口径，
+         但必须早于 tax-calculator.js 与两个 quick 模块 —— 它们在函数体里直接引用 window.EuriskoSolver -->
+    <script src="src/js/calculation/solver.js"></script>
     <script src="src/js/calculation/tax-calculator.js"></script>
     <script src="src/js/calculation/helper-functions.js"></script>
+    <!-- Phase 1.5：运行时环境识别 + 结果交付兜底（微信 / App 内置浏览器导出被拦时改用长图 + 文本）。
+         必须早于 navigation-ui.js 加载 —— exportToPDF 在保存前要读它。 -->
+    <script src="src/js/utils/runtime-env.js"></script>
+    <!-- Phase 1.5：页面导航与浏览器 History 同步（PWA standalone 下返回手势不再直接退出应用）。
+         必须早于 auth-ui.js —— 后者由 app.js 动态 import，这里静态加载才会先就位。 -->
+    <script src="src/js/utils/page-history.js"></script>
     <script src="src/js/ui/navigation-ui.js"></script>
     <script src="src/js/utils/mock-client.js"></script>
     <script src="src/js/ui/tax-assistant-ui.js"></script>
@@ -6376,11 +4872,23 @@
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>
     <script src="src/js/ui/toolbox-ui.js"></script>
+    <!-- 阶段17 通用多步测算向导：复用 toolbox-ui 暴露的 fieldHtml / readValues / visibleFields / fmtValue，
+         必须排在 toolbox-ui.js 之后 -->
+    <script src="src/js/ui/deep-wizard-ui.js"></script>
     <!-- 备案信息（ICP / 公安）：备案号为空时不渲染，下发后只改 site-filing-ui.js 的配置 -->
     <script src="src/js/ui/site-filing-ui.js"></script>
     <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->
     <script src="src/js/auth/plan.js"></script>
     <script src="src/js/data/history-sync.js"></script>
+    <!-- Phase 1：多步计税流程的本地草稿（断点续算）—— 手机上填到第三步被打断也不丢。
+         收入 / 五险一金属个保法敏感个人信息：只存本机 localStorage（独立 euriskoDraft: 命名空间，
+         不进云同步链路），7 天自动过期，恢复条上明示并支持一键清除，退出登录随本地数据一并清。 -->
+    <script src="src/js/data/draft-store.js"></script>
+    <!-- 阶段14：任务页（多步计税）固定层预算 —— 只负责标记「当前页是不是多步任务」，
+         窄屏怎么折叠全局顶栏与步骤条由 CSS 决定（桌面端形态零变化） -->
+    <script src="src/js/ui/task-mode.js"></script>
+    <!-- 游客会话：免登录使用的状态机（session 级，关掉标签页即失效） -->
+    <script src="src/js/auth/guest-session.js"></script>
     <!-- 阶段11：内容中心同步（政策要点全员可见 + 更新公告/运营内容 feed） -->
     <script src="src/js/data/tax-policy.js"></script>
     <!-- 阶段11：内容中心 UI（启动弹窗 / 首页公告条 / 个人中心公告列表） -->
@@ -6927,18 +5435,17 @@
         </div>
     </footer>
 
-    <!-- ====== 底部 Tab 栏 ======
-         只在顶层页出现（首页 / 工具 / 助手 / 我的）：计算页有自己的预览条与返回逻辑，
-         两层底栏会打架，也会把「结果」按钮顶出屏幕。显隐由 toolbox-ui 的 updateTabBar 统一控制。 -->
+    <!-- ====== 底部 Tab 栏（手机形态，<768px） ======
+         只在顶层页出现（首页 / 工具 / 我的）：计算页有自己的预览条与返回逻辑，
+         两层底栏会打架，也会把「结果」按钮顶出屏幕。显隐由 toolbox-ui 的 syncNav() 统一控制。
+         「助手」已移出：它是情境动作（悬浮球 + 结果页情境入口），不是目的地，
+         占一个 Tab 位会把真正的主目的地挤走。 -->
     <nav id="bottom-tabbar" class="bottom-tabbar hidden" aria-label="主导航">
         <button type="button" class="bottom-tab" data-tab="mode-selection-page">
             <i class="fa fa-home"></i><span>首页</span>
         </button>
         <button type="button" class="bottom-tab" data-tab="tools-page">
             <i class="fa fa-th-large"></i><span>工具</span>
-        </button>
-        <button type="button" class="bottom-tab" data-tab="assistant">
-            <i class="fa fa-comments"></i><span>助手</span>
         </button>
         <button type="button" class="bottom-tab" data-tab="profile-page">
             <i class="fa fa-user"></i><span>我的</span>

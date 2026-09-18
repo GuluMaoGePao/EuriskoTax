@@ -100,6 +100,23 @@
             '</style>';
     }
 
+    // 政策依据：与结果页同一份数据源（registry.basisOf），页面绝不自己写文号。
+    // 同样不给外链 —— 打印出来的 PDF 点不了链接，用户要的只是「按哪条政策算的」这一行文号。
+    function basisHtml(tool) {
+        var reg = window.EuriskoTaxRegistry;
+        var key = tool && tool.policyKey;
+        if (!key || !reg || typeof reg.basisOf !== 'function') return '';
+        try {
+            var list = reg.basisOf(key) || [];
+            if (!list.length) return '';
+            return '<div class="qr-h">政策依据</div><ul>' + list.map(function (b) {
+                return '<li>' + esc([b.doc, b.title].filter(Boolean).join(' —— ')) + '</li>';
+            }).join('') + '</ul>';
+        } catch (e) {
+            return '';
+        }
+    }
+
     function buildDocHtml(tool, values, out, now) {
         if (!tool || !out) return '';
         var d = now || new Date();
@@ -127,6 +144,7 @@
             : '';
 
         var policy = policyLine(tool);
+        var basis = basisHtml(tool);
 
         return styles() +
             '<div class="qr">' +
@@ -142,6 +160,7 @@
             (inputsHtml ? '<div class="qr-h">测算输入</div><table>' + inputsHtml + '</table>' : '') +
             (out.note ? '<div class="qr-note">' + esc(out.note) + '</div>' : '') +
             pitfalls +
+            basis +
             (policy ? '<div class="qr-note">政策时效：' + esc(policy) + '</div>' : '') +
             '<div class="qr-foot">本报告由 EuriskoTax 在本地浏览器完成计算并生成，计算过程不上传任何数据；' +
             '结果为测算参考，实际纳税请以税务机关核算为准。</div>' +
@@ -187,8 +206,10 @@
         fmtInput: fmtInput,
         fmtValue: fmtValue,
         policyLine: policyLine,
+        basisHtml: basisHtml,
         pure: {
             buildDocHtml: buildDocHtml,
+            basisHtml: basisHtml,
             filename: filename,
             fmtInput: fmtInput,
             fmtValue: fmtValue,

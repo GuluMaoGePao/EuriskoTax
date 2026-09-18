@@ -62,9 +62,15 @@
     gap: 8px;
 }
 
+/* 列数由「实际还剩多少宽度」决定，而不是由视口宽度决定 —— 现在有两个变量在改可用宽度：
+   视口变宽（S5 把工具页容器放到 1024）与助手侧栏推开（S6 再拿走 480）。
+   按视口写死列数，推开后 20 张卡会被压到约 170px；auto-fill 会自己算：
+   网格容器 ≥796px（3×260 + 2×8）才出第三列，否则退回两列。
+   260px 是「图标 + 标题 + 描述」不挤的最小卡宽；这里用 auto-fill 而非 auto-fit，
+   是为了让搜索结果里只有 1–2 条命中的分组也保持同一卡宽（auto-fit 会把孤零零的卡拉满整行）。 */
 @media (min-width: 768px) {
     .tool-grid-1 {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     }
 }
 
@@ -529,17 +535,20 @@
     cursor: default;
 }
 
-/* ====== 底部 Tab 栏（只在顶层页显示） ====== */
+/* ====== 手机底部 Tab 栏（只在顶层页显示，≥768px 让位给顶部 Tab 行） ======
+   色值 / 层级统一取 src/css/tokens.css，不要再写字面值。 */
 .bottom-tabbar {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 45;
+    z-index: var(--z-tabbar);
     display: flex;
-    border-top: 1px solid #e5e7eb;
-    background: rgba(255, 255, 255, .96);
+    border-top: 1px solid var(--c-border);
+    /* 必须半透明，backdrop-filter 才有意义（原实现就是 .96alpha） */
+    background: var(--c-surface-blur);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -548,27 +557,102 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
-    padding: 7px 0 6px;
+    /* 6+22+2+13+8 ≈ 52px 内容高，且整块满足 44px 最小触摸区 */
+    padding: 6px 0 8px;
+    min-height: 44px;
     border: none;
     background: transparent;
-    color: #9ca3af;
-    font-size: 11px;
+    /* 原为 #9ca3af：白底对比度仅约 2.6:1，不达 WCAG AA。改用 --c-text-3(#6b7280) ≈ 4.8:1 */
+    color: var(--c-text-3);
+    font-size: var(--fs-micro);
+    font-weight: 500;
     cursor: pointer;
+    transition: color var(--dur-micro) var(--ease);
 }
 
 .bottom-tab .fa {
-    font-size: 17px;
+    font-size: 22px;
+    line-height: 22px;
 }
 
 .bottom-tab.active {
-    color: #1e40af;
+    color: var(--c-brand);
+    font-weight: 600;
 }
 
-/* Tab 栏显示时为页面留出底部空间（避免遮住最后一张卡片） */
-body.has-tabbar #mode-selection-page .max-w-5xl,
-body.has-tabbar #tools-page .max-w-3xl {
-    padding-bottom: 64px;
+/* Tab 栏显示时为页面留出底部空间（避免遮住最后一张卡片）。
+   只在手机形态生效 —— 桌面没有底栏，不该白留一截。
+
+   为什么选 [data-page-container] 而不是选 .max-w-5xl 之类的宽度工具类：
+   本轮 S5 把工具页容器从 max-w-3xl(768) 加宽到 max-w-5xl(1024)，
+   而这里原本写的是 `#tools-page .max-w-3xl` —— 加宽一落地，选择器立刻匹配不到任何元素，
+   工具页最后一张卡片被底栏压住，且 jsdom 里看不出来（没有布局，测试照常全绿）。
+   宽度是**会被反复调的排版决策**，不该拿它当结构锚点；[data-page-container] 只表达
+   「这是这一页的内容容器」，与宽度解耦。两个顶层页各自在本容器的第一个 div 上标了它。 */
+@media (max-width: 767px) {
+    body.has-tabbar [data-page-container] {
+        padding-bottom: calc(var(--tabbar-h-mobile) + var(--sp-3));
+    }
+}
+
+/* 桌面形态下彻底收起底栏：即使 JS 判定「应显示」也不出现，
+   避免同一时刻出现两套导航。 */
+@media (min-width: 768px) {
+    .bottom-tabbar {
+        display: none !important;
+    }
+}
+
+/* ====== 桌面顶部 Tab 行（≥768px，样式与 .bottom-tab 同源于 tokens） ======
+   为什么必须坚持两套 DOM：手机导航在底部才落在拇指热区；桌面把 3 个 Tab
+   横贯 1440px 通栏，既浪费横向空间，也违背桌面「导航在上」的通用惯例。 */
+.top-tabbar {
+    /* sticky/top-14/z-40 等定位工具类由 Tailwind 提供，这里只补 brand 语义 */
+    height: var(--nav-h-tabrow);
+}
+
+.top-tab {
+    position: relative;
+    height: var(--nav-h-tabrow);
+    padding: 0 var(--sp-4);
+    border: none;
+    background: transparent;
+    color: var(--c-text-3);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--dur-micro) var(--ease),
+                background-color var(--dur-micro) var(--ease);
+}
+
+.top-tab:hover {
+    color: var(--c-brand);
+    background: var(--c-brand-subtle);
+}
+
+.top-tab.active {
+    color: var(--c-brand);
+    font-weight: 600;
+}
+
+/* 激活指示条：与 .tab-active 的 border-b-2 语汇一致 */
+.top-tab.active::after {
+    content: '';
+    position: absolute;
+    left: var(--sp-4);
+    right: var(--sp-4);
+    bottom: 0;
+    height: 2px;
+    background: var(--c-brand);
+}
+
+/* 键盘可见焦点（鼠标点击不触发，避免 Focus ring 干扰阅读） */
+.top-tab:focus-visible,
+.bottom-tab:focus-visible {
+    outline: 2px solid var(--c-brand);
+    outline-offset: -2px;
 }
 
 /* ====== 深色模式 ====== */
@@ -681,6 +765,13 @@ body.has-tabbar #tools-page .max-w-3xl {
 .dark .bottom-tabbar {
     background: rgba(17, 24, 39, .96);
     border-top-color: #374151;
+}
+
+/* ====== 政策依据（页内展开，不外跳） ======
+   多条文号纵向排开时光靠字号分层不好扫读，左侧一道竖线把条目分开 */
+.tool-basis-item {
+    border-left: 2px solid var(--c-border);
+    padding-left: 8px;
 }
 
 .dark .bottom-tab.active {

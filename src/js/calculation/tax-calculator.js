@@ -653,6 +653,10 @@ function updateTaxResultsUI(results) {
     if (typeof updateFormulaSteps === 'function') {
         updateFormulaSteps(results);
     }
+    // Phase 2：结论 / 一句话理由 / 注意点（只有 utils.js 已加载时才渲染，保证计算层可独立测试）
+    if (typeof updateResultNarrative === 'function') {
+        updateResultNarrative(results);
+    }
 }
 
 function handleCalculationError(error) {
@@ -1032,36 +1036,23 @@ function calculateFromMonthlyNet(inputData, deductionData, bonusTax, mode = 'bal
     // 公式：年度税后收入 = 月度税后收入 × 工作月数
     const annualNetTarget = monthlyNet * workMonths;
     
-    // 步骤2：使用二分法求解基准应纳税所得额
-    // 搜索范围：[扣除总额, 扣除总额 + 10,000,000]
-    let left = deductionData.totalDeduction;
-    let right = deductionData.totalDeduction + 10000000;
-    const precision = 0.01;
-    
-    let baseTaxableIncome = 0;
-    
-    while (right - left > precision) {
-        const mid = (left + right) / 2;
-        const taxableIncome = mid - deductionData.totalDeduction;
-        
-        if (taxableIncome <= 0) {
-            left = mid;
-            continue;
+    // 步骤2：二分求解基准应纳税所得额
+    // Phase 2.5 ①：算法骨架改走通用求解器（见 solver.js）——本文件只保留**判据**：
+    // 「到手还不够，要往前加钱」。求解器只负责怎么收敛，判断「该不该往上找」的还是这一句，
+    //   这也是这里唯一可能有 bug 的一行。
+    // 搜索区间 [扣除总额, 扣除总额 + 10000000] 与到分为止的精度沿用原实现，保证数值逐位不变。
+    const solved = window.EuriskoSolver.solveMonotone({
+        lo: deductionData.totalDeduction,
+        hi: deductionData.totalDeduction + 10000000,
+        increase: function (income) {
+            const taxableIncome = income - deductionData.totalDeduction;
+            if (taxableIncome <= 0) return true;
+            const netIncome = income - calculateTaxByTaxableIncome(taxableIncome).tax - bonusTax;
+            return netIncome < annualNetTarget;
         }
-        
-        const taxResult = calculateTaxByTaxableIncome(taxableIncome);
-        const comprehensiveTax = taxResult.tax;
-        const netIncome = mid - comprehensiveTax - bonusTax;
-        
-        if (netIncome < annualNetTarget) {
-            left = mid;
-        } else {
-            right = mid;
-        }
-    }
-    
-    baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-    baseTaxableIncome = Math.max(0, baseTaxableIncome);
+    });
+
+    const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
     
     // 步骤3：确定基准应纳税所得额所在的税率档位
     let targetBracket = null;
@@ -1167,34 +1158,18 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
     
     // 情况A：仅输入目标税额（或同时输入时优先使用税额），税额为0时也允许计算
     if (targetTax >= 0) {
-        // 步骤1：使用二分法求解基准应纳税所得额
-        let left = deductionData.totalDeduction;
-        let right = deductionData.totalDeduction + 10000000;
-        const precision = 0.01;
-        
-        let baseTaxableIncome = 0;
-        
-        while (right - left > precision) {
-            const mid = (left + right) / 2;
-            const taxable = mid - deductionData.totalDeduction;
-            
-            if (taxable <= 0) {
-                left = mid;
-                continue;
+        // 步骤1：二分求解基准应纳税所得额（通用求解器 + 本函数的判据：税额还不够）
+        const solved = window.EuriskoSolver.solveMonotone({
+            lo: deductionData.totalDeduction,
+            hi: deductionData.totalDeduction + 10000000,
+            increase: function (income) {
+                const taxable = income - deductionData.totalDeduction;
+                if (taxable <= 0) return true;
+                return calculateTaxByTaxableIncome(taxable).tax + bonusTax < targetTax;
             }
-            
-            const taxResult = calculateTaxByTaxableIncome(taxable);
-            const currentTax = taxResult.tax + bonusTax;
-            
-            if (currentTax < targetTax) {
-                left = mid;
-            } else {
-                right = mid;
-            }
-        }
-        
-        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-        baseTaxableIncome = Math.max(0, baseTaxableIncome);
+        });
+
+        const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
         
         // 步骤2：确定基准应纳税所得额所在的税率档位
         let targetBracket = null;
@@ -1285,35 +1260,18 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
     
     // 情况B：仅输入到手金额（税额为0时），到手金额为0时也允许计算
     if (targetNet >= 0) {
-        // 使用二分法求解基准应纳税所得额
-        let left = deductionData.totalDeduction;
-        let right = deductionData.totalDeduction + 10000000;
-        const precision = 0.01;
-        
-        let baseTaxableIncome = 0;
-        
-        while (right - left > precision) {
-            const mid = (left + right) / 2;
-            const taxable = mid - deductionData.totalDeduction;
-            
-            if (taxable <= 0) {
-                left = mid;
-                continue;
+        // 二分求解基准应纳税所得额（通用求解器 + 本函数的判据：到手还不够）
+        const solved = window.EuriskoSolver.solveMonotone({
+            lo: deductionData.totalDeduction,
+            hi: deductionData.totalDeduction + 10000000,
+            increase: function (income) {
+                const taxable = income - deductionData.totalDeduction;
+                if (taxable <= 0) return true;
+                return income - (calculateTaxByTaxableIncome(taxable).tax + bonusTax) < targetNet;
             }
-            
-            const taxResult = calculateTaxByTaxableIncome(taxable);
-            const currentTax = taxResult.tax + bonusTax;
-            const netIncome = mid - currentTax;
-            
-            if (netIncome < targetNet) {
-                left = mid;
-            } else {
-                right = mid;
-            }
-        }
-        
-        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-        baseTaxableIncome = Math.max(0, baseTaxableIncome);
+        });
+
+        const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
         
         // 确定基准应纳税所得额所在的税率档位
         let targetBracket = null;
@@ -1698,6 +1656,15 @@ function updateReverseResultDisplay(result) {
     
     // 更新三种计算模式对比表格
     updateReverseModeComparisonTable(data);
+
+    // 台账 C：反向倒算推导链（与综合所得同一套实现，utils.js 提供；未加载时跳过）
+    if (typeof buildReverseFormulaSteps === 'function' && typeof showFormulaStepsPanel === 'function') {
+        showFormulaStepsPanel(
+            buildReverseFormulaSteps(data),
+            'formula-steps-panel-reverse',
+            'formula-steps-body-reverse'
+        );
+    }
 }
 
 // 更新三种计算模式对比表格
@@ -1904,45 +1871,45 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
     };
 }
 
+// 经营所得：应纳税所得额 → 实际税额（含减半优惠）
+//
+// 政策口径：年应纳税所得额**不超过 200 万元的部分**减半征收 —— 是对「200 万那一段」减半，
+//   不是对全额减半：先按同档税率把这 200 万算出税额再打五折，超出部分照征。
+//
+// 抽出来的直接原因：三条经营所得倒算链原来各抄一份这段，改政策时必须在同一句话里改三遍，
+//   漏一处就是「看起来合理但算错」—— 这是典型的复制引起口径漂移。
+//
+// 遗留（本轮没动，不属于 Phase 2.5 ① 的范围）：结果展示与正向计算的路径里仍有 5 份同形实现
+//   （经营所得税率倒算的结果段、两条月度倒算的结果段、经营所得正向计算）。
+//   它们用的 guard 写法略有不同（`halvingTaxable > 0` vs `result.tax > 0`、税率取 targetBracket 还是 taxResult），
+//   在实际税率结构下等价，但**没有测试证明这一点** —— 要统一得先补一组等价对拍用例，
+//   否则「看起来一样」的重构一旦真有差别，是在改用户看到的税额数字。
+function businessTaxOf(taxableIncome) {
+    const result = calculateBusinessTaxByTaxableIncome(taxableIncome);
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
+    const halvingTax = result.tax > 0 ? (halvingTaxable * result.rate - result.deduction) * 0.5 : 0;
+    return Math.max(0, result.tax - halvingTax);
+}
+
 // 经营所得反向倒算：按目标税后收入倒算，支持三种计算模式
 function calculateBusinessFromMonthlyNet(inputData, deductionData, mode = 'balanced') {
     const monthlyNet = inputData.monthlyNet;
     const workMonths = inputData.workMonths;
     const annualNetTarget = monthlyNet * workMonths;
     
-    // 步骤1：使用二分法求解基准应纳税所得额
-    let left = deductionData.totalDeduction;
-    let right = deductionData.totalDeduction + 10000000;
-    const precision = 0.01;
-    
-    let baseTaxableIncome = 0;
-    
-    while (right - left > precision) {
-        const mid = (left + right) / 2;
-        const taxableIncome = mid - deductionData.totalDeduction;
-        
-        if (taxableIncome <= 0) {
-            left = mid;
-            continue;
+    // 步骤1：二分求解基准应纳税所得额（通用求解器 + 判据：经营所得到手还不够）
+    const solved = window.EuriskoSolver.solveMonotone({
+        lo: deductionData.totalDeduction,
+        hi: deductionData.totalDeduction + 10000000,
+        increase: function (income) {
+            const taxableIncome = income - deductionData.totalDeduction;
+            if (taxableIncome <= 0) return true;
+            return income - businessTaxOf(taxableIncome) < annualNetTarget;
         }
-        
-        const taxResult = calculateBusinessTaxByTaxableIncome(taxableIncome);
-        const halvingThreshold = 2000000;
-        const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
-        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-        const actualTax = Math.max(0, taxResult.tax - halvingTax);
-        
-        const netIncome = mid - actualTax;
-        
-        if (netIncome < annualNetTarget) {
-            left = mid;
-        } else {
-            right = mid;
-        }
-    }
-    
-    baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-    baseTaxableIncome = Math.max(0, baseTaxableIncome);
+    });
+
+    const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
     
     // 步骤2：确定基准应纳税所得额所在的税率档位
     let targetBracket = null;
@@ -2039,37 +2006,19 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
     const targetNet = inputData.fixedNet;
     
     if (targetTax >= 0) {
-        // 步骤1：使用二分法求解基准应纳税所得额，税额为0时也允许计算
-        let left = deductionData.totalDeduction;
-        let right = deductionData.totalDeduction + 10000000;
-        const precision = 0.01;
-        
-        let baseTaxableIncome = 0;
-        
-        while (right - left > precision) {
-            const mid = (left + right) / 2;
-            const taxable = mid - deductionData.totalDeduction;
-            
-            if (taxable <= 0) {
-                left = mid;
-                continue;
+        // 步骤1：二分求解基准应纳税所得额，税额为0时也允许计算
+        // （通用求解器 + 判据：经营所得实缴税额还不够；减半优惠在 businessTaxOf 里算）
+        const solved = window.EuriskoSolver.solveMonotone({
+            lo: deductionData.totalDeduction,
+            hi: deductionData.totalDeduction + 10000000,
+            increase: function (income) {
+                const taxable = income - deductionData.totalDeduction;
+                if (taxable <= 0) return true;
+                return businessTaxOf(taxable) < targetTax;
             }
-            
-            const taxResult = calculateBusinessTaxByTaxableIncome(taxable);
-            const halvingThreshold = 2000000;
-            const halvingTaxable = Math.min(taxable, halvingThreshold);
-            const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-            const actualTax = Math.max(0, taxResult.tax - halvingTax);
-            
-            if (actualTax < targetTax) {
-                left = mid;
-            } else {
-                right = mid;
-            }
-        }
-        
-        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-        baseTaxableIncome = Math.max(0, baseTaxableIncome);
+        });
+
+        const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
         
         // 步骤2：确定基准应纳税所得额所在的税率档位
         let targetBracket = null;
@@ -2160,38 +2109,18 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
     
     if (targetNet >= 0) {
         // 到手金额为0时也允许计算
-        let left = deductionData.totalDeduction;
-        let right = deductionData.totalDeduction + 10000000;
-        const precision = 0.01;
-        
-        let baseTaxableIncome = 0;
-        
-        while (right - left > precision) {
-            const mid = (left + right) / 2;
-            const taxable = mid - deductionData.totalDeduction;
-            
-            if (taxable <= 0) {
-                left = mid;
-                continue;
+        // （通用求解器 + 判据：经营所得扣除实缴税额后的到手还不够）
+        const solved = window.EuriskoSolver.solveMonotone({
+            lo: deductionData.totalDeduction,
+            hi: deductionData.totalDeduction + 10000000,
+            increase: function (income) {
+                const taxable = income - deductionData.totalDeduction;
+                if (taxable <= 0) return true;
+                return income - businessTaxOf(taxable) < targetNet;
             }
-            
-            const taxResult = calculateBusinessTaxByTaxableIncome(taxable);
-            const halvingThreshold = 2000000;
-            const halvingTaxable = Math.min(taxable, halvingThreshold);
-            const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-            const actualTax = Math.max(0, taxResult.tax - halvingTax);
-            
-            const netIncome = mid - actualTax;
-            
-            if (netIncome < targetNet) {
-                left = mid;
-            } else {
-                right = mid;
-            }
-        }
-        
-        baseTaxableIncome = (left + right) / 2 - deductionData.totalDeduction;
-        baseTaxableIncome = Math.max(0, baseTaxableIncome);
+        });
+
+        const baseTaxableIncome = Math.max(0, solved.value - deductionData.totalDeduction);
         
         let targetBracket = null;
         for (const bracket of businessTaxRates) {
@@ -2516,7 +2445,16 @@ function calculateBusinessTax() {
         safeSetTextContent('business-enterprise-annuity-total', '¥' + enterpriseAnnuity.toFixed(2));
         safeSetTextContent('business-insurance-total', '¥' + insuranceDeduction.toFixed(2));
         safeSetTextContent('business-charitable-total', '¥' + actualCharitableDonation.toFixed(2));
-        
+
+        // 台账 C：经营所得推导链（与综合所得同一套实现，utils.js 提供；未加载时跳过）
+        if (typeof buildBusinessFormulaSteps === 'function' && typeof showFormulaStepsPanel === 'function') {
+            showFormulaStepsPanel(
+                buildBusinessFormulaSteps(businessCalculationResults),
+                'formula-steps-panel-business',
+                'formula-steps-body-business'
+            );
+        }
+
     } catch (error) {
         console.error('经营所得计算过程中出现错误:', error);
         showAlert('计算过程中出现错误：' + error.message);

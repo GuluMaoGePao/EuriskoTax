@@ -11,7 +11,7 @@
  *   - 不做任何预缓存 → SW 不再锁定内容版本，代码更新即见即所得
  *   - HTML 导航：network-first，成功即缓存最新页面；仅真正断网时回退缓存
  *   - 同源 JS/CSS/图片：network-first，成功后覆写运行缓存（弱网/离线可回退）
- *   - CDN 第三方资源：cache-first（离线必需：Tailwind / Font Awesome）
+ *   - CDN 第三方资源：cache-first（离线必需：Font Awesome / Chart.js / jsPDF 等）
  *   - API（/api/*）：永不缓存、永不拦截
  *
  * 结果：在线永远最新；访问过的资源断网后仍可用（离线计税保留）；
@@ -22,9 +22,11 @@
 const RUNTIME_CACHE = 'euriskotax-runtime-v1';
 const CDN_CACHE = 'euriskotax-cdn-v1';
 
-// CDN 域名白名单：命中后走 cache-first 策略
+// CDN 域名白名单：命中后走 cache-first 策略。
+// 注意：Tailwind 自 1.38.0 起改为构建期编译（src/css/tailwind.css，同源静态文件，
+// 走下面的 network-first），因此 cdn.tailwindcss.com 已从白名单移除 —— 留着它只会
+// 让一个早已无人引用的旧运行时脚本继续占着缓存。
 const CDN_HOSTS = [
-  'cdn.tailwindcss.com',
   'cdn.jsdelivr.net',
   'cdnjs.cloudflare.com'
 ];

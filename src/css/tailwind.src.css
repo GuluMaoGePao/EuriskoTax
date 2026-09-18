@@ -1,0 +1,1760 @@
+/* =============================================================================
+   构建入口（源文件，页面不要直接引用）
+   产物：src/css/tailwind.css —— 由 `npm run build:css` 生成，index.html 用 <link> 引用。
+
+   下面 @layer utilities 起的内容**原样搬自旧 index.html 的
+   <style type="text/tailwindcss">**，一个字没改。
+   换的只是「谁来编译它」：浏览器里的 Play CDN 运行时 → 构建期 Tailwind CLI。
+   类名、优先级、@layer 归属全部保持原样，所以视觉不需要重新走查。
+
+   改这里之后必须重跑 `npm run build:css`，否则页面仍读旧产物。
+   ============================================================================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-all-300 {
+                transition: all 0.3s ease;
+            }
+            .card {
+                @apply bg-white rounded-lg shadow-card px-6 pt-6 pb-4 transition-all-300 flex flex-col;
+            }
+            .card-content {
+                @apply grow;
+            }
+            .card:hover {
+                @apply shadow-card-hover;
+            }
+            .btn {
+                @apply px-4 py-2 rounded-md font-medium transition-all-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
+            }
+            .btn-primary {
+                @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
+            }
+            .btn-secondary {
+                @apply bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/50;
+            }
+            .btn-success {
+                @apply bg-success text-white hover:bg-success/90 focus:ring-success/50;
+            }
+            .input-field {
+                @apply w-full pr-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+            }
+            .input-field.input-error {
+                @apply border-danger focus:ring-danger/50 focus:border-danger;
+            }
+            .label {
+                @apply block text-sm font-medium text-gray-700 mb-1;
+            }
+            .form-group {
+                @apply mb-4;
+            }
+            .tooltip {
+                @apply relative inline-flex items-center cursor-pointer;
+            }
+            .tooltip .tooltip-text {
+                @apply invisible absolute z-50 bg-gray-800 text-white text-xs rounded-md px-3 py-1.5 w-52 opacity-0 transition-opacity duration-200;
+                top: calc(100% + 6px);
+                left: 50%;
+                transform: translateX(-50%);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                pointer-events: none;
+            }
+            .dark .tooltip .tooltip-text {
+                @apply bg-gray-700;
+            }
+            .tooltip .tooltip-text::before {
+                content: '';
+                position: absolute;
+                top: -4px;
+                left: 50%;
+                transform: translateX(-50%) rotate(45deg);
+                width: 8px;
+                height: 8px;
+                background: inherit;
+            }
+            .tooltip.is-open .tooltip-text {
+                @apply visible opacity-100;
+                pointer-events: auto;
+            }
+            .tab {
+                @apply px-4 py-2 font-medium border-b-2 cursor-pointer transition-all-300;
+            }
+            .tab-active {
+                @apply border-primary text-primary;
+            }
+            .tab-inactive {
+                @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
+            }
+            /* 页面 Logo 样式 */
+            .login-logo {
+                width: 250px;
+                height: 250px;
+                margin-top: -50px;
+                margin-bottom: -50px;
+            }
+            .modal-logo {
+                width: 200px;
+                height: 200px;
+                margin-top: -40px;
+                margin-bottom: -40px;
+            }
+            /* 提示卡片图标 */
+            .tip-icon-wrapper {
+                background-color: rgba(30, 64, 175, 0.1);
+            }
+            .dark .tip-icon-wrapper {
+                background-color: rgba(59, 130, 246, 0.15);
+            }
+            .tip-icon {
+                color: #1e40af;
+                font-size: 1.1rem;
+            }
+            .dark .tip-icon {
+                color: #60a5fa;
+            }
+            .slider {
+                @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+            }
+            .slider::-webkit-slider-thumb {
+                @apply appearance-none w-4 h-4 rounded-full bg-primary;
+            }
+            .badge {
+                @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+            }
+            .badge-success {
+                @apply bg-success/20 text-success;
+            }
+            .badge-danger {
+                @apply bg-danger/20 text-danger;
+            }
+            .badge-warning {
+                @apply bg-warning/20 text-warning;
+            }
+            .step-indicator {
+                @apply flex items-center py-2 overflow-x-auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .step-indicator::-webkit-scrollbar { display: none; }
+            .step {
+                @apply flex items-center shrink-0;
+            }
+            .step-number {
+                @apply w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 transition-all-300;
+            }
+            .step-number.active {
+                @apply bg-primary text-white;
+            }
+            .step-number.completed {
+                @apply bg-success text-white;
+            }
+            .step-title {
+                @apply ml-1.5 text-xs font-medium text-gray-500 whitespace-nowrap;
+            }
+            .step-title.active {
+                @apply text-primary;
+            }
+            .step-title.completed {
+                @apply text-success;
+            }
+            .step-line {
+                @apply flex-1 h-0.5 bg-gray-200 mx-2 min-w-4;
+            }
+            .step-line.active {
+                @apply bg-primary;
+            }
+            .step-line.completed {
+                @apply bg-success;
+            }
+            @media (max-width: 640px) {
+                .step-title { display: none; }
+                .step-title.active { display: inline; }
+                .calc-page-subtitle { display: none; }
+            }
+            .tax-budget-table {
+                @apply w-full border-collapse border border-gray-200 shadow-sm;
+                min-width: 700px;
+            }
+            /* 正向主表新增「税后到手」「累计收入」两列，需单独放宽最小宽度避免列被挤压 */
+            #tax-budget-table {
+                min-width: 900px;
+            }
+            /* 表头单行不折行，数据统一等宽数字，提升可读性 */
+            .tax-budget-table th {
+                @apply px-4 py-3.5 text-center bg-gray-50 text-sm font-bold text-gray-700 border border-gray-200 leading-relaxed whitespace-nowrap;
+            }
+            .tax-budget-table td {
+                @apply px-4 py-3.5 text-sm text-gray-900 text-center border border-gray-200 leading-relaxed transition-colors hover:bg-blue-50/30;
+                font-variant-numeric: tabular-nums;
+            }
+            .tax-budget-table tr:nth-child(even) {
+                @apply bg-gray-50/50;
+            }
+            .tax-budget-table .section-title {
+                @apply font-semibold text-gray-800 bg-gray-100 py-2;
+            }
+            .tax-budget-table .highlight {
+                @apply font-bold text-primary;
+            }
+            .tax-budget-table .negative {
+                @apply text-danger font-medium;
+            }
+            .tax-budget-table .positive {
+                @apply text-success font-medium;
+            }
+            .overflow-x-auto {
+                overflow-x: auto;
+                overflow-y: hidden;
+                border-radius: 0.5rem;
+            }
+            .page-transition {
+                transition: opacity 0.2s ease, transform 0.2s ease;
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            .page-transition.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            .help-modal-scrollbar::-webkit-scrollbar {
+                width: 6px;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 3px;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            .help-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+                background-color: #94a3b8;
+            }
+            .help-modal-scrollbar {
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e1 transparent;
+            }
+            .loading-spinner {
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #3b82f6;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .loading-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255, 255, 255, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 0.5rem;
+                z-index: 10;
+            }
+            .dark .loading-overlay {
+                background: rgba(31, 41, 55, 0.8);
+            }
+            .btn:disabled {
+                @apply opacity-50 cursor-not-allowed;
+            }
+            .profile-card-hover {
+                @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5;
+            }
+            .menu-item-active {
+                @apply bg-primary/10 text-primary font-medium;
+            }
+
+            /* === 个人中心子页面顶栏 === */
+            .profile-sub-nav {
+                @apply sticky top-14 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 transition-all duration-200;
+                padding: 0.625rem 1rem;
+            }
+            .profile-sub-nav-inner {
+                @apply flex items-center relative max-w-4xl mx-auto;
+            }
+            .profile-sub-nav-back {
+                @apply flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-150 font-medium text-sm py-1.5 px-3 rounded-lg hover:bg-primary/5 cursor-pointer;
+            }
+            .profile-sub-nav-back:active {
+                @apply scale-95;
+            }
+            .profile-sub-nav-title {
+                @apply absolute left-1/2 -translate-x-1/2 text-gray-700 font-semibold text-sm pointer-events-none;
+                max-width: 70%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .dark .profile-sub-nav {
+                @apply bg-gray-800/95 border-gray-700;
+            }
+            .dark .profile-sub-nav-title {
+                @apply text-gray-200;
+            }
+
+            /* 个人中心子页面顶栏：手机窄屏适配（加大返回热区、收紧留白） */
+            @media (max-width: 640px) {
+                .profile-sub-nav {
+                    padding: 0.5rem 0.5rem;
+                }
+                .profile-sub-nav-back {
+                    min-height: 40px;
+                    min-width: 40px;
+                    padding: 0.375rem 0.75rem;
+                }
+                .profile-sub-nav-back span {
+                    display: none;
+                }
+            }
+
+            /* === 个人中心主页（banner 与模块卡片用内联 Tailwind 工具类，避免维护重复 CSS） === */
+            /* 用户信息横幅上的头像圆角大块 */
+            .profile-avatar-tile {
+                @apply w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center shrink-0;
+                box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+            }
+
+            /* 页面切换过渡动画 */
+            .page-enter {
+                @apply animate-fade-in;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(4px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.2s ease-out;
+            }
+
+            /* 用户下拉菜单入场右对齐（从右上角展开） */
+            @keyframes dropdownIn {
+                from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .animate-dropdown {
+                animation: dropdownIn 0.16s ease-out;
+            }
+
+            /* === 阶段1：紧凑顶栏 + 首页卡片流 === */
+            .compact-nav { height: 56px; }
+            .compact-nav .nav-logo { height: 66px; width: auto; margin: -5px 0; }
+            .compact-nav .brand-name {
+                font-size: 1.05rem;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+            }
+            .compact-nav .nav-icon-btn {
+                @apply p-2 rounded-full hover:bg-primary/80 transition-all-300;
+            }
+
+            /* 首页卡片 */
+            .home-card {
+                @apply bg-white rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 mb-3 sm:mb-4 transition-all-300;
+            }
+            .home-card-header {
+                @apply flex items-center justify-between mb-3;
+            }
+            .home-card-title {
+                @apply flex items-center text-sm font-medium text-gray-500;
+            }
+
+            /* 模式卡片 */
+            .mode-card {
+                @apply rounded-xl shadow-card cursor-pointer transition-all-300 flex flex-col items-center text-center relative overflow-hidden;
+                border: 1px solid transparent;
+                padding: 0.875rem 0.75rem 0.75rem;
+            }
+            @media (min-width: 640px) {
+                .mode-card {
+                    padding: 1.25rem 1rem 1rem;
+                }
+            }
+            .mode-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                transition: height 0.3s ease;
+            }
+            .mode-card:hover {
+                @apply shadow-card-hover;
+                transform: translateY(-3px);
+            }
+            .mode-card:hover::before { height: 5px; }
+            .mode-card:active {
+                transform: translateY(-1px) scale(0.97);
+                transition: transform 0.1s ease;
+            }
+
+            /* 4色变体：渐变背景 + 顶部彩条 */
+            .mode-card-primary { background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%); }
+            .mode-card-primary::before { background: #1e40af; }
+            .mode-card-accent { background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 70%); }
+            .mode-card-accent::before { background: #60a5fa; }
+            .mode-card-success { background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 70%); }
+            .mode-card-success::before { background: #10b981; }
+            .mode-card-secondary { background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%); }
+            .mode-card-secondary::before { background: #3b82f6; }
+
+            .dark .mode-card-primary,
+            .dark .mode-card-accent,
+            .dark .mode-card-success,
+            .dark .mode-card-secondary {
+                background: linear-gradient(135deg, rgba(30,41,59,0.6) 0%, #1f2937 70%);
+            }
+
+            /* 大图标 - 渐变填充 */
+            .mode-card-icon {
+                @apply w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3 text-xl sm:text-2xl text-white;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transition: transform 0.3s ease;
+            }
+            .mode-card:hover .mode-card-icon { transform: scale(1.08); }
+            .mode-card-icon-primary { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+            .mode-card-icon-accent { background: linear-gradient(135deg, #60a5fa, #93c5fd); }
+            .mode-card-icon-success { background: linear-gradient(135deg, #10b981, #34d399); }
+            .mode-card-icon-secondary { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+
+            .mode-card-title {
+                @apply text-sm font-bold text-gray-800 mb-1;
+            }
+            .dark .mode-card-title { @apply text-gray-100; }
+            .mode-card-subtitle {
+                @apply text-xs text-gray-500;
+            }
+            .dark .mode-card-subtitle { @apply text-gray-400; }
+            .mode-card-info-btn {
+                @apply absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:bg-white hover:text-primary transition-all-300 z-10;
+            }
+            .dark .mode-card-info-btn { @apply hover:bg-gray-700; }
+
+            /* 最近计算横向滑动 */
+            .recent-scroll {
+                display: flex;
+                gap: 0.75rem;
+                overflow-x: auto;
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 0.5rem;
+            }
+            .recent-scroll::-webkit-scrollbar { height: 4px; }
+            .recent-scroll::-webkit-scrollbar-track { background: transparent; }
+            .recent-scroll::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 2px;
+            }
+            .dark .recent-scroll::-webkit-scrollbar-thumb { background: #475569; }
+            .recent-card {
+                flex: 0 0 160px;
+                scroll-snap-align: start;
+                @apply bg-gray-50 rounded-lg p-3 cursor-pointer transition-all-300 border border-transparent;
+            }
+            @media (min-width: 640px) {
+                .recent-card { flex-basis: 180px; }
+            }
+            .dark .recent-card { @apply bg-gray-700; }
+            .recent-card:hover {
+                @apply bg-blue-50 shadow-md;
+                border-color: rgba(30, 64, 175, 0.2);
+            }
+            .dark .recent-card:hover { @apply bg-gray-600; }
+
+            /* 税务提醒项 */
+            .tax-reminder-item {
+                @apply flex items-start py-2 px-3 rounded-lg transition-colors cursor-pointer;
+            }
+            .tax-reminder-item:hover {
+                @apply bg-blue-50;
+            }
+            .dark .tax-reminder-item:hover { @apply bg-gray-700; }
+            .tax-reminder-dot {
+                @apply w-2 h-2 rounded-full mt-2 mr-3 shrink-0;
+            }
+
+            /* 小贴士卡片 */
+            .tip-card {
+                @apply bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100;
+            }
+            .dark .tip-card {
+                @apply from-gray-700 to-gray-800 border-gray-600;
+            }
+
+            /* 卡片入场动画 */
+            @keyframes homeFadeInUp {
+                from { opacity: 0; transform: translateY(12px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .home-card {
+                animation: homeFadeInUp 0.4s ease-out backwards;
+            }
+            #mode-selection-page .home-card:nth-child(1) { animation-delay: 0.05s; }
+            #mode-selection-page .home-card:nth-child(2) { animation-delay: 0.1s; }
+            #mode-selection-page .home-card:nth-child(3) { animation-delay: 0.15s; }
+            #mode-selection-page .home-card:nth-child(4) { animation-delay: 0.2s; }
+            #mode-selection-page .home-card:nth-child(5) { animation-delay: 0.25s; }
+
+            /* 通知红点 */
+            .notification-dot {
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                width: 8px;
+                height: 8px;
+                background: #ef4444;
+                border-radius: 50%;
+                border: 2px solid #1e40af;
+            }
+
+            /* 空状态 */
+            .home-empty-state {
+                @apply text-center py-6 text-gray-400 text-sm;
+            }
+            .home-empty-state i {
+                @apply text-3xl mb-2 block opacity-40;
+            }
+            .home-empty-state p {
+                @apply text-xs;
+            }
+            .home-empty-state .empty-hint {
+                @apply mt-2 inline-flex items-center text-[11px] text-primary/70 bg-primary/5 rounded-full px-3 py-1;
+            }
+
+            /* === 阶段2：计算页紧凑顶栏 + sticky预览条 === */
+            .calc-sticky-header {
+                @apply sticky top-14 z-30 bg-white/95 backdrop-blur border-b border-gray-100;
+                position: sticky;
+            }
+            /* 顶栏/底栏白底铺满视口宽度：此前白底只占容器宽度，
+               比下方卡片宽出一截又夹着灰缝，视觉上像悬空的独立白块，与卡片衔接生硬。
+               用负边距 + 补偿内边距铺满，内容位置保持不变。 */
+            .calc-sticky-header,
+            .calc-preview-bar {
+                margin-left: calc(50% - 50vw);
+                margin-right: calc(50% - 50vw);
+                padding-left: calc(50vw - 50%);
+                padding-right: calc(50vw - 50%);
+            }
+
+            .calc-top-row {
+                @apply flex items-center justify-between py-2 gap-2;
+            }
+            .calc-back-btn {
+                @apply w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-primary transition-all-300 shrink-0;
+            }
+            .dark .calc-back-btn { @apply hover:bg-gray-700; }
+            .calc-title-wrap {
+                @apply ml-2 min-w-0 flex-1;
+            }
+            .calc-page-title {
+                @apply text-base font-bold text-gray-800 leading-tight truncate;
+            }
+            .dark .calc-page-title { @apply text-gray-100; }
+            .calc-page-subtitle {
+                @apply text-xs text-gray-500 leading-tight truncate;
+            }
+            .calc-action-btn {
+                @apply w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-primary transition-all-300 shrink-0;
+            }
+            .dark .calc-action-btn { @apply hover:bg-gray-700; }
+
+            /* sticky 预览条 */
+            .calc-preview-bar {
+                @apply sticky bottom-0 bg-white z-30;
+                box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
+                border-top: 2px solid transparent;
+                border-image: linear-gradient(90deg, #1e40af 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
+            }
+            .calc-preview-grid {
+                @apply grid grid-cols-3 gap-2 py-2.5 px-4;
+            }
+            .calc-preview-item {
+                @apply text-center px-1;
+            }
+            .calc-preview-label {
+                @apply text-xs text-gray-500 mb-0.5;
+            }
+            .calc-preview-value {
+                @apply text-sm font-bold whitespace-nowrap;
+            }
+            .calc-preview-income { @apply text-primary; }
+            .calc-preview-deduction { @apply text-warning; }
+            .calc-preview-tax { @apply text-danger; }
+            .calc-preview-bar.is-result-step { @apply hidden; }
+
+            /* === 结果页视觉层次 === */
+            .result-hero {
+                @apply bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-5 text-center;
+            }
+            .result-hero-label { @apply text-sm text-gray-500 mb-1; }
+            .result-hero-value { @apply text-3xl font-bold text-primary; }
+            .result-hero-sub { @apply text-xs text-gray-500 mt-2 flex items-center justify-center gap-2; }
+            .result-hero-divider { @apply text-gray-300; }
+            .result-tax-bar { @apply mt-4; }
+            .result-tax-bar-track { @apply h-3 bg-gray-200 rounded-full overflow-hidden; }
+            .result-tax-bar-fill { @apply h-full bg-gradient-to-r from-blue-400 to-primary rounded-full transition-all duration-500; }
+            .dark .result-tax-bar-track { @apply bg-gray-700; }
+            .result-metric { @apply rounded-lg p-3 text-center; }
+            .result-metric-danger { @apply bg-red-50 border border-red-200; }
+            .result-metric-info { @apply bg-blue-50 border border-blue-200; }
+            .result-metric-success { @apply bg-green-50 border border-green-200; }
+            .dark .result-metric-danger { @apply bg-red-900/30 border-red-800; }
+            .dark .result-metric-info { @apply bg-blue-900/30 border-blue-800; }
+            .dark .result-metric-success { @apply bg-green-900/30 border-green-800; }
+            .result-metric-label { @apply text-xs text-gray-500 mb-1; }
+            .result-metric-value { @apply text-lg font-bold; }
+            .result-detail-list { @apply border rounded-lg overflow-hidden; }
+            .result-detail-row { @apply flex justify-between items-center px-4 py-2.5 text-sm border-b border-gray-100 last:border-b-0; }
+            .dark .result-detail-list { @apply border-gray-700; }
+            .dark .result-detail-row { @apply border-gray-700; }
+
+            /* === Phase 2：结果页视觉层级（Hero → 结论 → 理由 → 推导链 → pitfalls → 明细 → 免责 → 操作区）=== */
+            .result-conclusion { @apply mt-4 rounded-xl p-4 text-center border; }
+            .result-conclusion-head { @apply text-xl font-bold; }
+            .result-conclusion-sub { @apply text-xs text-gray-500 mt-1; }
+            .result-conclusion.is-refund { @apply bg-green-50 border-green-200; }
+            .result-conclusion.is-owe { @apply bg-red-50 border-red-200; }
+            .result-conclusion.is-even { @apply bg-gray-50 border-gray-200; }
+            .dark .result-conclusion.is-refund { @apply bg-green-900/30 border-green-800; }
+            .dark .result-conclusion.is-owe { @apply bg-red-900/30 border-red-800; }
+            .dark .result-conclusion.is-even { @apply bg-gray-800 border-gray-700; }
+
+            .result-reason { @apply mt-3 text-sm text-gray-700 leading-relaxed; }
+            .dark .result-reason { @apply text-gray-300; }
+
+            .result-pitfall { @apply mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3; }
+            .result-pitfall-head { @apply text-sm font-medium text-amber-800 flex items-center; }
+            .result-pitfall ul { @apply mt-2 space-y-1; }
+            .result-pitfall li { @apply text-xs text-amber-900 leading-relaxed list-disc ml-4; }
+
+            .result-disclaimer { @apply mt-4 text-xs text-gray-400 leading-relaxed; }
+
+            @media (max-width: 640px) {
+                .calc-preview-value { @apply text-xs; }
+                .calc-preview-label { @apply text-[10px]; }
+                /* py-2 → py-1.5：预览条是常驻固定层，手机上每 2px 都是从表单里抢的 */
+                .calc-preview-grid { @apply py-1.5; }
+            }
+
+            /* 步骤内容增加上下留白：顶部与顶栏拉开呼吸感，底部避开预览条 */
+            .step-content { @apply pt-4 pb-4; }
+            .has-preview-bar .step-content { @apply pb-20; }
+
+            /* 宽屏下为计算页主体增加左右留白，避免步骤条与卡片紧贴屏幕边缘 */
+            @media (min-width: 640px) {
+                .step-content.max-w-5xl,
+                .calc-sticky-header > .max-w-5xl,
+                .calc-preview-bar > .max-w-5xl {
+                    padding-left: 1.5rem;
+                    padding-right: 1.5rem;
+                }
+            }
+
+            /* === 移动端创意细节优化 === */
+            @media (max-width: 640px) {
+                /* 输入框加大触摸区 */
+                .input-field {
+                    @apply py-2.5;
+                    min-height: 40px;
+                }
+                select.input-field {
+                    min-height: 40px;
+                }
+                /* 步骤数字加大触摸区 */
+                .step-number {
+                    @apply w-7 h-7;
+                }
+                /* 顶栏按钮加大 */
+                .calc-back-btn, .calc-action-btn {
+                    @apply w-9 h-9;
+                }
+                /* 预览条数值加大字重 */
+                .calc-preview-value {
+                    @apply font-bold;
+                }
+                /* 卡片圆角缩小 */
+                .home-card {
+                    @apply rounded-lg;
+                }
+                /* 模式卡片更紧凑 */
+                .mode-card {
+                    @apply rounded-lg;
+                }
+            }
+
+            /* 步骤进度文字（移动端显示） */
+            .step-progress-text {
+                @apply hidden;
+            }
+            @media (max-width: 640px) {
+                .step-progress-text {
+                    @apply inline-block text-[10px] text-gray-400 ml-auto;
+                }
+            }
+
+            /* === 移动端：计算页固定层瘦身 ===
+               计算页同时压着三层常驻占位：全局顶栏(56) + 紧凑顶栏(原约 99) + sticky 预览条，
+               手机上合计吃掉约四分之一可视高度 —— 而这个战场恰恰是高价值线索的主战场。
+
+               这里**不动任何 DOM**：步骤条仍由 navigation-ui 的 updateStepIndicator 驱动，
+               tests/interaction.test.js 也按 .step-number / .step-progress-text 断言。
+               只把移动端形态改成「一次只显示当前步」：连接线与已完成步骤的圆圈在 360px 宽的
+               屏幕上本就要横向滚动才看得全，不如直接让出这段高度给表单。 */
+            @media (max-width: 640px) {
+                .calc-top-row { @apply py-1.5; }
+                /* 副标题在填表过程中是冗余信息：标题已说明在算什么，步序紧跟其后给出 */
+                .calc-page-subtitle { @apply hidden; }
+
+                .calc-sticky-header .step-indicator { @apply py-1; }
+                .calc-sticky-header .step-line { display: none; }
+                .calc-sticky-header .step-number { display: none; }
+                .calc-sticky-header .step-title { display: none; }
+                /* .step-title.active 已自带 text-primary，这里只需恢复显示 */
+                .calc-sticky-header .step-title.active { display: inline-block; }
+            }
+
+            /* === 阶段14：任务页固定层预算 —— 从「目测 22%」改成「实测达标」 ===
+               360×640 浏览器实测（2026-09-17）：全局顶栏 56 + 紧凑顶栏 73 + 预览条 48
+               = **177px / 640 = 27.7%** —— 留给表单的只有 463px。个体户 / 汇算要填十几项，
+               「算不完」的物理原因就在这里；§11 Phase 1 的预算线是 ≤18%（=115px）。
+
+               两条手段都只作用于 ≤640px，桌面端形态零变化（可整段回滚）：
+               ① task-mode 隐藏全局顶栏（-56）：**不是丢导航** —— 任务页自带「返回工作台」
+                  按钮，顶栏在填表过程中原本也没有被调用；
+               ② 步骤条并入标题行（-24）：省掉整整一行的常驻高度，
+                  步骤仍由 navigation-ui 驱动，DOM 不动。 */
+            @media (max-width: 640px) {
+                body.task-mode .compact-nav { display: none; }
+                body.task-mode .calc-sticky-header { top: 0; }
+
+                .calc-sticky-header > .max-w-5xl { @apply flex items-center gap-2; }
+                .calc-sticky-header .calc-top-row { @apply flex-1 min-w-0 py-1; }
+                .calc-sticky-header .step-indicator { @apply py-0; }
+                /* 单行后长标题不能把步骤条挤到换行，否则刚省下的高度又被吃掉 */
+                .calc-sticky-header .calc-page-title { @apply truncate; }
+            }
+
+            /* 输入框聚焦增强 */
+            .input-field:focus {
+                box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.12);
+                border-color: #1e40af;
+            }
+            .dark .input-field:focus {
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            }
+
+            /* 按钮按下反馈 */
+            .btn:active {
+                transform: scale(0.97);
+                transition: transform 0.1s ease;
+            }
+
+            /* 注册表单：必填星号与字段校验错误提示 */
+            .req-star {
+                font-style: normal;
+                margin-left: 2px;
+                color: inherit;
+            }
+            .label-danger,
+            .label-danger .req-star {
+                color: #dc2626 !important;
+            }
+            .field-error {
+                color: #dc2626;
+                @apply text-xs mt-1.5;
+            }
+        }
+
+        /* === 留资弹窗（阶段13B+）：成功态入场 ===
+           弹窗曾有一块原生 <details> 折叠的「顾虑答疑」，按要求已整体移除 ——
+           用户只需要填完信息等联系，不需要先读完三问三答；对应样式一并清掉，不留死代码 */
+        @keyframes lead-pop-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.97); }
+            to { opacity: 1; transform: none; }
+        }
+        .lead-pop-in {
+            animation: lead-pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        /* 尊重「减少动态效果」偏好：动画只是锦上添花 */
+        @media (prefers-reduced-motion: reduce) {
+            .lead-pop-in {
+                animation: none;
+            }
+        }
+
+        /* 铺满视口的顶栏/底栏会向两侧溢出，用 clip 裁掉溢出的几像素。
+           clip 不产生滚动容器，因此不会破坏 position: sticky；旧浏览器不支持时自动忽略。 */
+        @supports (overflow-x: clip) {
+            body { overflow-x: clip; }
+        }
+
+        /* 暗色模式基础样式 */
+        .dark body {
+            @apply bg-gray-900 text-gray-100;
+        }
+        .dark .card {
+            @apply bg-gray-800 text-gray-100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+        .dark .input-field {
+            @apply border-gray-600 text-gray-100 placeholder-gray-500;
+            background-color: #374151;
+        }
+        .dark .input-field:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            background-color: #374151;
+        }
+        .dark .label {
+            @apply text-gray-200;
+        }
+        .dark .text-gray-800 { @apply text-gray-100; }
+        .dark .text-gray-700 { @apply text-gray-200; }
+        .dark .text-gray-600 { @apply text-gray-300; }
+        .dark .text-gray-500 { @apply text-gray-400; }
+        .dark .bg-white { @apply bg-gray-800; }
+        .dark .bg-gray-50 { @apply bg-gray-900; }
+        .dark .bg-gray-100 { @apply bg-gray-700; }
+        .dark .bg-gray-200 { @apply bg-gray-700; }
+        .dark .border-gray-200 { @apply border-gray-700; }
+        .dark .border-gray-300 { @apply border-gray-600; }
+        .dark .hover\:bg-gray-100:hover { @apply hover:bg-gray-700; }
+        .dark .hover\:bg-gray-50:hover { @apply hover:bg-gray-700; }
+        .dark .hover\:text-gray-700:hover { @apply hover:text-gray-200; }
+        .dark .tax-budget-table th {
+            @apply bg-gray-700 text-gray-100 border-gray-600;
+        }
+        .dark .tax-budget-table td {
+            @apply text-gray-200 border-gray-600;
+        }
+        .dark .tax-budget-table tr:nth-child(even) {
+            @apply bg-gray-700/50;
+        }
+        .dark .tax-budget-table .section-title {
+            @apply text-gray-100 bg-gray-700;
+        }
+
+        /* === 深色模式增强：对比度与阴影（轻盈版） === */
+        .dark .home-card {
+            @apply bg-gray-800 border border-gray-700;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .dark .home-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .dark .home-card-title {
+            @apply text-gray-200;
+        }
+        .dark .mode-card {
+            @apply bg-gray-800 border border-gray-700;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .dark .mode-card:hover {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2), 0 0 0 1px rgba(59,130,246,0.25);
+        }
+        .dark .recent-card {
+            @apply bg-gray-700 border border-gray-600;
+        }
+        .dark .recent-card:hover {
+            background-color: #4b5563;
+        }
+        .dark .calc-sticky-header {
+            @apply bg-gray-800/95 border-gray-700;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+        }
+        .dark .calc-preview-bar {
+            @apply bg-gray-800;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.18);
+            border-image: linear-gradient(90deg, #3b82f6 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
+        }
+        .dark .calc-preview-value {
+            @apply text-gray-50;
+        }
+        .dark .calc-preview-label {
+            @apply text-gray-400;
+        }
+        .dark .step-number.active {
+            @apply bg-blue-600 text-white;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
+        }
+        .dark .step-number.completed {
+            @apply bg-green-700 text-white;
+        }
+        .dark .step-line {
+            @apply bg-gray-600;
+        }
+        .dark .tooltip .tooltip-text {
+            @apply bg-gray-700 text-gray-100 border border-gray-600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .dark .tooltip.is-open .tooltip-text {
+            @apply visible opacity-100;
+            pointer-events: auto;
+        }
+        .dark .btn-secondary {
+            @apply bg-gray-700 text-gray-100 border border-gray-600;
+        }
+        .dark .btn-secondary:hover {
+            @apply bg-gray-600;
+        }
+
+        /* 移动端深色模式：更轻盈的阴影 */
+        @media (max-width: 640px) {
+            .dark .home-card {
+                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+            }
+            .dark .mode-card {
+                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+            }
+            .dark .calc-sticky-header {
+                box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            }
+            .dark .calc-preview-bar {
+                box-shadow: 0 -1px 6px rgba(0,0,0,0.15);
+            }
+        }
+
+        /* ====== 悬浮税助手样式 ====== */
+        /* 44px 圆球：默认贴边半隐（只露月牙），hover/点击后完整滑出，可完全隐藏 */
+        .assistant-fab {
+            position: fixed;
+            left: auto;
+            top: auto;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            /* 原为字面的 100，与模态同级，导致浮动球盖住底部 Tab 栏。
+               改取层级表的值：高于 Tab 栏(45)、低于遮罩(90)。 */
+            z-index: var(--z-fab);
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+            border: none;
+            font-size: 18px;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            /* 半隐位移由 JS 写入 --peek-x(px)，缩放叠加在其上，避免 transform 互相覆盖 */
+            --peek-x: 0px;
+            transform: translateX(var(--peek-x)) scale(1);
+            transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
+                        box-shadow 0.25s ease,
+                        opacity 0.25s ease;
+        }
+        .assistant-fab:hover {
+            transform: translateX(var(--peek-x)) scale(1.08);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+        }
+        .assistant-fab:active {
+            transform: translateX(var(--peek-x)) scale(0.95);
+        }
+        .assistant-fab.dragging {
+            transition: none !important;
+            transform: translateX(var(--peek-x)) scale(1.1);
+            cursor: grabbing;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.55);
+        }
+        .assistant-fab-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        /* 半隐态：贴边只露月牙，稍降不透明度弱化存在感 */
+        .assistant-fab.assistant-fab--peek {
+            opacity: 0.5;
+        }
+        /* 完全隐藏态：移出视线，仅保留边缘热区可唤出 */
+        .assistant-fab.assistant-fab--hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(var(--peek-x)) scale(0.6);
+        }
+        /* 恢复热区：完全隐藏后仅此处可唤出悬浮球，位置与停靠边对齐 */
+        .assistant-fab-hotzone {
+            position: fixed;
+            width: 16px;
+            border-radius: 4px;
+            background: transparent;
+            /* 原为字面的 99：一个不上不下的魔法值。热区是「悬浮球被完全隐藏时的
+               替身」，取 --z-fab 即可 —— 低于遮罩(90)，抽屉打开时自动不可点。 */
+            z-index: var(--z-fab);
+            display: none;
+        }
+        .assistant-fab-hotzone.active {
+            display: block;
+            cursor: pointer;
+        }
+        .assistant-fab-hotzone.active:hover {
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .assistant-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: var(--z-overlay);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .assistant-overlay.assistant-overlay-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .assistant-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            /* 侧栏宽度进令牌层：桌面推开时内容区要让出同一段宽度，
+               两处必须同源，否则推开后内容会被压掉一截或留出一条缝 */
+            width: var(--assistant-w);
+            max-width: 100%;
+            background: white;
+            z-index: var(--z-drawer);
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+        }
+        .assistant-drawer.assistant-drawer-open {
+            transform: translateX(0);
+        }
+        .dark .assistant-drawer {
+            background: #1f2937;
+        }
+
+        /* 推进/推出的过渡写在基础选择器上（而不是写在 assistant-open 里）：
+           若只在推开态声明 transition，关闭时 padding 会瞬间归零、抽屉却还在滑，两者错位。
+           曲线与时长同 .assistant-drawer 保持一致。减少动效偏好由 tokens.css 统一兜掉。 */
+        #app-container {
+            transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ====== 桌面「推开」形态（≥1280px）======
+           为什么要推开：对着政策问答查税率时，「提问」和「在算的那张表」得同时看得见，
+           覆盖式只能二选一。桌面屏恰恰有这个宽度，不用白不用（云账房 / Notion 的工作区感）。
+           为什么取 1280 而不是内容形态的 1024：侧栏占位 480 + 内容至少留 --c-narrow(720) = 1200，
+           向上取标准断点 1280。低于它，推开会把速算器表单挤到 720 以下、标签与输入框脱钩，
+           所以 1024–1279 与手机/平板一样仍走「覆盖 + 遮罩」。
+           形态完全交给媒体查询：缩放窗口自动切换，JS 不必监听 resize，只需在开关时打个标记。 */
+        @media (min-width: 1280px) {
+            body.assistant-open #app-container {
+                padding-right: var(--assistant-w);
+            }
+            /* 推开形态下侧栏与内容要同时可用，所以既不压暗也不拦点击。
+               （计算页那些用 50vw 负边距做通栏的元素不受影响：内容会被 padding 推回可用区内，
+               通栏背景多出的部分正好被抽屉盖住，不会露缝。） */
+            body.assistant-open .assistant-overlay {
+                opacity: 0;
+                pointer-events: none;
+            }
+        }
+
+        .assistant-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+            flex-shrink: 0;
+        }
+        .assistant-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .assistant-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .assistant-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .assistant-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .assistant-close:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .assistant-search-wrap {
+            position: relative;
+        }
+        .assistant-search {
+            width: 100%;
+            padding: 10px 34px 10px 38px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #1f2937;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .assistant-search::placeholder {
+            color: #9ca3af;
+        }
+        .assistant-search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        .assistant-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+        .assistant-body::-webkit-scrollbar {
+            width: 5px;
+        }
+        .assistant-body::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+        }
+        .dark .assistant-body::-webkit-scrollbar-thumb {
+            background: #4b5563;
+        }
+
+        .assistant-shortcuts {
+            display: grid;
+            /* 快捷功能已增至 5 个（新增「全部工具」）：用 auto-fit 让它按抽屉宽度自适应排布，
+               窄屏仍 4 个一行、第 5 个换行，宽屏一行放下 5 个 —— 比写死 4 列多一个孤零零的第二行好 */
+            grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .assistant-shortcut {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 4px;
+            border-radius: 10px;
+            background: #f3f4f6;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+            color: #4b5563;
+            gap: 4px;
+        }
+        .assistant-shortcut:hover {
+            background: #e5e7eb;
+            transform: translateY(-1px);
+        }
+        .assistant-shortcut i {
+            font-size: 18px;
+            color: #3b82f6;
+        }
+        .dark .assistant-shortcut {
+            background: #374151;
+            color: #d1d5db;
+        }
+        .dark .assistant-shortcut:hover {
+            background: #4b5563;
+        }
+
+        .assistant-categories {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        /* 阶段10B：政策要点更新提示条 */
+        .assistant-policy-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .assistant-policy-banner > i {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner > span {
+            flex: 1;
+        }
+        .assistant-policy-banner-close {
+            background: none;
+            border: none;
+            color: #60a5fa;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 4px;
+            flex-shrink: 0;
+        }
+        .assistant-policy-banner-close:hover {
+            color: #1e40af;
+        }
+        .dark .assistant-policy-banner {
+            background: #172554;
+            border-color: #1e3a8a;
+            color: #bfdbfe;
+        }
+        .dark .assistant-policy-banner-close {
+            color: #93c5fd;
+        }
+        .dark .assistant-policy-banner-close:hover {
+            color: #dbeafe;
+        }
+
+        .assistant-cat {
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .assistant-cat:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .assistant-cat.assistant-cat-active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .dark .assistant-cat {
+            background: #374151;
+            border-color: #4b5563;
+            color: #d1d5db;
+        }
+        .dark .assistant-cat.assistant-cat-active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+
+        .assistant-qa-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .assistant-qa-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .assistant-qa-item:hover {
+            border-color: #93c5fd;
+        }
+        .dark .assistant-qa-item {
+            border-color: #4b5563;
+        }
+        .dark .assistant-qa-item:hover {
+            border-color: #60a5fa;
+        }
+
+        .assistant-qa-q {
+            display: flex;
+            align-items: center;
+            padding: 12px 14px;
+            cursor: pointer;
+            gap: 8px;
+            background: #f9fafb;
+            transition: background 0.2s;
+        }
+        .assistant-qa-q:hover {
+            background: #f3f4f6;
+        }
+        .dark .assistant-qa-q {
+            background: #374151;
+        }
+        .dark .assistant-qa-q:hover {
+            background: #4b5563;
+        }
+        .assistant-qa-icon {
+            color: #3b82f6;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .assistant-qa-q-text {
+            flex: 1;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1f2937;
+            line-height: 1.5;
+        }
+        .dark .assistant-qa-q-text {
+            color: #f3f4f6;
+        }
+        .assistant-qa-arrow {
+            font-size: 12px;
+            color: #9ca3af;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        .assistant-qa-a {
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #4b5563;
+            line-height: 1.7;
+            background: white;
+            border-top: 1px solid #f3f4f6;
+        }
+        .dark .assistant-qa-a {
+            color: #d1d5db;
+            background: #1f2937;
+            border-top-color: #374151;
+        }
+        .assistant-mark {
+            background: #fef08a;
+            color: #1f2937;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+        .dark .assistant-mark {
+            background: #854d0e;
+            color: #fef3c7;
+        }
+
+        .assistant-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #9ca3af;
+        }
+        .assistant-empty i {
+            font-size: 36px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .assistant-empty p {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .assistant-empty-hint {
+            font-size: 12px;
+            color: #d1d5db;
+        }
+
+        /* 搜索清空按钮 */
+        .assistant-search-clear {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #9ca3af;
+            font-size: 16px;
+            padding: 2px;
+            line-height: 1;
+        }
+        .assistant-search-clear:hover {
+            color: #6b7280;
+        }
+
+        /* 搜索历史 / 联想下拉 */
+        .assistant-suggest {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 20px;
+            right: 20px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 50;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+        .assistant-suggest-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: #9ca3af;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .assistant-suggest-clear {
+            background: none;
+            border: none;
+            color: #3b82f6;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .assistant-suggest-item {
+            padding: 9px 12px;
+            font-size: 13px;
+            color: #374151;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s;
+        }
+        .assistant-suggest-item:hover,
+        .assistant-suggest-item.suggest-active {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+        .assistant-suggest-item i {
+            color: #9ca3af;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .assistant-suggest-item .sg-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .dark .assistant-suggest {
+            background: #1f2937;
+            border-color: #4b5563;
+        }
+        .dark .assistant-suggest-head {
+            border-bottom-color: #374151;
+        }
+        .dark .assistant-suggest-item {
+            color: #d1d5db;
+        }
+        .dark .assistant-suggest-item:hover,
+        .dark .assistant-suggest-item.suggest-active {
+            background: #374151;
+            color: #93c5fd;
+        }
+
+        /* 热门问题区 */
+        .assistant-hot {
+            margin-bottom: 14px;
+        }
+        .assistant-hot-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .assistant-hot-title i {
+            color: #ef4444;
+        }
+        .assistant-hot-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .assistant-hot-chip {
+            padding: 5px 11px;
+            border-radius: 14px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .assistant-hot-chip:hover {
+            background: #fee2e2;
+            transform: translateY(-1px);
+        }
+        .dark .assistant-hot-title {
+            color: #9ca3af;
+        }
+        .dark .assistant-hot-chip {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        .dark .assistant-hot-chip:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* 收藏筛选 chip（带星标） */
+        .assistant-cat.assistant-cat-fav {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .assistant-cat.assistant-cat-fav i {
+            font-size: 11px;
+        }
+        .assistant-cat.assistant-cat-fav.assistant-cat-active {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        /* Q&A 答案底部操作栏 */
+        .assistant-qa-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed #e5e7eb;
+            flex-wrap: wrap;
+        }
+        .assistant-fav-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #6b7280;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .assistant-fav-btn:hover {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+        .assistant-fav-btn.fav-active {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #b45309;
+        }
+        .assistant-fav-btn.fav-active i {
+            color: #f59e0b;
+        }
+        .assistant-feedback {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .assistant-fb-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #6b7280;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .assistant-fb-btn:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .assistant-fb-btn.fb-clicked {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+        }
+        .assistant-fb-btn.fb-clicked.fb-bad {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #b91c1c;
+        }
+        .assistant-fb-count {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .assistant-related-btn {
+            margin-left: auto;
+            background: #3b82f6;
+            border: none;
+            border-radius: 14px;
+            padding: 5px 12px;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .assistant-related-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        /* API 同步中指示器：按钮半透明 + 脉冲动画 + 小转圈 */
+        .api-syncing {
+            opacity: 0.65;
+            pointer-events: none;
+            position: relative;
+        }
+        .api-syncing::after {
+            content: '';
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            margin-top: -4px;
+            border: 1.5px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: api-spin 0.6s linear infinite;
+        }
+        @keyframes api-spin {
+            to { transform: rotate(360deg); }
+        }
+        .dark .assistant-qa-footer {
+            border-top-color: #374151;
+        }
+        .dark .assistant-fav-btn,
+        .dark .assistant-fb-btn {
+            border-color: #4b5563;
+            color: #9ca3af;
+        }
+        .dark .assistant-fav-btn.fav-active {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+        .dark .assistant-fb-btn.fb-clicked {
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 640px) {
+            .assistant-drawer {
+                width: 100%;
+            }
+            .assistant-header {
+                padding: 12px 16px;
+            }
+            .assistant-title {
+                font-size: 16px;
+            }
+            .assistant-body {
+                padding: 12px 16px;
+            }
+            .assistant-suggest {
+                left: 16px;
+                right: 16px;
+                max-height: 200px;
+            }
+            .assistant-shortcuts {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            /* 修复：iOS Safari 对 font-size < 16px 的 input 会自动缩放页面 */
+            .assistant-search {
+                font-size: 16px;
+            }
+            /* 修复：快捷功能文字过小 */
+            .assistant-shortcut {
+                font-size: 12px;
+            }
+            /* 修复：触摸区偏小，增大 padding 至接近 44px 触摸标准 */
+            .assistant-cat {
+                padding: 8px 14px;
+            }
+            .assistant-hot-chip {
+                padding: 8px 13px;
+            }
+            .assistant-fav-btn {
+                padding: 6px 12px;
+            }
+            .assistant-fb-btn {
+                padding: 6px 12px;
+            }
+            .assistant-related-btn {
+                padding: 7px 14px;
+            }
+        }
+
+        /* 深色模式 */
+        .dark .assistant-fab {
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .dark .assistant-overlay {
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        /* 初始化遮罩：auth-ui 加载完成前隐藏登录页和应用容器，防止旧UI闪现 */
+        body:not(.auth-ready) #login-page,
+        body:not(.auth-ready) #app-container {
+            visibility: hidden !important;
+        }
+        body.auth-ready #init-splash {
+            display: none !important;
+        }
+        #init-splash {
+            position: fixed;
+            inset: 0;
+            z-index: var(--z-emergency);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+        }
+        #init-splash .splash-content {
+            text-align: center;
+        }
+        #init-splash .splash-logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            animation: splash-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes splash-pulse {
+            0%, 100% { opacity: 0.7; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }

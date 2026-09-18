@@ -139,6 +139,8 @@ model Lead {
   phone       String?
   wechat      String?
   company     String?
+  province    String   @default("") // v1.17.0 增补：所在省（省市两级级联下拉采集，顾问按省派单）
+  city        String   @default("") // v1.17.0 增补：所在城市（市名重名时须省+市组合才认得出统筹区）
   entity_type String   @default("unknown") // individual / sole / small / other / unknown
   need        String   @default("")        // 代理记账 / 汇算清缴 / 申报核对 / 咨询 / other
   source      String   @default("unknown") // 触点归因（见 §3.1）
@@ -185,6 +187,8 @@ model Lead {
 | `phone` | 选填，但 `phone` 与 `wechat` **至少提供一个**；提供时须匹配 `^1[3-9]\d{9}$` |
 | `wechat` | 选填，1–64 字符 |
 | `company` | 选填，≤ 100 字符 |
+| `province` | 选填，≤ 20 字符（v1.17.0 增补；省级联「其他/海外」为筛选哨兵值，出参前剔除、**不落库**） |
+| `city` | 选填，≤ 20 字符（v1.17.0 增补；与 `province` 同批，幂等合并时省市各自判断 —— 用户可能只改了城市） |
 | `entityType` | 白名单枚举，非法回落 `unknown` |
 | `need` | 白名单枚举，非法回落 `other` |
 | `source` | 白名单枚举，非法回落 `unknown` |

@@ -54,7 +54,7 @@ router.get('/', requireAdmin, citySocialAdminController.listCitySocial);
  *                         socialBaseMax: { type: number, nullable: true, description: 留空=无上限 }
  *                         housingBaseMin: { type: number }
  *                         housingBaseMax: { type: number, nullable: true }
- *                         housingFundRateOptions: { type: array, items: { type: number }, description: 公积金可选比例，默认 [5,7] }
+ *                         housingFundRateOptions: { type: array, items: { type: number }, description: '公积金可选比例，默认 [5,7]' }
  *                         note: { type: string }
  *               notify:
  *                 type: object

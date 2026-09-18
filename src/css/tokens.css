@@ -1,0 +1,248 @@
+/**
+ * 设计令牌唯一真源（Design Tokens）
+ *
+ * 为什么要有这一层：
+ *   本项目存在**两套互不相通的样式体系** —— App 端是 Tailwind 构建产物
+ *   （src/css/tailwind.css，由仓库根 tailwind.config.js 在构建期编译），
+ *   SEO 落地页用手写 CSS（seo/landing.css，且已经在使用 --brand 变量）。
+ *   两套各自维护色值与字号，改版必然漂移。本文件是唯一的取值来源。
+ *
+ * 消费范围（渐进接入）：
+ *   ✅ 已接入：src/css/toolbox.css（工具箱 + 底部 Tab 栏 + 桌面 Tab 行）
+ *   ✅ 已接入：seo/landing.css（21 个落地页：共享语义色取自本文件，落地页局部色集中在其 :root 一段）
+ *   ⏳ 待接入：tailwind.config.js（原因见下）
+ *
+ * 为什么不直接把 Tailwind config 变量化：
+ *   Tailwind 透明度修饰符（bg-primary/90、focus:ring-primary/50）依赖 <alpha-value>，
+ *   本地构建用的 v3.4.17 原生支持，这条旧 blocker 已消失。
+ *   剩下的真实阻力是**没有视觉回归**：全站几十处 /50 /90 一旦有一处颜色不对，
+ *   纯 DOM 断言看不出来，只能靠人眼翻。因此 Tailwind config 保留 hex 副本，
+ *   与本文件**同值镜像**（改色必须两边同步），全量变量化留到可做视觉回归时执行。
+ *
+ * 命名约定：<类别>-<角色>[-<状态>]
+ */
+:root {
+    /* ====== 字体 ======
+       Inter 从未被加载：原 config 写死 fontFamily.sans = ['Inter', ...]，
+       但全站既无 @font-face 也无 Google Fonts 引用，实际一直在走 system-ui 兜底。
+       这里把真实生效的栈显式写出来，不留误导。
+       中文栈显式给出（苹方 / 微软雅黑），避免不同系统落到字形差异过大的默认字体。 */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                 "Helvetica Neue", Arial, sans-serif;
+    /* 金额 / 税率一律走等宽数字，否则结果表纵向对不齐 */
+    --font-numeric: "SF Mono", "Segoe UI Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+    /* ====== 字号 ======
+       沿用 Tailwind 默认阶梯，只规定使用下限：11px 为绝对下限，
+       更小的字号在中文小屏上不可辨认（text-[10px] 只许用于非文字装饰）。 */
+    --fs-micro: 11px;   /* 徽章 / 角标（下限） */
+    --fs-xs:    12px;   /* 次级说明 */
+    --fs-sm:    14px;   /* 正文（手机） */
+    --fs-base:  16px;   /* 正文（桌面）；输入框强制此值以防 iOS 聚焦缩放 */
+    --fs-lg:    18px;
+    --fs-xl:    20px;
+    --fs-2xl:   24px;
+    --fs-hero:  28px;   /* Hero 金额（手机），桌面见下方 media query */
+
+    /* ====== 颜色 · 语义 ====== */
+    --c-brand:        #1e40af;
+    --c-brand-hover:  #1b3899;
+    --c-brand-subtle: #eff6ff;
+    --c-accent:       #3b82f6;
+    --c-success:      #10b981;  /* 退税（利好） */
+    --c-warning:      #f59e0b;  /* 政策到期提醒 */
+    --c-danger:       #ef4444;  /* 补税（需付出） */
+
+    /* 「白底可读档」与「描边档」：
+       --c-success / --c-warning 是徽章**底色**用的饱和色，直接拿来当文字色对比度不够
+       （emerald-500 在白底约 2.5:1，远低于 WCAG AA 的 4.5:1）。正文与提示框必须取下面这一档。
+       这一组是接入 seo/landing.css 时从落地页迁来的 —— 此前落地页自带 emerald-700 / amber-700 副本。 */
+    --c-success-text: #047857;  /* emerald-700：白底约 4.8:1 */
+    --c-warning-text: #b45309;  /* amber-700 */
+    --c-warning-bg:   #fffbeb;  /* amber-50：提示框底 */
+    --c-warning-line: #fde68a;  /* amber-200：提示框描边 */
+    --c-brand-line:   #c7d2fe;  /* 品牌描边：比 subtle 深一档 —— subtle(#eff6ff) 当边框在白底几乎看不见 */
+    /* 品牌色 rgba 三元组（投影 / 半透明遮罩需要）：与 --c-brand 同色，改色时两处必须同步 */
+    --c-brand-rgb: 30, 64, 175;
+
+    --c-text:   #111827;
+    --c-text-2: #4b5563;
+    /* 弱化文字原为 #9ca3af，白底对比度仅约 2.6:1，不达 WCAG AA（正文需 4.5:1）。
+       改用 #6b7280（约 4.8:1）；#9ca3af 降级为「禁用态」专用。 */
+    --c-text-3:       #6b7280;
+    --c-text-disabled: #9ca3af;
+
+    --c-bg:     #ffffff;
+    --c-bg-2:   #f9fafb;
+    --c-border: #e5e7eb;
+    /* 毛玻璃浮层背景（底部 Tab 栏等）：需要半透明才能透出 blur，
+       不能用实色 --c-bg，否则 backdrop-filter 失去意义 */
+    --c-surface-blur: rgba(255, 255, 255, .96);
+
+    /* ====== 间距（4px 基准栅格） ====== */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+
+    /* ====== 容器宽度 ======
+       注意：Tailwind 侧是 tailwind.config.js 里的字面量副本（未变量化的部分），
+       两者须同值镜像。改其中一侧时要记得同步另一侧，否则同一 App 内页宽会不一致：
+         --c-narrow(720)  ≈ max-w-3xl(768)   → 表单 / 速算器（列表宜宽、表单宜窄）
+         --c-default(1024) = max-w-5xl(1024) → 首页 / 工具页 / 计算页
+         --c-prose(760)                      → SEO 正文（尚未接入） */
+    --c-narrow:  720px;  /* 速算器 / 表单：行长 65–75 字符最优 */
+    --c-default: 1024px; /* 首页 / 列表 / 网格 */
+    --c-prose:   760px;  /* SEO 正文阅读 */
+
+    /* ====== 圆角 ====== */
+    --r-card-sm: 8px;   /* 卡片（手机） */
+    --r-card:    12px;  /* 卡片（桌面） */
+    --r-ctrl:     6px;  /* 按钮 / 输入框 */
+    --r-sheet:   16px;  /* 模态 / 抽屉 */
+
+    /* ====== z-index 层级表 ======
+       这张表是「浮动球压住底部 Tab 栏」的根因治理产物：此前全站 z-index 散布着
+       10 / 45 / 50 / 99 / 100 / 200 / 201 / 9999 / 10000 / 10002 共 10 个魔法值，
+       且浮动球(100) 与模态同级。新增固定层必须取下表的值，不得再写字面量。 */
+    --z-sticky:    30;   /* 二级导航 / 步骤条 */
+    --z-header:    40;   /* 顶部导航头 */
+    --z-tabbar:    45;   /* 手机底部 Tab 栏 */
+    --z-fab:       60;   /* 浮动球：高于 Tab 栏，低于遮罩 */
+    --z-overlay:   90;   /* 遮罩 */
+    --z-drawer:    95;   /* 侧边抽屉 */
+    --z-modal:    100;   /* 模态 */
+    --z-toast:    200;   /* 全局 Toast */
+    --z-emergency: 9999; /* 初始化遮罩 / 顶部强制横幅（冻结，不再增长） */
+
+    /* 尚未接入本表的已知字面值（有意保留，改前请三思）：
+       1) src/js/share/share-card.js 的 Toast(10002) 与预览遮罩(10000)：
+          server/scripts/verify-local-auth.js 与 tests/share-card.test.js
+          都以字符串断言钉住这两个值 —— 要改必须同步改门禁注释与测试。
+       2) .assistant-suggest(50)：抽在抽屉自己的层叠上下文里（抽屉 z-index 创建
+          上下文），不参与全局排序，迁移无收益。
+       3) 卡片内局部 loading 遮罩(10)：同理属于局部上下文。 */
+
+    /* ====== 动效 ====== */
+    --dur-micro: 150ms;
+    --dur-page:  200ms;
+    --dur-sheet: 250ms;
+    --ease: cubic-bezier(.4, 0, .2, 1);
+
+    /* ====== 档位与交易（为后续支付预留，当前无 UI 消费） ======
+       现有三档体系：基础版 / 14 天体验版 / 专业版，入口已收敛到
+       #topbar-plan-badge 与 #profile-nav-upgrade 两处（阶段14 入口收敛，不许再增）。 */
+    --plan-free:  #6b7280;
+    --plan-trial: #0891b2;
+    --plan-pro:   #b45309;
+    --pay-processing: #3b82f6;
+    --pay-success:    #10b981;
+    --pay-failed:     #ef4444;
+    --pay-refunded:   #6b7280;
+
+    /* 价格展示：整数大、小数小、货币符弱化 */
+    --fs-price-int:  1.75rem;
+    --fs-price-dec:  0.875rem;
+    --fs-price-unit: 0.75rem;
+
+    /* ====== 布局槽位 ====== */
+    --nav-h-desktop:  56px;  /* 顶栏行高 */
+    --nav-h-tabrow:   44px;  /* 桌面 Tab 行高 */
+    --tabbar-h-mobile: 52px; /* 手机底栏内容高（安全区另加） */
+    --assistant-w:   480px;  /* 助手侧栏宽：既是抽屉宽度，也是桌面推开时内容区让出的宽度 */
+    /* 注：浮动球不靠这里预留变量，而是直接读 #bottom-tabbar 的 offsetHeight
+       （见 tax-assistant-ui.js 的 fabBottomReserved）。底栏高度若调整，
+       静态令牌会漂移，实测值不会；桌面形态底栏 display:none 时实测为 0。 */
+}
+
+/* ====== 深色模式 ====== */
+.dark {
+    --c-brand:        #60a5fa;
+    --c-brand-hover:  #93c5fd;
+    --c-brand-subtle: #1e3a8a;
+    --c-accent:       #93c5fd;
+    --c-success:      #34d399;
+    --c-warning:      #fbbf24;
+    --c-danger:       #f87171;
+
+    --c-brand-rgb: 96, 165, 250;
+    /* 「白底可读档」暂无深色对应的消费方（落地页不提供深色模式），接入时再按深色对比度补 */
+
+    --c-text:         #f9fafb;
+    --c-text-2:       #d1d5db;
+    --c-text-3:       #9ca3af;
+    --c-text-disabled: #6b7280;
+
+    --c-bg:     #111827;
+    --c-bg-2:   #1f2937;
+    --c-border: #374151;
+    --c-surface-blur: rgba(17, 24, 39, .96);
+}
+
+/* ====== 桌面：Hero 金额放大 ====== */
+@media (min-width: 768px) {
+    :root {
+        --fs-hero: 34px;
+    }
+}
+
+/* ====== 无障碍：尊重系统「减少动效」偏好 ====== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ====== Tailwind 产物兜底：只兜 display 类 ======
+   *
+   * 为什么要兜：站点的显隐几乎全靠 Tailwind 工具类（.hidden / .flex / .block）。
+   *   Tailwind 自 1.38.0 起是构建期编译，产物 src/css/tailwind.css 随源码入仓 ——
+   *   这换掉了「CDN 抖动」这个老风险，却换来一个**更容易真发生**的：
+   *   改了类名没跑 npm run build:css、或新产物忘了提交，线上加载的就是旧的那份。
+   *   此时 .hidden 会**静默失效**：类名仍挂在 DOM 上、控制台一条报错都没有，
+   *   但登录页盖住整个应用 —— 用户看到的是「登录没反应 / 永远停在登录页」。
+   *   这段兜底就是为此留的地基：宁可样式降级，也不能整站卡死。
+   *
+   * 为什么产物正常时不会打架：Tokens 先于 Tailwind 加载（见 index.html 的 <link> 次序），
+   *   选择器权重相同 → 取后加载的那份。下方规则与 Tailwind 默认值**同值**，
+   *   两份结果一致，不存在谁压谁；产物缺失或过期时才由本段接管。
+   *
+   * 为什么不用 !important：加了就会反向压制 Tailwind 的响应式变体（md:flex / sm:hidden
+   *   一类），把「产物正常」这个主场景弄坏。宁可在产物出问题时样式降级，
+   *   也不能让正常场景出错。
+   *
+   * 为什么只到 display：兜底目标是「不致命」，不是「重写 Tailwind」。
+   *   间距 / 配色 / 布局类在产物缺失时确实会散，但那是看得见的坏，用户能感知并反馈；
+   *   而「元素该隐没隐」会把整个流程卡死，且不报错。
+   *
+   * 顺序不可调整：.hidden 必须排在所有 display 类**之后**。
+   *  Tailwind 自己的 display 顺序也是 hidden 压轴，这样 class="flex hidden" 才算
+   *  「既是 flex 布局、当前又隐藏」；若把 .hidden 放在 .flex 之前，
+   *  权重相同下后出现的 .flex 会赢，元素反而显示出来 —— 那就本末倒置了。 */
+.block        { display: block; }
+.inline-block { display: inline-block; }
+.inline       { display: inline; }
+.flex         { display: flex; }
+.inline-flex  { display: inline-flex; }
+.table        { display: table; }
+.inline-table { display: inline-table; }
+.table-caption { display: table-caption; }
+.table-cell   { display: table-cell; }
+.table-row    { display: table-row; }
+.flow-root    { display: flow-root; }
+.grid         { display: grid; }
+.inline-grid  { display: inline-grid; }
+.contents     { display: contents; }
+.list-item    { display: list-item; }
+/* 浏览器对 [hidden] 的默认 display:none 会被上面的同类规则压掉，这里显式补回 */
+[hidden],
+.hidden       { display: none; }

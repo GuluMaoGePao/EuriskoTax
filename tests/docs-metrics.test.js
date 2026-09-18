@@ -71,6 +71,43 @@ describe('文档口径与实测一致', () => {
     });
 });
 
+// 文档登记守护（2026-09-17）
+//
+// 背景：2026-09-16 / 09-17 新增的两份 UI 方案（`ui-ux-master-plan.md` / `dual-end-ui-plan.md`）
+// **从未被登记进 `docs/README.md`** —— 该索引最后更新停在 09-14，早于它们的创建日。
+// 后果不是报错，而是「想要的东西存在，但必须一层层点链接才找得到」：
+// 唯一入口变成被别的文档引用，文档之间越套越深，没人敢删也没人找得到。
+//
+// 这里把「新增文档必须登记」从口头纪律变成会红的断言 —— 否则下一次还是会漏。
+describe('docs 索引登记不能有遗漏', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const DOCS_ROOT = path.resolve(__dirname, '../docs');
+    const readme = () => fs.readFileSync(path.join(DOCS_ROOT, 'README.md'), 'utf8');
+
+    function docsMarkdowns() {
+        const files = [];
+        (function walk(dir) {
+            fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (e.name.endsWith('.md')) files.push(path.relative(DOCS_ROOT, full).replace(/\\/g, '/'));
+            });
+        })(DOCS_ROOT);
+        return files.filter((f) => f !== 'README.md');
+    }
+
+    test('docs 下每个 .md 都能在 docs/README.md 里找到（新增文档必须登记）', () => {
+        const content = readme();
+        const unlisted = docsMarkdowns().filter((rel) => !content.includes(rel));
+        expect(unlisted).toEqual([]);
+    });
+
+    test('至少扫到了足够多的文档（防目录改名后断言空转）', () => {
+        expect(docsMarkdowns().length).toBeGreaterThan(20);
+    });
+});
+
 // 旧口径残留防护（2026-09-13 加固）
 //
 // 旧实现只校验「每份文件里数值最大的那一条」项数声明，同文件内其余出现既不校验、也不要求版本前缀 ——

@@ -50,5 +50,10 @@ window.EuriskoEngine = {
     // 通用工具（utils.js）
     getTaxRate: getTaxRate,
     calculateRegularIncome: calculateRegularIncome,
-    generateOptimizationTips: generateOptimizationTips
+    generateOptimizationTips: generateOptimizationTips,
+
+    // 通用求解器（solver.js）—— Phase 2.5 ①：8 份手写二分合成这一个实现后，
+    //   「反推」类算法有了唯一的改动点，也就能被这里统一暴露给方案对比 / B 端 API / 小程序复用
+    solveMonotone: solveMonotone,
+    expandUpperBound: expandUpperBound
 };

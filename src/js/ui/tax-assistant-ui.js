@@ -827,6 +827,9 @@
         isOpen = true;
         drawer.classList.add('assistant-drawer-open');
         drawer.classList.remove('assistant-drawer-closed');
+        // 桌面推开形态的唯一开关：是否推开、让出多少宽度，全部由 CSS 按视口宽度决定。
+        // JS 不判断宽度 —— 判断就要监听 resize，两端形态还得各维护一遍。
+        document.body.classList.add('assistant-open');
         clearFabCollapseTimer();
         if (fab) fab.style.display = 'none';
         if (overlay) overlay.classList.add('assistant-overlay-visible');
@@ -887,6 +890,8 @@
         isOpen = false;
         drawer.classList.remove('assistant-drawer-open');
         drawer.classList.add('assistant-drawer-closed');
+        // 必须摘掉标记：残留会让内容区永久留白一整个侧栏的宽度
+        document.body.classList.remove('assistant-open');
         if (fab) fab.style.display = 'flex';
         if (overlay) overlay.classList.remove('assistant-overlay-visible');
         // 关闭抽屉后恢复悬浮球：先完整露出一下再自动回缩为半隐（隐藏态则保持隐藏）
@@ -1109,7 +1114,8 @@
 
     // ====== FAB 位置：恢复 / 保存 / 应用 ======
     function applyFabPosition(fab, side, offsetTop) {
-        var maxTop = window.innerHeight - FAB_SIZE - FAB_MARGIN;
+        // 底部预留量按当前是否有底栏实时计算，避免把球塞进 Tab 栏占位里
+        var maxTop = window.innerHeight - FAB_SIZE - FAB_MARGIN - fabBottomReserved();
         var minTop = FAB_MARGIN;
         var rawTop = offsetTop;
         var top = Math.max(minTop, Math.min(maxTop, offsetTop));
@@ -1146,7 +1152,7 @@
 
     function restoreFabPosition(fab) {
         var side = 'right';
-        var offsetTop = window.innerHeight - FAB_SIZE - 24; // 默认右下角
+        var offsetTop = window.innerHeight - FAB_SIZE - 24 - fabBottomReserved(); // 默认右下角（避开底栏）
         var source = 'default';
         try {
             var saved = localStorage.getItem(STORAGE_KEY);
@@ -1210,6 +1216,18 @@
             if (flag) localStorage.setItem(FAB_HIDDEN_KEY, '1');
             else localStorage.removeItem(FAB_HIDDEN_KEY);
         } catch (err) {}
+    }
+
+    // ====== 悬浮球底部避让 ======
+    // 手机形态下底部 Tab 栏常驻占位：悬浮球默认停在距底 24px，正好落在 Tab 栏上，
+    // 而层级表里球(60) 高于 Tab 栏(45)，结果就是「税助手」压住导航按钮。
+    // 这里读 DOM 实测高度而不是写死 52px：底栏高度将来可能调，读实测量不会漂移；
+    // 桌面形态底栏 display:none，offsetHeight 自然为 0，无需再判断点。
+    function fabBottomReserved() {
+        var bar = document.getElementById('bottom-tabbar');
+        // 显式判一次 hidden：底栏被切走时不应再留白（计算页没有底栏）
+        if (!bar || bar.classList.contains('hidden')) return 0;
+        return bar.offsetHeight || 0;
     }
 
     // 半隐时需向外移出的距离：margin + 球宽 - 想露出的宽度
@@ -1386,7 +1404,8 @@
         var newLeft = dragState.origLeft + dx;
         var newTop = dragState.origTop + dy;
         var clampedLeft = Math.max(FAB_MARGIN, Math.min(window.innerWidth - FAB_SIZE - FAB_MARGIN, newLeft));
-        var clampedTop = Math.max(FAB_MARGIN, Math.min(window.innerHeight - FAB_SIZE - FAB_MARGIN, newTop));
+        var clampedTop = Math.max(FAB_MARGIN,
+            Math.min(window.innerHeight - FAB_SIZE - FAB_MARGIN - fabBottomReserved(), newTop));
 
         fab.style.left = clampedLeft + 'px';
         fab.style.top = clampedTop + 'px';

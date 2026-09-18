@@ -94,28 +94,29 @@
         };
         if (!Social || !budget) return empty;
 
-        var lo = 0;
-        var hi = budget;
+        var Solver = window.EuriskoSolver;
         var iterations = 0;
         // 理论上 hi = budget 已够用；极端参数（自定义超高单位费率）下再翻倍兜底
-        while (monthlyCostAt(hi, input) < budget && iterations < 40) {
-            hi *= 2;
-            iterations += 1;
-        }
-        if (monthlyCostAt(hi, input) < budget) return Object.assign(empty, { iterations: iterations });
+        var expanded = Solver.expandUpperBound({
+            start: budget,
+            target: budget,
+            maxExpansions: 40,
+            at: function (wageAt) { return monthlyCostAt(wageAt, input); }
+        });
+        iterations += expanded.iterations;
+        if (!expanded.reached) return Object.assign(empty, { iterations: iterations });
 
-        for (var i = 0; i < 80 && hi - lo > 0.01; i++) {
-            var mid = (lo + hi) / 2;
-            if (monthlyCostAt(mid, input) >= budget) {
-                hi = mid;
-            } else {
-                lo = mid;
-            }
-            iterations += 1;
-        }
+        var solved = Solver.solveMonotone({
+            lo: 0,
+            hi: expanded.hi,
+            maxIterations: 80,
+            increase: function (wageAt) { return monthlyCostAt(wageAt, input) < budget; }
+        });
+        iterations += solved.iterations;
 
         // 向下取整到分：保证「按这个工资发，成本不超过预算」
-        var wage = round(Math.floor(hi * 100) / 100);
+        // （这里必须取下侧 hi 而不是中点 —— 预算红线的语义是「一毛都不能超」）
+        var wage = round(Math.floor(solved.hi * 100) / 100);
         var cost = costOf(Object.assign({}, input, { wage: wage }));
 
         return {

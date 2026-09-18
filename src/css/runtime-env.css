@@ -1,0 +1,52 @@
+/* ===== Phase 1.5：运行时形态适配（刘海 / 手势条 / PWA 独立窗口）=====
+ *
+ * 为什么单独一个文件：
+ *   1) `env(safe-area-inset-*)` 只有在 viewport 带 `viewport-fit=cover` 时才可能非 0。
+ *      改造前 index.html 的 viewport **没有** cover，因此旧代码里那几处 env()
+ *      （`.bottom-tabbar` 的 padding-bottom、share-card 的 toast top）**全是空操作**：
+ *      写了、看着也对，实际恒为 0，手势条依旧压着底栏按钮。这是一类典型的静默失效。
+ *   2) PWA standalone（加到主屏幕后）没有浏览器工具栏，状态栏会直接压住顶栏，
+ *      必须另外留出这段 inset 高度。
+ *
+ * 原则：
+ *   - 只做「留白」，不做重排；inset 为 0（桌面 / 非刘海设备 / 竖屏左右）时全部规则退化为无影响。
+ *   - 顶栏 `.compact-nav` 在 tailwind 里被写成**固定高度 56px**，所以不能给它加 padding
+ *     （border-box 下会挤压内部 logo 区），改为在 body 顶部留出 inset，让贴顶元素整体下移。
+ */
+
+:root {
+    --inset-top: env(safe-area-inset-top, 0px);
+    --inset-bottom: env(safe-area-inset-bottom, 0px);
+    --inset-left: env(safe-area-inset-left, 0px);
+    --inset-right: env(safe-area-inset-right, 0px);
+}
+
+/* 顶部状态栏 / 刘海：整体下移，避免贴顶导航被状态栏压住。
+   固定层（position:fixed）不受此影响，因此提示条 / 预览遮罩这类浮层仍按视口定位。 */
+body {
+    padding-top: var(--inset-top);
+}
+
+/* 横屏刘海：左右避开不安全区 */
+body {
+    padding-left: var(--inset-left);
+    padding-right: var(--inset-right);
+}
+
+/* 底部 Tab 栏：toolbox.css 里已有 `padding-bottom: env(safe-area-inset-bottom)`，
+   此前因缺 viewport-fit=cover 而无效；这里显式用变量重写一次，避免将来有人改回字面值后静默失效。 */
+.bottom-tabbar {
+    padding-bottom: var(--inset-bottom);
+}
+
+/* PWA 独立窗口：无地址栏，状态栏紧贴内容，必须比浏览器形态更保守 */
+@media (display-mode: standalone) {
+    body {
+        padding-top: var(--inset-top);
+    }
+}
+
+/* iOS 老设备 / 取不到 matchMedia 时用 JS 打的标记兜底（见 runtime-env.js applyStandaloneFlag） */
+html[data-app-mode="standalone"] body {
+    padding-top: var(--inset-top);
+}
