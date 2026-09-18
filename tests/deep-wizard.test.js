@@ -18,6 +18,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
     loadSource('src/js/calculation/helper-functions.js');
+    loadSource('src/js/calculation/utils.js');   // renderFormulaStepsHtml：推导链渲染的唯一实现
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
@@ -225,6 +226,60 @@ describe('多步向导：第四个税种（社保公积金）', () => {
             wage: 20000, socialAverage: 8000, housingRate: 12, specialMonthly: 0
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
+    });
+});
+
+// 17A-2：结果区与存量 4 页**对等** —— 这是 17B 反向迁移能不能动工的验收口径。
+// 存量 4 个页面式 deep 都有四件套：查看计算过程（推导链）、免责声明、保存、导出 PDF·Word。
+// spec 驱动的向导缺任何一样，迁移过去就是功能降级，所以先在这里补齐并钉住。
+describe('多步向导：结果区与存量页面对等（17A-2）', () => {
+    function toResult(toolId) {
+        W().open(toolId, { fresh: true });
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();     // → 结果步
+    }
+
+    test('结果区给出推导链与免责声明（与速算器同一套渲染）', () => {
+        toResult('vat-deep');
+        const panel = document.getElementById('dw-formula-panel');
+        expect(panel).toBeTruthy();
+        expect(panel.textContent).toContain('价税分离');       // 小规模最容易错的一步
+        expect(document.querySelector('.result-disclaimer').textContent).toContain('不构成税务建议');
+    });
+
+    test('保存走存量同一处（tax-calculator 的 saveToHistory），不开第二套历史', () => {
+        window.saveToHistory = jest.fn();
+        toResult('vat-deep');
+        document.getElementById('dw-save').click();
+        expect(window.saveToHistory).toHaveBeenCalledTimes(1);
+        const args = window.saveToHistory.mock.calls[0];
+        expect(args[1]).toBe('vat-deep');
+        expect(args[0].toolId).toBe('vat-deep');
+        expect(args[0].primary).toEqual(expect.objectContaining({ label: '应纳增值税' }));
+    });
+
+    test('导出 PDF / Word 不被存量页面的「请先进行计算」拦下', () => {
+        window.exportToPDF = jest.fn();
+        window.exportToWord = jest.fn();
+        toResult('vat-deep');
+        document.getElementById('dw-export-pdf').click();
+        document.getElementById('dw-export-word').click();
+
+        expect(window.exportToPDF).toHaveBeenCalledTimes(1);
+        expect(window.exportToWord).toHaveBeenCalledTimes(1);
+        // 两个导出函数默认校验的是存量 4 页的全局 results，spec 向导必须显式跳过
+        expect(window.exportToPDF.mock.calls[0][2].skipResultCheck).toBe(true);
+        expect(window.exportToWord.mock.calls[0][2].skipResultCheck).toBe(true);
+        // 报告内容非空：带着主结果，不是空壳
+        expect(window.exportToPDF.mock.calls[0][2].contentBuilder()).toContain('应纳增值税');
+        expect(window.exportToWord.mock.calls[0][2].content).toContain('应纳增值税');
+    });
+
+    test('还没到结果步就没有保存 / 导出按钮（不许导出半截结果）', () => {
+        W().open('vat-deep', { fresh: true });
+        expect(document.getElementById('dw-save')).toBeFalsy();
+        expect(document.getElementById('dw-export-pdf')).toBeFalsy();
+        expect(document.getElementById('dw-export-word')).toBeFalsy();
     });
 });
 

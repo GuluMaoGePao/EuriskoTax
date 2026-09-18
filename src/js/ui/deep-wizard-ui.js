@@ -21,8 +21,10 @@
 
     var PAGE_ID = 'deep-wizard-page';
     var DRAFT_PREFIX = 'euriskoDeepDraft:';
+    // 与存量 4 页同一句话、同样就地展示（不藏在页脚）—— 测算 ≠ 申报，这句话必须跟着结果走。
+    var DISCLAIMER = '测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。';
 
-    var state = { toolId: null, stepIndex: 0, values: {} };
+    var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null };
 
     function R() { return window.EuriskoToolRegistry; }
     function TB() { return window.EuriskoToolbox; }
@@ -103,22 +105,123 @@
             '</div>';
     }
 
+    // 导出用内容：两个导出函数默认读的是存量 4 页的**全局 results**（spec 向导没有这些全局变量，
+    // 不跳过校验就会被「请先进行计算」挡回来），所以这里按同一份 out 自己拼一份报告。
+    function exportHtml(tool, out) {
+        var rows = (out.rows || []).map(function (r) {
+            return '<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;color:#4b5563">' + esc(r.label) +
+                '</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600">' +
+                esc(TB().fmtValue(r.value, r.kind)) + '</td></tr>';
+        }).join('');
+        return '<div style="padding:24px;font-family:-apple-system,\'Segoe UI\',\'Microsoft YaHei\',sans-serif;color:#1f2937">' +
+            '<h2 style="margin:0 0 4px;font-size:18px">' + esc(tool.name) + '</h2>' +
+            '<div style="color:#6b7280;font-size:12px">' + esc(tool.subtitle || '') + '</div>' +
+            '<div style="margin:16px 0;padding:12px;background:#f3f4f6;border-radius:8px">' +
+                '<div style="font-size:12px;color:#6b7280">' + esc(out.primary.label) + '</div>' +
+                '<div style="font-size:24px;font-weight:700">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
+            '</div>' +
+            '<table style="width:100%;border-collapse:collapse;font-size:13px">' + rows + '</table>' +
+            (out.note ? '<p style="margin-top:12px;font-size:12px;color:#6b7280">' + esc(out.note) + '</p>' : '') +
+            '<p style="margin-top:16px;font-size:11px;color:#9ca3af">' + DISCLAIMER + '</p>' +
+            '</div>';
+    }
+
+    // 保存到历史：与存量 4 页**同一处**（tax-calculator.js 的 saveToHistory → calculationHistory），
+    // 这样历史记录页不必为 spec 驱动的向导开特例 —— 17B 迁移后入口换了、历史还是那一条。
+    function saveResult(tool) {
+        var out = state.lastResult;
+        if (!out) {
+            if (typeof showAlert === 'function') showAlert('请先完成计算后再保存');
+            return;
+        }
+        if (typeof saveToHistory !== 'function') {
+            console.warn('[deep-wizard] saveToHistory 未加载，保存被跳过');
+            return;
+        }
+        saveToHistory({
+            toolId: tool.id,
+            values: state.values,
+            primary: out.primary,
+            rows: out.rows || [],
+            note: out.note || ''
+        }, tool.id, tool.name);
+    }
+
+    function exportResult(tool, kind) {
+        var out = state.lastResult;
+        if (!out) {
+            if (typeof showAlert === 'function') showAlert('请先完成计算后再导出');
+            return;
+        }
+        var html = exportHtml(tool, out);
+        var title = tool.name + '测算表';
+        if (kind === 'pdf') {
+            if (typeof exportToPDF !== 'function') {
+                console.warn('[deep-wizard] exportToPDF 未加载，导出被跳过');
+                return;
+            }
+            // skipResultCheck：导出函数默认校验存量 4 页的全局 results，spec 向导没有那些变量
+            exportToPDF(null, title, { skipResultCheck: true, contentBuilder: function () { return html; } });
+            return;
+        }
+        if (typeof exportToWord !== 'function') {
+            console.warn('[deep-wizard] exportToWord 未加载，导出被跳过');
+            return;
+        }
+        exportToWord(null, title, { skipResultCheck: true, content: html });
+    }
+
     function resultHtml(tool) {
         var out = null;
         try { out = tool.compute(state.values); } catch (e) { out = null; }
         if (!out || !out.primary) {
             return '<div class="card"><p class="text-sm text-gray-600">暂无结果，请返回检查输入。</p></div>';
         }
+        state.lastResult = out;     // 保存 / 导出按钮要用，避免再算一遍（口径也不会走岔）
+
         var rows = (out.rows || []).map(function (r) {
             return '<div class="flex items-center justify-between py-2 border-b border-gray-100">' +
-                '<span class="text-sm text-gray-600">' + esc(r.label) + '</span>' +
+                '<span class="text-sm text-gray-600">' + esc(r.label) +
+                (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-400" title="' + esc(r.hint) + '"></i>' : '') +
+                '</span>' +
                 '<span class="font-medium">' + esc(TB().fmtValue(r.value, r.kind)) + '</span></div>';
         }).join('');
-        return '<div class="card">' +
+
+        // 推导链（台账 C）：与速算器**同一套约定** —— compute 返回 steps，渲染走 utils.js 的
+        // renderFormulaStepsHtml。不写第二套：20 个速算器与存量 4 页都在用那一份，写第二份必然漂移。
+        // 它是 17B 迁移的硬前置：存量 4 页都有「查看计算过程」，spec 向导没有就等于迁移即降级。
+        var stepsHtml = '';
+        if (out.steps && out.steps.length) {
+            if (typeof renderFormulaStepsHtml === 'function') {
+                stepsHtml = '<details id="dw-formula-panel" class="mt-4">' +
+                    '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
+                    '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
+                    '<span class="text-xs text-gray-500">每一步都可核对</span>' +
+                    '</summary>' +
+                    '<div class="mt-3">' + renderFormulaStepsHtml(out.steps) + '</div>' +
+                    '</details>';
+            } else {
+                // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
+                console.warn('[deep-wizard] renderFormulaStepsHtml 未加载（utils.js），推导链面板被跳过');
+            }
+        }
+
+        return '<div class="card" id="dw-result-card">' +
                 '<div class="text-sm text-gray-600">' + esc(out.primary.label) + '</div>' +
                 '<div class="text-3xl font-bold text-primary my-2">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
                 '<div class="mt-4">' + rows + '</div>' +
                 (out.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(out.note) + '</p>' : '') +
+                stepsHtml +
+                // 免责声明：与存量 4 页同一句话、同样就地展示（不藏在页脚）
+                '<p class="result-disclaimer">' + DISCLAIMER + '</p>' +
+                '<div class="mt-6">' +
+                    '<button id="dw-save" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">' +
+                    '<i class="fa fa-save mr-2"></i>保存计算结果</button>' +
+                    '<button id="dw-export-pdf" class="btn btn-secondary w-full mb-3">' +
+                    '<i class="fa fa-download mr-2"></i>导出PDF报告</button>' +
+                    '<button id="dw-export-word" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">' +
+                    '<i class="fa fa-file-word-o mr-2"></i>导出Word报告</button>' +
+                '</div>' +
                 '<div class="mt-6"><button id="dw-prev" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">' +
                 '<i class="fa fa-arrow-left mr-2"></i>返回上一步</button></div>' +
             '</div>';
@@ -209,6 +312,15 @@
             saveDraft();
             render();
         });
+
+        var saveBtn = document.getElementById('dw-save');
+        if (saveBtn) saveBtn.addEventListener('click', function () { saveResult(tool); });
+
+        var pdfBtn = document.getElementById('dw-export-pdf');
+        if (pdfBtn) pdfBtn.addEventListener('click', function () { exportResult(tool, 'pdf'); });
+
+        var wordBtn = document.getElementById('dw-export-word');
+        if (wordBtn) wordBtn.addEventListener('click', function () { exportResult(tool, 'word'); });
 
         var next = document.getElementById('dw-next');
         if (next) next.addEventListener('click', function () {

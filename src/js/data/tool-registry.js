@@ -1063,7 +1063,35 @@
                             { label: '法定 3% 对照', value: r.statutoryTax, kind: 'money' },
                             { label: '临界提示：再超 1 分即全额计税', value: r.cliffTax, kind: 'money', hint: '免征状态下再多 1 分钱的税额' }
                         ],
-                        note: '免征额度按**全部不含税销售额**判断、含本数；超过即按全额计税，不是只对超出部分计税。'
+                        note: '免征额度按**全部不含税销售额**判断、含本数；超过即按全额计税，不是只对超出部分计税。',
+                        // 推导链（台账 C 同一套 step schema，由 utils.js 的 renderFormulaStepsHtml 渲染）：
+                        // 小规模最容易错的一步就是「拿含税价和 30 万比」，所以第一步必须是价税分离。
+                        steps: [
+                            {
+                                title: '① 价税分离：' + (v.taxIncluded ? '含税价 → 不含税价' : '本身就是不含税价'),
+                                rows: [
+                                    { label: '本期销售额（' + (v.taxIncluded ? '含税' : '不含税') + '）', value: v.sales, format: 'money' },
+                                    { label: '征收率', value: r.rate, format: 'percent' },
+                                    { label: '不含税销售额', value: r.exclusive, format: 'money', note: v.taxIncluded ? '含税价 ÷ (1 + 征收率)' : '无需换算' }
+                                ],
+                                totalLabel: '用于比较免征额度的销售额',
+                                totalValue: r.exclusive,
+                                format: 'money',
+                                footnote: '免征额度比的是**不含税**销售额；直接拿含税价和 30 万比，会把本该免征的算成应税。'
+                            },
+                            {
+                                title: '② 与免征额度比较：' + (r.exempt ? '未超过 → 普票部分免征' : '已超过 → 全额计税'),
+                                rows: [
+                                    { label: r.period === 'quarter' ? '季度免征额度' : '月度免征额度', value: r.threshold, format: 'money' },
+                                    { label: '其中专票销售额', value: v.specialInvoice, format: 'money', note: '专票不享受免征' },
+                                    { label: '法定 3% 对照（未减征）', value: r.statutoryTax, format: 'money' }
+                                ],
+                                totalLabel: '应纳增值税',
+                                totalValue: r.tax,
+                                format: 'money',
+                                footnote: '临界点不是起征点：再多 1 分钱就要按全额计税（¥' + Number(r.cliffTax).toFixed(2) + '），不是只对超出部分计税。'
+                            }
+                        ]
                     };
                 }
                 if (v.variant === 'general') {
@@ -1079,7 +1107,42 @@
                             { label: '实际税负率', value: g.burden, kind: 'percent' },
                             { label: '简易计税 3% 对照', value: g.simplifiedTax, kind: 'money' }
                         ],
-                        note: '应纳税额 = 销项税额 − 进项税额，不足抵扣的留抵下期继续抵扣，不倒欠。'
+                        note: '应纳税额 = 销项税额 − 进项税额，不足抵扣的留抵下期继续抵扣，不倒欠。',
+                        steps: [
+                            {
+                                title: '① 价税分离',
+                                rows: [
+                                    { label: '销售额（' + (v.taxIncluded ? '含税' : '不含税') + '）', value: v.output, format: 'money' },
+                                    { label: '适用税率', value: Number(v.rate), format: 'percent' }
+                                ],
+                                totalLabel: '不含税销售额',
+                                totalValue: g.exclusive,
+                                format: 'money'
+                            },
+                            {
+                                title: '② 销项税额',
+                                rows: [
+                                    { label: '不含税销售额', value: g.exclusive, format: 'money' },
+                                    { label: '适用税率', value: Number(v.rate), format: 'percent' }
+                                ],
+                                totalLabel: '销项税额',
+                                totalValue: g.outputTax,
+                                format: 'money'
+                            },
+                            {
+                                title: '③ 抵扣进项',
+                                rows: [
+                                    { label: '销项税额', value: g.outputTax, format: 'money' },
+                                    { label: '当期进项税额', value: g.inputTax, format: 'money' },
+                                    { label: '留抵税额（结转下期）', value: g.credit, format: 'money' },
+                                    { label: '实际税负率', value: g.burden, format: 'percent' }
+                                ],
+                                totalLabel: '应纳增值税（销项 − 进项）',
+                                totalValue: g.tax,
+                                format: 'money',
+                                footnote: '进项大于销项时留抵下期继续抵扣，**不倒欠**；简易计税 3% 对照为 ¥' + Number(g.simplifiedTax).toFixed(2) + '。'
+                            }
+                        ]
                     };
                 }
                 var p = Q.priceSplitOf({ amount: v.amount, rate: Number(v.rate), taxIncluded: v.taxIncluded });
@@ -1090,8 +1153,23 @@
                         { label: '含税价', value: p.inclusive, kind: 'money' },
                         { label: '税率', value: p.rate, kind: 'percent' }
                     ],
-                    note: '含税价 ÷ (1 + 税率) = 不含税价；误用「含税价 × 税率」会多算税款。'
-                };
+                    note: '含税价 ÷ (1 + 税率) = 不含税价；误用「含税价 × 税率」会多算税款。',
+                    steps: [
+                        {
+                            title: '价税分离',
+                            rows: [
+                                { label: v.taxIncluded ? '含税金额' : '不含税金额', value: v.amount, format: 'money' },
+                                { label: '税率', value: Number(v.rate), format: 'percent' },
+                                { label: '不含税价', value: p.exclusive, format: 'money' },
+                                { label: '含税价', value: p.inclusive, format: 'money' }
+                            ],
+                            totalLabel: '税额',
+                            totalValue: p.tax,
+                            format: 'money',
+                            footnote: '含税价 ÷ (1 + 税率) = 不含税价；误用「含税价 × 税率」会多算税款。'
+                        }
+                    ]
+                    };
             }
         },
         {

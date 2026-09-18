@@ -1,15 +1,19 @@
 // 导出到Word文档
-function exportToWord(elementId, title) {
+function exportToWord(elementId, title, opts) {
+    opts = opts || {};
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0 && 
+    // opts.skipResultCheck：阶段17 spec 驱动的向导没有上面这几个全局变量（它们属于存量 4 页），
+    // 不做这个开关就会被「请先进行计算」挡回来 —— 新增参数，既有两参调用的行为不变。
+    if (!opts.skipResultCheck &&
+        Object.keys(calculationResults).length === 0 && 
         Object.keys(reverseCalculationResults).length === 0 &&
         Object.keys(businessCalculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }
     
-    // 构建Word文档内容
-    const docContent = generateWordDocumentContent(title);
+    // 构建Word文档内容（opts.content：调用方自定义内容，缺省仍走原逻辑）
+    const docContent = opts.content || generateWordDocumentContent(title);
     
     // 创建Blob对象
     const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
