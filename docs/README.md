@@ -1,7 +1,8 @@
 # EuriskoTax 文档中心
 
-> 最后更新：2026-09-14
+> 最后更新：2026-09-18
 > 维护原则：按用途分类存放，本文件为统一入口索引
+> 2026-09-18 新增：`docs/development/main-branch-split-20260918.md`（main 分支拆分记录：主干回退到锚点、阶段15-17 内容迁到特性分支）
 > 2026-09-14 新增：`docs/marketing/business-plan-for-partners.md`（合伙人版商业企划）与 `docs/marketing/gtm-execution-plan.md`（90 天落地执行手册）
 
 ---
@@ -13,6 +14,7 @@
 - **测试**：28 套件 570 个单元测试全部通过（`npm test`，2026-09-13 复跑，含阶段12 C1 税率热更新守护 20 例 + 阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **167/167** 全绿；动了 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练；本机 Docker 已就绪，2026-09-13 实跑 167/167 全绿）
 - **开发阶段**：阶段 8（首批测试用户运营）、阶段 9（PWA）、阶段 10（免费/专业版 ✅ v1.7.0 已上线）、阶段 11（内容/公告中心 ✅ v1.8.0 已上线）、阶段12 A + C1 ✅ 已完成（支付体系与 B 端 API 因 ICP 备案阻塞移至阶段16）、阶段13 获客与转化 ✅ 已完成（v1.12.0）、阶段14 变现与可信度 ✅ **已全部完成并上线**（14A–14D/C2 随 v1.13.0；剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 / v1.16.0 陆续交付三页「年终奖个税」「月薪个税」「汇算清缴」）—— 14A/14B/14C `ProCode` 兑换码 + 14D/C2 城市社保参数库（端上「参保城市」下拉已于 v1.17.0 回退为「默认基数 + 用户自改」，参数库保留待 SEO 落地页复用）+ `/seo/bonus-tax.html` + `/seo/salary-tax.html` + `/seo/annual-settlement.html`（`verify:local` 167/167、单测 28 套件 570 例）→ **下一阶段：阶段15 税务计算能力扩展（多税种）** ⏳ 待开始（先 15A 个税纵深 → 后 15B 企业税种；纯前端、不依赖备案，收编待办落地页「社保基数」「税后工资」），见 [development/stage15-multi-tax-plan.md](development/stage15-multi-tax-plan.md)；其后 **阶段16 迁移与合规升级** ⏳ 待开始（前置 ICP 备案；16D B 端 API 依赖 15B），见 [development/stage16-migration-and-compliance-plan.md](development/stage16-migration-and-compliance-plan.md)；并行线：ICP 备案（3–5 周排队）
 
+- **主干状态（2026-09-18 补记）**：`main`（本地与远端）已回退到锚点 `4f381e8` —— **对外展示版本 v1.17.0**，版本号五处落点与 CHANGELOG 均未改动；v1.25.0 ~ v1.37.11 的 30 个提交与当时未入库的 98 个文件全部迁到分支 `feature/stage15-17-wip`（含 wip 提交 `2793895`），另存保底副本 `backup/main-before-split-20260918`。原因、操作顺序、公网影响与合回方式见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)。**阶段 15 的 SEO 落地页、企微活码、速算器 PDF 导出等本次随回退从公网下线，是预期结果不是故障**
 - **商业与冷启动状态（2026-09-14 补记）**：产品已具备获客条件（转化链路 + 线索管理 + 兑换码收款 + 3 个 SEO 落地页），**尚未开始推广（0 用户 / 0 收入）**；三个点火动作待执行 —— 注册 `.com` 域名（须公司名下）→ 提交 ICP 备案（企业主体 · 有限责任公司，排队 3–5 周）→ 配置企业微信「联系我」活码（当前 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl` 为空，留资弹窗降级为仅留言通道）。战略与财务测算见 [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md)，执行清单见 [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md)
 
 ---
@@ -76,6 +78,7 @@ EuriskoTax/
 | [development/seo-landing-plan.md](development/seo-landing-plan.md) | 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；已交付三页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0、「汇算清缴」✅ v1.16.0，其余词条并入阶段15） | 2026-09-13 |
 | [development/stage15-multi-tax-plan.md](development/stage15-multi-tax-plan.md) | 阶段15 税务计算能力扩展（多税种）方案（15A 个税纵深 / 15B 企业税种 / 15C 社保薪酬 / 15D 架构与守护；含竞品对标与取舍） | 2026-09-13 |
 | [development/stage16-migration-and-compliance-plan.md](development/stage16-migration-and-compliance-plan.md) | 阶段16 迁移与合规升级方案（16A 迁腾讯云国内节点 / 16B 官方支付 / 16C 微信小程序 / 16D B 端 API；含 ICP 备案 checklist） | 2026-09-13 |
+| [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md) | **main 分支拆分记录（2026-09-18）**：主干回退到锚点 `4f381e8` 对外保持 v1.17.0，阶段15-17 的 30 个提交 + 98 个未入库文件迁至 `feature/stage15-17-wip`；含拆分原因、操作顺序、引用位置、公网影响与合回步骤 | 2026-09-18 |
 
 ### 使用与开发指南
 
