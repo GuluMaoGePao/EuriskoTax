@@ -315,3 +315,127 @@ describe('多步向导：最后一个税种类别（残保金与工会经费）'
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });
 });
+
+// 多方案对比（compare，17B-2 的通用能力）
+//
+// 加这个能力是为了让「同一份输入、几套口径」的测算不必再各写一页 —— 反向倒算的
+// 保守 / 均衡 / 激进就是最典型的一张脸。这里钉的不是某个税种的数字，而是**契约**：
+//   ① 有 compare 就给口径卡 + 横向对比表；② 切换口径后界面与明细同步；
+//   ③ 保存 / 导出必须跟着当前口径走（界面看 A、导出 B 是这类工具最伤信用的错）；
+//   ④ 没有 compare 的 spec 一切照旧。
+//
+// 为什么临时换掉 vat-deep 的 compute：DEEP 数组由 registry 私有持有，deep() 返回的是副本，
+// 没法塞一条新 spec 进去；借一个已经是 spec 驱动的壳最省事 —— 但用完必须还，
+// 否则后面凡是用到 vat-deep 的用例都会读到假结果（而且假得很难查）。
+describe('多步向导：多方案对比（compare）', () => {
+    const money = v => TB().fmtValue(v, 'currency');
+    const toolId = 'vat-deep';
+
+    // 三份口径的主结果与明细都不同，才能逼出「切换后整块结果都要跟着换」
+    function fakeCompute() {
+        const scenario = (key, label, gross, net) => ({
+            key, label, why: label + '口径',
+            primary: { label: '目标税前月薪', value: gross, kind: 'currency' },
+            rows: [
+                { label: '到手月薪', value: net, kind: 'currency' },
+                { label: '月均税负', value: gross - net, kind: 'currency' }
+            ]
+        });
+        return {
+            primary: { label: '目标税前月薪', value: 20000, kind: 'currency' },
+            rows: [{ label: '到手月薪', value: 15000, kind: 'currency' }],
+            compare: {
+                label: '三种口径对比',
+                active: 'balanced',
+                scenarios: [
+                    scenario('conservative', '保守', 18000, 15000),
+                    scenario('balanced', '均衡', 20000, 15000),
+                    scenario('aggressive', '激进', 25000, 15000)
+                ]
+            }
+        };
+    }
+
+    let original = null;
+    function mountCompareTool() {
+        const tool = R().get(toolId);
+        original = tool.compute;
+        tool.compute = fakeCompute;
+    }
+    function toResult() {
+        W().open(toolId, { fresh: true });
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();     // → 结果步
+    }
+    afterEach(() => {
+        if (original) { R().get(toolId).compute = original; original = null; }
+    });
+
+    test('有 compare 时给出三张口径卡与横向对比表，默认落在 active 那份', () => {
+        mountCompareTool();
+        toResult();
+
+        expect(document.getElementById('dw-cmp-conservative')).toBeTruthy();
+        expect(document.getElementById('dw-cmp-balanced')).toBeTruthy();
+        expect(document.getElementById('dw-cmp-aggressive')).toBeTruthy();
+        // 默认口径 = compare.active（均衡）
+        expect(document.getElementById('dw-result-primary').textContent).toBe(money(20000));
+        expect(document.getElementById('dw-cmp-balanced').textContent).toContain('当前口径');
+
+        const table = document.querySelector('#dw-result-card table');
+        expect(table).toBeTruthy();
+        expect(table.textContent).toContain('保守');
+        expect(table.textContent).toContain('激进');
+        // 明细跟着当前口径：均衡那份的月均税负 = 20000 - 15000
+        expect(document.querySelector('[data-dw-row="月均税负"]').textContent).toContain(money(5000));
+    });
+
+    test('点另一份口径，主结果与明细跟着换（不许停留在上一次的口径上）', () => {
+        mountCompareTool();
+        toResult();
+        document.getElementById('dw-cmp-conservative').click();
+
+        expect(document.getElementById('dw-result-primary').textContent).toBe(money(18000));
+        expect(document.querySelector('[data-dw-row="月均税负"]').textContent).toContain(money(3000));
+        expect(document.getElementById('dw-cmp-conservative').textContent).toContain('当前口径');
+        expect(document.getElementById('dw-cmp-balanced').textContent).not.toContain('当前口径');
+    });
+
+    test('保存跟着当前口径走：切到激进后存的是激进那份 primary', () => {
+        window.saveToHistory = jest.fn();
+        mountCompareTool();
+        toResult();
+        document.getElementById('dw-cmp-aggressive').click();
+        document.getElementById('dw-save').click();
+
+        expect(window.saveToHistory).toHaveBeenCalledTimes(1);
+        expect(window.saveToHistory.mock.calls[0][0].primary.value).toBe(25000);
+        expect(window.saveToHistory.mock.calls[0][1]).toBe(toolId);
+    });
+
+    test('导出报告带上对比表：拿去签字的不能只有一个数', () => {
+        window.exportToPDF = jest.fn();
+        window.exportToWord = jest.fn();
+        mountCompareTool();
+        toResult();
+        document.getElementById('dw-export-pdf').click();
+        document.getElementById('dw-export-word').click();
+
+        const pdf = window.exportToPDF.mock.calls[0][2].contentBuilder();
+        const word = window.exportToWord.mock.calls[0][2].content;
+        [pdf, word].forEach(function (html) {
+            expect(html).toContain('三种口径对比');
+            expect(html).toContain('保守');
+            expect(html).toContain('激进');
+            expect(html).toContain(money(18000));   // 保守那份的税前月薪
+            expect(html).toContain(money(25000));   // 激进那份的税前月薪
+        });
+    });
+
+    test('没有 compare 的 spec 一切照旧：结果区不带对比表', () => {
+        toResult();     // 未挂载假 compute，真实 spec 本来就没有 compare
+        expect(document.querySelector('#dw-result-card table')).toBeFalsy();
+        expect(document.querySelector('[id^="dw-cmp-"]')).toBeFalsy();
+        expect(document.getElementById('dw-result-primary')).toBeTruthy();
+    });
+});

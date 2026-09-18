@@ -24,7 +24,7 @@
     // 与存量 4 页同一句话、同样就地展示（不藏在页脚）—— 测算 ≠ 申报，这句话必须跟着结果走。
     var DISCLAIMER = '测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。';
 
-    var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null };
+    var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null, compareKey: null };
 
     function R() { return window.EuriskoToolRegistry; }
     function TB() { return window.EuriskoToolbox; }
@@ -105,6 +105,125 @@
             '</div>';
     }
 
+    // ====== 多方案对比（compare）======
+    // 有些测算天然要给好几份答案 —— 反向倒算就是典型：同样的到手目标，「保守 / 均衡 / 激进」
+    // 三种口径给出三个税前数，用户要的是横向比着挑，不是一个孤零零的数。
+    // 交给渲染器承担，spec 只声明结果：compute 返回 compare.scenarios，每行 billboard 同一个 label，
+    // 渲染器负责「切换主口径 + 拼对比表 + 导出带上对比表」。
+    //   compare = { label, active, scenarios: [{ key, label, why?, primary, rows, steps? }] }
+    // 约定：被选中的那一份就是「当前结果」—— 保存 / 导出都跟着它走，不许出现「界面看 A、导出 B」。
+    function activeScenario(cmp) {
+        if (!cmp) return null;
+        var key = state.compareKey || cmp.active;
+        return (cmp.scenarios || []).filter(function (s) { return s.key === key; })[0] || null;
+    }
+
+    // 以**当前口径**重新出一份 out：值的替换在渲染层完成，compute 不必知道自己被切换了
+    function viewOut(out) {
+        var cmp = out.compare;
+        var sc = activeScenario(cmp);
+        if (!sc) return out;
+        return {
+            primary: sc.primary || out.primary,
+            rows: sc.rows || out.rows,
+            steps: sc.steps || out.steps,
+            note: sc.note === undefined ? out.note : sc.note,
+            compare: cmp
+        };
+    }
+
+    // 对比表行集：**主指标自动成为首行**。
+    // 各口径最重要的那个数（primary）正是用户要比的东西，要求每个 spec 记得把它再抄进 rows 是
+    // 个陷阱 —— 抄漏了，界面上卡片还在、导出报告里却只剩明细。所以这里兜底，除非 spec 自己
+    // 已经把主指标写进 rows（那时不再重复加一行，按原样走）。
+    function compareRowSet(cmp) {
+        var scenarios = cmp.scenarios || [];
+        var first = scenarios[0];
+        if (!first) return [];
+        var already = (first.rows || []).some(function (r) { return r.label === first.primary.label; });
+        var labels = (already ? [] : [first.primary.label])
+            .concat((first.rows || []).map(function (r) { return r.label; }));
+        return labels.map(function (label) {
+            var cells = scenarios.map(function (s) {
+                if (s.primary && s.primary.label === label) return s.primary;
+                return (s.rows || []).filter(function (x) { return x.label === label; })[0] || null;
+            });
+            var kind = null;
+            cells.forEach(function (c) { if (!kind && c) kind = c.kind; });
+            return { label: label, kind: kind, cells: cells };
+        });
+    }
+
+    function compareRowHtml(cmp) {
+        var scenarios = cmp.scenarios || [];
+        var active = state.compareKey || cmp.active;
+        // 行序以第一个方案为准：同一次 compute 出来的各方案共用同一套行，
+        // 缺项显示「—」而不是报错 —— 少一个口径不该让整张表消失。
+        return compareRowSet(cmp).map(function (row) {
+            var tds = row.cells.map(function (cell, i) {
+                var on = scenarios[i] && scenarios[i].key === active;
+                return '<td class="px-2 py-2 text-right' + (on ? ' bg-blue-50 font-semibold' : '') + '">' +
+                    (cell ? esc(TB().fmtValue(cell.value, cell.kind || row.kind)) : '—') + '</td>';
+            }).join('');
+            return '<tr class="border-t border-gray-100">' +
+                '<td class="px-2 py-2 text-gray-600">' + esc(row.label) + '</td>' + tds + '</tr>';
+        }).join('');
+    }
+
+    function compareHtml(cmp) {
+        var scenarios = cmp.scenarios || [];
+        if (scenarios.length < 2) return '';
+        var active = state.compareKey || cmp.active;
+        var heads = scenarios.map(function (s) {
+            return '<th class="px-2 py-2 text-right' + (s.key === active ? ' text-primary' : ' text-gray-500') + '">' +
+                esc(s.label) + '</th>';
+        }).join('');
+        var cards = scenarios.map(function (s) {
+            var on = s.key === active;
+            return '<button id="dw-cmp-' + esc(s.key) + '" data-dw-compare="' + esc(s.key) + '"' +
+                ' class="flex-1 min-w-0 text-left px-3 py-2 rounded-lg border ' +
+                (on ? 'border-primary bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50') + '">' +
+                '<div class="text-xs ' + (on ? 'text-primary font-semibold' : 'text-gray-500') + '">' +
+                    esc(s.label) + (on ? ' · 当前口径' : '') + '</div>' +
+                '<div class="text-lg font-bold ' + (on ? 'text-primary' : 'text-gray-800') + '">' +
+                    esc(TB().fmtValue(s.primary.value, s.primary.kind)) + '</div>' +
+                '<div class="text-xs text-gray-500">' + esc(s.primary.label) + '</div>' +
+                (s.why ? '<div class="text-xs text-gray-500 mt-1">' + esc(s.why) + '</div>' : '') +
+                '</button>';
+        }).join('');
+        return '<div class="mt-5">' +
+                '<div class="text-sm font-medium text-gray-800 mb-2">' + esc(cmp.label || '测算口径对比') + '</div>' +
+                '<div class="flex flex-col md:flex-row gap-2">' + cards + '</div>' +
+                '<div class="overflow-x-auto mt-3">' +
+                    '<table class="w-full text-sm">' +
+                        '<thead><tr class="text-xs"><th class="px-2 py-2 text-left text-gray-500">对比项</th>' + heads + '</tr></thead>' +
+                        '<tbody>' + compareRowHtml(cmp) + '</tbody>' +
+                    '</table>' +
+                '</div>' +
+            '</div>';
+    }
+
+    // 导出要走另一套 markup（邮件正文 / Word 不吃 tailwind 类名），所以对比表也有一份简版
+    function compareExportHtml(cmp) {
+        var scenarios = cmp.scenarios || [];
+        if (!scenarios.length) return '';
+        var heads = scenarios.map(function (s) {
+            return '<th style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:#4b5563">' + esc(s.label) + '</th>';
+        }).join('');
+        var rows = compareRowSet(cmp).map(function (row) {
+            var tds = row.cells.map(function (cell) {
+                return '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">' +
+                    (cell ? esc(TB().fmtValue(cell.value, cell.kind || row.kind)) : '—') + '</td>';
+            }).join('');
+            return '<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;color:#4b5563">' + esc(row.label) + '</td>' + tds + '</tr>';
+        }).join('');
+        return '<h3 style="margin:16px 0 8px;font-size:14px">' + esc(cmp.label || '测算口径对比') + '</h3>' +
+            '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+                '<thead><tr><th style="padding:6px 8px;border-bottom:1px solid #eee;text-align:left;color:#4b5563">对比项</th>' + heads + '</tr></thead>' +
+                '<tbody>' + rows + '</tbody>' +
+            '</table>';
+    }
+
     // 导出用内容：两个导出函数默认读的是存量 4 页的**全局 results**（spec 向导没有这些全局变量，
     // 不跳过校验就会被「请先进行计算」挡回来），所以这里按同一份 out 自己拼一份报告。
     function exportHtml(tool, out) {
@@ -121,6 +240,8 @@
                 '<div style="font-size:24px;font-weight:700">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
             '</div>' +
             '<table style="width:100%;border-collapse:collapse;font-size:13px">' + rows + '</table>' +
+            // 多口径测算必须连对比表一起导出：只看一个数就签字，正是这类工具最容易踩的坑
+            (out.compare ? compareExportHtml(out.compare) : '') +
             (out.note ? '<p style="margin-top:12px;font-size:12px;color:#6b7280">' + esc(out.note) + '</p>' : '') +
             '<p style="margin-top:16px;font-size:11px;color:#9ca3af">' + DISCLAIMER + '</p>' +
             '</div>';
@@ -177,13 +298,15 @@
         if (!out || !out.primary) {
             return '<div class="card"><p class="text-sm text-gray-600">暂无结果，请返回检查输入。</p></div>';
         }
-        state.lastResult = out;     // 保存 / 导出按钮要用，避免再算一遍（口径也不会走岔）
+        // 有 compare 时按当前口径取一份视图：保存 / 导出必须跟着界面上这份走
+        var view = viewOut(out);
+        state.lastResult = view;     // 保存 / 导出按钮要用，避免再算一遍（口径也不会走岔）
 
         // 17B-1：spec 驱动的向导是**通用渲染器** —— 结果节点的 id 不按工具区分（dw-result-card
         // 会被所有 spec 工具复用）。所以这次把「结果属于谁」写进 data-tool-id、把「每一行是什么」
         // 写进 data-dw-row：留资归因 / 分享卡 / 埋点都靠这两个锚点认人，避免把增值税的测算
         // 归成因经营所得算过 —— 那是会写进线索表的数据质量问题。
-        var rows = (out.rows || []).map(function (r) {
+        var rows = (view.rows || []).map(function (r) {
             return '<div class="flex items-center justify-between py-2 border-b border-gray-100" data-dw-row="' + esc(r.label) + '">' +
                 '<span class="text-sm text-gray-600">' + esc(r.label) +
                 (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-400" title="' + esc(r.hint) + '"></i>' : '') +
@@ -195,14 +318,14 @@
         // renderFormulaStepsHtml。不写第二套：20 个速算器与存量 4 页都在用那一份，写第二份必然漂移。
         // 它是 17B 迁移的硬前置：存量 4 页都有「查看计算过程」，spec 向导没有就等于迁移即降级。
         var stepsHtml = '';
-        if (out.steps && out.steps.length) {
+        if (view.steps && view.steps.length) {
             if (typeof renderFormulaStepsHtml === 'function') {
                 stepsHtml = '<details id="dw-formula-panel" class="mt-4">' +
                     '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
                     '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
                     '<span class="text-xs text-gray-500">每一步都可核对</span>' +
                     '</summary>' +
-                    '<div class="mt-3">' + renderFormulaStepsHtml(out.steps) + '</div>' +
+                    '<div class="mt-3">' + renderFormulaStepsHtml(view.steps) + '</div>' +
                     '</details>';
             } else {
                 // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
@@ -211,10 +334,11 @@
         }
 
         return '<div class="card" id="dw-result-card" data-tool-id="' + esc(state.toolId) + '">' +
-                '<div class="text-sm text-gray-600">' + esc(out.primary.label) + '</div>' +
-                '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
+                '<div class="text-sm text-gray-600">' + esc(view.primary.label) + '</div>' +
+                '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(view.primary.value, view.primary.kind)) + '</div>' +
+                (view.compare ? compareHtml(view.compare) : '') +
                 '<div class="mt-4">' + rows + '</div>' +
-                (out.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(out.note) + '</p>' : '') +
+                (view.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(view.note) + '</p>' : '') +
                 stepsHtml +
                 // 免责声明：与存量 4 页同一句话、同样就地展示（不藏在页脚）
                 '<p class="result-disclaimer">' + DISCLAIMER + '</p>' +
@@ -387,6 +511,7 @@
         if (reset) reset.addEventListener('click', function () {
             state.values = defaultsOf(tool);
             state.stepIndex = 0;
+            state.compareKey = null;
             render();
         });
 
@@ -406,6 +531,17 @@
 
         var wordBtn = document.getElementById('dw-export-word');
         if (wordBtn) wordBtn.addEventListener('click', function () { exportResult(tool, 'word'); });
+
+        // 切换对比口径：只改 state.compareKey 重画结果步 —— 输入值不动（不算收值，DOM 里没有那些框）
+        var hostNode = document.getElementById(PAGE_ID);
+        if (hostNode) {
+            Array.prototype.forEach.call(hostNode.querySelectorAll('[id^="dw-cmp-"]'), function (btn) {
+                btn.addEventListener('click', function () {
+                    state.compareKey = btn.getAttribute('data-dw-compare');
+                    render();
+                });
+            });
+        }
 
         var next = document.getElementById('dw-next');
         if (next) next.addEventListener('click', function () {
@@ -435,6 +571,7 @@
         state.toolId = toolId;
         state.values = defaultsOf(tool);
         state.stepIndex = 0;
+        state.compareKey = null;   // 换工具就是换测算，不该沿用上一次挑的口径
         // 断点续算：有没填完的草稿就接着填，不让用户从头再来
         if (!opts.fresh) {
             var d = loadDraft(toolId);
