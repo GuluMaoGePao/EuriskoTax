@@ -110,15 +110,33 @@ describe('反向倒算迁移：扣除项真的进了内核', () => {
         expect(withDed.primary.value).toBeLessThan(without.primary.value);
     });
 
+    // 必须拿 **balanced**（解方程得到的那个值）来比：conservative 取的是「所在档位的下限」，
+    // 它不是解、会跳档，扣得多反而可能落到一个下限更高的档位上去。
+    // 另外到手目标要**高于扣除合计**：否则解被夹在下界（详见下面那条「目标低于扣除合计」）。
     test('专项附加扣除的总开关不勾时，下面的月标准一律不计', () => {
-        const on = compute({
-            reverseType: 'monthly', monthlyNet: 12000, calcMode: 'balanced',
+        const base = { reverseType: 'monthly', monthlyNet: 20000, calcMode: 'balanced' };
+        const on = compute(Object.assign({}, base, {
             specialAdditionalDeductionCheckbox: true, childrenInfantDeduction: 2000, elderlyDeduction: 3000
-        });
-        const off = compute({
-            reverseType: 'monthly', monthlyNet: 12000, calcMode: 'balanced',
+        }));
+        const off = compute(Object.assign({}, base, {
             specialAdditionalDeductionCheckbox: false, childrenInfantDeduction: 2000, elderlyDeduction: 3000
-        });
+        }));
         expect(on.primary.value).toBeLessThan(off.primary.value);
+    });
+
+    // 这个边界是 diagnose 时才看见的：默认的那一整套扣除（社保 + 房租）合计可能超过用户填的到手目标，
+    // 此时方程在下边界上就已经满足 —— 内核夹住它，给出「0 税、所需税前＝扣除合计」。
+    // 这不是错误，但它意味着「所需税前收入」有个**下界**，写在这儿是提醒后来人别把夹界当 bug 改。
+    test('到手目标低于扣除合计时，回落到「0 税」下界（所需税前＝扣除合计）', () => {
+        const out = compute({
+            reverseType: 'monthly', monthlyNet: 12000, calcMode: 'balanced',
+            childrenInfantDeduction: 2000, elderlyDeduction: 3000
+        });
+        const dedTotal = out.rows.find((r) => r.label === '全年扣除合计').value;
+        expect(dedTotal).toBeGreaterThan(12000 * 12);
+        // 二分求解器留了小数尾巴（约 0.005 元），别写 toBe(0) —— 那是把精度要求说成了业务要求
+        expect(out.rows.find((r) => r.label === '年应纳税所得额').value).toBeLessThan(1);
+        expect(out.rows.find((r) => r.label === '全年个人所得税').value).toBeLessThan(1);
+        expect(Math.abs(out.primary.value - dedTotal)).toBeLessThan(1);
     });
 });
