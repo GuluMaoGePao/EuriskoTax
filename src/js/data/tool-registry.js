@@ -84,6 +84,14 @@
             icon: 'fa-bank', status: 'deep',
             nextTools: ['vat', 'surtax-stamp', 'business-income']
         },
+        // 阶段17 17C-3：社保公积金的完整测算（§4.4 P1，HR 高频）。
+        // 它的「完整」在结果侧：速算器只给月度六行，完整测算给出**逐项明细 + 全年汇总** ——
+        // 社保是按年看的支出，年度预算表才是 HR 真正要拿走的那一版。
+        {
+            id: 'social-base-deep', name: '社保公积金', subtitle: '基数核定 → 逐项明细 → 全年汇总',
+            icon: 'fa-users', status: 'deep',
+            nextTools: ['employer-cost', 'net-salary', 'salary-tax']
+        },
         // 阶段17 17C-4：附加税印花税的完整测算。排在 vat deep 之后 ——
         // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。
         {
@@ -732,16 +740,25 @@
             group: 'social', icon: 'fa-users', status: 'native', seoPath: '/seo/social-base.html',
             policyKey: 'social-insurance',
             nextTools: ['employer-cost', 'net-salary', 'salary-tax'],
+            // 阶段17 分步编排（17A-1 / 17C-3）：`step` 引用下方 `steps` 的 key，与 vat / cit 同一套约定。
+            // 纯增量声明 —— 速算器页不读 steps，可见字段与改动前完全一致。
+            // 顺序刻意是「先核定基数、再谈比例」：缴费基数不是工资（60% 保底 / 300% 封顶），
+            // 基数没定下来，后面比例填得再准也是错的。
             fields: [
-                { key: 'wage', label: '税前月薪', type: 'money', default: 15000 },
-                { key: 'socialAverage', label: '当地社平工资（月）', type: 'money', default: 8000 },
-                { key: 'housingRate', label: '公积金比例（%）', type: 'percent', default: 12 },
-                { key: 'specialMonthly', label: '专项附加扣除（月）', type: 'money', default: 0 }
+                { key: 'wage', step: 'base', label: '税前月薪', type: 'money', default: 15000 },
+                { key: 'socialAverage', step: 'base', label: '当地社平工资（月）', type: 'money', default: 8000, hint: '决定缴费基数的上下限（60% / 300%）' },
+                { key: 'housingRate', step: 'detail', label: '公积金比例（%）', type: 'percent', default: 12, hint: '5% ~ 12%；超过 12% 的部分不免个税' },
+                { key: 'specialMonthly', step: 'detail', label: '专项附加扣除（月）', type: 'money', default: 0 }
+            ],
+            steps: [
+                { key: 'base', title: '核定缴费基数', why: '缴费基数**不是工资**：低于当地社平 60% 按下限保底、高于 300% 按上限封顶 —— 基数错一格，后面每一项都跟着错' },
+                { key: 'detail', title: '缴纳比例与扣除', why: '工伤、生育**个人不缴**；公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税，超出部分要并回工资计税' }
             ],
             pitfalls: [
                 '缴费基数**不是工资**：低于社平 60% 保底、高于 300% 封顶',
                 '工伤、生育个人不缴（生育已并入医保），算到手时扣掉就多扣了',
-                '公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税'
+                '公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税',
+                '到手工资**逐月变少**是累计预扣的正常结果（跳档后税率变高），不是算错'
             ],
             compute: function (v) {
                 var S = window.EuriskoSocialQuick;
@@ -755,16 +772,59 @@
                 var s = S.socialInsuranceOf(input);
                 var n = S.netSalaryOf(input);
                 var clampText = { below: '按下限保底', above: '按上限封顶', within: '未触及上下限', none: '未填工资' }[s.clamped] || '';
+                var yuan = function (x) { return (Math.round((Number(x) || 0) * 100) / 100).toFixed(2); };
+                var pct = function (r) { return Math.round((Number(r) || 0) * 10000) / 100 + '%'; };
+                var year = function (x) { return Math.round((Number(x) || 0) * 12 * 100) / 100; };
+
+                var rows = [];
+                // ① 基数先亮相：这一步错了，下面每一项都是错的，所以它必须在明细之前。
+                rows.push({
+                    label: '缴费基数',
+                    value: s.base,
+                    kind: 'money',
+                    hint: clampText + (s.socialAverage > 0 ? '（下限 ' + yuan(s.baseMin) + ' / 上限 ' + yuan(s.baseMax) + '）' : '（未填社平工资时不上下限）')
+                });
+                // ② 逐项明细：工伤/生育个人为 0 不是漏算，hint 里写明比例与单位侧，
+                //    否则「个人 0 元」会被当成 bug 报上来。
+                s.items.forEach(function (it) {
+                    rows.push({
+                        label: it.name + '（个人 / 月）',
+                        value: it.personal,
+                        kind: 'money',
+                        hint: '个人 ' + pct(it.personalRate) + '、单位 ' + pct(it.employerRate) + ' → 单位 ' + yuan(it.employer) + ' 元/月' + (it.personalRate ? '' : '（个人不缴）')
+                    });
+                });
+                rows.push({
+                    label: '住房公积金（个人 / 月）',
+                    value: s.housingPersonal,
+                    kind: 'money',
+                    hint: '比例 ' + pct(s.housingRate) + '，单位同比例再缴 ' + yuan(s.housingEmployer) + ' 元/月'
+                });
+                // ③ 月度小计
+                rows.push({ label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' });
+                rows.push({ label: '单位缴纳 / 月', value: s.employerTotal, kind: 'money' });
+                rows.push({ label: '到手（第 1 月）', value: n.net1, kind: 'money' });
+                rows.push({
+                    label: '到手（第 12 月）',
+                    value: n.net12,
+                    kind: 'money',
+                    hint: '累计预扣逐级跳档，比第 1 月少 ' + yuan(n.net1 - n.net12) + ' 元是正常结果'
+                });
+                rows.push({ label: '公积金超标部分（并入工资计税）', value: s.housingTaxable, kind: 'money' });
+                // ④ 全年汇总：社保是按年看的支出，年度口径才是 HR 真正要拿走的那一版。
+                rows.push({ label: '全年个人缴纳', value: year(s.personalTotal), kind: 'money', hint: '月缴 × 12' });
+                rows.push({ label: '全年单位缴纳', value: year(s.employerTotal), kind: 'money', hint: '月缴 × 12' });
+                rows.push({ label: '全年个税', value: n.annualTax, kind: 'money', hint: '累计预扣，逐月相加而非「单月 × 12」' });
+                rows.push({ label: '员工全年到手', value: n.annualNet, kind: 'money' });
+                rows.push({
+                    label: '企业全年用工成本（1 人）',
+                    value: year(s.wage + s.employerTotal),
+                    kind: 'money',
+                    hint: '税前工资 + 单位五险一金；多人再乘人数'
+                });
                 return {
                     primary: { label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' },
-                    rows: [
-                        { label: '缴费基数', value: s.base, kind: 'money', hint: clampText },
-                        { label: '到手（第 1 月）', value: n.net1, kind: 'money' },
-                        { label: '到手（第 12 月）', value: n.net12, kind: 'money' },
-                        { label: '全年个税', value: n.annualTax, kind: 'money' },
-                        { label: '单位缴纳 / 月', value: s.employerTotal, kind: 'money' },
-                        { label: '公积金超标部分（并入工资计税）', value: s.housingTaxable, kind: 'money' }
-                    ],
+                    rows: rows,
                     note: '到手 = 工资 − 个人五险一金 − 个税（累计预扣）。企业用工成本 = 工资 + 单位五险一金。'
                 };
             }

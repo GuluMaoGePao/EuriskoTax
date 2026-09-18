@@ -22,6 +22,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
     loadSource('src/js/calculation/corporate-income-tax-quick.js');
+    loadSource('src/js/calculation/social-insurance-quick.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
@@ -188,6 +189,39 @@ describe('多步向导：第三个税种（企业所得税）', () => {
             mode: 'adjust', staff: 80, assetsWan: 3000, highTech: false, restricted: false,
             revenue: 5000000, cost: 4200000, entertainment: 60000,
             advertising: 200000, donation: 100000, previousLoss: 0
+        });
+        expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
+    });
+});
+
+// 第四个税种（社保公积金，17C-3）：字段全在「月」这个量级上，但结果侧要出全年汇总 ——
+// 它与前三个税种的结构都不同（没有 variant 选择器、没有条件字段），
+// 它能跑通说明渲染器不依赖任何某个税种的特定字段形状。
+describe('多步向导：第四个税种（社保公积金）', () => {
+    test('第一步只核定基数，比例与扣除留给第二步', () => {
+        W().open('social-base-deep', { fresh: true });
+        expect(document.querySelector('.step-title.active').textContent).toBe('核定缴费基数');
+        expect(document.getElementById('qf-wage')).toBeTruthy();
+        expect(document.getElementById('qf-socialAverage')).toBeTruthy();
+        expect(document.getElementById('qf-housingRate')).toBeFalsy();
+    });
+
+    test('改了工资再回来，基数步填的值仍在（分步填值不丢）', () => {
+        W().open('social-base-deep', { fresh: true });
+        document.getElementById('qf-wage').value = '20000';
+        document.getElementById('dw-next').click();     // → 缴纳比例与扣除
+        document.getElementById('dw-prev').click();     // 回第 1 步
+        expect(document.getElementById('qf-wage').value).toBe('20000');
+    });
+
+    test('结果步与同源速算器一致', () => {
+        W().open('social-base-deep', { fresh: true });
+        document.getElementById('qf-wage').value = '20000';
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();     // → 结果
+        const shown = document.getElementById('deep-wizard-page').textContent;
+        const direct = R().get('social-base').compute({
+            wage: 20000, socialAverage: 8000, housingRate: 12, specialMonthly: 0
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });

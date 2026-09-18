@@ -61,10 +61,12 @@ describe('工具注册表：数量与分组', () => {
         const pageBased = deep.filter((t) => !!t.pageId);   // forward / business / classification / reverse
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
         expect(pageBased).toHaveLength(4);   // 17B 完成后应归零
-        // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、surtax-stamp-deep（17C-4）：
-        // 附加税的计税依据就是实缴增值税，所以它必须跟在 vat 之后 —— 这是 stage17 里
-        // 唯一不许反顺序做的一对华系，钉在这里防乱序施工。
-        expect(specDriven).toEqual(['corporate-income-tax-deep', 'surtax-stamp-deep', 'vat-deep']);
+        // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、social-base-deep（17C-3）、
+        // surtax-stamp-deep（17C-4）：附加税的计税依据就是实缴增值税，所以它必须跟在 vat 之后 ——
+        // 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
+        expect(specDriven).toEqual([
+            'corporate-income-tax-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+        ]);
     });
 
     // 用测试钉住 17A-5 的硬约束：spec 驱动的完整测算**不许**自带一份 fields / compute，
@@ -182,6 +184,31 @@ describe('工具注册表：App 内速算器（native）可用', () => {
         // 广宣费 20 万 < 500 万 × 15% 不调增；捐赠 10 万 − 80 万 × 12% = 0.4 万调增。
         expect(adjusted.rows.find((r) => r.label === '纳税调增合计').value).toBeCloseTo(39000, 2);
         expect(adjusted.rows.find((r) => r.label === '应纳税所得额').value).toBeCloseTo(839000, 2);
+    });
+
+    // 社保公积金的完整测算（17C-3）比速算器多出「逐项明细 + 全年汇总」。
+    // 年度口径最容易坏在「拿月度数直接当月缴 × 12」以外的写法上（比如把公积金超标部分重复计入），
+    // 而逐项明细的合计必须等于月缴合计 —— 少一项或多一项，用户看到的年度数就是错的。
+    test('社保公积金：逐项明细合计 = 月缴合计，全年口径 = 月度 × 12', () => {
+        const sb = R().get('social-base');
+        const base = {};
+        sb.fields.forEach((f) => { base[f.key] = f.default; });
+        const r = sb.compute(base);                 // 月薪 15000、社平 8000、公积金 12%
+        expect(r.error).toBeUndefined();
+
+        const input = { wage: 15000, socialAverage: 8000, housingRate: 0.12, specialMonthly: 0 };
+        const s = window.EuriskoSocialQuick.socialInsuranceOf(input);
+        const n = window.EuriskoSocialQuick.netSalaryOf(input);
+        const row = (label) => r.rows.find((x) => x.label === label).value;
+
+        const items = r.rows.filter((x) => String(x.label).endsWith('（个人 / 月）'));
+        expect(items.length).toBe(s.items.length + 1);                       // 五险 + 公积金
+        expect(items.reduce((a, x) => a + x.value, 0)).toBeCloseTo(s.personalTotal, 2);
+
+        expect(row('全年个人缴纳')).toBeCloseTo(s.personalTotal * 12, 2);
+        expect(row('全年单位缴纳')).toBeCloseTo(s.employerTotal * 12, 2);
+        expect(row('企业全年用工成本（1 人）')).toBeCloseTo((15000 + s.employerTotal) * 12, 2);
+        expect(row('员工全年到手')).toBeCloseTo(n.annualNet, 2);
     });
 
     test('增值税切换计税场景后仍能算（条件字段不影响求解）', () => {
