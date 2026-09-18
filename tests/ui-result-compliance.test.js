@@ -22,13 +22,14 @@ const SRC_CSS = read('src/css/tailwind.src.css');
 const OUT_CSS = read('src/css/tailwind.css');
 const OTHER_CSS = ['src/css/tokens.css', 'src/css/toolbox.css'].map(read).join('\n');
 
-// index.html 里「会展示测算结果」的顶层页容器：20 个速算器共用一个壳 + 4 个完整测算
+// index.html 里「会展示测算结果」的顶层页容器：20 个速算器共用一个壳 + 剩余的完整测算页
 // 17B-1（v1.47.0）：经营所得的旧页面整页删除了，它的结果区改由 spec 驱动的向导渲染 ——
 // 向导的免责声明不在静态 HTML 里，由 tests/business-income-core.test.js 的端到端用例守护。
+// 17B-2（v1.48.0）：反向倒算同此 —— 由 tests/reverse-migration.test.js 走端到端守护。
+// 这里每少一个条目都要**有对应的替代守护**，否则免责声明就多了一个零成本删得掉的缺口。
 const RESULT_PAGES = [
     'quick-calculator-page',
     'forward-calculation-page',
-    'reverse-calculation-page',
     'classification-calculation-page'
 ];
 

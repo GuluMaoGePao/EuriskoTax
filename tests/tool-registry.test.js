@@ -55,11 +55,11 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（3 个页面式 + 6 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（2 个页面式 + 7 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
-        // 17B-2：reverse 再迁一个，页面式由 3 → 2（旧页面进入拆除期，下一步删除）。
+        // 17B-2（v1.48.0）：reverse 迁完，页面式由 3 → 2，且**旧页面已同版删干净**（不像 17B-1 那样留到下一版收尾）。
         const pageBased = deep.filter((t) => !!t.pageId).map((t) => t.id).sort();
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
         expect(pageBased).toEqual(['classification', 'forward']);   // 17B 完成后应归零

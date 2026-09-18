@@ -26,7 +26,9 @@
     var TOUCHPOINTS = {
         forward:        { containerId: 'step-result',                source: 'result_settlement' },
         comprehensive:  { containerId: 'step-result',                source: 'result_settlement' },
-        business:       { containerId: 'business-step-result',       source: 'result_business' },
+        // 17B-2：business-step-result 是随旧页面删掉、却一直没跟着改的一行 —— 结果是 business
+        // 走完向导，引导因为找不到容器而从不出现（静默失败，没人觉得不对）。改成向导的结果卡。
+        business:       { containerId: 'dw-result-card',             source: 'result_business' },
         classification: { containerId: 'classification-step-result', source: 'result_budget' }
     };
 
@@ -120,8 +122,9 @@
         bindButton('next-to-result-btn', 'forward');            // 综合所得（年度汇算）
         bindWizardNext('business');                             // 经营所得：17B-1 起走 spec 驱动的向导
         bindButton('calculate-classification-btn', 'classification'); // 分类所得
-        // 反向倒算（谈薪）显式挂钩但会被 BLOCKED_TYPES 拦截 —— 证明守卫生效，可被门禁断言覆盖
-        bindButton('calculate-reverse-btn', 'reverse');
+        // 反向倒算（谈薪）显式挂钩但会被 BLOCKED_TYPES 拦截 —— 证明守卫生效，可被门禁断言覆盖。
+        // 17B-2：它的按钮随旧页面删了，钩到向导的下一步上（同样先按 data-tool-id 认人）。
+        bindWizardNext('reverse');
         bindCta();
     }
 

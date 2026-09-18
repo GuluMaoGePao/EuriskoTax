@@ -267,27 +267,28 @@ describe('月薪个税速算器推导链（打样）', () => {
 // 防回滚：三个面板 DOM 必须在 index.html（接线不因重构漂移）
 // ==================================================================
 describe('面板 DOM 防回滚（index.html）', () => {
-    test('经营 / 分类 / 反向三个推导链面板存在', () => {
+    test('分类所得的推导链面板存在（经营与反向已改为向导运行时渲染）', () => {
         const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-        // 17B-1（v1.47.0）：经营所得的推导链不再有静态面板 —— 它随旧页面删除，改由向导
-        // 在运行时渲染（dw-formula-panel），存在性由 tests/business-income-core.test.js 守护。
-        ['formula-steps-panel-classification', 'formula-steps-body-classification',
-            'formula-steps-panel-reverse', 'formula-steps-body-reverse'
+        // 17B-1（v1.47.0）/ 17B-2（v1.48.0）：经营所得与反向倒算的推导链不再有静态面板 ——
+        // 它们随各自旧页面删除，改由向导在运行时渲染（dw-formula-panel），存在性分别由
+        // tests/business-income-core.test.js 与 tests/reverse-migration.test.js 的端到端用例守护。
+        ['formula-steps-panel-classification', 'formula-steps-body-classification'
         ].forEach((id) => {
             expect(html).toContain('id="' + id + '"');
         });
-        expect(html).not.toContain('id="formula-steps-panel-business"');   // 旧面板确实已删干净
+        // 旧静态面板确实删干净了 —— 留一个半，就会出现「静态 HTML 一份 + 运行时面板一份」的两份真相
+        expect(html).not.toContain('id="formula-steps-panel-business"');
+        expect(html).not.toContain('id="formula-steps-panel-reverse"');
     });
 
-    test('utils.js 导出的渲染被三处流程接线引用（不是死代码）', () => {
-        const calc = fs.readFileSync(path.join(ROOT, 'src/js/calculation/tax-calculator.js'), 'utf8');
+    test('utils.js 导出的渲染被各流程接线引用（不是死代码）', () => {
         const helper = fs.readFileSync(path.join(ROOT, 'src/js/calculation/helper-functions.js'), 'utf8');
         const registry = fs.readFileSync(path.join(ROOT, 'src/js/data/tool-registry.js'), 'utf8');
-        expect(calc).toContain('showFormulaStepsPanel(');
-        expect(calc).toContain("buildReverseFormulaSteps(");
-        // 17B-1：经营所得迁到 spec 驱动后，buildBusinessFormulaSteps 的接线方从 tax-calculator.js
-        // 变成了 tool-registry 里的 business spec（向导渲染时用），别的两处（反向/分类）没动。
-        expect(registry).toContain("buildBusinessFormulaSteps(");
-        expect(helper).toContain("buildClassificationFormulaSteps(");
+        // 17B-1 / 17B-2：business 与 reverse 迁到 spec 驱动后，buildXxxFormulaSteps 的接线方
+        // 从 tax-calculator.js 变成了 tool-registry 里的 spec（向导渲染时用）；
+        // 分类所得仍是页面式，接线在 helper-functions.js。
+        expect(registry).toContain('buildBusinessFormulaSteps(');
+        expect(registry).toContain('buildReverseFormulaSteps(');
+        expect(helper).toContain('buildClassificationFormulaSteps(');
     });
 });

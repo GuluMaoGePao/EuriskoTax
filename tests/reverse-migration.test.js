@@ -2,7 +2,7 @@
  * 反向倒算迁移（阶段17 17B-2）对拍测试
  *
  * 这个文件回答的是「迁移到底迁干净了没」——页面还在的时候最容易出的是**半个迁移**：
- * spec 版能出数、看起来也对，但少读了一个总开关、或者 sellèi fiscal 口caliber 搞反了，
+ * spec 版能出数、看起来也对，但少读了一个总开关、或者把三种口径的先后搞反了，
  * 而页面版照样好好的。所以这里不快照数字，钉的是**关系**：
  *   ① 四种倒算目标都能出结果，且互相不为同一个入口（tax / net 都落到内核的 target 分支）；
  *   ② 三份口径是同一段区间的取点：保守 ≤ 均衡 ≤ 激进（顺序反了就是档位口径反了）；
@@ -21,9 +21,12 @@ beforeAll(() => {
     loadSource('src/js/calculation/utils.js');   // buildReverseFormulaSteps：推导链的唯一实现
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/data/tool-registry.js');
+    loadSource('src/js/ui/toolbox-ui.js');
+    loadSource('src/js/ui/deep-wizard-ui.js');
 });
 
 const R = () => window.EuriskoToolRegistry;
+const W = () => window.EuriskoDeepWizard;
 
 // 按 spec 的 defaults 拼一份输入：defaults 是 spec 里那份唯一真源 ——
 // 手抄一份 values 会立刻漂移（字段增删时手抄的那份不会报错，只会算错）。
@@ -138,5 +141,38 @@ describe('反向倒算迁移：扣除项真的进了内核', () => {
         expect(out.rows.find((r) => r.label === '年应纳税所得额').value).toBeLessThan(1);
         expect(out.rows.find((r) => r.label === '全年个人所得税').value).toBeLessThan(1);
         expect(Math.abs(out.primary.value - dedTotal)).toBeLessThan(1);
+    });
+});
+
+// 旧页面删掉以后（17B-2 v1.48.0），tests/ui-result-compliance.test.js 的 RESULT_PAGES 少了一个条目：
+// 反向倒算的免责声明不再位于静态 HTML 里 —— 那一处缺口由下面这两条**端到端**用例接住。
+// 免责声明的性质决定了它必须有人盯着：可带走的导出报告与分享图都有，看得最久的那一屏没有，
+// 就是 www.example.com 型合规预防针。
+describe('反向倒算走向导：reverse 由 spec 驱动', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        document.body.innerHTML = '<div id="deep-wizard-page" class="page hidden"></div>';
+    });
+
+    test('reverse 被通用向导接管（不再是页面式）', () => {
+        expect(W().has(R().get('reverse'))).toBe(true);
+        const steps = W().stepsOf(R().get('reverse'));
+        expect(steps.length).toBeGreaterThan(1);
+        expect(steps[steps.length - 1].result).toBe(true);
+        expect(steps[0].title).toBe('倒算目标');
+    });
+
+    test('走完向导出结果：主结果、推导链、免责声明都在', () => {
+        W().open('reverse', { fresh: true });
+        // 走到最后一步：翻到最后一步之前一直点下一步
+        for (let i = 0; i < 10; i++) {
+            document.getElementById('dw-next').click();
+            if (document.getElementById('dw-result-card')) break;
+        }
+        expect(document.getElementById('dw-formula-panel')).toBeTruthy();     // 推导链
+        expect(document.querySelector('.result-disclaimer').textContent).toContain('不构成税务建议');
+        // 结果卡带 data-tool-id：留资归因 / 分享图 / 埋点都靠它认人（向导是通用渲染器，
+        // 不认人的话 reverse 的结果会算到别的工具头上）
+        expect(document.getElementById('dw-result-card').getAttribute('data-tool-id')).toBe('reverse');
     });
 });

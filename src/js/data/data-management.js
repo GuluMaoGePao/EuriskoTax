@@ -338,35 +338,16 @@ function viewHistoryRecord(id) {
         
         showClassificationStep(2);
     } else if (record.type === 'reverse') {
-        // 切换到反向倒算页面
-        showPage('reverse-calculation-page');
-        
-        // 填充反向倒算数据
-        const results = record.results;
-        
-        // 基本参数
-        document.getElementById('reverse-type').value = results?.reverseType || 'rate';
-        document.getElementById('reverse-work-months').value = results?.workMonths || 12;
-        
-        // 扣除项
-        document.getElementById('reverse-basic-deduction').value = results?.deductionDetails?.basic || 0;
-        document.getElementById('reverse-social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
-        document.getElementById('reverse-pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
-        document.getElementById('reverse-medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
-        document.getElementById('reverse-unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
-        document.getElementById('reverse-housing-fund').value = results?.deductionDetails?.housingFund || 0;
-        document.getElementById('reverse-elderly-deduction').value = results?.deductionDetails?.elderly || 0;
-        document.getElementById('reverse-children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
-        document.getElementById('reverse-housing-deduction').value = results?.deductionDetails?.housing || 0;
-        document.getElementById('reverse-education-deduction').value = results?.deductionDetails?.education || 0;
-        document.getElementById('reverse-medical-deduction').value = results?.deductionDetails?.medical || 0;
-        document.getElementById('reverse-other-deduction').value = results?.deductionDetails?.other || 0;
-        
-        // 重新计算
-        calculateReverseTax();
-        showReverseStep(3);
-        updateReverseBudgetTable();
-        updateReverseCharts();
+        // 阶段17 17B-2（v1.48.0）：与 business 同款处理 —— 旧页面整页删掉了，
+        // 不再回填那一屏 DOM（数量比 business 还多：反算目标、三种口径、两级扣除勾选）。
+        // 打开向导即可续算：向导自带草稿，会接着上次的输入继续。
+        var W = window.EuriskoDeepWizard;
+        if (W && W.open('reverse')) {
+            showAlert('已打开反向倒算测算；向导会接着上次的输入继续。');
+            return;
+        }
+        showAlert('反向倒算测算暂不可用，请刷新页面后重试。');
+        return;
     } else {
         // 切换到正向计税页面
         showPage('forward-calculation-page');

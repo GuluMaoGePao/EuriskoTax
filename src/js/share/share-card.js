@@ -51,10 +51,14 @@
                 { label: '适用税率', selector: '#result-tax-rate' }
             ]
         },
-        // 17B-1：经营所得迁到 spec 驱动的向导后，结果节点是**运行时渲染**的通用节点，
+        // 17B-1 / 17B-2：经营所得与反向倒算迁到 spec 驱动后，结果节点是**运行时渲染**的通用节点，
         // 在 index.html 里查不到。selector 统一带上 data-tool-id 做归属校验 —— 向导是通用
         // 渲染器，dw-result-card 会被所有 spec 工具轮着用，不加这一层就会把增值税的结果截成
         // 一张「经营所得分享图」（数值来自别的口径，比空图更难被发现）。
+        //
+        // 麻烦的是**两个工具共用同一个容器 id**，而模板还不一样：经营所得 → income，
+        // 反向倒算（谈薪）→ negotiation。于是按工具再分一路，键写作 `容器:工具Id`，
+        // 由 sourceKey() 读活节点的 data-tool-id 落到对应那一份。
         'dw-result-card': {
             template: 'income',
             title: '经营所得年度汇算',
@@ -63,6 +67,18 @@
                 { label: '应纳税所得额', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="应纳税所得额"]' },
                 { label: '适用税率', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="适用税率"]' },
                 { label: '减半征收减免', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="减半征收减免"]' }
+            ]
+        },
+        // 谈薪卡的取数口径是「税前该谈多少」，与经营所得那张 income 卡完全不同 —— 这也是它必须
+        // 单独一路的原因：共用一套 selector 时漏并不会报错，只会把税額截成参数不明的一张卡。
+        'dw-result-card:reverse': {
+            template: 'negotiation',
+            title: '谈薪测算',
+            hero: { selector: '#dw-result-card[data-tool-id="reverse"] #dw-result-primary', label: '税前年收入（可谈目标）' },
+            rows: [
+                { label: '全年税后到手', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年税后到手"]' },
+                { label: '全年个人所得税', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年个人所得税"]' },
+                { label: '全年扣除合计', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年扣除合计"]' }
             ]
         },
         'classification-step-result': {
@@ -74,25 +90,26 @@
                 { label: '应纳税额', selector: '#classification-result-total-tax' }
             ]
         },
-        'reverse-step-result': {
-            template: 'negotiation',
-            title: '谈薪测算',
-            hero: { selector: '#reverse-result-total-income', label: '年度税前收入（可谈目标）' },
-            rows: [
-                { label: '年度税后收入', selector: '#reverse-result-net-income' },
-                { label: '全年应缴税额', selector: '#reverse-result-total-tax' },
-                { label: '适用税率', selector: '#reverse-result-tax-rate' }
-            ]
-        }
     };
 
     // 计算按钮 → 结果容器（与 lead-touchpoints / funnel-tracking 同一套映射，保持一致）
+    // 17B-2（v1.48.0）：reverse-step-result 随反向倒算旧页面删除，谈薪这一路改走向导的 dw-next
+    // → dw-result-card（同一收容容器，靠下面的 sourceKey 认出是谈薪那一路）。
     var TRIGGERS = [
         { buttonId: 'next-to-result-btn', containerId: 'step-result' },
-        { buttonId: 'dw-next', containerId: 'dw-result-card' },   // 17B-1：经营所得改走 spec 驱动的向导
-        { buttonId: 'calculate-classification-btn', containerId: 'classification-step-result' },
-        { buttonId: 'calculate-reverse-btn', containerId: 'reverse-step-result' }
+        { buttonId: 'dw-next', containerId: 'dw-result-card' },   // 17B-1/17B-2：经营所得与谈薪共用的向导下一步
+        { buttonId: 'calculate-classification-btn', containerId: 'classification-step-result' }
     ];
+
+    // 容器 id → 真正的取数配置。向导那两个工具（business / reverse）共用 dw-result-card，
+    // 要看**此刻结果卡上挂着的是哪个工具**才分得出来 —— 照 id 直接查会把谈薪卡截成经营所得卡。
+    function sourceKey(containerId) {
+        if (!containerId || String(containerId).indexOf('dw-result-card') !== 0) return containerId;
+        var el = document.getElementById('dw-result-card');
+        var toolId = el && el.getAttribute('data-tool-id');
+        var scoped = toolId ? containerId + ':' + toolId : containerId;
+        return SOURCES[scoped] ? scoped : containerId;
+    }
 
     // 模板文案：如实描述功能，不承诺收益（合规红线）。
     // 「微信扫码」这一步的指引放在二维码旁固定展示，文案本身只说价值，避免同一句话重复两遍。
@@ -388,7 +405,8 @@
 
     // 任何一条失败路径都必须有「用户可见 + 控制台可查」的反馈。
     // 静默 return 是最坏的选择：用户只会说「点了没反应」，排查时无从下手。
-    function generate(containerId) {
+    function generate(rawContainerId) {
+        var containerId = sourceKey(rawContainerId);
         var cfg = SOURCES[containerId];
         if (!cfg) {
             console.warn('[ShareCard] 未识别的结果容器，无法生成分享图:', containerId);
@@ -497,6 +515,7 @@
         TEMPLATE_TEXT: TEMPLATE_TEXT,
         SHARE_IMAGE_WIDTH: SHARE_IMAGE_WIDTH,
         DISCLAIMER: DISCLAIMER,
+        sourceKey: sourceKey,
         buildHtml: buildHtml,
         collect: collect,
         generate: generate,

@@ -27,22 +27,43 @@ const SAMPLE_DATA = {
 
 describe('阶段13D 分享图 - 模板分流', () => {
     test('4 类结果各归其模板：谈薪 → negotiation，其余 → income', () => {
-        expect(ShareCard.SOURCES['reverse-step-result'].template).toBe('negotiation');
+        // 17B-2（v1.48.0）：反向倒算的旧结果页删了，谈薪那一路改走 dw-result-card:reverse
+        expect(ShareCard.SOURCES['dw-result-card:reverse'].template).toBe('negotiation');
         ['step-result', 'dw-result-card', 'classification-step-result'].forEach((id) => {
             expect(ShareCard.SOURCES[id].template).toBe('income');
         });
     });
 
     test('触发器覆盖全部结果容器（新增结果页漏配 = 那个页面没有分享出口）', () => {
-        expect(ShareCard.TRIGGERS.map((t) => t.containerId).sort())
-            .toEqual(Object.keys(ShareCard.SOURCES).sort());
+        // `容器:工具Id` 是**同一容器按工具再分的一路**（两个 spec 工具共用 dw-result-card），
+        // 它不是一个独立的触发目标 —— 触发按钮还是那一个 dw-next。
+        const own = Object.keys(ShareCard.SOURCES).filter((k) => k.indexOf(':') === -1);
+        expect(ShareCard.TRIGGERS.map((t) => t.containerId).sort()).toEqual(own.sort());
     });
 
-    test('谈薪页被服务引导排除，分享图是它唯一的转化出口 —— 必须存在', () => {
+    test('谈薪结果被服务引导排除，分享图是它唯一的转化出口 —— 必须存在', () => {
         // lead-touchpoints 把谈薪排除在引导白名单外（受众是求职者，不该推企业服务），
-        // 因此这条断言守的是「谈薪页仍然有出口」这个产品决策，不只是代码
+        // 因此这条断言守的是「谈薪仍然有出口」这个产品决策，不只是代码
         expect(readSrc('src/js/lead/lead-touchpoints.js')).toMatch(/reverse/);
-        expect(ShareCard.TRIGGERS.some((t) => t.containerId === 'reverse-step-result')).toBe(true);
+        expect(ShareCard.TRIGGERS.some((t) => t.containerId === 'dw-result-card')).toBe(true);
+        expect(ShareCard.SOURCES['dw-result-card:reverse'].template).toBe('negotiation');
+    });
+
+    test('同一个向导结果卡能按当前工具分流（谈薪不能截成经营所得卡）', () => {
+        // 17B-2：dw-result-card 是通用节点，两个工具轮着用 —— 认不出工具就会糊成一张错卡
+        document.body.innerHTML = '<div id="dw-result-card" data-tool-id="reverse"></div>';
+        expect(ShareCard.generate.length).toBeGreaterThan(0);   // 入口在
+        expect(typeof ShareCard.sourceKey).toBe('function');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card:reverse');
+
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'business');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card');
+
+        // 别的工具（没有配过分享图的那几路）退回默认那一份，而不是认不出
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'vat-deep');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card');
+        // 页面式容器的 id 不被这条分流逻辑改口
+        expect(ShareCard.sourceKey('step-result')).toBe('step-result');
     });
 });
 

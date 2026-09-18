@@ -542,33 +542,45 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const helperFnJs = await request(PORT, 'GET', '/src/js/calculation/helper-functions.js');
         const toolRegJs = await request(PORT, 'GET', '/src/js/data/tool-registry.js');
         const wizardJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
-        // v1.47.0 删掉经营所得页之后，这里是两页面版 + 经营所得向导的 spec 字段：
-        // 经营所得那份不再活在 index.html 里（向导按 spec 运行时渲染），改到 tool-registry.js 断言。
-        const rateInputIds = ['housing-fund-rate', 'reverse-housing-fund-rate'];
-        record('「缴费比例」为可输入数字框且默认 5%（两页面版 + 经营所得向导 spec，不再是固定两档下拉）',
+        // v1.47.0 / v1.48.0 删掉经营所得页与反向倒算页之后，这里从「两页面版 + 经营所得向导 spec」
+        // 缩到「只剩正向一个页面版 + 两个向导 spec（business / reverse）」：
+        // 被删掉的那些控件不再活在 index.html 里（向导按 spec 运行时渲染），改到 tool-registry.js 断言。
+        // **数量变少不代表这项能力变弱了** —— 恰恰相反，反向倒算那份是这次迁移前才补登记进 spec 的。
+        const rateInputIds = ['housing-fund-rate'];
+        record('「缴费比例」为可输入数字框且默认 5%（正向页面版 + 经营所得/反向倒算两个 spec，不再是固定两档下拉）',
             leadPage.status === 200
             && rateInputIds.every((id) => !leadPage.raw.includes(`<select id="${id}"`)
                 && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw))
             && toolRegJs.status === 200 && toolRegJs.raw.includes("key: 'housingFundRate'")
-            && toolRegJs.raw.includes("type: 'percent', default: 5"),
+            && toolRegJs.raw.includes("type: 'percent', default: 5")
+            // 两个 spec 各有一份才是完整：漏一个，那个工具的向导里就没有「自填比例」这个框
+            && (toolRegJs.raw.match(/key: 'housingFundRate'/g) || []).length >= 2,
             `HTTP ${leadPage.status}/${toolRegJs.status}`);
         record('缴费比例输入即时重算 + 留空/越界回落默认值（清空后公积金不会静默变 0）',
             helperFnJs.status === 200 && helperFnJs.raw.includes('function normalizeRateInput')
             && homeAppJs.status === 200
             && homeAppJs.raw.includes("document.getElementById('housing-fund-rate').addEventListener('input'")
-            && homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate').addEventListener('input'")
-            && homeAppJs.raw.includes('normalizeRateInput(this)'),
+            && homeAppJs.raw.includes('normalizeRateInput(this)')
+            // 反向倒算那份随旧页面走了：半吊子残留会写成「监听一个不存在的控件」的静默失效
+            && !homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate')"),
             `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
         // 经营所得的「缴费基数 × 缴费比例 → 月缴额」原本是 app.js / helper-functions.js 的私有接线，
-        // v1.47.0 删页后改由向导的 derive / warnings 两个 spec 钩子承担 —— **能力不能随删页一起丢**，
-        // 而且最后一条反向断言保证旧接线没有半吊子残留（app.js 还引用着已经不存在的 business-* 控件）。
+        // v1.47.0 删页后改由向导的 derive / warnings 两个 spec 钩子承担 —— **能力不能随删页一起丢**。
+        // v1.48.0（17B-2）：反向倒算的旧页面也删了，同一份钩子抽到注册表顶部共用 ——
+        // `INSURANCE_DERIVE_FROM` / `insuranceDerive()` / `socialBaseWarnings()` 由 business 与 reverse
+        // 两个 spec 共用。**这份共用不是重构洁癖**：两边逻辑本来就是同一份，抄两遍迟早只改其中一遍。
         // 各险种回落**自己的**默认值（养老 8% / 医疗 2% / 失业 0.5% / 公积金 5%），统一回落 5% 是错的；
-        // 反向断言保证旧接线没有半吊子残留（删了页但 app.js / helper-functions.js 还引用着）。
-        record('经营所得「缴费基数 × 缴费比例 → 月缴额」联动 + 低于下限提示（spec 钩子承担，各险种回落自己的默认比例）',
+        // 末尾两组反向断言盯的是「半吊子残留」：删了页但私有函数 / 控件引用还挂在别处 ——
+        // 这种残留不会报错，只会在某天把值算到一个没人更新过的方向上。
+        record('经营所得 / 反向倒算「缴费基数 × 缴费比例 → 月缴额」联动 + 低于下限提示（spec 钩子承担，共用一份，各险种回落自己的默认比例）',
             toolRegJs.status === 200
-            && toolRegJs.raw.includes("deriveFrom: ['socialBase'")
-            && toolRegJs.raw.includes('derive: function')
-            && toolRegJs.raw.includes('warnings: function')
+            && toolRegJs.raw.includes('INSURANCE_DERIVE_FROM')
+            && toolRegJs.raw.includes('function insuranceDerive')
+            && toolRegJs.raw.includes('function socialBaseWarnings')
+            // 两个 spec 都得挂上：`deriveFrom: INSURANCE_DERIVE_FROM` 出现两次才算挂全
+            && (toolRegJs.raw.match(/deriveFrom: INSURANCE_DERIVE_FROM/g) || []).length >= 2
+            && (toolRegJs.raw.match(/derive: insuranceDerive/g) || []).length >= 2
+            && (toolRegJs.raw.match(/warnings: socialBaseWarnings/g) || []).length >= 2
             && toolRegJs.raw.includes('FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 }')
             && toolRegJs.raw.includes('MIN_SOCIAL_SECURITY_BASE')
             && wizardJs.status === 200
@@ -576,7 +588,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && wizardJs.raw.includes('function bindDerivedSources')
             && wizardJs.raw.includes('function renderWarnings')
             && homeAppJs.status === 200 && !homeAppJs.raw.includes('business-social-security-base')
-            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function calculateBusinessInsurance'),
+            && homeAppJs.raw.includes('EuriskoDeepWizard')
+            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function calculateBusinessInsurance')
+            && !helperFnJs.raw.includes('function calculateReverseSocialSecurity'),
             `HTTP ${toolRegJs.status}/${wizardJs.status}`);
         record('admin.html 含社保基数 Tab(data-nav="citysocial")与视图(#view-citysocial)',
             adminPage.status === 200 && adminPage.raw.includes('data-nav="citysocial"') && adminPage.raw.includes('id="view-citysocial"'),

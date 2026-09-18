@@ -133,28 +133,6 @@ function updateCalcPreview(pageId) {
             if (dedEl) dedEl.textContent = formatPreviewNum(deduction);
             if (taxEl) taxEl.textContent = formatPreviewNum(tax);
             InteractionLog.preview(pageId, { income, deduction, tax });
-        } else if (pageId === 'reverse-calculation-page') {
-            // 根据 reverse-type 取对应输入
-            let target = 0;
-            const reverseType = document.getElementById('reverse-type')?.value;
-            if (reverseType === 'rate') {
-                target = parseFloat(document.getElementById('reverse-target-rate')?.value) || 0;
-            } else if (reverseType === 'monthly') {
-                target = parseFloat(document.getElementById('reverse-monthly-net')?.value) || 0;
-            } else if (reverseType === 'both') {
-                const targetType = document.getElementById('reverse-target-type')?.value;
-                target = parseFloat(document.getElementById(targetType === 'net' ? 'reverse-fixed-net' : 'reverse-fixed-tax')?.value) || 0;
-            }
-            const deduction = (typeof reverseDeductionAmount !== 'undefined' && reverseDeductionAmount) || 0;
-            const income = (typeof reverseCalculationResults !== 'undefined' &&
-                (reverseCalculationResults?.incomeDetails?.total || reverseCalculationResults?.totalIncome)) || 0;
-            const tEl = document.getElementById('reverse-preview-target');
-            const dEl = document.getElementById('reverse-preview-deduction');
-            const iEl = document.getElementById('reverse-preview-income');
-            if (tEl) tEl.textContent = formatPreviewNum(target);
-            if (dEl) dEl.textContent = formatPreviewNum(deduction);
-            if (iEl) iEl.textContent = formatPreviewNum(income);
-            InteractionLog.preview(pageId, { target, deduction, income });
         } else if (pageId === 'classification-calculation-page') {
             const income = parseFloat(document.getElementById('classification-income')?.value) || 0;
             // 分类所得无显式税率字段，按类型估算
@@ -194,22 +172,8 @@ function bindPreviewLiveUpdate() {
         if (el) el.addEventListener('input', () => schedulePreviewUpdate('forward-calculation-page'));
     });
 
-    const reverseInputs = ['reverse-target-rate', 'reverse-monthly-net', 'reverse-fixed-tax', 'reverse-fixed-net',
-        'reverse-social-security-base', 'reverse-pension-insurance', 'reverse-medical-insurance'];
-    reverseInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', () => schedulePreviewUpdate('reverse-calculation-page'));
-            el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
-        }
-    });
-    // reverse-type / reverse-target-type 改变时也刷新
-    ['reverse-type', 'reverse-target-type'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
-    });
-
-
+    // 17B-2（v1.48.0）：反向倒算的预览条随旧页面一起删了 —— 剩下的 forward / classification 同理，
+    // 将来迁到向导后这一段也要走同一个出口（向导自己有预览，不需要这里代算）。
     const classificationInputs = ['classification-income'];
     classificationInputs.forEach(id => {
         const el = document.getElementById(id);
@@ -335,12 +299,6 @@ function showStepByPanes(pageId, step, paneIds) {
     updateStepIndicator(pageId, step);
 }
 
-// 反向倒算步骤导航
-function showReverseStep(step) {
-    showStepByPanes('reverse-calculation-page', step, [
-        'reverse-step-parameters', 'reverse-step-deductions', 'reverse-step-result'
-    ]);
-}
 
 
 // 分类所得步骤导航
@@ -350,28 +308,6 @@ function showClassificationStep(step) {
     ]);
 }
 
-// 反向倒算扣除项显示/隐藏控制
-function setupReverseDeductionToggle(checkboxId, contentId) {
-    const checkbox = document.getElementById(checkboxId);
-    const content = document.getElementById(contentId);
-    
-    // 初始状态
-    if (checkbox.checked) {
-        content.classList.remove('hidden');
-    } else {
-        content.classList.add('hidden');
-    }
-    
-    // 绑定事件
-    checkbox.addEventListener('change', function() {
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-}
 
 // 导出PDF
 // opts（可选，阶段10B 专业版汇算清缴报告复用）：
@@ -384,9 +320,9 @@ function setupReverseDeductionToggle(checkboxId, contentId) {
 function exportToPDF(elementId, title, opts) {
     opts = opts || {};
     // 获取计算结果数据
-    if (!opts.skipResultCheck &&
-        Object.keys(calculationResults).length === 0 &&
-        Object.keys(reverseCalculationResults).length === 0) {
+    // 17B-2（v1.48.0）：原先还多一个 reverseCalculationResults 的分支 —— 那个全局变量随旧页面删了，
+    // 留着这半句是**必炸的**（未声明变量直接抛 ReferenceError），而删掉它不影响任何现役入口。
+    if (!opts.skipResultCheck && Object.keys(calculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }

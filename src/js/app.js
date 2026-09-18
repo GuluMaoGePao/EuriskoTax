@@ -24,404 +24,12 @@ window.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('reverse-mode-btn').addEventListener('click', function() {
         console.log('%c[EuriskoTax] MODE → 选择"反向倒算"模式', 'color: #1e40af; font-weight: bold;');
-        showPage('reverse-calculation-page');
-        showReverseStep(1);
-        // 初始化时显示计算模式选择器
-        const calcModeSection = document.getElementById('reverse-calc-mode-section');
-        if (calcModeSection) {
-            calcModeSection.classList.remove('hidden');
-        }
-        // 初始化时触发一次倒算方式变更事件，更新描述文案
-        document.getElementById('reverse-type').dispatchEvent(new Event('change'));
-    });
-    
-    // 反向倒算页面倒算方式选择
-    document.getElementById('reverse-type').addEventListener('change', function() {
-        const type = this.value;
-        const descriptionEl = document.querySelector('#reverse-calculation-page .text-gray-600');
-        
-        // 更新描述文案
-        if (descriptionEl) {
-            if (type === 'rate') {
-                descriptionEl.textContent = '输入目标税率，反推税前收入';
-            } else if (type === 'monthly') {
-                descriptionEl.textContent = '输入月度税后收入，反推税前收入';
-            } else if (type === 'both') {
-                descriptionEl.textContent = '输入目标税额，反推税前收入';
-            }
-        }
-        
-        // 显示/隐藏相应的输入区域
-        document.getElementById('reverse-rate-input').classList.add('hidden');
-        document.getElementById('reverse-monthly-input').classList.add('hidden');
-        document.getElementById('reverse-both-input').classList.add('hidden');
-        
-        // 显示/隐藏计算模式选择器（所有倒算方式都支持）
-        const calcModeSection = document.getElementById('reverse-calc-mode-section');
-        if (calcModeSection) {
-            calcModeSection.classList.remove('hidden');
-        }
-        
-        if (type === 'rate') {
-            document.getElementById('reverse-rate-input').classList.remove('hidden');
-        } else if (type === 'monthly') {
-            document.getElementById('reverse-monthly-input').classList.remove('hidden');
-        } else if (type === 'both') {
-            document.getElementById('reverse-both-input').classList.remove('hidden');
-        }
-    });
-    
-    // 反向倒算页面所得类型选择
-    document.getElementById('reverse-income-type').addEventListener('change', function() {
-        const incomeType = this.value;
-        
-        // 显示/隐藏经营所得特有扣除项
-        const businessSection = document.getElementById('reverse-business-deduction-section');
-        if (businessSection) {
-            if (incomeType === 'business') {
-                businessSection.classList.remove('hidden');
-            } else {
-                businessSection.classList.add('hidden');
-            }
-        }
-        
-        // 显示/隐藏经营所得提示和年终奖
-        const bonusSection = document.getElementById('reverse-bonus-income').closest('.form-group');
-        const businessHint = document.getElementById('business-rate-hint');
-        const reverseWorkMonths = document.getElementById('reverse-work-months').closest('.form-group');
-        
-        if (incomeType === 'business') {
-            // 隐藏年终奖和工作月数（经营所得不适用）
-            if (bonusSection) bonusSection.classList.add('hidden');
-            if (reverseWorkMonths) reverseWorkMonths.classList.add('hidden');
-            if (businessHint) businessHint.classList.remove('hidden');
-            
-            // 更新税率选项为经营所得税率
-            const rateSelect = document.getElementById('reverse-target-rate');
-            rateSelect.innerHTML = `
-                <option value="5">5%（经营所得第1级）</option>
-                <option value="10">10%（经营所得第2级）</option>
-                <option value="20">20%（经营所得第3级）</option>
-                <option value="30">30%（经营所得第4级）</option>
-                <option value="35">35%（经营所得第5级）</option>
-            `;
-            rateSelect.value = '10';
-            
-            // 隐藏综合所得特有扣除项，显示经营所得特有扣除项
-            document.getElementById('reverse-special-deduction-checkbox').closest('.mt-4')?.classList.add('hidden');
-            document.getElementById('reverse-basic-deduction').closest('.form-group')?.classList.add('hidden');
-        } else {
-            // 显示年终奖和工作月数（综合所得适用）
-            if (bonusSection) bonusSection.classList.remove('hidden');
-            if (reverseWorkMonths) reverseWorkMonths.classList.remove('hidden');
-            if (businessHint) businessHint.classList.add('hidden');
-            
-            // 恢复综合所得税率选项
-            const rateSelect = document.getElementById('reverse-target-rate');
-            rateSelect.innerHTML = `
-                <option value="3">3%（综合所得第1级）</option>
-                <option value="10">10%（综合所得第2级）</option>
-                <option value="20">20%（综合所得第3级）</option>
-                <option value="25">25%（综合所得第4级）</option>
-                <option value="30">30%（综合所得第5级）</option>
-                <option value="35">35%（综合所得第6级/经营所得第5级）</option>
-                <option value="45">45%（综合所得第7级）</option>
-            `;
-            rateSelect.value = '3';
-            
-            // 显示综合所得特有扣除项
-            document.getElementById('reverse-special-deduction-checkbox').closest('.mt-4')?.classList.remove('hidden');
-            document.getElementById('reverse-basic-deduction').closest('.form-group')?.classList.remove('hidden');
-        }
-    });
-    
-    // 反向倒算页面扣除项显示/隐藏控制
-    setupReverseDeductionToggle('reverse-special-deduction-checkbox', 'reverse-special-deduction-content');
-    setupReverseDeductionToggle('reverse-special-additional-deduction-checkbox', 'reverse-special-additional-deduction-content');
-    setupReverseDeductionToggle('reverse-other-deduction-checkbox', 'reverse-other-deduction-content');
-    setupReverseDeductionToggle('reverse-business-deduction-checkbox', 'reverse-business-deduction-content');
-    
-    // 反向倒算页面住房类型选择
-    document.getElementById('reverse-housing-type').addEventListener('change', function() {
-        const type = this.value;
-        document.getElementById('reverse-rent-fields').classList.add('hidden');
-        document.getElementById('reverse-loan-fields').classList.add('hidden');
-        
-        if (type === 'rent') {
-            document.getElementById('reverse-rent-fields').classList.remove('hidden');
-        } else if (type === 'loan') {
-            document.getElementById('reverse-loan-fields').classList.remove('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面继续教育复选框
-    document.getElementById('reverse-education-degree-checkbox').addEventListener('change', updateReverseEducationDeduction);
-    document.getElementById('reverse-education-professional-checkbox').addEventListener('change', updateReverseEducationDeduction);
-    
-    // 反向倒算页面企业年金复选框
-    document.getElementById('reverse-enterprise-annuity-checkbox').addEventListener('change', function() {
-        const content = document.getElementById('reverse-enterprise-annuity-fields');
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面企业年金输入（仅更新显示，不触发计算）
-    document.getElementById('reverse-enterprise-annuity').addEventListener('input', updateReverseDeductionCalculation);
-    
-    // 反向倒算页面个人养老金复选框
-    document.getElementById('reverse-pension-deduction-checkbox').addEventListener('change', function() {
-        const content = document.getElementById('reverse-pension-deduction-fields');
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面商业健康保险复选框
-    document.getElementById('reverse-insurance-other-deduction-checkbox').addEventListener('change', function() {
-        const content = document.getElementById('reverse-insurance-other-deduction-fields');
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面税收递延型养老保险复选框
-    document.getElementById('reverse-tax-deferred-pension-checkbox').addEventListener('change', function() {
-        const content = document.getElementById('reverse-tax-deferred-pension-fields');
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面公益捐赠支出复选框
-    document.getElementById('reverse-charitable-donation-checkbox').addEventListener('change', function() {
-        const content = document.getElementById('reverse-charitable-donation-fields');
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面社保缴费相关事件监听器
-    document.getElementById('reverse-social-security-base').addEventListener('input', function() {
-        calculateReverseSocialSecurity();
-        validateSocialSecurityBase('reverse');
-    });
-    document.getElementById('reverse-pension-insurance').addEventListener('input', function() {
-        calculateReverseSocialSecurityRate('pension');
-    });
-    document.getElementById('reverse-pension-rate').addEventListener('input', function() {
-        calculateReverseSocialSecurity();
-    });
-    document.getElementById('reverse-medical-insurance').addEventListener('input', function() {
-        calculateReverseSocialSecurityRate('medical');
-    });
-    document.getElementById('reverse-medical-rate').addEventListener('input', function() {
-        calculateReverseSocialSecurity();
-    });
-    document.getElementById('reverse-unemployment-insurance').addEventListener('input', function() {
-        calculateReverseSocialSecurityRate('unemployment');
-    });
-    document.getElementById('reverse-unemployment-rate').addEventListener('input', function() {
-        calculateReverseSocialSecurity();
-    });
-    document.getElementById('reverse-housing-fund').addEventListener('input', function() {
-        calculateReverseSocialSecurityRate('housing');
-    });
-    document.getElementById('reverse-housing-fund-base').addEventListener('input', function() {
-        calculateReverseHousingFund();
-        validateHousingFundBase('reverse');
-    });
-    // 同正向页：比例用户自填，输入即时重算 + 失焦归一
-    document.getElementById('reverse-housing-fund-rate').addEventListener('input', function() {
-        calculateReverseHousingFund();
-    });
-    document.getElementById('reverse-housing-fund-rate').addEventListener('blur', function() {
-        normalizeRateInput(this);
-        calculateReverseHousingFund();
-    });
-    
-    // 反向倒算页面子女教育 + 婴幼儿照护数量输入
-    document.getElementById('reverse-children-infant-count').addEventListener('input', function() {
-        const count = parseInt(this.value) || 0;
-        const rate = parseInt(document.getElementById('reverse-children-infant-deduction-rate').value) || 100;
-        const amount = count * 2000 * (rate / 100); // 每个子女/婴幼儿每月2000元，考虑扣除比例（月度金额）
-        document.getElementById('reverse-children-infant-deduction').value = amount;
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面子女教育 + 婴幼儿照护扣除比例变化
-    document.getElementById('reverse-children-infant-deduction-rate').addEventListener('change', function() {
-        const count = parseInt(document.getElementById('reverse-children-infant-count').value) || 0;
-        const rate = parseInt(this.value) || 100;
-        const amount = count * 2000 * (rate / 100); // 每个子女/婴幼儿每月2000元，考虑扣除比例（月度金额）
-        document.getElementById('reverse-children-infant-deduction').value = amount;
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面赡养老人类型选择
-    document.getElementById('reverse-elderly-type').addEventListener('change', function() {
-        const type = this.value;
-        const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
-        if (type === 'only') {
-            elderlyDeduction.max = 3000;
-            elderlyDeduction.value = 3000; // 独生子女每月3000元（月度金额）
-        } else if (type === 'non-only') {
-            elderlyDeduction.max = 1500;
-            elderlyDeduction.value = 1500; // 非独生子女每月1500元（月度金额）
-        } else {
-            elderlyDeduction.max = 0;
-            elderlyDeduction.value = 0;
-        }
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面大病医疗输入
-    document.getElementById('reverse-medical-deduction').addEventListener('input', updateReverseDeductionCalculation);
-    
-    // 反向倒算页面其他扣除输入
-    document.getElementById('reverse-pension-deduction').addEventListener('input', updateReverseDeductionCalculation);
-    document.getElementById('reverse-insurance-other-deduction').addEventListener('input', updateReverseDeductionCalculation);
-    document.getElementById('reverse-tax-deferred-pension').addEventListener('input', updateReverseDeductionCalculation);
-    document.getElementById('reverse-charitable-donation').addEventListener('input', updateReverseDeductionCalculation);
-    
-    // 反向倒算页面工作月数变化
-    document.getElementById('reverse-work-months').addEventListener('change', function() {
-        updateReverseDeductionCalculation();
-        // 更新子女教育扣除（保持月度金额，不随工作月数变化）
-        const count = parseInt(document.getElementById('reverse-children-infant-count').value) || 0;
-        const rate = parseInt(document.getElementById('reverse-children-infant-deduction-rate').value) || 100;
-        const amount = count * 2000 * (rate / 100); // 月度金额
-        document.getElementById('reverse-children-infant-deduction').value = amount;
-        
-        // 更新赡养老人扣除（保持月度金额，不随工作月数变化）
-        const elderlyType = document.getElementById('reverse-elderly-type').value;
-        const elderlyDeduction = document.getElementById('reverse-elderly-deduction');
-        if (elderlyType === 'only') {
-            elderlyDeduction.max = 3000;
-            elderlyDeduction.value = 3000; // 月度金额
-        } else if (elderlyType === 'non-only') {
-            elderlyDeduction.max = 1500;
-            elderlyDeduction.value = 1500; // 月度金额
-        } else {
-            elderlyDeduction.max = 0;
-            elderlyDeduction.value = 0;
-        }
-        
-        // 更新继续教育扣除
-        updateReverseEducationDeduction();
-        
-        // 重新计算
-        updateReverseDeductionCalculation();
-    });
-    
-    // 反向倒算页面新输入字段事件监听
-    document.getElementById('reverse-target-rate').addEventListener('change', calculateReverseTax);
-    document.getElementById('reverse-calc-mode').addEventListener('change', calculateReverseTax);
-    document.getElementById('reverse-monthly-net').addEventListener('input', calculateReverseTax);
-    document.getElementById('reverse-fixed-tax').addEventListener('input', calculateReverseTax);
-    document.getElementById('reverse-fixed-net').addEventListener('input', calculateReverseTax);
-    
-    // 反向倒算按钮
-    document.getElementById('calculate-reverse-btn').addEventListener('click', function() {
-        calculateReverseTax();
-        showReverseStep(3);
-        updateReverseBudgetTable();
-        updateReverseCharts();
-    });
-    
-    // 反向倒算页面导航按钮
-    document.getElementById('reverse-back-to-parameters-btn').addEventListener('click', function() {
-        showReverseStep(1);
-    });
-    
-    document.getElementById('reverse-next-to-deductions-btn').addEventListener('click', function() {
-        showReverseStep(2);
-    });
-    
-    // 反向倒算页面重置按钮
-    document.getElementById('reset-reverse-btn').addEventListener('click', resetReverseCalculation);
-    
-    // 反向倒算扣除项明细页面重置按钮
-    document.getElementById('reset-reverse-deduction-btn').addEventListener('click', function() {
-        // 重置扣除项复选框状态
-        document.getElementById('reverse-special-deduction-checkbox').checked = true;
-        document.getElementById('reverse-special-additional-deduction-checkbox').checked = false;
-        document.getElementById('reverse-other-deduction-checkbox').checked = false;
-        
-        // 重置专项扣除数据
-        document.getElementById('reverse-social-security-base').value = 7546;
-        document.getElementById('reverse-housing-fund-base').value = 7546;
-        document.getElementById('reverse-pension-insurance').value = 603.68;
-        document.getElementById('reverse-medical-insurance').value = 150.92;
-        document.getElementById('reverse-unemployment-insurance').value = 37.73;
-        document.getElementById('reverse-housing-fund').value = 377.3;
-        document.getElementById('reverse-pension-rate').value = 8;
-        document.getElementById('reverse-medical-rate').value = 2;
-        document.getElementById('reverse-unemployment-rate').value = 0.5;
-        document.getElementById('reverse-housing-fund-rate').value = 5;
-        
-        // 重置专项附加扣除数据
-        document.getElementById('reverse-children-infant-count').value = 0;
-        document.getElementById('reverse-children-infant-deduction').value = 0;
-        document.getElementById('reverse-elderly-type').value = 'none';
-        document.getElementById('reverse-elderly-deduction').value = 0;
-        document.getElementById('reverse-housing-type').value = 'none';
-        document.getElementById('reverse-rent-deduction').value = 1500; // 月度金额
-        document.getElementById('reverse-housing-loan-deduction').value = 1000; // 月度金额
-        
-        // 重置继续教育复选框
-        document.getElementById('reverse-education-degree-checkbox').checked = false;
-        document.getElementById('reverse-education-professional-checkbox').checked = false;
-        document.getElementById('reverse-education-deduction').value = 0;
-        
-        // 重置大病医疗数据
-        document.getElementById('reverse-medical-deduction').value = 0;
-        
-        // 重置其他扣除数据
-        document.getElementById('reverse-pension-deduction-checkbox').checked = false;
-        document.getElementById('reverse-pension-deduction').value = 0;
-        document.getElementById('reverse-pension-deduction-fields').classList.add('hidden');
-        document.getElementById('reverse-enterprise-annuity-checkbox').checked = false;
-        document.getElementById('reverse-enterprise-annuity').value = 0;
-        document.getElementById('reverse-enterprise-annuity-fields').classList.add('hidden');
-        document.getElementById('reverse-insurance-other-deduction-checkbox').checked = false;
-        document.getElementById('reverse-insurance-other-deduction').value = 0;
-        document.getElementById('reverse-insurance-other-deduction-fields').classList.add('hidden');
-        document.getElementById('reverse-tax-deferred-pension-checkbox').checked = false;
-        document.getElementById('reverse-tax-deferred-pension').value = 0;
-        document.getElementById('reverse-tax-deferred-pension-fields').classList.add('hidden');
-        document.getElementById('reverse-charitable-donation-checkbox').checked = false;
-        document.getElementById('reverse-charitable-donation').value = 0;
-        document.getElementById('reverse-charitable-donation-fields').classList.add('hidden');
-        
-        // 重置显示状态
-        document.getElementById('reverse-special-deduction-content').classList.remove('hidden');
-        document.getElementById('reverse-special-additional-deduction-content').classList.add('hidden');
-        document.getElementById('reverse-other-deduction-content').classList.add('hidden');
-        document.getElementById('reverse-rent-fields').classList.add('hidden');
-        document.getElementById('reverse-loan-fields').classList.add('hidden');
-        
-        // 重置大病医疗实际可扣除额显示
-        document.getElementById('reverse-actual-medical-deduction-display').textContent = '实际可扣除额：0 元';
-        
-        // 重新计算并更新显示
-        updateReverseDeductionCalculation();
+        // 阶段17 17B-2（v1.48.0）：反向倒算已迁到 spec 驱动的向导，旧整页删掉了。
+        // 按钮本身保留：首页静态卡片的点击最终落到它身上（工具箱会先按 data-tool-id 走向导），
+        // 删掉按钮反而会让两处的点击进入空白。
+        var W = window.EuriskoDeepWizard;
+        if (W && W.open('reverse')) return;
+        showAlert('反向倒算测算暂不可用，请刷新页面后重试。');
     });
     
     
@@ -465,9 +73,6 @@ window.addEventListener('DOMContentLoaded', function() {
         goBack();
     });
     
-    document.getElementById('back-to-mode-selection-reverse').addEventListener('click', function() {
-        goBack();
-    });
     
     document.getElementById('back-to-mode-selection-business').addEventListener('click', function() {
         goBack();
@@ -589,15 +194,6 @@ window.addEventListener('DOMContentLoaded', function() {
     // 保存计算结果按钮
     document.getElementById('save-calculation-btn').addEventListener('click', saveCalculationResult);
 
-    // 反向倒算保存按钮
-    document.getElementById('save-reverse-calculation-btn').addEventListener('click', function() {
-        if (Object.keys(reverseCalculationResults).length === 0) {
-            showAlert('请先完成计算后再保存');
-            return;
-        }
-        saveReverseCalculation();
-    });
-
     // 分类所得保存按钮
     document.getElementById('save-classification-calculation-btn').addEventListener('click', function() {
         if (Object.keys(classificationCalculationResults).length === 0) {
@@ -624,7 +220,6 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     bindCalcActionBtns({ modeName: '综合所得', saveBtnId: 'forward-save-btn', resetBtnId: 'forward-reset-btn', saveFn: saveCalculationResult, resetFn: resetForwardCalculation });
-    bindCalcActionBtns({ modeName: '反向倒算', saveBtnId: 'reverse-save-btn', resetBtnId: 'reverse-reset-btn', saveFn: saveReverseCalculation, resetFn: resetReverseCalculation, stepFn: showReverseStep });
     bindCalcActionBtns({ modeName: '分类所得', saveBtnId: 'classification-save-btn', resetBtnId: 'classification-reset-btn', saveFn: saveClassificationCalculation, resetFn: resetClassificationCalculation, stepFn: showClassificationStep });
 
     // 导出PDF按钮（阶段10B：专业版出汇算清缴报告，免费版保留现导出——分流在 EuriskoReport 内完成）
@@ -646,27 +241,10 @@ window.addEventListener('DOMContentLoaded', function() {
         resetForwardCalculation();
     });
     
-    document.getElementById('new-reverse-calculation-btn').addEventListener('click', function() {
-        resetReverseCalculation();
-        showReverseStep(1);
-    });
-    
-    
     document.getElementById('new-classification-calculation-btn').addEventListener('click', function() {
         resetClassificationCalculation();
         showClassificationStep(1);
     });
-    
-    // 反向倒算页面导出PDF按钮
-    document.getElementById('export-reverse-pdf-btn').addEventListener('click', function() {
-        exportToPDF('reverse-result', '个人年度个税预算表（反向倒算）');
-    });
-    
-    // 反向倒算页面导出Word按钮
-    document.getElementById('export-reverse-word-btn').addEventListener('click', function() {
-        exportToWord('reverse-result', '个人年度个税预算表（反向倒算）');
-    });
-    
     
     // 分类所得页面导出PDF按钮
     document.getElementById('export-classification-pdf-btn').addEventListener('click', function() {
@@ -931,10 +509,6 @@ window.addEventListener('DOMContentLoaded', function() {
     // 初始化
     loadHistoryRecords();
     
-    // 初始化反向倒算页面
-    resetReverseCalculation();
-    
-    
     // 初始化分类所得页面
     resetClassificationCalculation();
     
@@ -942,8 +516,4 @@ window.addEventListener('DOMContentLoaded', function() {
     calculateSocialSecurity();
     calculateHousingFund();
     updateDeductionCalculation();
-    
-    calculateReverseSocialSecurity();
-    calculateReverseHousingFund();
-    updateReverseDeductionCalculation();
 });

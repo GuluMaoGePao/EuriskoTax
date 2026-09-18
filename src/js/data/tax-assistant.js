@@ -179,7 +179,7 @@ const TAX_ASSISTANT_QA = [
         question: '反向倒算有什么用？',
         answer: '反向倒算适用于薪酬规划场景：\n\n1. 按目标税率倒算：给定希望适用的税率档位，反推所需税前收入\n2. 按月度税后倒算：给定每月到手金额，反推税前月薪\n3. 按目标税额倒算：给定全年纳税总额，反推收入\n\n支持三种模式对比：\n• 保守：取档位下限\n• 均衡：取档位中值\n• 进取：取档位上限\n\n适合财务人员、薪酬规划、薪资谈判参考。',
         hot: true,
-        related: { page: 'reverse-calculation-page', label: '去反向倒算测算' }
+        related: { tool: 'reverse', label: '去反向倒算测算' }
     },
     {
         id: 'rev_modes',
@@ -187,7 +187,7 @@ const TAX_ASSISTANT_QA = [
         keywords: ['保守', '均衡', '进取', '模式区别'],
         question: '反向倒算三种模式有什么区别？',
         answer: '三种模式对应档位取值不同：\n\n• 保守模式：取税率档位下限\n  → 税前收入要求较低，税负轻但到手也少\n\n• 均衡模式：取税率档位中值\n  → 平衡选择，居中\n\n• 进取模式：取税率档位上限\n  → 税前收入要求较高，税负重但到手更多\n\n适用场景：\n• 薪资谈判：参考进取模式\n• 保守预算：参考保守模式\n• 年度规划：参考均衡模式',
-        related: { page: 'reverse-calculation-page', label: '去反向倒算测算' }
+        related: { tool: 'reverse', label: '去反向倒算测算' }
     },
 
     // ===== 汇算清缴 =====

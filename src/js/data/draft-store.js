@@ -29,11 +29,9 @@
             paneIds: ['step-parameters', 'step-income', 'step-deductions', 'step-result'],
             gotoName: 'goToStep'
         },
-        {
-            id: 'reverse', containerId: 'reverse-calculation-page', title: '税后工资反算',
-            paneIds: ['reverse-step-parameters', 'reverse-step-deductions', 'reverse-step-result'],
-            gotoName: 'showReverseStep'
-        },
+        // 17B-2（v1.48.0）：reverse 条目随旧页面摘走了 —— 留一个指向不存在容器的条目，
+        // bindFlow 只会静默 return false：草稿条既不会被回填，也不会被清掉，直到过期才消失。
+        // spec 向导有自己的草稿，不再需要这条旧路径。
         {
             id: 'classification', containerId: 'classification-calculation-page', title: '分类所得计税',
             paneIds: ['classification-step-info', 'classification-step-result'],

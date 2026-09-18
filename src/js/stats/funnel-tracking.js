@@ -22,8 +22,9 @@ const CALC_TRIGGERS = [
     // 17B-1：经营所得改走 spec 驱动的向导（dw-next / dw-result-card 是**通用**节点，
     // 会被所有 spec 工具轮着用），所以额外声明 toolId —— 见 bindCalcDone 里的归属校验。
     { buttonId: 'dw-next', resultId: 'dw-result-card', toolId: 'business' },
-    { buttonId: 'calculate-classification-btn', resultId: 'classification-step-result' },
-    { buttonId: 'calculate-reverse-btn', resultId: 'reverse-step-result' }
+    // 17B-2：反向倒算（谈薪）同样改走向导，与经营所得共用 dw-next —— 靠 toolId 认出是哪一路
+    { buttonId: 'dw-next', resultId: 'dw-result-card', toolId: 'reverse' },
+    { buttonId: 'calculate-classification-btn', resultId: 'classification-step-result' }
 ];
 
 // 等结果渲染的时长：纯前端同步计算，300ms 足够；宁可少记，也不让埋点拖慢用户

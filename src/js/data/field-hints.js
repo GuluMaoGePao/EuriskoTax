@@ -34,16 +34,8 @@ const FIELD_HINTS = {
     'forward_investment': '当月收入的6%与1000元中的较低者',
     'forward_donation': '符合标准的一般捐赠30%，特殊捐赠100%',
 
-    // ===== 反向倒算 =====
-    'reverse_mode': '选择倒算方式',
-    'reverse_type': '选择需要反向倒算的所得类型',
-    'reverse_basis': '选择应纳税所得额的计算基准，适配不同预算规划需求',
-    'reverse_rate': '选择希望适用的税率级别',
-    'reverse_monthly_income': '每月实际到手的税后收入',
-    'reverse_target_type': '选择倒算的目标类型',
-    'reverse_target_tax': '希望全年缴纳的个人所得税总额',
-    'reverse_target_income': '希望全年实际到手的税后收入',
-    'reverse_bonus': '全年一次性奖金收入',
+    // 17B-2（v1.48.0）：反向倒算的这一组键随旧页面删除 —— 它们对应的 `<reverse-*>`
+    // 输入框不存在了，留着只是给「改字段提示的人」一份找不到主人的清单。
 
     // ===== 经营所得 - 成本费用 =====
     'business_revenue': '包括主营业务收入和其他业务收入',

@@ -14,7 +14,7 @@ beforeAll(() => {
     global.showAlert = jest.fn();
     global.showSaveSuccessMessage = jest.fn();
     global.showSaveErrorMessage = jest.fn();
-    global.updateReverseDeductionCalculation = jest.fn();
+    // 17B-2（v1.48.0）：原先这里的 updateReverseDeductionCalculation mock 随旧页面删了。
     global.updateIncomeCalculation = jest.fn();
     global.updateDeductionCalculation = jest.fn();
 
@@ -120,38 +120,10 @@ describe('showStepByPanes - 通用步骤面板切换', () => {
     });
 });
 
-describe('showReverseStep / showClassificationStep - 步骤导航包装函数（经营所得 v1.47.0 起由 spec 驱动的向导接管，不再有步骤包装函数）', () => {
-    test('showReverseStep 应切换反向倒算页面的步骤面板', () => {
-        // 设置反向倒算页面 DOM
-        const page = document.createElement('div');
-        page.id = 'reverse-calculation-page';
-        const indicator = document.createElement('div');
-        indicator.className = 'step-indicator';
-        for (let i = 0; i < 3; i++) {
-            const stepNum = document.createElement('div');
-            stepNum.className = 'step-number';
-            indicator.appendChild(stepNum);
-        }
-        page.appendChild(indicator);
-
-        const paneIds = ['reverse-step-parameters', 'reverse-step-deductions', 'reverse-step-result'];
-        const panes = {};
-        paneIds.forEach(id => {
-            const el = document.createElement('div');
-            el.id = id;
-            el.classList.add('hidden');
-            page.appendChild(el);
-            panes[id] = el;
-        });
-        document.body.appendChild(page);
-
-        showReverseStep(2);
-
-        expect(panes['reverse-step-parameters'].classList.contains('hidden')).toBe(true);
-        expect(panes['reverse-step-deductions'].classList.contains('hidden')).toBe(false);
-        expect(panes['reverse-step-result'].classList.contains('hidden')).toBe(true);
-    });
-
+// 17B-2（v1.48.0）：showReverseStep 与 setupReverseDeductionToggle 的用例随旧页面删了 ——
+// 它们测的不是业务规则，而是那张表单自己的显示/隐藏接线，页面没了就没人可测。
+// 反算口径本身的回归 guard 在 tests/reverse-migration.test.js（按税法口径独立重算，不读页面）。
+describe('showClassificationStep - 步骤导航包装函数（经营所得 v1.47.0 / 反向倒算 v1.48.0 起由 spec 驱动的向导接管，页面自己不再有步骤包装函数）', () => {
     test('showClassificationStep 应切换分类所得页面的步骤面板（2步）', () => {
         const page = document.createElement('div');
         page.id = 'classification-calculation-page';
@@ -365,10 +337,9 @@ describe('保存包装函数 - 调用通用 saveToHistory', () => {
         expect(global.showAlert).toHaveBeenCalledWith('请先完成计算后再保存');
     });
 
-    test('默认状态下 saveReverseCalculation 应提示用户先计算', () => {
-        saveReverseCalculation();
-        expect(global.showAlert).toHaveBeenCalledWith('请先完成计算后再保存');
-    });
+    // 17B-2（v1.48.0）：saveReverseCalculation 这个「未算先提示」的包装函数随旧页面删除了 ——
+    // spec 驱动的向导走到结果步才渲染保存按钮，压根没有「没算就能点」的入口，这个分支不存在了。
+    // 历史记录里 type='reverse' 仍然有效（向导保存用的就是它），见下面那条类型的用例。
 
     test('saveToHistory 用 business 类型应正确保存', () => {
         saveToHistory({ totalTax: 5000 }, 'business', '经营所得计税');
@@ -393,89 +364,8 @@ describe('保存包装函数 - 调用通用 saveToHistory', () => {
 });
 
 // ========== 扣除项切换测试 ==========
-describe('setupReverseDeductionToggle - 扣除项显示/隐藏切换', () => {
-    test('复选框选中时应显示内容区域', () => {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'test-checkbox';
-        checkbox.checked = true;
-
-        const content = document.createElement('div');
-        content.id = 'test-content';
-        content.classList.add('hidden');
-
-        document.body.appendChild(checkbox);
-        document.body.appendChild(content);
-
-        setupReverseDeductionToggle('test-checkbox', 'test-content');
-
-        // 初始状态：checkbox.checked = true → 应移除 hidden
-        expect(content.classList.contains('hidden')).toBe(false);
-    });
-
-    test('复选框未选中时应隐藏内容区域', () => {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'test-checkbox-2';
-        checkbox.checked = false;
-
-        const content = document.createElement('div');
-        content.id = 'test-content-2';
-
-        document.body.appendChild(checkbox);
-        document.body.appendChild(content);
-
-        setupReverseDeductionToggle('test-checkbox-2', 'test-content-2');
-
-        // 初始状态：checkbox.checked = false → 应添加 hidden
-        expect(content.classList.contains('hidden')).toBe(true);
-    });
-
-    test('切换复选框状态应触发内容显示/隐藏', () => {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'test-checkbox-3';
-        checkbox.checked = false;
-
-        const content = document.createElement('div');
-        content.id = 'test-content-3';
-
-        document.body.appendChild(checkbox);
-        document.body.appendChild(content);
-
-        setupReverseDeductionToggle('test-checkbox-3', 'test-content-3');
-
-        // 模拟勾选
-        checkbox.checked = true;
-        checkbox.dispatchEvent(new Event('change'));
-        expect(content.classList.contains('hidden')).toBe(false);
-
-        // 模拟取消勾选
-        checkbox.checked = false;
-        checkbox.dispatchEvent(new Event('change'));
-        expect(content.classList.contains('hidden')).toBe(true);
-    });
-
-    test('切换复选框应调用 updateReverseDeductionCalculation', () => {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'test-checkbox-4';
-        checkbox.checked = false;
-
-        const content = document.createElement('div');
-        content.id = 'test-content-4';
-
-        document.body.appendChild(checkbox);
-        document.body.appendChild(content);
-
-        global.updateReverseDeductionCalculation = jest.fn();
-        setupReverseDeductionToggle('test-checkbox-4', 'test-content-4');
-
-        checkbox.dispatchEvent(new Event('change'));
-        expect(global.updateReverseDeductionCalculation).toHaveBeenCalled();
-    });
-});
-
+// 17B-2（v1.48.0）：setupReverseDeductionToggle 随旧页面删除。它做的事（勾选取消 → 显示/隐藏 +
+// 重算扣除）在 spec 驱动下由渲染器的 when 条件与 collect 统一处理，没有页面私有的 toggle 函数了。
 // ========== 分类所得计算测试 ==========
 describe('calculateSingleClassificationTax - 分类所得单条计算', () => {
     test('利息所得应按 20% 比例税率计算', () => {

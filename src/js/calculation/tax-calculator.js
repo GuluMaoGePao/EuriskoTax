@@ -1,5 +1,7 @@
 let calculationResults = {};
-let reverseCalculationResults = {};
+// 17B-2（v1.48.0）：reverseCalculationResults 随反向倒算旧页面一起删了 —— 那份结果本来是
+// collectReverseInputData 读 DOM 攒出来的，页面没了它也就不该再存在。留着这行，只会养出一批
+//「读一个永远为空的对象」的分支（就是 export-utils / navigation-ui 里那几处）。
 let classificationCalculationResults = {};
 
 // 税法常量（综合所得/月度/经营所得/分类所得税率表）已抽离至 tax-constants.js
@@ -705,23 +707,6 @@ const REVERSE_DEDUCTION_KEYS = [
     'charitable-donation'
 ];
 
-// 17B-2：把旧页面里「一边读 DOM 一边算」的扣除逻辑拆开 —— 这里只负责读表，
-// 计算交给 calculateReverseDeductions(ded, workMonths)，spec 版向导可以直接喂自己的 values。
-function readReverseDeductionValues() {
-    const ded = {};
-    REVERSE_DEDUCTION_KEYS.forEach(function (key) {
-        const el = document.getElementById('reverse-' + key);
-        if (!el) return;
-        if (el.type === 'checkbox') {
-            ded[key] = !!el.checked;
-        } else if (el.tagName === 'SELECT') {
-            ded[key] = el.value;
-        } else {
-            ded[key] = parseFloat(el.value) || 0;
-        }
-    });
-    return ded;
-}
 
 // 综合所得的反向倒算扣除汇总（纯函数：不读 DOM，ded 为「去前缀 id → 值」字典）
 function calculateReverseDeductions(ded, workMonths) {
@@ -838,65 +823,7 @@ function calculateReverseDeductions(ded, workMonths) {
     };
 }
 
-// 计算经营所得反向倒算扣除项
-function calculateBusinessReverseDeductions(inputData) {
-    const hasComprehensiveIncome = document.getElementById('reverse-business-has-comprehensive-income')?.checked ?? false;
-    const investorDeduction = hasComprehensiveIncome ? 0 : 60000;
-    
-    let businessIncome = 0;
-    let businessCost = 0;
-    let businessExpenses = 0;
-    let businessTaxes = 0;
-    let businessLosses = 0;
-    let businessOtherExpenses = 0;
-    let businessPreviousLosses = 0;
-    
-    const isBusinessDeductionVisible = document.getElementById('reverse-business-deduction-checkbox')?.checked;
-    if (isBusinessDeductionVisible) {
-        businessCost = parseFloat(document.getElementById('reverse-business-cost')?.value) || 0;
-        businessExpenses = parseFloat(document.getElementById('reverse-business-expenses')?.value) || 0;
-        businessTaxes = parseFloat(document.getElementById('reverse-business-taxes')?.value) || 0;
-        businessLosses = parseFloat(document.getElementById('reverse-business-losses')?.value) || 0;
-        businessOtherExpenses = parseFloat(document.getElementById('reverse-business-other-expenses')?.value) || 0;
-        businessPreviousLosses = parseFloat(document.getElementById('reverse-business-previous-losses')?.value) || 0;
-    }
-    
-    let specialAdditionalDeduction = 0;
-    let otherDeduction = 0;
-    const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox')?.checked;
-    if (isSpecialAdditionalDeductionVisible) {
-        specialAdditionalDeduction = parseFloat(document.getElementById('reverse-business-special-additional-deduction')?.value) || 0;
-    }
-    
-    const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox')?.checked;
-    if (isOtherDeductionVisible) {
-        otherDeduction = parseFloat(document.getElementById('reverse-business-other-deduction')?.value) || 0;
-    }
-    
-    const annualBusinessDeduction = businessCost + businessExpenses + businessTaxes + 
-        businessLosses + businessOtherExpenses + businessPreviousLosses + 
-        investorDeduction + specialAdditionalDeduction + otherDeduction;
-    
-    return {
-        hasComprehensiveIncome,
-        investorDeduction,
-        businessCost,
-        businessExpenses,
-        businessTaxes,
-        businessLosses,
-        businessOtherExpenses,
-        businessPreviousLosses,
-        specialAdditionalDeduction,
-        otherDeduction,
-        annualBusinessDeduction,
-        totalDeduction: annualBusinessDeduction
-    };
-}
 
-// 计算经营所得年终奖税额（经营所得不涉及年终奖，返回0）
-function calculateBusinessReverseBonusTax(inputData) {
-    return 0;
-}
 
 // 计算反向倒算年终奖税额
 function calculateReverseBonusTax(inputData) {
@@ -1398,8 +1325,9 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
     }
 }
 
-// 反向倒算内核：不读 DOM。inputData 见 collectReverseInputData 的 8 个字段，
-// ded 为「去前缀 id → 值」字典（见 readReverseDeductionValues）。
+// 反向倒算内核：不读 DOM。inputData 的字段见 tests/reverse-migration.test.js 的用例；
+// ded 是「去前缀的 DOM id → 值」字典（如 'pension-insurance'），原先由页面版的
+// readReverseDeductionValues 对着表单攒出来；17B-2 起改由 spec 的 compute 把驼峰键转成短横线键拼。
 // 三个逆推入口（目标税负率 / 月度到手 / 固定税额或到手）× 三种口径（保守/均衡/激进）都在这里分派。
 // 注：incomeType==='business' 分支仍由旧的实际函数读表 —— spec 版不含经营所得，会随旧页面一并删除。
 function calculateReverseTaxCore(inputData, ded) {
@@ -1496,98 +1424,7 @@ function calculateReverseTaxCore(inputData, ded) {
         };
 }
 
-// 反向倒算主函数（页面版：读 DOM → 调内核 → 写结果区）
-function calculateReverseTax() {
-    try {
-        const inputData = collectReverseInputData();
-        const core = calculateReverseTaxCore(inputData, readReverseDeductionValues());
-        
-        // 保存结果（包含所有模式的结果和用户选择的模式）
-        saveReverseCalculationResult(core.result, inputData, core.deductionData, core.bonusTax, core.allModeResults);
-        updateReverseResultDisplay(core.result);
-        
-    } catch (error) {
-        console.error('反向倒算计算过程中出现错误:', error);
-        showAlert('计算过程中出现错误，请检查输入数据后重试。错误信息：' + error.message);
-    }
-}
 
-// 收集反向倒算输入数据
-function collectReverseInputData() {
-    const reverseType = document.getElementById('reverse-type')?.value || 'rate';
-    const incomeType = document.getElementById('reverse-income-type')?.value || 'comprehensive';
-    const calcMode = document.getElementById('reverse-calc-mode')?.value || 'conservative';
-    
-    let targetRate = 3;
-    let monthlyNet = 0;
-    let fixedTax = 0;
-    let fixedNet = 0;
-    
-    if (reverseType === 'rate') {
-        targetRate = parseFloat(document.getElementById('reverse-target-rate')?.value) || 3;
-    } else if (reverseType === 'monthly') {
-        monthlyNet = parseFloat(document.getElementById('reverse-monthly-net')?.value) || 0;
-        if (monthlyNet < 0) {
-            throw new Error('月度税后收入不能为负数');
-        }
-    } else {
-        const targetType = document.getElementById('reverse-target-type')?.value || 'tax';
-        if (targetType === 'tax') {
-            fixedTax = parseFloat(document.getElementById('reverse-fixed-tax')?.value) || 0;
-            fixedNet = 0;
-            const taxWarning = document.getElementById('reverse-fixed-tax-warning');
-            const netWarning = document.getElementById('reverse-fixed-net-warning');
-            if (taxWarning) {
-                if (fixedTax < 0) {
-                    taxWarning.textContent = '⚠️ 税额不能为负数';
-                    taxWarning.classList.remove('hidden');
-                } else {
-                    taxWarning.classList.add('hidden');
-                }
-            }
-            if (netWarning) {
-                netWarning.classList.add('hidden');
-            }
-        } else {
-            fixedNet = parseFloat(document.getElementById('reverse-fixed-net')?.value) || 0;
-            fixedTax = 0;
-            const taxWarning = document.getElementById('reverse-fixed-tax-warning');
-            const netWarning = document.getElementById('reverse-fixed-net-warning');
-            if (netWarning) {
-                if (fixedNet < 0) {
-                    netWarning.textContent = '⚠️ 到手金额不能为负数';
-                    netWarning.classList.remove('hidden');
-                } else {
-                    netWarning.classList.add('hidden');
-                }
-            }
-            if (taxWarning) {
-                taxWarning.classList.add('hidden');
-            }
-        }
-    }
-    
-    const workMonths = parseInt(document.getElementById('reverse-work-months')?.value) || 12;
-    if (workMonths < 1 || workMonths > 12) {
-        throw new Error('工作月数必须在1-12之间');
-    }
-    
-    const bonusIncome = parseFloat(document.getElementById('reverse-bonus-income')?.value) || 0;
-    const bonusInclude = document.getElementById('reverse-bonus-include')?.checked;
-    
-    return {
-        reverseType,
-        incomeType,
-        calcMode,
-        targetRate,
-        monthlyNet,
-        fixedTax,
-        fixedNet,
-        workMonths,
-        bonusIncome,
-        bonusInclude
-    };
-}
 
 // 保存反向倒算计算结果
 // 「结果明细账」：incomeDetails / deductionDetails / taxDetails 三段结构。
@@ -1649,166 +1486,8 @@ function buildReverseResultsRecord(result, inputData, deductionData, bonusTax, a
     };
 }
 
-// 保存反向倒算计算结果（页面版）
-function saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults = {}) {
-    reverseCalculationResults = buildReverseResultsRecord(result, inputData, deductionData, bonusTax, allModeResults);
-}
 
-// 更新反向倒算结果显示
-function updateReverseResultDisplay(result) {
-    const data = reverseCalculationResults;
-    
-    const totalTaxEl = document.getElementById('reverse-result-total-tax');
-    const bonusEl = document.getElementById('reverse-result-bonus');
-    const bonusTaxEl = document.getElementById('reverse-result-bonus-tax');
-    const totalIncomeEl = document.getElementById('reverse-result-total-income');
-    const netIncomeEl = document.getElementById('reverse-result-net-income');
-    const rateEl = document.getElementById('reverse-result-tax-rate');
-    const deductionEl = document.getElementById('reverse-result-deduction');
-    const taxableIncomeEl = document.getElementById('reverse-result-taxable-income');
-    const totalDeductionEl = document.getElementById('reverse-result-total-deduction');
-    
-    if (totalTaxEl) {
-        const taxValue = isFinite(result.finalTotalTax) ? result.finalTotalTax : 0;
-        totalTaxEl.textContent = '¥' + taxValue.toFixed(2);
-    }
-    if (bonusEl) {
-        bonusEl.textContent = '¥' + (data.bonusIncome || 0).toFixed(2);
-    }
-    if (bonusTaxEl) {
-        bonusTaxEl.textContent = '¥' + (data.bonusTax || 0).toFixed(2);
-    }
-    if (totalIncomeEl) {
-        // 按目标税率倒算：显示范围
-        if (result.isRateMode && result.minTotalIncome !== undefined) {
-            const minStr = isFinite(result.minTotalIncome) ? '¥' + result.minTotalIncome.toFixed(2) : '¥0';
-            const maxStr = isFinite(result.maxTotalIncome) ? '¥' + result.maxTotalIncome.toFixed(2) : '无上限';
-            const midStr = isFinite(result.totalIncome) ? '¥' + result.totalIncome.toFixed(2) : '¥0';
-            totalIncomeEl.innerHTML = 
-                `${minStr} - ${maxStr}` +
-                `<br><span style="font-size: 14px; color: #666;">(中间值: ${midStr})</span>`;
-        } else {
-            // 月度税后倒算、目标税额倒算：只显示数值
-            const incomeValue = isFinite(result.totalIncome) ? result.totalIncome : 0;
-            totalIncomeEl.textContent = '¥' + incomeValue.toFixed(2);
-        }
-    }
-    if (netIncomeEl) {
-        const netValue = isFinite(result.calculatedNetIncome) ? result.calculatedNetIncome : 0;
-        netIncomeEl.textContent = '¥' + netValue.toFixed(2);
-    }
-    if (rateEl) {
-        rateEl.textContent = (result.applicableRate * 100).toFixed(0) + '%';
-    }
-    if (deductionEl) {
-        deductionEl.textContent = '¥' + result.applicableDeduction.toFixed(2);
-    }
-    if (taxableIncomeEl) {
-        const taxableValue = isFinite(result.taxableIncome) ? result.taxableIncome : 0;
-        taxableIncomeEl.textContent = '¥' + taxableValue.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    }
-    if (totalDeductionEl) {
-        totalDeductionEl.textContent = '¥' + data.deductionDetails.total.toFixed(2);
-    }
-    
-    // 更新三种计算模式对比表格
-    updateReverseModeComparisonTable(data);
 
-    // 台账 C：反向倒算推导链（与综合所得同一套实现，utils.js 提供；未加载时跳过）
-    if (typeof buildReverseFormulaSteps === 'function' && typeof showFormulaStepsPanel === 'function') {
-        showFormulaStepsPanel(
-            buildReverseFormulaSteps(data),
-            'formula-steps-panel-reverse',
-            'formula-steps-body-reverse'
-        );
-    }
-}
-
-// 更新三种计算模式对比表格
-function updateReverseModeComparisonTable(data) {
-    const comparisonSection = document.getElementById('reverse-mode-comparison-section');
-    const singleModeSection = document.getElementById('reverse-single-mode-section');
-    const tableBody = document.getElementById('reverse-mode-comparison-body');
-    const singleTaxSection = document.getElementById('reverse-single-tax-section');
-    
-    if (!comparisonSection || !singleModeSection || !tableBody) return;
-    
-    const allModeResults = data.allModeResults || {};
-    const selectedMode = data.calcMode || 'all';
-    
-    const modeNames = {
-        all: '📊 全部模式',
-        conservative: '🌱 保守模式',
-        balanced: '⚖️ 均衡模式',
-        aggressive: '🚀 进取模式'
-    };
-    
-    // 根据用户选择决定显示内容
-    if (selectedMode === 'all') {
-        // 全部模式：显示对比表格，隐藏单个模式显示和顶部税额行
-        comparisonSection.classList.remove('hidden');
-        singleModeSection.classList.add('hidden');
-        if (singleTaxSection) {
-            singleTaxSection.classList.add('hidden');
-        }
-        
-        // 清空表格
-        tableBody.innerHTML = '';
-        
-        if (Object.keys(allModeResults).length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">正在计算...</td></tr>';
-            return;
-        }
-        
-        // 添加三种模式的数据
-        const modeOrder = ['conservative', 'balanced', 'aggressive'];
-        const modeDescriptions = {
-            conservative: '最低门槛',
-            balanced: '区间均值',
-            aggressive: '接近上限'
-        };
-        
-        modeOrder.forEach((mode, index) => {
-            const modeResult = allModeResults[mode];
-            if (!modeResult) return;
-            
-            const netIncome = modeResult.totalIncome - modeResult.finalTotalTax;
-            
-            const row = document.createElement('tr');
-            row.className = index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-white';
-            
-            row.innerHTML = `
-                <td class="px-3 py-2">
-                    <div class="flex flex-col">
-                        <span class="font-medium text-gray-800">${modeNames[mode]}</span>
-                        <span class="text-xs text-gray-500">${modeDescriptions[mode]}</span>
-                    </div>
-                </td>
-                <td class="px-3 py-2 text-right font-medium text-gray-700">
-                    ¥${isFinite(modeResult.taxableIncome) ? modeResult.taxableIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
-                </td>
-                <td class="px-3 py-2 text-right font-medium text-blue-600">
-                    ¥${isFinite(modeResult.totalIncome) ? modeResult.totalIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
-                </td>
-                <td class="px-3 py-2 text-right font-medium text-red-600">
-                    ¥${isFinite(modeResult.finalTotalTax) ? modeResult.finalTotalTax.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
-                </td>
-                <td class="px-3 py-2 text-right font-medium text-green-600">
-                    ¥${isFinite(netIncome) ? netIncome.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}
-                </td>
-            `;
-            
-            tableBody.appendChild(row);
-        });
-    } else {
-        // 单个模式：隐藏对比表格，显示单个模式结果和顶部税额行
-        comparisonSection.classList.add('hidden');
-        singleModeSection.classList.remove('hidden');
-        if (singleTaxSection) {
-            singleTaxSection.classList.remove('hidden');
-        }
-    }
-}
 
 // 辅助函数：根据应纳税所得额和税率表计算经营所得税额
 function calculateBusinessTaxByTaxableIncome(taxableIncome) {
@@ -2468,10 +2147,6 @@ function saveClassificationCalculation() {
     saveToHistory(classificationCalculationResults, 'classification', '分类所得计税');
 }
 
-// 保存反向倒算计算结果到历史记录
-function saveReverseCalculation() {
-    saveToHistory(reverseCalculationResults, 'reverse', '反向倒算计税');
-}
 
 // 计算单个分类所得条目
 function calculateSingleClassificationTax(type, income, deduction = 0) {

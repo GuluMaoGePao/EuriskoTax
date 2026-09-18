@@ -4,9 +4,9 @@ function exportToWord(elementId, title, opts) {
     // 获取计算结果数据
     // opts.skipResultCheck：阶段17 spec 驱动的向导没有上面这几个全局变量（它们属于存量 4 页），
     // 不做这个开关就会被「请先进行计算」挡回来 —— 新增参数，既有两参调用的行为不变。
-    if (!opts.skipResultCheck &&
-        Object.keys(calculationResults).length === 0 && 
-        Object.keys(reverseCalculationResults).length === 0) {
+    // 17B-2（v1.48.0）：原先这半句还判 reverseCalculationResults —— 那个全局变量随旧页面删除了，
+    // 留着是**必炸**的（未声明变量直接抛 ReferenceError），而删掉它不影响任何现役入口。
+    if (!opts.skipResultCheck && Object.keys(calculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }
@@ -35,82 +35,18 @@ function safeFormatNumber(value, decimals = 2) {
 
 // 生成Word文档内容
 function generateWordDocumentContent(title) {
-    // 优先使用反向倒算结果（如果有），否则使用正向计算结果，最后检查经营所得
-    const hasReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
-    const hasForwardCalculation = Object.keys(calculationResults).length > 0;
-    
-    // 综合所得或反向倒算
-    const isReverseCalculation = hasReverseCalculation;
-    const results = isReverseCalculation ? reverseCalculationResults : calculationResults;
+    // 17B-2（v1.48.0）：原本这里三选一（正向 / 反向倒算 / 经营所得）—— 反向与经营所得两个页面
+    // 都随 spec 迁移删掉了，不会再有那两份全局结果，所以只剩正向这一份。
+    // 三种结果的形状本来也不通用（反向那套 incomeDetails 里大半是为对齐结构补上去的 0），
+    // 留着任何一半都是**看着还能用、实际永远不进得去**的死代码。
+    const results = calculationResults;
     const workMonths = results.workMonths;
     
-    // 构建收入明细（根据计算类型）
-    let incomeDetails;
-    let deductionDetails;
-    let taxDetails;
+    // 构建收入明细（只剩正向这一种结构了）
+    const incomeDetails = results.incomeDetails;
+    const deductionDetails = results.deductionDetails;
+    const taxDetails = results.taxDetails;
     
-    if (isReverseCalculation) {
-        // 反向倒算结果结构
-        const bonusInclude = document.getElementById('reverse-bonus-include')?.checked || false;
-        const regularIncome = calculateRegularIncome(results.totalIncome, results.bonusIncome, bonusInclude);
-        
-        incomeDetails = {
-            total: results.totalIncome,
-            bonus: results.bonusIncome,
-            bonusInclude: bonusInclude,
-            bonusTax: results.bonusTax,
-            // 添加缺失的属性，避免toFixed错误
-            labor: 0,
-            laborCalculated: 0,
-            laborTax: 0,
-            author: 0,
-            authorCalculated: 0,
-            authorTax: 0,
-            royalty: 0,
-            royaltyCalculated: 0,
-            royaltyTax: 0,
-            salary: regularIncome / results.workMonths // 平均月工资（不含年终奖）
-        };
-        
-        deductionDetails = {
-            total: results.totalDeduction,
-            basic: 5000,
-            pensionInsurance: 0,
-            medicalInsurance: 0,
-            unemploymentInsurance: 0,
-            housingFund: 0,
-            elderly: 0,
-            childrenInfant: 0,
-            housing: 0,
-            educationDegree: 0,
-            professional: 0,
-            actualMedical: results.deductionDetails.actualMedical || 0,
-            pension: 0,
-            enterpriseAnnuity: 0,
-            insuranceOther: 0,
-            taxDeferredPension: 0,
-            charitableDonation: 0,
-            specialAdditionalTotal: 0,
-            otherTotal: 0
-        };
-        
-        const reverseTotalTax = results.totalTax || 0;
-        
-        taxDetails = {
-            taxableIncome: results.taxableIncome || 0,
-            applicableRate: results.applicableRate || 0,
-            applicableDeduction: results.applicableDeduction || 0,
-            totalTax: reverseTotalTax,
-            prepaidTax: 0, // 反向倒算为预测性计算，尚未实际缴纳
-            refundTax: reverseTotalTax - 0, // 应退/补税额 = 应纳税额 - 已纳税额
-            netIncome: results.netIncome || 0
-        };
-    } else {
-        // 正向计算结果结构
-        incomeDetails = results.incomeDetails;
-        deductionDetails = results.deductionDetails;
-        taxDetails = results.taxDetails;
-    }
     
     // 生成月度数据
     const monthlyData = generateMonthlyData(results);
@@ -603,40 +539,19 @@ function generateWordDocumentContent(title) {
 function generateMonthlyData(results) {
     const workMonths = results.workMonths;
     
-    // 检查是否为反向倒算结果
-    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
-    
-    let monthlySalary, monthlyBasicDeduction, monthlyInsuranceDeduction, monthlySpecialAdditional, monthlyOtherDeduction;
-    
-    if (isReverseCalculation) {
-        // 反向倒算结果
-        const bonusInclude = document.getElementById('reverse-bonus-include')?.checked || false;
-        const regularIncome = calculateRegularIncome(results.totalIncome, results.bonusIncome, bonusInclude);
-        monthlySalary = regularIncome / workMonths;
-        monthlyBasicDeduction = results.deductionDetails?.basic || 5000;
-        monthlyInsuranceDeduction = (results.deductionDetails?.pensionInsurance || 0) + 
-                                     (results.deductionDetails?.medicalInsurance || 0) + 
-                                     (results.deductionDetails?.unemploymentInsurance || 0) + 
-                                     (results.deductionDetails?.housingFund || 0);
-        monthlySpecialAdditional = (results.deductionDetails?.elderly || 0) + 
-                                     (results.deductionDetails?.childrenInfant || 0) + 
-                                     (results.deductionDetails?.housing || 0) + 
-                                     (results.deductionDetails?.educationDegree || 0);
-        monthlyOtherDeduction = ((results.deductionDetails?.otherTotal || 0) - (results.deductionDetails?.charitableDonation || 0)) / workMonths;
-    } else {
-        // 正向计算结果
-        monthlySalary = results.incomeDetails.salary;
-        monthlyBasicDeduction = results.deductionDetails.basic;
-        monthlyInsuranceDeduction = results.deductionDetails.pensionInsurance + 
-                                     results.deductionDetails.medicalInsurance + 
-                                     results.deductionDetails.unemploymentInsurance + 
+    // 反向倒算那半个分支随旧页面删了（17B-2 v1.48.0）：它的月度数据是拿年度数摊出来的，
+    // 与正向逐月预扣本来就不是一个口径，留着只会让人以为两边还能对得上。
+    const monthlySalary = results.incomeDetails.salary;
+    const monthlyBasicDeduction = results.deductionDetails.basic;
+    const monthlyInsuranceDeduction = results.deductionDetails.pensionInsurance +
+                                     results.deductionDetails.medicalInsurance +
+                                     results.deductionDetails.unemploymentInsurance +
                                      results.deductionDetails.housingFund;
-        monthlySpecialAdditional = results.deductionDetails.elderly + 
-                                     results.deductionDetails.childrenInfant + 
-                                     results.deductionDetails.housing + 
+    const monthlySpecialAdditional = results.deductionDetails.elderly +
+                                     results.deductionDetails.childrenInfant +
+                                     results.deductionDetails.housing +
                                      (results.deductionDetails.educationDegree || 0);
-        monthlyOtherDeduction = results.deductionDetails.otherTotal / workMonths;
-    }
+    const monthlyOtherDeduction = results.deductionDetails.otherTotal / workMonths;
     
     const monthlyData = [];
     let cumulativeTaxableIncome = 0;
@@ -729,31 +644,32 @@ function generateTaxRateDistribution(taxableIncome) {
 
 // 生成税收优化建议
 function generateOptimizationTipsForWord() {
-    if (Object.keys(calculationResults).length === 0 && Object.keys(reverseCalculationResults).length === 0) {
+    // 17B-2（v1.48.0）：原先还要兼顾反向倒算结果（那份结果的 deductionDetails 里大半字段是补的 0，
+    // 所以每一条建议都得先判「不是反向」才能读），现在只剩正向一份。
+    if (Object.keys(calculationResults).length === 0) {
         return '<p>暂无优化建议</p>';
     }
     
     const tips = [];
-    const isReverseCalculation = Object.keys(reverseCalculationResults).length > 0;
-    const results = isReverseCalculation ? reverseCalculationResults : calculationResults;
+    const results = calculationResults;
     
     // 检查专项附加扣除
-    if (!isReverseCalculation && results.deductionDetails.specialAdditionalTotal === 0) {
+    if (results.deductionDetails.specialAdditionalTotal === 0) {
         tips.push('您未填写任何专项附加扣除，建议检查是否有符合条件的扣除项目，如子女教育、赡养老人、住房贷款利息等。');
     }
     
     // 检查个人养老金
-    if (!isReverseCalculation && results.deductionDetails.pension === 0) {
+    if (results.deductionDetails.pension === 0) {
         tips.push('您未填写个人养老金扣除，建议考虑缴纳个人养老金，每年最高可扣除12000元。');
     }
     
     // 检查商业健康保险
-    if (!isReverseCalculation && results.deductionDetails.insuranceOther === 0) {
+    if (results.deductionDetails.insuranceOther === 0) {
         tips.push('您未填写商业健康保险扣除，建议考虑购买符合条件的商业健康保险，每年最高可扣除2400元。');
     }
     
     // 检查年终奖计税方式
-    if (!isReverseCalculation && results.incomeDetails && results.incomeDetails.bonus > 0) {
+    if (results.incomeDetails && results.incomeDetails.bonus > 0) {
         const bonusTax = results.incomeDetails.bonusTax;
         const bonusInclude = results.incomeDetails.bonusInclude;
         const bonusAmount = results.incomeDetails.bonus;
@@ -803,12 +719,12 @@ function generateOptimizationTipsForWord() {
     }
     
     // 检查大病医疗
-    if (!isReverseCalculation && results.deductionDetails.medical > 0 && results.deductionDetails.actualMedical === 0) {
+    if (results.deductionDetails.medical > 0 && results.deductionDetails.actualMedical === 0) {
         tips.push('您填写的大病医疗费用未达到扣除标准（超过15000元的部分），建议保留相关凭证，以备后续年度可能的扣除。');
     }
     
     // 检查社保缴费
-    if (!isReverseCalculation && results.deductionDetails.pensionInsurance + 
+    if (results.deductionDetails.pensionInsurance + 
         results.deductionDetails.medicalInsurance + 
         results.deductionDetails.unemploymentInsurance + 
         results.deductionDetails.housingFund === 0) {
