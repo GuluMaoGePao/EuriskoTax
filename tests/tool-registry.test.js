@@ -58,16 +58,18 @@ describe('工具注册表：数量与分组', () => {
     test('20 个速算器 + 深度流程（3 个页面式 + 6 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
-        // 17B-1（v1.46.0）：business 已从页面式迁到 spec 驱动，页面式由 4 → 3。
+        // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
+        // 17B-2：reverse 再迁一个，页面式由 3 → 2（旧页面进入拆除期，下一步删除）。
         const pageBased = deep.filter((t) => !!t.pageId).map((t) => t.id).sort();
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
-        expect(pageBased).toEqual(['classification', 'forward', 'reverse']);   // 17B 完成后应归零
+        expect(pageBased).toEqual(['classification', 'forward']);   // 17B 完成后应归零
         // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、social-base-deep（17C-3）、
         // surtax-stamp-deep（17C-4）、disability-fund-deep（17C-5）：附加税的计税依据就是实缴增值税，
         // 所以它必须跟在 vat 之后 —— 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
         // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**；business 是 17B 迁回来的第一个。
         expect(specDriven).toEqual([
-            'business', 'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'business', 'corporate-income-tax-deep', 'disability-fund-deep', 'reverse',
+            'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
         ]);
     });
 
@@ -91,12 +93,14 @@ describe('工具注册表：数量与分组', () => {
             expect(t.compute).toBe(twin.compute);
         });
 
-        // ② 从页面迁来的（17B：business）：它**没有**同名速算器可复用（经营所得速算器是
+        // ② 从页面迁来的（17B：business；17B-2 起加上 reverse）：它们**没有**同名速算器可复用
+        //    （经营所得速算器是「核定 vs 查账」对比、反向倒算压根没有速算器），所以计算走的是
+        //    从页面里抽出来的共享内核（calculateBusinessTaxCore / calculateReverseTaxCore）。
         //    「核定 vs 查账」对比，口径不同），所以计算走的是从页面里抽出来的共享内核
-        //    `calculateBusinessTaxCore`。这里只钉三件套齐全（防止只迁一半），
-        //    **口径一致**由 tests/business-migration.test.js 的逐点对拍证明。
+        //    这里只钉三件套齐全（防止只迁一半），**口径一致**由逐点对拍证明：
+        //    business → tests/business-migration.test.js，reverse → tests/reverse-migration.test.js。
         const migrated = specDriven.filter((t) => !t.id.endsWith('-deep'));
-        expect(migrated.map((t) => t.id)).toEqual(['business']);
+        expect(migrated.map((t) => t.id)).toEqual(['business', 'reverse']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);

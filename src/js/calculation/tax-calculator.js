@@ -1590,8 +1590,11 @@ function collectReverseInputData() {
 }
 
 // 保存反向倒算计算结果
-function saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults = {}) {
-    reverseCalculationResults = {
+// 「结果明细账」：incomeDetails / deductionDetails / taxDetails 三段结构。
+// 17B-2 抽出来是为了让页面版与 spec 版吃同一份形状 —— utils.js 的 buildReverseFormulaSteps
+// 认的正是这三段，写第二份必然在字段名上漂移（推导链看着在，读出来的却是另一个口径）。
+function buildReverseResultsRecord(result, inputData, deductionData, bonusTax, allModeResults) {
+    return {
         incomeType: inputData.incomeType,
         reverseType: inputData.reverseType,
         workMonths: inputData.workMonths,
@@ -1644,6 +1647,11 @@ function saveReverseCalculationResult(result, inputData, deductionData, bonusTax
         bonusTax: bonusTax,
         calculationDate: new Date().toISOString()
     };
+}
+
+// 保存反向倒算计算结果（页面版）
+function saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults = {}) {
+    reverseCalculationResults = buildReverseResultsRecord(result, inputData, deductionData, bonusTax, allModeResults);
 }
 
 // 更新反向倒算结果显示

@@ -172,9 +172,214 @@
             nextTools: ['withholding', 'annual-settlement']
         },
         {
-            id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推收入',
-            icon: 'fa-refresh', status: 'deep', pageId: 'reverse-calculation-page',
-            nextTools: ['net-salary', 'salary-tax', 'employer-cost']
+            // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
+            // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
+            // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
+            //
+            // 它比前面 5 个 spec 多一样东西：同一个目标是**一段区间**，不是一个数。
+            // 目标税负率给的是税率档位，档位内的任意收入都满足同一个税负率 —— 所以必须给出
+            // 保守（档位下限）/ 均衡（解出的值）/ 激进（档位上限）三份答案让用户挑。
+            // 这套能力就是上一小步落到向导里的 compare 契约：spec 只出 scenarios，
+            // 切换、对比表、导出带表都由渲染器统一负责。
+            //
+            // 口径一字未改：compute 直接调 tax-calculator.js 抽出的 calculateReverseTaxCore，
+            // 与页面版同一份内核；推导链复用 utils.js 的 buildReverseFormulaSteps。
+            //
+            // 另一个决定：**不保留经营所得子模式**（incomeType 固定 comprehensive）——
+            // 经营所得的反向需求由「经营所得」完整测算承接，两个入口算同一件事迟早互相打架。
+            id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推税前收入',
+            icon: 'fa-refresh', status: 'deep',
+            nextTools: ['net-salary', 'salary-tax', 'employer-cost'],
+            fields: [
+                // ---- 第一步：倒算目标 ----
+                // 四种目标合成一个下拉：拆成「先选方式、再选金额类型」两层就多一处不一致，
+                // 而内核只看 reverseType + fixedTax / fixedNet，本来就用不上第二层。
+                { key: 'reverseType', step: 'target', label: '倒算方式', type: 'select', default: 'rate', options: [
+                    { value: 'rate', label: '按目标税负率倒算' },
+                    { value: 'monthly', label: '按月均到手倒算' },
+                    { value: 'tax', label: '按目标税额倒算' },
+                    { value: 'net', label: '按全年到手额倒算' }
+                ] },
+                { key: 'targetRate', step: 'target', label: '目标税负率', type: 'percent', default: 3,
+                    when: { key: 'reverseType', in: ['rate'] },
+                    hint: '全年个税 ÷ 全年税前收入。填 3 就是按最低档 3% 反推' },
+                { key: 'monthlyNet', step: 'target', label: '月均到手（元/月）', type: 'money', default: 10000,
+                    when: { key: 'reverseType', in: ['monthly'] } },
+                { key: 'fixedAmount', step: 'target', label: '目标金额（元/年）', type: 'money', default: 30000,
+                    when: { key: 'reverseType', in: ['tax', 'net'] },
+                    hint: '按税额倒算时填全年个税；按到手倒算时填全年税后收入' },
+
+                // ---- 第二步：发放与口径 ----
+                { key: 'workMonths', step: 'income', label: '年工作总月数', type: 'select', default: 12,
+                    options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }),
+                    hint: '学历继续教育的年额度按工作月数摊到每月' },
+                { key: 'calcMode', step: 'income', label: '计算口径', type: 'select', default: 'conservative', options: [
+                    { value: 'conservative', label: '保守（档位下限）' },
+                    { value: 'balanced', label: '均衡（解出的值）' },
+                    { value: 'aggressive', label: '激进（档位上限）' }
+                ], hint: '同一目标对应一个收入区间：保守是下限、激进是上限，结果页可随时横着比' },
+                { key: 'bonusIncome', step: 'income', label: '年终奖（元/年）', type: 'money', default: 0 },
+                { key: 'bonusInclude', step: 'income', label: '反推的收入含年终奖', type: 'switch', default: false,
+                    hint: '含年终奖时，年终奖单独计税，其余部分才按月摊' },
+
+                // ---- 第三步：扣除项明细 ----
+                // 两级勾选沿用页面版：「专项扣除」「专项附加扣除」「其他扣除」三个总开关各管一片，
+                // 总开关不勾，下面的月缴额 / 分项一律不计 —— 这是页面上最容易踩、且看不出来的坑。
+                { key: 'specialDeductionCheckbox', step: 'deduction', label: '缴纳社保与公积金（专项扣除）', type: 'switch', default: true },
+                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+
+                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '享受专项附加扣除', type: 'switch', default: true },
+                { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'housingType', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
+                    { value: 'rent', label: '住房租金' },
+                    { value: 'loan', label: '住房贷款利息' }
+                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息**只能二选一**' },
+                { key: 'rentDeduction', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 1500,
+                    when: { key: 'housingType', in: ['rent'] } },
+                { key: 'housingLoanDeduction', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 1000,
+                    when: { key: 'housingType', in: ['loan'] } },
+                { key: 'educationDeduction', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '学历继续教育按定额扣；职业资格另勾下面那一项' },
+                { key: 'educationProfessionalCheckbox', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'medicalDeduction', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '只扣超过 1.5 万的部分、限额 8 万；且只在年度汇算扣，不进月度' },
+
+                { key: 'otherDeductionCheckbox', step: 'deduction', label: '有其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
+                { key: 'pensionDeductionCheckbox', step: 'deduction', label: '商业健康险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'pensionDeduction', step: 'deduction', label: '商业健康险（元/月）', type: 'money', default: 0,
+                    when: { key: 'pensionDeductionCheckbox', in: [true] } },
+                { key: 'enterpriseAnnuityCheckbox', step: 'deduction', label: '企业年金', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'enterpriseAnnuity', step: 'deduction', label: '企业年金（元/月）', type: 'money', default: 0,
+                    when: { key: 'enterpriseAnnuityCheckbox', in: [true] } },
+                { key: 'insuranceOtherDeductionCheckbox', step: 'deduction', label: '其他商业保险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'insuranceOtherDeduction', step: 'deduction', label: '其他商业保险（元/月）', type: 'money', default: 0,
+                    when: { key: 'insuranceOtherDeductionCheckbox', in: [true] } },
+                { key: 'taxDeferredPensionCheckbox', step: 'deduction', label: '税延养老保险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'taxDeferredPension', step: 'deduction', label: '税延养老保险（元/月）', type: 'money', default: 0,
+                    when: { key: 'taxDeferredPensionCheckbox', in: [true] } },
+                { key: 'charitableDonationCheckbox', step: 'deduction', label: '公益性捐赠', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠（元/年）', type: 'money', default: 0,
+                    when: { key: 'charitableDonationCheckbox', in: [true] }, hint: '扣除限额为应纳税所得额的 30%' }
+            ],
+            steps: [
+                { key: 'target', title: '倒算目标', why: '先定「想要什么」：目标税负率、月均到手，还是固定的税额 / 到手金额' },
+                { key: 'income', title: '发放与口径', why: '同一个目标对应税率档位上的一段区间 —— 选哪一档决定最终落在区间的哪一端' },
+                { key: 'deduction', title: '扣除项明细', why: '扣除项直接决定「到同样的手需要多少税前」：漏一项，就得多发一份税' }
+            ],
+            pitfalls: [
+                '同一个税负率对应的是**一段收入区间**（税率档位），不是唯一解 —— 保守落在档位下限、激进用到上限',
+                '住房租金与住房贷款利息**只能二选一**，同时享受会被税务机关驳回',
+                '含年终奖时它按全年一次性奖金单独计税，与并入综合所得的口径不同：反推前先确认发放方式',
+                '大病医疗只在**年度汇算**扣（超过 1.5 万的部分、限额 8 万），不进月度'
+            ],
+            compute: function (v) {
+                if (typeof calculateReverseTaxCore !== 'function') return null;
+                // spec 的驼峰键 ↔ 内核字典的「去前缀 DOM id」键：两处拼写由这一个转换互认。
+                // 不写对照表 —— 表迟早漏一行，漏一行就是**静默少扣一项**，界面上完全看不出来。
+                function kebab(k) { return k.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); }); }
+                var ded = {};
+                ['specialDeductionCheckbox', 'specialAdditionalDeductionCheckbox', 'otherDeductionCheckbox',
+                    'pensionInsurance', 'medicalInsurance', 'unemploymentInsurance', 'housingFund',
+                    'childrenInfantDeduction', 'elderlyDeduction', 'housingType', 'rentDeduction', 'housingLoanDeduction',
+                    'educationDeduction', 'medicalDeduction', 'educationProfessionalCheckbox',
+                    'pensionDeductionCheckbox', 'pensionDeduction', 'enterpriseAnnuityCheckbox', 'enterpriseAnnuity',
+                    'insuranceOtherDeductionCheckbox', 'insuranceOtherDeduction',
+                    'taxDeferredPensionCheckbox', 'taxDeferredPension',
+                    'charitableDonationCheckbox', 'charitableDonation'
+                ].forEach(function (k) { ded[kebab(k)] = v[k]; });
+
+                // tax / net 两种方式在内核里都是 target 分支（只看 fixedTax / fixedNet 哪个非 0）
+                var inputData = {
+                    reverseType: (v.reverseType === 'tax' || v.reverseType === 'net') ? 'target' : v.reverseType,
+                    incomeType: 'comprehensive',       // 17B-2 决定：经营所得子模式不再由本工具承载
+                    calcMode: v.calcMode,
+                    targetRate: v.targetRate,
+                    monthlyNet: v.monthlyNet,
+                    fixedTax: v.reverseType === 'tax' ? v.fixedAmount : 0,
+                    fixedNet: v.reverseType === 'net' ? v.fixedAmount : 0,
+                    workMonths: v.workMonths,
+                    bonusIncome: v.bonusIncome,
+                    bonusInclude: !!v.bonusInclude
+                };
+
+                var core = calculateReverseTaxCore(inputData, ded);
+                if (!core || !core.result) return null;
+
+                var MODE_LABEL = { conservative: '保守', balanced: '均衡', aggressive: '激进' };
+                var MODE_WHY = {
+                    conservative: '取税率档位下限：满足目标所需的最少税前收入',
+                    balanced: '按目标直接解出的应纳税所得额',
+                    aggressive: '用满目标税率档位：同样税负率下能拿到的最高税前收入'
+                };
+                function scenario(mode) {
+                    var r = core.allModeResults && core.allModeResults[mode];
+                    if (!r) return null;
+                    return {
+                        key: mode,
+                        label: MODE_LABEL[mode],
+                        why: MODE_WHY[mode],
+                        primary: { label: '所需税前年收入', value: r.totalIncome, kind: 'money' },
+                        rows: [
+                            { label: '全年个人所得税', value: r.finalTotalTax, kind: 'money' },
+                            { label: '全年税后到手', value: r.calculatedNetIncome, kind: 'money' },
+                            { label: '月均税前收入', value: r.monthlyIncome, kind: 'money' },
+                            { label: '月均到手', value: r.monthlyNet, kind: 'money' },
+                            { label: '年应纳税所得额', value: r.taxableIncome, kind: 'money' },
+                            { label: '适用税率', value: r.applicableRate, kind: 'percent' }
+                        ]
+                    };
+                }
+                var scenarios = ['conservative', 'balanced', 'aggressive'].map(scenario).filter(Boolean);
+                var active = scenarios.filter(function (s) { return s.key === inputData.calcMode; })[0];
+                if (!active) return null;
+
+                // 推导链：与页面版同吃 utils.js 那一份（页面删了之后这也是唯一一份）
+                var steps = [];
+                if (typeof buildReverseFormulaSteps === 'function') {
+                    var record = (typeof buildReverseResultsRecord === 'function')
+                        ? buildReverseResultsRecord(core.result, inputData, core.deductionData, core.bonusTax, core.allModeResults)
+                        : null;
+                    steps = record ? buildReverseFormulaSteps(record) : [];
+                } else if (typeof console !== 'undefined') {
+                    console.warn('[tool-registry] buildReverseFormulaSteps 未加载（utils.js），推导链面板被跳过');
+                }
+
+                return {
+                    primary: active.primary,
+                    rows: [
+                        { label: '全年个人所得税', value: core.result.finalTotalTax, kind: 'money' },
+                        { label: '全年税后到手', value: core.result.calculatedNetIncome, kind: 'money' },
+                        { label: '月均税前收入', value: core.result.monthlyIncome, kind: 'money' },
+                        { label: '月均到手', value: core.result.monthlyNet, kind: 'money' },
+                        { label: '全年扣除合计', value: core.deductionData.totalDeduction, kind: 'money' },
+                        { label: '年应纳税所得额', value: core.result.taxableIncome, kind: 'money' },
+                        { label: '适用税率', value: core.result.applicableRate, kind: 'percent' },
+                        { label: '年终奖税额', value: core.bonusTax, kind: 'money' }
+                    ],
+                    // 三份答案是区间的两个端点 + 中间解，不是说有三种算法 —— 这句话跟着结果走
+                    note: '一个税负目标对应税率档位上的一段收入区间：保守落在档位下限、激进用到上限，均衡是按目标直接解出的值。三者是同一段区间的取点，不是三个不同的算法。',
+                    steps: steps,
+                    compare: { label: '三种口径对比', active: active.key, scenarios: scenarios }
+                };
+            }
         },
         // 阶段17 17C-1：第一个**由 spec 驱动**的完整测算 —— 此前 4 个 deep 各有独立页面与私有逻辑，
         // 每加一个税种就要再写一页 HTML；本条目没有 pageId，内容由 deep-wizard-ui.js 按 spec 渲染。
