@@ -85,6 +85,21 @@
         });
     }
 
+    // 17B-1：spec 驱动的向导是**通用渲染器** —— dw-next 与 dw-result-card 会被所有 spec 工具
+    // 轮着用。若照搬 bindButton('dw-next', 'business')，用户算了增值税也会被当成经营所得线索
+    // 归因进去（线索表里看不出错，联系时也答非所问）。所以注入前先按 data-tool-id 认人。
+    function bindWizardNext(type) {
+        var btn = document.getElementById('dw-next');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            setTimeout(function () {
+                var card = document.getElementById('dw-result-card');
+                if (!card || card.getAttribute('data-tool-id') !== type) return;
+                inject(type);
+            }, 150);
+        });
+    }
+
     function bindCta() {
         document.addEventListener('click', function (e) {
             var target = e.target;
@@ -103,7 +118,7 @@
 
     function init() {
         bindButton('next-to-result-btn', 'forward');            // 综合所得（年度汇算）
-        bindButton('calculate-business-btn', 'business');       // 经营所得
+        bindWizardNext('business');                             // 经营所得：17B-1 起走 spec 驱动的向导
         bindButton('calculate-classification-btn', 'classification'); // 分类所得
         // 反向倒算（谈薪）显式挂钩但会被 BLOCKED_TYPES 拦截 —— 证明守卫生效，可被门禁断言覆盖
         bindButton('calculate-reverse-btn', 'reverse');

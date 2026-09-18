@@ -28,7 +28,7 @@ const SAMPLE_DATA = {
 describe('阶段13D 分享图 - 模板分流', () => {
     test('4 类结果各归其模板：谈薪 → negotiation，其余 → income', () => {
         expect(ShareCard.SOURCES['reverse-step-result'].template).toBe('negotiation');
-        ['step-result', 'business-step-result', 'classification-step-result'].forEach((id) => {
+        ['step-result', 'dw-result-card', 'classification-step-result'].forEach((id) => {
             expect(ShareCard.SOURCES[id].template).toBe('income');
         });
     });
@@ -50,6 +50,9 @@ describe('阶段13D 分享图 - 与 index.html 的契约', () => {
     test('所有取数 selector 在页面中真实存在（id 改名会让分享图静默变空）', () => {
         const missing = [];
         Object.keys(ShareCard.SOURCES).forEach((key) => {
+            // 17B-1：spec 驱动的向导结果是**运行时渲染**的，静态 HTML 里查不到，
+            // 它们的存在改由 tests/business-income-core.test.js 的向导端到端用例守护。
+            if (key.indexOf('dw-') === 0) return;
             const cfg = ShareCard.SOURCES[key];
             [cfg.hero.selector].concat(cfg.rows.map((r) => r.selector)).forEach((sel) => {
                 if (INDEX_HTML.indexOf('id="' + sel.replace('#', '') + '"') === -1) missing.push(sel);
@@ -61,8 +64,10 @@ describe('阶段13D 分享图 - 与 index.html 的契约', () => {
     test('所有触发按钮与结果容器 id 在页面中真实存在', () => {
         const missing = [];
         ShareCard.TRIGGERS.forEach((t) => {
-            if (INDEX_HTML.indexOf('id="' + t.buttonId + '"') === -1) missing.push(t.buttonId);
-            if (INDEX_HTML.indexOf('id="' + t.containerId + '"') === -1) missing.push(t.containerId);
+            // 同上：dw-* 是向导的运行时节点，不在静态 HTML 里
+            const gone = (id) => id && id.indexOf('dw-') !== 0 && INDEX_HTML.indexOf('id="' + id + '"') === -1;
+            if (gone(t.buttonId)) missing.push(t.buttonId);
+            if (gone(t.containerId)) missing.push(t.containerId);
         });
         expect(missing).toEqual([]);
     });

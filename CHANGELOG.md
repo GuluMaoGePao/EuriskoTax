@@ -7,6 +7,75 @@
 
 ---
 
+## [1.47.0] - 2026-09-18（阶段17 17B-1 收尾：清理经营所得旧页面的死代码）
+
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **67 套件 1219 例**；线上指纹 **37 项**（不改动指纹覆盖点）。
+
+### 删了什么（约 1,150 行）
+
+- **页面**：index.html 的 `business-calculation-page`（853 行 HTML，含那份 23 字段表单）。
+- **计算层**：`readBusinessFormValues()` / `calculateBusinessTax()` / `saveBusinessCalculation()` 与
+  `businessCalculationResults` 变量（tax-calculator.js）、`updateBusinessBudgetTable` /
+  `updateBusinessCharts` / `updateBusinessCompositionChart`（utils.js）、经营所得的保险联动与
+  `resetBusinessCalculation`（helper-functions.js）。**保留** `calculateBusinessTaxCore` —— 它是向导在用的内核。
+- **接线**：navigation-ui 的经营所得预览分支与 `showBusinessStep`、draft-store 的 business 草稿流、
+  app.js 里约 300 行旧页表单逻辑（含「填社保基数反推四险一金」那段纯前端辅助 —— 见下方「补回来」）。
+- **导出**：export-utils.js 的经营所得文档生成（276 行）与其守卫、final-report.js 的 `business` kind
+  （这份专业版报告经营性产出为零，随旧页一并下线）。
+
+### 改造而非删除的部分
+
+| 位置 | 原来 | 现在 |
+| --- | --- | --- |
+| data-management 查看历史 | 把 23 个字段回填回旧页面 DOM | 走向导（向导自带草稿，接着上次继续） |
+| 历史列表取值 | 只读旧结构 `incomeDetails/taxDetails` | 两种结构都读：旧记录 + 向导的 `{values, primary, rows}` |
+| tax-assistant 关联入口 | `related: { page: 'business-calculation-page' }` | `related: { tool: 'business' }`，渲染与点击都支持 tool 型跳转 |
+| 留资情境 / 分享图 / 漏斗埋点 | `business-step-result` 等专属 id | 向导通用节点 + **`data-tool-id` 归因** |
+
+最后一行是这次唯一「删不干净」的地方：向导是**通用渲染器**，`dw-result-card` 会被所有 spec 工具轮着用。
+不加归属校验的话，用户算了增值税也会被记成一次经营所得 calc_done / 线索情境 —— 这类错误在线索表里
+看不出来，打电话联系时才答非所问。所以给结果卡加了 `data-tool-id`、每行加 `data-dw-row`、主结果加
+`dw-result-primary`，让 `lead-context / share-card / funnel-tracking / lead-touchpoints` 四个消费方按工具认人。
+
+### 测试怎么跟着改的
+
+- `tests/business-migration.test.js` → **`tests/business-income-core.test.js`**：页面版没了，对拍的左式
+  也不存在了，于是改成**按税法口径独立重算**（自己写一份税率表与扣除规则）再去核内核输出。
+  比起把三组数字固化成快照，这样将来改坏了会红在「公益性捐赠按应纳税所得额 30% 封顶」这条业务规则上，
+  而不是一个不明所以的期望值 —— 用例反倒从 7 条涨到 8 条（新增「有/无综合所得的分水岭」）。
+- 其余 6 个套件：删掉随页面消失的用例（interaction 的步骤包装函数、final-report 的 business kind），
+  或改为在向导上验证。其中 share-card 与 lead-context 的「selector 必须在 index.html 存在」契约
+  **演进**为：向导节点是运行时渲染的、静态 HTML 查不到，改由向导端到端用例守护。
+
+### 顺带捞回来的：经营所得「基数 × 比例」便利输入
+
+v1.46.0 把它记成「一处体验差异」——旧页面能「填社保缴费基数 × 缴费比例自动算出四险一金月缴额」。
+用户手里有的是**基数**，不是「每月扣了多少养老金」，所以这组输入不是装饰品。这段联动当时写在
+app.js + helper-functions.js 的私有函数里（`calculateBusinessInsurance` / `validateSocialSecurityBase('business')`），
+删页面时必然连着一起删。做法不是跟着删，而是把它**沉淀成 spec 的通用钩子**，好让后面
+reverse / forward / classification 三个迁移直接用：
+
+- `tool-registry.js` 的 business 新增 `deriveFrom` / `derive()`：基数 × 比例 → 月缴额；比例留空或越界时
+  回落**该险种自己的默认比例**（养老 8% / 医疗 2% / 失业 0.5% / 公积金 5%），不是统一回落 5%。
+- 新增 `warnings()`：低于当前生效下限的基数**当场**在输入框下面就提示（下限仍读 tax-constants.js，
+  管理台可热改 —— 注册表里不复制第二份常量）。
+- `deep-wizard-ui.js` 补上渲染器侧的三件套 `applyDerived / bindDerivedSources / renderWarnings`：
+  derive 挂在统一的收值入口 `collect()` 上（避免某条路径漏跑）；只对 `deriveFrom` 声明过的来源字段
+  接线（用户改别的字，不该把他手改过的月缴额冲掉）；数字框失焦时先把比例归一写回输入框再收值 ——
+  否则会出现「用户留了个空框，却按 0% 算出 0 元」，界面上看不出自己被当成 0 处理了。
+- `verify:local` 那两条断言**没有删**：它们盯的能力还在（只是换了承载位置），改盯等价位置即可 ——
+  首页 / 反向页仍在 index.html 里，经营所得那份改到 tool-registry.js + deep-wizard-ui.js 上，
+  门禁仍是 259 项。**「门禁红了就删门禁」是最省事、也最贵的做法**：删掉的是将来唯一会再提醒你的人。
+
+踩坑一处：第一版在 input 回调里写成 `if (applyDerived(...)) applyValues(...)` —— derive 已经在
+`collect()` 里跑过一次，第二次必然返回 `false`，于是「派生值回写界面」被整段跳过（内存改了、DOM 没动），
+测试表现为期望 800 却拿到 0。
+
+### 没做的
+
+- `business-income` **速算器**（核定 vs 查账对比）与 `business-income-quick` 页面不在本次范围，它们仍健在。
+- `field-hints.js` 里那批旧页字段名没清 —— 只是静态数据表，留着无害，等 reverse / forward 迁移时一并清理。
+
 ## [1.46.0] - 2026-09-18（阶段17 17B-1：经营所得从页面式迁到 spec 驱动）
 
 > 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **67 套件 1217 例**（新增 9 例，其中 7 例在新的 `tests/business-migration.test.js`）；线上指纹 **37 项**（不改动指纹覆盖点）。

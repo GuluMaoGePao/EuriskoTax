@@ -1,6 +1,5 @@
 let calculationResults = {};
 let reverseCalculationResults = {};
-let businessCalculationResults = {};
 let classificationCalculationResults = {};
 
 // 税法常量（综合所得/月度/经营所得/分类所得税率表）已抽离至 tax-constants.js
@@ -2363,176 +2362,6 @@ function calculateBusinessTaxCore(v) {
     };
 }
 
-// 页面版专用：把 23 个 DOM 输入读成内核要的 values 对象
-function readBusinessFormValues() {
-    const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
-    return {
-        income: num('business-income'),
-        cost: num('business-cost'),
-        expenses: num('business-expenses'),
-        taxes: num('business-taxes'),
-        losses: num('business-losses'),
-        otherExpenses: num('business-other-expenses'),
-        previousLosses: num('business-previous-losses'),
-        hasComprehensiveIncome: document.getElementById('business-has-comprehensive-income')?.checked ?? true,
-        workMonths: parseInt(document.getElementById('business-work-months')?.value, 10) || 12,
-        pensionInsurance: num('business-pension-insurance'),
-        medicalInsurance: num('business-medical-insurance'),
-        unemploymentInsurance: num('business-unemployment-insurance'),
-        housingFund: num('business-housing-fund'),
-        childrenInfantDeduction: num('business-children-infant-deduction'),
-        elderlyDeduction: num('business-elderly-deduction'),
-        housingDeduction: num('business-housing-deduction'),
-        educationDeduction: num('business-education-deduction'),
-        medicalDeduction: num('business-medical-deduction'),
-        pensionDeduction: num('business-pension-deduction'),
-        enterpriseAnnuity: num('business-enterprise-annuity'),
-        insuranceDeduction: num('business-insurance-deduction'),
-        charitableDonation: num('business-charitable-donation'),
-        prepaidTax: num('business-prepaid-tax')
-    };
-}
-
-function calculateBusinessTax() {
-    try {
-        businessCalculationResults = calculateBusinessTaxCore(readBusinessFormValues());
-
-        // 下面这段渲染代码沿用原有的局部变量名（从结果里取回），
-        // 保证抽内核前后**渲染逻辑一处未动**。
-        const t = businessCalculationResults.taxDetails;
-        const d = businessCalculationResults.deductionDetails;
-        const netIncomeAfterLoss = t.netIncome;
-        const taxableIncome = t.taxableIncome;
-        const applicableRate = t.applicableRate;
-        const applicableDeduction = t.applicableDeduction;
-        const taxReduction = t.taxReduction;
-        const totalTax = t.totalTax;
-        const prepaidTax = t.prepaidTax;
-        const refundTax = t.refundTax;
-        const totalDeduction = d.total;
-        const investorDeduction = d.investorDeduction;
-        const sd = d.specialDeduction;
-        const pensionInsurance = sd.pensionInsurance;
-        const medicalInsurance = sd.medicalInsurance;
-        const unemploymentInsurance = sd.unemploymentInsurance;
-        const housingFund = sd.housingFund;
-        const specialDeductionTotal = sd.total;
-        const sad = d.specialAdditionalDeduction;
-        const childrenInfantDeduction = sad.childrenInfant;
-        const elderlyDeduction = sad.elderly;
-        const housingDeduction = sad.housing;
-        const educationDeduction = sad.education;
-        const actualMedicalDeduction = sad.actualMedical;
-        const specialAdditionalDeductionTotal = sad.total;
-        const od = d.otherDeduction;
-        const pensionDeduction = od.pension;
-        const enterpriseAnnuity = od.enterpriseAnnuity;
-        const insuranceDeduction = od.insurance;
-        const actualCharitableDonation = od.actualCharitableDonation;
-        const otherDeductionTotal = od.total;
-        
-        safeSetTextContent('business-result-net-income', '¥' + netIncomeAfterLoss.toFixed(2));
-        safeSetTextContent('business-result-taxable-income', '¥' + taxableIncome.toFixed(2));
-        safeSetTextContent('business-result-tax-rate', (applicableRate * 100).toFixed(0) + '%');
-        safeSetTextContent('business-result-total-tax', '¥' + totalTax.toFixed(2));
-        safeSetTextContent('business-result-prepaid-tax', '¥' + prepaidTax.toFixed(2));
-        safeSetTextContent('business-result-refund-tax', (refundTax >= 0 ? '应补 ¥' : '应退 ¥') + Math.abs(refundTax).toFixed(2));
-
-        // 颜色切换 + 税负条渲染（含性能日志）
-        const bizRenderStart = performance.now();
-
-        const businessRefundEl = document.getElementById('business-result-refund-tax');
-        if (businessRefundEl) {
-            businessRefundEl.classList.remove('text-danger', 'text-success', 'text-primary');
-            businessRefundEl.classList.add(refundTax >= 0 ? 'text-danger' : 'text-success');
-        }
-
-        // 税负可视化条
-        const businessTotalIncome = businessCalculationResults.income || 0;
-        const businessEffectiveRate = businessTotalIncome > 0 ? (totalTax / businessTotalIncome * 100) : 0;
-        const businessBarFill = document.getElementById('business-tax-bar-fill');
-        if (businessBarFill) businessBarFill.style.width = Math.min(businessEffectiveRate, 100) + '%';
-        const businessRateEl = document.getElementById('business-effective-rate');
-        if (businessRateEl) businessRateEl.textContent = businessEffectiveRate.toFixed(1) + '%';
-
-        const bizRenderDuration = +(performance.now() - bizRenderStart).toFixed(3);
-        if (typeof InteractionLog !== 'undefined') {
-            InteractionLog.calc('经营所得指标卡渲染',
-                { income: businessTotalIncome, tax: totalTax, effectiveRate: businessEffectiveRate.toFixed(2) + '%' },
-                { durationMs: bizRenderDuration });
-        }
-
-        safeSetTextContent('business-result-deduction', '¥' + applicableDeduction.toFixed(2));
-        safeSetTextContent('business-result-tax-reduction', '¥' + taxReduction.toFixed(2));
-        safeSetTextContent('business-result-deductions', '¥' + totalDeduction.toFixed(2));
-        
-        const deductionDetails = businessCalculationResults.deductionDetails;
-        const hasDeductions = deductionDetails.specialDeduction.total > 0 || 
-            deductionDetails.specialAdditionalDeduction.total > 0 || 
-            deductionDetails.otherDeduction.total > 0;
-        
-        if (hasDeductions) {
-            document.getElementById('business-deduction-details')?.classList.remove('hidden');
-            safeSetTextContent('business-result-pension-insurance', '¥' + deductionDetails.specialDeduction.pensionInsurance.toFixed(2));
-            safeSetTextContent('business-result-medical-insurance', '¥' + deductionDetails.specialDeduction.medicalInsurance.toFixed(2));
-            safeSetTextContent('business-result-unemployment-insurance', '¥' + deductionDetails.specialDeduction.unemploymentInsurance.toFixed(2));
-            safeSetTextContent('business-result-housing-fund', '¥' + deductionDetails.specialDeduction.housingFund.toFixed(2));
-            safeSetTextContent('business-result-special-deduction', '¥' + deductionDetails.specialDeduction.deductible.toFixed(2));
-            
-            safeSetTextContent('business-result-children-infant', '¥' + deductionDetails.specialAdditionalDeduction.childrenInfant.toFixed(2));
-            safeSetTextContent('business-result-elderly', '¥' + deductionDetails.specialAdditionalDeduction.elderly.toFixed(2));
-            safeSetTextContent('business-result-housing', '¥' + deductionDetails.specialAdditionalDeduction.housing.toFixed(2));
-            safeSetTextContent('business-result-education', '¥' + deductionDetails.specialAdditionalDeduction.education.toFixed(2));
-            safeSetTextContent('business-result-medical', '¥' + deductionDetails.specialAdditionalDeduction.actualMedical.toFixed(2));
-            safeSetTextContent('business-result-special-additional', '¥' + deductionDetails.specialAdditionalDeduction.total.toFixed(2));
-            
-            safeSetTextContent('business-result-pension-deduction', '¥' + deductionDetails.otherDeduction.pension.toFixed(2));
-            safeSetTextContent('business-result-enterprise-annuity', '¥' + deductionDetails.otherDeduction.enterpriseAnnuity.toFixed(2));
-            safeSetTextContent('business-result-insurance-deduction', '¥' + deductionDetails.otherDeduction.insurance.toFixed(2));
-            safeSetTextContent('business-result-charitable', '¥' + deductionDetails.otherDeduction.actualCharitableDonation.toFixed(2));
-            safeSetTextContent('business-result-other-deduction', '¥' + deductionDetails.otherDeduction.total.toFixed(2));
-        } else {
-            document.getElementById('business-deduction-details')?.classList.add('hidden');
-        }
-        
-        // 更新步骤2扣除项汇总
-        safeSetTextContent('business-investor-deduction', '¥' + investorDeduction.toFixed(2));
-        safeSetTextContent('business-special-deduction-total', '¥' + specialDeductionTotal.toFixed(2));
-        safeSetTextContent('business-special-additional-total', '¥' + specialAdditionalDeductionTotal.toFixed(2));
-        safeSetTextContent('business-other-deduction-total', '¥' + otherDeductionTotal.toFixed(2));
-        safeSetTextContent('business-total-deduction', '¥' + totalDeduction.toFixed(2));
-        
-        // 更新步骤2扣除项明细
-        safeSetTextContent('business-pension-insurance-total', '¥' + pensionInsurance.toFixed(2));
-        safeSetTextContent('business-medical-insurance-total', '¥' + medicalInsurance.toFixed(2));
-        safeSetTextContent('business-unemployment-insurance-total', '¥' + unemploymentInsurance.toFixed(2));
-        safeSetTextContent('business-housing-fund-total', '¥' + housingFund.toFixed(2));
-        
-        safeSetTextContent('business-children-infant-total', '¥' + childrenInfantDeduction.toFixed(2));
-        safeSetTextContent('business-elderly-total', '¥' + elderlyDeduction.toFixed(2));
-        safeSetTextContent('business-housing-total', '¥' + housingDeduction.toFixed(2));
-        safeSetTextContent('business-education-total', '¥' + educationDeduction.toFixed(2));
-        safeSetTextContent('business-medical-total', '¥' + actualMedicalDeduction.toFixed(2));
-        
-        safeSetTextContent('business-pension-total', '¥' + pensionDeduction.toFixed(2));
-        safeSetTextContent('business-enterprise-annuity-total', '¥' + enterpriseAnnuity.toFixed(2));
-        safeSetTextContent('business-insurance-total', '¥' + insuranceDeduction.toFixed(2));
-        safeSetTextContent('business-charitable-total', '¥' + actualCharitableDonation.toFixed(2));
-
-        // 台账 C：经营所得推导链（与综合所得同一套实现，utils.js 提供；未加载时跳过）
-        if (typeof buildBusinessFormulaSteps === 'function' && typeof showFormulaStepsPanel === 'function') {
-            showFormulaStepsPanel(
-                buildBusinessFormulaSteps(businessCalculationResults),
-                'formula-steps-panel-business',
-                'formula-steps-body-business'
-            );
-        }
-
-    } catch (error) {
-        console.error('经营所得计算过程中出现错误:', error);
-        showAlert('计算过程中出现错误：' + error.message);
-    }
-}
 
 // 保存经营所得计算结果到历史记录
 // 通用保存到历史记录
@@ -2574,10 +2403,6 @@ function saveToHistory(results, type, titlePrefix) {
         showSaveErrorMessage();
         return false;
     }
-}
-
-function saveBusinessCalculation() {
-    saveToHistory(businessCalculationResults, 'business', '经营所得计税');
 }
 
 // 保存分类所得计算结果到历史记录

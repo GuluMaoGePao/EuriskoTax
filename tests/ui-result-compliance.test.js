@@ -23,11 +23,12 @@ const OUT_CSS = read('src/css/tailwind.css');
 const OTHER_CSS = ['src/css/tokens.css', 'src/css/toolbox.css'].map(read).join('\n');
 
 // index.html 里「会展示测算结果」的顶层页容器：20 个速算器共用一个壳 + 4 个完整测算
+// 17B-1（v1.47.0）：经营所得的旧页面整页删除了，它的结果区改由 spec 驱动的向导渲染 ——
+// 向导的免责声明不在静态 HTML 里，由 tests/business-income-core.test.js 的端到端用例守护。
 const RESULT_PAGES = [
     'quick-calculator-page',
     'forward-calculation-page',
     'reverse-calculation-page',
-    'business-calculation-page',
     'classification-calculation-page'
 ];
 
@@ -57,7 +58,7 @@ function customClasses(css) {
 }
 
 describe('结果页免责不能有缺口', () => {
-    test('五个结果页容器都还在（防「死选择器」重演：容器改名后断言先红）', () => {
+    test('四个结果页容器都还在（防「死选择器」重演：容器改名后断言先红）', () => {
         const ids = pageSlices(INDEX_HTML).map((s) => s.id);
         RESULT_PAGES.forEach((id) => expect(ids).toContain(id));
     });

@@ -14,8 +14,9 @@
 (function () {
     'use strict';
 
+    // 阶段17 17B-1（v1.47.0）：经营所得那份「专业版报告」随旧页面一并删除。
+    // 向导有自己的导出路径（deep-wizard-ui 的 exportResult → exportToPDF/Word），不需要这条 kind。
     const KIND_COMPREHENSIVE = 'comprehensive';
-    const KIND_BUSINESS = 'business';
 
     const META = {
         comprehensive: {
@@ -23,12 +24,6 @@
             resultElId: 'step-result',
             reportTitle: () => `${new Date().getFullYear()}年度综合所得汇算清缴报告`,
             kindLabel: '综合所得年度汇算测算'
-        },
-        business: {
-            legacyTitle: '经营所得年度预算表',
-            resultElId: 'business-result',
-            reportTitle: () => `${new Date().getFullYear()}年度经营所得汇算清缴报告`,
-            kindLabel: '经营所得年度汇算测算'
         }
     };
 
@@ -80,19 +75,7 @@
 
     // === 纯数据：税负结构（柱状图数据源） ===
     function taxStructure(kind) {
-        if (kind === KIND_BUSINESS) {
-            const R = (typeof window !== 'undefined' && window.businessCalculationResults) || {};
-            const id = R.incomeDetails || {};
-            const td = R.taxDetails || {};
-            const loss = num(id.businessLosses) + num(id.businessOtherExpenses);
-            const profit = num(id.businessProfit);
-            return {
-                kind: KIND_BUSINESS,
-                labels: ['收入总额', '成本费用', '税金/损失等', '利润总额', '应纳税所得额', '应纳税额'],
-                values: [num(id.businessIncome), num(id.businessCost), loss, profit, num(td.taxableIncome), num(td.totalTax)],
-                note: '税额已按优惠政策（如减半征收）自动折算；若勾选“有综合所得”，6万元减除费用在综合所得侧扣除。'
-            };
-        }
+
         const R = (typeof window !== 'undefined' && window.calculationResults) || {};
         const id = R.incomeDetails || {};
         const dd = R.deductionDetails || {};
@@ -112,9 +95,7 @@
         const qa = (typeof window !== 'undefined' && window.TAX_ASSISTANT_QA) || [];
         if (!Array.isArray(qa)) return [];
         const max = limit || 6;
-        const preferred = kind === KIND_BUSINESS
-            ? ['经营所得', '政策法规']
-            : ['汇算清缴', '政策法规', '综合所得'];
+        const preferred = ['汇算清缴', '政策法规', '综合所得'];
         const result = [];
         const seen = {};
 
@@ -307,7 +288,7 @@
 
     // === 合规护栏：与 lead-touchpoints.js 同款双保险 ===
     // 谈薪（reverse）永不出现「留资换权益」钩子；白名单之外一律回落标准导出。
-    var REPORT_ALLOWED_TYPES = ['comprehensive', 'business'];
+    var REPORT_ALLOWED_TYPES = ['comprehensive'];
     var REPORT_BLOCKED_TYPES = ['reverse'];
 
     function hookAllowed(kind) {

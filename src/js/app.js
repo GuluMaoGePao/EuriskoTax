@@ -9,12 +9,11 @@ window.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('business-mode-btn').addEventListener('click', function() {
         console.log('%c[EuriskoTax] MODE → 选择"经营所得计税"模式', 'color: #1e40af; font-weight: bold;');
-        // 阶段17 17B-1：经营所得已迁到 spec 驱动的向导，首页这个模式按钮同走向导
-        // （向导不可用时才回退旧页面 —— 迁移期保留退路）
+        // 阶段17 17B-1：经营所得已迁到 spec 驱动的向导，17B-2（v1.47.0）把旧页面整页删掉了。
+        // 按钮本身保留：首页卡片（home-ui 的 cardBtnMap）与工具箱兜底都还会点它，点击即进向导。
         var W = window.EuriskoDeepWizard;
         if (W && W.open('business')) return;
-        showPage('business-calculation-page');
-        showBusinessStep(1);
+        showAlert('经营所得测算暂不可用，请刷新页面后重试。');
     });
 
     document.getElementById('classification-mode-btn').addEventListener('click', function() {
@@ -425,313 +424,6 @@ window.addEventListener('DOMContentLoaded', function() {
         updateReverseDeductionCalculation();
     });
     
-    // 经营所得页面导航按钮
-    document.getElementById('business-back-to-income-cost-btn').addEventListener('click', function() {
-        showBusinessStep(1);
-    });
-    
-    document.getElementById('business-next-to-deductions-btn').addEventListener('click', function() {
-        showBusinessStep(2);
-    });
-    
-    // 经营所得扣除项明细页面重置按钮
-    document.getElementById('reset-business-deduction-btn').addEventListener('click', function() {
-        // 重置是否有综合所得
-        document.getElementById('business-has-comprehensive-income').checked = true;
-
-        // 重置专项扣除
-        document.getElementById('business-special-deduction-checkbox').checked = false;
-        document.getElementById('business-special-deduction-content').classList.add('hidden');
-        document.getElementById('business-pension-insurance').value = 0;
-        document.getElementById('business-medical-insurance').value = 0;
-        document.getElementById('business-unemployment-insurance').value = 0;
-        document.getElementById('business-housing-fund').value = 0;
-
-        // 重置专项附加扣除
-        document.getElementById('business-special-additional-checkbox').checked = false;
-        document.getElementById('business-special-additional-content').classList.add('hidden');
-        document.getElementById('business-children-infant-count').value = 0;
-        document.getElementById('business-children-infant-rate').value = '100';
-        document.getElementById('business-children-infant-deduction').value = 0;
-        document.getElementById('business-elderly-type').value = 'none';
-        document.getElementById('business-elderly-deduction').value = 0;
-        document.getElementById('business-housing-type').value = 'none';
-        document.getElementById('business-housing-deduction').value = 0;
-        document.getElementById('business-education-deduction').value = 0;
-        document.getElementById('business-medical-deduction').value = 0;
-
-        // 重置其他扣除
-        document.getElementById('business-other-deduction-checkbox').checked = false;
-        document.getElementById('business-other-deduction-content').classList.add('hidden');
-        document.getElementById('business-pension-checkbox').checked = false;
-        document.getElementById('business-pension-fields').classList.add('hidden');
-        document.getElementById('business-pension-deduction').value = 0;
-        document.getElementById('business-enterprise-annuity-checkbox').checked = false;
-        document.getElementById('business-enterprise-annuity-fields').classList.add('hidden');
-        document.getElementById('business-enterprise-annuity').value = 0;
-        document.getElementById('business-insurance-checkbox').checked = false;
-        document.getElementById('business-insurance-fields').classList.add('hidden');
-        document.getElementById('business-insurance-deduction').value = 0;
-        document.getElementById('business-charitable-checkbox').checked = false;
-        document.getElementById('business-charitable-fields').classList.add('hidden');
-        document.getElementById('business-charitable-donation').value = 0;
-
-        // 重置已预缴税额
-        document.getElementById('business-prepaid-tax').value = 0;
-
-        // 重新计算
-        calculateBusinessTax();
-    });
-    
-    document.getElementById('calculate-business-btn').addEventListener('click', function() {
-        // 验证输入
-        if (!validateBusinessInput()) {
-            return;
-        }
-        calculateBusinessTax();
-        showBusinessStep(3);
-        updateBusinessBudgetTable();
-        updateBusinessCharts();
-    });
-
-    // 经营所得实时计算（步骤1输入时）
-    const businessIncomeInputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses'];
-    businessIncomeInputs.forEach(function(inputId) {
-        const element = document.getElementById(inputId);
-        if (element) {
-            element.addEventListener('input', function() {
-                validateBusinessInputValue(inputId);
-                performRealTimeBusinessCalculation();
-            });
-        }
-    });
-
-    // 经营所得实时计算（步骤2输入时）
-    const businessDeductionInputs = [
-        'business-pension-insurance', 'business-medical-insurance', 'business-unemployment-insurance', 'business-housing-fund',
-        'business-children-infant-count', 'business-children-infant-rate', 'business-children-infant-deduction',
-        'business-elderly-type', 'business-elderly-deduction',
-        'business-housing-type', 'business-housing-deduction',
-        'business-education-deduction', 'business-medical-deduction',
-        'business-pension-deduction', 'business-enterprise-annuity', 'business-insurance-deduction', 'business-charitable-donation',
-        'business-prepaid-tax'
-    ];
-    businessDeductionInputs.forEach(function(inputId) {
-        const element = document.getElementById(inputId);
-        if (element) {
-            element.addEventListener('input', function() {
-                validateBusinessInputValue(inputId);
-                performRealTimeBusinessCalculation();
-            });
-        }
-    });
-
-    // 经营页「缴费基数 / 缴费比例」此前没有任何事件接线（改什么都不发生），补齐联动：
-    // 基数 × 比例 → 月度金额，并复用正向页的「低于下限」提示（提示位 id 已按 business-* 对齐）
-    ['business-social-security-base', 'business-housing-fund-base'].forEach(function(baseId) {
-        const element = document.getElementById(baseId);
-        if (!element) return;
-        element.addEventListener('input', function() {
-            if (baseId === 'business-social-security-base') {
-                validateSocialSecurityBase('business');
-                calculateBusinessSocialInsurance();
-            } else {
-                validateHousingFundBase('business');
-                calculateBusinessInsurance('business-housing-fund-rate');
-            }
-            performRealTimeBusinessCalculation();
-        });
-    });
-
-    ['business-pension-rate', 'business-medical-rate', 'business-unemployment-rate', 'business-housing-fund-rate'].forEach(function(rateId) {
-        const element = document.getElementById(rateId);
-        if (!element) return;
-        element.addEventListener('input', function() {
-            calculateBusinessInsurance(rateId);
-            performRealTimeBusinessCalculation();
-        });
-        element.addEventListener('blur', function() {
-            calculateBusinessInsurance(rateId, true);
-            performRealTimeBusinessCalculation();
-        });
-    });
-
-    // 经营所得综合所得勾选变化时
-    const hasComprehensiveCheckbox = document.getElementById('business-has-comprehensive-income');
-    if (hasComprehensiveCheckbox) {
-        hasComprehensiveCheckbox.addEventListener('change', function() {
-            const specialDeductionCheckbox = document.getElementById('business-special-deduction-checkbox');
-            const specialDeductionContent = document.getElementById('business-special-deduction-content');
-            if (this.checked) {
-                specialDeductionCheckbox.checked = false;
-                specialDeductionContent.classList.add('hidden');
-            }
-            performRealTimeBusinessCalculation();
-        });
-    }
-
-    // 经营所得专项扣除checkbox交互
-    const businessSpecialDeductionCheckbox = document.getElementById('business-special-deduction-checkbox');
-    const businessSpecialDeductionContent = document.getElementById('business-special-deduction-content');
-    if (businessSpecialDeductionCheckbox && businessSpecialDeductionContent) {
-        businessSpecialDeductionCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                const hasComprehensive = document.getElementById('business-has-comprehensive-income').checked;
-                if (hasComprehensive) {
-                    showAlert('有综合所得时，专项扣除（社保/公积金）已在综合所得中扣除，不可重复扣除');
-                    this.checked = false;
-                    return;
-                }
-                businessSpecialDeductionContent.classList.remove('hidden');
-            } else {
-                businessSpecialDeductionContent.classList.add('hidden');
-            }
-            performRealTimeBusinessCalculation();
-        });
-    }
-
-    // 经营所得专项附加扣除checkbox交互
-    const businessSpecialAdditionalCheckbox = document.getElementById('business-special-additional-checkbox');
-    const businessSpecialAdditionalContent = document.getElementById('business-special-additional-content');
-    if (businessSpecialAdditionalCheckbox && businessSpecialAdditionalContent) {
-        businessSpecialAdditionalCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                businessSpecialAdditionalContent.classList.remove('hidden');
-            } else {
-                businessSpecialAdditionalContent.classList.add('hidden');
-            }
-            performRealTimeBusinessCalculation();
-        });
-    }
-
-    // 经营所得其他扣除checkbox交互
-    const businessOtherDeductionCheckbox = document.getElementById('business-other-deduction-checkbox');
-    const businessOtherDeductionContent = document.getElementById('business-other-deduction-content');
-    if (businessOtherDeductionCheckbox && businessOtherDeductionContent) {
-        businessOtherDeductionCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                businessOtherDeductionContent.classList.remove('hidden');
-            } else {
-                businessOtherDeductionContent.classList.add('hidden');
-            }
-            performRealTimeBusinessCalculation();
-        });
-    }
-
-    // 经营所得其他扣除子项checkbox交互
-    ['business-pension', 'business-enterprise-annuity', 'business-insurance', 'business-charitable'].forEach(function(id) {
-        const checkbox = document.getElementById(id + '-checkbox');
-        const fields = document.getElementById(id + '-fields');
-        if (checkbox && fields) {
-            checkbox.addEventListener('change', function() {
-                if (this.checked) {
-                    fields.classList.remove('hidden');
-                } else {
-                    fields.classList.add('hidden');
-                }
-                performRealTimeBusinessCalculation();
-            });
-        }
-    });
-
-    // 经营所得输入验证函数
-    function validateBusinessInputValue(inputId) {
-        const element = document.getElementById(inputId);
-        if (!element) return true;
-
-        const value = parseFloat(element.value);
-        const originalValue = element.value;
-
-        // 清除之前的错误状态
-        element.classList.remove('input-error');
-
-        // 验证是否为负数
-        if (!isNaN(value) && value < 0) {
-            element.classList.add('input-error');
-            showBusinessInputError(element, '输入值不能为负数');
-            return false;
-        }
-
-        // 验证是否为有效数字
-        if (originalValue !== '' && isNaN(value)) {
-            element.classList.add('input-error');
-            showBusinessInputError(element, '请输入有效数字');
-            return false;
-        }
-
-        return true;
-    }
-
-    // 显示输入错误提示
-    function showBusinessInputError(element, message) {
-        // 移除已存在的错误提示
-        const existingError = element.parentElement.querySelector('.input-error-message');
-        if (existingError) {
-            existingError.remove();
-        }
-
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'input-error-message text-danger text-sm mt-1';
-        errorDiv.textContent = message;
-        element.parentElement.appendChild(errorDiv);
-
-        // 3秒后自动移除
-        setTimeout(function() {
-            errorDiv.remove();
-            element.classList.remove('input-error');
-        }, 3000);
-    }
-
-    // 验证所有经营所得输入
-    function validateBusinessInput() {
-        let isValid = true;
-
-        const inputs = [
-            'business-income', 'business-cost', 'business-expenses', 'business-taxes', 'business-losses', 'business-other-expenses', 'business-previous-losses',
-            'business-pension-insurance', 'business-medical-insurance', 'business-unemployment-insurance', 'business-housing-fund',
-            'business-children-infant-count', 'business-children-infant-deduction',
-            'business-elderly-deduction', 'business-housing-deduction',
-            'business-education-deduction', 'business-medical-deduction',
-            'business-pension-deduction', 'business-enterprise-annuity', 'business-insurance-deduction', 'business-charitable-donation',
-            'business-prepaid-tax'
-        ];
-
-        inputs.forEach(function(inputId) {
-            if (!validateBusinessInputValue(inputId)) {
-                isValid = false;
-            }
-        });
-
-        // 验证已预缴税额不能超过合理范围
-        const prepaidTax = parseFloat(document.getElementById('business-prepaid-tax').value) || 0;
-        const businessIncome = parseFloat(document.getElementById('business-income').value) || 0;
-        if (prepaidTax > businessIncome * 0.45) {
-            isValid = false;
-            const element = document.getElementById('business-prepaid-tax');
-            element.classList.add('input-error');
-            showBusinessInputError(element, '已预缴税额不能超过收入的45%（最高税率）');
-        }
-
-        return isValid;
-    }
-
-    // 执行实时经营所得计算
-    function performRealTimeBusinessCalculation() {
-        try {
-            calculateBusinessTax();
-            // 如果当前在结果步骤，同步更新预算表
-            const resultStep = document.getElementById('business-step-result');
-            if (resultStep && !resultStep.classList.contains('hidden')) {
-                updateBusinessBudgetTable();
-                updateBusinessCharts();
-            }
-        } catch (error) {
-            console.error('实时计算出错:', error);
-        }
-    }
-    
-    // 经营所得页面重置按钮
-    document.getElementById('reset-business-btn').addEventListener('click', resetBusinessCalculation);
     
     // 分类所得页面导航按钮
     document.getElementById('calculate-classification-btn').addEventListener('click', function() {
@@ -933,7 +625,6 @@ window.addEventListener('DOMContentLoaded', function() {
 
     bindCalcActionBtns({ modeName: '综合所得', saveBtnId: 'forward-save-btn', resetBtnId: 'forward-reset-btn', saveFn: saveCalculationResult, resetFn: resetForwardCalculation });
     bindCalcActionBtns({ modeName: '反向倒算', saveBtnId: 'reverse-save-btn', resetBtnId: 'reverse-reset-btn', saveFn: saveReverseCalculation, resetFn: resetReverseCalculation, stepFn: showReverseStep });
-    bindCalcActionBtns({ modeName: '经营所得', saveBtnId: 'business-save-btn', resetBtnId: 'business-reset-btn', saveFn: saveBusinessCalculation, resetFn: resetBusinessCalculation, stepFn: showBusinessStep });
     bindCalcActionBtns({ modeName: '分类所得', saveBtnId: 'classification-save-btn', resetBtnId: 'classification-reset-btn', saveFn: saveClassificationCalculation, resetFn: resetClassificationCalculation, stepFn: showClassificationStep });
 
     // 导出PDF按钮（阶段10B：专业版出汇算清缴报告，免费版保留现导出——分流在 EuriskoReport 内完成）
@@ -960,19 +651,6 @@ window.addEventListener('DOMContentLoaded', function() {
         showReverseStep(1);
     });
     
-    document.getElementById('new-business-calculation-btn').addEventListener('click', function() {
-        resetBusinessCalculation();
-        showBusinessStep(1);
-    });
-
-    // 保存经营所得计算结果
-    document.getElementById('save-business-result-btn').addEventListener('click', function() {
-        if (Object.keys(businessCalculationResults).length === 0) {
-            showAlert('请先完成计算后再保存');
-            return;
-        }
-        saveBusinessCalculation();
-    });
     
     document.getElementById('new-classification-calculation-btn').addEventListener('click', function() {
         resetClassificationCalculation();
@@ -989,19 +667,6 @@ window.addEventListener('DOMContentLoaded', function() {
         exportToWord('reverse-result', '个人年度个税预算表（反向倒算）');
     });
     
-    // 经营所得页面导出PDF按钮（阶段10B：专业版出汇算清缴报告，免费版保留现导出）
-    document.getElementById('export-business-pdf-btn').addEventListener('click', function() {
-        if (window.EuriskoReport && typeof window.EuriskoReport.exportFinalReport === 'function') {
-            window.EuriskoReport.exportFinalReport('business');
-        } else {
-            exportToPDF('business-result', '经营所得年度预算表');
-        }
-    });
-    
-    // 经营所得页面导出Word按钮
-    document.getElementById('export-business-word-btn').addEventListener('click', function() {
-        exportToWord('business-result', '经营所得年度预算表');
-    });
     
     // 分类所得页面导出PDF按钮
     document.getElementById('export-classification-pdf-btn').addEventListener('click', function() {
@@ -1269,8 +934,6 @@ window.addEventListener('DOMContentLoaded', function() {
     // 初始化反向倒算页面
     resetReverseCalculation();
     
-    // 初始化经营所得页面
-    resetBusinessCalculation();
     
     // 初始化分类所得页面
     resetClassificationCalculation();

@@ -38,10 +38,13 @@
 
     // 「已算完」判据节点：读它的文本是否还是占位符，判断结果面板是否真的渲染过
     // （只是本地判断，不作为情境内容上报）
+    // 17B-1：经营所得迁到 spec 驱动的向导后不再有专属 id（向导是通用渲染器，dw-* 节点被所有
+    // spec 工具复用），所以它的三个节点改用「wizard:」锚点 —— 由 readWizardText 按
+    // data-tool-id 归因人。写成裸 id 会把增值税的结果当成经营所得的情境报给顾问。
     var RESULT_MARKERS = {
         forward: 'result-net-income',
         comprehensive: 'result-net-income',
-        business: 'business-result-net-income',
+        business: 'wizard:primary',
         classification: 'classification-result-net-income'
     };
 
@@ -49,19 +52,48 @@
     var CONCLUSION_NODES = {
         forward: 'result-refund-tax',
         comprehensive: 'result-refund-tax',
-        business: 'business-result-refund-tax'
+        business: 'wizard:refund'
     };
 
     // 适用税率节点：文本形如「20%」
     var RATE_NODES = {
         forward: 'result-tax-rate',
         comprehensive: 'result-tax-rate',
-        business: 'business-result-tax-rate'
+        business: 'wizard:row:适用税率'
     };
 
     function readText(id) {
         var node = document.getElementById(id);
         return node ? String(node.textContent || '').trim() : '';
+    }
+
+    // spec 驱动的向导：通过 data-tool-id 找到「当前这次测算」的结果节点，再按锚点取值。
+    // 返回值与 readText 同形态，区别只在定位方式。
+    function readWizardText(type, kind, arg) {
+        var card = document.getElementById('dw-result-card');
+        if (!card || card.getAttribute('data-tool-id') !== type) return '';
+        if (kind === 'primary') {
+            var hero = document.getElementById('dw-result-primary');
+            return hero ? String(hero.textContent || '').trim() : '';
+        }
+        if (kind === 'refund') {
+            // 方向写在**行标签**上（"应补税额" / "应退税额"），而不是行值里 ——
+            // conclusionWord 认的正是这两个词，取不到方向就返回空，情境里不出现结论项。
+            if (card.querySelector('[data-dw-row="应补税额"]')) return '应补税额';
+            if (card.querySelector('[data-dw-row="应退税额"]')) return '应退税额';
+            return '';
+        }
+        var row = card.querySelector('[data-dw-row="' + arg + '"]');
+        return row ? String(row.textContent || '').trim() : '';
+    }
+
+    // 支持两种定位写法：普通 id（存量页面）与 'wizard:xxx'（spec 驱动的向导）
+    function readNode(selector, type) {
+        if (String(selector).indexOf('wizard:') === 0) {
+            var parts = String(selector).split(':');
+            return readWizardText(type, parts[1], parts.slice(2).join(':'));
+        }
+        return readText(selector);
     }
 
     // 与 share-card.js 同一判据：占位符（¥0 / — / 空）视为「尚未测算」
@@ -92,14 +124,14 @@
         var name = TYPE_NAMES[type];
         if (!name) return '';
 
-        var marker = readText(RESULT_MARKERS[type]);
+        var marker = readNode(RESULT_MARKERS[type], type);
         if (!isMeaningful(marker)) return '';
 
         var parts = [name];
-        var conclusion = conclusionWord(readText(CONCLUSION_NODES[type]));
+        var conclusion = conclusionWord(readNode(CONCLUSION_NODES[type], type));
         if (conclusion) parts.push(conclusion);
 
-        var rate = rateWord(readText(RATE_NODES[type]));
+        var rate = rateWord(readNode(RATE_NODES[type], type));
         if (rate) parts.push(rate);
 
         return parts.join(' · ');

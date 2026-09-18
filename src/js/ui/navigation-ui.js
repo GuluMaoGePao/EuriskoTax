@@ -155,17 +155,6 @@ function updateCalcPreview(pageId) {
             if (dEl) dEl.textContent = formatPreviewNum(deduction);
             if (iEl) iEl.textContent = formatPreviewNum(income);
             InteractionLog.preview(pageId, { target, deduction, income });
-        } else if (pageId === 'business-calculation-page') {
-            const taxable = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxableIncome) || 0;
-            const deduction = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.deductionDetails?.totalDeduction) || 0;
-            const tax = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxDetails?.totalTax) || 0;
-            const tEl = document.getElementById('business-preview-taxable');
-            const dEl = document.getElementById('business-preview-deduction');
-            const taxEl = document.getElementById('business-preview-tax');
-            if (tEl) tEl.textContent = formatPreviewNum(taxable);
-            if (dEl) dEl.textContent = formatPreviewNum(deduction);
-            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { taxable, deduction, tax });
         } else if (pageId === 'classification-calculation-page') {
             const income = parseFloat(document.getElementById('classification-income')?.value) || 0;
             // 分类所得无显式税率字段，按类型估算
@@ -220,12 +209,6 @@ function bindPreviewLiveUpdate() {
         if (el) el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
     });
 
-    const businessInputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes',
-        'business-losses', 'business-other-expenses', 'business-pension-insurance', 'business-medical-insurance'];
-    businessInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('business-calculation-page'));
-    });
 
     const classificationInputs = ['classification-income'];
     classificationInputs.forEach(id => {
@@ -359,12 +342,6 @@ function showReverseStep(step) {
     ]);
 }
 
-// 经营所得步骤导航
-function showBusinessStep(step) {
-    showStepByPanes('business-calculation-page', step, [
-        'business-step-income-cost', 'business-step-deductions', 'business-step-result'
-    ]);
-}
 
 // 分类所得步骤导航
 function showClassificationStep(step) {
@@ -409,8 +386,7 @@ function exportToPDF(elementId, title, opts) {
     // 获取计算结果数据
     if (!opts.skipResultCheck &&
         Object.keys(calculationResults).length === 0 &&
-        Object.keys(reverseCalculationResults).length === 0 &&
-        Object.keys(businessCalculationResults).length === 0) {
+        Object.keys(reverseCalculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }

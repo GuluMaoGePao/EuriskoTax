@@ -540,12 +540,18 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 控件形态与「空值兜底」都要守住：清空输入若按 0 计算，公积金会静默变 0，用户会当成算错
         const homeAppJs = await request(PORT, 'GET', '/src/js/app.js');
         const helperFnJs = await request(PORT, 'GET', '/src/js/calculation/helper-functions.js');
-        const rateInputIds = ['housing-fund-rate', 'reverse-housing-fund-rate', 'business-housing-fund-rate'];
-        record('index.html 三页「缴费比例」为可输入数字框且默认 5%（不再是固定两档下拉）',
+        const toolRegJs = await request(PORT, 'GET', '/src/js/data/tool-registry.js');
+        const wizardJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
+        // v1.47.0 删掉经营所得页之后，这里是两页面版 + 经营所得向导的 spec 字段：
+        // 经营所得那份不再活在 index.html 里（向导按 spec 运行时渲染），改到 tool-registry.js 断言。
+        const rateInputIds = ['housing-fund-rate', 'reverse-housing-fund-rate'];
+        record('「缴费比例」为可输入数字框且默认 5%（两页面版 + 经营所得向导 spec，不再是固定两档下拉）',
             leadPage.status === 200
             && rateInputIds.every((id) => !leadPage.raw.includes(`<select id="${id}"`)
-                && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw)),
-            `HTTP ${leadPage.status}`);
+                && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw))
+            && toolRegJs.status === 200 && toolRegJs.raw.includes("key: 'housingFundRate'")
+            && toolRegJs.raw.includes("type: 'percent', default: 5"),
+            `HTTP ${leadPage.status}/${toolRegJs.status}`);
         record('缴费比例输入即时重算 + 留空/越界回落默认值（清空后公积金不会静默变 0）',
             helperFnJs.status === 200 && helperFnJs.raw.includes('function normalizeRateInput')
             && homeAppJs.status === 200
@@ -553,18 +559,25 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate').addEventListener('input'")
             && homeAppJs.raw.includes('normalizeRateInput(this)'),
             `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
-        // 经营页的基数/比例原本一个事件都没接（改什么都不发生），且养老清空后若统一回落 5% 是错的
-        record('经营页「缴费基数 × 缴费比例」联动 + 低于下限提示接线（各险种回落自己的默认比例）',
-            helperFnJs.status === 200
-            && helperFnJs.raw.includes('function calculateBusinessInsurance')
-            && helperFnJs.raw.includes('function calculateBusinessSocialInsurance')
-            && helperFnJs.raw.includes('fallback: 8')
-            && homeAppJs.status === 200
-            && homeAppJs.raw.includes("['business-social-security-base', 'business-housing-fund-base']")
-            && homeAppJs.raw.includes("['business-pension-rate', 'business-medical-rate', 'business-unemployment-rate', 'business-housing-fund-rate']")
-            && homeAppJs.raw.includes("validateSocialSecurityBase('business')")
-            && homeAppJs.raw.includes("validateHousingFundBase('business')"),
-            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
+        // 经营所得的「缴费基数 × 缴费比例 → 月缴额」原本是 app.js / helper-functions.js 的私有接线，
+        // v1.47.0 删页后改由向导的 derive / warnings 两个 spec 钩子承担 —— **能力不能随删页一起丢**，
+        // 而且最后一条反向断言保证旧接线没有半吊子残留（app.js 还引用着已经不存在的 business-* 控件）。
+        // 各险种回落**自己的**默认值（养老 8% / 医疗 2% / 失业 0.5% / 公积金 5%），统一回落 5% 是错的；
+        // 反向断言保证旧接线没有半吊子残留（删了页但 app.js / helper-functions.js 还引用着）。
+        record('经营所得「缴费基数 × 缴费比例 → 月缴额」联动 + 低于下限提示（spec 钩子承担，各险种回落自己的默认比例）',
+            toolRegJs.status === 200
+            && toolRegJs.raw.includes("deriveFrom: ['socialBase'")
+            && toolRegJs.raw.includes('derive: function')
+            && toolRegJs.raw.includes('warnings: function')
+            && toolRegJs.raw.includes('FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 }')
+            && toolRegJs.raw.includes('MIN_SOCIAL_SECURITY_BASE')
+            && wizardJs.status === 200
+            && wizardJs.raw.includes('function applyDerived')
+            && wizardJs.raw.includes('function bindDerivedSources')
+            && wizardJs.raw.includes('function renderWarnings')
+            && homeAppJs.status === 200 && !homeAppJs.raw.includes('business-social-security-base')
+            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function calculateBusinessInsurance'),
+            `HTTP ${toolRegJs.status}/${wizardJs.status}`);
         record('admin.html 含社保基数 Tab(data-nav="citysocial")与视图(#view-citysocial)',
             adminPage.status === 200 && adminPage.raw.includes('data-nav="citysocial"') && adminPage.raw.includes('id="view-citysocial"'),
             `HTTP ${adminPage.status}`);

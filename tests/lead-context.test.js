@@ -88,13 +88,21 @@ describe('阶段13B+ 咨询情境 - 结果页真实摘要（读已渲染 DOM）'
         expect(scene).not.toContain('3,120');
     });
 
-    test('经营所得走自己的结果容器节点', () => {
+    test('经营所得走 spec 驱动的向导结果节点（按 data-tool-id 认人）', () => {
+        // 17B-1：经营所得的旧结果容器随页面整页删除，节点改在向导里渲染 ——
+        // 但向导是**通用渲染器**，dw-result-card 会被所有 spec 工具轮着用，必须认 data-tool-id。
         document.body.innerHTML =
-            '<div id="business-result-net-income">¥180,000.00</div>' +
-            '<div id="business-result-refund-tax">应补 ¥6,800.00</div>' +
-            '<div id="business-result-tax-rate">35%</div>';
+            '<div id="dw-result-card" data-tool-id="business">' +
+            '<div id="dw-result-primary">¥180,000.00</div>' +
+            '<div data-dw-row="应补税额">¥6,800.00</div>' +
+            '<div data-dw-row="适用税率">35%</div>' +
+            '</div>';
 
         expect(LeadContext.current('business')).toBe('经营所得年度汇算 · 预计补税 · 适用税率 35%');
+
+        // 换一个工具用同一个容器：不能把增值税算完当成经营所得的情境报给顾问
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'vat-deep');
+        expect(LeadContext.current('business')).toBe('');
     });
 
     test('未知类型返回空（谈薪等不投服务引导的类型不会被凑出情境）', () => {
@@ -151,9 +159,11 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
 
     test('情境提取依赖的结果节点 id 在 index.html 中真实存在（改名会静默失效）', () => {
         ['result-net-income', 'result-refund-tax', 'result-tax-rate',
-            'business-result-net-income', 'business-result-refund-tax', 'business-result-tax-rate',
             'classification-result-net-income']
             .forEach((id) => expect(INDEX_HTML).toContain('id="' + id + '"'));
+        // 经营所得 17B-1 起走 spec 驱动的向导，结果节点是**运行时渲染**的（dw-result-card +
+        // data-tool-id），静态 HTML 里没有 —— 由 tests/business-income-core.test.js 的
+        // 向导端到端用例守护，含「换工具后不再归因给 business」这条。
     });
 
     test('本模块必须在 lead-modal.js 之前加载（弹窗打开时同步取用）', () => {

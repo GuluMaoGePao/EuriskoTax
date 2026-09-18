@@ -161,7 +161,12 @@ function saveCalculationResult() {
 function getIncomeValue(item) {
     try {
         if (item.type === 'business') {
-            return item.results?.incomeDetails?.businessIncome || 0;
+            // 17B-1 起经营所得有两种历史结构：旧页面版散在 incomeDetails/taxDetails 里，
+            // spec 驱动的向导存的是 { values, primary, rows } —— 两种都要读得出来。
+            if (item.results && item.results.incomeDetails) {
+                return item.results.incomeDetails.businessIncome || 0;
+            }
+            return Number(item.results?.values?.income) || 0;
         } else if (item.type === 'classification') {
             return item.results?.totalIncome || 0;
         } else if (item.type === 'reverse') {
@@ -188,7 +193,12 @@ function getTaxValue(item) {
 function getNetIncomeValue(item) {
     try {
         if (item.type === 'business') {
-            return item.results?.taxDetails?.netIncome || 0;
+            if (item.results && item.results.taxDetails) {
+                return item.results.taxDetails.netIncome || 0;
+            }
+            // 向导版：税后经营所得在结果行里（rows 是 [{label, value}]）
+            const row = (item.results?.rows || []).find(function (r) { return r.label === '税后经营所得'; });
+            return Number(row?.value) || 0;
         } else if (item.type === 'classification') {
             const totalIncome = item.results?.totalIncome || 0;
             const totalTax = item.results?.taxDetails?.totalTax || item.results?.totalTax || 0;
@@ -292,92 +302,15 @@ function viewHistoryRecord(id) {
     
     // 根据记录类型切换到相应页面
     if (record.type === 'business') {
-        // 切换到经营所得页面
-        showPage('business-calculation-page');
-        
-        // 填充经营所得数据
-        const results = record.results;
-        
-        // 基本信息
-        document.getElementById('business-income').value = results?.incomeDetails?.businessIncome || 0;
-        document.getElementById('business-cost').value = results?.incomeDetails?.businessCost || 0;
-        document.getElementById('business-expenses').value = results?.incomeDetails?.businessExpenses || 0;
-        document.getElementById('business-taxes').value = results?.incomeDetails?.businessTaxes || 0;
-        document.getElementById('business-losses').value = results?.incomeDetails?.businessLosses || 0;
-        document.getElementById('business-other-expenses').value = results?.incomeDetails?.businessOtherExpenses || 0;
-        document.getElementById('business-previous-losses').value = results?.incomeDetails?.businessPreviousLosses || 0;
-        
-        // 扣除项
-        const deductionDetails = results?.deductionDetails || {};
-        document.getElementById('business-has-comprehensive-income').checked = deductionDetails.hasComprehensiveIncome ?? true;
-        
-        // 专项扣除 - 兼容新旧格式
-        const specialDeduction = deductionDetails.specialDeduction || {};
-        const hasSpecialDeduction = typeof specialDeduction === 'object' && specialDeduction.total > 0;
-        document.getElementById('business-special-deduction-checkbox').checked = hasSpecialDeduction;
-        if (hasSpecialDeduction) {
-            document.getElementById('business-special-deduction-content').classList.remove('hidden');
-            document.getElementById('business-pension-insurance').value = specialDeduction.pensionInsurance || 0;
-            document.getElementById('business-medical-insurance').value = specialDeduction.medicalInsurance || 0;
-            document.getElementById('business-unemployment-insurance').value = specialDeduction.unemploymentInsurance || 0;
-            document.getElementById('business-housing-fund').value = specialDeduction.housingFund || 0;
+        // 阶段17 17B-1（v1.47.0）：经营所得已迁到 spec 驱动的向导，旧页面整页删掉了 ——
+        // 不再回填那 23 个 DOM。打开向导即可续算（向导自带草稿，会接着上次的输入继续）。
+        var W = window.EuriskoDeepWizard;
+        if (W && W.open('business')) {
+            showAlert('已打开经营所得测算；向导会接着上次的输入继续。');
+            return;
         }
-        
-        // 专项附加扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
-        const rawSpecialAdditional = deductionDetails.specialAdditionalDeduction || {};
-        const specialAdditional = typeof rawSpecialAdditional === 'number' 
-            ? { total: rawSpecialAdditional, childrenInfant: 0, elderly: 0, housing: 0, education: 0, medical: 0 }
-            : rawSpecialAdditional;
-        const hasSpecialAdditional = specialAdditional.total > 0;
-        document.getElementById('business-special-additional-checkbox').checked = hasSpecialAdditional;
-        if (hasSpecialAdditional) {
-            document.getElementById('business-special-additional-content').classList.remove('hidden');
-            document.getElementById('business-children-infant-deduction').value = specialAdditional.childrenInfant || 0;
-            document.getElementById('business-elderly-deduction').value = specialAdditional.elderly || 0;
-            document.getElementById('business-housing-deduction').value = specialAdditional.housing || 0;
-            document.getElementById('business-education-deduction').value = specialAdditional.education || 0;
-            document.getElementById('business-medical-deduction').value = specialAdditional.medical || 0;
-        }
-        
-        // 其他扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
-        const rawOtherDeduction = deductionDetails.otherDeduction || {};
-        const otherDeduction = typeof rawOtherDeduction === 'number'
-            ? { total: rawOtherDeduction, pension: 0, enterpriseAnnuity: 0, insurance: 0, charitableDonation: 0 }
-            : rawOtherDeduction;
-        const hasOtherDeduction = otherDeduction.total > 0;
-        document.getElementById('business-other-deduction-checkbox').checked = hasOtherDeduction;
-        if (hasOtherDeduction) {
-            document.getElementById('business-other-deduction-content').classList.remove('hidden');
-            
-            if (otherDeduction.pension > 0) {
-                document.getElementById('business-pension-checkbox').checked = true;
-                document.getElementById('business-pension-fields').classList.remove('hidden');
-                document.getElementById('business-pension-deduction').value = otherDeduction.pension || 0;
-            }
-            if (otherDeduction.enterpriseAnnuity > 0) {
-                document.getElementById('business-enterprise-annuity-checkbox').checked = true;
-                document.getElementById('business-enterprise-annuity-fields').classList.remove('hidden');
-                document.getElementById('business-enterprise-annuity').value = otherDeduction.enterpriseAnnuity || 0;
-            }
-            if (otherDeduction.insurance > 0) {
-                document.getElementById('business-insurance-checkbox').checked = true;
-                document.getElementById('business-insurance-fields').classList.remove('hidden');
-                document.getElementById('business-insurance-deduction').value = otherDeduction.insurance || 0;
-            }
-            if (otherDeduction.charitableDonation > 0) {
-                document.getElementById('business-charitable-checkbox').checked = true;
-                document.getElementById('business-charitable-fields').classList.remove('hidden');
-                document.getElementById('business-charitable-donation').value = otherDeduction.charitableDonation || 0;
-            }
-        }
-        
-        document.getElementById('business-prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
-        
-        // 重新计算
-        calculateBusinessTax();
-        showBusinessStep(3);
-        updateBusinessBudgetTable();
-        updateBusinessCharts();
+        showAlert('经营所得测算暂不可用，请刷新页面后重试。');
+        return;
     } else if (record.type === 'classification') {
         // 切换到分类所得页面
         showPage('classification-calculation-page');

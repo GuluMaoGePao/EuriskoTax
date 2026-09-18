@@ -35,11 +35,6 @@
             gotoName: 'showReverseStep'
         },
         {
-            id: 'business', containerId: 'business-calculation-page', title: '经营所得计税',
-            paneIds: ['business-step-income-cost', 'business-step-deductions', 'business-step-result'],
-            gotoName: 'showBusinessStep'
-        },
-        {
             id: 'classification', containerId: 'classification-calculation-page', title: '分类所得计税',
             paneIds: ['classification-step-info', 'classification-step-result'],
             gotoName: 'showClassificationStep'

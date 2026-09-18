@@ -71,10 +71,19 @@
                 { key: 'previousLosses', step: 'income', label: '以前年度亏损弥补', type: 'money', default: 0, hint: '亏损可向以后年度结转，最长 5 年' },
                 { key: 'hasComprehensiveIncome', step: 'deduction', label: '本年度有综合所得（工资薪金等）', type: 'switch', default: true, hint: '有综合所得时，基本减除与社保公积金在综合所得里扣，经营所得不再扣' },
                 { key: 'workMonths', step: 'deduction', label: '年工作总月数', type: 'select', default: 12, options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
-                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 8%，按年工作月数折算为年度' },
-                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 2%' },
-                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 0.5%' },
-                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0 },
+                // 下面 6 项是**便利输入**：用户手里有的是社保缴费基数，不是「每月扣了多少养老金」。
+                // 页面版由 index.html 的输入框 + app.js/helper-functions.js 的私有联动提供，
+                // 迁移到 spec 后改由向导的 derive / warnings 两个通用钩子承担（见文件内 derive 注释）。
+                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 0, hint: '填了就由它和下面三项比例算月缴额（月缴额以基数为准）；不填则自己填月缴额' },
+                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 0 },
+                { key: 'pensionRate', step: 'deduction', label: '养老缴费比例', type: 'percent', default: 8 },
+                { key: 'medicalRate', step: 'deduction', label: '医疗缴费比例', type: 'percent', default: 2 },
+                { key: 'unemploymentRate', step: 'deduction', label: '失业缴费比例', type: 'percent', default: 0.5 },
+                { key: 'housingFundRate', step: 'deduction', label: '公积金缴费比例', type: 'percent', default: 5, hint: '各地 5%~12% 不同，按参保地口径填' },
+                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 养老比例，按年工作月数折算为年度' },
+                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 医疗比例' },
+                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 失业比例' },
+                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0, hint: '＝ 公积金缴费基数 × 公积金比例' },
                 { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护', type: 'money', default: 0 },
                 { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人', type: 'money', default: 0 },
                 { key: 'housingDeduction', step: 'deduction', label: '住房贷款利息 / 住房租金', type: 'money', default: 0 },
@@ -86,6 +95,46 @@
                 { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠', type: 'money', default: 0, hint: '扣除限额＝应纳税所得额 × 30%' },
                 { key: 'prepaidTax', step: 'deduction', label: '已预缴税额', type: 'money', default: 0 }
             ],
+            // 「基数 × 比例 → 月缴额」的联动源：只有这几个框变了才重算（见 deep-wizard-ui 的 bindDerivedSources）
+            deriveFrom: ['socialBase', 'housingFundBase', 'pensionRate', 'medicalRate', 'unemploymentRate', 'housingFundRate'],
+            // 页面版的这段逻辑写在 app.js + helper-functions.js 的私有函数里（calculateBusinessInsurance /
+            // validateSocialSecurityBase('business')），随页面一起删掉就丢了。这里用 spec 的两个通用钩子
+            // 补回来：**规矩写在注册表里，动作由渲染器做** —— 17B 后面几个迁移照抄即可。
+            derive: function (v) {
+                // 清空 / 越界时回落的是**该险种自己的常用比例**，不是统一的 5%
+                var FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 };
+                function pct(key) {
+                    var raw = Number(v[key]);
+                    if (!isFinite(raw) || raw < 0 || raw > 100) return FALLBACK[key];
+                    return raw;
+                }
+                var r2 = function (x) { return Math.round(x * 100) / 100; };
+                var base = Number(v.socialBase) || 0;
+                var hBase = Number(v.housingFundBase) || 0;
+                var out = {};
+                // 比例归位是无条件做的：清空输入框后框里要显示回落值，而不是留着一个空框让用户以为按 0 算
+                Object.keys(FALLBACK).forEach(function (k) { out[k] = pct(k); });
+                // 金额只在填了基数时才有意义 —— 没填基数却把用户手填的月缴额冲成 0，是页面版都没犯的错
+                if (base > 0) {
+                    out.pensionInsurance = r2(base * pct('pensionRate') / 100);
+                    out.medicalInsurance = r2(base * pct('medicalRate') / 100);
+                    out.unemploymentInsurance = r2(base * pct('unemploymentRate') / 100);
+                }
+                if (hBase > 0) out.housingFund = r2(hBase * pct('housingFundRate') / 100);
+                return out;
+            },
+            // 低于最低标准的基数要在**填的时候**就说出来，别等到结果 Reconciliation。
+            // 下限读 tax-constants.js 的全局变量（管理台可热改）—— 这里不复制第二份常量。
+            warnings: function (v) {
+                var w = {};
+                var minS = (typeof MIN_SOCIAL_SECURITY_BASE === 'number') ? MIN_SOCIAL_SECURITY_BASE : 0;
+                var minH = (typeof MIN_HOUSING_FUND_BASE === 'number') ? MIN_HOUSING_FUND_BASE : 0;
+                var b = Number(v.socialBase) || 0;
+                var h = Number(v.housingFundBase) || 0;
+                if (b > 0 && minS > 0 && b < minS) w.socialBase = '⚠️ 当前基数低于最低标准 ' + minS + ' 元/月';
+                if (h > 0 && minH > 0 && h < minH) w.housingFundBase = '⚠️ 当前基数低于最低标准 ' + minH + ' 元/月';
+                return w;
+            },
             steps: [
                 { key: 'income', title: '经营收入与成本', why: '经营所得按年计税：收入总额减成本、费用、税金与损失，才是经营利润' },
                 { key: 'deduction', title: '扣除项明细', why: '先确认有没有综合所得 —— 它决定 6 万减除与社保公积金在哪边扣，两边不能重复扣' }

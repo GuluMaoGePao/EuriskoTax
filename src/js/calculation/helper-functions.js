@@ -84,39 +84,6 @@ function calculateHousingFund() {
     document.getElementById('housing-fund').value = housingFundAmount.toFixed(2);
 }
 
-// 经营页的「缴费基数 / 缴费比例 / 月度金额」是三个并列输入框，但只有金额参与税额计算。
-// 用户改了基数或比例却看不到金额变化，会当成算错（这几个框此前压根没有接线，改什么都不发生）。
-// 这里照正向页口径补齐：基数 × 比例 → 月度金额（改基数/比例即覆盖金额，之后仍可手改金额）。
-// fallback = 该险种的默认比例，供失焦归一用（养老 8 / 医疗 2 / 失业 0.5 / 公积金 5）。
-const BUSINESS_INSURANCE_LINKS = [
-    { base: 'business-social-security-base', rate: 'business-pension-rate', amount: 'business-pension-insurance', fallback: 8 },
-    { base: 'business-social-security-base', rate: 'business-medical-rate', amount: 'business-medical-insurance', fallback: 2 },
-    { base: 'business-social-security-base', rate: 'business-unemployment-rate', amount: 'business-unemployment-insurance', fallback: 0.5 },
-    { base: 'business-housing-fund-base', rate: 'business-housing-fund-rate', amount: 'business-housing-fund', fallback: 5 }
-];
-
-// normalize 为真时先做失焦归一（留空 / 越界回落该险种默认比例，而非统一的 5%）
-function calculateBusinessInsurance(rateId, normalize) {
-    const link = BUSINESS_INSURANCE_LINKS.find(function(item) { return item.rate === rateId; });
-    if (!link) return;
-
-    const baseElement = document.getElementById(link.base);
-    const rateElement = document.getElementById(link.rate);
-    const amountElement = document.getElementById(link.amount);
-    if (!baseElement || !rateElement || !amountElement) return;
-
-    const rate = normalize ? normalizeRateInput(rateElement, link.fallback) : (parseFloat(rateElement.value) || 0);
-    amountElement.value = ((parseFloat(baseElement.value) || 0) * (rate / 100)).toFixed(2);
-}
-
-// 社保基数一改，养老 / 医疗 / 失业三项金额都要跟着重算（公积金基数是独立一项）
-function calculateBusinessSocialInsurance() {
-    BUSINESS_INSURANCE_LINKS.forEach(function(item) {
-        if (item.base === 'business-social-security-base') {
-            calculateBusinessInsurance(item.rate);
-        }
-    });
-}
 
 // 根据社保基数和保险金额计算缴费比例
 function calculateSocialSecurityRate(type) {
@@ -847,69 +814,6 @@ function resetReverseCalculation() {
     }, 100);
 }
 
-// 重置经营所得计算
-function resetBusinessCalculation() {
-    // 1. 重置经营收入与成本
-    document.getElementById('business-income').value = 0;
-    document.getElementById('business-cost').value = 0;
-    document.getElementById('business-expenses').value = 0;
-    document.getElementById('business-taxes').value = 0;
-    document.getElementById('business-losses').value = 0;
-    document.getElementById('business-other-expenses').value = 0;
-    document.getElementById('business-previous-losses').value = 0;
-    
-    // 2. 重置扣除项
-    document.getElementById('business-has-comprehensive-income').checked = true;
-    document.getElementById('business-work-months').value = 12;
-    
-    // 重置专项扣除
-    document.getElementById('business-special-deduction-checkbox').checked = false;
-    document.getElementById('business-special-deduction-content').classList.add('hidden');
-    document.getElementById('business-social-security-base').value = 7546;
-    document.getElementById('business-pension-insurance').value = 0;
-    document.getElementById('business-pension-rate').value = 8;
-    document.getElementById('business-medical-insurance').value = 0;
-    document.getElementById('business-medical-rate').value = 2;
-    document.getElementById('business-unemployment-insurance').value = 0;
-    document.getElementById('business-unemployment-rate').value = 0.5;
-    document.getElementById('business-housing-fund-base').value = 7546;
-    document.getElementById('business-housing-fund-rate').value = '5';
-    document.getElementById('business-housing-fund').value = 0;
-
-    // 重置专项附加扣除
-    document.getElementById('business-special-additional-checkbox').checked = false;
-    document.getElementById('business-special-additional-content').classList.add('hidden');
-    document.getElementById('business-children-infant-count').value = 0;
-    document.getElementById('business-children-infant-rate').value = '100';
-    document.getElementById('business-children-infant-deduction').value = 0;
-    document.getElementById('business-elderly-type').value = 'none';
-    document.getElementById('business-elderly-deduction').value = 0;
-    document.getElementById('business-housing-type').value = 'none';
-    document.getElementById('business-housing-deduction').value = 0;
-    document.getElementById('business-education-deduction').value = 0;
-    document.getElementById('business-medical-deduction').value = 0;
-
-    // 重置其他扣除
-    document.getElementById('business-other-deduction-checkbox').checked = false;
-    document.getElementById('business-other-deduction-content').classList.add('hidden');
-    document.getElementById('business-pension-checkbox').checked = false;
-    document.getElementById('business-pension-fields').classList.add('hidden');
-    document.getElementById('business-pension-deduction').value = 0;
-    document.getElementById('business-enterprise-annuity-checkbox').checked = false;
-    document.getElementById('business-enterprise-annuity-fields').classList.add('hidden');
-    document.getElementById('business-enterprise-annuity').value = 0;
-    document.getElementById('business-insurance-checkbox').checked = false;
-    document.getElementById('business-insurance-fields').classList.add('hidden');
-    document.getElementById('business-insurance-deduction').value = 0;
-    document.getElementById('business-charitable-checkbox').checked = false;
-    document.getElementById('business-charitable-fields').classList.add('hidden');
-    document.getElementById('business-charitable-donation').value = 0;
-    
-    document.getElementById('business-prepaid-tax').value = 0;
-    
-    // 3. 重置步骤
-    showBusinessStep(1);
-}
 
 // 重置分类所得计算
 function resetClassificationCalculation() {

@@ -19,7 +19,9 @@ import apiClient from '../api/api-client.js';
 // 计算按钮 → 结果容器 id（结果容器可见 = 这次真的算出来了）
 const CALC_TRIGGERS = [
     { buttonId: 'next-to-result-btn', resultId: 'step-result' },
-    { buttonId: 'calculate-business-btn', resultId: 'business-step-result' },
+    // 17B-1：经营所得改走 spec 驱动的向导（dw-next / dw-result-card 是**通用**节点，
+    // 会被所有 spec 工具轮着用），所以额外声明 toolId —— 见 bindCalcDone 里的归属校验。
+    { buttonId: 'dw-next', resultId: 'dw-result-card', toolId: 'business' },
     { buttonId: 'calculate-classification-btn', resultId: 'classification-step-result' },
     { buttonId: 'calculate-reverse-btn', resultId: 'reverse-step-result' }
 ];
@@ -36,13 +38,17 @@ function report(step) {
 }
 
 function bindCalcDone() {
-    CALC_TRIGGERS.forEach(({ buttonId, resultId }) => {
+    CALC_TRIGGERS.forEach(({ buttonId, resultId, toolId }) => {
         const btn = document.getElementById(buttonId);
         if (!btn) return;
         btn.addEventListener('click', () => {
             setTimeout(() => {
                 const el = document.getElementById(resultId);
-                if (el && !el.classList.contains('hidden')) report('calc_done');
+                if (!el || el.classList.contains('hidden')) return;
+                // 认不出 data-tool-id 就不记账：向导的结果容器是共用的，否则用户算了
+                // 增值税也会被记成一次经营所得 calc_done，漏斗数据就失真了。
+                if (toolId && el.getAttribute('data-tool-id') !== toolId) return;
+                report('calc_done');
             }, CALC_SETTLE_MS);
         });
     });

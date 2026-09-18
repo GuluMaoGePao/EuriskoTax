@@ -120,7 +120,7 @@ describe('showStepByPanes - 通用步骤面板切换', () => {
     });
 });
 
-describe('showReverseStep / showBusinessStep / showClassificationStep - 步骤导航包装函数', () => {
+describe('showReverseStep / showClassificationStep - 步骤导航包装函数（经营所得 v1.47.0 起由 spec 驱动的向导接管，不再有步骤包装函数）', () => {
     test('showReverseStep 应切换反向倒算页面的步骤面板', () => {
         // 设置反向倒算页面 DOM
         const page = document.createElement('div');
@@ -150,36 +150,6 @@ describe('showReverseStep / showBusinessStep / showClassificationStep - 步骤�
         expect(panes['reverse-step-parameters'].classList.contains('hidden')).toBe(true);
         expect(panes['reverse-step-deductions'].classList.contains('hidden')).toBe(false);
         expect(panes['reverse-step-result'].classList.contains('hidden')).toBe(true);
-    });
-
-    test('showBusinessStep 应切换经营所得页面的步骤面板', () => {
-        const page = document.createElement('div');
-        page.id = 'business-calculation-page';
-        const indicator = document.createElement('div');
-        indicator.className = 'step-indicator';
-        for (let i = 0; i < 3; i++) {
-            const stepNum = document.createElement('div');
-            stepNum.className = 'step-number';
-            indicator.appendChild(stepNum);
-        }
-        page.appendChild(indicator);
-
-        const paneIds = ['business-step-income-cost', 'business-step-deductions', 'business-step-result'];
-        const panes = {};
-        paneIds.forEach(id => {
-            const el = document.createElement('div');
-            el.id = id;
-            el.classList.add('hidden');
-            page.appendChild(el);
-            panes[id] = el;
-        });
-        document.body.appendChild(page);
-
-        showBusinessStep(3);
-
-        expect(panes['business-step-income-cost'].classList.contains('hidden')).toBe(true);
-        expect(panes['business-step-deductions'].classList.contains('hidden')).toBe(true);
-        expect(panes['business-step-result'].classList.contains('hidden')).toBe(false);
     });
 
     test('showClassificationStep 应切换分类所得页面的步骤面板（2步）', () => {
@@ -389,12 +359,6 @@ describe('保存包装函数 - 调用通用 saveToHistory', () => {
     // 注意：businessCalculationResults 等变量用 let 声明于 eval 词法作用域，
     // 测试环境无法直接修改。因此这里测试默认状态（空对象）下的行为，
     // 以及 saveToHistory 对各类型的正确处理。
-
-    test('默认状态下 saveBusinessCalculation 应提示用户先计算', () => {
-        // businessCalculationResults 初始为 {} → saveToHistory 会提示
-        saveBusinessCalculation();
-        expect(global.showAlert).toHaveBeenCalledWith('请先完成计算后再保存');
-    });
 
     test('默认状态下 saveClassificationCalculation 应提示用户先计算', () => {
         saveClassificationCalculation();

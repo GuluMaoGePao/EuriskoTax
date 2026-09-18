@@ -42,40 +42,35 @@ function setInput(id, value) {
 //       应纳税所得额 91100 → 20% − 10500 = 7720；减半 3860；税后 186140）。
 // ==================================================================
 describe('经营所得推导链（全链路）', () => {
-    function injectBusinessForm(overrides = {}) {
-        const values = Object.assign({
-            'business-income': 500000,
-            'business-cost': 200000,
-            'business-expenses': 50000,
-            'business-taxes': 10000,
-            'business-losses': 0,
-            'business-other-expenses': 20000,
-            'business-previous-losses': 30000,
-            'business-has-comprehensive-income': false,
-            'business-work-months': 12,
-            'business-pension-insurance': 1000,
-            'business-medical-insurance': 200,
-            'business-unemployment-insurance': 50,
-            'business-housing-fund': 500,
-            'business-children-infant-deduction': 2000,
-            'business-elderly-deduction': 3000,
-            'business-housing-deduction': 1500,
-            'business-education-deduction': 400,
-            'business-medical-deduction': 0,
-            'business-pension-deduction': 1000,
-            'business-enterprise-annuity': 0,
-            'business-insurance-deduction': 0,
-            'business-charitable-donation': 10000,
-            'business-prepaid-tax': 5000
+    // 17B-1（v1.47.0）：旧页面的 calculateBusinessTax 随 business-calculation-page 整页删除了，
+    // 推导链的接线方换成 tool-registry 里的 business spec（compute 返回 buildBusinessFormulaSteps(...)）。
+    // 所以这里把「值 → 内核 → 推导链」自己串起来 —— 键名也随之从 DOM id 改成内核的 values key。
+    function businessValues(overrides = {}) {
+        return Object.assign({
+            income: 500000,
+            cost: 200000,
+            expenses: 50000,
+            taxes: 10000,
+            losses: 0,
+            otherExpenses: 20000,
+            previousLosses: 30000,
+            hasComprehensiveIncome: false,
+            workMonths: 12,
+            pensionInsurance: 1000,
+            medicalInsurance: 200,
+            unemploymentInsurance: 50,
+            housingFund: 500,
+            childrenInfantDeduction: 2000,
+            elderlyDeduction: 3000,
+            housingDeduction: 1500,
+            educationDeduction: 400,
+            medicalDeduction: 0,
+            pensionDeduction: 1000,
+            enterpriseAnnuity: 0,
+            insuranceDeduction: 0,
+            charitableDonation: 10000,
+            prepaidTax: 5000
         }, overrides);
-
-        Object.keys(values).forEach((id) => {
-            const el = setInput(id, values[id]);
-            if (id === 'business-has-comprehensive-income') {
-                el.type = 'checkbox';
-                el.checked = Boolean(values[id]);
-            }
-        });
     }
 
     function injectBusinessPanel() {
@@ -87,16 +82,19 @@ describe('经营所得推导链（全链路）', () => {
         body.id = 'formula-steps-body-business';
         panel.appendChild(body);
         document.body.appendChild(panel);
+        return body;
     }
 
-    test('计算后面板点亮，关键数值逐位可核对', () => {
-        injectBusinessForm();
-        injectBusinessPanel();
-        calculateBusinessTax();
+    // 三步走：值 → 内核（calculateBusinessTaxCore）→ 推导链（buildBusinessFormulaSteps）→ 渲染
+    function runBusinessChain(overrides = {}) {
+        const body = injectBusinessPanel();
+        const steps = buildBusinessFormulaSteps(calculateBusinessTaxCore(businessValues(overrides)));
+        body.innerHTML = renderFormulaStepsHtml(steps);
+        return { body, steps };
+    }
 
-        const panel = document.getElementById('formula-steps-panel-business');
-        const body = document.getElementById('formula-steps-body-business');
-        expect(panel.classList.contains('hidden')).toBe(false);
+    test('关键数值逐位可核对', () => {
+        const { body } = runBusinessChain();
 
         expect(body.innerHTML).toContain('220000.00');   // 第一步：经营利润
         expect(body.innerHTML).toContain('190000.00');   // 第二步：弥补亏损后所得
@@ -109,19 +107,13 @@ describe('经营所得推导链（全链路）', () => {
     });
 
     test('无综合所得时投资者减除费用出现在扣除步', () => {
-        injectBusinessForm();
-        injectBusinessPanel();
-        calculateBusinessTax();
-        const body = document.getElementById('formula-steps-body-business');
+        const { body } = runBusinessChain();
         expect(body.innerHTML).toContain('投资者减除费用');
         expect(body.innerHTML).toContain('60000.00'); // 5000 × 12
     });
 
     test('有综合所得时不扣投资者减除费用与专项扣除', () => {
-        injectBusinessForm({ 'business-has-comprehensive-income': true });
-        injectBusinessPanel();
-        calculateBusinessTax();
-        const body = document.getElementById('formula-steps-body-business');
+        const { body } = runBusinessChain({ hasComprehensiveIncome: true });
         expect(body.innerHTML).not.toContain('投资者减除费用');
         expect(body.innerHTML).not.toContain('专项扣除（三险一金）');
     });
@@ -277,20 +269,25 @@ describe('月薪个税速算器推导链（打样）', () => {
 describe('面板 DOM 防回滚（index.html）', () => {
     test('经营 / 分类 / 反向三个推导链面板存在', () => {
         const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-        ['formula-steps-panel-business', 'formula-steps-body-business',
-            'formula-steps-panel-classification', 'formula-steps-body-classification',
+        // 17B-1（v1.47.0）：经营所得的推导链不再有静态面板 —— 它随旧页面删除，改由向导
+        // 在运行时渲染（dw-formula-panel），存在性由 tests/business-income-core.test.js 守护。
+        ['formula-steps-panel-classification', 'formula-steps-body-classification',
             'formula-steps-panel-reverse', 'formula-steps-body-reverse'
         ].forEach((id) => {
             expect(html).toContain('id="' + id + '"');
         });
+        expect(html).not.toContain('id="formula-steps-panel-business"');   // 旧面板确实已删干净
     });
 
     test('utils.js 导出的渲染被三处流程接线引用（不是死代码）', () => {
         const calc = fs.readFileSync(path.join(ROOT, 'src/js/calculation/tax-calculator.js'), 'utf8');
         const helper = fs.readFileSync(path.join(ROOT, 'src/js/calculation/helper-functions.js'), 'utf8');
+        const registry = fs.readFileSync(path.join(ROOT, 'src/js/data/tool-registry.js'), 'utf8');
         expect(calc).toContain('showFormulaStepsPanel(');
-        expect(calc).toContain("buildBusinessFormulaSteps(");
         expect(calc).toContain("buildReverseFormulaSteps(");
+        // 17B-1：经营所得迁到 spec 驱动后，buildBusinessFormulaSteps 的接线方从 tax-calculator.js
+        // 变成了 tool-registry 里的 business spec（向导渲染时用），别的两处（反向/分类）没动。
+        expect(registry).toContain("buildBusinessFormulaSteps(");
         expect(helper).toContain("buildClassificationFormulaSteps(");
     });
 });

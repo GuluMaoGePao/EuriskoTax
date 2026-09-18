@@ -100,7 +100,7 @@ const TAX_ASSISTANT_QA = [
         keywords: ['经营所得', '个体工商户', '个人独资', '合伙企业'],
         question: '经营所得的计税范围是什么？',
         answer: '经营所得适用于：\n• 个体工商户\n• 个人独资企业投资人\n• 合伙企业自然人合伙人\n• 其他从事生产、经营活动的个人\n\n计税方式：\n收入总额 - 成本费用 - 损失 - 投资者扣除 - 允许弥补的以前年度亏损 = 应纳税所得额\n\n适用5%-35%五级超额累进税率。',
-        related: { page: 'business-calculation-page', label: '去经营所得测算' }
+        related: { tool: 'business', label: '去经营所得测算' }
     },
     {
         id: 'biz_rate',
@@ -108,7 +108,7 @@ const TAX_ASSISTANT_QA = [
         keywords: ['经营所得', '税率', '五级', '累进'],
         question: '经营所得税率表是怎样的？',
         answer: '经营所得适用5级超额累进税率：\n• 不超过3万：5%\n• 3万-9万：10%\n• 9万-30万：20%\n• 30万-50万：30%\n• 超过50万：35%\n\n注：以上为年度应纳税所得额档位。',
-        related: { page: 'business-calculation-page', label: '去经营所得测算' }
+        related: { tool: 'business', label: '去经营所得测算' }
     },
     {
         id: 'biz_half_reduction',
@@ -117,7 +117,7 @@ const TAX_ASSISTANT_QA = [
         question: '经营所得减半征收优惠怎么享受？',
         answer: '减半征收优惠要点：\n• 适用对象：个体工商户\n• 优惠内容：年应纳税所得额不超过200万元的部分，减半征收\n• 有效期：2023.1.1 - 2027.12.31\n• 系统自动计算：在经营所得计税页面，系统会自动应用该优惠',
         hot: true,
-        related: { page: 'business-calculation-page', label: '去经营所得测算' }
+        related: { tool: 'business', label: '去经营所得测算' }
     },
     {
         id: 'biz_with_comp',
@@ -125,7 +125,7 @@ const TAX_ASSISTANT_QA = [
         keywords: ['综合所得', '重复扣除', '基本减除', '6万'],
         question: '同时有经营所得和综合所得，6万减除怎么扣？',
         answer: '重要规则：\n基本减除费用6万元/年、社保公积金、专项附加扣除等，只能在综合所得或经营所得中扣除一次，不可重复。\n\n本系统的处理方式：\n• 勾选"有综合所得"：这些扣除在综合所得中享受，经营所得不再扣除\n• 不勾选"无综合所得"：可在经营所得中扣除每月5000元减除费用及社保公积金\n\n建议：通常在综合所得中扣除更划算。',
-        related: { page: 'business-calculation-page', label: '去经营所得测算' }
+        related: { tool: 'business', label: '去经营所得测算' }
     },
     {
         id: 'biz_loss_carryforward',
@@ -133,7 +133,7 @@ const TAX_ASSISTANT_QA = [
         keywords: ['亏损', '弥补', '以前年度', '结转'],
         question: '经营所得亏损怎么弥补？',
         answer: '经营所得亏损弥补规则：\n• 亏损可向以后年度结转弥补\n• 最长结转年限：5年\n• 弥补顺序：先弥补以前年度最早亏损，逐年向后\n• 需在汇算清缴时填报《个人所得税经营所得纳税申报表（B表）》\n\n注意：核定征收期间发生的亏损不得弥补。',
-        related: { page: 'business-calculation-page', label: '去经营所得测算' }
+        related: { tool: 'business', label: '去经营所得测算' }
     },
 
     // ===== 分类所得计税 =====

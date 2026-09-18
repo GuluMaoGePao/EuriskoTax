@@ -179,8 +179,12 @@
         }
         state.lastResult = out;     // 保存 / 导出按钮要用，避免再算一遍（口径也不会走岔）
 
+        // 17B-1：spec 驱动的向导是**通用渲染器** —— 结果节点的 id 不按工具区分（dw-result-card
+        // 会被所有 spec 工具复用）。所以这次把「结果属于谁」写进 data-tool-id、把「每一行是什么」
+        // 写进 data-dw-row：留资归因 / 分享卡 / 埋点都靠这两个锚点认人，避免把增值税的测算
+        // 归成因经营所得算过 —— 那是会写进线索表的数据质量问题。
         var rows = (out.rows || []).map(function (r) {
-            return '<div class="flex items-center justify-between py-2 border-b border-gray-100">' +
+            return '<div class="flex items-center justify-between py-2 border-b border-gray-100" data-dw-row="' + esc(r.label) + '">' +
                 '<span class="text-sm text-gray-600">' + esc(r.label) +
                 (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-400" title="' + esc(r.hint) + '"></i>' : '') +
                 '</span>' +
@@ -206,9 +210,9 @@
             }
         }
 
-        return '<div class="card" id="dw-result-card">' +
+        return '<div class="card" id="dw-result-card" data-tool-id="' + esc(state.toolId) + '">' +
                 '<div class="text-sm text-gray-600">' + esc(out.primary.label) + '</div>' +
-                '<div class="text-3xl font-bold text-primary my-2">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
+                '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
                 '<div class="mt-4">' + rows + '</div>' +
                 (out.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(out.note) + '</p>' : '') +
                 stepsHtml +
@@ -249,18 +253,23 @@
         if (!tool || !host) return;
         var steps = stepsOf(tool);
         if (state.stepIndex >= steps.length) state.stepIndex = steps.length - 1;
+        // 采纳联动结果再渲染：这里**只能算不能收**（collect 会按「当前步」整表读 DOM，
+        // 而此刻 DOM 还是上一步的样子，会在渲染前把当前步的值冲回默认）。
+        applyDerived(tool);
         host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps);
         bind(tool, steps);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
         // 分步向导每次只渲染当前步，若不回填，用户「上一步 → 下一步」就会被打回默认值 ——
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
         applyValues(state.values);
+        renderWarnings(tool);
     }
 
-    function applyValues(values) {
+    // skipEl：正在输入的那个控件不回写 —— 否则用户敲到一半，光标会被自己刚触发的联动重置
+    function applyValues(values, skipEl) {
         Object.keys(values || {}).forEach(function (k) {
             var el = document.getElementById('qf-' + k);
-            if (!el) return;
+            if (!el || el === skipEl) return;
             if (el.type === 'checkbox') el.checked = !!values[k];
             else el.value = values[k];
         });
@@ -275,6 +284,8 @@
         fieldsOfStep(tool, step.key).forEach(function (f) {
             state.values[f.key] = dom[f.key];
         });
+        // 统一入口：任何一次收值都跑一次联动，避免某条路径忘了跑（切步 / 返回 / 条件字段变更）
+        applyDerived(tool);
         // 不在这里落盘：草稿要记的是**移动后**停在哪一步，由调用方在改完 stepIndex 后再 saveDraft
     }
 
@@ -288,6 +299,80 @@
     function loadDraft(toolId) {
         try { return JSON.parse(localStorage.getItem(DRAFT_PREFIX + toolId) || 'null'); }
         catch (e) { return null; }
+    }
+
+    // ====== 字段联动（derive）与行内提示（warnings）======
+    // 迁移到 spec 之后，页面里那些写在 page 私有逻辑里的便利能力必须有个去处 ——
+    // 「社保缴费基数 × 缴费比例 → 每月扣缴额」就是典型：用户手里有的是基数，不是月缴额，
+    // 这类联动要是每个迁移都丢一次，17B 后面三个页面的迁移会一路丢下去。
+    // 交给渲染器承担，spec 只声明规则：derive(values) 回写派生值，warnings(values) 给字段提示。
+    function applyDerived(tool) {
+        if (typeof tool.derive !== 'function') return false;
+        var patched;
+        try { patched = tool.derive(state.values) || {}; }
+        catch (e) { return false; }
+        var changed = false;
+        Object.keys(patched).forEach(function (k) {
+            if (state.values[k] === patched[k]) return;
+            state.values[k] = patched[k];
+            changed = true;
+        });
+        return changed;
+    }
+
+    function renderWarnings(tool) {
+        if (typeof tool.warnings !== 'function') return;
+        var host = document.getElementById(PAGE_ID);
+        if (!host) return;
+        // 先清所有旧提示：只按本次 map 逐个贴的话，条件不再成立的提示会一直挂着
+        Array.prototype.forEach.call(host.querySelectorAll('.dw-field-warning'), function (n) { n.remove(); });
+        var map;
+        try { map = tool.warnings(state.values) || {}; }
+        catch (e) { return; }
+        Object.keys(map).forEach(function (k) {
+            if (!map[k]) return;
+            var el = document.getElementById('qf-' + k);
+            var field = el && el.closest ? el.closest('.tool-field') : null;
+            if (!field) return;
+            var node = document.createElement('div');
+            node.className = 'dw-field-warning text-xs text-red-600 mt-1';
+            node.textContent = map[k];
+            field.appendChild(node);
+        });
+    }
+
+    // 联动源字段要「按键即时」反应 —— 页面版把这些写在各自 page 的 input 事件里。
+    // 只对 spec 声明过的来源字段（deriveFrom）接线：用户在别处敲字时不该把他手动改过的
+    // 派生值又冲一遍（页面版也是只认基数 / 比例两个输入框的 change）。
+    function bindDerivedSources(tool, step) {
+        if (typeof tool.derive !== 'function' || !step || step.result) return;
+        (tool.deriveFrom || []).forEach(function (k) {
+            var el = document.getElementById('qf-' + k);
+            if (!el) return;
+            var meta = (tool.fields || []).filter(function (f) { return f.key === k; })[0];
+            // 注意别在这里再判 changed：derive 已经挂在 collect 里跑过了，第二次调用必然返回 false，
+            // 一判就把「派生值回写到界面」这一步跳过了（DOM 不更新，只有内存变了）
+            el.addEventListener('input', function () {
+                collect(tool);
+                applyValues(state.values, el);      // 跳过正在输入的框，别抢光标
+                renderWarnings(tool);
+            });
+            el.addEventListener('change', function () {
+                // 数字框失焦（页面版 normalizeRateInput 也是这个时机）：比例框留空 / 越界，
+                // 先把它归一到**这个险种自己的默认比例**再收值。否则 readValues 会把空串读成 0，
+                // derive 就按 0% 算 —— 用户留了个空框，看到的却是 0 元，会被当成算错了。
+                if (meta && meta.type === 'percent' && !isRateOk(el.value)) el.value = meta.default;
+                collect(tool);
+                applyValues(state.values);
+                renderWarnings(tool);
+            });
+        });
+    }
+
+    // 0 与 100 之间的有限数才算合法比例 —— 空串、负数、>100 都要回落
+    function isRateOk(raw) {
+        var n = parseFloat(raw);
+        return String(raw).trim() !== '' && isFinite(n) && n >= 0 && n <= 100;
     }
 
     function bind(tool, steps) {
@@ -340,6 +425,7 @@
                 el.addEventListener('change', function () { collect(tool); render(); });
             });
         }
+        bindDerivedSources(tool, step);
     }
 
     function open(toolId, opts) {

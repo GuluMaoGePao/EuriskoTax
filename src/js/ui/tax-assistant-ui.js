@@ -319,8 +319,13 @@
 
             // 关联跳转按钮
             var relatedBtn = '';
-            if (item.related && item.related.page) {
-                relatedBtn = '<button class="assistant-related-btn" data-related-page="' + item.related.page + '">' +
+            // 17B-1：关联跳转支持两种写法 —— 存量页面用 page，spec 驱动的向导用 tool。
+            // 经营所得的旧页面整页删掉了，它的 5 条快捷入口改为 tool:'business'。
+            if (item.related && (item.related.tool || item.related.page)) {
+                var relatedAttr = item.related.tool
+                    ? 'data-related-tool="' + item.related.tool + '"'
+                    : 'data-related-page="' + item.related.page + '"';
+                relatedBtn = '<button class="assistant-related-btn" ' + relatedAttr + '>' +
                              '<i class="fa fa-calculator"></i> ' + escapeHtml(item.related.label || '去测算') +
                              ' <i class="fa fa-arrow-right"></i></button>';
             }
@@ -433,8 +438,18 @@
         container.querySelectorAll('.assistant-related-btn').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                var pageId = this.getAttribute('data-related-page');
-                goToRelatedPage(pageId);
+                // 17B-1：tool 型关联的去处是 spec 驱动的向导，而向导**不在** showPage 的页面列表里
+                // （它是渲染进 deep-wizard-page 的一段 DOM），所以这里单独走 EuriskoDeepWizard.open。
+                var toolId = this.getAttribute('data-related-tool');
+                if (toolId) {
+                    closeAssistant();
+                    var W = window.EuriskoDeepWizard;
+                    if (!W || !W.open(toolId)) {
+                        logger.warn('NAV', '向导不可用，无法跳转到关联测算', { tool: toolId });
+                    }
+                    return;
+                }
+                goToRelatedPage(this.getAttribute('data-related-page'));
             });
         });
     }

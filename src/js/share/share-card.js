@@ -51,13 +51,18 @@
                 { label: '适用税率', selector: '#result-tax-rate' }
             ]
         },
-        'business-step-result': {
+        // 17B-1：经营所得迁到 spec 驱动的向导后，结果节点是**运行时渲染**的通用节点，
+        // 在 index.html 里查不到。selector 统一带上 data-tool-id 做归属校验 —— 向导是通用
+        // 渲染器，dw-result-card 会被所有 spec 工具轮着用，不加这一层就会把增值税的结果截成
+        // 一张「经营所得分享图」（数值来自别的口径，比空图更难被发现）。
+        'dw-result-card': {
             template: 'income',
             title: '经营所得年度汇算',
-            hero: { selector: '#business-result-net-income', label: '税后经营所得' },
+            hero: { selector: '#dw-result-card[data-tool-id="business"] #dw-result-primary', label: '应纳个人所得税' },
             rows: [
-                { label: '经营利润', selector: '#business-result-profit' },
-                { label: '年度扣除', selector: '#business-result-deductions' }
+                { label: '应纳税所得额', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="应纳税所得额"]' },
+                { label: '适用税率', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="适用税率"]' },
+                { label: '减半征收减免', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="减半征收减免"]' }
             ]
         },
         'classification-step-result': {
@@ -84,7 +89,7 @@
     // 计算按钮 → 结果容器（与 lead-touchpoints / funnel-tracking 同一套映射，保持一致）
     var TRIGGERS = [
         { buttonId: 'next-to-result-btn', containerId: 'step-result' },
-        { buttonId: 'calculate-business-btn', containerId: 'business-step-result' },
+        { buttonId: 'dw-next', containerId: 'dw-result-card' },   // 17B-1：经营所得改走 spec 驱动的向导
         { buttonId: 'calculate-classification-btn', containerId: 'classification-step-result' },
         { buttonId: 'calculate-reverse-btn', containerId: 'reverse-step-result' }
     ];

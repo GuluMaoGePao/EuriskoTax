@@ -74,18 +74,11 @@ describe('taxStructure 税负结构（柱状图数据源）', () => {
         expect(s.note).toContain('退税');
     });
 
-    test('经营所得：收入/成本/税金损失/利润/所得额/税额', () => {
-        window.businessCalculationResults = {
-            incomeDetails: { businessIncome: 800000, businessCost: 300000, businessLosses: 20000, businessOtherExpenses: 0, businessProfit: 480000 },
-            taxDetails: { taxableIncome: 460000, totalTax: 120000 }
-        };
+    // 17B-1（v1.47.0）：经营所得那份「专业版报告」随旧页面一并删除 —— 它在向导里走
+    // 自己的导出路径（deep-wizard-ui exportResult → exportToPDF/Word），不再有 business 这个 kind。
+    test('只有综合所得一种税负结构（经营所得的 kind 已随旧页删除）', () => {
         const s = report().pure.taxStructure('business');
-        expect(s.labels).toContain('收入总额');
-        expect(s.values[0]).toBe(800000);
-        expect(s.values[1]).toBe(300000);
-        expect(s.values[2]).toBe(20000); // 损失+其他
-        expect(s.values[3]).toBe(480000);
-        expect(s.kind).toBe('business');
+        expect(s.kind).toBe('comprehensive');   // 未知 kind 一律回落，不抛错
     });
 
     test('无结果数据时安全返回 0 序列', () => {
@@ -104,11 +97,10 @@ describe('pickPolicyItems 政策要点挑选', () => {
         expect(ids).not.toContain('policy-biz1');
     });
 
-    test('经营所得报告：纳入经营所得相关政策条目', () => {
+    test('经营所得这条 kind 已下线：政策要点按综合所得的口径挑（不抛错、不漏版）', () => {
         const items = report().pure.pickPolicyItems('business', 6);
         const ids = items.map((it) => it.id);
-        expect(ids).toContain('policy-biz1');
-        expect(ids).not.toContain('normal-business');
+        expect(ids).toContain('policy-tax1');
     });
 
     test('limit 生效；无 QA 时返回空', () => {
