@@ -55,18 +55,19 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（4 个页面式 + 3 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（3 个页面式 + 6 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
-        const pageBased = deep.filter((t) => !!t.pageId);   // forward / business / classification / reverse
+        // 17B-1（v1.46.0）：business 已从页面式迁到 spec 驱动，页面式由 4 → 3。
+        const pageBased = deep.filter((t) => !!t.pageId).map((t) => t.id).sort();
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
-        expect(pageBased).toHaveLength(4);   // 17B 完成后应归零
+        expect(pageBased).toEqual(['classification', 'forward', 'reverse']);   // 17B 完成后应归零
         // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、social-base-deep（17C-3）、
         // surtax-stamp-deep（17C-4）、disability-fund-deep（17C-5）：附加税的计税依据就是实缴增值税，
         // 所以它必须跟在 vat 之后 —— 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
-        // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**。
+        // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**；business 是 17B 迁回来的第一个。
         expect(specDriven).toEqual([
-            'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'business', 'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
         ]);
     });
 
@@ -75,12 +76,31 @@ describe('工具注册表：数量与分组', () => {
     // 复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
     // 而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
     test('spec 驱动的完整测算复用速算器的字段与计算（不是复制）', () => {
-        R().deep().filter((t) => !t.pageId).forEach((t) => {
+        const specDriven = R().deep().filter((t) => !t.pageId);
+
+        // ① `-deep` 系列：与同名速算器共享同一份 fields / steps / compute（同一对象引用）。
+        //    复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
+        //    而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
+        const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
+        expect(twins).toHaveLength(5);
+        twins.forEach((t) => {
             const twin = R().all().find((n) => n.compute === t.compute);
             expect(twin !== undefined && twin !== null).toBe(true);   // 必须能在速算器里找到同口径孪生项
             expect(t.fields).toBe(twin.fields);     // 同一对象引用，不是结构相等
             expect(t.steps).toBe(twin.steps);
             expect(t.compute).toBe(twin.compute);
+        });
+
+        // ② 从页面迁来的（17B：business）：它**没有**同名速算器可复用（经营所得速算器是
+        //    「核定 vs 查账」对比，口径不同），所以计算走的是从页面里抽出来的共享内核
+        //    `calculateBusinessTaxCore`。这里只钉三件套齐全（防止只迁一半），
+        //    **口径一致**由 tests/business-migration.test.js 的逐点对拍证明。
+        const migrated = specDriven.filter((t) => !t.id.endsWith('-deep'));
+        expect(migrated.map((t) => t.id)).toEqual(['business']);
+        migrated.forEach((t) => {
+            expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
+            expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);
+            expect(typeof t.compute).toBe('function');
         });
     });
 

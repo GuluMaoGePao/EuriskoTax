@@ -53,9 +53,69 @@
             nextTools: ['salary-tax', 'annual-settlement', 'special-deduction']
         },
         {
+            // 阶段17 17B-1：**第一个由页面式迁到 spec 驱动**的经营所得测算。
+            // 原来它指向 business-calculation-page（index.html 里 390 行 + app.js 私有逻辑），
+            // 现在由 deep-wizard-ui.js 按这份 spec 渲染，卡片点击即进向导。
+            // 口径没动：compute 直接调 tax-calculator.js 抽出的 calculateBusinessTaxCore —— 与页面版同一份内核。
             id: 'business', name: '经营所得', subtitle: '个体 / 独资，成本费用逐项扣',
-            icon: 'fa-briefcase', status: 'deep', pageId: 'business-calculation-page',
-            nextTools: ['business-income', 'social-base', 'vat']
+            icon: 'fa-briefcase', status: 'deep',
+            nextTools: ['business-income', 'social-base', 'vat'],
+            // 结果步由渲染器自动追加（所有完整测算都有，「计算结果」不在此重复声明）。
+            fields: [
+                { key: 'income', step: 'income', label: '年度经营收入总额', type: 'money', default: 600000 },
+                { key: 'cost', step: 'income', label: '年度成本', type: 'money', default: 350000 },
+                { key: 'expenses', step: 'income', label: '年度费用', type: 'money', default: 50000 },
+                { key: 'taxes', step: 'income', label: '年度税金', type: 'money', default: 0 },
+                { key: 'losses', step: 'income', label: '年度损失', type: 'money', default: 0 },
+                { key: 'otherExpenses', step: 'income', label: '其他支出', type: 'money', default: 0 },
+                { key: 'previousLosses', step: 'income', label: '以前年度亏损弥补', type: 'money', default: 0, hint: '亏损可向以后年度结转，最长 5 年' },
+                { key: 'hasComprehensiveIncome', step: 'deduction', label: '本年度有综合所得（工资薪金等）', type: 'switch', default: true, hint: '有综合所得时，基本减除与社保公积金在综合所得里扣，经营所得不再扣' },
+                { key: 'workMonths', step: 'deduction', label: '年工作总月数', type: 'select', default: 12, options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
+                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 8%，按年工作月数折算为年度' },
+                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 2%' },
+                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, hint: '＝ 缴费基数 × 0.5%' },
+                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0 },
+                { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护', type: 'money', default: 0 },
+                { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人', type: 'money', default: 0 },
+                { key: 'housingDeduction', step: 'deduction', label: '住房贷款利息 / 住房租金', type: 'money', default: 0 },
+                { key: 'educationDeduction', step: 'deduction', label: '继续教育', type: 'money', default: 0 },
+                { key: 'medicalDeduction', step: 'deduction', label: '大病医疗', type: 'money', default: 0, hint: '只扣超过 1.5 万的部分，限额 8 万' },
+                { key: 'pensionDeduction', step: 'deduction', label: '商业健康险 / 税延养老保险', type: 'money', default: 0 },
+                { key: 'enterpriseAnnuity', step: 'deduction', label: '企业年金', type: 'money', default: 0 },
+                { key: 'insuranceDeduction', step: 'deduction', label: '其他商业保险', type: 'money', default: 0 },
+                { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠', type: 'money', default: 0, hint: '扣除限额＝应纳税所得额 × 30%' },
+                { key: 'prepaidTax', step: 'deduction', label: '已预缴税额', type: 'money', default: 0 }
+            ],
+            steps: [
+                { key: 'income', title: '经营收入与成本', why: '经营所得按年计税：收入总额减成本、费用、税金与损失，才是经营利润' },
+                { key: 'deduction', title: '扣除项明细', why: '先确认有没有综合所得 —— 它决定 6 万减除与社保公积金在哪边扣，两边不能重复扣' }
+            ],
+            pitfalls: [
+                '有综合所得时，基本减除费用与社保公积金**只能在综合所得里扣一次**，经营所得不再扣',
+                '减半征收是**年应纳税所得额 200 万以内**的部分减半，不是全部所得减半',
+                '大病医疗只扣**超过 1.5 万**的部分、限额 8 万；公益性捐赠限额为应纳税所得额的 30%'
+            ],
+            compute: function (v) {
+                if (typeof calculateBusinessTaxCore !== 'function') return null;
+                var core = calculateBusinessTaxCore(v);
+                var t = core.taxDetails;
+                return {
+                    primary: { label: '应纳个人所得税', value: t.totalTax, kind: 'money' },
+                    rows: [
+                        { label: '应纳税所得额', value: t.taxableIncome, kind: 'money' },
+                        { label: '适用税率', value: t.applicableRate, kind: 'percent' },
+                        { label: '速算扣除数', value: t.applicableDeduction, kind: 'money' },
+                        { label: '减半征收减免', value: t.taxReduction, kind: 'money', hint: '年应纳税所得额 200 万以内的部分减半' },
+                        { label: '扣除合计', value: core.deductionDetails.total, kind: 'money' },
+                        { label: '已预缴税额', value: t.prepaidTax, kind: 'money' },
+                        { label: t.refundTax >= 0 ? '应补税额' : '应退税额', value: Math.abs(t.refundTax), kind: 'money' },
+                        { label: '税后经营所得', value: t.netIncomeAfterTax, kind: 'money' }
+                    ],
+                    note: '投资者本人减除费用 5000 元/月按实际工作月数算；有综合所得时该减除与社保公积金改在综合所得里扣除。',
+                    // 推导链直接复用 utils.js 里既有那份（页面版用的也是它）—— 不写第二套
+                    steps: (typeof buildBusinessFormulaSteps === 'function') ? buildBusinessFormulaSteps(core) : []
+                };
+            }
         },
         {
             id: 'classification', name: '分类所得', subtitle: '利息 / 租赁 / 转让 / 偶然所得',

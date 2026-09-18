@@ -7,6 +7,40 @@
 
 ---
 
+## [1.46.0] - 2026-09-18（阶段17 17B-1：经营所得从页面式迁到 spec 驱动）
+
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **67 套件 1217 例**（新增 9 例，其中 7 例在新的 `tests/business-migration.test.js`）；线上指纹 **37 项**（不改动指纹覆盖点）。
+
+### 做了什么
+
+- **抽内核**：`tax-calculator.js` 新增 `calculateBusinessTaxCore(values)`（纯函数）与 `readBusinessFormValues()`；
+  原 `calculateBusinessTax()` 改为「读 23 个 DOM → 调内核 → 写结果区」，**渲染逻辑一处未动**。
+  不抽而另抄一份的话，经营所得就会多出第 6 份同形实现（此前减半优惠公式已有 5 份 —— 那是口径漂移的源头）。
+- **写 spec**：`tool-registry.js` 的 `business` 补齐 `fields`（2 步 23 字段）/ `steps` / `pitfalls` / `compute`，
+  去掉 `pageId` → 由 `deep-wizard-ui.js` 接管。`compute` 调内核，推导链直接复用 `utils.js` 既有的
+  `buildBusinessFormulaSteps`（页面版用的也是它 —— 不写第二套）。
+- **切入口**：`toolbox-ui.js` 把 spec 驱动的判断提到 `mode-btn` **之前**（否则卡片点击会被 `business-mode-btn`
+  带回旧页面）；`app.js` 的 `business-mode-btn` 也走向导。
+
+### 口径没变（本版的重点）
+
+新增 `tests/business-migration.test.js`：**页面版**（读 DOM，取它**渲染出来**的结果元素）与 **spec 版**（`compute`）
+在 3 组输入下逐点比对 9 个口径字段，全部一致。3 组分别是：
+① 有综合所得 + 捐赠按 30% 限额 + 预缴参与补退；② 无综合所得（5000×月数 与社保公积金进经营所得扣除）；
+③ 高所得触发 200 万减半封顶。后 3 个待迁页面（reverse / forward / classification）照这个模板各写一份。
+
+### 一处体验差异（不是口径差异）
+
+旧页面能「填社保基数 × 缴费比例自动算出四险一金月缴额」，那是**纯前端辅助**（`calculateBusinessTax`
+只读月度金额，基数和比例不参与计算）。spec 版改为直接填月度金额，并在字段提示里给出换算式
+（养老＝基数×8%、医疗×2%、失业×0.5%）。
+
+### 还没做
+
+旧页面 `business-calculation-page`（`index.html` 约 390 行）与其私有逻辑**仍在**，但两条入口都走向导、
+已无人可达；下一版 v1.47.0 清理死代码（页面 HTML + navigation / app / draft-store / tax-assistant /
+data-management 里的引用 + 相关测试）。**页面式 deep 由 4 → 3**（剩 forward / classification / reverse）。
+
 ## [1.45.0] - 2026-09-18（阶段17 17A-2：结果区与存量页面对等 —— **17B 反向迁移的硬前置**）
 
 > 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **66 套件 1210 例**（新增 4 例，

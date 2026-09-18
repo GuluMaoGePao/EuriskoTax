@@ -317,13 +317,15 @@
         pushRecent(id);
 
         if (tool.status === 'deep') {
+            // 阶段17：spec 驱动的完整测算（没有独立页面）—— 交给通用向导按注册表渲染。
+            // 放在 mode-btn 分支**之前**（17B-1）：这类工具的入口就是 spec，不该再复用到页面式的
+            // mode-btn —— business 迁移后若仍走 business-mode-btn，卡片点下去会被带回旧页面。
+            // W.has 只对 spec 驱动的返回 true（其余 3 个 deep 有 pageId，不受影响）。
+            var W = window.EuriskoDeepWizard;
+            if (W && W.has(tool) && W.open(tool.id)) return;
             // 原有深度流程：复用工具页那张卡片里的隐藏按钮，保证与既有初始化逻辑完全一致
             var btn = document.getElementById(tool.id + '-mode-btn');
             if (btn) { btn.click(); return; }
-            // 阶段17：spec 驱动的完整测算（没有独立页面）—— 交给通用向导按注册表渲染。
-            // 放在 pageId 分支之前：这类工具本就没有 pageId，多一层判断也不会误伤原有 4 个 deep。
-            var W = window.EuriskoDeepWizard;
-            if (W && W.has(tool) && W.open(tool.id)) return;
             // 目标页面若尚未落地则**不跳转**：否则 showPage 会切到一个不存在的 DOM，留下白屏。
             if (tool.pageId && document.getElementById(tool.pageId)) showPageFn(tool.pageId);
             return;

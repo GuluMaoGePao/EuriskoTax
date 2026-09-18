@@ -2204,159 +2204,232 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
 }
 
 // 计算经营所得
+// 阶段17 17B-1：经营所得的**纯内核**（values → 结果）。
+// 为什么要抽：spec 驱动的向导需要一个「输入对象 → 结果」的纯函数，而原实现是
+// 「读 23 个 DOM → 算 → 写全局 + 写 DOM」。若不抽而照抄一份算法，经营所得就会多出
+// 第 6 份同形实现（此前减半优惠公式已有 5 份）—— 那正是口径漂移的源头。
+// 页面版与向导版从此共用这一份，并由 tests/business-migration.test.js 逐点对拍。
+function calculateBusinessTaxCore(v) {
+    const businessIncome = Number(v.income) || 0;
+    const businessCost = Number(v.cost) || 0;
+    const businessExpenses = Number(v.expenses) || 0;
+    const businessTaxes = Number(v.taxes) || 0;
+    const businessLosses = Number(v.losses) || 0;
+    const businessOtherExpenses = Number(v.otherExpenses) || 0;
+    const businessPreviousLosses = Number(v.previousLosses) || 0;
+    const hasComprehensiveIncome = v.hasComprehensiveIncome !== false && !!v.hasComprehensiveIncome;
+    const workMonths = parseInt(v.workMonths, 10) || 12;
+
+    // 专项扣除（社保/公积金）- 月度金额，需乘以工作月数转换为年度
+    const monthlyPensionInsurance = Number(v.pensionInsurance) || 0;
+    const monthlyMedicalInsurance = Number(v.medicalInsurance) || 0;
+    const monthlyUnemploymentInsurance = Number(v.unemploymentInsurance) || 0;
+    const monthlyHousingFund = Number(v.housingFund) || 0;
+    const pensionInsurance = monthlyPensionInsurance * workMonths;
+    const medicalInsurance = monthlyMedicalInsurance * workMonths;
+    const unemploymentInsurance = monthlyUnemploymentInsurance * workMonths;
+    const housingFund = monthlyHousingFund * workMonths;
+    const specialDeductionTotal = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
+
+    // 专项附加扣除明细
+    const childrenInfantDeduction = Number(v.childrenInfantDeduction) || 0;
+    const elderlyDeduction = Number(v.elderlyDeduction) || 0;
+    const housingDeduction = Number(v.housingDeduction) || 0;
+    const educationDeduction = Number(v.educationDeduction) || 0;
+    const medicalDeduction = Number(v.medicalDeduction) || 0;
+    const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
+    const specialAdditionalDeductionTotal = childrenInfantDeduction + elderlyDeduction + housingDeduction + educationDeduction + actualMedicalDeduction;
+
+    // 其他扣除明细
+    const pensionDeduction = Number(v.pensionDeduction) || 0;
+    const enterpriseAnnuity = Number(v.enterpriseAnnuity) || 0;
+    const insuranceDeduction = Number(v.insuranceDeduction) || 0;
+    const charitableDonation = Number(v.charitableDonation) || 0;
+    const otherDeductionTotalBeforeDonation = pensionDeduction + enterpriseAnnuity + insuranceDeduction;
+
+    const prepaidTax = Number(v.prepaidTax) || 0;
+
+    // 计算经营利润
+    const businessProfit = Math.max(0, businessIncome - businessCost - businessExpenses -
+        businessTaxes - businessLosses - businessOtherExpenses);
+
+    // 扣除以前年度亏损
+    const netIncomeAfterLoss = Math.max(0, businessProfit - businessPreviousLosses);
+
+    // 计算投资者减除费用（5000元/月，按实际工作月数计算）
+    const investorDeduction = hasComprehensiveIncome ? 0 : 5000 * workMonths;
+
+    // 计算公益性捐赠前的应纳税所得额
+    const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction -
+        (hasComprehensiveIncome ? 0 : specialDeductionTotal) - specialAdditionalDeductionTotal - otherDeductionTotalBeforeDonation);
+
+    // 公益性捐赠扣除限额为应纳税所得额的30%
+    const charitableDonationLimit = taxableIncomeBeforeDonation * 0.3;
+    const actualCharitableDonation = Math.min(charitableDonation, charitableDonationLimit);
+    const otherDeductionTotal = otherDeductionTotalBeforeDonation + actualCharitableDonation;
+
+    // 计算应纳税所得额
+    const taxableIncome = Math.max(0, taxableIncomeBeforeDonation - actualCharitableDonation);
+
+    // 计算应纳税额（未减半）
+    let totalTaxBeforeHalving = 0;
+    let applicableRate = 0;
+    let applicableDeduction = 0;
+
+    for (const bracket of businessTaxRates) {
+        if (taxableIncome <= bracket.max) {
+            totalTaxBeforeHalving = taxableIncome * bracket.rate - bracket.deduction;
+            applicableRate = bracket.rate;
+            applicableDeduction = bracket.deduction;
+            break;
+        }
+    }
+
+    // 计算减半征收减免税额（年应纳税所得额不超过200万元的部分减半征收）
+    const halvingThreshold = 2000000;
+    const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
+    const taxReduction = totalTaxBeforeHalving > 0 ? (halvingTaxable * applicableRate - applicableDeduction) * 0.5 : 0;
+
+    // 计算实际应纳税额
+    const totalTax = Math.max(0, totalTaxBeforeHalving - taxReduction);
+
+    // 计算应退/应补税额
+    const refundTax = totalTax - prepaidTax;
+
+    // 计算税后经营所得
+    const netIncomeAfterTax = netIncomeAfterLoss - totalTax;
+
+    // 计算可扣除的专项扣除（无综合所得时才允许扣除）
+    const deductibleSpecialDeduction = hasComprehensiveIncome ? 0 : specialDeductionTotal;
+
+    // 计算总扣除额
+    const totalDeduction = investorDeduction + deductibleSpecialDeduction + specialAdditionalDeductionTotal + otherDeductionTotal;
+
+    return {
+        incomeDetails: {
+            businessIncome,
+            businessCost,
+            businessExpenses,
+            businessTaxes,
+            businessLosses,
+            businessOtherExpenses,
+            businessPreviousLosses,
+            businessProfit
+        },
+        deductionDetails: {
+            hasComprehensiveIncome,
+            investorDeduction,
+            specialDeduction: {
+                pensionInsurance,
+                medicalInsurance,
+                unemploymentInsurance,
+                housingFund,
+                total: specialDeductionTotal,
+                deductible: deductibleSpecialDeduction
+            },
+            specialAdditionalDeduction: {
+                childrenInfant: childrenInfantDeduction,
+                elderly: elderlyDeduction,
+                housing: housingDeduction,
+                education: educationDeduction,
+                medical: medicalDeduction,
+                actualMedical: actualMedicalDeduction,
+                total: specialAdditionalDeductionTotal
+            },
+            otherDeduction: {
+                pension: pensionDeduction,
+                enterpriseAnnuity,
+                insurance: insuranceDeduction,
+                charitableDonation,
+                actualCharitableDonation,
+                charitableDonationLimit,
+                total: otherDeductionTotal
+            },
+            total: totalDeduction
+        },
+        taxDetails: {
+            netIncome: netIncomeAfterLoss,
+            taxableIncome,
+            applicableRate,
+            applicableDeduction,
+            totalTaxBeforeHalving,
+            taxReduction,
+            totalTax,
+            prepaidTax,
+            refundTax,
+            netIncomeAfterTax
+        },
+        calculationDate: new Date().toISOString()
+    };
+}
+
+// 页面版专用：把 23 个 DOM 输入读成内核要的 values 对象
+function readBusinessFormValues() {
+    const num = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+    return {
+        income: num('business-income'),
+        cost: num('business-cost'),
+        expenses: num('business-expenses'),
+        taxes: num('business-taxes'),
+        losses: num('business-losses'),
+        otherExpenses: num('business-other-expenses'),
+        previousLosses: num('business-previous-losses'),
+        hasComprehensiveIncome: document.getElementById('business-has-comprehensive-income')?.checked ?? true,
+        workMonths: parseInt(document.getElementById('business-work-months')?.value, 10) || 12,
+        pensionInsurance: num('business-pension-insurance'),
+        medicalInsurance: num('business-medical-insurance'),
+        unemploymentInsurance: num('business-unemployment-insurance'),
+        housingFund: num('business-housing-fund'),
+        childrenInfantDeduction: num('business-children-infant-deduction'),
+        elderlyDeduction: num('business-elderly-deduction'),
+        housingDeduction: num('business-housing-deduction'),
+        educationDeduction: num('business-education-deduction'),
+        medicalDeduction: num('business-medical-deduction'),
+        pensionDeduction: num('business-pension-deduction'),
+        enterpriseAnnuity: num('business-enterprise-annuity'),
+        insuranceDeduction: num('business-insurance-deduction'),
+        charitableDonation: num('business-charitable-donation'),
+        prepaidTax: num('business-prepaid-tax')
+    };
+}
+
 function calculateBusinessTax() {
     try {
-        const businessIncome = parseFloat(document.getElementById('business-income')?.value) || 0;
-        const businessCost = parseFloat(document.getElementById('business-cost')?.value) || 0;
-        const businessExpenses = parseFloat(document.getElementById('business-expenses')?.value) || 0;
-        const businessTaxes = parseFloat(document.getElementById('business-taxes')?.value) || 0;
-        const businessLosses = parseFloat(document.getElementById('business-losses')?.value) || 0;
-        const businessOtherExpenses = parseFloat(document.getElementById('business-other-expenses')?.value) || 0;
-        const businessPreviousLosses = parseFloat(document.getElementById('business-previous-losses')?.value) || 0;
-        const hasComprehensiveIncome = document.getElementById('business-has-comprehensive-income')?.checked ?? true;
-        const workMonths = parseInt(document.getElementById('business-work-months')?.value) || 12;
-        
-        // 专项扣除（社保/公积金）- 月度金额，需乘以工作月数转换为年度
-        const monthlyPensionInsurance = parseFloat(document.getElementById('business-pension-insurance')?.value) || 0;
-        const monthlyMedicalInsurance = parseFloat(document.getElementById('business-medical-insurance')?.value) || 0;
-        const monthlyUnemploymentInsurance = parseFloat(document.getElementById('business-unemployment-insurance')?.value) || 0;
-        const monthlyHousingFund = parseFloat(document.getElementById('business-housing-fund')?.value) || 0;
-        const pensionInsurance = monthlyPensionInsurance * workMonths;
-        const medicalInsurance = monthlyMedicalInsurance * workMonths;
-        const unemploymentInsurance = monthlyUnemploymentInsurance * workMonths;
-        const housingFund = monthlyHousingFund * workMonths;
-        const specialDeductionTotal = pensionInsurance + medicalInsurance + unemploymentInsurance + housingFund;
-        
-        // 专项附加扣除明细
-        const childrenInfantDeduction = parseFloat(document.getElementById('business-children-infant-deduction')?.value) || 0;
-        const elderlyDeduction = parseFloat(document.getElementById('business-elderly-deduction')?.value) || 0;
-        const housingDeduction = parseFloat(document.getElementById('business-housing-deduction')?.value) || 0;
-        const educationDeduction = parseFloat(document.getElementById('business-education-deduction')?.value) || 0;
-        const medicalDeduction = parseFloat(document.getElementById('business-medical-deduction')?.value) || 0;
-        const actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
-        const specialAdditionalDeductionTotal = childrenInfantDeduction + elderlyDeduction + housingDeduction + educationDeduction + actualMedicalDeduction;
-        
-        // 其他扣除明细
-        const pensionDeduction = parseFloat(document.getElementById('business-pension-deduction')?.value) || 0;
-        const enterpriseAnnuity = parseFloat(document.getElementById('business-enterprise-annuity')?.value) || 0;
-        const insuranceDeduction = parseFloat(document.getElementById('business-insurance-deduction')?.value) || 0;
-        const charitableDonation = parseFloat(document.getElementById('business-charitable-donation')?.value) || 0;
-        const otherDeductionTotalBeforeDonation = pensionDeduction + enterpriseAnnuity + insuranceDeduction;
-        
-        const prepaidTax = parseFloat(document.getElementById('business-prepaid-tax')?.value) || 0;
-        
-        // 计算经营利润
-        const businessProfit = Math.max(0, businessIncome - businessCost - businessExpenses - 
-            businessTaxes - businessLosses - businessOtherExpenses);
-        
-        // 扣除以前年度亏损
-        const netIncomeAfterLoss = Math.max(0, businessProfit - businessPreviousLosses);
-        
-        // 计算投资者减除费用（5000元/月，按实际工作月数计算）
-        const investorDeduction = hasComprehensiveIncome ? 0 : 5000 * workMonths;
-        
-        // 计算公益性捐赠前的应纳税所得额
-        const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction - 
-            (hasComprehensiveIncome ? 0 : specialDeductionTotal) - specialAdditionalDeductionTotal - otherDeductionTotalBeforeDonation);
-        
-        // 公益性捐赠扣除限额为应纳税所得额的30%
-        const charitableDonationLimit = taxableIncomeBeforeDonation * 0.3;
-        const actualCharitableDonation = Math.min(charitableDonation, charitableDonationLimit);
-        const otherDeductionTotal = otherDeductionTotalBeforeDonation + actualCharitableDonation;
-        
-        // 计算应纳税所得额
-        const taxableIncome = Math.max(0, taxableIncomeBeforeDonation - actualCharitableDonation);
-        
-        // 计算应纳税额（未减半）
-        let totalTaxBeforeHalving = 0;
-        let applicableRate = 0;
-        let applicableDeduction = 0;
-        
-        for (const bracket of businessTaxRates) {
-            if (taxableIncome <= bracket.max) {
-                totalTaxBeforeHalving = taxableIncome * bracket.rate - bracket.deduction;
-                applicableRate = bracket.rate;
-                applicableDeduction = bracket.deduction;
-                break;
-            }
-        }
-        
-        // 计算减半征收减免税额（年应纳税所得额不超过200万元的部分减半征收）
-        const halvingThreshold = 2000000;
-        const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
-        const taxReduction = totalTaxBeforeHalving > 0 ? (halvingTaxable * applicableRate - applicableDeduction) * 0.5 : 0;
-        
-        // 计算实际应纳税额
-        const totalTax = Math.max(0, totalTaxBeforeHalving - taxReduction);
-        
-        // 计算应退/应补税额
-        const refundTax = totalTax - prepaidTax;
-        
-        // 计算税后经营所得
-        const netIncomeAfterTax = netIncomeAfterLoss - totalTax;
-        
-        // 计算可扣除的专项扣除（无综合所得时才允许扣除）
-        const deductibleSpecialDeduction = hasComprehensiveIncome ? 0 : specialDeductionTotal;
-        
-        // 计算总扣除额
-        const totalDeduction = investorDeduction + deductibleSpecialDeduction + specialAdditionalDeductionTotal + otherDeductionTotal;
-        
-        businessCalculationResults = {
-            incomeDetails: {
-                businessIncome,
-                businessCost,
-                businessExpenses,
-                businessTaxes,
-                businessLosses,
-                businessOtherExpenses,
-                businessPreviousLosses,
-                businessProfit
-            },
-            deductionDetails: {
-                hasComprehensiveIncome,
-                investorDeduction,
-                specialDeduction: {
-                    pensionInsurance,
-                    medicalInsurance,
-                    unemploymentInsurance,
-                    housingFund,
-                    total: specialDeductionTotal,
-                    deductible: deductibleSpecialDeduction
-                },
-                specialAdditionalDeduction: {
-                    childrenInfant: childrenInfantDeduction,
-                    elderly: elderlyDeduction,
-                    housing: housingDeduction,
-                    education: educationDeduction,
-                    medical: medicalDeduction,
-                    actualMedical: actualMedicalDeduction,
-                    total: specialAdditionalDeductionTotal
-                },
-                otherDeduction: {
-                    pension: pensionDeduction,
-                    enterpriseAnnuity,
-                    insurance: insuranceDeduction,
-                    charitableDonation,
-                    actualCharitableDonation,
-                    charitableDonationLimit,
-                    total: otherDeductionTotal
-                },
-                total: totalDeduction
-            },
-            taxDetails: {
-                netIncome: netIncomeAfterLoss,
-                taxableIncome,
-                applicableRate,
-                applicableDeduction,
-                totalTaxBeforeHalving,
-                taxReduction,
-                totalTax,
-                prepaidTax,
-                refundTax,
-                netIncomeAfterTax
-            },
-            calculationDate: new Date().toISOString()
-        };
+        businessCalculationResults = calculateBusinessTaxCore(readBusinessFormValues());
+
+        // 下面这段渲染代码沿用原有的局部变量名（从结果里取回），
+        // 保证抽内核前后**渲染逻辑一处未动**。
+        const t = businessCalculationResults.taxDetails;
+        const d = businessCalculationResults.deductionDetails;
+        const netIncomeAfterLoss = t.netIncome;
+        const taxableIncome = t.taxableIncome;
+        const applicableRate = t.applicableRate;
+        const applicableDeduction = t.applicableDeduction;
+        const taxReduction = t.taxReduction;
+        const totalTax = t.totalTax;
+        const prepaidTax = t.prepaidTax;
+        const refundTax = t.refundTax;
+        const totalDeduction = d.total;
+        const investorDeduction = d.investorDeduction;
+        const sd = d.specialDeduction;
+        const pensionInsurance = sd.pensionInsurance;
+        const medicalInsurance = sd.medicalInsurance;
+        const unemploymentInsurance = sd.unemploymentInsurance;
+        const housingFund = sd.housingFund;
+        const specialDeductionTotal = sd.total;
+        const sad = d.specialAdditionalDeduction;
+        const childrenInfantDeduction = sad.childrenInfant;
+        const elderlyDeduction = sad.elderly;
+        const housingDeduction = sad.housing;
+        const educationDeduction = sad.education;
+        const actualMedicalDeduction = sad.actualMedical;
+        const specialAdditionalDeductionTotal = sad.total;
+        const od = d.otherDeduction;
+        const pensionDeduction = od.pension;
+        const enterpriseAnnuity = od.enterpriseAnnuity;
+        const insuranceDeduction = od.insurance;
+        const actualCharitableDonation = od.actualCharitableDonation;
+        const otherDeductionTotal = od.total;
         
         safeSetTextContent('business-result-net-income', '¥' + netIncomeAfterLoss.toFixed(2));
         safeSetTextContent('business-result-taxable-income', '¥' + taxableIncome.toFixed(2));

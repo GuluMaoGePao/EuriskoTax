@@ -9,6 +9,10 @@ window.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('business-mode-btn').addEventListener('click', function() {
         console.log('%c[EuriskoTax] MODE → 选择"经营所得计税"模式', 'color: #1e40af; font-weight: bold;');
+        // 阶段17 17B-1：经营所得已迁到 spec 驱动的向导，首页这个模式按钮同走向导
+        // （向导不可用时才回退旧页面 —— 迁移期保留退路）
+        var W = window.EuriskoDeepWizard;
+        if (W && W.open('business')) return;
         showPage('business-calculation-page');
         showBusinessStep(1);
     });
