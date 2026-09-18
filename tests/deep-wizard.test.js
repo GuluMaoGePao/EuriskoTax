@@ -23,6 +23,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/surtax-stamp-quick.js');
     loadSource('src/js/calculation/corporate-income-tax-quick.js');
     loadSource('src/js/calculation/social-insurance-quick.js');
+    loadSource('src/js/calculation/disability-fund-quick.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
@@ -222,6 +223,39 @@ describe('多步向导：第四个税种（社保公积金）', () => {
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('social-base').compute({
             wage: 20000, socialAverage: 8000, housingRate: 12, specialMonthly: 0
+        });
+        expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
+    });
+});
+
+// 最后一个税种类别（残保金与工会经费，17C-5）：它的两步是「人数/工资总额 → 分档减缴」，
+// 字段比前面几个都少，但每一步都有 `when` 条件（按 variant 切换 levy / union 两套字段）——
+// 它能跑通说明向导对「选择器 + 条件字段」的组合是稳的，这一轮 6 类才算真的齐了。
+describe('多步向导：最后一个税种类别（残保金与工会经费）', () => {
+    test('第一步只问规模，分档减缴留给第二步', () => {
+        W().open('disability-fund-deep', { fresh: true });
+        expect(document.querySelector('.step-title.active').textContent).toBe('人数与工资总额');
+        expect(document.getElementById('qf-headcount')).toBeTruthy();
+        expect(document.getElementById('qf-disabled')).toBeFalsy();
+    });
+
+    test('改了人数再回来，规模步填的值仍在（分步填值不丢）', () => {
+        W().open('disability-fund-deep', { fresh: true });
+        document.getElementById('qf-headcount').value = '80';
+        document.getElementById('dw-next').click();     // → 分档减缴与封顶
+        document.getElementById('dw-prev').click();     // 回第 1 步
+        expect(document.getElementById('qf-headcount').value).toBe('80');
+    });
+
+    test('结果步与同源速算器一致', () => {
+        W().open('disability-fund-deep', { fresh: true });
+        document.getElementById('qf-headcount').value = '80';
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();     // → 结果
+        const shown = document.getElementById('deep-wizard-page').textContent;
+        const direct = R().get('disability-fund').compute({
+            variant: 'levy', headcount: 80, disabled: 0,
+            socialAverageMonthly: 8000, avgAnnualWage: 120000
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });

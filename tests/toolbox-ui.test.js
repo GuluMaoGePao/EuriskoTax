@@ -64,6 +64,7 @@ beforeEach(() => {
             <div id="toolbox-groups"></div>
             <div id="toolbox-deep">
                 <div class="mode-card" id="forward-mode-card"><button id="forward-mode-btn"></button></div>
+                <div id="toolbox-deep-extra" class="hidden"></div>
             </div>
         </div>
         <div id="quick-calculator-page" class="page hidden"></div>
@@ -115,9 +116,21 @@ describe('工具页', () => {
         expect(ids).toContain('net-salary');
     });
 
+    // 注意关键词：17C-5 之后「残保金」已有自己的完整测算，会命中 deep 组，不能再用它测「无命中」。
     test('搜索无命中时收起完整测算组（不把无关入口留在结果里）', () => {
-        window.EuriskoToolbox.renderToolbox('残保金');
+        window.EuriskoToolbox.renderToolbox('房产税');
         expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(true);
+    });
+
+    // 反过来的那条：deep 命中时必须露出，否则用户搜到了税种却看不到它的完整测算入口。
+    // spec 驱动的 deep 是动态渲染进 #toolbox-deep-extra 的（不在 index.html 里写死），
+    // 这条用例同时守住「新增 deep 不需要改 HTML 就能被搜到」这件事。
+    test('搜索命中完整测算时露出该组（残保金 → 残保金与工会经费）', () => {
+        window.EuriskoToolbox.renderToolbox('残保金');
+        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(false);
+        const ids = Array.from(document.querySelectorAll('#toolbox-deep [data-tool-id]'))
+            .map((el) => el.getAttribute('data-tool-id'));
+        expect(ids).toContain('disability-fund-deep');
     });
 });
 

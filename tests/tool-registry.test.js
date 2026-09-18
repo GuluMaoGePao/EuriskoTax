@@ -62,10 +62,11 @@ describe('工具注册表：数量与分组', () => {
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
         expect(pageBased).toHaveLength(4);   // 17B 完成后应归零
         // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、social-base-deep（17C-3）、
-        // surtax-stamp-deep（17C-4）：附加税的计税依据就是实缴增值税，所以它必须跟在 vat 之后 ——
-        // 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
+        // surtax-stamp-deep（17C-4）、disability-fund-deep（17C-5）：附加税的计税依据就是实缴增值税，
+        // 所以它必须跟在 vat 之后 —— 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
+        // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**。
         expect(specDriven).toEqual([
-            'corporate-income-tax-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
         ]);
     });
 
@@ -209,6 +210,33 @@ describe('工具注册表：App 内速算器（native）可用', () => {
         expect(row('全年单位缴纳')).toBeCloseTo(s.employerTotal * 12, 2);
         expect(row('企业全年用工成本（1 人）')).toBeCloseTo((15000 + s.employerTotal) * 12, 2);
         expect(row('员工全年到手')).toBeCloseTo(n.annualNet, 2);
+    });
+
+    // 残保金（17C-5）是唯一一个「临界点比公式更要命」的类别：
+    // 分档减缴是边际递减的（招到第 3 人可能一分钱都省不了），30 人又是临界点不是起征点。
+    // 这两件事光看一个应缴额都看不出来 —— 不量化就会被当成算错，钉在这里。
+    test('残保金：分档减缴边际递减，30 人临界点的跳变被量化出来', () => {
+        const df = R().get('disability-fund');
+        const base = {};
+        df.fields.forEach((f) => { base[f.key] = f.default; });
+        const r = df.compute(base);                 // 50 人、0 名残疾、社平 8000、年均工资 12 万
+        expect(r.error).toBeUndefined();
+
+        const Q = window.EuriskoDisabilityFundQuick;
+        const input = { headcount: 50, disabled: 0, socialAverageMonthly: 8000, avgAnnualWage: 120000 };
+        const row = (res, label) => res.rows.find((x) => x.label === label).value;
+
+        expect(row(r, '再招 1 名残疾人可省')).toBeCloseTo(Q.savingOf(input, 1).saving, 2);
+        expect(Q.savingOf(input, 1).saving).toBeGreaterThanOrEqual(Q.savingOf(input, 2).saving);
+
+        const small = df.compute(Object.assign({}, base, { headcount: 30 }));
+        expect(small.primary.value).toBe(0);
+        expect(row(small, '超过 30 人后（按 31 人）应缴'))
+            .toBeCloseTo(Q.levyOf(Object.assign({}, input, { headcount: 31 })).payable, 2);
+
+        // 工会经费：年度计提 → 月均，做预算要的是月均
+        const u = df.compute(Object.assign({}, base, { variant: 'union' }));
+        expect(row(u, '月均计提')).toBeCloseTo(5000000 * 0.02 / 12, 2);
     });
 
     test('增值税切换计税场景后仍能算（条件字段不影响求解）', () => {

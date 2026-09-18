@@ -209,7 +209,7 @@ EuriskoTax
 │   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张工具卡    │
 │ ─ #toolbox-deep 558「完整测算」静态 4 张 mode-card ──────────────── │
 │   · forward 566 │ business 578 │ classification 590 │ reverse 602   │
-│ ─ #toolbox-deep-extra 613 ← 阶段17 spec 驱动入口（现 2 张：vat / surtax）│
+│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 5 张：vat / cit / social / surtax / fee）│
 └──────────────────────────────────────────────────────────────────┘
 ```
 

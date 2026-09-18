@@ -98,6 +98,16 @@
             id: 'surtax-stamp-deep', name: '附加税与印花税', subtitle: '城建税 + 教育费附加 + 印花税，分步核计税依据',
             icon: 'fa-tags', status: 'deep',
             nextTools: ['vat', 'corporate-income-tax', 'business-income']
+        },
+        // 阶段17 17C-5：**最后一个税种类别**（§4.4 P2）。排在最后不是因为它不重要 ——
+        // 它低频但单次申报金额大，且它是唯一一个「临界点比公式更要命」的类别。
+        // 两步照抄 §4.4 给这类的形态（人数/工资总额 → 分档减缴 → 申报表），
+        // 它的「完整」在决策侧：不只给应缴额，还量化「再招 1 人省多少」与「超过 30 人后会跳出多少」。
+        // 至此按 tax-registry 的 6 类计，**每类都有完整测算**（页面式 4 个 + spec 驱动 5 个）。
+        {
+            id: 'disability-fund-deep', name: '残保金与工会经费', subtitle: '人数 / 工资总额 → 分档减缴 → 申报口径',
+            icon: 'fa-wheelchair', status: 'deep',
+            nextTools: ['employer-cost', 'social-base', 'corporate-income-tax']
         }
     ];
 
@@ -914,19 +924,28 @@
             group: 'social', icon: 'fa-wheelchair', status: 'native', seoPath: '/seo/disability-fund.html',
             policyKey: 'disability-fund',
             nextTools: ['employer-cost', 'social-base', 'corporate-income-tax'],
+            // 阶段17 分步编排（17A-1 / 17C-5）：`step` 引用下方 `steps` 的 key，与 vat / cit / social 同一套约定。
+            // 纯增量声明 —— 速算器页不读 steps，可见字段只是换了顺序（按步分组），值与口径不变。
+            // 两步直接照抄 §4.4 给这类的形态：「人数/工资总额 → 分档减缴 → 申报表」（第三步是结果步，
+            // 由渲染器自动追加）。顺序不能反：**规模没定就谈减免，等于拿 31 人的系数去套 300 人的盘子**。
             fields: [
-                { key: 'variant', label: '算哪一项', type: 'select', default: 'levy', options: [{ value: 'levy', label: '残疾人就业保障金' }, { value: 'union', label: '工会经费' }] },
-                { key: 'headcount', label: '在职职工人数', type: 'number', default: 50, min: 0, when: { key: 'variant', in: ['levy'] } },
-                { key: 'disabled', label: '已安排残疾人数', type: 'number', default: 0, min: 0, when: { key: 'variant', in: ['levy'] } },
-                { key: 'socialAverageMonthly', label: '当地社平工资（月）', type: 'money', default: 8000, when: { key: 'variant', in: ['levy'] }, hint: '年平均工资按社平 2 倍封顶' },
-                { key: 'avgAnnualWage', label: '本单位职工年平均工资', type: 'money', default: 120000, when: { key: 'variant', in: ['levy'] } },
-                { key: 'wageTotal', label: '全年工资总额', type: 'money', default: 5000000, when: { key: 'variant', in: ['union'] } },
-                { key: 'hasUnion', label: '已建立工会组织', type: 'switch', default: true, when: { key: 'variant', in: ['union'] }, hint: '建会：40% 上缴、60% 留存；未建会：全额上缴' }
+                { key: 'variant', step: 'scale', label: '算哪一项', type: 'select', default: 'levy', options: [{ value: 'levy', label: '残疾人就业保障金' }, { value: 'union', label: '工会经费' }] },
+                { key: 'headcount', step: 'scale', label: '在职职工人数', type: 'number', default: 50, min: 0, when: { key: 'variant', in: ['levy'] } },
+                { key: 'avgAnnualWage', step: 'scale', label: '本单位职工年平均工资', type: 'money', default: 120000, when: { key: 'variant', in: ['levy'] } },
+                { key: 'wageTotal', step: 'scale', label: '全年工资总额', type: 'money', default: 5000000, when: { key: 'variant', in: ['union'] }, hint: '统计口径：含奖金、津贴与加班工资，不含单位承担的社保公积金' },
+                { key: 'disabled', step: 'exempt', label: '已安排残疾人数', type: 'number', default: 0, min: 0, when: { key: 'variant', in: ['levy'] } },
+                { key: 'socialAverageMonthly', step: 'exempt', label: '当地社平工资（月）', type: 'money', default: 8000, when: { key: 'variant', in: ['levy'] }, hint: '年平均工资按社平 2 倍封顶' },
+                { key: 'hasUnion', step: 'exempt', label: '已建立工会组织', type: 'switch', default: true, when: { key: 'variant', in: ['union'] }, hint: '建会：40% 上缴、60% 留存；未建会：全额上缴' }
+            ],
+            steps: [
+                { key: 'scale', title: '人数与工资总额', why: '残保金看**上年在职职工人数**（30 人是临界点，31 人按全部 31 人算），工会经费看**全年工资总额** —— 两个数不是同一个口径，先把规模定下来' },
+                { key: 'exempt', title: '分档减缴与封顶', why: '实际安排比例决定**分档减缴**（≥1.5% 免征、≥1% 减半、<1% 按 90%）；计费工资按当地社平 **2 倍**封顶 —— 不是社保那个 300%' }
             ],
             pitfalls: [
                 '**30 人是临界点不是起征点**：31 人按全部 31 人算，不是只对超出的 1 人算',
                 '应安排人数按 1.5% 计算可能是小数（31 人 → 0.465 人），不要四舍五入',
-                '计费工资按当地社平 **2 倍**封顶（不是社保的 3 倍）'
+                '计费工资按当地社平 **2 倍**封顶（不是社保的 3 倍）',
+                '**第一个残疾人最值钱**：分档减缴是边际递减的，招到第 3 个人时可能一分钱都省不了'
             ],
             compute: function (v) {
                 var Q = window.EuriskoDisabilityFundQuick;
@@ -937,6 +956,8 @@
                         primary: { label: '应拨缴工会经费', value: u.fee, kind: 'money' },
                         rows: [
                             { label: '计提比例（工资总额）', value: u.rate, kind: 'percent' },
+                            // 工会经费是按年申报、按月计提的 —— 年度数算出来后，做预算要的是月均。
+                            { label: '月均计提', value: Math.round(u.fee / 12 * 100) / 100, kind: 'money', hint: '按 12 个月均摊，便于做月度预算' },
                             { label: '上缴上级工会', value: u.remitted, kind: 'money', hint: u.hasUnion ? '建会：40% 上缴' : '未建会：全额上缴' },
                             { label: '本单位留存', value: u.retained, kind: 'money' },
                             { label: '企业所得税扣除限额', value: u.limit, kind: 'money' },
@@ -946,24 +967,52 @@
                         note: '工会经费按工资总额 2% 计提；凭《工会经费收入专用收据》在不超过工资总额 2% 的范围内税前扣除。'
                     };
                 }
-                var r = Q.levyOf({
+                var levyInput = {
                     headcount: v.headcount,
                     disabled: v.disabled,
                     socialAverageMonthly: v.socialAverageMonthly,
                     avgAnnualWage: v.avgAnnualWage
+                };
+                var r = Q.levyOf(levyInput);
+                var rows = [
+                    { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text', hint: '人数 × 1.5%，保留小数' },
+                    { label: '缺口人数', value: r.gap.toFixed(2) + ' 人', kind: 'text' },
+                    { label: '实际安排比例', value: r.arrangedRatio, kind: 'percent' },
+                    { label: '计费工资（社平 2 倍封顶）', value: r.avgWageUsed, kind: 'money', hint: r.capped ? '已封顶，上限 ' + Math.round(r.wageCap) + ' 元/年' : '未触及封顶' },
+                    { label: '应缴费额（缺口 × 计费工资）', value: r.base, kind: 'money' },
+                    { label: '分档减缴系数', value: r.multiplier, kind: 'percent', hint: '安排比例 ≥1.5% 免征，≥1% 减半（0.5），<1% 按 0.9' },
+                    { label: '减缴前应缴', value: r.payableBeforeExempt, kind: 'money' },
+                    { label: '30 人以下暂免', value: r.smallExempt ? '是（在职 ' + r.headcount + ' 人）' : '否（在职 ' + r.headcount + ' 人）', kind: 'text' }
+                ];
+                // 「该不该再招一个残疾人」才是 HR 拿着这笔钱要做的事，而速算器只给一个应缴额 ——
+                // 分档减缴是边际递减的，招到第 3 个人时可能一分钱都省不了，不量化就会被当成算错。
+                var nextHire = Q.savingOf(levyInput, Math.floor(r.disabled) + 1);
+                rows.push({
+                    label: '再招 1 名残疾人可省',
+                    value: nextHire.saving,
+                    kind: 'money',
+                    hint: '第 ' + nextHire.index + ' 人：应缴 ' + (Math.round(nextHire.before * 100) / 100) + ' → ' + (Math.round(nextHire.after * 100) / 100)
                 });
+                var need = Math.max(0, Math.ceil(r.required - r.disabled - 1e-9));
+                rows.push({
+                    label: '补到免征还需招',
+                    value: need + ' 人',
+                    kind: 'text',
+                    hint: need > 0 ? '安排比例达到规定比例即免征，招满这 ' + need + ' 人后应缴为 0' : '已达免征比例'
+                });
+                if (r.smallExempt) {
+                    // 30 人是临界点不是起征点：多招 1 个普通人，这笔钱可能从 0 直接跳成一整年的数。
+                    var over = Q.levyOf(Object.assign({}, levyInput, { headcount: 31 }));
+                    rows.push({
+                        label: '超过 30 人后（按 31 人）应缴',
+                        value: over.payable,
+                        kind: 'money',
+                        hint: '临界点不是起征点：成本从 0 直接跳到这个数'
+                    });
+                }
                 return {
                     primary: { label: '应缴残疾人就业保障金', value: r.payable, kind: 'money' },
-                    rows: [
-                        { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text', hint: '人数 × 1.5%，保留小数' },
-                        { label: '缺口人数', value: r.gap.toFixed(2) + ' 人', kind: 'text' },
-                        { label: '实际安排比例', value: r.arrangedRatio, kind: 'percent' },
-                        { label: '计费工资（社平 2 倍封顶）', value: r.avgWageUsed, kind: 'money', hint: r.capped ? '已封顶，上限 ' + Math.round(r.wageCap) + ' 元/年' : '未触及封顶' },
-                        { label: '应缴费额（缺口 × 计费工资）', value: r.base, kind: 'money' },
-                        { label: '分档减缴系数', value: r.multiplier, kind: 'percent', hint: '安排比例 ≥1.5% 免征，≥1% 减半（0.5），<1% 按 0.9' },
-                        { label: '减缴前应缴', value: r.payableBeforeExempt, kind: 'money' },
-                        { label: '30 人以下暂免', value: r.smallExempt ? '是（在职 ' + r.headcount + ' 人）' : '否（在职 ' + r.headcount + ' 人）', kind: 'text' }
-                    ],
+                    rows: rows,
                     note: '残保金 =（应安排人数 − 已安排人数）× 上年在职职工年平均工资（按当地社平 2 倍封顶）× 分档系数；在职 30 人（含）以下暂免征收。'
                 };
             }
