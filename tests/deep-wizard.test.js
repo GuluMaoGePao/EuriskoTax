@@ -21,6 +21,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
+    loadSource('src/js/calculation/corporate-income-tax-quick.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
@@ -151,5 +152,43 @@ describe('多步向导：第二个税种（附加税与印花税）', () => {
         const text = document.getElementById('deep-wizard-page').textContent;
         expect(text).toContain('实际缴纳的增值税');
         expect(text).toContain('计税依据');       // step.why 渲染出来了
+    });
+});
+
+// 第三个税种（企业所得税，17C-2）：它的完整测算比速算器多一条「收入成本 → 纳税调整」路径，
+// 字段靠 mode 条件切换 —— 这条能跑通，说明「一条 spec 撑起一个比速算器更完整的测算」成立。
+describe('多步向导：第三个税种（企业所得税）', () => {
+    test('第一步只问身份与规模，利润相关的都留给第二步', () => {
+        W().open('corporate-income-tax-deep', { fresh: true });
+        expect(document.querySelector('.step-title.active').textContent).toBe('企业身份与规模');
+        expect(document.getElementById('qf-staff')).toBeTruthy();
+        expect(document.getElementById('qf-taxable')).toBeFalsy();
+    });
+
+    test('切到「从收入成本算」后，纳税调整字段出现、直接填的字段消失', () => {
+        W().open('corporate-income-tax-deep', { fresh: true });
+        document.getElementById('dw-next').click();              // → 利润与纳税调整
+        document.getElementById('qf-mode').value = 'adjust';
+        document.getElementById('qf-mode').dispatchEvent(new Event('change'));
+        expect(document.getElementById('qf-revenue')).toBeTruthy();
+        expect(document.getElementById('qf-entertainment')).toBeTruthy();
+        expect(document.getElementById('qf-taxable')).toBeFalsy();
+    });
+
+    test('结果步与同源速算器一致（走纳税调整路径）', () => {
+        W().open('corporate-income-tax-deep', { fresh: true });
+        document.getElementById('dw-next').click();
+        document.getElementById('qf-mode').value = 'adjust';
+        document.getElementById('qf-mode').dispatchEvent(new Event('change'));
+        document.getElementById('qf-revenue').value = '5000000';
+        document.getElementById('qf-cost').value = '4200000';
+        document.getElementById('dw-next').click();              // → 结果
+        const shown = document.getElementById('deep-wizard-page').textContent;
+        const direct = R().get('corporate-income-tax').compute({
+            mode: 'adjust', staff: 80, assetsWan: 3000, highTech: false, restricted: false,
+            revenue: 5000000, cost: 4200000, entertainment: 60000,
+            advertising: 200000, donation: 100000, previousLoss: 0
+        });
+        expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });
 });

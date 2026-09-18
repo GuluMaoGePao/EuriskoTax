@@ -55,15 +55,16 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（4 个页面式 + 2 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（4 个页面式 + 3 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         const pageBased = deep.filter((t) => !!t.pageId);   // forward / business / classification / reverse
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
         expect(pageBased).toHaveLength(4);   // 17B 完成后应归零
-        // vat-deep（17C-1）与 surtax-stamp-deep（17C-4）：后者跟着前者，因为附加税的计税依据
-        // 就是实缴增值税 —— 这两条是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
-        expect(specDriven).toEqual(['surtax-stamp-deep', 'vat-deep']);
+        // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、surtax-stamp-deep（17C-4）：
+        // 附加税的计税依据就是实缴增值税，所以它必须跟在 vat 之后 —— 这是 stage17 里
+        // 唯一不许反顺序做的一对华系，钉在这里防乱序施工。
+        expect(specDriven).toEqual(['corporate-income-tax-deep', 'surtax-stamp-deep', 'vat-deep']);
     });
 
     // 用测试钉住 17A-5 的硬约束：spec 驱动的完整测算**不许**自带一份 fields / compute，
@@ -158,6 +159,29 @@ describe('工具注册表：App 内速算器（native）可用', () => {
                 }
             });
         });
+    });
+
+    // 企业所得税的完整测算比速算器多一条「从收入成本算 + 纳税调整」的路径（17C-2）。
+    // 两条路径必须都算得出数 —— 申报表口径那条最容易坏在「调增写成调减」上，
+    // 符号错了税额反而变小，肉眼和用户都不会察觉，只能靠固定数值钉住。
+    test('企业所得税两种填法都能算（直接填 vs 收入成本纳税调整）', () => {
+        const cit = R().get('corporate-income-tax');
+        const base = {};
+        cit.fields.forEach((f) => { base[f.key] = f.default; });
+
+        const direct = cit.compute(Object.assign({}, base, { mode: 'direct', taxable: 2800000 }));
+        expect(direct.error).toBeUndefined();
+        expect(direct.primary.value).toBeCloseTo(140000, 2);   // 280 万 × 减按 25% 计入 × 20% = 14 万
+
+        const adjusted = cit.compute(Object.assign({}, base, {
+            mode: 'adjust', revenue: 5000000, cost: 4200000,
+            entertainment: 60000, advertising: 200000, donation: 100000, previousLoss: 0
+        }));
+        expect(adjusted.error).toBeUndefined();
+        // 会计利润 80 万：招待费可扣 min(6 万 × 60%, 500 万 × 5‰) = 2.5 万 → 调增 3.5 万；
+        // 广宣费 20 万 < 500 万 × 15% 不调增；捐赠 10 万 − 80 万 × 12% = 0.4 万调增。
+        expect(adjusted.rows.find((r) => r.label === '纳税调增合计').value).toBeCloseTo(39000, 2);
+        expect(adjusted.rows.find((r) => r.label === '应纳税所得额').value).toBeCloseTo(839000, 2);
     });
 
     test('增值税切换计税场景后仍能算（条件字段不影响求解）', () => {

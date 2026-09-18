@@ -75,6 +75,15 @@
             icon: 'fa-shopping-cart', status: 'deep',
             nextTools: ['surtax-stamp', 'corporate-income-tax', 'business-income']
         },
+        // 阶段17 17C-2：企业所得税的完整测算。与 vat 同为 §4.4 的 P0（B 端财务客群）。
+        // 排在 vat deep 之后、附加税之前 —— 卡片顺序就是施工优先级（P0 → P1 → P2）。
+        // 它的「完整」体现在第二步：速算器只认「年应纳税所得额」，完整测算多给一条
+        // 「从收入成本算 + 三大扣除限额纳税调整」的路径 —— 这才是申报表上的口径。
+        {
+            id: 'corporate-income-tax-deep', name: '企业所得税', subtitle: '小微 / 高新判定 + 纳税调整，分步出申报口径',
+            icon: 'fa-bank', status: 'deep',
+            nextTools: ['vat', 'surtax-stamp', 'business-income']
+        },
         // 阶段17 17C-4：附加税印花税的完整测算。排在 vat deep 之后 ——
         // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。
         {
@@ -981,35 +990,76 @@
             group: 'corp', icon: 'fa-bank', status: 'native', seoPath: '/seo/corporate-income-tax.html',
             policyKey: 'corporate-small-low-profit',
             nextTools: ['vat', 'surtax-stamp', 'employer-cost'],
+            // 阶段17 分步编排（17A-1 / 17C-2）：`step` 引用下方 `steps` 的 key，与 vat / surtax-stamp 同一套约定。
+            // 纯增量声明 —— 速算器页不读 steps，且默认 mode='direct' 时可见字段与改动前完全一致。
+            // 分步顺序把「身份与规模」排在「利润」之前：小微三条件是「且」的关系，
+            // 先知道自己够不够格，才知道后面填的利润按哪一档计税。
             fields: [
-                { key: 'taxable', label: '年应纳税所得额', type: 'money', default: 2800000 },
-                { key: 'staff', label: '从业人数', type: 'number', default: 80 },
-                { key: 'assetsWan', label: '资产总额（万元）', type: 'number', default: 3000 },
-                { key: 'highTech', label: '高新技术企业', type: 'switch', default: false },
-                { key: 'restricted', label: '属于限制/禁止行业', type: 'switch', default: false }
+                { key: 'staff', step: 'identity', label: '从业人数', type: 'number', default: 80 },
+                { key: 'assetsWan', step: 'identity', label: '资产总额（万元）', type: 'number', default: 3000 },
+                { key: 'highTech', step: 'identity', label: '高新技术企业', type: 'switch', default: false },
+                { key: 'restricted', step: 'identity', label: '属于限制/禁止行业', type: 'switch', default: false },
+                { key: 'mode', step: 'profit', label: '利润怎么填', type: 'select', default: 'direct', options: [{ value: 'direct', label: '直接填应纳税所得额' }, { value: 'adjust', label: '从收入成本算（含纳税调整）' }] },
+                { key: 'taxable', step: 'profit', label: '年应纳税所得额', type: 'money', default: 2800000, when: { key: 'mode', in: ['direct'] } },
+                { key: 'revenue', step: 'profit', label: '营业收入', type: 'money', default: 5000000, when: { key: 'mode', in: ['adjust'] } },
+                { key: 'cost', step: 'profit', label: '成本、费用、税金及损失', type: 'money', default: 4200000, when: { key: 'mode', in: ['adjust'] } },
+                { key: 'entertainment', step: 'profit', label: '业务招待费', type: 'money', default: 60000, when: { key: 'mode', in: ['adjust'] }, hint: '只能扣发生额的 60%，且不超过收入的 5‰' },
+                { key: 'advertising', step: 'profit', label: '广告费与业务宣传费', type: 'money', default: 200000, when: { key: 'mode', in: ['adjust'] }, hint: '不超过收入 15% 的部分可扣，超出结转以后年度' },
+                { key: 'donation', step: 'profit', label: '公益性捐赠支出', type: 'money', default: 100000, when: { key: 'mode', in: ['adjust'] }, hint: '不超过年度利润总额 12% 的部分可扣，超出结转三年' },
+                { key: 'previousLoss', step: 'profit', label: '可弥补以前年度亏损', type: 'money', default: 0, when: { key: 'mode', in: ['adjust'] } }
+            ],
+            steps: [
+                { key: 'identity', title: '企业身份与规模', why: '小微三个条件是「且」的关系（应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万）且非限制/禁止行业；高新 15% 与小微 5% 不叠加，按税额孰优' },
+                { key: 'profit', title: '利润与纳税调整', why: '企业所得税算的是**利润**不是收入：会计利润还要把超限额的业务招待费、广宣费、公益性捐赠**调增**回来，才是申报表上的应纳税所得额' }
             ],
             pitfalls: [
                 '小微实际税负 **5% 是乘出来的**（减按 25% 计入 × 20% 税率）',
                 '三个门槛是「**且**」的关系且是**临界点**：300 万交 15 万，301 万交 75.25 万 —— 多 1 万利润多缴 60.25 万税',
-                '高新 15% 与小微 5% **不叠加**，按孰优'
+                '高新 15% 与小微 5% **不叠加**，按孰优',
+                '纳税调整是**调增不是扣减**：超限额的业务招待费、广宣费、公益性捐赠要加回利润，直接按会计利润申报会少缴'
             ],
             compute: function (v) {
                 var C = window.EuriskoCorporateQuick;
                 if (!C) return null;
+                var taxable;
+                var adjust = null;
+                if (v.mode === 'adjust') {
+                    // 申报表口径：会计利润 → 三大扣除限额调增 → 弥补以前年度亏损 → 应纳税所得额。
+                    // 限额比例同样取自 tax-constants（deductionLimitOf），本文件不内置任何数字。
+                    var revenue = Number(v.revenue) || 0;
+                    var profit = Math.max(0, revenue - (Number(v.cost) || 0));
+                    adjust = C.deductionLimitOf({
+                        revenue: revenue, profit: profit,
+                        entertainment: v.entertainment, advertising: v.advertising, donation: v.donation
+                    });
+                    taxable = Math.max(0, adjust.adjustedProfit - (Number(v.previousLoss) || 0));
+                } else {
+                    taxable = Number(v.taxable) || 0;
+                }
                 var r = C.enterpriseOf({
-                    taxable: v.taxable,
+                    taxable: taxable,
                     staff: v.staff,
                     assets: (Number(v.assetsWan) || 0) * 10000,
                     highTech: !!v.highTech,
                     restricted: !!v.restricted
                 });
                 var regimeText = { small: '小型微利', highTech: '高新技术企业', general: '一般企业' }[r.regime] || r.regime;
-                var rows = [
-                    { label: '适用身份', value: regimeText, kind: 'text', hint: '按税额孰优选取；小微与高新不叠加' },
-                    { label: '实际税负率', value: r.effectiveRate, kind: 'percent' },
-                    { label: '按法定 25% 对照', value: r.statutoryTax, kind: 'money' },
-                    { label: '优惠减免', value: r.saving, kind: 'money' }
-                ];
+                var rows = [];
+                if (adjust) {
+                    // 调整明细放在最前面：用户先看到「我的会计利润怎么变成应纳税所得额的」，
+                    // 再看适用哪一档税率 —— 顺序反了会让人以为调增是税率的一部分。
+                    rows.push({ label: '会计利润（收入 − 成本费用）', value: adjust.profit, kind: 'money' });
+                    rows.push({ label: '业务招待费调增', value: adjust.entertainment.addBack, kind: 'money', hint: '发生额 60% 与收入 5‰ 孰低后的差额' });
+                    rows.push({ label: '广宣费调增', value: adjust.advertising.addBack, kind: 'money', hint: '超收入 15% 的部分，结转以后年度' });
+                    rows.push({ label: '公益性捐赠调增', value: adjust.donation.addBack, kind: 'money', hint: '超利润总额 12% 的部分，结转三年' });
+                    rows.push({ label: '纳税调增合计', value: adjust.totalAddBack, kind: 'money' });
+                    rows.push({ label: '弥补以前年度亏损', value: Math.min(Number(v.previousLoss) || 0, adjust.adjustedProfit), kind: 'money' });
+                }
+                rows.push({ label: '应纳税所得额', value: r.taxable, kind: 'money' });
+                rows.push({ label: '适用身份', value: regimeText, kind: 'text', hint: '按税额孰优选取；小微与高新不叠加' });
+                rows.push({ label: '实际税负率', value: r.effectiveRate, kind: 'percent' });
+                rows.push({ label: '按法定 25% 对照', value: r.statutoryTax, kind: 'money' });
+                rows.push({ label: '优惠减免', value: r.saving, kind: 'money' });
                 if (r.smallTax !== null) rows.push({ label: '小微口径税额', value: r.smallTax, kind: 'money' });
                 if (r.highTechTax !== null) rows.push({ label: '高新口径税额', value: r.highTechTax, kind: 'money' });
                 if (!r.qualified) {
@@ -1023,7 +1073,9 @@
                 return {
                     primary: { label: '应纳企业所得税', value: r.tax, kind: 'money' },
                     rows: rows,
-                    note: '小微优惠需同时满足：年应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万，且从事国家非限制和禁止行业（至 2027-12-31，以注册表状态为准）。'
+                    note: adjust
+                        ? '应纳税所得额 = 会计利润 + 纳税调增 − 可弥补亏损；三大限额（招待费 60% 与 5‰ 孰低、广宣费 15%、捐赠 12%）以注册表状态为准。'
+                        : '小微优惠需同时满足：年应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万，且从事国家非限制和禁止行业（至 2027-12-31，以注册表状态为准）。'
                 };
             }
         },
