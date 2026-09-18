@@ -676,12 +676,61 @@ function calculateTax() {
 }
 
 // 计算反向倒算扣除项
-function calculateReverseDeductions(inputData) {
+// 反向倒算「扣除项」涉及的字段 id（去掉 reverse- 前缀后的部分，页面与 spec 共用同一套键）
+const REVERSE_DEDUCTION_KEYS = [
+    'special-deduction-checkbox',
+    'special-additional-deduction-checkbox',
+    'other-deduction-checkbox',
+    'pension-insurance',
+    'medical-insurance',
+    'unemployment-insurance',
+    'housing-fund',
+    'children-infant-deduction',
+    'elderly-deduction',
+    'housing-type',
+    'rent-deduction',
+    'housing-loan-deduction',
+    'education-deduction',
+    'medical-deduction',
+    'education-professional-checkbox',
+    'pension-deduction-checkbox',
+    'pension-deduction',
+    'enterprise-annuity-checkbox',
+    'enterprise-annuity',
+    'insurance-other-deduction-checkbox',
+    'insurance-other-deduction',
+    'tax-deferred-pension-checkbox',
+    'tax-deferred-pension',
+    'charitable-donation-checkbox',
+    'charitable-donation'
+];
+
+// 17B-2：把旧页面里「一边读 DOM 一边算」的扣除逻辑拆开 —— 这里只负责读表，
+// 计算交给 calculateReverseDeductions(ded, workMonths)，spec 版向导可以直接喂自己的 values。
+function readReverseDeductionValues() {
+    const ded = {};
+    REVERSE_DEDUCTION_KEYS.forEach(function (key) {
+        const el = document.getElementById('reverse-' + key);
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            ded[key] = !!el.checked;
+        } else if (el.tagName === 'SELECT') {
+            ded[key] = el.value;
+        } else {
+            ded[key] = parseFloat(el.value) || 0;
+        }
+    });
+    return ded;
+}
+
+// 综合所得的反向倒算扣除汇总（纯函数：不读 DOM，ded 为「去前缀 id → 值」字典）
+function calculateReverseDeductions(ded, workMonths) {
+    ded = ded || {};
     const basicDeduction = 5000;
     
-    const isSpecialDeductionVisible = document.getElementById('reverse-special-deduction-checkbox')?.checked;
-    const isSpecialAdditionalDeductionVisible = document.getElementById('reverse-special-additional-deduction-checkbox')?.checked;
-    const isOtherDeductionVisible = document.getElementById('reverse-other-deduction-checkbox')?.checked;
+    const isSpecialDeductionVisible = !!ded['special-deduction-checkbox'];
+    const isSpecialAdditionalDeductionVisible = !!ded['special-additional-deduction-checkbox'];
+    const isOtherDeductionVisible = !!ded['other-deduction-checkbox'];
     
     let monthlyPensionInsurance = 0;
     let monthlyMedicalInsurance = 0;
@@ -689,10 +738,10 @@ function calculateReverseDeductions(inputData) {
     let monthlyHousingFund = 0;
     let specialDeduction = 0;
     if (isSpecialDeductionVisible) {
-        monthlyPensionInsurance = parseFloat(document.getElementById('reverse-pension-insurance')?.value) || 0;
-        monthlyMedicalInsurance = parseFloat(document.getElementById('reverse-medical-insurance')?.value) || 0;
-        monthlyUnemploymentInsurance = parseFloat(document.getElementById('reverse-unemployment-insurance')?.value) || 0;
-        monthlyHousingFund = parseFloat(document.getElementById('reverse-housing-fund')?.value) || 0;
+        monthlyPensionInsurance = ded['pension-insurance'] || 0;
+        monthlyMedicalInsurance = ded['medical-insurance'] || 0;
+        monthlyUnemploymentInsurance = ded['unemployment-insurance'] || 0;
+        monthlyHousingFund = ded['housing-fund'] || 0;
         specialDeduction = monthlyPensionInsurance + monthlyMedicalInsurance + 
             monthlyUnemploymentInsurance + monthlyHousingFund;
     }
@@ -708,26 +757,26 @@ function calculateReverseDeductions(inputData) {
     let monthlyEducationDeduction = 0;
     let specialAdditionalDeduction = 0;
     if (isSpecialAdditionalDeductionVisible) {
-        monthlyChildrenInfantDeduction = parseFloat(document.getElementById('reverse-children-infant-deduction')?.value) || 0;
-        monthlyElderlyDeduction = parseFloat(document.getElementById('reverse-elderly-deduction')?.value) || 0;
+        monthlyChildrenInfantDeduction = ded['children-infant-deduction'] || 0;
+        monthlyElderlyDeduction = ded['elderly-deduction'] || 0;
         
-        const housingType = document.getElementById('reverse-housing-type')?.value;
+        const housingType = ded['housing-type'];
         if (housingType === 'rent') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('reverse-rent-deduction')?.value) || 0;
+            monthlyHousingDeduction = ded['rent-deduction'] || 0;
         } else if (housingType === 'loan') {
-            monthlyHousingDeduction = parseFloat(document.getElementById('reverse-housing-loan-deduction')?.value) || 0;
+            monthlyHousingDeduction = ded['housing-loan-deduction'] || 0;
         }
 
-        annualEducationDeduction = parseFloat(document.getElementById('reverse-education-deduction')?.value) || 0;
-        medicalDeduction = parseFloat(document.getElementById('reverse-medical-deduction')?.value) || 0;
+        annualEducationDeduction = ded['education-deduction'] || 0;
+        medicalDeduction = ded['medical-deduction'] || 0;
         actualMedicalDeduction = medicalDeduction > 15000 ? Math.min(medicalDeduction - 15000, 80000) : 0;
         
-        if (document.getElementById('reverse-education-professional-checkbox')?.checked) {
+        if (ded['education-professional-checkbox']) {
             annualProfessionalDeduction = 3600;
         }
         
         educationDegreeAmount = annualEducationDeduction - annualProfessionalDeduction;
-        monthlyEducationDeduction = educationDegreeAmount / inputData.workMonths;
+        monthlyEducationDeduction = educationDegreeAmount / workMonths;
         specialAdditionalDeduction = monthlyChildrenInfantDeduction + monthlyElderlyDeduction + 
             monthlyHousingDeduction + monthlyEducationDeduction;
     }
@@ -737,32 +786,22 @@ function calculateReverseDeductions(inputData) {
     let monthlyInsuranceOtherDeduction = 0;
     let monthlyTaxDeferredPension = 0;
     let otherDeduction = 0;
-    const isPensionDeductionChecked = isOtherDeductionVisible && 
-        document.getElementById('reverse-pension-deduction-checkbox')?.checked;
-    monthlyPensionDeduction = isPensionDeductionChecked ? 
-        (parseFloat(document.getElementById('reverse-pension-deduction')?.value) || 0) : 0;
-    const isEnterpriseAnnuityChecked = isOtherDeductionVisible && 
-        document.getElementById('reverse-enterprise-annuity-checkbox')?.checked;
-    monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? 
-        (parseFloat(document.getElementById('reverse-enterprise-annuity')?.value) || 0) : 0;
-    const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && 
-        document.getElementById('reverse-insurance-other-deduction-checkbox')?.checked;
-    monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? 
-        (parseFloat(document.getElementById('reverse-insurance-other-deduction')?.value) || 0) : 0;
-    const isTaxDeferredPensionChecked = isOtherDeductionVisible && 
-        document.getElementById('reverse-tax-deferred-pension-checkbox')?.checked;
-    monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? 
-        (parseFloat(document.getElementById('reverse-tax-deferred-pension')?.value) || 0) : 0;
+    const isPensionDeductionChecked = isOtherDeductionVisible && !!ded['pension-deduction-checkbox'];
+    monthlyPensionDeduction = isPensionDeductionChecked ? (ded['pension-deduction'] || 0) : 0;
+    const isEnterpriseAnnuityChecked = isOtherDeductionVisible && !!ded['enterprise-annuity-checkbox'];
+    monthlyEnterpriseAnnuity = isEnterpriseAnnuityChecked ? (ded['enterprise-annuity'] || 0) : 0;
+    const isInsuranceOtherDeductionChecked = isOtherDeductionVisible && !!ded['insurance-other-deduction-checkbox'];
+    monthlyInsuranceOtherDeduction = isInsuranceOtherDeductionChecked ? (ded['insurance-other-deduction'] || 0) : 0;
+    const isTaxDeferredPensionChecked = isOtherDeductionVisible && !!ded['tax-deferred-pension-checkbox'];
+    monthlyTaxDeferredPension = isTaxDeferredPensionChecked ? (ded['tax-deferred-pension'] || 0) : 0;
     otherDeduction = monthlyPensionDeduction + monthlyEnterpriseAnnuity + 
         monthlyInsuranceOtherDeduction + monthlyTaxDeferredPension;
     
     const monthlyTotalDeduction = basicDeduction + specialDeduction + specialAdditionalDeduction + otherDeduction;
     
-    const isCharitableDonationChecked = isOtherDeductionVisible && 
-        document.getElementById('reverse-charitable-donation-checkbox')?.checked;
-    const annualCharitableDonation = isCharitableDonationChecked ? 
-        (parseFloat(document.getElementById('reverse-charitable-donation')?.value) || 0) : 0;
-    const totalDeduction = monthlyTotalDeduction * inputData.workMonths + annualProfessionalDeduction + 
+    const isCharitableDonationChecked = isOtherDeductionVisible && !!ded['charitable-donation-checkbox'];
+    const annualCharitableDonation = isCharitableDonationChecked ? (ded['charitable-donation'] || 0) : 0;
+    const totalDeduction = monthlyTotalDeduction * workMonths + annualProfessionalDeduction + 
         actualMedicalDeduction + annualCharitableDonation;
     
     return {
@@ -786,10 +825,10 @@ function calculateReverseDeductions(inputData) {
         monthlyTaxDeferredPension,
         annualCharitableDonation,
         monthlySpecialAdditionalTotal: specialAdditionalDeduction,
-        annualSpecialAdditionalTotal: specialAdditionalDeduction * inputData.workMonths + annualProfessionalDeduction + actualMedicalDeduction,
-        annualOtherDeductionTotal: otherDeduction * inputData.workMonths + annualCharitableDonation,
+        annualSpecialAdditionalTotal: specialAdditionalDeduction * workMonths + annualProfessionalDeduction + actualMedicalDeduction,
+        annualOtherDeductionTotal: otherDeduction * workMonths + annualCharitableDonation,
         monthlyInsuranceDeduction: specialDeduction,
-        annualSpecialDeductionTotal: specialDeduction * inputData.workMonths,
+        annualSpecialDeductionTotal: specialDeduction * workMonths,
         basicDeduction,
         specialDeduction,
         specialAdditionalDeduction,
@@ -1359,17 +1398,14 @@ function calculateFromTargetTax(inputData, deductionData, bonusTax, mode = 'bala
     }
 }
 
-// 反向倒算主函数
-function calculateReverseTax() {
-    try {
-        const inputData = collectReverseInputData();
-        
-        let deductionData;
-        if (inputData.incomeType === 'business') {
-            deductionData = calculateBusinessReverseDeductions(inputData);
-        } else {
-            deductionData = calculateReverseDeductions(inputData);
-        }
+// 反向倒算内核：不读 DOM。inputData 见 collectReverseInputData 的 8 个字段，
+// ded 为「去前缀 id → 值」字典（见 readReverseDeductionValues）。
+// 三个逆推入口（目标税负率 / 月度到手 / 固定税额或到手）× 三种口径（保守/均衡/激进）都在这里分派。
+// 注：incomeType==='business' 分支仍由旧的实际函数读表 —— spec 版不含经营所得，会随旧页面一并删除。
+function calculateReverseTaxCore(inputData, ded) {
+        const deductionData = inputData.incomeType === 'business'
+            ? calculateBusinessReverseDeductions(inputData)
+            : calculateReverseDeductions(ded, inputData.workMonths);
         
         let result;
         let allModeResults = {}; // 存储三种模式的结果
@@ -1452,9 +1488,23 @@ function calculateReverseTax() {
             }
         }
         
+        return {
+            result: result,
+            deductionData: deductionData,
+            bonusTax: bonusTax,
+            allModeResults: allModeResults
+        };
+}
+
+// 反向倒算主函数（页面版：读 DOM → 调内核 → 写结果区）
+function calculateReverseTax() {
+    try {
+        const inputData = collectReverseInputData();
+        const core = calculateReverseTaxCore(inputData, readReverseDeductionValues());
+        
         // 保存结果（包含所有模式的结果和用户选择的模式）
-        saveReverseCalculationResult(result, inputData, deductionData, bonusTax, allModeResults);
-        updateReverseResultDisplay(result);
+        saveReverseCalculationResult(core.result, inputData, core.deductionData, core.bonusTax, core.allModeResults);
+        updateReverseResultDisplay(core.result);
         
     } catch (error) {
         console.error('反向倒算计算过程中出现错误:', error);
