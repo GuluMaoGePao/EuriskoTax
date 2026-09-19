@@ -62,7 +62,11 @@
         // 麻烦的是**两个工具共用同一个容器 id**，而模板还不一样：经营所得 → income，
         // 反向倒算（谈薪）→ negotiation。于是按工具再分一路，键写作 `容器:工具Id`，
         // 由 sourceKey() 读活节点的 data-tool-id 落到对应那一份。
-        'dw-result-card': {
+        // 阶段18-3（v1.73.0）：这一份原先挂在裸键 'dw-result-card' 上，兼作「认不出时的兜底」——
+        // 于是其余 17 个完整测算的取数都会落到这里，而它的 selector 写死 business，读到的自然是
+        // 空，用户刚算完却看到「暂无可分享的结果」。兜底改由下面的 genericConfig 承担（按卡上
+        // 的 data-tool-id 现场取数），这一份回归它本来的身份：经营所得那一路。
+        'dw-result-card:business': {
             template: 'income',
             title: '经营所得年度汇算',
             hero: { selector: '#dw-result-card[data-tool-id="business"] #dw-result-primary', label: '应纳个人所得税' },
@@ -119,6 +123,55 @@
         return SOURCES[scoped] ? scoped : containerId;
     }
 
+    // 阶段18-3（v1.73.0）：21 个完整测算共用同一张结果卡，而手写的取数配置只有阶段17 逐个迁移
+    // 的那 4 份。其余 17 个算完点「生成分享图」时，sourceKey 认不出就退回裸键，裸键的 selector
+    // 指向另一个工具，读到的自然是空 —— 用户看到「暂无可分享的结果…请先完成一次测算」，
+    // 而保存与导出都是好的（与阶段18-2 的历史查看同一个病：按名字认人的表，每加一种形态就漏
+    // 一批）。与其每加一个测算就补一份配置（漏一个就静默失败），不如给 spec 驱动的向导一份
+    // **通用取数**：主结果是 #dw-result-primary，明细照卡上的 data-dw-row 抄前几行，
+    // 标题取注册表里的工具名。手写那 4 份仍在 —— 它们是挑过行的（分类所得取的是实际税负率
+    // 而不是适用税率），通用取数只会照卡上顺序抄。
+    var GENERIC_ROW_LIMIT = 3;
+
+    function rowsFromCard(card, scoped) {
+        var rows = [];
+        if (!card) return rows;
+        var nodes = card.querySelectorAll('[data-dw-row]');
+        for (var i = 0; i < nodes.length && rows.length < GENERIC_ROW_LIMIT; i++) {
+            var label = nodes[i].getAttribute('data-dw-row');
+            // 行标签要拼进属性选择器，带引号会把选择器撑坏 —— 宁可少一行，也不出半张图
+            if (!label || String(label).indexOf('"') !== -1) continue;
+            rows.push({ label: label, selector: scoped + ' [data-dw-row="' + label + '"]' });
+        }
+        return rows;
+    }
+
+    function genericConfig(containerId) {
+        var el = document.getElementById(containerId);
+        var toolId = el && el.getAttribute('data-tool-id');
+        if (!toolId) return null;
+        var reg = window.EuriskoToolRegistry;
+        var tool = reg && typeof reg.get === 'function' ? reg.get(toolId) : null;
+        var scoped = '#' + containerId + '[data-tool-id="' + toolId + '"]';
+        return {
+            // 谈薪卡的口径是「税前该谈多少」，与 income 那张完全不同 —— 这一路是手写的，
+            // 通用取数也必须尊重这个分流，否则谈薪会被写成一张正向结果卡。
+            template: toolId === 'reverse' ? 'negotiation' : 'income',
+            title: (tool && tool.name) ? tool.name : toolId,
+            hero: {
+                selector: scoped + ' #dw-result-primary',
+                label: readText(scoped + ' #dw-result-primary-label') || '测算结果'
+            },
+            rows: rowsFromCard(el, scoped)
+        };
+    }
+
+    // 解析顺序不能反：先认「容器 + 工具」的手写配置（挑过行），再回落到通用取数。
+    function resolveConfig(rawContainerId) {
+        var key = sourceKey(rawContainerId);
+        return SOURCES[key] || genericConfig(rawContainerId);
+    }
+
     // 模板文案：如实描述功能，不承诺收益（合规红线）。
     // 「微信扫码」这一步的指引放在二维码旁固定展示，文案本身只说价值，避免同一句话重复两遍。
     var TEMPLATE_TEXT = {
@@ -150,6 +203,18 @@
         return node ? String(node.textContent || '').trim() : '';
     }
 
+    // 明细行的值：向导把「标签」和「值」渲染在**同一个节点**里
+    // （'<div data-dw-row="适用税率"><span>适用税率</span><span>20%</span></div>'），
+    // 照 textContent 整取会把标签一起带进图上（「适用税率20%」）—— 与 lead-context.js 同一处坑，
+    // 那里也是取最后一个 span。值 span 恒在最后，不依赖 class，也不要求每行都有标签。
+    function readCell(selector) {
+        var node = document.querySelector(selector);
+        if (!node) return '';
+        var spans = node.querySelectorAll('span');
+        var value = spans.length ? spans[spans.length - 1] : node;
+        return String(value.textContent || '').trim();
+    }
+
     // 取数：hero 必须有效，否则视为「尚未测算」而拒绝出图 ——
     // 生成一张写着 ¥0 的分享图比不出图更伤品牌
     function collect(cfg) {
@@ -158,7 +223,7 @@
 
         var rows = [];
         (cfg.rows || []).forEach(function (row) {
-            var value = readText(row.selector);
+            var value = readCell(row.selector);
             if (isMeaningful(value)) rows.push({ label: row.label, value: value });
         });
 
@@ -415,7 +480,7 @@
     // 静默 return 是最坏的选择：用户只会说「点了没反应」，排查时无从下手。
     function generate(rawContainerId) {
         var containerId = sourceKey(rawContainerId);
-        var cfg = SOURCES[containerId];
+        var cfg = resolveConfig(rawContainerId);
         if (!cfg) {
             console.warn('[ShareCard] 未识别的结果容器，无法生成分享图:', containerId);
             showToast('生成失败：未识别的结果类型，请刷新页面后重试');
@@ -524,6 +589,7 @@
         SHARE_IMAGE_WIDTH: SHARE_IMAGE_WIDTH,
         DISCLAIMER: DISCLAIMER,
         sourceKey: sourceKey,
+        resolveConfig: resolveConfig,   // 测试与排查用：看「这一次到底按哪一份配置出图」
         buildHtml: buildHtml,
         collect: collect,
         generate: generate,

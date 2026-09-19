@@ -35,7 +35,9 @@ describe('阶段13D 分享图 - 模板分流', () => {
         // 四个迁移工具（business / reverse / forward / classification）共用 dw-result-card，
         // 全靠 `:toolId` 后缀分家 —— 少划一路就会退到兜底那份 business 的配置上，把某一路的
         // 分享图截成「应纳个人所得税」这种张冠李戴的标题。
-        ['dw-result-card:forward', 'dw-result-card:classification', 'dw-result-card'].forEach((id) => {
+        // 18-3（v1.73.0）：business 那份原先挂在裸键 'dw-result-card' 上兼作兜底，现已改为
+        // 'dw-result-card:business'，兜底交给按卡现场取数的通用配置（见下一条用例）。
+        ['dw-result-card:forward', 'dw-result-card:classification', 'dw-result-card:business'].forEach((id) => {
             expect(ShareCard.SOURCES[id].template).toBe('income');
         });
     });
@@ -43,7 +45,9 @@ describe('阶段13D 分享图 - 模板分流', () => {
     test('触发器覆盖全部结果容器（新增结果页漏配 = 那个页面没有分享出口）', () => {
         // `容器:工具Id` 是**同一容器按工具再分的一路**（两个 spec 工具共用 dw-result-card），
         // 它不是一个独立的触发目标 —— 触发按钮还是那一个 dw-next。
-        const own = Object.keys(ShareCard.SOURCES).filter((k) => k.indexOf(':') === -1);
+        // 18-3：配置键统一成 `容器:工具Id`（business 那份原先是裸键），所以「容器」要按
+        // 冒号前那一段去重来看 —— 一个容器对应一颗触发按钮，与它下面挂了几路工具无关。
+        const own = Array.from(new Set(Object.keys(ShareCard.SOURCES).map((k) => k.split(':')[0])));
         expect(ShareCard.TRIGGERS.map((t) => t.containerId).sort()).toEqual(own.sort());
     });
 
@@ -63,11 +67,13 @@ describe('阶段13D 分享图 - 模板分流', () => {
         expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card:reverse');
 
         document.getElementById('dw-result-card').setAttribute('data-tool-id', 'business');
-        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card:business');
 
-        // 别的工具（没有配过分享图的那几路）退回默认那一份，而不是认不出
+        // 18-3：别的工具（没手写配置的那 17 路）**不再退回 business 那一份** —— 表里确实没有
+        // 这一路，但取数要按卡上的 data-tool-id 现场生成，否则「算的是增值税、图上是经营所得」
         document.getElementById('dw-result-card').setAttribute('data-tool-id', 'vat-deep');
         expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card');
+        expect(ShareCard.resolveConfig('dw-result-card').hero.selector).toContain('data-tool-id="vat-deep"');
         // 页面式容器的 id 不被这条分流逻辑改口
         expect(ShareCard.sourceKey('step-result')).toBe('step-result');
     });

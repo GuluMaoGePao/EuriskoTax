@@ -435,7 +435,9 @@
         }
 
         return '<div class="card" id="dw-result-card" data-tool-id="' + esc(state.toolId) + '">' +
-                '<div class="text-sm text-gray-600">' + esc(view.primary.label) + '</div>' +
+                // 阶段18-3：主结果的**含义**（如「应纳个人所得税」）此前只能靠第一个 .text-sm 去猜，
+                // 分享图取数时没有锚点可用。给它一个 id，通用取数就能照抄真实口径，而不是写死文案。
+                '<div class="text-sm text-gray-600" id="dw-result-primary-label">' + esc(view.primary.label) + '</div>' +
                 '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(view.primary.value, view.primary.kind)) + '</div>' +
                 (view.compare ? compareHtml(view.compare) : '') +
                 '<div class="mt-4">' + rows + '</div>' +
