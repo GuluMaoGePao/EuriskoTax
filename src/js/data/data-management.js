@@ -239,60 +239,46 @@ function loadHistoryRecords() {
 }
 
 // 查看历史记录
+//
+// 阶段18-2（v1.72.0）：这里原本是一串按 record.type 写的 else-if —— 每迁移一个页面式 deep
+// 就地加一条（business / classification / reverse / forward）。后果是**只认这 4 个**：
+// 20 个速算器保存时 type 写的是 'quick'（toolbox-ui.js 的 saveToHistory），其余 17 个完整测算
+// 保存时 type 是各自的 tool.id（tax-calculator.js 的 saveToHistory 第二参），两者都落到最后
+// 那个 else，弹「这条记录没有对应的测算入口，可能来自更新的版本」—— 用户刚在本版保存的，
+// 却被告知可能来自更新的版本。而保存本身一直是好的，所以没人发现看不了。
+//
+// 改为**按注册表统一分发**：存的时候记下 toolId，看的时候按 toolId 决定开速算器还是开向导，
+// 并把这条记录的输入一起带过去（此前打开的是向导草稿，点老记录会看到最近一次算的东西）。
 function viewHistoryRecord(id) {
-    const record = calculationHistory.find(item => item.id === id);
+    const record = calculationHistory.find(item => String(item.id) === String(id));
     if (!record) return;
-    
-    // 根据记录类型切换到相应页面
-    if (record.type === 'business') {
-        // 阶段17 17B-1（v1.47.0）：经营所得已迁到 spec 驱动的向导，旧页面整页删掉了 ——
-        // 不再回填那 23 个 DOM。打开向导即可续算（向导自带草稿，会接着上次的输入继续）。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('business')) {
-            showAlert('已打开经营所得测算；向导会接着上次的输入继续。');
-            return;
-        }
-        showAlert('经营所得测算暂不可用，请刷新页面后重试。');
+
+    // 两种保存实现记的位置不同：速算器记在记录顶层，完整测算记在 results 里
+    var toolId = record.toolId || (record.results && record.results.toolId) || record.type;
+    var values = record.values || (record.results && record.results.values) || null;
+
+    // 老数据兼容：页面式时代存下的 type 是流程英文名。comprehensive 是云同步协议里 forward
+    // 的别名（history-sync 上行时映射），拉回来的云端记录必须能走同一条路。
+    if (toolId === 'comprehensive') toolId = 'forward';
+
+    var reg = window.EuriskoToolRegistry;
+    var tool = reg && typeof reg.get === 'function' ? reg.get(toolId) : null;
+
+    if (tool && tool.status === 'deep' && window.EuriskoDeepWizard && window.EuriskoDeepWizard.has(tool)) {
+        window.EuriskoDeepWizard.open(toolId, { values: values });
+        // 老记录没有 values（那时存的是页面自己的字段），此时仍是「打开向导接着算」
+        showAlert(values ? '已打开「' + tool.name + '」，并载入这条记录的输入。'
+                         : '已打开「' + tool.name + '」；向导会接着上次的输入继续。');
         return;
-    } else if (record.type === 'classification') {
-        // 阶段17 17B-4（v1.50.0）：分类所得也迁到了 spec 驱动的向导，旧页面整页删掉了 ——
-        // 原先这里回填的是那一份 DOM（条目列表、结果区、计税表、类型分布饼图），
-        // 现在与 business / reverse / forward 同为一套处理：打开向导续算，草稿会接着上次的输入。
-        // 历史里的旧记录仍然能读：**「看得见列表」和「能续着算」是两件事**，后者靠向导草稿，不靠回填。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('classification')) {
-            showAlert('已打开分类所得测算；向导会接着上次的输入继续。');
-            return;
-        }
-        showAlert('分类所得测算暂不可用，请刷新页面后重试。');
-        return;
-    } else if (record.type === 'reverse') {
-        // 阶段17 17B-2（v1.48.0）：与 business 同款处理 —— 旧页面整页删掉了，
-        // 不再回填那一屏 DOM（数量比 business 还多：反算目标、三种口径、两级扣除勾选）。
-        // 打开向导即可续算：向导自带草稿，会接着上次的输入继续。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('reverse')) {
-            showAlert('已打开反向倒算测算；向导会接着上次的输入继续。');
-            return;
-        }
-        showAlert('反向倒算测算暂不可用，请刷新页面后重试。');
-        return;
-    } else if (record.type === 'forward' || record.type === 'comprehensive') {
-        // 阶段17 17B-3（v1.49.0）：与 business / reverse 同款处理 —— 综合所得整页删掉了，
-        // 不再回填那二十来个 DOM（逐年参数的 DOM 比经营所得还碎）。打开向导即可续算：
-        // 向导自带草稿，会接着上次的输入继续。comprehensive 是云同步协议里的同一个类型
-        // （history-sync 上行时把 forward 映射成它），拉回来的云端记录必须能走同一条路。
-        W = window.EuriskoDeepWizard;
-        if (W && W.open('forward')) {
-            showAlert('已打开综合所得测算；向导会接着上次的输入继续。');
-            return;
-        }
-        showAlert('综合所得测算暂不可用，请刷新页面后重试。');
-        return;
-    } else {
-        // 未知类型：宁可说清楚也不猜 —— 猜错会把人扔到一个不相关的页面里。
-        showAlert('这条记录没有对应的测算入口，可能来自更新的版本。');
     }
+
+    if (tool && window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+        window.EuriskoToolbox.openTool(toolId, { values: values });
+        return;
+    }
+
+    // 认不出：宁可说清楚也不猜 —— 猜错会把人扔到一个不相关的页面里。
+    showAlert('这条记录没有对应的测算入口，可能来自更新的版本。');
 }
 
 // 删除历史记录

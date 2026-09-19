@@ -311,9 +311,10 @@
     }
 
     // ====== 打开工具 ======
-    function openTool(id) {
+    function openTool(id, opts) {
         var tool = R().get(id);
         if (!tool) return;
+        opts = opts || {};
         pushRecent(id);
 
         if (tool.status === 'deep') {
@@ -322,7 +323,7 @@
             // mode-btn —— business 迁移后若仍走 business-mode-btn，卡片点下去会被带回旧页面。
             // W.has 只对 spec 驱动的返回 true（其余 3 个 deep 有 pageId，不受影响）。
             var W = window.EuriskoDeepWizard;
-            if (W && W.has(tool) && W.open(tool.id)) return;
+            if (W && W.has(tool) && W.open(tool.id, { values: opts.values })) return;
             // 原有深度流程：复用工具页那张卡片里的隐藏按钮，保证与既有初始化逻辑完全一致
             var btn = document.getElementById(tool.id + '-mode-btn');
             if (btn) { btn.click(); return; }
@@ -335,11 +336,14 @@
             window.open(tool.seoPath + '?source=app_toolbox', '_blank');
             return;
         }
-        renderQuickPage(tool);
+        renderQuickPage(tool, opts.values);
         showPageFn('quick-calculator-page');
     }
 
     // ====== 通用速算器页 ======
+    // 从历史记录打开时带进来的那一份输入（阶段18-2）：只服务于速算器这一页，换工具即作废
+    var quickSeed = null;
+
     function visibleFields(tool, values) {
         return (tool.fields || []).filter(function (f) {
             if (!f.when) return true;
@@ -347,20 +351,23 @@
         });
     }
 
-    function fieldHtml(f) {
+    // values 可选：给「回填一份已有输入」用（阶段18-2 从历史记录打开）。不传就是原行为 ——
+    // 用 spec 声明的 default。deep-wizard-ui.js 复用这一个函数渲染字段，第二参缺省即不受影响。
+    function fieldHtml(f, values) {
+        var cur = values && values[f.key] !== undefined ? values[f.key] : f.default;
         var id = 'qf-' + f.key;
         var hint = f.hint ? '<div class="tool-field-hint">' + esc(f.hint) + '</div>' : '';
         var input = '';
         if (f.type === 'select') {
             input = '<select id="' + id + '" class="tool-input">' + f.options.map(function (o) {
-                return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(f.default) ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+                return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>';
             }).join('') + '</select>';
         } else if (f.type === 'switch') {
-            input = '<label class="tool-switch"><input type="checkbox" id="' + id + '"' + (f.default ? ' checked' : '') + '><span>' + (f.default ? '是' : '否') + '</span></label>';
+            input = '<label class="tool-switch"><input type="checkbox" id="' + id + '"' + (cur ? ' checked' : '') + '><span>' + (cur ? '是' : '否') + '</span></label>';
         } else if (f.type === 'percent') {
-            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(f.default) + '" step="0.1" min="0"><span class="tool-input-unit">%</span></div>';
+            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" step="0.1" min="0"><span class="tool-input-unit">%</span></div>';
         } else {
-            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(f.default) + '"' +
+            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '"' +
                 (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>' +
                 '<span class="tool-input-unit">' + (f.type === 'money' ? '元' : '') + '</span></div>';
         }
@@ -519,7 +526,10 @@
         }
     }
 
-    function renderQuickPage(tool) {
+    // seed 可选：一份已有输入（阶段18-2 从历史记录打开时带来）。表单按它渲染而不是按 default，
+    // 否则「保存 → 查看」这条路上，用户看到的是一份全新的默认值 —— 保存等于白存。
+    function renderQuickPage(tool, seed) {
+        quickSeed = seed || null;
         var titleEl = document.getElementById('quick-title');
         var subEl = document.getElementById('quick-subtitle');
         var badgeEl = document.getElementById('quick-policy-badge');
@@ -546,7 +556,10 @@
 
         function build() {
             var values = readValues(tool);
-            formEl.innerHTML = visibleFields(tool, values).map(fieldHtml).join('');
+            if (quickSeed) {
+                Object.keys(quickSeed).forEach(function (k) { values[k] = quickSeed[k]; });
+            }
+            formEl.innerHTML = visibleFields(tool, values).map(function (f) { return fieldHtml(f, values); }).join('');
             formEl.querySelectorAll('input, select').forEach(function (el) {
                 el.addEventListener('input', function () {
                     // 条件字段变化时需要重建表单（如切换增值税计税场景）

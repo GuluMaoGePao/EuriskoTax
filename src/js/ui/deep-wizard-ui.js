@@ -818,8 +818,17 @@
         state.values = defaultsOf(tool);
         state.stepIndex = 0;
         state.compareKey = null;   // 换工具就是换测算，不该沿用上一次挑的口径
-        // 断点续算：有没填完的草稿就接着填，不让用户从头再来
-        if (!opts.fresh) {
+        if (opts.values) {
+            // 阶段18-2（v1.72.0）：从历史记录「查看」进来 —— 带进来的是**那一条记录**的输入，
+            // 不是草稿。此前只能打开向导、由草稿决定显示什么，于是「点一条老记录看到的是
+            // 最近一次算的东西」—— 只有一份输入时两者恰好一样，所以一直没被发现。
+            // 传了 values 就直接落到结果步：点历史记录是想看结果，不是想重新填一遍。
+            state.values = {};
+            Object.keys(defaultsOf(tool)).forEach(function (k) { state.values[k] = defaultsOf(tool)[k]; });
+            Object.keys(opts.values).forEach(function (k) { state.values[k] = opts.values[k]; });
+            state.stepIndex = Math.max(0, stepsOf(tool).length - 1);
+        } else if (!opts.fresh) {
+            // 断点续算：有没填完的草稿就接着填，不让用户从头再来
             var d = loadDraft(toolId);
             if (d && d.values) {
                 state.values = d.values;

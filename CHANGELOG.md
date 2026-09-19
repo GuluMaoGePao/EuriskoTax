@@ -11,6 +11,47 @@
 
 ---
 
+## [1.72.0] - 2026-09-19 — 阶段18-2：保存的记录打不开（历史「查看」按注册表统一分发）
+
+`保存` 与 `导出` 早就有测试守着（速算器存进同一份 `taxCalculationHistory`、deep 的保存走
+`saveToHistory`、导出带 compare 与 extras），但**存进去之后点「查看」会发生什么，从来没人测过**。
+历史列表里那个按钮是唯一入口（`onclick="viewHistoryRecord(id)"`），而 `viewHistoryRecord` 是
+按 `record.type` 分发的 else-if 链，只认 4 个：
+
+- `business` / `classification` / `reverse` / `forward` —— 阶段17 每迁移一个页面式 deep 就地加一条；
+- **20 个速算器保存时 type 写的是 `'quick'`**（`toolbox-ui.js` 的 `saveToHistory`）→ 落到 else；
+- **其余 17 个完整测算保存时 type 是各自的 `tool.id`**（`tax-calculator.js` 的 `saveToHistory`
+  第二参）→ 同样落到 else。
+
+落到 else 的行为是弹「这条记录没有对应的测算入口，可能来自更新的版本。」—— 用户**刚在本版保存的**，
+却被告知可能来自更新的版本。保存本身一直是好的，所以没人发现看不了。
+
+第二个洞更隐蔽：那 4 个能打开的 deep，打开的是**向导草稿**（localStorage 里最后一次编辑），不是这
+条记录的输入。只有一份输入时两者恰好一样，所以平时看不出来；一旦又算了别的场景，点历史里那条老记录
+看到的就是新场景的值 —— 历史记录成了假账。
+
+改法：**按注册表统一分发，而不是按 type 认名字**。
+
+- `viewHistoryRecord`：存的时候记下 `toolId`，看的时候按 `toolId` 查注册表 —— 是 `deep` 就交给向导
+  并把这条记录的输入带过去，否则交给 `EuriskoToolbox.openTool` 回填；`comprehensive`（云同步协议里
+  forward 的别名）与老记录一并兼容，认不出时仍然**说清楚而不猜**；
+- `EuriskoDeepWizard.open(id, { values })`：支持带一份输入进来，并**直接落到结果步**（点历史记录是想
+  看结果，不是想重填一遍）；不传时与原来一样走草稿；
+- 速算器侧 `fieldHtml(f, values)` / `renderQuickPage(tool, seed)`：表单按这份输入渲染而不是按 `default`，
+  否则「保存 → 查看」看到的是一份全新的默认值 —— 保存等于白存。
+
+守护 `tests/history-reopen.test.js`（4 例）：20 个速算器逐个存一条再点开、断言**打开的是速算器页且
+表里是记录里的数**；21 个完整测算逐个存一条、并**先塞一份不同的草稿**，断言结果区那个数等于「按这条
+记录算出的」而不等于「按草稿算出的」；老记录（business / classification / reverse / forward /
+comprehensive）必须还能打开（改代码不能让存量数据变成死数据）；认不出的记录仍然明确提示且不跳转。
+
+**新测试照例做了变异检验**（故意改回旧行为，确认会红）：把 open 改成忽略传入值 → 21 个 deep 那条红；
+把分发改回只认 `record.type` → 20 个速算器那条红。另有一处顺带修掉的隐患：测试宿主原先手写 20 个
+`-quick.js` 的加载清单，第 21、22 个（`property-transfer` / `non-resident`）漏了 —— 漏加载的表现是
+`compute` 返回 `null`，与「这个工具坏了」长得一模一样，现已改为扫目录。
+
+单测 **92 套件 1742 例**；门禁：`verify:local` 259/259；线上指纹 37 项。
+
 ## [1.71.0] - 2026-09-19 — 阶段18-1：给 index.html 的加载顺序补一份「装配守护」
 
 阶段17 收在「21 个 spec 驱动完整测算 + 90 个套件全绿」，但有一件事**从来没人验证过**：
