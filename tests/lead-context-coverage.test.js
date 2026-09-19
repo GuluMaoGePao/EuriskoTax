@@ -160,6 +160,21 @@ describe('21 个完整测算的咨询情境', () => {
         expect(broken).toEqual([]);
     });
 
+    test('行名带括号后缀（真机上就是这个形态）也认得出税率锚点', () => {
+        // 真机结果区的行名是「实际税负率（占不含税销售额）」，按名字精确匹配取不到 ——
+        // 情境就只剩「增值税」三个字，顾问依旧看不出税负率。
+        document.body.insertAdjacentHTML('beforeend',
+            '<div id="dw-result-card" data-tool-id="vat-deep">' +
+            '<div id="dw-result-primary">¥54,900.00</div>' +
+            '<div data-dw-row="实际税负率（占不含税销售额）">' +
+            '<span>实际税负率（占不含税销售额）</span><span>4.88%</span></div>' +
+            '</div>');
+
+        const scene = LC().current('vat-deep');
+        expect(scene).toContain('实际税负率 4.88%');
+        expect(hasAmount(scene)).toBe(false);
+    });
+
     test('红线仍然成立：谈薪不作咨询情境，认不出的类型宁可留空', () => {
         // 谈薪（reverse）是服务错配：既不能投服务引导，也不能拿它当留资情境
         renderResult(R().get('reverse'));

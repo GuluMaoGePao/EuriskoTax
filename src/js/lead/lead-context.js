@@ -104,6 +104,11 @@
             return '';
         }
         var row = card.querySelector('[data-dw-row="' + arg + '"]');
+        if (!row) {
+            // 真机上行名常带后缀（「实际税负率（占不含税销售额）」），精确匹配会取不到 ——
+            // 阶段18-4 只验了 jsdom 里那批精确行名，真机一跑税率锚点就整段消失。按前缀再找一次。
+            row = card.querySelector('[data-dw-row^="' + arg + '"]');
+        }
         if (!row) return '';
         // 行标签和值渲染在**同一个**节点里（'<div data-dw-row="适用税率"><span>适用税率</span>
         // <span>20%</span></div>'），而下面 rateWord 认的是纯粹的一个 '20%' —— 整行 textContent
