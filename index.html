@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.65.0';
+        window.__APP_VERSION__ = '1.66.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -615,7 +615,7 @@
                          注册表中「尚无静态卡片」的 deep 工具由 renderDeepEntries() 动态追加至此。
                          原有 4 个页面式 deep 各有静态卡，v1.46.0 → v1.50.0 四次迁移后**页面式已归零**
                          （business / reverse / forward / classification 各留一张卡作为首页与工具箱的入口），
-                         故这里渲染的是**阶段17 的 spec 驱动 deep**（现 18 个：
+                         故这里渲染的是**阶段17 的 spec 驱动 deep**（现 19 个：
                          vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
                          + 17D-1 withholding-deep 劳务报酬预扣预缴 + 17D-2 bonus-tax-deep 年终奖择优
                          + 17D-3 equity-deep 股权激励 + 17D-4 severance-deep 离职补偿
@@ -623,7 +623,8 @@
                          + 17D-6 expat-deep 外籍津补贴免税
                          + 17D-7 annual-settlement-deep 年度汇算清缴（个税场景 11/16）
                          + 17D-8 special-deduction-deep 专项附加扣除（个税场景 12/16）
-                         + 17D-9 private-pension-deep 个人养老金与税优三件套（个税场景 13/16）；
+                         + 17D-9 private-pension-deep 个人养老金与税优三件套（个税场景 13/16）
+                         + 17D-10 donation 公益慈善捐赠扣除（个税场景 14/16，第一个没有同名速算器的完整测算）；
                          其中 vat-deep（17C-1 纵深 v1.58.0）、cit-deep（17C-2 纵深 v1.59.0）、
                          social-base-deep（17C-3 纵深 v1.60.0）、disability-fund-deep（17C-5 纵深 v1.61.0）、
                          surtax-stamp-deep（17C-4 纵深 v1.62.0）已改为**自带 spec**：前者速算器只认一个
@@ -642,7 +643,11 @@
                          累计」、「逐项边际节税」这三层它一个都答不了；
                          private-pension-deep（17D-9 纵深 v1.65.0）三个速算器各算各的（12000 / 2400 / 个人
                          4%），但三项**扣的是同一份应纳税所得额** —— 叠加会跨档（实测差 974 元）、年金
-                         4% 的基数是**上年度月平均工资**且封顶社平 3 倍、领取环节三件套各不相同）；
+                         4% 的基数是**上年度月平均工资**且封顶社平 3 倍、领取环节三件套各不相同；
+                         donation（17D-10 纵深 v1.66.0）捐赠不是一个所得项目，而是**横跨综合 / 经营 /
+                         分类三个所得项目**的一项扣除 —— 20 个速算器里没有一个能算，而最贵的一层是
+                         「先扣哪一项」：顺序自行决定，实测同一笔 5 万捐赠省 8000 还是 4244，差 3756 元；
+                         另外股权 / 房产的捐赠额按**财产原值**而不是市值）；
                          新增税种无需再改本文件。 -->
                     <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
                 </div>
@@ -1409,7 +1414,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.65.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.66.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1724,6 +1729,8 @@
     <script src="src/js/calculation/disability-fund-quick.js"></script>
     <script src="src/js/calculation/surtax-stamp-quick.js"></script>
     <script src="src/js/calculation/business-income-quick.js"></script>
+    <!-- 17D-10（v1.66.0）：公益捐赠扣除 —— 跨综合 / 经营 / 分类三个所得项目，故排在经营所得之后 -->
+    <script src="src/js/calculation/donation-quick.js"></script>
     <script src="src/js/calculation/vat-quick.js"></script>
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>

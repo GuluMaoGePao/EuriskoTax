@@ -735,6 +735,34 @@ var vatRules = {
 //   · assessed.profitRatioByIndustry：应税所得率**参考幅度**（幅度取自国税发〔2008〕30 号
 //     第八条行业幅度；个体户核定由各地税务局在幅度内确定具体值）。页面默认取 defaultProfitRatio，
 //     实际以主管税务机关的核定为准 —— 这是本页唯一一个「必须提示以当地为准」的参数。
+// 阶段17 17D-10（v1.66.0）：公益慈善捐赠扣除。
+//
+// 数字来源与口径：财政部 税务总局公告 **2019 年第 99 号**
+//   · limitRatio 0.3：限额 = 各所得项目**应纳税所得额** × 30%（不是收入的 30%）；
+//     综合 / 经营所得按**当年**、分类所得按**当月**（三（二））；
+//   · carryAcrossItems：一个项目扣不完的**可以在其他项目继续扣**（三（一））—— 不是作废；
+//     但超出全部项目限额之和的部分，个人 carryForwardYears = 0，**不结转以后年度**
+//     （企业捐赠可结转 3 年，这是最常被混用的两条）；
+//   · assessedNoDeduction：核定征收的经营所得**不扣**公益捐赠（六（四））；
+//   · makeupDays 90：分类所得当月应扣未扣的追补、以及补充提供捐赠票据，都是 90 日（五、九）；
+//   · receiptRetentionYears 5：捐赠票据留存 5 年（十）。
+var donationRules = {
+    limitRatio: 0.30,
+    carryAcrossItems: true,
+    carryForwardYears: 0,
+    assessedNoDeduction: true,
+    makeupDays: 90,
+    receiptRetentionYears: 5,
+    basis: '财政部 税务总局公告 2019 年第 99 号',
+    amountBasis: {
+        cash: '按实际捐赠金额确定',
+        equity: '按持有股权的财产原值确定（不是市值）',
+        house: '按持有房产的财产原值确定（不是市值）',
+        other: '按非货币性资产的市场价格确定'
+    },
+    fullDeductionNote: '国务院规定全额税前扣除的从其规定；同时发生按 30% 扣除与全额扣除的，**扣除次序自行选择**（八）'
+};
+
 var businessIncomeRules = {
     rateTable: 'businessTaxRates',
     halve: {
@@ -891,6 +919,7 @@ window.EuriskoTaxConstants = {
     stampDutyRules: stampDutyRules,
     socialInsuranceRules: socialInsuranceRules,
     businessIncomeRules: businessIncomeRules,
+    donationRules: donationRules,
     disabilityFundRules: disabilityFundRules,
     unionFeeRules: unionFeeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,

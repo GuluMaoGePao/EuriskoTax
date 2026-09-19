@@ -2916,6 +2916,209 @@
             }
         },
         {
+            // 阶段17 17D-10（v1.66.0）：个税场景完整度 **13/16 → 14/16** 的第十个场景 —— 公益捐赠。
+            //
+            // 20 个速算器里**没有一个**能算捐赠：它不是一个所得项目，而是**横跨综合所得、
+            // 经营所得、分类所得三个所得项目**的一项扣除。而它最贵的一层恰恰是「**先扣哪一项**」：
+            //   ① **扣除顺序由纳税人自行决定**（99 号公告三（三）），且各项目税率不同 —— 实测
+            //      同一笔 5 万捐赠：先扣分类（20%）→ 经营 → 综合，省 **8000**；先扣综合（3% 档）
+            //      → 经营 → 分类，只省 **4244** —— **差 3756**；
+            //   ② **捐赠额 ≠ 你想捐的那个数**：货币按实际捐赠额，**股权 / 房产按财产原值**
+            //      （不是市值）。实测房产市值 500 万、原值 200 万 → 捐赠额是 **200 万**；
+            //   ③ **限额 = 各项目应纳税所得额 × 30%**（不是收入的 30%），分类所得按**当月**；
+            //      一个项目扣不完的**可以在其他项目继续扣**（不是作废），但超出全部限额的
+            //      部分个人**不结转以后年度**（企业可结转 3 年 —— 最常被混用的两条）；
+            //   ④ **核定征收的经营所得不扣捐赠**、两处工资**只能选一处且当年不得变更**、
+            //      劳务 / 稿酬 / 特许权**预扣时不扣**、追补与补票据都是 **90 日**。
+            //
+            // 它没有同名速算器可复用（与 business / forward / reverse / classification 同类），
+            // 口径同源由 `donation-quick.js` + 单笔输入逐点对拍守护（见 tests/donation-deep.test.js）。
+            id: 'donation', name: '公益慈善捐赠扣除',
+            subtitle: '同一笔捐赠，先扣哪一项一年能差 3756 元',
+            icon: 'fa-heart', status: 'deep',
+            nextTools: ['special-deduction', 'annual-settlement', 'business-income'],
+            policyKey: 'donation',
+            fields: [
+                { key: 'donateKind', step: 'donate', label: '捐赠什么', type: 'select', default: 'cash',
+                    options: [{ value: 'cash', label: '货币' }, { value: 'equity', label: '股权' },
+                        { value: 'house', label: '房产' }, { value: 'other', label: '其他非货币性资产' }],
+                    hint: '捐赠额**不是**你想捐的那个数：股权与房产按**财产原值**，其他非货币性资产按市场价格' },
+                { key: 'cashAmount', step: 'donate', label: '实际捐赠金额（元）', type: 'money', default: 50000, min: 0,
+                    when: { key: 'donateKind', in: ['cash'] }, hint: '货币性资产按实际捐赠金额确定' },
+                { key: 'equityCost', step: 'donate', label: '股权的财产原值（元）', type: 'money', default: 1000000, min: 0,
+                    when: { key: 'donateKind', in: ['equity'] }, hint: '按财产原值确定 —— 不是现在的市值' },
+                { key: 'equityMarketValue', step: 'donate', label: '股权当前市值（元，仅对照）', type: 'money', default: 3000000, min: 0,
+                    when: { key: 'donateKind', in: ['equity'] } },
+                { key: 'houseCost', step: 'donate', label: '房产的财产原值（元）', type: 'money', default: 2000000, min: 0,
+                    when: { key: 'donateKind', in: ['house'] }, hint: '按财产原值确定 —— 不是现在的市值' },
+                { key: 'houseMarketValue', step: 'donate', label: '房产当前市值（元，仅对照）', type: 'money', default: 5000000, min: 0,
+                    when: { key: 'donateKind', in: ['house'] } },
+                { key: 'otherMarketValue', step: 'donate', label: '非货币性资产的市场价格（元）', type: 'money', default: 300000, min: 0,
+                    when: { key: 'donateKind', in: ['other'] } },
+                { key: 'fullDeduction', step: 'donate', label: '是否属于国务院规定的全额扣除情形', type: 'select', default: 'no',
+                    options: [{ value: 'no', label: '按 30% 限额扣除' }, { value: 'yes', label: '可全额税前扣除' }],
+                    hint: '同时发生按 30% 扣除与全额扣除的，**扣除次序自行选择**' },
+
+                { key: 'comprehensiveTaxable', step: 'income', label: '综合所得应纳税所得额（元，捐赠前）', type: 'money', default: 36000, min: 0,
+                    hint: '限额按**应纳税所得额**算，不是收入 —— 已扣完 6 万与五险一金、专项附加之后的那个数' },
+                { key: 'comprehensiveBasis', step: 'income', label: '上面这个数是', type: 'select', default: 'year',
+                    options: [{ value: 'year', label: '全年（居民个人）' }, { value: 'month', label: '当月（非居民个人）' }] },
+                { key: 'businessTaxable', step: 'income', label: '经营所得应纳税所得额（元，捐赠前）', type: 'money', default: 300000, min: 0,
+                    hint: '个体户 / 个人独资 / 合伙企业的自然人合伙人填这一栏' },
+                { key: 'businessVerified', step: 'income', label: '经营所得是否核定征收', type: 'select', default: 'no',
+                    options: [{ value: 'no', label: '查账征收' }, { value: 'yes', label: '核定征收' }],
+                    hint: '核定征收的经营所得**不扣除**公益捐赠（99 号公告六（四））' },
+                { key: 'classificationTaxable', step: 'income', label: '当月分类所得应纳税所得额（元）', type: 'money', default: 100000, min: 0,
+                    hint: '财产租赁 / 财产转让 / 利息股息红利 / 偶然所得 —— 限额按**当月**算，不是全年' },
+                { key: 'classificationType', step: 'income', label: '分类所得项目', type: 'select', default: 'accidental',
+                    options: [{ value: 'accidental', label: '偶然所得' }, { value: 'transfer', label: '财产转让所得' },
+                        { value: 'rent', label: '财产租赁所得' }, { value: 'interest', label: '利息、股息、红利所得' }] },
+
+                { key: 'residency', step: 'special', label: '纳税人身份', type: 'select', default: 'resident',
+                    options: [{ value: 'resident', label: '居民个人' }, { value: 'non-resident', label: '非居民个人' }],
+                    hint: '非居民按捐赠**当月**应纳税所得额的 30% 扣除，扣不完的可以在经营所得中继续扣除' },
+                { key: 'employerCount', step: 'special', label: '工资薪金任职单位数', type: 'select', default: '1',
+                    options: [{ value: '1', label: '一处' }, { value: '2', label: '两处以上' }],
+                    hint: '两处以上取得工资薪金的，只能选择其中一处扣除，**选择后当年不得变更**' },
+                { key: 'hasReceipt', step: 'special', label: '是否已取得捐赠票据', type: 'select', default: 'yes',
+                    options: [{ value: 'yes', label: '已取得' }, { value: 'no', label: '尚未取得（先凭银行支付凭证）' }],
+                    hint: '未取得的可先凭银行支付凭证扣除，须在捐赠之日起 **90 日**内补充提供票据；票据留存 5 年' }
+            ],
+            steps: [
+                { key: 'donate', title: '这笔捐赠按多少算', why: '捐赠额不是票面那个数 —— 股权与房产按**财产原值**，其他非货币性资产按市场价格' },
+                { key: 'income', title: '三个所得项目各能扣多少', why: '限额是各项目**应纳税所得额**的 30%，且分类所得按**当月** —— 三项各自的额度决定了顺序怎么排' },
+                { key: 'special', title: '身份与票据', why: '非居民按当月、两处工资只能选一处、票据 90 日内补齐 —— 这三条决定了扣得到扣不到' }
+            ],
+            pitfalls: [
+                '**同一笔捐赠，先扣哪一项税不一样**：扣除顺序由纳税人自行决定（99 号公告三（三））。实测 5 万捐赠：先扣分类（20%）→ 经营 → 综合省 **8000**，先扣综合（3% 档）→ 经营 → 分类只省 **4244** —— **差 3756 元**',
+                '**捐赠额不是票面那个数**：货币按实际捐赠额，但**股权、房产按财产原值**（不是市值），其他非货币性资产按市场价格（二）。房产市值 500 万、原值 200 万 → 捐赠额是 **200 万**',
+                '**限额 = 应纳税所得额 × 30%**，不是收入的 30%；且分类所得按**当月**应纳税所得额算（三（二））',
+                '**一个项目扣不完的可以在其他项目继续扣**（三（一））—— 不是作废；但超出全部项目限额之和的部分，个人**不结转以后年度**（企业捐赠可结转 3 年，这是最常被混用的两条）',
+                '**已在分类所得中扣除的捐赠，不再调整到其他所得**（五）—— 所以顺序选错没法回头改',
+                '**核定征收的经营所得不扣捐赠**（六（四））；合伙 / 个人独资企业按**分配比例**归属到每个投资者（六（二））；两处以上工资薪金**只能选一处扣除、当年不得变更**（四（一））',
+                '**劳务报酬 / 稿酬 / 特许权使用费预扣预缴时不扣捐赠**，统一在汇算清缴时扣除（四（二））；全年一次性奖金、股权激励单独计税的，捐赠扣除**比照分类所得**处理（四（三））',
+                '分类所得当月应扣未扣的可**追补扣除**、未取得票据的可先凭银行支付凭证扣除 —— 两个期限都是 **90 日**；捐赠票据留存 **5 年**（五、九、十）'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoDonationQuick;
+                if (!Q) return null;
+
+                var r = Q.stackOf({
+                    donateKind: v.donateKind, cashAmount: v.cashAmount,
+                    equityCost: v.equityCost, equityMarketValue: v.equityMarketValue,
+                    houseCost: v.houseCost, houseMarketValue: v.houseMarketValue,
+                    otherMarketValue: v.otherMarketValue, fullDeduction: v.fullDeduction,
+                    comprehensiveTaxable: v.comprehensiveTaxable, comprehensiveBasis: v.comprehensiveBasis,
+                    businessTaxable: v.businessTaxable, businessVerified: v.businessVerified,
+                    classificationTaxable: v.classificationTaxable, classificationType: v.classificationType,
+                    residency: v.residency, employerCount: v.employerCount, hasReceipt: v.hasReceipt
+                });
+
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+
+                if (r.amount <= 0) {
+                    return {
+                        primary: { label: '今年这笔捐赠能少交个税', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '捐赠额是 0：先在第一步把捐赠金额（或股权 / 房产的财产原值）填上，才会进入限额与扣除顺序的对照。',
+                        steps: []
+                    };
+                }
+
+                var rows = [
+                    { label: '核定后的捐赠额', value: r.amount, kind: 'money', hint: r.declared.note },
+                    { label: '扣除限额合计', value: r.limitSum, kind: 'money',
+                        hint: '三个项目各按应纳税所得额 × ' + Math.round(r.limitRatio * 100) + '%' },
+                    { label: '实际可扣除', value: r.deductibleTotal, kind: 'money' },
+                    { label: '最优扣除顺序', value: r.best.label, kind: 'text' },
+                    { label: '按最优顺序少交', value: r.best.saving, kind: 'money' },
+                    { label: '最差顺序少交', value: r.worst.saving, kind: 'money',
+                        hint: r.worst.label + ' —— 顺序选错就少省这么多' },
+                    { label: '顺序选错的差额', value: r.orderGap, kind: 'money' },
+                    { label: '扣不完的部分', value: r.unused, kind: 'money',
+                        hint: '超出全部项目限额之和：个人**不结转以后年度**（企业可结转 3 年）' }
+                ];
+                if (r.declared.gap > 0) {
+                    rows.push({ label: '与票面市值的差', value: r.declared.gap, kind: 'money',
+                        hint: '按财产原值计，多出来的部分不能扣' });
+                }
+
+                var extras = [{
+                    title: '三个所得项目：限额、可扣、各自省多少（按最优顺序）',
+                    note: '限额 = 该项目**应纳税所得额** × ' + Math.round(r.limitRatio * 100)
+                        + '%；分类所得按**当月**',
+                    table: {
+                        head: ['所得项目', '应纳税所得额', '扣除限额', '实际可扣', '扣除后', '少交'],
+                        rows: r.best.per.map(function (p) {
+                            return [p.label, money(p.taxable), money(p.limit), money(p.deductible),
+                                money(p.taxableAfter), money(p.saving)];
+                        }).concat([['合计', money(r.items.reduce(function (a, it) { return a + it.taxable; }, 0)),
+                            money(r.limitSum), money(r.deductibleTotal), '—', money(r.best.saving)]])
+                    }
+                }, {
+                    title: '六种扣除顺序对照（**顺序自行决定**，税不一样）',
+                    note: '一个项目扣不完的可以继续在下一个项目扣（三（一））；已在分类所得扣除的不再调整到其他所得（五）',
+                    table: {
+                        head: ['扣除顺序', '可扣合计', '少交个税', '比最优少省'],
+                        rows: r.orders.map(function (o) {
+                            return [o.label, money(o.deductibleTotal), money(o.saving),
+                                money(Math.max(0, r.best.saving - o.saving))];
+                        })
+                    }
+                }, {
+                    title: '捐赠额怎么算出来的（99 号公告二）',
+                    note: '同一份资产，捐赠形式不同 → 能扣的捐赠额不同',
+                    table: {
+                        head: ['捐赠形式', '捐赠额按什么确定', '本次金额'],
+                        rows: [
+                            ['货币性资产', '实际捐赠金额', money(r.declared.kind === 'cash' ? r.amount : 0)],
+                            ['股权', '持有股权的**财产原值**', money(r.declared.kind === 'equity' ? r.amount : 0)],
+                            ['房产', '持有房产的**财产原值**', money(r.declared.kind === 'house' ? r.amount : 0)],
+                            ['其他非货币性资产', '非货币性资产的**市场价格**', money(r.declared.kind === 'other' ? r.amount : 0)]
+                        ]
+                    }
+                }];
+
+                var note = '这笔捐赠核定为 ' + Math.round(r.amount) + ' 元，'
+                    + (r.unused > 0 ? '只能扣 ' + Math.round(r.deductibleTotal) + ' 元（超出限额的 '
+                        + Math.round(r.unused) + ' 元不结转以后年度）' : '限额内可全额扣除')
+                    + '，按最优顺序今年少交 **' + Math.round(r.best.saving) + ' 元**；'
+                    + '顺序换成 ' + r.worst.label + ' 只省 ' + Math.round(r.worst.saving)
+                    + ' 元 —— **差 ' + Math.round(r.orderGap) + ' 元**。';
+                if (r.notes.length) note += ' ' + r.notes.join('；') + '。';
+
+                var steps = [{
+                    title: '① 捐赠额核定（不是票面那个数）',
+                    rows: [
+                        { label: r.declared.kindLabel, value: r.declared.declared, format: 'money' },
+                        { label: '核定后的捐赠额', value: r.amount, format: 'money', note: r.declared.note }
+                    ],
+                    footnote: '货币按实际捐赠额；股权、房产按**财产原值**；其他非货币性资产按市场价格（99 号公告二）。'
+                }, {
+                    title: '② 三个所得项目的限额与分配',
+                    rows: r.best.per.map(function (p) {
+                        return { label: p.label + '（限额 ' + Math.round(p.limit) + '）', value: p.deductible, format: 'money' };
+                    }).concat([{ label: '可扣合计', value: r.deductibleTotal, format: 'money' }]),
+                    footnote: '限额 = 各项目应纳税所得额 × 30%（分类所得按当月）；一个项目扣不完的继续在下一个项目扣。'
+                }, {
+                    title: '③ 节税与扣不完的部分',
+                    rows: [
+                        { label: '扣除前三个项目税额合计', value: r.taxBefore, format: 'money' },
+                        { label: '扣除后税额合计', value: r.taxAfter, format: 'money' },
+                        { label: '少交个税', value: r.best.saving, format: 'money' },
+                        { label: '扣不完（不结转）', value: r.unused, format: 'money' }
+                    ],
+                    footnote: '扣除顺序自行决定（三（三））；顺序不同 → 各项目边际税率不同 → 税额不同。'
+                }];
+
+                return {
+                    primary: { label: '今年这笔捐赠能少交个税', value: r.best.saving, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。

@@ -55,7 +55,7 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（0 个页面式 + 18 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（0 个页面式 + 19 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
@@ -90,10 +90,13 @@ describe('工具注册表：数量与分组', () => {
         expect(specDriven).toEqual([
             'annual-settlement-deep',
             'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep',
-            'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'private-pension-deep',
+            'donation', 'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'private-pension-deep',
             'reverse', 'severance-deep',
             'social-base-deep', 'special-deduction-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
-        ]);   // 17D-9（v1.65.0）：private-pension-deep 个人养老金与税优三件套 —— 第九个
+        ]);   // 17D-9（v1.65.0）：private-pension-deep 个人养老金与税优三件套 —— 第九个；
+        // 17D-10（v1.66.0）：donation 公益慈善捐赠扣除 —— 第十个（13/16 → 14/16），且是
+        // **第一个没有同名速算器的完整测算**：捐赠横跨综合 / 经营 / 分类三个所得项目，
+        // 20 个速算器里没有能收它的那一个（口径同源改由 donation-quick.js + 逐点对拍守护）
     });
 
     // 用测试钉住 17A-5 的硬约束：spec 驱动的完整测算**不许**自带一份 fields / compute，
@@ -177,7 +180,9 @@ describe('工具注册表：数量与分组', () => {
         //    business → tests/business-migration.test.js，reverse → tests/reverse-migration.test.js，
         //    forward → tests/forward-migration.test.js，classification → tests/classification-migration.test.js。
         const migrated = specDriven.filter((t) => !t.id.endsWith('-deep'));
-        expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'forward', 'reverse']);
+        // 17D-10（v1.66.0）：donation 是第 5 个 —— 它不是页面迁移，而是**第一个没有同名速算器**
+        // 的完整测算：公益捐赠横跨综合 / 经营 / 分类三个所得项目，20 个速算器里没有能收它的那一个
+        expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'donation', 'forward', 'reverse']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);
