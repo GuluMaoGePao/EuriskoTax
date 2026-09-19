@@ -44,6 +44,40 @@
             .concat([{ value: 'other', label: '其他（八类之外，一律不免）' }]);
     }
 
+    // 阶段17 17C-1 纵深（v1.58.0）：增值税进项的两道闸门 + 法定简易计税情形。
+    //
+    // 与八类津补贴同构 —— 只存**代号**（下标对应常量 entries），名字与「能不能抵」的判定
+    // 一律从 `vatRules.inputRules` / `vatRules.simplifiedCases` 读，一条文案都不复制。
+    // 同样必须放在文件最前面，原因见上一条注释。
+    var VAT_VOUCHERS = ['special', 'customs', 'vehicle', 'toll', 'normal', 'none'];
+    var VAT_USAGES = ['business', 'exempt', 'welfare', 'service', 'loss'];
+
+    function vatInputRules() {
+        return (typeof vatRules !== 'undefined' && vatRules.inputRules) || {};
+    }
+
+    function vatList(which) {
+        var r = vatInputRules();
+        return (which === 'voucher' ? r.vouchers : r.usages) || [];
+    }
+
+    function vatVoucherOptions() {
+        return vatList('voucher').map(function (it, i) { return { value: VAT_VOUCHERS[i], label: it.label }; });
+    }
+
+    function vatUsageOptions() {
+        return vatList('usage').map(function (it, i) { return { value: VAT_USAGES[i], label: it.label }; });
+    }
+
+    function vatSimplifiedOptions() {
+        var items = (typeof vatRules !== 'undefined' && vatRules.simplifiedCases && vatRules.simplifiedCases.items) || [];
+        return items.map(function (it) { return { value: it.key, label: it.label }; });
+    }
+
+    function vatApportionNote() {
+        return vatInputRules().apportionNote || '';
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -2219,13 +2253,379 @@
                 };
             }
         },
-        // 阶段17 17C-1：第一个**由 spec 驱动**的完整测算 —— 此前 4 个 deep 各有独立页面与私有逻辑，
-        // 每加一个税种就要再写一页 HTML；本条目没有 pageId，内容由 deep-wizard-ui.js 按 spec 渲染。
-        // 字段与计算不在这里重复声明，见文件末尾「与 vat 速算器共享同一份 fields / compute」。
         {
-            id: 'vat-deep', name: '增值税', subtitle: '小规模 / 一般纳税人，分步填本期数据',
+            // 阶段17 17C-1（v1.48.0 铺齐 → **v1.58.0 做深**）。
+            //
+            // 17C-1 v1.48.0 交付的是「铺齐」：本条目当时只有元数据，字段与计算**共享 vat 速算器**，
+            // 于是「增值税完整测算」= 速算器那一屏 —— category 覆盖到了 6/6，但深度没上来。
+            // 这一版做的是**纵向做深**（与 17D 同一套判断：速算器只认一个数，完整测算要算
+            // 速算器算不出来的那几层）。速算器只收一个标量 `inputTax`「当期进项税额」，
+            // 于是「这笔进项到底能不能抵」被推给了用户 —— 而增值税最贵的一类错误就在这里：
+            //   ① **凭证闸门**：增值税普通发票、收据、白条**不是扣税凭证** —— 最常见的一笔「以为能抵」；
+            //   ② **用途闸门**：用于免征 / 简易计税项目、集体福利与个人消费、餐饮 / 居民日常 /
+            //      娱乐 / 贷款服务、非正常损失的进项一律不得抵扣，**即使拿到的是专票**；
+            //   ③ **共同进项分摊转出**：房租、水电、办公用品这类**分不清用途**的进项，要按免税与
+            //      简易项目销售额占比分摊转出（财税〔2016〕36 号附件1 第二十九条公式）——
+            //      速算器一个框，表达不出这条公式。
+            // 还有一层是**速算器给了对照却没说「你能不能选」**的：
+            //   ④ **一般计税 vs 简易计税不是自由选择题**：只有法定情形才可以选，且**一经选择
+            //      36 个月内不得变更**。即便能选，也只有进项占比高于**临界增值率**
+            //      （= 税率 − 征收率：13% → 10%、9% → 6%、**6% → 仅 3%**）时一般计税才更省 ——
+            //      6% 的现代服务业进项主要是房租与差旅，很容易低于 3%，也就是**很多 6% 纳税人
+            //      其实该走简易，却往往不符合法定情形**，这才是要讲清楚的话。
+            //   ⑤ **小规模 vs 一般纳税人的身份临界增值率**（= 税率 − 现行 1%：13% → 12%）：
+            //      登记为一般纳税人**原则上不可逆**，所以这笔账必须在登记前算。
+            //   ⑥ **附加税跟着实缴增值税走**：城建税 + 教育费附加 + 地方教育附加（市区 12%），
+            //      所以两种计税方法的差额要 ×1.12 才是真实的现金流差额。
+            // 口径仍同源：价税分离、免征判定、销项进项一律走 `EuriskoVatQuick`；
+            // 附加税走 `EuriskoSurtaxStampQuick`（税率取 surtaxRules）；
+            // 单笔输入与速算器逐点相等，由 tests/vat-deep.test.js 钉住。
+            id: 'vat-deep', name: '增值税', subtitle: '逐笔核定进项能不能抵，再比计税方法',
             icon: 'fa-shopping-cart', status: 'deep',
-            nextTools: ['surtax-stamp', 'corporate-income-tax', 'business-income']
+            nextTools: ['vat', 'surtax-stamp', 'corporate-income-tax', 'business-income'],
+            policyKey: 'vat-small-scale',
+            fields: [
+                { key: 'taxpayer', step: 'identity', label: '纳税人身份', type: 'select', default: 'general',
+                    options: [{ value: 'small', label: '小规模纳税人' }, { value: 'general', label: '一般纳税人' }] },
+                { key: 'rate', step: 'identity', label: '适用税率', type: 'select', default: 0.13,
+                    options: [{ value: 0.13, label: '13%' }, { value: 0.09, label: '9%' },
+                        { value: 0.06, label: '6%' }, { value: 0, label: '0%（出口 / 跨境）' }],
+                    when: { key: 'taxpayer', in: ['general'] } },
+                { key: 'simplifiedCase', step: 'identity', label: '是否符合法定简易计税情形', type: 'select', default: 'none',
+                    options: vatSimplifiedOptions(), when: { key: 'taxpayer', in: ['general'] },
+                    hint: '一般纳税人**不是想选就能选简易**：只有法定情形才可以，且一经选择 36 个月内不得变更' },
+
+                { key: 'sales', step: 'sales', label: '本期销售额', type: 'money', default: 1130000 },
+                { key: 'taxIncluded', step: 'sales', label: '销售额为含税价', type: 'switch', default: false },
+                { key: 'period', step: 'sales', label: '纳税期', type: 'select', default: 'quarter',
+                    options: [{ value: 'quarter', label: '按季' }, { value: 'month', label: '按月' }],
+                    when: { key: 'taxpayer', in: ['small'] } },
+                { key: 'specialInvoice', step: 'sales', label: '其中开具专票的销售额', type: 'money', default: 0,
+                    when: { key: 'taxpayer', in: ['small'] }, hint: '免征只覆盖普票，专票部分照缴' },
+                { key: 'exemptSales', step: 'sales', label: '其中免征项目销售额', type: 'money', default: 0,
+                    when: { key: 'taxpayer', in: ['general'] },
+                    hint: '免税项目的进项不得抵扣，且要把分不清用途的共同进项按比例分摊转出' },
+                { key: 'simplifiedSales', step: 'sales', label: '其中简易计税项目销售额', type: 'money', default: 0,
+                    when: { key: 'taxpayer', in: ['general'] } },
+
+                { key: 'inputs', step: 'input', label: '进项税额逐笔（按凭证与用途核定）', type: 'repeater',
+                    addLabel: '添加一笔进项',
+                    hint: '小规模**不得抵扣进项** —— 这里填的是你**若登记为一般纳税人**能抵多少，用来判断要不要转',
+                    default: [
+                        { voucher: 'special', usage: 'business', amount: 80000 },
+                        { voucher: 'normal', usage: 'business', amount: 12000 },
+                        { voucher: 'special', usage: 'service', amount: 15000 },
+                        { voucher: 'special', usage: 'welfare', amount: 8000 }
+                    ],
+                    itemFields: [
+                        { key: 'voucher', label: '扣税凭证', type: 'select', default: 'special', options: vatVoucherOptions() },
+                        { key: 'usage', label: '用途', type: 'select', default: 'business', options: vatUsageOptions() },
+                        { key: 'amount', label: '票面税额（元）', type: 'money', default: 0, min: 0 }
+                    ] },
+                { key: 'unallocatedInput', step: 'input', label: '无法划分用途的共同进项税额（元）', type: 'money', default: 12000,
+                    when: { key: 'taxpayer', in: ['general'] }, hint: vatApportionNote() },
+
+                { key: 'annualSales', step: 'compare', label: '连续 12 个月累计应征增值税销售额（元）', type: 'money', default: 4800000,
+                    hint: '超过 500 万须**强制登记**为一般纳税人；登记后原则上不得转回小规模' },
+                { key: 'location', step: 'compare', label: '城建税：纳税人所在地', type: 'select', default: 'urban',
+                    options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' },
+                        { value: 'other', label: '不在市区、县城、镇（1%）' }] },
+                { key: 'halve', step: 'compare', label: '享受“六税两费”减半', type: 'switch', default: true,
+                    hint: '小规模纳税人 / 小型微利企业 / 个体工商户可享，附加税减半征收' }
+            ],
+            steps: [
+                { key: 'identity', title: '纳税人身份与计税方法', why: '决定用哪套算法：小规模按「不含税销售额 × 征收率」，一般纳税人按「销项 − 进项」' },
+                { key: 'sales', title: '本期销售额', why: '增值税是价外税 —— 先确认是不是含税价；免税与简易项目要单列，它们决定共同进项要分摊转出多少' },
+                { key: 'input', title: '进项逐笔核定', why: '两道闸门：先看过没过「有没有合规扣税凭证」，再看过没过「用于什么用途」—— 两道都过才能抵' },
+                { key: 'compare', title: '计税方法对照与附加税', why: '附加税跟着**实缴增值税**走，所以真正要对比的是「增值税 + 附加」的合计' }
+            ],
+            pitfalls: [
+                '**普票不是扣税凭证**：增值税普通发票、收据、白条一律不得抵扣 —— 最常见的一笔「以为能抵」',
+                '**拿到专票也不一定可抵**：用于免征 / 简易计税项目、集体福利与个人消费、餐饮 / 居民日常 / 娱乐 / 贷款服务、非正常损失的进项一律不得抵扣',
+                '分不清用途的共同进项（房租、水电、办公用品）要按免税与简易项目销售额占比**分摊转出**',
+                '一般纳税人**不是想选简易就能选简易**：只有法定情形才可以，且**一经选择 36 个月内不得变更**',
+                '一般计税更省的前提是进项占比高于**临界增值率**（税率 − 征收率）：13% → 10%、9% → 6%、**6% → 仅 3%**',
+                '小规模「季 30 万」是**临界点不是起征点**：超过即**全额**计税，且开具专票的部分不免税',
+                '小规模纳税人**不得抵扣进项**；一般纳税人抵不完的留抵下期继续抵扣，**不倒欠**',
+                '连续 12 个月累计销售额超过 **500 万**须强制登记为一般纳税人，登记后**原则上不得转回小规模** —— 这笔账要在登记前算',
+                '附加税以**实际缴纳的增值税**为计税依据（市区合计 12%），所以省下的增值税还能再省 12% 的附加'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoVatQuick;
+                if (!Q) return null;
+                // 附加税跟着**实缴增值税**走 —— 所以「省了多少增值税」要连同附加税一起看。
+                // 注：surtax-stamp-quick 导出的名字是 EuriskoSurtaxQuick（不带 stamp），别写错。
+                var SU = window.EuriskoSurtaxQuick;
+
+                var rules = Q.rules() || {};
+                var num = function (x) { var n = Number(x); return isFinite(n) && n > 0 ? n : 0; };
+                var numN = function (x, d) { var n = Number(x); return isFinite(n) ? n : (d || 0); };
+                var general = v.taxpayer === 'general';
+
+                // ① 进项逐笔核定：两道闸门（凭证 + 用途），再叠一层共同进项分摊转出
+                var vouchers = {}, usages = {};
+                vatList('voucher').forEach(function (x) { vouchers[x.key] = x; });
+                vatList('usage').forEach(function (x) { usages[x.key] = x; });
+
+                var claimed = 0, deductible = 0, cutVoucher = 0, cutUsage = 0;
+                var detail = [];
+                (Array.isArray(v.inputs) ? v.inputs : []).forEach(function (it) {
+                    it = it || {};
+                    var amount = num(it.amount);
+                    var vc = vouchers[it.voucher] || vouchers.normal || { ok: false, label: '未知凭证', note: '' };
+                    var us = usages[it.usage] || usages.business || { ok: true, label: '应税项目', note: '' };
+                    var ok = vc.ok === true && us.ok !== false;
+                    var okAmount = ok ? amount : 0;
+                    claimed += amount;
+                    deductible += okAmount;
+                    if (vc.ok !== true) cutVoucher += amount; else if (us.ok === false) cutUsage += amount;
+                    var why = vc.ok !== true ? vc.note : (us.ok === false ? us.note : '凭证与用途均符合，可抵扣');
+                    detail.push([vc.label + ' · ' + us.label, { value: amount, kind: 'money' },
+                        { value: okAmount, kind: 'money' }, why]);
+                });
+
+                var rawSales = num(v.sales);
+                var reducedRate = (rules.smallScale && rules.smallScale.reducedRate) || 0.01;
+                var rate = numN(v.rate, 0.13);
+                var exclusive = v.taxIncluded ? rawSales / (1 + (general ? rate : reducedRate)) : rawSales;
+
+                var exemptSales = general ? num(v.exemptSales) : 0;
+                var simplifiedSales = general ? num(v.simplifiedSales) : 0;
+
+                // 法定简易情形决定征收率（不是想选就能选，所以不符合时只给对照、不给建议）
+                var simplifiedCase = null;
+                ((rules.simplifiedCases || {}).items || []).forEach(function (x) {
+                    if (x.key === v.simplifiedCase) simplifiedCase = x;
+                });
+                var caseRate = simplifiedCase ? numN(simplifiedCase.rate, 0) : 0;
+                var fallbackRate = (rules.general && rules.general.simplifiedRate) || 0.03;
+                var compareRate = caseRate > 0 ? caseRate : fallbackRate;
+                var eligible = !!(simplifiedCase && simplifiedCase.key !== 'none' && caseRate > 0);
+
+                var taxableSalesF = general ? Math.max(0, exclusive - exemptSales - simplifiedSales) : 0;
+                var outputTax = general ? (taxableSalesF * rate + simplifiedSales * caseRate) : 0;
+
+                // ③ 共同进项分摊转出（财税〔2016〕36 号附件1 第二十九条）
+                var unallocated = general ? num(v.unallocatedInput) : 0;
+                var apportionedOut = (general && exclusive > 0)
+                    ? unallocated * (exemptSales + simplifiedSales) / exclusive : 0;
+                var creditableInput = deductible + Math.max(0, unallocated - apportionedOut);
+
+                var small = null;
+                var tax = 0;
+                if (general) {
+                    tax = Math.max(0, outputTax - creditableInput);
+                } else {
+                    // 小规模：免征判定与计税一律问 quick（含「临界点不是起征点」那条提示）
+                    small = Q.smallScaleOf({
+                        sales: v.sales, period: v.period, taxIncluded: v.taxIncluded, specialInvoice: v.specialInvoice
+                    });
+                    exclusive = small.exclusive;
+                    tax = small.tax;
+                }
+                var credit = general ? Math.max(0, creditableInput - outputTax) : 0;
+                // 速算器口径：把填进来的进项当成全部可抵
+                var naiveTax = general ? Math.max(0, outputTax - (claimed + unallocated)) : tax;
+                var understated = tax - naiveTax;
+
+                // ④ 一般计税 vs 简易计税：临界增值率 = 税率 − 征收率
+                var simplifiedTax = exclusive * compareRate;
+                var methodBreakEven = rate - compareRate;
+                var inputRatio = exclusive > 0 ? creditableInput / exclusive : 0;
+                var methodBetter = simplifiedTax < tax ? 'simplified' : (tax < simplifiedTax ? 'general' : 'same');
+                var methodText = { simplified: '简易计税更省', general: '一般计税更省', same: '两者相同' }[methodBetter];
+
+                // ⑤ 身份临界：小规模（现行 1%）vs 一般纳税人，临界增值率 = 税率 − 现行征收率
+                var smallTax = exclusive * reducedRate;
+                var generalHypo = Math.max(0, exclusive * rate - creditableInput);
+                var identityBreakEven = rate - reducedRate;
+                var identityBetter = generalHypo < smallTax ? 'general' : (smallTax < generalHypo ? 'small' : 'same');
+                var cap = (rules.smallScale && rules.smallScale.annualSalesCap) || 5000000;
+                var annualSales = num(v.annualSales);
+                var mustRegister = annualSales > cap;
+
+                // ⑥ 附加税跟着**实缴**增值税走
+                var surtax = SU ? SU.surtaxOf({
+                    vat: tax, consumption: 0, location: v.location, halve: !!v.halve
+                }) : null;
+                var surtaxTotal = surtax ? surtax.total : 0;
+                var totalWithSurtax = tax + surtaxTotal;
+
+                var primary = { label: '应纳增值税', value: tax, kind: 'money',
+                    hint: '填进来的进项 ' + Math.round(claimed + unallocated) + ' 元里，核定可抵 '
+                        + Math.round(creditableInput) + ' 元' };
+
+                var rows = [
+                    { label: '不含税销售额', value: exclusive, kind: 'money' }
+                ];
+                if (general) {
+                    rows.push({ label: '销项税额', value: outputTax, kind: 'money' });
+                } else {
+                    rows.push({ label: (small.period === 'quarter' ? '本季' : '本月') + '免征额度', value: small.threshold, kind: 'money' });
+                    rows.push({ label: '是否免征', value: small.exempt ? '是（普票部分）' : '否（全额计税）', kind: 'text' });
+                    rows.push({ label: '其中专票销售额（不免税）', value: small.specialInvoice, kind: 'money' });
+                    rows.push({ label: '征收率（现行减按）', value: small.rate, kind: 'percent' });
+                    rows.push({ label: '临界提示：再超 1 分即全额计税', value: small.cliffTax, kind: 'money' });
+                }
+                rows.push({ label: '填进来的进项税额合计', value: claimed + unallocated, kind: 'money',
+                    hint: '速算器只有一个「当期进项税额」框，会把它当成全部可抵' });
+                rows.push({ label: '核定可抵的进项税额', value: creditableInput, kind: 'money' });
+                rows.push({ label: '核减：凭证不合规', value: cutVoucher, kind: 'money' });
+                rows.push({ label: '核减：用途不得抵扣', value: cutUsage, kind: 'money' });
+                if (general) {
+                    rows.push({ label: '核减：共同进项分摊转出', value: apportionedOut, kind: 'money' });
+                    rows.push({ label: '留抵税额（结转下期）', value: credit, kind: 'money' });
+                    rows.push({ label: '实际税负率（占不含税销售额）', value: exclusive > 0 ? tax / exclusive : 0, kind: 'percent' });
+                    rows.push({ label: '若全部走简易计税（' + Math.round(compareRate * 100) + '%）', value: simplifiedTax, kind: 'money',
+                        hint: eligible ? '符合法定情形，但一经选择 36 个月内不得变更' : '⚠️ 不符合法定简易情形 —— 仅作对照，实际不可选' });
+                    rows.push({ label: '两种计税方法差额', value: Math.abs(tax - simplifiedTax), kind: 'money' });
+                    rows.push({ label: '临界增值率（进项 ÷ 销售额）', value: methodBreakEven, kind: 'percent',
+                        hint: '高于它一般计税更省，低于它简易更省' });
+                    rows.push({ label: '当前进项占比', value: inputRatio, kind: 'percent' });
+                    rows.push({ label: '计税方法结论', value: methodText + (eligible ? '' : '（不可选）'), kind: 'text' });
+                }
+                rows.push({ label: '随增值税附征（城建 + 教育费附加 + 地方教育附加）', value: surtaxTotal, kind: 'money' });
+                rows.push({ label: '增值税与附加合计', value: totalWithSurtax, kind: 'money' });
+                rows.push({ label: '年累计销售额', value: annualSales, kind: 'money' });
+                rows.push({ label: '小规模纳税人标准', value: cap, kind: 'money',
+                    hint: mustRegister ? '已超过 —— 须强制登记为一般纳税人' : '未超过' });
+
+                var note = '增值税是价外税：' + Math.round(rawSales) + ' 元' + (v.taxIncluded ? '（含税）' : '')
+                    + ' → 不含税 ' + Math.round(exclusive) + ' 元。';
+                if (general) {
+                    note += ' 进项核定才是大头：填进来的 ' + Math.round(claimed + unallocated)
+                        + ' 元里，只有 ' + Math.round(creditableInput) + ' 元能抵（'
+                        + (cutVoucher > 0 ? '凭证不合规核减 ' + Math.round(cutVoucher) + '、' : '')
+                        + (cutUsage > 0 ? '用途不得抵扣核减 ' + Math.round(cutUsage) + '、' : '')
+                        + (apportionedOut > 0 ? '共同进项分摊转出 ' + Math.round(apportionedOut) + '、' : '')
+                        + '），速算器把它当成全部可抵，会**少算税 ' + Math.round(understated) + ' 元**。';
+                    note += ' 一般计税 ' + Math.round(tax) + ' 元 vs 简易计税 ' + Math.round(simplifiedTax)
+                        + ' 元（' + Math.round(compareRate * 100) + '%）：' + methodText
+                        + '。临界增值率 ' + Math.round(methodBreakEven * 1000) / 10 + '%，你当前 '
+                        + Math.round(inputRatio * 1000) / 10 + '% —— '
+                        + (inputRatio < methodBreakEven ? '低于临界，进项再少就该走简易' : '高于临界，一般计税更划算')
+                        + (eligible ? '' : '（但**不符合法定简易情形**，实际只能一般计税）') + '。';
+                } else {
+                    note += ' 小规模按不含税销售额 × 现行 ' + Math.round(reducedRate * 100)
+                        + '% 计税，不得抵扣进项；免征额度按**全部不含税销售额**判断、含本数，'
+                        + '超过即**全额**计税（不是只对超出部分）。';
+                    if (small && small.exempt) {
+                        note += ' 当前未超额度，但再超 1 分钱就要全额计税（¥'
+                            + Number(small.cliffTax).toFixed(2) + '）—— 临界点附近应把开票与收入确认时点往后挪一个纳税期。';
+                    }
+                }
+                note += ' 加上随增值税附征的附加税后，本期现金流合计 ' + Math.round(totalWithSurtax) + ' 元。';
+                if (!mustRegister) {
+                    note += ' 年累计 ' + Math.round(annualSales) + ' 元未超 ' + Math.round(cap)
+                        + ' 元：同一笔业务走小规模是 ' + Math.round(smallTax) + ' 元、走一般纳税人是 '
+                        + Math.round(generalHypo) + ' 元 —— ' + (identityBetter === 'small' ? '小规模更省' : '一般纳税人更省')
+                        + '（临界增值率 ' + Math.round(identityBreakEven * 1000) / 10
+                        + '%）。登记为一般纳税人**原则上不可逆**，这笔账要在登记前算。';
+                } else {
+                    note += ' ⚠️ 年累计已超 ' + Math.round(cap) + ' 元，须**强制登记**为一般纳税人。';
+                }
+
+                var extras = [{
+                    title: '进项逐笔核定明细',
+                    note: '每一笔能不能抵，取决于「凭证」与「用途」两道闸门 —— 这一层速算器表达不出来',
+                    table: { head: ['凭证 · 用途', '票面税额', '核定可抵', '依据'], rows: detail }
+                }];
+                if (surtax) {
+                    extras.push({
+                        title: '随增值税附征的附加税',
+                        note: '计税依据是**实际缴纳的增值税**（' + Math.round(tax) + ' 元），随增值税同增同减',
+                        table: {
+                            head: ['项目', '金额'], rows: [
+                                ['城市维护建设税（' + surtax.locationLabel + ' ' + Math.round(surtax.cityRate * 100) + '%）',
+                                    { value: surtax.cityTax, kind: 'money' }],
+                                ['教育费附加（3%）', { value: surtax.educationTax, kind: 'money' }],
+                                ['地方教育附加（2%）', { value: surtax.localEducationTax, kind: 'money' }],
+                                ['合计' + (v.halve ? '（“六税两费”减半后）' : ''), { value: surtax.total, kind: 'money' }]
+                            ]
+                        }
+                    });
+                }
+
+                // 推导链（台账 C）：与 20 个速算器**同一套约定** —— compute 返回 steps，
+                // 渲染走 utils.js 的 renderFormulaStepsHtml。不写第二套（17A-2 的硬前置）。
+                var steps = [{
+                    title: '价税分离',
+                    rows: [
+                        { label: '销售额（' + (v.taxIncluded ? '含税' : '不含税') + '）', value: rawSales, format: 'money' },
+                        { label: '不含税销售额', value: exclusive, format: 'money',
+                            note: v.taxIncluded ? '含税 ÷ (1 + ' + (general ? rate : reducedRate) + ')' : '本就是不含税价' }
+                    ],
+                    footnote: '增值税是价外税 —— 先分离，后面每一步都建立在不含税金额上'
+                }];
+                if (general) {
+                    steps.push({
+                        title: '销项税额',
+                        rows: [
+                            { label: '一般计税项目 ' + Math.round(taxableSalesF) + ' × ' + rate,
+                                value: taxableSalesF * rate, format: 'money' },
+                            { label: '简易计税项目 ' + Math.round(simplifiedSales) + ' × ' + caseRate,
+                                value: simplifiedSales * caseRate, format: 'money' },
+                            { label: '销项税额合计', value: outputTax, format: 'money' }
+                        ],
+                        footnote: '免征项目不产生销项'
+                    });
+                    steps.push({
+                        title: '进项核定（两道闸门 + 分摊转出）',
+                        rows: [
+                            { label: '填进来的进项税额', value: claimed + unallocated, format: 'money',
+                                note: '速算器只有一个「当期进项税额」框，会把它当成全部可抵' },
+                            { label: '核减：凭证不合规', value: -cutVoucher, format: 'money' },
+                            { label: '核减：用途不得抵扣', value: -cutUsage, format: 'money' },
+                            { label: '核减：共同进项分摊转出', value: -apportionedOut, format: 'money' },
+                            { label: '核定可抵的进项税额', value: creditableInput, format: 'money' }
+                        ],
+                        footnote: '两道闸门：先看过没过「有没有合规扣税凭证」，再看过没过「用于什么用途」'
+                    });
+                    steps.push({
+                        title: '应纳增值税',
+                        rows: [
+                            { label: '销项税额 − 核定可抵进项', value: outputTax - creditableInput, format: 'money' },
+                            { label: '留抵税额（结转下期）', value: credit, format: 'money' },
+                            { label: '应纳增值税', value: tax, format: 'money' }
+                        ],
+                        footnote: '抵不完的留抵下期继续抵扣，不倒欠'
+                    });
+                } else {
+                    steps.push({
+                        title: '免征判定',
+                        rows: [
+                            { label: '不含税销售额', value: exclusive, format: 'money' },
+                            { label: (small.period === 'quarter' ? '本季' : '本月') + '免征额度', value: small.threshold, format: 'money' },
+                            { label: small.exempt ? '未超额度 → 免征（普票部分）' : '已超额度 → 全额计税',
+                                value: small.exempt ? 0 : 1, format: 'money' }
+                        ],
+                        footnote: '这是**临界点不是起征点**：超过即全额计税'
+                    });
+                    steps.push({
+                        title: '应纳增值税',
+                        rows: [
+                            { label: '不含税销售额 × 现行 ' + Math.round(reducedRate * 100) + '%',
+                                value: exclusive * reducedRate, format: 'money' },
+                            { label: '其中专票部分照缴', value: small.specialInvoice, format: 'money' },
+                            { label: '应纳增值税', value: tax, format: 'money' }
+                        ],
+                        footnote: '小规模不得抵扣进项'
+                    });
+                }
+                steps.push({
+                    title: '随增值税附征的附加税',
+                    rows: [
+                        { label: '实际缴纳的增值税', value: tax, format: 'money' },
+                        { label: '城建税（' + (surtax ? surtax.locationLabel : '—') + '）', value: surtax ? surtax.cityTax : 0, format: 'money' },
+                        { label: '教育费附加（3%）', value: surtax ? surtax.educationTax : 0, format: 'money' },
+                        { label: '地方教育附加（2%）', value: surtax ? surtax.localEducationTax : 0, format: 'money' },
+                        { label: '合计', value: surtaxTotal, format: 'money' }
+                    ],
+                    footnote: '计税依据是**实际缴纳的增值税** —— 随增值税同增同减'
+                });
+
+                return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
+            }
         },
         // 阶段17 17C-2：企业所得税的完整测算。与 vat 同为 §4.4 的 P0（B 端财务客群）。
         // 排在 vat deep 之后、附加税之前 —— 卡片顺序就是施工优先级（P0 → P1 → P2）。

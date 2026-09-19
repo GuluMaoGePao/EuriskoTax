@@ -100,13 +100,15 @@ describe('工具注册表：数量与分组', () => {
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
         expect(twins).toHaveLength(11);
 
-        // ① 共享速算器 spec 的那 5 个（vat / cit / social / surtax-stamp / fee）：
+        // ① 共享速算器 spec 的那 4 个（cit / social / surtax-stamp / fee）：
         //    完整测算与速算器本就问同一件事，共享同一份对象最省事，也最不容易漂。
+        //    注：vat-deep 在 17C-1 纵深（v1.58.0）后改为自带 spec —— 速算器只认一个
+        //    `inputTax` 标量，而「这笔进项能不能抵」恰恰是增值税最贵的一类错误。
         const OWN_SPEC = ['bonus-tax-deep', 'early-retirement-deep', 'equity-deep', 'expat-deep',
-            'severance-deep', 'withholding-deep'];
+            'severance-deep', 'vat-deep', 'withholding-deep'];
         const shared = twins.filter((t) => OWN_SPEC.indexOf(t.id) < 0);
         expect(shared.map((t) => t.id).sort()).toEqual([
-            'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep'
         ]);
         shared.forEach((t) => {
             const twin = R().all().find((n) => n.compute === t.compute);
@@ -132,7 +134,8 @@ describe('工具注册表：数量与分组', () => {
             { id: 'equity-deep', twin: 'equity', policy: 'equity-incentive' },
             { id: 'severance-deep', twin: 'severance', policy: 'severance' },
             { id: 'early-retirement-deep', twin: 'early-retirement', policy: 'early-retirement' },
-            { id: 'expat-deep', twin: 'expat', policy: 'expat-allowance' }
+            { id: 'expat-deep', twin: 'expat', policy: 'expat-allowance' },
+            { id: 'vat-deep', twin: 'vat', policy: 'vat-small-scale' }
         ].forEach((pair) => {
             const own = R().get(pair.id);
             expect(own.compute).not.toBe(R().get(pair.twin).compute);

@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.57.0';
+        window.__APP_VERSION__ = '1.58.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -620,7 +620,9 @@
                          + 17D-1 withholding-deep 劳务报酬预扣预缴 + 17D-2 bonus-tax-deep 年终奖择优
                          + 17D-3 equity-deep 股权激励 + 17D-4 severance-deep 离职补偿
                          + 17D-5 early-retirement-deep 提前退休 / 内退
-                         + 17D-6 expat-deep 外籍津补贴免税）；
+                         + 17D-6 expat-deep 外籍津补贴免税；
+                         其中 vat-deep 已在 17C-1 纵深（v1.58.0）改为**自带 spec** —— 速算器只认一个
+                         inputTax 标量，而「这笔进项能不能抵」恰恰是增值税最贵的一类错误）；
                          新增税种无需再改本文件。 -->
                     <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
                 </div>
@@ -1387,7 +1389,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.57.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.58.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

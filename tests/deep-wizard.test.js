@@ -54,74 +54,70 @@ describe('多步向导：接管范围', () => {
     });
 });
 
+// 通用样例取**与速算器共享 spec** 的那一个（vat-deep 在 17C-1 纵深后改为自带 spec，
+// 它的步数与字段随深度涨，不适合再当「形状固定」的样例）。
 describe('多步向导：spec 形状', () => {
     test('结果步由渲染器自动追加，不在每个 spec 里重复声明', () => {
-        const steps = W().stepsOf(R().get('vat-deep'));
-        expect(steps).toHaveLength(3);                       // 纳税人身份 + 本期数据 + 结果
+        const steps = W().stepsOf(R().get('disability-fund-deep'));
+        expect(steps).toHaveLength(3);                       // 人数与工资总额 + 分档减缴与封顶 + 结果
         expect(steps[steps.length - 1].title).toBe('计算结果');
         expect(steps[steps.length - 1].result).toBe(true);
     });
 
-    test('字段按 step 归组，身份步只问身份', () => {
-        const t = R().get('vat-deep');
-        expect(W().fieldsOfStep(t, 'identity').map((f) => f.key)).toEqual(['variant']);
-        expect(W().fieldsOfStep(t, 'data').length).toBe(8);
+    test('字段按 step 归组，规模步只问规模', () => {
+        const t = R().get('disability-fund-deep');
+        expect(W().fieldsOfStep(t, 'scale').map((f) => f.key))
+            .toEqual(['variant', 'headcount', 'avgAnnualWage', 'wageTotal']);
+        expect(W().fieldsOfStep(t, 'exempt').length).toBe(3);
     });
 });
 
 describe('多步向导：渲染与走查', () => {
     test('打开向导：步骤条与第一步渲染出来，并切到向导页', () => {
-        expect(W().open('vat-deep', { fresh: true })).toBe(true);
+        expect(W().open('disability-fund-deep', { fresh: true })).toBe(true);
         const host = document.getElementById('deep-wizard-page');
         expect(host.querySelectorAll('.step-number')).toHaveLength(3);
-        expect(host.querySelector('.step-title.active').textContent).toBe('纳税人身份');
+        expect(host.querySelector('.step-title.active').textContent).toBe('人数与工资总额');
         expect(host.querySelector('#qf-variant')).toBeTruthy();
         expect(window.showPage).toHaveBeenCalledWith('deep-wizard-page');
     });
 
-    test('条件字段跟随计税场景切换（小规模 → 一般纳税人）', () => {
-        W().open('vat-deep', { fresh: true });
-        document.getElementById('qf-variant').value = 'general';
+    test('条件字段跟随计税口径切换（残保金 → 工会经费）', () => {
+        W().open('disability-fund-deep', { fresh: true });
+        document.getElementById('qf-variant').value = 'union';
         document.getElementById('qf-variant').dispatchEvent(new Event('change'));
-        document.getElementById('dw-next').click();
-        expect(document.getElementById('qf-inputTax')).toBeTruthy();   // 一般纳税人：进项税额
-        expect(document.getElementById('qf-sales')).toBeFalsy();       // 小规模：本期销售额
+        expect(document.getElementById('qf-wageTotal')).toBeTruthy();   // 工会经费：工资总额
+        expect(document.getElementById('qf-headcount')).toBeFalsy();     // 残保金：在职人数
     });
 
     test('分步填值不丢：上一步再回来，已填的值仍在', () => {
-        W().open('vat-deep', { fresh: true });
-        document.getElementById('qf-variant').value = 'general';
-        document.getElementById('qf-variant').dispatchEvent(new Event('change'));
+        W().open('disability-fund-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-output').value = '200000';
+        document.getElementById('qf-socialAverageMonthly').value = '9000';
         document.getElementById('dw-prev').click();     // 回第 1 步
         document.getElementById('dw-next').click();     // 再进第 2 步
-        expect(document.getElementById('qf-output').value).toBe('200000');
+        expect(document.getElementById('qf-socialAverageMonthly').value).toBe('9000');
     });
 
     test('结果步算出的税与同源速算器一致（不许两套口径）', () => {
-        W().open('vat-deep', { fresh: true });
-        document.getElementById('qf-variant').value = 'general';
-        document.getElementById('qf-variant').dispatchEvent(new Event('change'));
+        W().open('disability-fund-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-output').value = '200000';
+        document.getElementById('qf-socialAverageMonthly').value = '9000';
         document.getElementById('dw-next').click();     // 进结果步
         const shown = document.getElementById('deep-wizard-page').textContent;
-        const direct = R().get('vat').compute({
-            variant: 'general', output: 200000, inputTax: 8000, rate: 0.13, taxIncluded: true
+        const direct = R().get('disability-fund').compute({
+            variant: 'levy', headcount: 50, disabled: 0,      // 在职人数用默认值（向导里没改）
+            socialAverageMonthly: 9000, avgAnnualWage: 120000
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });
 
     test('断点续算：中途退出再进来，停在同一步且值还在', () => {
-        W().open('vat-deep', { fresh: true });
-        document.getElementById('qf-variant').value = 'general';
-        document.getElementById('qf-variant').dispatchEvent(new Event('change'));
+        W().open('disability-fund-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-output').value = '200000';
         document.getElementById('dw-next').click();     // 走到结果步并落草稿
         // 重新打开（非 fresh）应回到结果步
-        W().open('vat-deep');
+        W().open('disability-fund-deep');
         const host = document.getElementById('deep-wizard-page');
         expect(host.querySelector('.step-title.active').textContent).toBe('计算结果');
     });
@@ -239,10 +235,14 @@ describe('多步向导：第四个税种（社保公积金）', () => {
 // 存量 4 个页面式 deep 都有四件套：查看计算过程（推导链）、免责声明、保存、导出 PDF·Word。
 // spec 驱动的向导缺任何一样，迁移过去就是功能降级，所以先在这里补齐并钉住。
 describe('多步向导：结果区与存量页面对等（17A-2）', () => {
+    // 各 spec 的步数不同（vat-deep 纵深后是 4 步），所以一律「点到结果出来为止」
     function toResult(toolId) {
         W().open(toolId, { fresh: true });
-        document.getElementById('dw-next').click();
-        document.getElementById('dw-next').click();     // → 结果步
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
     }
 
     test('结果区给出推导链与免责声明（与速算器同一套渲染）', () => {
@@ -330,12 +330,13 @@ describe('多步向导：最后一个税种类别（残保金与工会经费）'
 //   ③ 保存 / 导出必须跟着当前口径走（界面看 A、导出 B 是这类工具最伤信用的错）；
 //   ④ 没有 compare 的 spec 一切照旧。
 //
-// 为什么临时换掉 vat-deep 的 compute：DEEP 数组由 registry 私有持有，deep() 返回的是副本，
+// 为什么临时换掉一个已有 spec 的 compute：DEEP 数组由 registry 私有持有，deep() 返回的是副本，
 // 没法塞一条新 spec 进去；借一个已经是 spec 驱动的壳最省事 —— 但用完必须还，
-// 否则后面凡是用到 vat-deep 的用例都会读到假结果（而且假得很难查）。
+// 否则后面凡是用到它的用例都会读到假结果（而且假得很难查）。
+// 壳取 disability-fund-deep：它自己**没有** compare，正好用来验证「没有 compare 时一切照旧」。
 describe('多步向导：多方案对比（compare）', () => {
     const money = v => TB().fmtValue(v, 'currency');
-    const toolId = 'vat-deep';
+    const toolId = 'disability-fund-deep';
 
     // 三份口径的主结果与明细都不同，才能逼出「切换后整块结果都要跟着换」
     function fakeCompute() {
@@ -370,8 +371,11 @@ describe('多步向导：多方案对比（compare）', () => {
     }
     function toResult() {
         W().open(toolId, { fresh: true });
-        document.getElementById('dw-next').click();
-        document.getElementById('dw-next').click();     // → 结果步
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
     }
     afterEach(() => {
         if (original) { R().get(toolId).compute = original; original = null; }
@@ -450,7 +454,8 @@ describe('多步向导：多方案对比（compare）', () => {
 // 12 个月，累计预扣法下每月到手并不是年收入的十二分之一。这块东西不是一个 label 一个值
 // 的 rows 装得下的 —— 没有通用容器，迁移到向导就只能把它删掉（＝迁移即降级）。
 describe('多步向导：结果附加块（extras）', () => {
-    const toolId = 'vat-deep';
+    // 壳取 disability-fund-deep：它自己**没有** extras，正好用来验证「没有 extras 时一切照旧」
+    const toolId = 'disability-fund-deep';
     let original = null;
 
     const MONTHLY = {
@@ -475,8 +480,11 @@ describe('多步向导：结果附加块（extras）', () => {
     }
     function toResult() {
         W().open(toolId, { fresh: true });
-        document.getElementById('dw-next').click();
-        document.getElementById('dw-next').click();     // → 结果步
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
     }
     afterEach(() => {
         if (original) { R().get(toolId).compute = original; original = null; }
