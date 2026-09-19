@@ -752,6 +752,226 @@
             }
         },
         {
+            // 阶段17 17D-2（v1.53.0）：个税纵深补齐的第二个场景 —— 年终奖择优。
+            //
+            // 速算器 `bonus-tax` 只能算**单独计税**那一半：它收了「全年其他应纳税所得额」
+            // 却在 compute 里一行都没用到，subtitle 写着「单独计税还是并入综合所得更省」，
+            // 实际没比过。这里补的是它缺的三层：
+            //   ① **两套口径真比一次**（并入 vs 单独），并给出择优结论与差额 —— 而不是只报一个数；
+            //   ② **最优分配点**：当这笔钱本就可以在「工资」与「年终奖」之间切分时，
+            //      最省的那个点常常既不是全并入也不是全单独，而是某一档的上沿 ——
+            //      f(x) = T(总额 − x) + 奖金税(x) 是分段线性且在每个阈值处向上跳，
+            //      最小值只可能落在段的两个端点，所以只需枚举「各档上沿」与「上沿 − 1 分」；
+            //   ③ **临界区（雷区）表**：6 个跳档点各自算出「多发 1 元增多少税」与
+            //      「到手回到原来水平的出口金额」—— 速算器只报一个「跳档多交」，
+            //      不给「该定在多少」，而用户真正需要的正是后者。
+            // 口径仍然同源：奖金税一律走 withholding 那样的 quick 模块 `EuriskoBonusQuick`，
+            // 综合所得部分走内核 `calculateTaxByTaxableIncome`，一个税率、一条公式都没复制。
+            id: 'bonus-tax-deep', name: '年终奖择优', subtitle: '并入还是单独计税，并给出最优分配点',
+            icon: 'fa-star', status: 'deep',
+            nextTools: ['bonus-tax', 'annual-settlement', 'salary-tax'],
+            policyKey: 'bonus',
+            fields: [
+                { key: 'otherTaxable', step: 'base', label: '全年其他综合所得的应纳税所得额（元）', type: 'money', default: 60000,
+                    hint: '工资薪金等已减 6 万基本减除、三险一金与专项附加扣除后的余额；全年只有年终奖这一笔收入就填 0' },
+
+                { key: 'bonus', step: 'bonus', label: '年终奖金额（元）', type: 'money', default: 36000, min: 0,
+                    hint: '全年一次性奖金；同一个月内只发一次（一年只能用一次单独计税）' },
+
+                { key: 'splittable', step: 'split', label: '这笔薪酬能在「工资」与「年终奖」之间自由分配', type: 'switch', default: false,
+                    hint: '总额不变、只换名目发放（谈 offer / 年底定包的情形）。已经发完的年终奖改不了分配，只能两套口径二选一' }
+            ],
+            steps: [
+                { key: 'base', title: '全年口径', why: '年终奖并入还是单独更省，取决于你**其余综合所得落在哪一档** —— 没有这一档，两套口径无从比较' },
+                { key: 'bonus', title: '年终奖', why: '单独计税按「奖金 ÷ 12」定档、再全额乘税率：发 36000 与发 36001 之间差两千多，中间那一段是雷区' },
+                { key: 'split', title: '分配方式', why: '如果这笔钱本就可以在工资与年终奖之间切分，那么最省的点通常既不是全并入也不是全单独' }
+            ],
+            pitfalls: [
+                '单独计税按「奖金 ÷ 12」定档、再全额乘税率，所以**临界点附近多发 1 元可能到手更少**：36000 / 144000 / 300000 / 420000 / 660000 / 960000 之后各有一段雷区，本工具给出每段的出口金额',
+                '「并入更省」不是绝对的：它取决于你其余综合所得落在哪一档 —— 全年没什么其他收入时并入通常更省，中高收入单独计税通常更省',
+                '最优分配只在**你能决定发放名目**时成立：已经发完的年终奖改不了口径，只能在两套算法里二选一',
+                '一年只能用一次单独计税；同一个月内分两笔发也不改变这一点（那是两笔奖金，不是两次优惠）',
+                '单独计税政策执行至 2027-12-31（以注册表状态为准）；之后只能并入综合所得',
+                '本工具按「工资与年终奖总额不变」求最优，未考虑社保 / 公积金缴费基数随工资变动带来的影响'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoBonusQuick;
+                if (!Q) return null;
+
+                var T = function (x) {
+                    return typeof calculateTaxByTaxableIncome === 'function'
+                        ? calculateTaxByTaxableIncome(Math.max(0, x)).tax : 0;
+                };
+
+                var other = Math.max(0, Number(v.otherTaxable) || 0);
+                var bonus = Math.max(0, Number(v.bonus) || 0);
+
+                // ① 两套口径：单独计税 = 综合所得照常算 + 奖金按月度换算表单独算；
+                //    并入 = 奖金全额加进综合所得一起找档（**不是**「奖金 × 边际税率」）。
+                var bonusTax = Q.taxOf(bonus);
+                var sep = T(other) + bonusTax;
+                var inc = T(other + bonus);
+                var gap = inc - sep;                       // 正数 = 并入更贵
+                var pick = gap > 0.005 ? '单独计税更省' : (gap < -0.005 ? '并入综合所得更省' : '两种口径相同');
+                var pickTax = Math.min(sep, inc);
+
+                var br = Q.bracketOf(bonus);
+                var edge = br && isFinite(br.max) ? br.max * 12 : 0;
+
+                // ② 临界区（雷区）：每一档的上沿 t 本身仍按低档计税，t + 1 元就跳档。
+                //    跳档后净额 = x(1 − 高档税率) + 高档速算扣除，随 x 线性回升，
+                //    于是能解出「到手回到 t 水平」的出口金额 —— 那一段就是真实的雷区。
+                var table = (Array.isArray(window.bonusMonthlyTaxRates) && window.bonusMonthlyTaxRates)
+                    || (window.EuriskoTaxConstants && window.EuriskoTaxConstants.bonusMonthlyTaxRates) || [];
+                var edges = [];
+                table.forEach(function (r, i) {
+                    if (!isFinite(r.max)) return;
+                    var t = r.max * 12;
+                    var next = table[i + 1];
+                    var taxAt = Q.taxOf(t);
+                    var netAt = t - taxAt;
+                    var escape = null;
+                    if (next) {
+                        var x = (netAt - next.deduction) / (1 - next.rate);
+                        if (x > t) escape = x;
+                    }
+                    edges.push({
+                        edge: t, rate: r.rate, jump: Q.taxOf(t + 1) - taxAt,
+                        nextRate: next ? next.rate : null, escape: escape
+                    });
+                });
+
+                // 雷区判定：金额刚过上沿、但还没到「出口金额」—— 这一段里多发不如少发
+                function inEscapeZone(e, x) {
+                    if (e.escape === null || e.escape === undefined) return false;
+                    return x > e.edge && x < e.escape;
+                }
+
+                var inDanger = null;
+                edges.forEach(function (e) {
+                    if (inEscapeZone(e, bonus)) inDanger = e;
+                });
+
+                // ③ 最优分配：总额固定的前提下，多少走年终奖单独计税最省？
+                //    f(x) = T(pool − x) + 奖金税(x) 在每一档内是线性的，只会在阈值处向上跳，
+                //    所以最小值必然落在「档的上沿」或「上沿 − 1 分」这类端点上 —— 枚举即可，不需要搜索。
+                var splitRows = null, best = null;
+                if (v.splittable === true && (other + bonus) > 0) {
+                    var pool = other + bonus;
+                    var cands = [0, pool, bonus];
+                    edges.forEach(function (e) {
+                        if (e.edge <= pool) {
+                            cands.push(e.edge);
+                            if (e.edge - 0.01 > 0) cands.push(e.edge - 0.01);
+                        }
+                    });
+                    var seen = {};
+                    splitRows = [];
+                    cands.forEach(function (raw) {
+                        var x = Math.min(Math.max(raw, 0), pool);
+                        var key = x.toFixed(2);
+                        if (seen[key]) return;
+                        seen[key] = true;
+                        var tax = T(pool - x) + Q.taxOf(x);
+                        var row = { bonus: x, other: pool - x, tax: tax };
+                        splitRows.push(row);
+                        if (!best || tax < best.tax - 1e-9) best = row;
+                    });
+                    splitRows.sort(function (a, b) { return a.tax - b.tax; });
+                }
+
+                var rows = [
+                    { label: '单独计税：综合所得部分', value: T(other), kind: 'money' },
+                    { label: '单独计税：年终奖税额', value: bonusTax, kind: 'money',
+                        hint: '奖金 ÷ 12 定档，再全额乘税率减速算扣除' },
+                    { label: '单独计税：全年个税合计', value: sep, kind: 'money' },
+                    { label: '并入综合所得：全年个税合计', value: inc, kind: 'money',
+                        hint: '奖金全额计入综合所得，与其余所得合并找档' },
+                    { label: '两种口径差额（并入 − 单独）', value: gap, kind: 'money',
+                        hint: '正数表示并入更贵、单独计税更省' },
+                    { label: '择优结论', value: pick, kind: 'text' },
+                    { label: '年终奖适用税率', value: br ? br.rate : 0, kind: 'percent' },
+                    // 最高档没有上限（max 是 Infinity）—— 显示成「0 元」会被读成「一分都不能多发」，
+                    // 所以这里给文字而不是数字
+                    edge > 0
+                        ? { label: '本档上限（年终奖）', value: edge, kind: 'money', hint: '超过此数即跳下一档' }
+                        : { label: '本档上限（年终奖）', value: '最高档，无上限', kind: 'text' }
+                ];
+
+                if (best) {
+                    var saveNow = sep - best.tax;      // 现状按「单独计税」计，最优也按同一口径比
+                    rows.push({ label: '最优：年终奖发', value: best.bonus, kind: 'money',
+                        hint: '总额 ' + (other + bonus) + ' 元不变，其余走工资' });
+                    rows.push({ label: '最优：工资部分应纳税所得额', value: best.other, kind: 'money' });
+                    rows.push({ label: '最优：全年个税合计', value: best.tax, kind: 'money' });
+                    rows.push({ label: '相对当前分配可省', value: saveNow, kind: 'money',
+                        hint: '当前把 ' + bonus + ' 元作为年终奖、' + other + ' 元作为工资' });
+                }
+
+                var note = '两套口径都是「算出来的」，不是「估出来的」：单独计税按奖金 ÷ 12 定档、全额乘税率；'
+                    + '并入则把奖金全额加进综合所得重新找档。择优结论取决于你其余综合所得的档位，'
+                    + '所以上面那一栏填得越准，结论越可信。';
+                if (inDanger) {
+                    note = '⚠️ 当前年终奖落在**雷区**：' + inDanger.edge + ' ~ ' + Math.ceil(inDanger.escape)
+                        + ' 元这段里，多发不如少发（多发 1 元就要多缴 ' + Math.round(inDanger.jump)
+                        + ' 元）。要么就定在 ' + inDanger.edge + ' 元，要么发到 ' + Math.ceil(inDanger.escape) + ' 元以上。';
+                }
+
+                var extras = [{
+                    title: '两套口径逐项对比',
+                    note: '同样是这笔年终奖，两种算法差在「奖金是单独找档还是并进综合所得找档」',
+                    table: {
+                        head: ['计税口径', '综合所得部分', '年终奖部分', '全年个税合计'],
+                        rows: [
+                            ['单独计税', { value: T(other), kind: 'money' }, { value: bonusTax, kind: 'money' }, { value: sep, kind: 'money' }],
+                            ['并入综合所得', { value: T(other + bonus), kind: 'money' }, '─', { value: inc, kind: 'money' }]
+                        ]
+                    }
+                }, {
+                    title: '临界区（多发反而少拿的区间）',
+                    note: '每一档的上沿本身仍按低档计税，超过 1 元就整笔跳档；跳档后要涨到「出口金额」以上，到手才回到原来水平',
+                    table: {
+                        head: ['档位上限', '该档税率', '多发 1 元多缴', '雷区上沿（到手回到原水平）'],
+                        rows: edges.map(function (e) {
+                            return [
+                                { value: e.edge, kind: 'money' },
+                                { value: e.rate, kind: 'percent' },
+                                { value: e.jump, kind: 'money' },
+                                e.escape === null || e.escape === undefined ? '─' : { value: Math.ceil(e.escape), kind: 'money' }
+                            ];
+                        })
+                    }
+                }];
+
+                if (splitRows) {
+                    extras.push({
+                        title: '可分配总额下的候选切分点',
+                        note: '总额固定时，全年个税在每一档内是线性变化的、只会在阈值处向上跳 —— 最优点必然落在这些端点上，已按税额从低到高排序',
+                        table: {
+                            head: ['年终奖', '工资部分应纳税所得额', '全年个税合计', '说明'],
+                            rows: splitRows.map(function (r) {
+                                var mark = (best && Math.abs(r.tax - best.tax) < 1e-9) ? '最优'
+                                    : (Math.abs(r.bonus - bonus) < 0.005 ? '当前' : '─');
+                                return [
+                                    { value: r.bonus, kind: 'money' },
+                                    { value: r.other, kind: 'money' },
+                                    { value: r.tax, kind: 'money' },
+                                    mark
+                                ];
+                            })
+                        }
+                    });
+                }
+
+                return {
+                    primary: { label: '择优后全年个税合计', value: pickTax, kind: 'money', hint: pick },
+                    rows: rows,
+                    note: note,
+                    extras: extras
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
