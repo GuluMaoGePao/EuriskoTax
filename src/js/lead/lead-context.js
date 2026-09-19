@@ -23,9 +23,9 @@
     var HISTORY_KEY = 'taxCalculationHistory';
     var HISTORY_LIMIT = 8; // 下拉最多列 8 条：更多用户也不会看，反而拖慢渲染
 
-    // 与 lead-touchpoints.ALLOWED_TYPES 同一口径：谈薪(reverse)不投服务引导，
-    // 因此也不让它作为留资情境出现在下拉里 —— 否则顾问会收到其服务范围外的线索
-    var SERVICE_TYPES = ['forward', 'comprehensive', 'business', 'classification'];
+    // 服务错配：谈薪是**主动不投**的那一类（lead-touchpoints 里它连引导都不出），
+    // 因此也不作为留资情境 —— 否则顾问会收到服务范围外的线索。这一条是产品硬约束。
+    var BLOCKED_TYPES = ['reverse'];
 
     // 类型 → 展示名（与 lead-touchpoints.TOUCHPOINTS / share-card.SOURCES 同一命名口径）
     var TYPE_NAMES = {
@@ -35,6 +35,18 @@
         classification: '分类所得计税',
         reverse: '谈薪测算'
     };
+
+    // 阶段18-4（v1.74.0）：21 个完整测算共用同一个向导，而上表只手写了阶段17 逐个迁移的那 4 个。
+    // 其余 17 个（增值税、企业所得税、年终奖、股权激励、离职补偿、非居民……）留资时
+    // current() 认不出、历史下拉里也选不到 —— 顾问只看到「有人留了资」，不知道他算的是什么税。
+    // 名字改由注册表兜底（注册表里有的才算数），认不出仍然返回空：**不编造情境**。
+    // 与阶段18-2 / 18-3 同一个病、同一剂药：按名字认人的表，每加一种形态就漏一批。
+    function nameOf(type) {
+        if (TYPE_NAMES[type]) return TYPE_NAMES[type];
+        var reg = window.EuriskoToolRegistry;
+        var tool = reg && typeof reg.get === 'function' ? reg.get(type) : null;
+        return tool && tool.name ? tool.name : '';
+    }
 
     // 「已算完」判据节点：读它的文本是否还是占位符，判断结果面板是否真的渲染过
     // （只是本地判断，不作为情境内容上报）
@@ -134,18 +146,37 @@
     }
 
     // 结果页真实摘要：未测算（面板仍是占位符）时返回 ''，调用方据此隐藏情境卡
+    // 未列出锚点的那一批测算（17 个）没有手写配置：试几个常见行名，取第一个真有值的。
+    // 行名是什么就写什么（「实际税负率 12%」而不是一律「适用税率 …」）—— 这两者不是一回事。
+    var GENERIC_RATE_ROWS = ['适用税率', '实际税负率', '税负率'];
+
+    function rateOf(type) {
+        if (RATE_NODES[type]) return rateWord(readNode(RATE_NODES[type], type));
+        for (var i = 0; i < GENERIC_RATE_ROWS.length; i++) {
+            var value = readNode('wizard:row:' + GENERIC_RATE_ROWS[i], type);
+            if (value && value !== '0%') return GENERIC_RATE_ROWS[i] + ' ' + value;
+        }
+        return '';
+    }
+
     function current(type) {
-        var name = TYPE_NAMES[type];
+        // 谈薪是**主动排除**的那一类。注意它此前返回空是靠「没给它配锚点」这种巧合撑着的
+        // （RESULT_MARKERS 里没有 reverse 这一路）—— 通用锚点一加，那个巧合就没了。
+        // 硬约束不能靠巧合，这里显式挡掉。
+        if (BLOCKED_TYPES.indexOf(type) !== -1) return '';
+
+        var name = nameOf(type);
         if (!name) return '';
 
-        var marker = readNode(RESULT_MARKERS[type], type);
+        // 缺锚点的照样能取数：主结果一律是 wizard:primary，结论行没有就留空（不猜方向）
+        var marker = readNode(RESULT_MARKERS[type] || 'wizard:primary', type);
         if (!isMeaningful(marker)) return '';
 
         var parts = [name];
-        var conclusion = conclusionWord(readNode(CONCLUSION_NODES[type], type));
+        var conclusion = conclusionWord(readNode(CONCLUSION_NODES[type] || 'wizard:refund', type));
         if (conclusion) parts.push(conclusion);
 
-        var rate = rateWord(readNode(RATE_NODES[type], type));
+        var rate = rateOf(type);
         if (rate) parts.push(rate);
 
         return parts.join(' · ');
@@ -163,7 +194,8 @@
     function summarize(record) {
         if (!record || typeof record !== 'object') return '';
 
-        var name = TYPE_NAMES[record.type] || '';
+        if (BLOCKED_TYPES.indexOf(record.type) !== -1) return '';
+        var name = nameOf(record.type);
         if (!name) return '';
 
         var parts = [name];
@@ -201,7 +233,12 @@
         for (var i = 0; i < records.length && options.length < HISTORY_LIMIT; i++) {
             var record = records[i];
             if (!record || record.id == null) continue;
-            if (SERVICE_TYPES.indexOf(record.type) === -1) continue;
+            // 阶段18-4：这里原先只放行 SERVICE_TYPES 那 4 个类型 —— 于是 17 个完整测算算完
+            // 保存的记录在下拉里根本选不到（阶段18-2 让它们打得开，这里让它们说得清）。
+            // 过滤条件改为「不是主动排除的 + 认得出名字」：谈薪依旧进不来（服务错配），
+            // 认不出的依旧不编造。下拉是**用户自己选**的情境，不是推送引导。
+            if (BLOCKED_TYPES.indexOf(record.type) !== -1) continue;
+            if (!nameOf(record.type)) continue;
             var scene = summarize(record);
             if (!scene) continue;
             var date = formatDate(record.date || record.updatedAt);
