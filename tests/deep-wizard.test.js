@@ -162,37 +162,53 @@ describe('多步向导：第二个税种（附加税与印花税）', () => {
 
 // 第三个税种（企业所得税，17C-2）：它的完整测算比速算器多一条「收入成本 → 纳税调整」路径，
 // 字段靠 mode 条件切换 —— 这条能跑通，说明「一条 spec 撑起一个比速算器更完整的测算」成立。
+// 第三个税种（企业所得税）。17C-2 纵深（v1.59.0）后 corporate-income-tax-deep 改为**自带 spec**：
+// 速算器只收一个「从业人数」和一个「资产总额」，而法定口径是**全年季度平均值**；加计扣除能
+// 把应纳税所得额压回 300 万门槛内、整档掉到 5%；亏损还会过期作废 —— 这三层速算器都表达不出来。
+// 它是唯一一个有 **repeater 出现在多步中间**（季度台账、亏损台账）的税种，能跑通说明
+// repeater 不依赖「只有最后一步才收明细」这个隐含前提。
 describe('多步向导：第三个税种（企业所得税）', () => {
-    test('第一步只问身份与规模，利润相关的都留给第二步', () => {
+    test('第一步只问身份与资质，人数资产与利润都留给后面', () => {
         W().open('corporate-income-tax-deep', { fresh: true });
-        expect(document.querySelector('.step-title.active').textContent).toBe('企业身份与规模');
-        expect(document.getElementById('qf-staff')).toBeTruthy();
-        expect(document.getElementById('qf-taxable')).toBeFalsy();
+        expect(document.querySelector('.step-title.active').textContent).toBe('企业身份与资质');
+        expect(document.getElementById('qf-industry')).toBeTruthy();
+        expect(document.getElementById('qf-staffBegin')).toBeFalsy();     // 没有「直接填人数」的框
+        expect(document.getElementById('qf-revenue')).toBeFalsy();
     });
 
-    test('切到「从收入成本算」后，纳税调整字段出现、直接填的字段消失', () => {
+    test('第二步收各季度季初 / 季末（repeater 在多步中间也要能用）', () => {
         W().open('corporate-income-tax-deep', { fresh: true });
-        document.getElementById('dw-next').click();              // → 利润与纳税调整
-        document.getElementById('qf-mode').value = 'adjust';
-        document.getElementById('qf-mode').dispatchEvent(new Event('change'));
-        expect(document.getElementById('qf-revenue')).toBeTruthy();
-        expect(document.getElementById('qf-entertainment')).toBeTruthy();
-        expect(document.getElementById('qf-taxable')).toBeFalsy();
+        document.getElementById('dw-next').click();              // → 从业人数与资产总额
+        expect(document.getElementById('qf-quarters-0-staffBegin')).toBeTruthy();
+        expect(document.getElementById('qf-quarters-3-assetsEnd')).toBeTruthy();
     });
 
-    test('结果步与同源速算器一致（走纳税调整路径）', () => {
+    test('第三步收收入成本与三大扣除限额', () => {
         W().open('corporate-income-tax-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-mode').value = 'adjust';
-        document.getElementById('qf-mode').dispatchEvent(new Event('change'));
-        document.getElementById('qf-revenue').value = '5000000';
-        document.getElementById('qf-cost').value = '4200000';
-        document.getElementById('dw-next').click();              // → 结果
+        document.getElementById('dw-next').click();              // → 收入成本与纳税调整
+        expect(document.getElementById('qf-revenue')).toBeTruthy();
+        expect(document.getElementById('qf-entertainment')).toBeTruthy();
+        expect(document.getElementById('qf-donation')).toBeTruthy();
+    });
+
+    test('结果步算出的税与直接调 compute 一致', () => {
+        W().open('corporate-income-tax-deep', { fresh: true });
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            document.getElementById('dw-next').click();
+        }
         const shown = document.getElementById('deep-wizard-page').textContent;
-        const direct = R().get('corporate-income-tax').compute({
-            mode: 'adjust', staff: 80, assetsWan: 3000, highTech: false, restricted: false,
-            revenue: 5000000, cost: 4200000, entertainment: 60000,
-            advertising: 200000, donation: 100000, previousLoss: 0
+        const direct = R().get('corporate-income-tax-deep').compute({
+            highTech: false, smeTech: false, industry: 'general', restricted: false,
+            quarters: [
+                { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                { staffBegin: 380, staffEnd: 250, assetsBegin: 3000, assetsEnd: 3000 }
+            ],
+            revenue: 12000000, cost: 8800000,
+            entertainment: 100000, advertising: 2000000, donation: 300000,
+            rdExpense: 1000000, currentYear: 2026, losses: [{ year: 2019, amount: 1500000 }]
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });

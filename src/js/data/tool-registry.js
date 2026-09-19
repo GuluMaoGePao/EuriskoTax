@@ -78,6 +78,34 @@
         return vatInputRules().apportionNote || '';
     }
 
+    // 阶段17 17C-2 纵深（v1.59.0）：企业所得税的三处「速算器收了数却没说口径」。
+    // 与上面同构 —— 只存**代号**（下标 / key 对应常量 entries），判定一律从
+    // `corporateIncomeTaxRules` 读，一条文案都不复制。同样必须放在文件最前面，原因见上。
+    function citRules() {
+        return (typeof corporateIncomeTaxRules !== 'undefined' && corporateIncomeTaxRules) || {};
+    }
+
+    function citIndustryOptions() {
+        return [{ value: 'general', label: '一般行业（可加计扣除）' }].concat(
+            ((citRules().rdSuperDeduction || {}).excluded || []).map(function (x) {
+                return { value: x.key, label: x.label + '（负面清单，不得加计扣除）' };
+            })
+        );
+    }
+
+    function citNote(which) {
+        var r = citRules();
+        if (which === 'quarter') return (r.quarterlyAverage || {}).note || '';
+        if (which === 'rd') return (r.rdSuperDeduction || {}).note || '';
+        if (which === 'loss') return (r.lossCarryForward || {}).note || '';
+        if (which === 'lossScope') return (r.lossCarryForward || {}).extendedScope || '';
+        return '';
+    }
+
+    function citQuarterFormula() {
+        return (citRules().quarterlyAverage || {}).formula || '';
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -2627,14 +2655,357 @@
                 return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
             }
         },
-        // 阶段17 17C-2：企业所得税的完整测算。与 vat 同为 §4.4 的 P0（B 端财务客群）。
-        // 排在 vat deep 之后、附加税之前 —— 卡片顺序就是施工优先级（P0 → P1 → P2）。
-        // 它的「完整」体现在第二步：速算器只认「年应纳税所得额」，完整测算多给一条
-        // 「从收入成本算 + 三大扣除限额纳税调整」的路径 —— 这才是申报表上的口径。
         {
-            id: 'corporate-income-tax-deep', name: '企业所得税', subtitle: '小微 / 高新判定 + 纳税调整，分步出申报口径',
+            // 阶段17 17C-2（v1.48.0 铺齐 → **v1.59.0 做深**）。
+            //
+            // 17C-2 v1.48.0 交付的是「铺齐」：本条目当时只有元数据，字段与计算**共享 cit 速算器**。
+            // 与 vat 不同，cit 速算器本身已经不浅（纳税调增 + 小微/高新孰优 + 300 万临界点），
+            // 所以这一版要补的不是「再给一条填数路径」，而是**三处速算器收了数、却没说口径**的地方：
+            //
+            //   ① **从业人数与资产总额看的是「全年季度平均值」，不是期末数**
+            //      （国家税务总局公告 2019 年第 2 号：季度平均值 =（季初+季末）÷2，
+            //       全年季度平均值 = 四个季度平均值之和 ÷4）。速算器只收一个数，把「填哪个数」
+            //      推给了用户 —— 于是**12 月 31 日裁员到 300 人以下被认为是「够格了」**。
+            //      实测：Q1–Q3 各 380 人、Q4 裁到 250 人，期末 250 人看着符合 ≤300，
+            //      但全年季度平均值 363.75 人 → **不符合小微**。利润 200 万时差 40 万税。
+            //
+            //   ② **研发费用加计扣除不是「少交一点税」，而是能把应纳税所得额压回 300 万门槛以内**。
+            //      加计扣除直接减少应纳税所得额，够得着门槛时会**整档从 25% 掉回 5%** ——
+            //      边际收益在临界点是**跳变**的，不是线性的。
+            //      实测：会计利润 320 万 + 调增 24 万 = 344 万（超门槛，25% → 86 万）；
+            //      研发投入 100 万按 100% 加计 → 244 万（回到门槛内，5% → **12.2 万**）。
+            //      **省 73.8 万，比研发投入 100 万本身小不了多少**。
+            //      反过来说：已经稳在 5% 档的企业，加计扣除 100 万只省 5 万 —— 值不值得做归集，
+            //      取决于你离 300 万门槛有多远。负面清单行业（烟草、住宿餐饮、批发零售、
+            //      房地产、租赁商务服务、娱乐）**一律不得加计**。
+            //
+            //   ③ **以前年度亏损会过期作废**：一般企业结转 5 年；当年具备高新技术企业或
+            //      科技型中小企业资格的延长至 10 年。速算器只收一个「可弥补以前年度亏损」数字，
+            //      不问这笔亏损是哪一年、还在不在弥补期 —— 于是十年前那笔巨亏常被当成今天还能抵的税盾。
+            //      实测：2026 年汇算，2019 年亏 150 万 → 一般企业 2024 年度已到期**作废**；
+            //      取得科技型中小企业资格 → 2029 年度到期，**能抵回 7.5 万税**。
+            //      注意：**科技型中小企业本身不减税率**（那是高新 15% 的事），它只延长亏损结转年限。
+            //
+            // 口径仍同源：企业所得税税额、小微三门槛、孰优、临界点一律走 `EuriskoCorporateQuick`；
+            // 三大扣除限额走 `deductionLimitOf`；季度平均值 / 加计扣除 / 亏损台账走新增的三个
+            // quick 函数（同样读 tax-constants，运营改数字后前台同口径生效）。
+            id: 'corporate-income-tax-deep', name: '企业所得税',
+            subtitle: '季度平均定身份、加计扣除定档、亏损台账定可抵',
             icon: 'fa-bank', status: 'deep',
-            nextTools: ['vat', 'surtax-stamp', 'business-income']
+            nextTools: ['corporate-income-tax', 'vat', 'surtax-stamp', 'business-income'],
+            policyKey: 'corporate-small-low-profit',
+            fields: [
+                { key: 'highTech', step: 'identity', label: '高新技术企业', type: 'switch', default: false,
+                    hint: '减按 15% 计税；与小微 5% 不叠加，按税额孰优' },
+                { key: 'smeTech', step: 'identity', label: '科技型中小企业', type: 'switch', default: false,
+                    hint: '**不减税率**，但当年度具备资格可把亏损结转年限由 5 年延长至 10 年' },
+                { key: 'industry', step: 'identity', label: '所属行业', type: 'select', default: 'general',
+                    options: citIndustryOptions() },
+                { key: 'restricted', step: 'identity', label: '属于国家限制/禁止行业', type: 'switch', default: false,
+                    hint: '属于则一律不适用小微优惠' },
+
+                { key: 'quarters', step: 'scale', label: '各季度季初 / 季末人数与资产', type: 'repeater',
+                    addLabel: '添加一个季度', hint: citQuarterFormula(),
+                    default: [
+                        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+                        { staffBegin: 380, staffEnd: 250, assetsBegin: 3000, assetsEnd: 3000 }
+                    ],
+                    itemFields: [
+                        { key: 'staffBegin', label: '季初从业人数', type: 'number', default: 0, min: 0 },
+                        { key: 'staffEnd', label: '季末从业人数', type: 'number', default: 0, min: 0 },
+                        { key: 'assetsBegin', label: '季初资产总额（万元）', type: 'number', default: 0, min: 0 },
+                        { key: 'assetsEnd', label: '季末资产总额（万元）', type: 'number', default: 0, min: 0 }
+                    ] },
+
+                { key: 'revenue', step: 'profit', label: '营业收入', type: 'money', default: 12000000 },
+                { key: 'cost', step: 'profit', label: '成本、费用、税金及损失', type: 'money', default: 8800000 },
+                { key: 'entertainment', step: 'profit', label: '业务招待费', type: 'money', default: 100000,
+                    hint: '只能扣发生额的 60%，且不超过收入的 5‰（两个上限都要过）' },
+                { key: 'advertising', step: 'profit', label: '广告费与业务宣传费', type: 'money', default: 2000000,
+                    hint: '不超过收入 15% 的部分可扣，超出**结转以后年度**（无年限）' },
+                { key: 'donation', step: 'profit', label: '公益性捐赠支出', type: 'money', default: 300000,
+                    hint: '不超过年度利润总额 12% 的部分可扣，超出只**结转三年**，第四年作废' },
+
+                { key: 'rdExpense', step: 'deduction', label: '可归集的研发费用', type: 'money', default: 1000000,
+                    hint: '负面清单行业不得加计扣除；加计扣除直接减少应纳税所得额，够得着 300 万会整档掉到 5%' },
+                { key: 'currentYear', step: 'deduction', label: '当前汇算年度', type: 'number', default: 2026 },
+                { key: 'losses', step: 'deduction', label: '以前年度亏损台账', type: 'repeater',
+                    addLabel: '添加一笔往年亏损', hint: citNote('loss'),
+                    default: [{ year: 2019, amount: 1500000 }],
+                    itemFields: [
+                        { key: 'year', label: '亏损年度', type: 'number', default: 2025, min: 1990 },
+                        { key: 'amount', label: '尚未弥补的亏损额（元）', type: 'money', default: 0, min: 0 }
+                    ] }
+            ],
+            steps: [
+                { key: 'identity', title: '企业身份与资质', why: '高新 15% 与小微 5% 不叠加、按税额孰优；科技型中小企业不减税率但延长亏损结转；负面清单行业不得加计扣除' },
+                { key: 'scale', title: '从业人数与资产总额', why: '小微门槛看的是**全年季度平均值**，不是期末数 —— 期末突击裁员不改变这个数' },
+                { key: 'profit', title: '收入成本与纳税调整', why: '企业所得税算的是**利润**不是收入：超限额的招待费、广宣费、捐赠要**调增**回利润' },
+                { key: 'deduction', title: '研发加计扣除与亏损弥补', why: '加计扣除能把应纳税所得额压回 300 万门槛内（整档掉到 5%）；亏损会过期，先填哪一年才知道还能不能抵' }
+            ],
+            pitfalls: [
+                '从业人数与资产总额按**全年季度平均值**判定（四个季度平均值的平均），**不是期末数** —— 12 月 31 日裁员到 300 人以下不改变判定结果',
+                '研发费用加计扣除直接减少应纳税所得额，够得着 300 万门槛时会**整档从 25% 掉回 5%**，边际收益是**跳变**的',
+                '已经稳在 5% 档的小微企业，100 万研发加计只省 5 万税；25% 档的企业省 25 万 —— 值不值得做归集，取决于离 300 万门槛多远',
+                '负面清单行业（烟草、住宿餐饮、批发零售、房地产、租赁商务服务、娱乐）**一律不得**加计扣除',
+                '以前年度亏损**会过期作废**：一般企业 5 年，当年具备高新 / 科技型中小企业资格的延长至 10 年',
+                '**科技型中小企业不减税率**（那是高新 15% 的事），它只把亏损结转年限从 5 年延长到 10 年',
+                '小微实际税负 **5% 是乘出来的**（减按 25% 计入 × 20% 税率）',
+                '三个门槛是「**且**」的关系且是**临界点**：300 万交 15 万，300.0001 万交约 75 万 —— 多 1 元利润多缴约 60 万税',
+                '纳税调整是**调增不是扣减**：超限额的业务招待费、广宣费、公益性捐赠要加回利润',
+                '广宣费超限额部分**无限期结转**，公益性捐赠超限额部分只**结转三年**（第四年作废）—— 两者不一样'
+            ],
+            compute: function (v) {
+                var C = window.EuriskoCorporateQuick;
+                if (!C) return null;
+                var rules = C.rules() || {};
+                var num = function (x) { var n = Number(x); return isFinite(n) && n > 0 ? n : 0; };
+                var staffCap = (rules.small || {}).staffCap === undefined ? 300 : rules.small.staffCap;
+                var assetsCap = (rules.small || {}).assetsCap === undefined ? 50000000 : rules.small.assetsCap;
+                var taxableCap = (rules.small || {}).taxableCap === undefined ? 3000000 : rules.small.taxableCap;
+
+                // ① 全年季度平均值 —— 法定口径，不是期末数
+                var qs = Array.isArray(v.quarters) ? v.quarters : [];
+                var staffAvg = C.quarterlyAverageOf(qs.map(function (q) {
+                    return { begin: q && q.staffBegin, end: q && q.staffEnd };
+                }));
+                var assetAvg = C.quarterlyAverageOf(qs.map(function (q) {
+                    return { begin: q && q.assetsBegin, end: q && q.assetsEnd };
+                }));
+                var staff = staffAvg.annualAverage;
+                var assets = assetAvg.annualAverage * 10000;      // 万元 → 元
+
+                // ② 会计利润 → 三大扣除限额调增
+                var revenue = num(v.revenue);
+                var profit = Math.max(0, revenue - num(v.cost));
+                var adjust = C.deductionLimitOf({
+                    revenue: revenue, profit: profit,
+                    entertainment: v.entertainment, advertising: v.advertising, donation: v.donation
+                });
+                var afterAdjust = Math.max(0, adjust.adjustedProfit);
+
+                // ③ 研发费用加计扣除（负面清单行业不得加计）
+                var rd = C.rdSuperDeductionOf({ expense: v.rdExpense, industry: v.industry });
+                var afterRd = Math.max(0, afterAdjust - rd.superDeduction);
+
+                // ④ 亏损弥补台账：会过期（高新 / 科技型中小企业延长至 10 年）
+                var extended = !!v.smeTech || !!v.highTech;
+                var carry = C.lossCarryOf({
+                    losses: v.losses, currentYear: v.currentYear, extended: extended, limit: afterRd
+                });
+                var taxable = Math.max(0, afterRd - carry.total);
+
+                var r = C.enterpriseOf({
+                    taxable: taxable, staff: staff, assets: assets,
+                    highTech: !!v.highTech, restricted: !!v.restricted
+                });
+
+                // ⑤ 对照：同样花了研发的钱、但没有做归集（于是没有加计扣除）
+                var carryNoRd = C.lossCarryOf({
+                    losses: v.losses, currentYear: v.currentYear, extended: extended, limit: afterAdjust
+                });
+                var noRd = Math.max(0, afterAdjust - carryNoRd.total);
+                var rNoRd = C.enterpriseOf({
+                    taxable: noRd, staff: staff, assets: assets,
+                    highTech: !!v.highTech, restricted: !!v.restricted
+                });
+                var rdSaving = rNoRd.tax - r.tax;
+                var regimeChanged = rNoRd.regime !== r.regime;
+                var regimeText = { small: '小型微利（5%）', highTech: '高新技术企业（15%）', general: '一般企业（25%）' }[r.regime] || r.regime;
+
+                var primary = { label: '应纳企业所得税', value: r.tax, kind: 'money',
+                    hint: '应纳税所得额 ' + Math.round(taxable) + ' 元 → ' + regimeText };
+
+                var rows = [
+                    { label: '从业人数（全年季度平均值）', value: staff, kind: 'number',
+                        hint: citQuarterFormula() },
+                    { label: '从业人数（期末数，不作数）', value: staffAvg.yearEnd, kind: 'number',
+                        hint: staffAvg.yearEnd <= staffCap && staff > staffCap
+                            ? '⚠️ 期末 ' + Math.round(staffAvg.yearEnd) + ' 人看着符合 ≤' + staffCap
+                                + '，但法定看的是全年季度平均值 ' + Math.round(staff) + ' 人 —— 不符合'
+                            : '判定小微用的是全年季度平均值，不是这个数' },
+                    { label: '资产总额（全年季度平均值）', value: assets, kind: 'money' },
+                    { label: '会计利润（收入 − 成本费用）', value: adjust.profit, kind: 'money' },
+                    { label: '业务招待费调增', value: adjust.entertainment.addBack, kind: 'money',
+                        hint: '发生额 60% 与收入 5‰ 孰低后的差额' },
+                    { label: '广宣费调增', value: adjust.advertising.addBack, kind: 'money',
+                        hint: '超收入 15% 的部分，结转以后年度' },
+                    { label: '公益性捐赠调增', value: adjust.donation.addBack, kind: 'money',
+                        hint: '超利润总额 12% 的部分，只结转三年' },
+                    { label: '调增后所得额', value: afterAdjust, kind: 'money' },
+                    { label: '研发费用加计扣除', value: rd.superDeduction, kind: 'money',
+                        hint: rd.excluded ? '⚠️ ' + rd.excludedLabel + '属于负面清单，不得加计扣除' : rd.note },
+                    { label: '弥补以前年度亏损（在弥补期内）', value: carry.total, kind: 'money' },
+                    { label: '已过弥补期作废的亏损', value: carry.expired, kind: 'money',
+                        hint: carry.rescuable > 0 && !extended
+                            ? '取得高新技术 / 科技型中小企业资格可延长至 10 年，能救回 ' + Math.round(carry.rescuable) + ' 元'
+                            : '超过结转年限仍未弥补完的部分，不再抵税' },
+                    { label: '应纳税所得额', value: r.taxable, kind: 'money' },
+                    { label: '适用身份', value: regimeText, kind: 'text', hint: '按税额孰优选取；小微与高新不叠加' },
+                    { label: '实际税负率', value: r.effectiveRate, kind: 'percent' },
+                    { label: '若不做研发费用归集（无加计扣除）', value: rNoRd.tax, kind: 'money',
+                        hint: '所得额 ' + Math.round(noRd) + ' 元 → '
+                            + ({ small: '小型微利（5%）', highTech: '高新技术企业（15%）', general: '一般企业（25%）' }[rNoRd.regime] || rNoRd.regime) },
+                    { label: '加计扣除省下的税', value: rdSaving, kind: 'money' },
+                    { label: '按法定 25% 对照', value: r.statutoryTax, kind: 'money' },
+                    { label: '优惠减免合计', value: r.saving, kind: 'money' },
+                    { label: '小微门槛余额（应纳税所得额）', value: taxableCap - r.taxable, kind: 'money',
+                        hint: r.taxable <= taxableCap ? '再超这个数就要全额按 25% 计税' : '已超门槛，全额按 25% 计税' },
+                    { label: '踩线代价（+1 元）', value: r.cliff.gap, kind: 'money',
+                        hint: '超过 ' + Math.round(taxableCap) + ' 元后按全额 25% 计税的差额' }
+                ];
+                if (!r.qualified) {
+                    rows.push({
+                        label: '未满足小微的原因',
+                        value: { taxable: '应纳税所得额超 300 万', staff: '从业人数（全年季度平均值）超 300 人',
+                            assets: '资产总额（全年季度平均值）超 5000 万', restricted: '属于限制/禁止行业' }[r.fails[0]] || '—',
+                        kind: 'text'
+                    });
+                }
+
+                var note = '从业人数与资产总额按**全年季度平均值**判定：'
+                    + staffAvg.quarters.map(function (x) { return Math.round(x); }).join(' / ')
+                    + ' → 平均 ' + Math.round(staff * 100) / 100 + ' 人（期末 '
+                    + Math.round(staffAvg.yearEnd) + ' 人**不作数**）。';
+                note += ' 会计利润 ' + Math.round(profit) + ' 元，三大限额调增 '
+                    + Math.round(adjust.totalAddBack) + ' 元 → ' + Math.round(afterAdjust) + ' 元。';
+                if (rd.superDeduction > 0) {
+                    note += ' 研发加计扣除 ' + Math.round(rd.superDeduction) + ' 元后为 '
+                        + Math.round(afterRd) + ' 元';
+                } else if (rd.excluded) {
+                    note += ' ⚠️ ' + rd.excludedLabel + '属于负面清单行业，**不得**加计扣除';
+                }
+                if (carry.total > 0) note += '，再弥补亏损 ' + Math.round(carry.total) + ' 元';
+                note += ' → **应纳税所得额 ' + Math.round(taxable) + ' 元**，按' + regimeText + '，应纳 **'
+                    + Math.round(r.tax) + ' 元**。';
+                if (rdSaving > 0) {
+                    note += ' 加计扣除省下 ' + Math.round(rdSaving) + ' 元'
+                        + (regimeChanged
+                            ? ' —— 而且不只是「少交一点」：它把应纳税所得额压回 ' + Math.round(taxableCap)
+                                + ' 元门槛以内，**整档从 ' + Math.round((rNoRd.effectiveRate || 0.25) * 100)
+                                + '% 掉到 ' + Math.round((r.effectiveRate || 0) * 100) + '%**'
+                            : '（一直在同一档，加计的边际收益就是这一档的税率）') + '。';
+                }
+                if (carry.expired > 0) {
+                    note += ' ⚠️ 有 ' + Math.round(carry.expired) + ' 元亏损**已过弥补期作废**'
+                        + (carry.rescuable > 0 && !extended
+                            ? '：取得高新技术企业或科技型中小企业资格可延长至 10 年，能救回 '
+                                + Math.round(carry.rescuable) + ' 元（科技型中小企业**不减税率**，只延长年限）'
+                            : '，超过结转年限未弥补完的部分不再抵税') + '。';
+                }
+                if (r.taxable > taxableCap && r.regime === 'general') {
+                    note += ' 已超 ' + Math.round(taxableCap) + ' 元门槛，全额按 25% 计税：多赚 1 元要多缴 '
+                        + Math.round(r.cliff.gap) + ' 元税，所以只要压回门槛的成本低于这个数就值得压。';
+                }
+
+                var extras = [{
+                    title: '从业人数与资产总额的季度平均',
+                    note: citQuarterFormula() + ' —— 期末数不参与判定',
+                    table: {
+                        head: ['季度', '季初人数', '季末人数', '季度平均', '季初资产（万元）', '季末资产（万元）', '季度平均（万元）'],
+                        rows: qs.map(function (q, i) {
+                            return ['第 ' + (i + 1) + ' 季度', q.staffBegin, q.staffEnd,
+                                Math.round((staffAvg.quarters[i] || 0) * 100) / 100,
+                                q.assetsBegin, q.assetsEnd,
+                                Math.round((assetAvg.quarters[i] || 0) * 100) / 100];
+                        }).concat([['全年季度平均值', '—', '—', Math.round(staff * 100) / 100,
+                            '—', '—', Math.round(assetAvg.annualAverage * 100) / 100],
+                            ['门槛', '—', '—', staffCap, '—', '—', assetsCap / 10000],
+                            ['是否通过', '—', '—', staff <= staffCap ? '通过' : '不通过',
+                                '—', '—', assetAvg.annualAverage * 10000 <= assetsCap ? '通过' : '不通过']])
+                    }
+                }, {
+                    title: '以前年度亏损弥补台账',
+                    note: '一般企业结转 ' + carry.years + ' 年' + (carry.extended ? '（已延长至 ' + carry.extendedYears + ' 年）' : '')
+                        + '；先到期的先弥补，超期**作废**',
+                    table: {
+                        head: ['亏损年度', '亏损额', '5 年到期年度', '延长后到期', '本次可抵', '结论'],
+                        rows: carry.rows.length ? carry.rows.map(function (x) {
+                            return [x.year + ' 年', { value: x.amount, kind: 'money' },
+                                x.year + carry.years + ' 年', x.year + carry.extendedYears + ' 年',
+                                { value: x.used, kind: 'money' },
+                                x.usable ? (x.used > 0 ? '在弥补期内' : '所得额不足，结转以后年度')
+                                    : '已过弥补期作废' + (x.aliveIfExtended ? '（延长后可救回）' : '')];
+                        }) : [['—', '—', '—', '—', '—', '未填写往年亏损']]
+                    }
+                }, {
+                    title: '三大扣除限额',
+                    note: '纳税调整是**调增**不是扣减 —— 超限额的部分要加回利润',
+                    table: {
+                        head: ['项目', '发生额', '扣除上限', '可扣除', '调增', '结转'],
+                        rows: [
+                            ['业务招待费', { value: adjust.entertainment.amount, kind: 'money' },
+                                'min(60% = ' + Math.round(adjust.entertainment.byAmount) + ', 收入 5‰ = '
+                                    + Math.round(adjust.entertainment.byRevenue) + ')',
+                                { value: adjust.entertainment.deductible, kind: 'money' },
+                                { value: adjust.entertainment.addBack, kind: 'money' }, '不可结转'],
+                            ['广告费与业务宣传费', { value: adjust.advertising.amount, kind: 'money' },
+                                '收入 15% = ' + Math.round(adjust.advertising.byRevenue),
+                                { value: adjust.advertising.deductible, kind: 'money' },
+                                { value: adjust.advertising.addBack, kind: 'money' }, '结转以后年度（无年限）'],
+                            ['公益性捐赠', { value: adjust.donation.amount, kind: 'money' },
+                                '利润总额 12% = ' + Math.round(adjust.donation.byProfit),
+                                { value: adjust.donation.deductible, kind: 'money' },
+                                { value: adjust.donation.addBack, kind: 'money' },
+                                '只结转 ' + adjust.donation.carryForwardYears + ' 年']
+                        ]
+                    }
+                }];
+
+                // 推导链（台账 C）：与 20 个速算器同一套约定，走 utils.js 的 renderFormulaStepsHtml
+                var steps = [{
+                    title: '从业人数与资产总额（全年季度平均值）',
+                    rows: [
+                        { label: '四个季度平均值', value: Math.round(staff * 100) / 100, format: 'text' },
+                        { label: '从业人数门槛', value: staffCap, format: 'text' },
+                        { label: '资产总额平均值（万元）', value: Math.round(assetAvg.annualAverage * 100) / 100, format: 'text' },
+                        { label: '资产总额门槛（万元）', value: assetsCap / 10000, format: 'text' }
+                    ],
+                    footnote: '期末数不参与判定 —— 12 月 31 日裁员到门槛以下不改变这个数'
+                }, {
+                    title: '会计利润与纳税调增',
+                    rows: [
+                        { label: '营业收入 − 成本费用', value: adjust.profit, format: 'money' },
+                        { label: '业务招待费调增', value: adjust.entertainment.addBack, format: 'money' },
+                        { label: '广宣费调增', value: adjust.advertising.addBack, format: 'money' },
+                        { label: '公益性捐赠调增', value: adjust.donation.addBack, format: 'money' },
+                        { label: '调增后所得额', value: afterAdjust, format: 'money' }
+                    ],
+                    footnote: '超限额的部分是**加回**利润，不是从利润里扣'
+                }, {
+                    title: '研发费用加计扣除',
+                    rows: [
+                        { label: '可归集研发费用', value: rd.expense, format: 'money' },
+                        { label: '加计比例', value: rd.excluded ? '不适用（负面清单）' : Math.round(rd.ratio * 100) + '%', format: 'text' },
+                        { label: '加计扣除额', value: rd.superDeduction, format: 'money' },
+                        { label: '加计后所得额', value: afterRd, format: 'money' }
+                    ],
+                    footnote: rd.excluded ? rd.excludedLabel + '属于负面清单行业，不得加计扣除'
+                        : '加计扣除直接减少应纳税所得额 —— 够得着门槛时会整档掉到 5%'
+                }, {
+                    title: '弥补以前年度亏损',
+                    rows: [
+                        { label: '结转年限', value: carry.extended ? carry.extendedYears + ' 年（已延长）' : carry.years + ' 年', format: 'text' },
+                        { label: '本次可抵', value: carry.total, format: 'money' },
+                        { label: '已过弥补期作废', value: carry.expired, format: 'money' },
+                        { label: '应纳税所得额', value: taxable, format: 'money' }
+                    ],
+                    footnote: carry.expired > 0 ? '超期未弥补完的亏损**作废**，不再抵税' : '先到期的先弥补'
+                }, {
+                    title: '适用税率与税额（孰优）',
+                    rows: [
+                        { label: '一般企业 25%', value: r.statutoryTax, format: 'money' },
+                        { label: '小型微利 5%（减按 25% 计入 × 20%）', value: r.smallTax === null ? 0 : r.smallTax, format: 'money' },
+                        { label: '高新技术企业 15%', value: r.highTechTax === null ? 0 : r.highTechTax, format: 'money' },
+                        { label: '应纳企业所得税', value: r.tax, format: 'money' }
+                    ],
+                    footnote: '小微与高新不叠加，按税额孰优；小微三条件是「且」的关系'
+                }];
+
+                return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
+            }
         },
         // 阶段17 17C-3：社保公积金的完整测算（§4.4 P1，HR 高频）。
         // 它的「完整」在结果侧：速算器只给月度六行，完整测算给出**逐项明细 + 全年汇总** ——

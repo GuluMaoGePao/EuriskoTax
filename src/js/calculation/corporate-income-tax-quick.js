@@ -232,11 +232,144 @@
         };
     }
 
+    /**
+     * 阶段17 17C-2（v1.59.0）：小微三条件的**全年季度平均值**
+     *
+     * 从业人数与资产总额不是「期末数」而是全年季度平均值（国家税务总局公告 2019 年第 2 号）：
+     *   季度平均值 =（季初值 + 季末值）÷ 2
+     *   全年季度平均值 = 全年各季度平均值之和 ÷ 4
+     * 所以 12 月 31 日裁员到 300 人以下**不改变**判定结果 —— 速算器只收一个数，
+     * 把「填哪个数」推给了用户，而这里正是最容易踩空的一处。
+     *
+     * @param {Array<{begin:number,end:number}>} quarters 四个季度的季初 / 季末值
+     */
+    function quarterlyAverageOf(quarters) {
+        var list = Array.isArray(quarters) ? quarters.filter(function (q) { return q && isFinite(Number(q.begin)) && isFinite(Number(q.end)); }) : [];
+        var per = list.map(function (q) { return (num(q.begin) + num(q.end)) / 2; });
+        var annual = per.length ? per.reduce(function (a, b) { return a + b; }, 0) / per.length : 0;
+        return {
+            quarters: per,
+            annualAverage: annual,
+            yearEnd: list.length ? num(list[list.length - 1].end) : 0,   // 期末数：看着符合，其实不算数
+            count: per.length
+        };
+    }
+
+    /**
+     * 研发费用加计扣除（财税〔2015〕119 号 + 后续提高比例的文件）
+     *
+     * 加计扣除直接**减少应纳税所得额**，所以够得着 300 万门槛时会**整档掉到 5%** ——
+     * 边际收益在临界点是跳变的，不是线性的：同样是 100 万研发费，25% 档省 25 万，
+     * 5% 档只省 5 万，但把 344 万压回 244 万时省的是 73.8 万。
+     *
+     * @param {Object} input
+     * @param {number} input.expense     可归集的研发费用
+     * @param {boolean} input.capitalized 是否形成无形资产（按成本 200% 摊销，不是当期 100% 加计）
+     * @param {string} input.industry    行业（负面清单行业不得加计）
+     * @param {boolean} input.advanced   集成电路 / 工业母机企业（120%）
+     */
+    function rdSuperDeductionOf(input) {
+        var rules = rulesOf();
+        var rd = rules.rdSuperDeduction || {};
+        input = input || {};
+
+        var excluded = (rd.excluded || []).some(function (x) { return x.key === input.industry; });
+        var expense = num(input.expense);
+        var ratio = input.advanced ? (rd.advancedRatio === undefined ? 1.2 : rd.advancedRatio)
+            : (rd.ratio === undefined ? 1 : rd.ratio);
+        var capitalizedRatio = rd.capitalizedRatio === undefined ? 2 : rd.capitalizedRatio;
+
+        // 形成无形资产：按成本的 200% 摊销（当期不额外加计，口径不同，这里给的是年度摊销额的口径）
+        var superDeduction = excluded ? 0 : round2(expense * ratio);
+        return {
+            expense: expense,
+            ratio: excluded ? 0 : ratio,
+            capitalized: !!input.capitalized,
+            capitalizedRatio: capitalizedRatio,
+            excluded: excluded,
+            excludedLabel: excluded ? ((rd.excluded || []).filter(function (x) { return x.key === input.industry; })[0] || {}).label : '',
+            superDeduction: superDeduction,
+            note: excluded ? '负面清单行业不得加计扣除' : '按 ' + Math.round(ratio * 100) + '% 加计扣除'
+        };
+    }
+
+    /**
+     * 以前年度亏损弥补台账 —— 亏损**会过期作废**
+     *
+     * 一般企业结转年限 5 年；当年具备高新技术企业或科技型中小企业资格的延长至 10 年
+     * （精确口径：限于具备资格年度**之前 5 个年度**发生的尚未弥补完的亏损）。
+     * 速算器只收一个「可弥补以前年度亏损」数字，不问这笔亏损是哪一年、还在不在弥补期 ——
+     * 于是「十年前那笔巨亏」常被当成今天还能抵的税盾。
+     *
+     * @param {Object} input
+     * @param {Array<{year:number,amount:number}>} input.losses 亏损台账（往年亏损年度 + 金额）
+     * @param {number} input.currentYear  当前汇算年度
+     * @param {boolean} input.extended    是否具备延长资格（高新 / 科技型中小企业）
+     * @param {number} input.limit        当期可用于弥补的所得额上限（应纳税所得额）
+     */
+    function lossCarryOf(input) {
+        var rules = rulesOf();
+        var lc = rules.lossCarryForward || {};
+        input = input || {};
+
+        var years = lc.years === undefined ? 5 : lc.years;
+        var extendedYears = lc.extendedYears === undefined ? 10 : lc.extendedYears;
+        var currentYear = num(input.currentYear, new Date().getFullYear());
+        var extended = !!input.extended;
+        var limit = num(input.limit);
+
+        // 先到期的先弥补（到期年度升序）
+        var items = (Array.isArray(input.losses) ? input.losses : [])
+            .filter(function (x) { return x && isFinite(Number(x.year)) && num(x.amount) > 0; })
+            .map(function (x) { return { year: Math.round(num(x.year)), amount: num(x.amount) }; })
+            .sort(function (a, b) { return a.year - b.year; });
+
+        var remaining = limit;
+        var usableTotal = 0, expiredTotal = 0;
+        var rows = items.map(function (x) {
+            var deadline = x.year + years;
+            var deadlineExtended = x.year + extendedYears;
+            var alive = currentYear <= deadline;
+            var aliveIfExtended = currentYear <= deadlineExtended;
+            var ok = extended ? aliveIfExtended : alive;
+            var used = ok ? Math.min(x.amount, remaining) : 0;
+            remaining = round2(remaining - used);
+            if (ok) usableTotal += used; else expiredTotal += x.amount;
+            return {
+                year: x.year,
+                amount: x.amount,
+                deadline: deadline,
+                deadlineExtended: deadlineExtended,
+                alive: alive,
+                aliveIfExtended: aliveIfExtended,
+                usable: ok,
+                used: used,
+                remainingUnused: round2(ok ? x.amount - used : x.amount)
+            };
+        });
+
+        return {
+            currentYear: currentYear,
+            years: years,
+            extendedYears: extendedYears,
+            extended: extended,
+            rows: rows,
+            total: round2(usableTotal),
+            expired: round2(expiredTotal),
+            carryOn: round2(rows.reduce(function (a, x) { return a + (x.usable ? x.remainingUnused : 0); }, 0)),
+            // 延长资格能救回多少（勾选前后的差额）—— 这是「要不要去申请科技型中小企业」的答案
+            rescuable: round2(rows.reduce(function (a, x) { return a + (!x.alive && x.aliveIfExtended ? x.amount : 0); }, 0))
+        };
+    }
+
     var api = {
         rules: rulesOf,
         enterpriseOf: enterpriseOf,
         dividendOf: dividendOf,
-        deductionLimitOf: deductionLimitOf
+        deductionLimitOf: deductionLimitOf,
+        quarterlyAverageOf: quarterlyAverageOf,
+        rdSuperDeductionOf: rdSuperDeductionOf,
+        lossCarryOf: lossCarryOf
     };
 
     global.EuriskoCorporateQuick = api;
