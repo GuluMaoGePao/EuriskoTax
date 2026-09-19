@@ -11,6 +11,42 @@
 
 ---
 
+## [1.71.0] - 2026-09-19 — 阶段18-1：给 index.html 的加载顺序补一份「装配守护」
+
+阶段17 收在「21 个 spec 驱动完整测算 + 90 个套件全绿」，但有一件事**从来没人验证过**：
+`index.html` 是靠 **62 个 `<script>` 的书写顺序**表达依赖的（没有打包器、没有模块系统），
+而全部测试都是「只 eval 自己需要的那几个文件」—— `tests/helpers/load-source.js` 里登记的
+前置只有 `solver → tax-calculator` 那三条。于是存在一条谁都看不见的缝，而且它已经咬过人：
+
+- `solver.js` 必须排在 `tax-calculator.js` 之前（v1.41.0 起通用求解器收编了手写在 8 处的
+  二分倒算，错序即倒算整块失效）；
+- 所有 `*-quick.js` 必须排在 `tool-registry.js` 之前 —— spec 驱动的完整测算复用速算器的
+  fields / steps / compute 靠的是**同一份对象引用**，quick 晚于注册表加载则 spec 拿到 undefined；
+- v1.67~v1.70 刚往这个顺序里新插了 `property-transfer-quick.js` / `non-resident-quick.js`。
+
+这三种错法都会让页面整块失效，而 90 个套件依然全绿 —— 因为没有一个测试按真实顺序装配过。
+
+新增 `tests/index-assembly.test.js`（11 例）：解析 index.html 的 script 清单 → 按真实顺序在
+jsdom 里 eval 全部经典脚本（`type="module"` 的走 ESM 图，单独登记不进这条路径）→ 断言无异常、
+注册表可用、**每个工具的 compute 在装配环境里真跑得出结果**。清单侧还守了三件事：src 指向的
+文件真实存在、没有重复加载（重复会静默重置模块状态）、磁盘上的 `*-quick.js` 一个不落地登记进
+index.html（新增速算器不会漏插脚本）。
+
+最后一条是整套守护的牙齿所在：spec 的 compute 是**运行时**才去取 quick 模块的全局对象的 ——
+`var Q = window.EuriskoNonResidentQuick; if (!Q) return null;` —— 所以漏插一个 `-quick.js` 的
+表现不是报错，也不是注册表里少一个工具（spec 是静态定义的），而是**页面能开、卡片也在、点进去
+结果区是空的**；而 `tool-registry.test.js` 那一边是在自己 eval 好了全部 quick 的环境里跑的，
+永远绿。只有把 compute 放在真实装配环境里跑一遍，这个洞才暴露得出来。
+
+**守护本身也做了变异检验**（新测试必须证明自己会红，否则就是一条装饰）：
+
+| 变异（故意破坏 index.html） | 期望 | 实测 |
+|---|---|---|
+| 删掉 `non-resident-quick.js` 的 script 标签 | 孤儿检测 + compute 断言红 | 红，报 `non-resident：compute 返回空（对应的 -quick 模块多半没挂上）` |
+| 删掉 `solver.js` 的 script 标签 | 顺序约束 + 装配执行断言红 | 红，报 `solver.js 必须排在 tax-calculator.js 之前` 与 `net-salary：抛异常 ... expandUpperBound` |
+
+单测 **91 套件 1738 例**；门禁：`verify:local` 259/259；线上指纹 37 项。
+
 ## [1.70.0] - 2026-09-19 — 17E 遗留清偿：经营所得减半公式收成一处（顺手修两处错档）
 
 `tax-calculator.js` 里一直挂着一句注释承认技术债：**同一条政策（2023 年第 12 号，应纳税所得额
