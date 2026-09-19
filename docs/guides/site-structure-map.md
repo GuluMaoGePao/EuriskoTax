@@ -79,15 +79,16 @@ EuriskoTax
 │   │   ├── prefer 税优与养老 ....... 3（个人养老金/税优健康险/企业年金）
 │   │   ├── social 社保与用工 ....... 3（社保公积金/企业用工成本/残保金）
 │   │   └── corp 企业与经营 ......... 4（增值税/企业所得税/附加税印花/个体经营所得）
-│   └── 【完整测算】12 个 ── status:deep，**全部 spec 驱动**（无独立页，共用 P15 `#deep-wizard-page`）
+│   └── 【完整测算】13 个 ── status:deep，**全部 spec 驱动**（无独立页，共用 P15 `#deep-wizard-page`）
 │       ├── 17B 反向迁移回来的 4 个：business 经营所得（v1.46.0/v1.47.0）
 │       │   / reverse 反向倒算·谈薪（v1.48.0）/ forward 综合所得（v1.49.0，27 个字段三步）
 │       │   / classification 分类所得（**v1.50.0，最后一块**：四类所得 × repeater 动态增删条目）
 │       ├── 17C 新增的 5 个：vat-deep 增值税 / corporate-income-tax-deep 企业所得税
 │       │   / social-base-deep 社保公积金 / surtax-stamp-deep 附加税印花税
 │       │   / disability-fund-deep 残保金
-│       └── 17D 个税纵深（场景完整度 4/16 → 7/16）：withholding-deep 劳务报酬预扣预缴（**v1.52.0**）
+│       └── 17D 个税纵深（场景完整度 4/16 → 8/16）：withholding-deep 劳务报酬预扣预缴（**v1.52.0**）
 │           / bonus-tax-deep 年终奖择优（**v1.53.0**）/ equity-deep 股权激励（**v1.54.0**）
+│           / severance-deep 离职补偿（**v1.55.0**）
 ├── 横向分发：5 张身份卡 → 按人找工具（employee/freelance/owner/finance/executive）
 ├── 政策依据库：27 条 / 6 类（iit 15、vat 2、cit 2、附加+印花 3、社保 2、规费 3）
 └── SEO 落地层：21 个 HTML（每个工具 1 页，源自同一份 tool-registry）
@@ -95,7 +96,7 @@ EuriskoTax
 
 **要点**
 
-- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP（12 个：**全部 spec 驱动**，见 `tests/tool-registry.test.js` 的分口径断言 —— 那条 `pageBased` 断言现在钉的是**空数组**）
+- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP（13 个：**全部 spec 驱动**，见 `tests/tool-registry.test.js` 的分口径断言 —— 那条 `pageBased` 断言现在钉的是**空数组**）
 - `X-deep` 自动复用 `X` 的 `fields` / `compute`（**同一对象引用**）；由 `tests/tool-registry.test.js` 断言守护
   —— 这是「同一个税种不会算出两个数」的机器保证。**17D-1（v1.52.0）起的例外**：`withholding-deep` 自带 spec
   （速算器只认一笔收入，完整测算要按次、按月算好几笔，共享同一份 fields 等于把速算器复制一遍），
@@ -103,7 +104,7 @@ EuriskoTax
   + 单笔输入的逐点对拍（`tests/withholding-deep.test.js`）守护
 - `tax-registry.js`：27 条政策依据 —— 这是**政策库**，与 20 个工具**不是同一份东西**，画图时勿混
 - 「方案对比」卡（v1.51.0）：原先长在综合所得页面的结果区，删页后**宿主与数据源一起没了**；现  由 spec 的
-  `toCalcInput` 钩子挂载到向导结果区（仅 forward 声明，其余 11 个 deep 没有），取数与 `compute` 同源
+  `toCalcInput` 钩子挂载到向导结果区（仅 forward 声明，其余 12 个 deep 没有），取数与 `compute` 同源
 - 注意：`index.html:5413` 的注释写「15 个落地页」是**过期的**，实际 **20 个**
 
 ---
@@ -119,8 +120,8 @@ EuriskoTax
      → 返回工具页（明确不回首页）
 
 【路径 B｜完整测算：值钱的深任务】
-工具页 → 「完整测算」组 → 12 个入口之一
-                          └ 全是 spec 驱动 12 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
+工具页 → 「完整测算」组 → 13 个入口之一
+                          └ 全是 spec 驱动 13 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
        → 向导多步（按 spec 的 steps，①…④ 不等；v1.46.0 起页面式归零，常驻预览条随页面一并删除）
        → 结果区（推导链 / 明细 / 预算表 / 优化建议）
        → 保存 · 导出 PDF/Word · 留资引导（reverse 被硬排除）
@@ -213,9 +214,9 @@ EuriskoTax
 │   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张工具卡    │
 │ ─ #toolbox-deep 558「完整测算」静态 4 张 mode-card ──────────────── │
 │   · forward 566 │ business 578 │ classification 590 │ reverse 602   │
-│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 12 张：vat / cit / social / surtax-stamp│
+│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 13 张：vat / cit / social / surtax-stamp│
 │   / fee + 反向迁移来的 business / reverse / forward / classification + 17D 的 withholding /  │
-│   bonus-tax / equity）                                                                      │
+│   bonus-tax / equity / severance）                                                          │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

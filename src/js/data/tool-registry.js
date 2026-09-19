@@ -1215,6 +1215,283 @@
             }
         },
         {
+            // 阶段17 17D-4（v1.55.0）：个税纵深补齐的第四个场景 —— 离职补偿金。
+            //
+            // 速算器 `severance` 只有 `economic` / `other` 两个框，而 `compareOf` 里写的是
+            // `legalPart = legalEconomic + other` —— 即「其他一次性补助」被**全额认可为可享免税**。
+            // 这恰恰是离职补偿里最贵的那个坑：真实的补偿包是**多笔构成**的，而税务处理各不相同：
+            //   ① **经济补偿金 / 医疗生活补助费** —— 属于财税〔2001〕157 号的「一次性补偿收入」，
+            //      可享「当地上年职工年平均工资 × 3」的免税额度；
+            //   ② **一次性安置费（破产企业）** —— 157 号第三条**全额免税**，不受 3 倍限制；
+            //   ③ **代通知金（+1）/ 竞业限制补偿 / 未休年休假折算** —— **不属于**解除劳动关系
+            //      取得的一次性补偿，不能享受免税额度。把它们填进速算器的「其他补助」框，
+            //      就会**少算税**（本工具量化这个差额）。
+            // 速算器做不到的另外三层：
+            //   ④ **法定应得的精确折算**：《劳动合同法》第 47 条是「满一年一个月、六个月以上
+            //      不满一年按一年、不满六个月按半个月」，速算器直接把「年限」当月数用；
+            //   ⑤ **代扣的社保公积金可扣除**（157 号第二条）—— 速算器**没有这一栏**，用户会多算税；
+            //   ⑥ **免税额度是按「一次性补偿收入」整体给一次**，分次 / 跨年支付不能重复扣。
+            // 还有一条算出来才知道的反直觉结论：月工资超过社平 3 倍时，经济补偿受
+            // 「3 倍 × 12 年」双封顶，封顶值 = 月均×3×12 = 年均×3，**恰好等于免税额度** ——
+            // 按法定上限足额支付的经济补偿，一分钱税都不用交。
+            // 口径仍然同源：免税额度、法定上限、税额全部走 `EuriskoSeveranceQuick`，
+            // 并入综合所得的部分走内核 `calculateTaxByTaxableIncome` 的**增量**；
+            // 单笔输入与速算器逐点相等，由 tests/severance-deep.test.js 钉住。
+            id: 'severance-deep', name: '离职补偿金', subtitle: '逐笔分类计税，并核算法定应得',
+            icon: 'fa-sign-out', status: 'deep',
+            nextTools: ['severance', 'annual-settlement', 'early-retirement'],
+            policyKey: 'severance',
+            fields: [
+                { key: 'avgWage', step: 'basis', label: '当地上年职工年平均工资（元/年）', type: 'money', default: 120000,
+                    hint: '免税额度 = 该数 × 3；各地人社部门每年公布，口径是**年平均工资**' },
+                { key: 'monthlyWage', step: 'basis', label: '离职前 12 个月月平均工资（元）', type: 'money', default: 15000 },
+                { key: 'years', step: 'basis', label: '本单位工作年限（整年）', type: 'number', default: 8, min: 0 },
+                { key: 'extraMonths', step: 'basis', label: '不足一年的月数', type: 'number', default: 0, min: 0,
+                    hint: '满一年一个月；六个月以上不满一年按一年；不满六个月按半个月' },
+
+                { key: 'items', step: 'package', label: '离职补偿包的构成（逐笔）', type: 'repeater',
+                    addLabel: '添加一笔',
+                    hint: '**不同款项的税务处理不一样**：只有经济补偿金与医疗 / 生活补助费能享受免税额度，'
+                        + '代通知金、竞业限制补偿、未休年休假折算都不能 —— 分开填才不会算错',
+                    default: [{ kind: 'economic', amount: 120000 }, { kind: 'noncompete', amount: 60000 }],
+                    itemFields: [
+                        { key: 'kind', label: '款项类别', type: 'select', default: 'economic',
+                            options: [
+                                { value: 'economic', label: '经济补偿金（N）' },
+                                { value: 'subsidy', label: '医疗 / 生活补助费' },
+                                { value: 'placement', label: '一次性安置费（破产）' },
+                                { value: 'notice', label: '代通知金（+1）' },
+                                { value: 'noncompete', label: '竞业限制补偿' },
+                                { value: 'leave', label: '未休年休假折算' },
+                                { value: 'other', label: '其他款项' }
+                            ] },
+                        { key: 'amount', label: '金额（元）', type: 'money', default: 0 }
+                    ] },
+
+                { key: 'socialDeduction', step: 'option', label: '从补偿款中代扣的社保公积金（元）', type: 'money', default: 0,
+                    hint: '财税〔2001〕157 号第二条：领取补偿时按国家规定比例**实际缴纳**的住房公积金、'
+                        + '医疗 / 养老 / 失业保险费，可以在计征时扣除' },
+                { key: 'otherTaxable', step: 'option', label: '当年其他综合所得的应纳税所得额（元）', type: 'money', default: 60000,
+                    hint: '工资薪金等已减 6 万基本减除与各项扣除后的余额；只影响「并入综合所得」的那些款项' },
+                { key: 'installments', step: 'option', label: '补偿是分次 / 跨年支付的', type: 'switch', default: false,
+                    hint: '免税额度是按「一次性补偿收入」整体给**一次**的，分几次支付也不能重复扣' },
+                { key: 'times', step: 'option', label: '分几次支付', type: 'number', default: 2, min: 1,
+                    when: { key: 'installments', in: [true] } }
+            ],
+            steps: [
+                { key: 'basis', title: '当地口径与年限', why: '免税额度是**当地上年职工年平均工资 × 3** —— 不是月工资 × 3，也不是全国一个数；年限决定法定应得几个月' },
+                { key: 'package', title: '补偿构成', why: '补偿包往往是多笔构成的，而**只有**经济补偿金与医疗 / 生活补助费属于「一次性补偿收入」、能享受免税额度' },
+                { key: 'option', title: '扣除与对照', why: '补偿款里代扣的社保公积金可以在计征时扣除；并入综合所得的那部分要按你当年的档位算增量' }
+            ],
+            pitfalls: [
+                '免税额度是**当地上年职工年平均工资 × 3**，不是「离职前月工资 × 3」，也不是全国一个数',
+                '只有**解除劳动关系取得的一次性补偿收入**才享受免税：竞业限制补偿、未休年休假折算、代通知金、股权激励结算都**不属于**，把它们算进补偿包就会少算税',
+                '破产企业职工取得的一次性安置费**全额免税**，不受 3 倍限制（财税〔2001〕157 号第三条）',
+                '领取补偿时按国家规定比例**实际缴纳**的住房公积金、医疗 / 养老 / 失业保险费，可以在计征时扣除 —— 速算器没有这一栏，会多算税',
+                '免税额度按「一次性补偿收入」整体给**一次** —— 分次支付、跨年支付都不能重复扣（每扣一次就少算一份税）',
+                '超过免税额度部分**不并入**当年综合所得，单独适用年度税率表、不减除任何费用、也**不做按工作年限平均**（国税发〔1999〕178 号的平均法已停止执行）',
+                '月工资超过社平 3 倍时，经济补偿受「3 倍 × 12 年」双封顶，封顶值**恰好等于免税额度** —— 按法定上限足额支付的经济补偿一分钱税都不用交'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoSeveranceQuick;
+                if (!Q) return null;
+
+                var T = function (x) {
+                    return typeof calculateTaxByTaxableIncome === 'function'
+                        ? calculateTaxByTaxableIncome(Math.max(0, x)).tax : 0;
+                };
+                var num = function (x) { var n = Number(x); return isFinite(n) ? n : 0; };
+
+                // 三类款式的税务处理不同 —— 这是速算器两个框表达不出来的那一层
+                var KIND = {
+                    economic: { name: '经济补偿金', bucket: 'sev', note: '《劳动合同法》第 47 条，受法定上限约束' },
+                    subsidy: { name: '医疗 / 生活补助费', bucket: 'sev', note: '157 号文列举的「其他补助费」，法定只设下限' },
+                    placement: { name: '一次性安置费（破产）', bucket: 'free', note: '破产企业职工取得，全额免税' },
+                    notice: { name: '代通知金（+1）', bucket: 'merge', note: '各地口径不一，本工具按并入综合所得处理' },
+                    noncompete: { name: '竞业限制补偿', bucket: 'merge', note: '不属于解除劳动关系的一次性补偿' },
+                    leave: { name: '未休年休假折算', bucket: 'merge', note: '工资薪金性质' },
+                    other: { name: '其他款项', bucket: 'merge', note: '口径不明时按并入处理（保守）' }
+                };
+                var BUCKET = {
+                    sev: '一次性补偿收入（可享免税额度）',
+                    free: '全额免税',
+                    merge: '并入当年综合所得'
+                };
+
+                var rules = Q.rules() || {};
+                var mult = num(rules.exemptMultipleOfAverageWage) || 3;
+                var capM = num(rules.capMonthlyWageMultiple) || 3;
+                var capY = num(rules.capYears) || 12;
+
+                var avgWage = Math.max(0, num(v.avgWage));
+                var monthlyWage = Math.max(0, num(v.monthlyWage));
+                var years = Math.max(0, num(v.years));
+                var extraMonths = Math.min(11, Math.max(0, Math.round(num(v.extraMonths))));
+
+                // 《劳动合同法》第 47 条：满一年一个月；六个月以上不满一年按一年；不满六个月按半个月
+                // （速算器直接把「年限」当月数用，小数年限会被少算）
+                var months = years + (extraMonths >= 6 ? 1 : (extraMonths > 0 ? 0.5 : 0));
+
+                var items = Array.isArray(v.items) ? v.items : [];
+                var detail = items.map(function (it) {
+                    var kind = KIND[it && it.kind] ? it.kind : 'other';
+                    var k = KIND[kind];
+                    return {
+                        kind: kind, name: k.name, bucket: k.bucket, note: k.note,
+                        amount: Math.max(0, num(it && it.amount))
+                    };
+                });
+                var sumOf = function (kind) {
+                    return detail.reduce(function (s, d) { return s + (d.kind === kind ? d.amount : 0); }, 0);
+                };
+                var sumBucket = function (b) {
+                    return detail.reduce(function (s, d) { return s + (d.bucket === b ? d.amount : 0); }, 0);
+                };
+                var sevEconomic = sumOf('economic');
+                var sevSubsidy = sumOf('subsidy');
+                var sevBase = sevEconomic + sevSubsidy;
+                var freePart = sumBucket('free');
+                var mergePart = sumBucket('merge');
+                var total = sevBase + freePart + mergePart;
+
+                // 免税额度与法定上限一律走 quick，一个数字都没复制
+                var r = Q.compareOf({
+                    economic: sevEconomic, other: sevSubsidy, avgWage: avgWage,
+                    monthlyWage: monthlyWage, years: months, otherTaxable: 0
+                });
+
+                var socialDed = Math.max(0, num(v.socialDeduction));
+                var taxable = Math.max(0, r.taxable - socialDed);
+                var br = Q.bracketOf(taxable);
+                var sevTax = Q.taxSeparateOf(taxable);
+
+                // 并入综合所得的部分按**增量**算：离职补偿不占用 6 万元基本减除
+                var otherTaxable = Math.max(0, num(v.otherTaxable));
+                var mergeTax = T(otherTaxable + mergePart) - T(otherTaxable);
+                var totalTax = sevTax + mergeTax;
+
+                // 法定应得（法条精确版）：只有月工资超社平 3 倍时才封「3 倍 × 12 年」
+                var maWage = avgWage / 12;
+                var wageCapped = monthlyWage > maWage * capM + 1e-9;
+                // 只有月工资超社平 3 倍时才「按 3 倍计、年限封 12 年」；否则年限不封顶
+                var dueMonths = wageCapped ? Math.min(months, capY) : months;
+                var dueWage = wageCapped ? maWage * capM : monthlyWage;
+                var legalDue = dueWage * dueMonths;
+                var dueGap = legalDue - sevBase;      // 正数 = 拿到的经济补偿低于法定应得
+
+                // 错误口径①：把所有款项都填进「经济补偿金」（速算器只有两个框时最常见的填法）
+                var naive = Q.compareOf({
+                    economic: sevBase + mergePart, other: 0, avgWage: avgWage,
+                    monthlyWage: monthlyWage, years: months, otherTaxable: 0
+                });
+                var naiveTax = Q.taxSeparateOf(Math.max(0, naive.taxable - socialDed));
+                var naiveGap = totalTax - naiveTax;   // 正数 = 混着填会少算
+
+                // 错误口径②：分次支付时每次各扣一次免税额度（免税额度整体只给一次）
+                var inst = null;
+                var times = Math.max(1, Math.round(num(v.times)));
+                if (v.installments === true && times > 1 && sevBase > 0) {
+                    var each = sevBase / times;
+                    var eachTaxable = Math.max(0, each - r.exemptCap);
+                    var instTax = Q.taxSeparateOf(eachTaxable) * times;
+                    inst = { times: times, each: each, taxable: eachTaxable, tax: instTax, gap: sevTax - instTax };
+                }
+
+                var rows = [
+                    { label: '补偿包合计', value: total, kind: 'money' },
+                    { label: '其中：一次性补偿收入（可享免税）', value: sevBase, kind: 'money' },
+                    { label: '其中：全额免税（破产安置费）', value: freePart, kind: 'money' },
+                    { label: '其中：并入综合所得', value: mergePart, kind: 'money' },
+                    { label: '免税额度（社平年工资 ×' + mult + '）', value: r.exemptCap, kind: 'money' },
+                    { label: '实际使用免税额度', value: r.exemptUsed, kind: 'money',
+                        hint: '免税额度只抵「符合法定标准」的那部分' },
+                    { label: '扣除：补偿款中代扣的社保公积金', value: socialDed, kind: 'money' },
+                    { label: '一次性补偿应纳税所得额', value: taxable, kind: 'money' },
+                    { label: '适用税率', value: br ? br.rate : 0, kind: 'percent' },
+                    { label: '一次性补偿应纳个税', value: sevTax, kind: 'money' },
+                    { label: '并入部分的增量税', value: mergeTax, kind: 'money',
+                        hint: '不占用 6 万元基本减除，按并入前后的档位差计算' },
+                    { label: '应纳个税合计', value: totalTax, kind: 'money' },
+                    { label: '税后到手', value: total - totalTax, kind: 'money' },
+                    { label: '实际税负率', value: total > 0 ? totalTax / total : 0, kind: 'percent' },
+                    { label: '法定应得经济补偿（' + dueMonths + ' 个月）', value: legalDue, kind: 'money',
+                        hint: wageCapped ? '月工资超社平 ' + capM + ' 倍，按「' + capM + ' 倍 × ' + capY + ' 年」双封顶'
+                            : '月工资未超社平 ' + capM + ' 倍，年限不封顶' },
+                    { label: '经济补偿低于法定应得', value: Math.max(0, dueGap), kind: 'money' },
+                    { label: '若全按一次性补偿（错误口径）', value: naiveTax, kind: 'money' },
+                    { label: '混着填会少算', value: naiveGap, kind: 'money' }
+                ];
+                if (inst) {
+                    rows.push({ label: '若分 ' + inst.times + ' 次支付、每次各扣免税额度', value: inst.tax, kind: 'money' });
+                    rows.push({ label: '分次各扣会少算', value: inst.gap, kind: 'money' });
+                }
+
+                var note = '免税额度 = 当地上年职工年平均工资 × ' + mult + '（' + Math.round(r.exemptCap)
+                    + ' 元）。一次性补偿收入在该额度以内免税，超出部分**不并入**当年综合所得、'
+                    + '单独适用年度税率表，不减除任何费用，也不做按工作年限平均。';
+                if (mergePart > 0 && naiveGap > 0.005) {
+                    note = '⚠️ 补偿包里有 ' + Math.round(mergePart) + ' 元**不属于**解除劳动关系的一次性补偿收入'
+                        + '（代通知金 / 竞业限制补偿 / 未休年休假折算等），不能享受免税额度。'
+                        + '若把它们一并填进「经济补偿金」，会**少算 ' + Math.round(naiveGap) + ' 元**税。';
+                }
+                if (wageCapped) {
+                    note += ' 你填的月工资已超过社平月工资 ' + capM + ' 倍，经济补偿受「' + capM + ' 倍 × ' + capY
+                        + ' 年」双封顶，封顶值 ' + Math.round(legalDue) + ' 元**恰好等于免税额度** —— '
+                        + '按法定上限足额支付的经济补偿一分钱税都不用交。';
+                }
+                if (!wageCapped && months > 0) {
+                    note += ' 你填的月工资未超社平 ' + capM + ' 倍，经济补偿的年限**不封顶**（按 ' + months
+                        + ' 个月计付）；速算器口径无条件按 ' + capY + ' 年封顶，长工龄时会低估法定应得。';
+                }
+                if (dueGap > 0.005) {
+                    note += ' 另：按《劳动合同法》第 47 条折算，法定应得经济补偿约 ' + Math.round(legalDue)
+                        + ' 元，你填的经济补偿比它少 ' + Math.round(dueGap) + ' 元 —— 先核实基数与年限，再谈税。';
+                }
+
+                var compareRows = [
+                    ['现行：按款项分类处理', { value: totalTax, kind: 'money' }, '—', '法定口径'],
+                    ['若全按一次性补偿', { value: naiveTax, kind: 'money' },
+                        Math.abs(naiveGap) < 0.005 ? '相同' : '少算 ' + Math.round(naiveGap) + ' 元',
+                        '把不能免税的款项塞进补偿包']
+                ];
+                if (inst) {
+                    compareRows.push(['若分次支付每次各扣免税额度', { value: inst.tax, kind: 'money' },
+                        Math.abs(inst.gap) < 0.005 ? '相同' : '少算 ' + Math.round(inst.gap) + ' 元',
+                        '免税额度只给一次']);
+                }
+
+                return {
+                    primary: { label: '离职补偿应纳个税', value: totalTax, kind: 'money',
+                        hint: '一次性补偿单独计税 + 并入部分的增量税' },
+                    rows: rows,
+                    note: note,
+                    extras: [{
+                        title: '补偿构成与税务处理',
+                        note: '同一笔钱，类别不同处理就不同 —— 只有前两类能享受免税额度',
+                        table: {
+                            head: ['款项', '金额', '税务处理', '可享免税额度', '说明'],
+                            rows: detail.map(function (d) {
+                                return [
+                                    d.name,
+                                    { value: d.amount, kind: 'money' },
+                                    BUCKET[d.bucket],
+                                    d.bucket === 'sev' ? '是' : (d.bucket === 'free' ? '全额免税' : '否'),
+                                    d.note
+                                ];
+                            })
+                        }
+                    }, {
+                        title: '口径对照',
+                        note: '只有第一行是法定口径；后两行是常见填法会造成的差额',
+                        table: {
+                            head: ['口径', '应纳税额', '与现行差额', '说明'],
+                            rows: compareRows
+                        }
+                    }]
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
