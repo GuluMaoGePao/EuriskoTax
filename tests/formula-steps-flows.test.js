@@ -281,11 +281,16 @@ describe('面板 DOM 防回滚（index.html）', () => {
 
     test('utils.js 导出的渲染被 spec 接线引用（不是死代码）', () => {
         const registry = fs.readFileSync(path.join(ROOT, 'src/js/data/tool-registry.js'), 'utf8');
-        // 17B-1 / 17B-2 / 17B-4：business、reverse、classification 迁到 spec 驱动后，
-        // buildXxxFormulaSteps 的接线方从 tax-calculator.js（页面时代）变成了 tool-registry 里的
-        // spec（向导渲染时用）。前者越搬越少，后者才是现在的唯一调用方。
-        expect(registry).toContain('buildBusinessFormulaSteps(');
+        // 17B-1 / 17B-2 / 17B-4：reverse、classification 迁到 spec 驱动后，buildXxxFormulaSteps
+        // 的接线方从 tax-calculator.js（页面时代）变成了 tool-registry 里的 spec（向导渲染时用）。
         expect(registry).toContain('buildReverseFormulaSteps(');
         expect(registry).toContain('buildClassificationFormulaSteps(');
+
+        // 17D-11（v1.67.0）：business 是这条链上**第一个退回去自带推导链**的 ——
+        // utils 那一份六步是按「一家个体户、成本费用逐项扣」写的，讲不出新的三层
+        // （投资者工资调增 / 合伙企业分配比例 / 多家企业汇总定档 + 亏损不能互抵），
+        // 硬套就会出现「推导链一个数、主结果另一个数」的两份真相。
+        expect(registry).toContain('② 汇总定档（第十二 ~ 十四条）');
+        expect(registry).not.toContain('buildBusinessFormulaSteps(');
     });
 });

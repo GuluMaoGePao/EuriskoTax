@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.66.0';
+        window.__APP_VERSION__ = '1.70.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -615,7 +615,7 @@
                          注册表中「尚无静态卡片」的 deep 工具由 renderDeepEntries() 动态追加至此。
                          原有 4 个页面式 deep 各有静态卡，v1.46.0 → v1.50.0 四次迁移后**页面式已归零**
                          （business / reverse / forward / classification 各留一张卡作为首页与工具箱的入口），
-                         故这里渲染的是**阶段17 的 spec 驱动 deep**（现 19 个：
+                         故这里渲染的是**阶段17 的 spec 驱动 deep**（现 21 个：
                          vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
                          + 17D-1 withholding-deep 劳务报酬预扣预缴 + 17D-2 bonus-tax-deep 年终奖择优
                          + 17D-3 equity-deep 股权激励 + 17D-4 severance-deep 离职补偿
@@ -624,7 +624,9 @@
                          + 17D-7 annual-settlement-deep 年度汇算清缴（个税场景 11/16）
                          + 17D-8 special-deduction-deep 专项附加扣除（个税场景 12/16）
                          + 17D-9 private-pension-deep 个人养老金与税优三件套（个税场景 13/16）
-                         + 17D-10 donation 公益慈善捐赠扣除（个税场景 14/16，第一个没有同名速算器的完整测算）；
+                         + 17D-10 donation 公益慈善捐赠扣除（个税场景 14/16，第一个没有同名速算器的完整测算）
+                         + 17D-12 property-transfer 个人转让房屋（个税场景 15/16，20% 比例税率的那一档）
+                         + 17D-13 non-resident 非居民 / 无住所（个税场景 16/16，第三个没有同名速算器的完整测算）；
                          其中 vat-deep（17C-1 纵深 v1.58.0）、cit-deep（17C-2 纵深 v1.59.0）、
                          social-base-deep（17C-3 纵深 v1.60.0）、disability-fund-deep（17C-5 纵深 v1.61.0）、
                          surtax-stamp-deep（17C-4 纵深 v1.62.0）已改为**自带 spec**：前者速算器只认一个
@@ -647,7 +649,29 @@
                          donation（17D-10 纵深 v1.66.0）捐赠不是一个所得项目，而是**横跨综合 / 经营 /
                          分类三个所得项目**的一项扣除 —— 20 个速算器里没有一个能算，而最贵的一层是
                          「先扣哪一项」：顺序自行决定，实测同一笔 5 万捐赠省 8000 还是 4244，差 3756 元；
-                         另外股权 / 房产的捐赠额按**财产原值**而不是市值）；
+                         另外股权 / 房产的捐赠额按**财产原值**而不是市值；
+                         business（17D-11 纵深 v1.67.0）原来只认「一家个体户、成本费用逐项扣」，而
+                         **一人兴办两家以上企业必须汇总定档**（分别申报实测少交 28250）、**年度经营
+                         亏损不能跨企业弥补**（误按互抵实测少算 70000）、**投资者的工资不得税前扣除**
+                         —— 这三层它一层都没碰；
+                         property-transfer（17D-12 纵深 v1.68.0）卖房的税既不是工资也不是经营所得，
+                         而是**财产转让所得**（20% 比例税率）：应纳税所得额 = 转让收入 − 房屋原值 −
+                         转让环节税金 − 合理费用，装修费还有**原值比例上限**（原值 200 万、装修发票
+                         30 万只能扣 20 万，多缴 2 万）；**核定 1% 不是可选项**（查账 80 万 vs 核定
+                         5 万，差 75 万）；满五唯一的「唯一」是**同一省 / 自治区 / 直辖市范围内**
+                         夫妻唯一一套，不是全国唯一；受赠 / 继承的房屋原值取**原捐赠人 / 被继承人**
+                         的取得成本（误按受赠时评估价算差 68 万）；换购退税退的是**已缴**个税
+                         （财政部 税务总局 住房城乡建设部公告 2026 年第 3 号，至 2027-12-31），
+                         按新购 ÷ 转让金额的比例退）；
+                         non-resident（17D-13 纵深 v1.69.0）即便同属个税，「月薪 + 五险一金 + 专项附加」
+                         那五个框默认这位是**中国税收居民**，而这一类人进门要解决的第一个问题根本不是
+                         「扣多少」，而是「**这笔钱要不要在中国缴**」：≤ 90 天只对「境内工作 + 境内
+                         雇主支付或者负担」的重叠部分计税、90~183 天境内工作期间的**不论谁支付**都要缴、
+                         满 183 天但不满六年时境外支付的境外所得免税、连续满六年且无单次离境超过
+                         30 天的才全球征税（同一批工资实测 **0 / 26620 / 53080 / 73080**）；收入额要
+                         先按三个公式过一道乘法，非居民再按**按月换算后的月度税率表逐月单独计税**
+                         （同一笔 24 万年薪均匀发 19080、集中到一个月发 44280），数月奖金单独 ÷ 6
+                         定档且不减费用 —— 错把它并入发放当月会算出 89580，虚增 **62960**）；
                          新增税种无需再改本文件。 -->
                     <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
                 </div>
@@ -1414,7 +1438,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.66.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.70.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1731,6 +1755,10 @@
     <script src="src/js/calculation/business-income-quick.js"></script>
     <!-- 17D-10（v1.66.0）：公益捐赠扣除 —— 跨综合 / 经营 / 分类三个所得项目，故排在经营所得之后 -->
     <script src="src/js/calculation/donation-quick.js"></script>
+    <!-- 17D-12（v1.68.0）：个人转让房屋（财产转让所得 20%）—— 与捐赠同款，20 个速算器里没有一个能收它 -->
+    <script src="src/js/calculation/property-transfer-quick.js"></script>
+    <!-- 17D-13（v1.69.0）：非居民 / 无住所个人（90 天 · 183 天 · 满六年）-->
+    <script src="src/js/calculation/non-resident-quick.js"></script>
     <script src="src/js/calculation/vat-quick.js"></script>
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>

@@ -763,6 +763,52 @@ var donationRules = {
     fullDeductionNote: '国务院规定全额税前扣除的从其规定；同时发生按 30% 扣除与全额扣除的，**扣除次序自行选择**（八）'
 };
 
+// 17D-12（v1.68.0）：个人转让房屋 —— 财产转让所得 20%。
+// 与捐赠同一类处境：20 个速算器里没有一个能收它（它不是「一个月薪」也不是「一笔劳务」），
+// 所以口径落在 property-transfer-quick.js，常量只声明**法定参数**，公式不复制第二份。
+var propertyTransferRules = {
+    rate: 0.20,                    // 财产转让所得：比例税率 20%（《个人所得税法》第三条）
+    taxableFormula: '转让收入 − 房屋原值 − 转让过程中缴纳的税金 − 合理费用',
+    decorationCap: {
+        commercial: 0.10,          // 商品房及其他住房：最高扣除限额 = 房屋原值 10%
+        publicOrAffordable: 0.15,  // 已购公有住房、经济适用房：房屋原值 15%
+        basis: '房屋原值'
+    },
+    assessRange: [0.01, 0.03],     // 原值凭证不全：按转让收入 1%~3% 核定（具体由省局 / 市局确定）
+    assessDefault: 0.01,
+    exemption: {
+        years: 5,                  // 自用 5 年以上
+        scope: '同一省、自治区、直辖市范围内纳税人（有配偶的为夫妻双方）仅拥有一套住房',
+        startRule: '房屋产权证注明的时间与契税完税凭证注明的时间孰先',
+        applyTo: '住房（非住房不适用，国税发〔2007〕33 号二）'
+    },
+    repurchase: {
+        windowMonths: 12,          // 出售住房后 1 年内重新购房
+        sameCity: true,            // 同一直辖市、副省级城市、地级市所辖全部行政区划
+        mustBeOwner: true,         // 售房人须为新购住房产权人或产权人之一
+        from: '2026-01-01',
+        to: '2027-12-31'           // 财政部 税务总局 住房城乡建设部公告 2026 年第 3 号
+    },
+    basis: '《个人所得税法》第三条（财产转让所得 20%）、国税发〔2006〕108 号、国税发〔2007〕33 号、财税字〔1999〕278 号、财税〔2009〕78 号'
+};
+
+// 17D-13（v1.69.0）：非居民个人 / 无住所个人 —— 这一类人进门要解决的不是「扣多少」，
+// 而是「**这笔钱要不要在中国缴**」：90 天 / 183 天 / 满六年三道门槛决定哪些钱压根不用缴。
+// 月度税率表不在这里复制 —— 与年终奖单独计税共用 `bonusMonthlyTaxRates`。
+var nonResidentRules = {
+    residentDays: 183,          // 一个纳税年度内累计居住满 183 天 → 居民个人（个税法第一条）
+    shortStayDays: 90,          // ≤ 90 天：只对「境内工作期间 + 境内雇主支付或者负担」的部分征税
+    sixYears: 6,                // 此前连续六个年度每年累计居住都满 183 天（34 号一）
+    singleTripMaxAbsence: 30,   // 且没有任何一年单次离境超过 30 天 —— **没有**「累计离境 90 天」那条老规则
+    partialDayWeight: 0.5,      // 工作天数：境内停留当天不足 24 小时的按半天算（35 号第一条（一））
+    monthlyDeduction: 5000,     // 非居民个人：每月减除费用 5000 元
+    annualDeduction: 60000,     // 居民个人：年度减除费用 6 万元
+    bonusSpreadMonths: 6,       // 非居民数月奖金：÷ 6 定档后 × 6，**不减除费用**
+    bonusOncePerYear: true,     // 一个公历年度内对每一个非居民个人只允许适用一次（公式五）
+    monthlyRateTable: 'bonusMonthlyTaxRates',
+    basis: '《个人所得税法》第一条、《个人所得税法实施条例》第四条、财政部 税务总局公告 2019 年第 34 号、财政部 税务总局公告 2019 年第 35 号'
+};
+
 var businessIncomeRules = {
     rateTable: 'businessTaxRates',
     halve: {
@@ -789,6 +835,25 @@ var businessIncomeRules = {
             { key: 'other', name: '其他行业', min: 0.10, max: 0.30 }
         ],
         note: '核定征收按「收入 × 应税所得率」计税：不扣成本费用、不扣业主 6 万费用、不扣专项附加，核定期间的亏损也不得弥补'
+    },
+    // 阶段17 17D-11（v1.67.0）：一人兴办**两家以上**企业（含参与兴办）时的汇总口径。
+    // 五条都是财税〔2000〕91号《关于个人独资企业和合伙企业投资者征收个人所得税的规定》：
+    //   · aggregate      第十二条：年度终了应**汇总**所有企业的应纳税所得额，据此确定适用税率
+    //                   并计算缴纳税款 —— 不是各家各自查一次税率表；
+    //   · lossCarryAcross 第十四条第二款：企业的年度经营亏损**不能跨企业弥补**
+    //                   （只能留在本企业，用本企业以后年度所得弥补）；
+    //   · lossCarryYears  第十四条第一款：逐年延续弥补，**最长 5 年**；
+    //   · investorDeductionOnce 第十三条：投资者本人的费用扣除（6 万）**只能选择在其中一家
+    //                   企业**的生产经营所得中扣除，不能每家都扣一次；
+    //   · investorSalaryNotDeductible 第六条（一）：**投资者的工资不得在税前扣除**
+    //                   （已计入成本费用的要调增回来）。
+    multiEntity: {
+        aggregate: true,
+        lossCarryAcross: false,
+        lossCarryYears: 5,
+        investorDeductionOnce: true,
+        investorSalaryNotDeductible: true,
+        basis: '财税〔2000〕91号 第十二条 / 第十三条 / 第十四条、第六条（一）'
     }
 };
 

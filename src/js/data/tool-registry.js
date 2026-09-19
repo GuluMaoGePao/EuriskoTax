@@ -573,11 +573,52 @@
             // 原来它指向 business-calculation-page（index.html 里 390 行 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染，卡片点击即进向导。
             // 口径没动：compute 直接调 tax-calculator.js 抽出的 calculateBusinessTaxCore —— 与页面版同一份内核。
-            id: 'business', name: '经营所得', subtitle: '个体 / 独资，成本费用逐项扣',
+            id: 'business', name: '经营所得', subtitle: '一人多家怎么汇总，亏损能不能互抵',
             icon: 'fa-briefcase', status: 'deep',
             nextTools: ['business-income', 'social-base', 'vat'],
             // 结果步由渲染器自动追加（所有完整测算都有，「计算结果」不在此重复声明）。
+            //
+            // 17D-11（v1.67.0）做深：原来的 spec 只认「一家个体户、成本费用逐项扣」，
+            // 而经营所得最贵的三层它一层都没碰 ——
+            //   ① **一人兴办两家以上企业必须汇总定档**（财税〔2000〕91号 第十二条）：
+            //      分别申报会把速算扣除数扣两次、档位还偏低（实测少交 **29250**）；
+            //   ② **年度经营亏损不能跨企业弥补**（第十四条第二款）：亏损企业当年计 0，
+            //      亏损留在本企业逐年弥补（最长 5 年）—— 误按互抵会少算 **70000**；
+            //   ③ **投资者的工资不得税前扣除**（第六条（一））、6 万费用扣除**只能选其中一家**
+            //      （第十三条）、合伙企业按**分配比例**归属（第五条）。
+            // 这三层都加在 business-income-quick.js 里（multiEntityOf / halveCompareOf），
+            // 内核 calculateBusinessTaxCore 只加了两个**默认不生效**的可选参数
+            // （ownerSalaryAddBack / profitShareRatio）—— 关掉它们必须回到内核那一个数，
+            // 这条「增量不改变原样」由 tests/business-income-core.test.js 的闭环对拍钉住。
             fields: [
+                { key: 'entityType', step: 'entity', label: '企业类型', type: 'select', default: 'individual',
+                    options: [{ value: 'individual', label: '个体工商户' }, { value: 'sole', label: '个人独资企业' },
+                        { value: 'partnership', label: '合伙企业（按分配比例）' }],
+                    hint: '合伙企业以**每一个合伙人**为纳税人：按合伙协议约定的分配比例确定应纳税所得额，没约定的按合伙人数量平均（第五条）' },
+                { key: 'partnershipRatio', step: 'entity', label: '你在该合伙企业的分配比例（%）', type: 'percent', default: 50,
+                    when: { key: 'entityType', in: ['partnership'] },
+                    hint: '合伙协议约定优先；没有约定的按合伙人数量平均计算（财税〔2000〕91号 第五条）' },
+                { key: 'mode', step: 'entity', label: '征收方式', type: 'select', default: 'audited',
+                    options: [{ value: 'audited', label: '查账征收' }, { value: 'assessed', label: '核定征收（按应税所得率）' }],
+                    hint: '核定征收按「收入 × 应税所得率」计税：成本费用再多也不看，投资者 6 万费用与专项附加同样不能扣' },
+                { key: 'profitRatio', step: 'entity', label: '核定应税所得率（%）', type: 'percent', default: 10,
+                    when: { key: 'mode', in: ['assessed'] },
+                    hint: '各地按行业核定：制造业 5%~15%、批发零售 4%~15%、娱乐业 15%~30%、其他 10%~30%' },
+                { key: 'halve', step: 'entity', label: '享受“不超过 200 万部分减半征收”', type: 'switch', default: true,
+                    hint: '财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31' },
+                { key: 'hasOtherEntities', step: 'entity', label: '你今年还有别的个体户 / 个独 / 合伙份额', type: 'switch', default: true,
+                    hint: '一人兴办两家以上企业（含参与兴办），年度终了必须**汇总**所有企业的应纳税所得额确定税率（第十二条）' },
+                { key: 'otherEntities', step: 'entity', label: '其他企业（亏损填负数）', type: 'repeater',
+                    when: { key: 'hasOtherEntities', in: [true] }, addLabel: '添加一家企业',
+                    default: [{ taxable: 800000 }, { taxable: -400000 }],
+                    itemFields: [
+                        { key: 'taxable', label: '该企业年度应纳税所得额（元，亏损填负数）', type: 'money', default: 0 }
+                    ],
+                    hint: '亏损企业的亏损**不能跨企业弥补**，只能留在本企业用以后年度所得逐年弥补（最长 5 年）' },
+                { key: 'ownerDeductionAt', step: 'entity', label: '投资者本人 6 万费用扣除在哪家扣', type: 'select', default: 'self',
+                    when: { key: 'hasOtherEntities', in: [true] },
+                    options: [{ value: 'self', label: '扣在本企业' }, { value: 'other', label: '已在其他企业扣过' }],
+                    hint: '只能选**其中一家**企业的所得中扣除，不能每家都扣一次（第十三条）' },
                 { key: 'income', step: 'income', label: '年度经营收入总额', type: 'money', default: 600000 },
                 { key: 'cost', step: 'income', label: '年度成本', type: 'money', default: 350000 },
                 { key: 'expenses', step: 'income', label: '年度费用', type: 'money', default: 50000 },
@@ -585,6 +626,8 @@
                 { key: 'losses', step: 'income', label: '年度损失', type: 'money', default: 0 },
                 { key: 'otherExpenses', step: 'income', label: '其他支出', type: 'money', default: 0 },
                 { key: 'previousLosses', step: 'income', label: '以前年度亏损弥补', type: 'money', default: 0, hint: '亏损可向以后年度结转，最长 5 年' },
+                { key: 'ownerSalary', step: 'income', label: '给投资者本人（业主）发的工资（已计入成本费用）', type: 'money', default: 120000, min: 0,
+                    hint: '投资者的工资**不得在税前扣除** —— 已列支的要调增回来（财税〔2000〕91号 第六条（一））' },
                 { key: 'hasComprehensiveIncome', step: 'deduction', label: '本年度有综合所得（工资薪金等）', type: 'switch', default: true, hint: '有综合所得时，基本减除与社保公积金在综合所得里扣，经营所得不再扣' },
                 { key: 'workMonths', step: 'deduction', label: '年工作总月数', type: 'select', default: 12, options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
                 // 下面 6 项是**便利输入**：用户手里有的是社保缴费基数，不是「每月扣了多少养老金」。
@@ -618,33 +661,216 @@
             derive: insuranceDerive,
             warnings: socialBaseWarnings,
             steps: [
-                { key: 'income', title: '经营收入与成本', why: '经营所得按年计税：收入总额减成本、费用、税金与损失，才是经营利润' },
+                { key: 'entity', title: '身份与征收方式', why: '先定两件事：是不是合伙企业（按分配比例归属）、还有没有别的企业（有就必须汇总定档）' },
+                { key: 'income', title: '经营收入与成本', why: '经营所得按年计税：收入总额减成本、费用、税金与损失，才是经营利润；给业主发的工资要调增回来' },
                 { key: 'deduction', title: '扣除项明细', why: '先确认有没有综合所得 —— 它决定 6 万减除与社保公积金在哪边扣，两边不能重复扣' }
             ],
             pitfalls: [
-                '有综合所得时，基本减除费用与社保公积金**只能在综合所得里扣一次**，经营所得不再扣',
-                '减半征收是**年应纳税所得额 200 万以内**的部分减半，不是全部所得减半',
-                '大病医疗只扣**超过 1.5 万**的部分、限额 8 万；公益性捐赠限额为应纳税所得额的 30%'
+                '**一人兴办两家以上企业（含参与兴办）必须汇总**：年度终了汇总所有企业的应纳税所得额，据此确定适用税率（财税〔2000〕91号 第十二条）。分别各自申报会把速算扣除数扣两次、档位还偏低 —— 实测少交 **28250 元**',
+                '**年度经营亏损不能跨企业弥补**（第十四条第二款）：亏损企业当年计 0，亏损留在本企业用以后年度所得逐年弥补、**最长 5 年**。误按「盈利 50 万 − 亏损 20 万 = 30 万」互抵，实测少算 **70000 元**',
+                '**投资者的工资不得在税前扣除**（第六条（一））：给业主本人发的工资已计入成本费用的，汇算时一律调增；投资者本人的费用扣除（6 万）**只能选择在其中一家企业**扣除，不能每家都扣一次（第十三条）',
+                '**合伙企业按分配比例**归属到每个合伙人，协议没约定的按合伙人数量平均（第五条）—— 不是谁拿了多少就算多少',
+                '**减半减的是「不超过 200 万那部分对应的税额」**，不是全额应纳税额打五折：应纳税所得额 ≤ 200 万时两种算法恰好相等，所以这个坑只在**超过 200 万**时才现形 —— 恰恰是数字最大的那批人（300 万时差 **175000 元**）',
+                '**核定征收不是「少交税」的代名词**：按「收入 × 应税所得率」计税，成本费用再多也不看，投资者 6 万费用与专项附加同样不能扣，核定期间的亏损也不得弥补 —— 实际利润率低于应税所得率 + 6 万 ÷ 年收入时，核定反而多交',
+                '有综合所得时，基本减除费用与社保公积金**只能在综合所得里扣一次**，经营所得不再扣；大病医疗只扣**超过 1.5 万**的部分、限额 8 万；公益性捐赠限额为应纳税所得额的 30%',
+                '减半政策执行至 **2027-12-31**；经营所得按年计算、分月或分季预缴，**年度终了后 3 个月内**汇算清缴，多退少补（第十七条）'
             ],
             compute: function (v) {
                 if (typeof calculateBusinessTaxCore !== 'function') return null;
-                var core = calculateBusinessTaxCore(v);
-                var t = core.taxDetails;
-                return {
-                    primary: { label: '应纳个人所得税', value: t.totalTax, kind: 'money' },
-                    rows: [
-                        { label: '应纳税所得额', value: t.taxableIncome, kind: 'money' },
-                        { label: '适用税率', value: t.applicableRate, kind: 'percent' },
-                        { label: '速算扣除数', value: t.applicableDeduction, kind: 'money' },
-                        { label: '减半征收减免', value: t.taxReduction, kind: 'money', hint: '年应纳税所得额 200 万以内的部分减半' },
-                        { label: '扣除合计', value: core.deductionDetails.total, kind: 'money' },
-                        { label: '已预缴税额', value: t.prepaidTax, kind: 'money' },
-                        { label: t.refundTax >= 0 ? '应补税额' : '应退税额', value: Math.abs(t.refundTax), kind: 'money' },
-                        { label: '税后经营所得', value: t.netIncomeAfterTax, kind: 'money' }
+                var Q = window.EuriskoBusinessIncomeQuick;
+                if (!Q) return null;
+
+                var useHalve = v.halve !== false;
+                var isAssessed = v.mode === 'assessed';
+                var shareRatio = v.entityType === 'partnership' ? (Number(v.partnershipRatio) || 0) / 100 : 1;
+                var ownerSalary = isAssessed ? 0 : (Number(v.ownerSalary) || 0);
+
+                // 6 万只能扣在一家（第十三条）：已在别家扣过 → 本企业不再扣
+                var ownerDeductedElsewhere = !!(v.hasOtherEntities && v.ownerDeductionAt === 'other');
+
+                var ownTaxable, deductionTotal = 0, core = null;
+                if (isAssessed) {
+                    ownTaxable = Q.assessedOf({
+                        revenue: Number(v.income) || 0,
+                        profitRatio: (Number(v.profitRatio) || 0) / 100,
+                        halve: useHalve
+                    }).taxable;
+                } else {
+                    core = calculateBusinessTaxCore(v, {
+                        ownerSalaryAddBack: ownerSalary,
+                        profitShareRatio: shareRatio,
+                        ownerDeductedElsewhere: ownerDeductedElsewhere
+                    });
+                    ownTaxable = core.taxDetails.taxableIncome;
+                    deductionTotal = core.deductionDetails.total;
+                }
+
+                var others = (v.hasOtherEntities && Array.isArray(v.otherEntities))
+                    ? v.otherEntities.map(function (o, i) {
+                        // 亏损填负数 —— 不能用 `|| 0` 兜底，否则 -40 万会被当成 0
+                        var n = Number(o && o.taxable);
+                        return { name: '其他企业 ' + (i + 1), taxable: isFinite(n) ? n : 0 };
+                    }) : [];
+                var m = Q.multiEntityOf({ own: ownTaxable, others: others, halve: useHalve, ownName: '本企业' });
+                var bracket = Q.taxBeforeHalveOf(m.aggregateTaxable);
+                var halved = Q.taxOf(m.aggregateTaxable);
+                var prepaid = Number(v.prepaidTax) || 0;
+                var refund = halved.tax - prepaid;
+
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+
+                var rows = [
+                    { label: '本企业应纳税所得额', value: ownTaxable, kind: 'money',
+                        hint: isAssessed ? '核定征收：收入 × 应税所得率，不扣成本费用' : '已调增投资者工资、并按分配比例归属后的所得' },
+                    { label: '汇总应纳税所得额', value: m.aggregateTaxable, kind: 'money',
+                        hint: others.length ? '各企业相加，亏损企业当年计 0（不能跨企业弥补）' : '只有这一家企业，汇总数等于本企业数' },
+                    { label: '适用税率', value: bracket.rate, kind: 'percent', hint: '按**汇总**数定档，不是各家各查一次' },
+                    { label: '速算扣除数', value: bracket.deduction, kind: 'money' },
+                    { label: '减半征收减免', value: halved.halve, kind: 'money', hint: '年应纳税所得额 200 万以内的部分减半（2023 年第 12 号，至 2027-12-31）' },
+                    { label: '应纳个人所得税', value: halved.tax, kind: 'money' }
+                ];
+                if (m.separateGap > 0.01) {
+                    rows.push({ label: '比“分别申报”多交', value: m.separateGap, kind: 'money',
+                        hint: '分别申报会少交这么多 —— 那是漏报，不是筹划' });
+                }
+                if (m.nettingGap > 0.01) {
+                    rows.push({ label: '比“亏损互抵”多交', value: m.nettingGap, kind: 'money',
+                        hint: '亏损不能跨企业弥补，误按互抵会少算这么多' });
+                }
+                if (m.lossCarriedForward > 0) {
+                    rows.push({ label: '留在原企业结转的亏损', value: m.lossCarriedForward, kind: 'money',
+                        hint: '用本企业以后年度所得逐年弥补，最长 ' + m.lossCarryYears + ' 年' });
+                }
+                if (!isAssessed) rows.push({ label: '扣除合计', value: deductionTotal, kind: 'money' });
+                rows.push({ label: '已预缴税额', value: prepaid, kind: 'money' });
+                rows.push({ label: refund >= 0 ? '应补税额' : '应退税额', value: Math.abs(refund), kind: 'money' });
+                rows.push({ label: '税后经营所得', value: m.aggregateTaxable - halved.tax, kind: 'money' });
+
+                var extras = [];
+                if (others.length) {
+                    extras.push({
+                        title: '各家企业的所得、单独申报税额与汇总口径（第十二条）',
+                        note: '汇总后按各企业应纳税所得额占比分摊；亏损企业当年计 0，亏损留在本企业结转 '
+                            + m.lossCarryYears + ' 年',
+                        table: {
+                            head: ['企业', '应纳税所得额', '单独申报税额', '汇总后分摊', '备注'],
+                            rows: m.items.map(function (it) {
+                                var share = m.aggregateTaxable > 0
+                                    ? halved.tax * (Math.max(0, it.taxable) / m.aggregateTaxable) : 0;
+                                return [it.name, money(it.taxable), money(Q.taxOf(Math.max(0, it.taxable)).tax),
+                                    money(share), it.taxable < 0 ? '亏损结转，不能跨企业弥补' : ''];
+                            }).concat([['合计', money(m.aggregateTaxable), money(m.separate), money(halved.tax), '']])
+                        }
+                    });
+                }
+
+                var halveRows = [500000, 1000000, 2000000, 3000000, 5000000].map(function (t) {
+                    var c = Q.halveCompareOf(t);
+                    return [money(t), money(c.before), money(c.halve), money(c.correct), money(c.byTax), money(c.byTaxable)];
+                });
+                extras.push({
+                    title: '减半到底减的是什么（三种算法对照）',
+                    note: '正确：减免 = min(应纳税所得额, 200 万) 那部分**对应的税额** × 50%；'
+                        + '「应纳税额打五折」只在 ≤ 200 万时恰好相等，超过 200 万就开始少算',
+                    table: {
+                        head: ['应纳税所得额', '减半前税额', '减免额', '正确税额', '误：税额打五折', '误：所得额打五折'],
+                        rows: halveRows
+                    }
+                });
+
+                if (!isAssessed) {
+                    var cmp = Q.compareOf({
+                        revenue: Number(v.income) || 0,
+                        cost: (Number(v.cost) || 0) + (Number(v.expenses) || 0) + (Number(v.taxes) || 0)
+                            + (Number(v.losses) || 0) + (Number(v.otherExpenses) || 0) - ownerSalary,
+                        previousLoss: Number(v.previousLosses) || 0,
+                        specialDeduction: core ? core.deductionDetails.specialDeduction.total : 0,
+                        specialAdditional: core ? core.deductionDetails.specialAdditionalDeduction.total : 0,
+                        hasComprehensiveIncome: v.hasComprehensiveIncome,
+                        profitRatio: (Number(v.profitRatio) || 0) / 100,
+                        halve: useHalve
+                    });
+                    var be = Q.breakevenProfitRatioOf({
+                        revenue: Number(v.income) || 0,
+                        cost: (Number(v.cost) || 0) + (Number(v.expenses) || 0) + (Number(v.taxes) || 0)
+                            + (Number(v.losses) || 0) + (Number(v.otherExpenses) || 0) - ownerSalary,
+                        previousLoss: Number(v.previousLosses) || 0,
+                        specialDeduction: core ? core.deductionDetails.specialDeduction.total : 0,
+                        specialAdditional: core ? core.deductionDetails.specialAdditionalDeduction.total : 0,
+                        hasComprehensiveIncome: v.hasComprehensiveIncome,
+                        profitRatio: (Number(v.profitRatio) || 0) / 100,
+                        halve: useHalve
+                    });
+                    extras.push({
+                        title: '如果改成核定征收会怎样（不是必然更省）',
+                        note: be ? '临界净利率约 ' + Math.round(be.ratio * 1000) / 10 + '%：高于它查账更省，低于它核定更省'
+                            : '当前口径下查账在任何利润率下都不比核定差',
+                        table: {
+                            head: ['征收方式', '应纳税所得额', '税率', '减半减免', '税额'],
+                            rows: [
+                                ['查账征收', money(cmp.audited.taxable), pct(cmp.audited.rate),
+                                    money(cmp.audited.halve), money(cmp.audited.tax)],
+                                ['核定征收', money(cmp.assessed.taxable), pct(cmp.assessed.rate),
+                                    money(cmp.assessed.halve), money(cmp.assessed.tax)]
+                            ]
+                        }
+                    });
+                }
+
+                var note = '本企业应纳税所得额 ' + Math.round(ownTaxable) + ' 元'
+                    + (others.length ? '，加上其他企业后**汇总 ' + Math.round(m.aggregateTaxable) + ' 元**定档'
+                        + '（适用税率 ' + Math.round(bracket.rate * 100) + '%）' : '')
+                    + '，减半减免 ' + Math.round(halved.halve) + ' 元，全年应纳个人所得税 **'
+                    + Math.round(halved.tax) + ' 元**。';
+                if (m.separateGap > 0.01) note += ' 按各家分别申报会少交 ' + Math.round(m.separateGap) + ' 元（漏报）；';
+                if (m.nettingGap > 0.01) note += ' 把亏损拿去互抵会少算 ' + Math.round(m.nettingGap) + ' 元（不能跨企业弥补）；';
+                if (isAssessed) note += ' 核定征收按「收入 × 应税所得率」计税，成本费用、投资者 6 万与专项附加一律不扣；';
+                note += ' 投资者本人的工资不得税前扣除，已列支的 ' + Math.round(ownerSalary) + ' 元已调增。';
+
+                var steps = [{
+                    title: '① 本企业应纳税所得额',
+                    rows: isAssessed ? [
+                        { label: '收入总额', value: Number(v.income) || 0, format: 'money' },
+                        { label: '应税所得率', value: (Number(v.profitRatio) || 0) / 100, format: 'percent' },
+                        { label: '应纳税所得额', value: ownTaxable, format: 'money', note: '核定不扣成本费用' }
+                    ] : [
+                        { label: '经营利润（收入 − 成本费用损失）', value: core.incomeDetails.businessProfit, format: 'money' },
+                        { label: '加：投资者工资调增', value: ownerSalary, format: 'money', note: '投资者的工资不得税前扣除（第六条（一））' },
+                        { label: '减：以前年度亏损', value: Number(v.previousLosses) || 0, format: 'money' },
+                        { label: shareRatio < 1 ? '× 合伙分配比例' : '投资者份额', value: shareRatio < 1 ? shareRatio : 1,
+                            format: shareRatio < 1 ? 'percent' : 'text' },
+                        { label: '减：扣除合计', value: deductionTotal, format: 'money' },
+                        { label: '应纳税所得额', value: ownTaxable, format: 'money' }
                     ],
-                    note: '投资者本人减除费用 5000 元/月按实际工作月数算；有综合所得时该减除与社保公积金改在综合所得里扣除。',
-                    // 推导链直接复用 utils.js 里既有那份（页面版用的也是它）—— 不写第二套
-                    steps: (typeof buildBusinessFormulaSteps === 'function') ? buildBusinessFormulaSteps(core) : []
+                    footnote: isAssessed ? '核定征收：应纳税所得额 = 收入总额 × 应税所得率（第九条）'
+                        : '投资者本人的工资不得扣除；合伙企业按分配比例归属（第五条）。'
+                }, {
+                    title: '② 汇总定档（第十二 ~ 十四条）',
+                    rows: m.items.map(function (it) {
+                        return { label: it.name, value: Math.max(0, it.taxable), format: 'money',
+                            note: it.taxable < 0 ? '亏损当年计 0，留在本企业结转' : '' };
+                    }).concat([
+                        { label: '汇总应纳税所得额', value: m.aggregateTaxable, format: 'money' },
+                        { label: '适用税率', value: bracket.rate, format: 'percent' },
+                        { label: '速算扣除数', value: bracket.deduction, format: 'money' }
+                    ]),
+                    footnote: '一人兴办两家以上企业的，年度终了汇总所有企业应纳税所得额确定税率；企业的年度亏损不能跨企业弥补。'
+                }, {
+                    title: '③ 减半与补退',
+                    rows: [
+                        { label: '减半前应纳税额', value: halved.beforeHalve, format: 'money' },
+                        { label: '减：200 万以内部分减半', value: halved.halve, format: 'money' },
+                        { label: '应纳个人所得税', value: halved.tax, format: 'money' },
+                        { label: '已预缴税额', value: prepaid, format: 'money' },
+                        { label: refund >= 0 ? '应补税额' : '应退税额', value: Math.abs(refund), format: 'money' }
+                    ],
+                    footnote: '财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31；年度终了后 3 个月内汇算清缴。'
+                }];
+
+                return {
+                    primary: { label: '全年应纳个人所得税', value: halved.tax, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
                 };
             }
         },
@@ -5517,6 +5743,539 @@
                         footnote: '岗位本来就要招人 → 招残疾人净省全额残保金；专为省残保金增设岗位 → 雇一个人要付 '
                             + pct(1 + cmp.totalRate) + ' 倍工资'
                     }]
+                };
+            }
+        },
+        {
+            // 阶段17 17D-12（v1.68.0）：**个人转让房屋** —— 与 donation 同款处境，20 个速算器里
+            // **没有一个**能收它：它不是「一个月薪」也不是「一笔劳务」，而是《个人所得税法》
+            // 第二条里单独一档的**财产转让所得**（20% 比例税率）。速算器那套「收入 − 扣除 → 按表算」
+            // 的框架在这里会直接把「售价」当「所得」，而卖房最贵的五层它一层都没碰：
+            //   ① 应纳税所得额 = 转让收入 − **房屋原值** − 转让环节税金 − 合理费用（国税发〔2006〕108 号一）；
+            //      装修费有**原值比例上限**（商品房及其他住房 10%、已购公有住房 / 经济适用房 15%）
+            //      —— 原值 200 万、装修发票 30 万只能扣 20 万，多缴 **2 万**；
+            //   ② **核定 1% 不是可选项**：有原值凭证必须查账，只有凭证不全才按转让收入 1%~3% 核定
+            //      （售价 500 万 / 原值 100 万：查账 80 万、核定 5 万，差 **75 万**但没有选择权）；
+            //   ③ **满五唯一**免征的「唯一」是**同一省 / 自治区 / 直辖市范围内**夫妻唯一一套住房
+            //      （不是全国唯一、也不是同城唯一），自用年限按产权证与契税完税凭证**孰先**起算；
+            //   ④ **受赠 / 继承**的房屋再转让，原值是**原捐赠人 / 被继承人**的实际购置成本
+            //      （父亲 60 万买的房受赠后卖 500 万：正确 88 万，误按评估价 400 万算只有 20 万，差 **68 万**）；
+            //   ⑤ **换购退税**退的是**已缴**个税（2026 年第 3 号，至 2027-12-31），按新购 ÷ 转让金额
+            //      的比例退 —— 卖 500 万缴 33.6 万：买 400 万退 26.88 万、买 600 万全退 33.6 万。
+            // 口径实现在 property-transfer-quick.js（税率 / 上限 / 免征年限 / 退税口径全部读
+            // propertyTransferRules），这里只负责收集与呈现 —— 与 17D-11 同一个约定：**不复制公式**。
+            id: 'property-transfer', name: '卖房要交多少税',
+            subtitle: '满五唯一免在哪、核定 1% 能不能选、换购能退多少',
+            icon: 'fa-home', status: 'deep',
+            nextTools: ['classification', 'surtax-stamp'],
+            fields: [
+                { key: 'usage', step: 'property', label: '转让的是', type: 'select', default: 'residence',
+                    options: [{ value: 'residence', label: '住房（住宅）' }, { value: 'nonresidence', label: '非住房（商铺 / 写字楼等）' }],
+                    hint: '满五唯一免征与换购退税**只适用于住房**（国税发〔2007〕33 号二）' },
+                { key: 'acquireType', step: 'property', label: '房子是怎么取得的', type: 'select', default: 'purchase',
+                    options: [{ value: 'purchase', label: '自己买的' }, { value: 'gift', label: '受赠取得' },
+                        { value: 'inherit', label: '继承取得' }],
+                    hint: '受赠 / 继承的房屋再转让：房屋原值是**原捐赠人 / 被继承人**的实际购置成本，不是 0（财税〔2009〕78 号五）' },
+                { key: 'salePrice', step: 'property', label: '转让收入（实际成交价，元）', type: 'money', default: 5000000,
+                    hint: '按实际成交价；网签价明显偏低又无正当理由的，税务机关可核定' },
+                { key: 'originalValue', step: 'property', label: '房屋原值（元）', type: 'money', default: 3000000,
+                    when: { key: 'acquireType', in: ['purchase', 'inherit'] },
+                    hint: '实际支付的购房价款 + 缴纳的契税、土地出让金等（108 号二）；继承的填**被继承人**的取得成本' },
+                { key: 'donorCost', step: 'property', label: '原捐赠人取得该房屋的实际购置成本（元）', type: 'money', default: 600000,
+                    when: { key: 'acquireType', in: ['gift'] },
+                    hint: '不是受赠时的评估价，也不是 0 —— 父亲 60 万买的房受赠后卖 500 万，原值是 60 万（财税〔2009〕78 号五）' },
+                { key: 'hasValueProof', step: 'property', label: '能提供完整、准确的房屋原值凭证', type: 'switch', default: true,
+                    hint: '关掉就是「原值凭证不全」：由税务机关按转让收入 1%~3% **核定**征收，装修费、贷款利息等扣除项都不再看（108 号三）' },
+                { key: 'assessRate', step: 'property', label: '核定征收率（%）', type: 'percent', default: 1,
+                    when: { key: 'hasValueProof', in: [false] },
+                    hint: '法定区间 1%~3%，具体由各省局 / 市局确定（如海南为 2%）—— 不是纳税人可以挑的' },
+                { key: 'holdYears', step: 'property', label: '自用年限', type: 'select', default: 6,
+                    options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30].map(function (y) {
+                        return { value: y, label: y + ' 年' };
+                    }),
+                    hint: '起算点：房屋产权证注明的时间与契税完税凭证注明的时间**孰先**（财税字〔1999〕278 号）' },
+                { key: 'isOnlyHome', step: 'property', label: '本次出售的住房是家庭唯一生活用房', type: 'switch', default: false,
+                    when: { key: 'usage', in: ['residence'] },
+                    hint: '「唯一」是**同一省 / 自治区 / 直辖市范围内**（有配偶的为夫妻双方）只有这一套住房 —— 不是全国唯一、也不是同城唯一' },
+                { key: 'vatAndSurcharge', step: 'cost', label: '转让过程中缴纳的税金（元）', type: 'money', default: 0,
+                    hint: '增值税及附加、土地增值税等；住房满 2 年免征增值税时填 0（108 号一（三））' },
+                { key: 'houseType', step: 'cost', label: '房屋性质', type: 'select', default: 'commercial',
+                    when: { key: 'usage', in: ['residence'] },
+                    options: [{ value: 'commercial', label: '商品房及其他住房' },
+                        { value: 'public', label: '已购公有住房 / 经济适用房' }],
+                    hint: '决定装修费的扣除上限比例：商品房 10%、公有住房 / 经济适用房 15%' },
+                { key: 'decoration', step: 'cost', label: '住房装修费用（元）', type: 'money', default: 300000,
+                    hint: '须有税务统一发票、发票付款人与产权人一致；超过原值比例上限的部分**不能扣**（108 号二（一）1）' },
+                { key: 'loanInterest', step: 'cost', label: '住房贷款利息（元）', type: 'money', default: 0,
+                    hint: '凭贷款利息支出凭证按实际发生额扣除' },
+                { key: 'otherFees', step: 'cost', label: '手续费、公证费等其他合理费用（元）', type: 'money', default: 20000 },
+                { key: 'repurchase', step: 'repurchase', label: '出售住房后 1 年内有重新购房', type: 'switch', default: true,
+                    when: { key: 'usage', in: ['residence'] },
+                    hint: '财政部 税务总局 住房城乡建设部公告 2026 年第 3 号：退的是**已缴**个税，不是补贴' },
+                { key: 'sameCity', step: 'repurchase', label: '新购住房与现住房在同一城市', type: 'switch', default: true,
+                    when: { key: 'repurchase', in: [true] },
+                    hint: '同一直辖市、副省级城市、地级市所辖的全部行政区划范围' },
+                { key: 'isNewOwner', step: 'repurchase', label: '售房人为新购住房产权人或产权人之一', type: 'switch', default: true,
+                    when: { key: 'repurchase', in: [true] } },
+                { key: 'repurchasePrice', step: 'repurchase', label: '新购住房金额（元）', type: 'money', default: 4000000,
+                    when: { key: 'repurchase', in: [true] },
+                    hint: '新购金额 ≥ 现住房转让金额 → **全额退还**已缴个税；< 则按新购 ÷ 转让金额的比例退还' }
+            ],
+            steps: [
+                { key: 'property', title: '房子与产权', why: '先定三件事：住房还是非住房、怎么取得的（受赠 / 继承的原值另有规定）、满五年是不是家庭唯一' },
+                { key: 'cost', title: '能扣什么', why: '原值、转让环节税金、装修费（有原值比例上限）、贷款利息与手续费公证费 —— 扣完才是应纳税所得额' },
+                { key: 'repurchase', title: '卖后换购', why: '出售住房后 1 年内在同城重新购房的，按新购金额占转让金额的比例退还已缴个税' }
+            ],
+            pitfalls: [
+                '**应纳税所得额不是「售价 − 买价」**：转让收入 − 房屋原值 − 转让过程中缴纳的税金 − 合理费用（国税发〔2006〕108 号一）。装修费有**原值比例上限** —— 商品房及其他住房 10%、已购公有住房 / 经济适用房 15%：原值 200 万、装修发票 30 万只能扣 20 万，多缴 **2 万**',
+                '**核定 1% 不是可选项**：能提供完整、准确的房屋原值凭证的**必须查账**，只有凭证不全时才由税务机关按转让收入 1%~3% 核定（具体征收率由省局 / 市局确定）。售价 500 万、原值 100 万：查账 80 万、核定 5 万，差 **75 万** —— 恰恰是差额大的那批人最想选、也最没有选择权',
+                '**满五唯一的「唯一」不是全国唯一、也不是同城唯一**：是**同一省、自治区、直辖市范围内**纳税人（有配偶的为夫妻双方）仅拥有一套住房；自用 5 年以上的起算点是房屋产权证注明时间与契税完税凭证注明时间**孰先**（财税字〔1999〕278 号四）',
+                '**受赠 / 继承的房屋再转让**，原值不是 0、也不是受赠时的评估价，而是**原捐赠人 / 被继承人**取得该房屋的实际购置成本（财税〔2009〕78 号五）：父亲 60 万买的房子受赠后卖 500 万，正确税额 88 万；误按受赠时评估价 400 万算只有 20 万 —— 差 **68 万**',
+                '**换购退税退的是已缴个税，不是补贴**（财政部 税务总局 住房城乡建设部公告 **2026 年第 3 号**，执行至 **2027-12-31**）：出售住房后 **1 年内**在**同城**重新购房、且售房人为新购住房产权人或之一，新购金额 ≥ 转让金额**全额退**，< 则按新购 ÷ 转让金额的比例退。卖 500 万缴 33.6 万：买 400 万退 **26.88 万**、买 600 万全退 **33.6 万**',
+                '**已经满五唯一的人换购退不到钱**：已缴个税本来就是 0，退税额 = 0 × 比例 = 0。别把「卖了再买能退税」当成年年可吃的红利 —— 它只在**你真的缴了税**时才有意义',
+                '**非住房（商铺、写字楼）不适用**满五唯一免征，**也不适用**换购住房退税（国税发〔2007〕33 号二），装修费也不受住房那档比例上限约束',
+                '装修费须凭**税务统一发票**、且发票付款人与产权人一致；住房贷款利息凭贷款利息支出凭证按实际发生额扣除；转让收入按**实际成交价**，网签价明显偏低又无正当理由的，税务机关有权核定'
+            ],
+            compare: [
+                '查账 vs 核定：有原值凭证必须查账，核定 1%~3% 只是凭证不全时的替代 —— 「哪个省选哪个」不成立',
+                '满五唯一：免的是全部个税，但「唯一」看同一省 / 自治区 / 直辖市范围内，不是全国唯一',
+                '换购退税：已缴个税 × 新购 ÷ 转让金额，与满五唯一免征不叠加（免征时已缴为 0）'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoPropertyTransferQuick;
+                if (!Q) return null;
+
+                var input = {
+                    usage: v.usage, acquireType: v.acquireType,
+                    salePrice: Number(v.salePrice) || 0,
+                    originalValue: Number(v.originalValue) || 0,
+                    donorCost: Number(v.donorCost) || 0,
+                    hasValueProof: v.hasValueProof !== false,
+                    holdYears: Number(v.holdYears) || 0,
+                    isOnlyHome: !!v.isOnlyHome,
+                    vatAndSurcharge: Number(v.vatAndSurcharge) || 0,
+                    houseType: v.houseType || 'commercial',
+                    decoration: Number(v.decoration) || 0,
+                    loanInterest: Number(v.loanInterest) || 0,
+                    otherFees: Number(v.otherFees) || 0,
+                    assessRate: Number(v.assessRate) || 0,
+                    repurchase: !!v.repurchase, sameCity: !!v.sameCity, isNewOwner: !!v.isNewOwner,
+                    repurchasePrice: Number(v.repurchasePrice) || 0
+                };
+                var s = Q.stackOf(input);
+                var cmp = Q.assessCompareOf(input);
+                var ex = Q.exemptCompareOf(input);
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+                var isAssess = s.method === 'assess';
+
+                var rows = [{ label: '转让收入（实际成交价）', value: s.price, kind: 'money' }];
+                if (isAssess) {
+                    rows.push({ label: '核定征收率', value: s.assessRate, kind: 'percent',
+                        hint: '原值凭证不全：按转让收入 1%~3% 核定（省局 / 市局确定）' });
+                    rows.push({ label: '核定应纳税额', value: s.assessTax, kind: 'money' });
+                } else {
+                    rows.push({ label: '减：房屋原值', value: s.basis.value, kind: 'money', hint: s.basis.label });
+                    rows.push({ label: '减：转让过程中缴纳的税金', value: s.taxPaidInTransfer, kind: 'money',
+                        hint: '增值税及附加等；住房满 2 年免征增值税时填 0' });
+                    rows.push({ label: '减：合理费用', value: s.decoration.allowed + s.loanInterest + s.otherFees,
+                        kind: 'money', hint: s.decoration.note });
+                    rows.push({ label: '应纳税所得额', value: s.taxable, kind: 'money' });
+                    rows.push({ label: '税率', value: s.rate, kind: 'percent', hint: '财产转让所得：20% 比例税率' });
+                    rows.push({ label: '应纳税额', value: s.taxBeforeExempt, kind: 'money' });
+                }
+                if (s.exemptEligible) {
+                    rows.push({ label: '满五唯一免征', value: 0, kind: 'money',
+                        hint: '自用 5 年以上且为家庭唯一生活用房（财税字〔1999〕278 号四）' });
+                }
+                if (s.refund.applied) {
+                    rows.push({ label: '换购住房退税', value: s.refund.refund, kind: 'money',
+                        hint: '退还比例 ' + Math.round(s.refund.ratio * 100) + '%（新购 ÷ 转让金额）' });
+                }
+                rows.push({ label: '实际净缴个税', value: s.netTax, kind: 'money' });
+
+                var extras = [{
+                    title: '核定 1% 能不能选：查账与核定对照',
+                    note: cmp.note,
+                    table: {
+                        head: ['口径', '税额', '本例适用', '说明'],
+                        rows: cmp.rows.map(function (r0) {
+                            return [r0.label, money(r0.tax), r0.applied ? '是' : '', r0.note];
+                        })
+                    }
+                }, {
+                    title: '满五唯一的三种边界（同一省 / 自治区 / 直辖市范围内）',
+                    note: '免征条件：自用 ' + ex.needYears + ' 年以上 **且** 是家庭唯一生活用房；自用年限起算点按'
+                        + ex.startRule,
+                    table: {
+                        head: ['情形', '是否免征', '个税'],
+                        rows: ex.rows.map(function (r0) {
+                            return [r0.label, r0.eligible ? '免征' : '照缴', money(r0.tax)];
+                        })
+                    }
+                }];
+
+                if (s.isResidence) {
+                    var price = s.price;
+                    var rpRows = [0, Math.round(price * 0.8), price, Math.round(price * 1.2)].map(function (buy) {
+                        var r0 = Q.repurchaseRefundOf({
+                            usage: 'residence', salePrice: price, taxPaidIIT: s.tax,
+                            repurchase: buy > 0, repurchasePrice: buy, sameCity: true, isNewOwner: true
+                        });
+                        return [buy > 0 ? '重新购房（' + Math.round(buy / 10000) + ' 万）' : '不重新购房',
+                            money(buy), pct(r0.ratio), money(r0.refund), money(r0.netTax)];
+                    });
+                    extras.push({
+                        title: '卖后 1 年换购：买多少退多少（2026 年第 3 号，至 2027-12-31）',
+                        note: '退的是**已缴**个税：新购金额 ≥ 转让金额全额退，不足则按新购 ÷ 转让金额的比例退；'
+                            + '满五唯一免征的（已缴为 0）退不到钱',
+                        table: { head: ['情形', '新购金额', '退还比例', '退还个税', '实际净缴'], rows: rpRows }
+                    });
+                }
+
+                var note = '转让收入 ' + Math.round(s.price) + ' 元';
+                if (isAssess) {
+                    note += '，原值凭证不全按 ' + Math.round(s.assessRate * 100) + '% 核定，应纳税额 **'
+                        + Math.round(s.tax) + ' 元**';
+                } else {
+                    note += '，减除房屋原值 ' + Math.round(s.basis.value) + ' 元、转让环节税金 '
+                        + Math.round(s.taxPaidInTransfer) + ' 元、合理费用 '
+                        + Math.round(s.decoration.allowed + s.loanInterest + s.otherFees) + ' 元后，应纳税所得额 '
+                        + Math.round(s.taxable) + ' 元，按 20% 计税 **' + Math.round(s.taxBeforeExempt) + ' 元**';
+                }
+                if (s.decoration.disallowed > 0.01) {
+                    note += '；装修费有 ' + Math.round(s.decoration.disallowed) + ' 元超过原值 '
+                        + Math.round(s.decoration.capRatio * 100) + '% 的上限不能扣（多缴 '
+                        + Math.round(s.decoration.disallowed * s.rate) + ' 元）';
+                }
+                if (s.exemptEligible) note += '；符合满五唯一 → **免征**';
+                if (s.refund.applied && s.refund.refund > 0.01) {
+                    note += '；换购退税 ' + Math.round(s.refund.refund) + ' 元后实际净缴 **'
+                        + Math.round(s.netTax) + ' 元**';
+                }
+
+                var steps = [{
+                    title: '① 应纳税所得额（国税发〔2006〕108 号一）',
+                    rows: isAssess ? [
+                        { label: '转让收入', value: s.price, format: 'money' },
+                        { label: '核定征收率', value: s.assessRate, format: 'percent' },
+                        { label: '核定应纳税额', value: s.assessTax, format: 'money' }
+                    ] : [
+                        { label: '转让收入（实际成交价）', value: s.price, format: 'money' },
+                        { label: '减：房屋原值', value: s.basis.value, format: 'money', note: s.basis.label },
+                        { label: '减：转让过程中缴纳的税金', value: s.taxPaidInTransfer, format: 'money' },
+                        { label: '减：装修费（受原值比例上限约束）', value: s.decoration.allowed, format: 'money',
+                            note: s.decoration.note },
+                        { label: '减：住房贷款利息', value: s.loanInterest, format: 'money' },
+                        { label: '减：手续费、公证费等其他合理费用', value: s.otherFees, format: 'money' },
+                        { label: '应纳税所得额', value: s.taxable, format: 'money' },
+                        { label: '× 税率', value: s.rate, format: 'percent' },
+                        { label: '应纳税额', value: s.taxBeforeExempt, format: 'money' }
+                    ],
+                    footnote: isAssess ? '原值凭证不全 → 由税务机关按转让收入 1%~3% 核定（108 号三）'
+                        : '转让收入按实际成交价；房屋原值含购置价款与缴纳的契税、土地出让金等（108 号二）'
+                }, {
+                    title: '② 满五唯一免征（财税字〔1999〕278 号四）',
+                    rows: [
+                        { label: '自用年限', value: s.rules.exemption.years, format: 'text',
+                            note: '本例 ' + Math.round(input.holdYears) + ' 年' },
+                        { label: '家庭唯一生活用房', value: input.isOnlyHome ? '是' : '否', format: 'text',
+                            note: '同一省 / 自治区 / 直辖市范围内（有配偶的为夫妻双方）' },
+                        { label: '免征后应纳税额', value: s.exemptTax, format: 'money' }
+                    ],
+                    footnote: '自用 5 年以上 **且** 是家庭唯一生活用房才免征；自用年限按房屋产权证注明时间与契税完税凭证注明时间孰先起算'
+                }, {
+                    title: '③ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）',
+                    rows: [
+                        { label: '已缴个人所得税', value: s.tax, format: 'money' },
+                        { label: '新购住房金额', value: s.refund.repurchasePrice, format: 'money' },
+                        { label: '退还比例（新购 ÷ 转让）', value: s.refund.ratio, format: 'percent' },
+                        { label: '退还个人所得税', value: s.refund.refund, format: 'money' },
+                        { label: '实际净缴', value: s.netTax, format: 'money' }
+                    ],
+                    footnote: '出售住房后 1 年内在同城重新购房、售房人为新购住房产权人或之一；执行至 2027-12-31'
+                }];
+
+                return {
+                    primary: { label: s.exemptEligible ? '应缴个人所得税（免征）' : '应缴个人所得税',
+                        value: s.tax, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
+        },
+        {
+            // 阶段17 17D-13（v1.69.0）：**非居民个人 / 无住所个人** —— 第三类「20 个速算器里
+            // 没有一个能收它」的完整测算（前两个是 donation、property-transfer）。即便同为个税，
+            // 「月薪 + 五险一金 + 专项附加」那五个框**默认这位是中国税收居民**：monthsYears /
+            // 累计预扣 / 年度汇算 / 专项附加扣除一律假定法定。而这一类人进门要解决的第一个问题
+            // 根本不是「扣多少」，而是「**这笔钱要不要在中国缴**」。要补的四层：
+            //   ① 居住天数 → 纳税义务四档（个税法第一条 + 34 号）：≤ 90 天只对「境内工作 +
+            //      境内雇主支付」的部分计税；90~183 天境内工作期间的**不论谁支付**都要缴；
+            //      满 183 天成为居民但连续不满六年，境外所得中境外支付的部分免税；连续满六年
+            //      （且无任何一年单次离境超过 30 天）→ 境内境外**全部**所得都要缴；
+            //      同样的工资，四档实测 **0 / 6220 / 53080 / 73080**；
+            //   ② 收入额要先过一道乘法（35 号第二条）：公式一 = 境内外工资 × 境内支付占比 ×
+            //      境内工作天数占比；公式二 = 境内外工资 × 境内工作天数占比；公式三 = 境内外
+            //      工资 ×〔1 − 境外支付占比 × 境外工作天数占比〕；高管（董事、监事、高层管理
+            //      职务）无论是否在境内履行职务，由境内居民企业支付或者负担的报酬一律属境内所得；
+            //   ③ 非居民**按月换算后的综合所得税率表逐月单独计税**（当月收入额 − 5000 → 月度
+            //      税率表），不像居民那样按年累计：24 万年收入均匀发 19080、集中到一个月发
+            //      **44280**，差 **25200** —— 而居民那张年度表根本不看发放节奏；
+            //   ④ 数月奖金单独按 **6 个月**分摊、**不减除费用**、一年只能用一次（公式五），
+            //      这与居民的「全年一次性奖金 ÷ 12 定档」是两回事，不能互相套用；
+            //      实测默认口径：法定 26620，把奖金并入发放当月算出 **89580**，虚增 **62960**。
+            // 口径实现在 non-resident-quick.js（183 天 / 90 天 / 六年 / 30 天 / 5000 / 6 个月全部
+            // 读 nonResidentRules，月度税率表复用 bonusMonthlyTaxRates，年度表走内核），
+            // 这里只负责收集与呈现 —— 与前三版同一个约定：**不复制税率、不复制公式**。
+            id: 'non-resident', name: '非居民 / 无住所要缴多少税',
+            subtitle: '90 天 · 183 天 · 满六年，这次问题不是扣多少',
+            icon: 'fa-passport', status: 'deep',
+            nextTools: ['expat', 'forward', 'withholding'],
+            fields: [
+                { key: 'role', step: 'residence', label: '在境内单位的职务', type: 'select', default: 'staff',
+                    options: [{ value: 'staff', label: '普通 / 中层员工' },
+                        { value: 'executive', label: '董事、监事或高层管理人员' }],
+                    hint: '担任境内居民企业董事、监事、高层管理职务的个人，**无论是否在境内履行职务**，'
+                        + '由该境内企业支付或者负担的报酬一律属于境内所得（35 号第一条（三））' },
+                { key: 'stayFullDays', step: 'residence', label: '本纳税年度内在境内累计居住天数', type: 'number',
+                    default: 120,
+                    hint: '在中国境内停留的**当天满 24 小时**才算一天；不足 24 小时的不计入居住天数'
+                        + '（作为工作天数时可按半天算，两个口径不同）' },
+                { key: 'fullYearsBefore', step: 'residence', label: '此前连续住满 183 天的年度数', type: 'select',
+                    default: 5,
+                    options: [0, 1, 2, 3, 4, 5, 6].map(function (y) {
+                        return { value: y, label: y === 6 ? '6 年及以上' : y + ' 年' };
+                    }),
+                    hint: '满 183 天 **且** 此前六年每年都住满 183 天 **且** 没有任何一年单次离境超过 30 天'
+                        + ' → 境内境外全部所得都要缴（财政部 税务总局公告 2019 年第 34 号一）' },
+                { key: 'maxSingleAbsence', step: 'residence', label: '此前六年中任一年度的单次最长离境天数',
+                    type: 'number', default: 0,
+                    hint: '六年判定只看**有没有任何一年单次离境超过 30 天** —— 不再有「累计离境 90 天作废」'
+                        + '那条老规则（财税字〔1995〕98 号已随 2019 年新法废止）' },
+                { key: 'monthlyTotal', step: 'income', label: '当月境内外工资薪金总额（元）', type: 'money',
+                    default: 30000,
+                    hint: '工资薪金所属的工作期间**横跨境内境外**时，境内外支付都要算进来，'
+                        + '再按比例切出境内所得' },
+                { key: 'monthlyPaidDomestic', step: 'income', label: '其中由境内雇主支付或者负担的部分（元）',
+                    type: 'money', default: 15000,
+                    hint: '「支付或者负担」包括外国母公司替境内子公司承担的部分 —— 谁最终买单比谁填支票更重要' },
+                { key: 'calendarDays', step: 'income', label: '当月工资薪金所属工作期间的公历天数',
+                    type: 'number', default: 30 },
+                { key: 'domesticWorkDays', step: 'income', label: '其中境内工作天数', type: 'number', default: 20,
+                    hint: '在境内、境外单位同时任职（或仅在境外单位任职）的，境内停留当天**不足 24 小时的按半天**'
+                        + '计入境内工作天数（35 号第一条（一））' },
+                { key: 'months', step: 'income', label: '本年在境内任职领取工资的月数', type: 'select', default: 12,
+                    options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (m) {
+                        return { value: m, label: m + ' 个月' };
+                    }) },
+                { key: 'bonus', step: 'bonus', label: '一次性取得的数月奖金（元）', type: 'money', default: 120000,
+                    hint: '非居民一个月内取得数月奖金：单独、**不与当月工资合并**、按 6 个月分摊且'
+                        + '**不减除费用**计税（公式五），一个公历年度内每人只能适用一次' }
+            ],
+            steps: [
+                { key: 'residence', title: '身份与居住天数', why: '先定四档里的哪一档：90 天以内、90~183 天、满 183 天但不满六年、连续满六年' },
+                { key: 'income', title: '钱从哪来、人在哪干活', why: '收入额不是工资总额 —— 要先按境内支付占比与境内工作天数占比过一道乘法' },
+                { key: 'bonus', title: '数月奖金', why: '单独按 6 个月分摊计税，不并入当月工资、也不减除费用' }
+            ],
+            pitfalls: [
+                '**先问要不要缴，再问扣多少**：同样是每月 3 万全部由境外母公司支付 —— 年内累计居住 60 天的适用公式一，只对「境内工作 + 境内雇主支付或者负担」两者重叠的那部分计税（本例交集为空 → **0 元**）；住到 120 天就换成公式二，境内工作期间的工资**不论由谁支付**都要缴（**26620 元**）',
+                '**六年不是自然年，是被「单次离境超过 30 天」打断的**：同样住满 200 天且此前已连续六年，一次性离境 40 天就把六年清掉 —— 73080 元退回到 **53080 元**，差 **20000 元**；34 号只认「单次」，老黄历里那句「累计离境 90 天作废」（财税字〔1995〕98 号）已随 2019 年新法废止',
+                '**收入额是不等于工资总额的**：公式一 = 当月境内外工资 × 境内支付占比 × 境内工作天数占比（例如 3 万 × 50% × 20/30 = **1 万**）；公式二去掉支付占比；公式三只对「境外工作且境外支付」的那部分做扣除 —— 三个公式随居住天数切换，不能记一个用到底',
+                '**非居民按月换算后的综合所得税率表逐月单独计税**（当月收入额 − 5000 → 月度税率表），不像居民那样按年累计合并：**同一笔 24 万年薪，均匀发放与全压到最后一个月发放相差 25200 元**（19080 vs 44280），而居民按年累计的那张年度表**根本不看发放节奏**，两种算法差出来的钱没有任何补偿',
+                '**数月奖金单独按 6 个月分摊、不减除费用、一年只能用一次**（公式五）：默认口径下法定 26620 元，而最常见的错误算法「奖金并入发放当月」会算出 **89580 元** —— 虚增 **62960 元**，原因就是把 12 万一把推进月度税率的 45% 那一档',
+                '**数月奖金分摊不是居民的「全年一次性奖金 ÷ 12」**：居民是把奖金 ÷ 12 定档后「全额 × 税率 − 速算扣除数」，速算扣除数只扣一次、也不另行减除费用；非居民是 ÷ **6** 定档、**不减除** 5000 元、且一个公历年度内对同一人**只能用一次** —— 两张口诀长得像，结果未必相同，不能互相套',
+                '**高管（董事、监事、高层管理职务）不适用「按天数分摊」的待遇**：≤90 天档里普通员工的公式一是「支付占比 × 天数占比」两道相乘，高管只看第一道 —— 由境内居民企业支付或者负担的报酬**全额计入**，不再切天数；90~183 天档里高管也改用公式三（35 号第二条（三））',
+                '**非居民不享受专项附加扣除、不办理年度汇算**：子女教育 / 房贷利息 / 赡养老人只属于居民个人综合所得；此外居住天数按「当天满 24 小时」计、而工作天数在同时对境外任职时可按**半天**计 —— 两个口径规则不同，混着用会在 90 天 / 183 天的临界点上出错'
+            ],
+            compare: [
+                '四档纳税义务：≤90 天 / 90~183 天 / 满183天不满六年 / 满六年 —— 同一批收入实测 6220 / 26620 / 53080 / 73080',
+                '收入额三公式：公式一（<90天）→ 公式二（90~183天）→ 公式三（居民不满六年或90~183天的高管）',
+                '非居民逐月单独计税 vs 居民按年累计：收入越不均匀，前者越吃亏',
+                '数月奖金：单独 ÷ 6 定档 × 6（不减费用）vs 并入当月工资 —— 实测差 62960'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoNonResidentQuick;
+                if (!Q) return null;
+
+                var input = {
+                    role: v.role || 'staff',
+                    stayFullDays: Number(v.stayFullDays) || 0,
+                    fullYearsBefore: Number(v.fullYearsBefore) || 0,
+                    maxSingleAbsence: Number(v.maxSingleAbsence) || 0,
+                    monthlyTotal: Number(v.monthlyTotal) || 0,
+                    monthlyPaidDomestic: Number(v.monthlyPaidDomestic) || 0,
+                    calendarDays: Number(v.calendarDays) || 30,
+                    domesticWorkDays: Number(v.domesticWorkDays) || 0,
+                    months: Number(v.months) || 12,
+                    bonus: Number(v.bonus) || 0
+                };
+                var s = Q.stackOf(input);
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+                var text = function (x) { return { value: x, kind: 'text' }; };
+                var ic = s.income;
+                var sal = s.salary;
+                var rround = function (x) { return Math.round(x * 100) / 100; };
+
+                var rows = [
+                    { label: '本纳税年度境内累计居住天数', value: s.status.days + ' 天', kind: 'text',
+                        hint: '在中国境内停留的当天**满 24 小时**才算一天' },
+                    { label: '身份判定', value: s.status.tierLabel, kind: 'text',
+                        hint: '一个纳税年度内累计居住是否满 183 天（个税法第一条）' }
+                ];
+                if (s.status.isResident) {
+                    rows.push({ label: '六年规则', value: s.sixYear.sixYearsMet ? '已连续满六年（全球所得征税）'
+                        : '不满六年（境外支付的境外所得免税）', kind: 'text',
+                        hint: s.sixYear.reasons.join('；') });
+                }
+                rows.push({ label: '当月境内外工资薪金总额', value: input.monthlyTotal, kind: 'money' });
+                rows.push({ label: '当月工资薪金收入额', value: ic.amount, kind: 'money',
+                    hint: ic.formula + '：' + ic.label + ' —— ' + ic.note });
+                rows.push({ label: '每月减除费用', value: sal.monthlyDeduction, kind: 'money',
+                    hint: '非居民个人：按月换算后的综合所得税率表，一个月算一次' });
+                if (input.monthlyPaidDomestic > 0 || ic.ratio < 1) {
+                    rows.push({ label: '留在征税范围外（由所得来源地规则切出去）', value: input.monthlyTotal
+                        - ic.amount, kind: 'money',
+                        hint: '这一档里不用在中国的部分，不是「扣除」而是**本来就不在征税范围**' });
+                }
+                if (!s.status.isResident) {
+                    rows.push({ label: '月度税率', value: sal.rate, kind: 'percent',
+                        hint: '速算扣除数 ' + Math.round(sal.deduction) + ' 元' });
+                    rows.push({ label: '工资薪金税额（' + sal.months + ' 个月）', value: sal.tax, kind: 'money' });
+                }
+                if (input.bonus > 0) {
+                    rows.push({ label: '数月奖金税额（÷ ' + s.bonus.spreadMonths + ' 定档后再 × '
+                        + s.bonus.spreadMonths + '）', value: s.bonus.tax, kind: 'money',
+                        hint: s.bonus.note });
+                }
+                rows.push({ label: s.status.isResident ? '应缴个人所得税（按年累计）' : '应缴个人所得税',
+                    value: s.tax, kind: 'money' });
+                if (input.bonus > 0 && Math.abs(s.naiveGap) > 0.01) {
+                    rows.push({ label: '若把奖金并入发放当月（错误算法）', value: s.naive, kind: 'money',
+                        hint: '法定口径 ' + Math.round(s.tax) + ' 元，差 ' + Math.round(s.naiveGap) + ' 元' });
+                }
+
+                var scenarios = Q.scenarioTableOf(input);
+                var vol = Q.volatilitySampleOf(input);
+                var bonusMerged = input.bonus > 0
+                    ? Q.monthlyTaxOf(Math.max(0, input.monthlyTotal + input.bonus - sal.monthlyDeduction)).tax
+                        + Math.max(0, sal.months - 1) * sal.taxPerMonth
+                    : 0;
+
+                var extras = [{
+                    title: '四档：同样是这批工资，住多久决定缴多少',
+                    note: '没有单位 PRC 税务局会替你选一档 —— 四个情形是同一批收入（月领 3 万，其中境内'
+                        + '支付 ' + Math.round(input.monthlyPaidDomestic / 10000) + ' 万，'
+                        + input.calendarDays + ' 天里境内工作 ' + input.domesticWorkDays + ' 天）',
+                    table: {
+                        head: ['居住天数 / 身份', '适用公式', '当月收入额', '个税'],
+                        rows: scenarios.map(function (r0) {
+                            return [r0.label, r0.formula, money(r0.monthlyIncome), money(r0.tax)];
+                        })
+                    }
+                }, {
+                    title: '数月奖金：单独分摊 vs 并入发放当月',
+                    note: s.bonus.note + '；这是非居民最贵的一处上手经验',
+                    table: {
+                        head: ['口径', '算法', '税额'],
+                        rows: [
+                            ['法定：单独按 ' + s.bonus.spreadMonths + ' 个月分摊',
+                                '〔（' + Math.round(s.bonus.inScope) + ' ÷ ' + s.bonus.spreadMonths
+                                    + '）× ' + Math.round(s.bonus.rate * 100) + '% − '
+                                    + Math.round(s.bonus.deduction) + '〕× ' + s.bonus.spreadMonths,
+                                money(s.bonus.tax)],
+                            ['错误：并入发放当月计税',
+                                '（' + Math.round(input.monthlyTotal + input.bonus) + ' − '
+                                    + Math.round(sal.monthlyDeduction) + '）查月度税率表',
+                                money(bonusMerged)]
+                        ]
+                    }
+                }, {
+                    title: '发放节奏：同一笔年收入，怎么发决定非居民交多少',
+                    note: vol.note,
+                    table: {
+                        head: ['发放方式', '每月金额', '非居民（月度表）', '居民（年度表）'],
+                        rows: [
+                            ['按月均匀发放', money(rround(vol.flatEach)), money(vol.flatTax), money(vol.residentSame)],
+                            ['前 ' + Math.max(0, vol.months - 1) + ' 个月少发、最后一个月集中发',
+                                Math.round(vol.lumpEach) + ' 元 / ' + Math.round(vol.lumpLast) + ' 元',
+                                money(vol.lumpTax), money(vol.residentSame)]
+                        ]
+                    }
+                }];
+
+                var note = '本纳税年度境内累计居住 ' + s.status.days + ' 天 → ' + s.status.tierLabel
+                    + '；当月工资薪金收入额 ' + Math.round(ic.amount) + ' 元（' + ic.formula + '：'
+                    + ic.label + '）';
+                if (!s.status.isResident) {
+                    note += '，按 ' + (sal.monthlyDeduction || 0) + ' 元/月减除后适用月度税率表 '
+                        + Math.round(sal.rate * 100) + '%';
+                }
+                note += '，工资薪金 ' + Math.round(sal.tax) + ' 元';
+                if (input.bonus > 0) note += '，数月奖金 ' + Math.round(s.bonus.tax) + ' 元';
+                note += '，合计 **' + Math.round(s.tax) + ' 元**';
+                if (input.bonus > 0 && Math.abs(s.naiveGap) > 0.01) {
+                    note += '；奖金并入发放当月的错法会算出 ' + Math.round(s.naive) + ' 元（多 '
+                        + Math.round(s.naiveGap) + ' 元）';
+                }
+                if (ic.amount < input.monthlyTotal - 0.01) {
+                    note += '；另有每月 ' + Math.round(input.monthlyTotal - ic.amount)
+                        + ' 元按所得来源地规则不在中国的征税范围内';
+                }
+
+                var steps = [{
+                    title: '① 纳税义务四个档（个税法第一条 + 34 号）',
+                    rows: [
+                        { label: '本纳税年度境内累计居住天数', value: s.status.days + ' 天', format: 'text',
+                            note: '当天停留满 24 小时才算一天' },
+                        { label: '身份判定', value: s.status.tierLabel, format: 'text' },
+                        { label: '适用口径', value: ic.formula, format: 'text', note: ic.note }
+                    ],
+                    footnote: s.sixYear.reasons.join('；')
+                }, {
+                    title: '② 当月工资薪金收入额（35 号第二条）',
+                    rows: [
+                        { label: '当月境内外工资薪金总额', value: input.monthlyTotal, format: 'money' },
+                        { label: '境内支付占比', value: ic.payRatio, format: 'percent',
+                            note: '由境内雇主支付或者负担 ' + Math.round(input.monthlyPaidDomestic) + ' 元' },
+                        { label: '境内工作天数占比', value: ic.dayRatio, format: 'percent',
+                            note: input.domesticWorkDays + ' ÷ ' + input.calendarDays + ' 天' },
+                        { label: '当月工资薪金收入额', value: ic.amount, format: 'money',
+                            note: ic.label }
+                    ],
+                    footnote: '三个公式随居住天数与身份切换；高管（董事、监事、高层管理职务）'
+                        + '无论是否在境内履行职务，由境内居民企业支付或者负担的报酬一律属于境内所得'
+                }, {
+                    title: '③ 税款计算（35 号第三条）',
+                    rows: s.status.isResident ? [
+                        { label: '年度收入额合计', value: sal.salaryIncome + s.bonus.inScope, format: 'money' },
+                        { label: '减：年度费用扣除', value: s.rules.annualDeduction || 0, format: 'money' },
+                        { label: '应纳税所得额', value: Math.max(0, sal.salaryIncome + s.bonus.inScope
+                            - (s.rules.annualDeduction || 0)), format: 'money' },
+                        { label: '应缴个人所得税（年度表）', value: s.tax, format: 'money' }
+                    ] : [
+                        { label: '当月收入额', value: ic.amount, format: 'money' },
+                        { label: '减：每月费用扣除', value: sal.monthlyDeduction, format: 'money' },
+                        { label: '应纳税所得额（月度口径）', value: sal.taxablePerMonth, format: 'money' },
+                        { label: '月度税率 / 速算扣除数', value: Math.round(sal.rate * 100) + '% / '
+                            + Math.round(sal.deduction) + ' 元', format: 'text' },
+                        { label: '当月工资薪金税额', value: sal.taxPerMonth, format: 'money' },
+                        { label: '× 任职月数', value: sal.months + ' 个月', format: 'text' },
+                        { label: '工资薪金税额合计', value: sal.tax, format: 'money' },
+                        { label: '数月奖金（÷ ' + s.bonus.spreadMonths + ' 定档后 × '
+                            + s.bonus.spreadMonths + '）', value: s.bonus.tax, format: 'money' },
+                        { label: '应缴个人所得税', value: s.tax, format: 'money' }
+                    ],
+                    footnote: s.status.isResident
+                        ? '居民个人：工资薪金并入综合所得按年计税，次年办理汇算清缴'
+                        : '非居民个人：按月换算后的综合所得税率表逐月单独计税，不办理年度汇算、'
+                            + '不享受专项附加扣除；数月奖金单独分摊且一个年度内只能用一次'
+                }];
+
+                return {
+                    primary: { label: s.status.isResident ? '应缴个人所得税（居民：按年累计）'
+                        : '应缴个人所得税（非居民：按月换算）', value: s.tax, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
                 };
             }
         }

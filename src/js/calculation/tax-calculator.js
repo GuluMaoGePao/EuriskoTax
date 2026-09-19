@@ -1506,6 +1506,50 @@ function calculateBusinessTaxByTaxableIncome(taxableIncome) {
     return { tax: 0, rate: 0, deduction: 0 };
 }
 
+// 经营所得：「≤200 万部分减半征收」的**唯一实现**（阶段17 17E / v1.70.0）
+//
+// 为什么不能不抽：这条政策此前被抄了 6 份散在上面各条倒算路径与正向内核里，
+// guard 写法各不相同（`halvingTaxable > 0` / `result.tax > 0` / `totalTaxBeforeHalving > 0`），
+// 更糟的是税率有时取**用户选的目标税率那一档**、有时取**实际应纳税所得额所在的那一档** ——
+// 「税率倒算 + 保守模式」因此会算出 (所得额 × 高档税率 − 高档速算扣除数) 这个**负数**，
+// 再把它当减免额减出去，于是选的税率越高、算出来的税反而越多。
+//
+// 抽出来之前的纪律：先把「证明」留在测试里 —— tests/business-halve-consistency.test.js 用一份
+// **不调用被测代码**的参考实现，对 7 条路径逐一比对。有了那张网才敢动这里的括号。
+function businessHalveOf(taxableIncome) {
+    const t = Math.max(0, Number(taxableIncome) || 0);
+    const result = calculateBusinessTaxByTaxableIncome(t);
+    const params = businessHalveParamsOf();
+    if (result.tax <= 0) {
+        return { taxable: t, before: 0, rate: 0, deduction: 0, reduction: 0, tax: 0 };
+    }
+    // 减免额 = min(应纳税所得额, 200 万) 那一段**对应的税额** × 50%
+    // （财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31 —— 期限由注册表给出）
+    const capped = Math.min(t, params.threshold);
+    const raw = Math.max(0, (capped * result.rate - result.deduction) * params.ratio);
+    const reduction = Math.min(result.tax, raw);
+    return {
+        taxable: t,
+        before: result.tax,
+        rate: result.rate,
+        deduction: result.deduction,
+        reduction: reduction,
+        tax: Math.max(0, result.tax - reduction)
+    };
+}
+
+// 减半的两个参数（200 万 / 50%）来自注册表 `businessIncomeRules.halve`，不在这里硬编码成一串数字；
+// 硬编码兜底只用于「注册表还没加载」的场景，写政策改时要改的是 `tax-constants.js` 那一份。
+function businessHalveParamsOf() {
+    const rules = (typeof businessIncomeRules !== 'undefined' && businessIncomeRules)
+        || (window.EuriskoTaxConstants && window.EuriskoTaxConstants.businessIncomeRules) || {};
+    const halve = rules.halve || {};
+    return {
+        threshold: Number(halve.threshold) || 2000000,
+        ratio: halve.ratio === undefined ? 0.5 : Number(halve.ratio)
+    };
+}
+
 // 经营所得反向倒算：按目标税率倒算
 function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conservative') {
     const targetRate = inputData.targetRate / 100;
@@ -1518,8 +1562,19 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
         throw new Error('找不到对应的经营所得税率级距');
     }
     
-    const minTaxableIncome = targetBracket.min || 0;
-    const maxTaxableIncome = targetBracket.max;
+    // 17E（v1.70.0）修一处真 bug：税率表**只有 max 没有 min**，`targetBracket.min || 0`
+    // 恒等于 0，于是「保守」模式无论选哪个目标税率都落到最低档（12000 元）—— 表面是省钱的数，
+    // 实际适用税率 5%，与用户选的那一档完全不是一回事。级距下界要自己从上一档的 max 推。
+    const targetBracketIndex = businessTaxRates.indexOf(targetBracket);
+    // 下界取上一档的 `max`（表中级距是 `(上一档上限, 本档上限]`，下面再 +1 进入本档）
+    const minTaxableIncome = targetBracketIndex > 0
+        ? businessTaxRates[targetBracketIndex - 1].max
+        : 0;
+    // 最高级距的 `max` 在表里是 **null** 而不是 `Infinity`：老写法直接拿它当上界，
+    // 于是 35% 档的均衡模式算成 (下界 + null)/2 = 下界的一半（落进 20% 档），进取模式更是给出 0
+    const maxTaxableIncome = (targetBracket.max === null || targetBracket.max === undefined)
+        ? Infinity
+        : targetBracket.max;
     
     // 根据计算模式确定参考应纳税所得额
     // 保守模式（conservative）：最低值+1，确保达到目标税率（仅对最低档位设置小额最低值）
@@ -1568,13 +1623,13 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
     // 经营所得：应纳税额 = 应纳税所得额 × 税率 - 速算扣除数
     const taxResult = calculateBusinessTaxByTaxableIncome(middleTaxableIncome);
     
-    // 计算减半征收
-    const halvingThreshold = 2000000;
-    const halvingTaxable = Math.min(middleTaxableIncome, halvingThreshold);
-    const halvingTax = halvingTaxable > 0 ? (halvingTaxable * targetBracket.rate - targetBracket.deduction) * 0.5 : 0;
+    // 计算减半征收：只用 businessHalveOf（它在自己的档位上算，不会像这里原来那样
+    // 拿用户选的目标税率去乘一个根本不在那一档的应纳税所得额）
+    const halving = businessHalveOf(middleTaxableIncome);
+    const halvingTax = halving.reduction;
     
     // 实际税额（考虑减半征收）
-    const actualTax = taxResult.tax > 0 ? Math.max(0, taxResult.tax - halvingTax) : 0;
+    const actualTax = halving.tax;
     
     // 税前收入 = 应纳税所得额 + 扣除总额
     const preTaxIncome = middleTaxableIncome + deductionData.totalDeduction;
@@ -1615,17 +1670,12 @@ function calculateBusinessFromTargetRate(inputData, deductionData, mode = 'conse
 // 抽出来的直接原因：三条经营所得倒算链原来各抄一份这段，改政策时必须在同一句话里改三遍，
 //   漏一处就是「看起来合理但算错」—— 这是典型的复制引起口径漂移。
 //
-// 遗留（本轮没动，不属于 Phase 2.5 ① 的范围）：结果展示与正向计算的路径里仍有 5 份同形实现
-//   （经营所得税率倒算的结果段、两条月度倒算的结果段、经营所得正向计算）。
-//   它们用的 guard 写法略有不同（`halvingTaxable > 0` vs `result.tax > 0`、税率取 targetBracket 还是 taxResult），
-//   在实际税率结构下等价，但**没有测试证明这一点** —— 要统一得先补一组等价对拍用例，
-//   否则「看起来一样」的重构一旦真有差别，是在改用户看到的税额数字。
+// 17E（v1.70.0）：上面那段「遗留」已经清偿 —— 原先散在各处的 5 份同形实现连同这一份
+// 一起收进了 `businessHalveOf`，这里是唯一入口的一个薄封装。
+// 止血的顺序是**先写对拍、再统一**：tests/business-halve-consistency.test.js 用一份独立
+// 参考实现把 7 条路径逐点比对，其中「税率倒算」那条原本**真的不等价**（不是写法差异，是错数）。
 function businessTaxOf(taxableIncome) {
-    const result = calculateBusinessTaxByTaxableIncome(taxableIncome);
-    const halvingThreshold = 2000000;
-    const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
-    const halvingTax = result.tax > 0 ? (halvingTaxable * result.rate - result.deduction) * 0.5 : 0;
-    return Math.max(0, result.tax - halvingTax);
+    return businessHalveOf(taxableIncome).tax;
 }
 
 // 经营所得反向倒算：按目标税后收入倒算，支持三种计算模式
@@ -1706,10 +1756,9 @@ function calculateBusinessFromMonthlyNet(inputData, deductionData, mode = 'balan
     
     // 步骤5：计算税额
     const taxResult = calculateBusinessTaxByTaxableIncome(modeTaxableIncome);
-    const halvingThreshold = 2000000;
-    const halvingTaxable = Math.min(modeTaxableIncome, halvingThreshold);
-    const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-    const actualTax = Math.max(0, taxResult.tax - halvingTax);
+    const halving = businessHalveOf(modeTaxableIncome);   // 17E：减去≤200万那半的认知已集中在一处
+    const halvingTax = halving.reduction;
+    const actualTax = halving.tax;
     const calculatedNetIncome = totalIncome - actualTax;
     
     return {
@@ -1815,10 +1864,9 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         
         // 步骤5：计算税额
         const taxResult = calculateBusinessTaxByTaxableIncome(modeTaxableIncome);
-        const halvingThreshold = 2000000;
-        const halvingTaxable = Math.min(modeTaxableIncome, halvingThreshold);
-        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        const halving = businessHalveOf(modeTaxableIncome);   // 17E：同上
+        const halvingTax = halving.reduction;
+        const actualTax = halving.tax;
         
         return {
             totalIncome: totalIncome,
@@ -1910,10 +1958,9 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
         const totalIncome = modeTaxableIncome + deductionData.totalDeduction;
         
         const taxResult = calculateBusinessTaxByTaxableIncome(modeTaxableIncome);
-        const halvingThreshold = 2000000;
-        const halvingTaxable = Math.min(modeTaxableIncome, halvingThreshold);
-        const halvingTax = taxResult.tax > 0 ? (halvingTaxable * taxResult.rate - taxResult.deduction) * 0.5 : 0;
-        const actualTax = Math.max(0, taxResult.tax - halvingTax);
+        const halving = businessHalveOf(modeTaxableIncome);   // 17E：同上
+        const halvingTax = halving.reduction;
+        const actualTax = halving.tax;
         
         return {
             totalIncome: totalIncome,
@@ -1945,7 +1992,18 @@ function calculateBusinessFromTargetTax(inputData, deductionData, mode = 'balanc
 // 「读 23 个 DOM → 算 → 写全局 + 写 DOM」。若不抽而照抄一份算法，经营所得就会多出
 // 第 6 份同形实现（此前减半优惠公式已有 5 份）—— 那正是口径漂移的源头。
 // 页面版与向导版从此共用这一份，并由 tests/business-migration.test.js 逐点对拍。
-function calculateBusinessTaxCore(v) {
+function calculateBusinessTaxCore(v, options) {
+    // 阶段17 17D-11（v1.67.0）：两个新增口径，默认不传 → 行为与之前完全一致。
+    //   ownerSalaryAddBack  投资者（业主）本人的工资薪金支出：已在成本费用里列支的，
+    //                       须**调增**回来（财税〔2000〕91号 第六条（一）「投资者的工资不得
+    //                       在税前扣除」）—— 这是个体户与个独最常被税务机关调整的一项。
+    //   profitShareRatio    合伙企业的分配比例（第五条）：投资者按合伙协议约定的比例确定
+    //                       应纳税所得额；没有约定的按合伙人数量平均。个体户 / 个独填 1（默认）。
+    const opts = options || {};
+    const ownerSalaryAddBack = Number(opts.ownerSalaryAddBack) || 0;
+    const profitShareRatio = opts.profitShareRatio === undefined || opts.profitShareRatio === null
+        ? 1 : (Number(opts.profitShareRatio) || 0);
+
     const businessIncome = Number(v.income) || 0;
     const businessCost = Number(v.cost) || 0;
     const businessExpenses = Number(v.expenses) || 0;
@@ -1985,18 +2043,25 @@ function calculateBusinessTaxCore(v) {
 
     const prepaidTax = Number(v.prepaidTax) || 0;
 
-    // 计算经营利润
+    // 计算经营利润（投资者本人的工资不得税前扣除 —— 已列支的加回来）
     const businessProfit = Math.max(0, businessIncome - businessCost - businessExpenses -
-        businessTaxes - businessLosses - businessOtherExpenses);
+        businessTaxes - businessLosses - businessOtherExpenses + ownerSalaryAddBack);
 
     // 扣除以前年度亏损
     const netIncomeAfterLoss = Math.max(0, businessProfit - businessPreviousLosses);
 
+    // 合伙企业：按分配比例归属到本投资者（个人独资 / 个体工商户为 1）
+    const investorShare = Math.max(0, netIncomeAfterLoss * profitShareRatio);
+
     // 计算投资者减除费用（5000元/月，按实际工作月数计算）
-    const investorDeduction = hasComprehensiveIncome ? 0 : 5000 * workMonths;
+    // 17D-11：一人兴办两家以上企业时，投资者本人的费用扣除**只能选择在其中一家企业**
+    // 的所得中扣除（财税〔2000〕91号 第十三条）—— 已在别家扣过 → 本企业不再扣。
+    // 注意不能靠把 workMonths 设成 0 来表达（内核里 0 会回落成 12），所以单独给一个开关。
+    const ownerDeductedElsewhere = !!opts.ownerDeductedElsewhere;
+    const investorDeduction = (hasComprehensiveIncome || ownerDeductedElsewhere) ? 0 : 5000 * workMonths;
 
     // 计算公益性捐赠前的应纳税所得额
-    const taxableIncomeBeforeDonation = Math.max(0, netIncomeAfterLoss - investorDeduction -
+    const taxableIncomeBeforeDonation = Math.max(0, investorShare - investorDeduction -
         (hasComprehensiveIncome ? 0 : specialDeductionTotal) - specialAdditionalDeductionTotal - otherDeductionTotalBeforeDonation);
 
     // 公益性捐赠扣除限额为应纳税所得额的30%
@@ -2007,33 +2072,24 @@ function calculateBusinessTaxCore(v) {
     // 计算应纳税所得额
     const taxableIncome = Math.max(0, taxableIncomeBeforeDonation - actualCharitableDonation);
 
-    // 计算应纳税额（未减半）
-    let totalTaxBeforeHalving = 0;
-    let applicableRate = 0;
-    let applicableDeduction = 0;
+    // 计算应纳税额（未减半）—— 五级表（含速算扣除数）的唯一定档入口，不在这里二次实现
+    const beforeHalving = calculateBusinessTaxByTaxableIncome(taxableIncome);
+    const totalTaxBeforeHalving = beforeHalving.tax;
+    const applicableRate = beforeHalving.rate;
+    const applicableDeduction = beforeHalving.deduction;
 
-    for (const bracket of businessTaxRates) {
-        if (taxableIncome <= bracket.max) {
-            totalTaxBeforeHalving = taxableIncome * bracket.rate - bracket.deduction;
-            applicableRate = bracket.rate;
-            applicableDeduction = bracket.deduction;
-            break;
-        }
-    }
-
-    // 计算减半征收减免税额（年应纳税所得额不超过200万元的部分减半征收）
-    const halvingThreshold = 2000000;
-    const halvingTaxable = Math.min(taxableIncome, halvingThreshold);
-    const taxReduction = totalTaxBeforeHalving > 0 ? (halvingTaxable * applicableRate - applicableDeduction) * 0.5 : 0;
+    // 计算减半征收减免税额（年应纳税所得额不超过 200 万元的部分减半征收）—— 17E：同一入口
+    const halving = businessHalveOf(taxableIncome);
+    const taxReduction = halving.reduction;
 
     // 计算实际应纳税额
-    const totalTax = Math.max(0, totalTaxBeforeHalving - taxReduction);
+    const totalTax = halving.tax;
 
     // 计算应退/应补税额
     const refundTax = totalTax - prepaidTax;
 
     // 计算税后经营所得
-    const netIncomeAfterTax = netIncomeAfterLoss - totalTax;
+    const netIncomeAfterTax = investorShare - totalTax;
 
     // 计算可扣除的专项扣除（无综合所得时才允许扣除）
     const deductibleSpecialDeduction = hasComprehensiveIncome ? 0 : specialDeductionTotal;
@@ -2085,6 +2141,9 @@ function calculateBusinessTaxCore(v) {
         },
         taxDetails: {
             netIncome: netIncomeAfterLoss,
+            investorShare: investorShare,
+            ownerSalaryAddBack: ownerSalaryAddBack,
+            profitShareRatio: profitShareRatio,
             taxableIncome,
             applicableRate,
             applicableDeduction,

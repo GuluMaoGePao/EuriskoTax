@@ -18,6 +18,10 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/utils.js');           // buildBusinessFormulaSteps：推导链
     loadSource('src/js/calculation/tax-calculator.js');  // calculateBusinessTaxCore
+    loadSource('src/js/calculation/tax-registry.js');    // business spec 的 policyKey / params
+    // 17D-11（v1.67.0）：business spec 的 compute 现在要走 quick 的 taxOf / multiEntityOf，
+    // 少了这个模块 compute 会返回 null（它拒绝在没有 quick 的情况下静默算出别的结果）
+    loadSource('src/js/calculation/business-income-quick.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
@@ -201,14 +205,18 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
     test('business 被通用向导接管（不再是页面式）', () => {
         expect(W().has(R().get('business'))).toBe(true);
         const steps = W().stepsOf(R().get('business'));
-        expect(steps).toHaveLength(3);                     // 收入成本 + 扣除项 + 结果
-        expect(steps[0].title).toBe('经营收入与成本');
-        expect(steps[1].title).toBe('扣除项明细');
+        // 17D-11（v1.67.0）：最前面多了一步「身份与征收方式」—— 企业类型（合伙按分配比例）、
+        // 征收方式（查账 / 核定）与「还有没有别的企业」（有就必须汇总定档）都在这一步
+        expect(steps).toHaveLength(4);           // 身份 + 收入成本 + 扣除项 + 结果
+        expect(steps[0].title).toBe('身份与征收方式');
+        expect(steps[1].title).toBe('经营收入与成本');
+        expect(steps[2].title).toBe('扣除项明细');
         expect(steps[steps.length - 1].result).toBe(true);
     });
 
-    test('两步走完出结果：主结果、推导链、免责声明都在', () => {
+    test('三步走完出结果：主结果、推导链、免责声明都在', () => {
         W().open('business', { fresh: true });
+        document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();
         const host = document.getElementById('deep-wizard-page');
@@ -231,6 +239,7 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
 
     test('缴费基数 × 缴费比例 → 月缴额：改基数即时重算三项', () => {
         W().open('business', { fresh: true });
+        document.getElementById('dw-next').click();          // 17D-11：先过「身份与征收方式」
         document.getElementById('dw-next').click();          // 进「扣除项明细」步
 
         setField('socialBase', 10000);
@@ -248,6 +257,7 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
     test('比例清空/越界回落的是该险种自己的默认值，不是统一 5%', () => {
         W().open('business', { fresh: true });
         document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();
         setField('socialBase', 10000);
 
         const rate = document.getElementById('qf-pensionRate');
@@ -260,6 +270,7 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
 
     test('低于最低标准的缴费基数当场给出提示', () => {
         W().open('business', { fresh: true });
+        document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();
         setField('socialBase', 1000);
 
@@ -277,10 +288,18 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
         W().open('business', { fresh: true });
         document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();
 
         const tool = R().get('business');
         const values = {};
         tool.fields.forEach((f) => { values[f.key] = f.default; });
+
+        // 17D-11（v1.67.0）：spec 新增的三个口径（投资者工资调增 / 合伙企业分配比例 /
+        // 多家企业汇总定档）都是**增量** —— 把它们关掉，主结果必须仍等于内核那一个数。
+        // 这条就钉这个「关掉＝原样」：新增口径不能悄悄改掉原来那一条链路的答案
+        // （三家新口径各自的数字由 tests/business-deep.test.js 单独守护）。
+        values.ownerSalary = 0;
+        values.hasOtherEntities = false;
 
         expect(tool.compute(values).primary.value).toBeCloseTo(recompute(values).total, 6);
     });

@@ -843,6 +843,11 @@ function updateFormulaSteps(results) {
 // ===== 台账 C：其余三个完整测算流程的推导链（纯函数，结构沿用 buildFormulaSteps 的 step schema）=====
 
 // 经营所得推导链：输入 calculateBusinessTax 产出的 businessCalculationResults
+//
+// 17D-11（v1.67.0）：business 的 spec 已改回**自带推导链** —— 这份六步是按「一家个体户、
+// 成本费用逐项扣」写的，讲不出新的三层（投资者工资调增 / 合伙企业分配比例 / 多家企业
+// 汇总定档 + 亏损不能跨企业弥补）。这里保留实现，是因为 tests/formula-steps-flows.test.js
+// 仍逐位钉着它的输出（它同时也是另外两个 builder 的结构参照）；生产链路上不再有调用方。
 function buildBusinessFormulaSteps(results) {
     const income = results.incomeDetails;
     const deduction = results.deductionDetails;
