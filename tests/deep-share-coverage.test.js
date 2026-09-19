@@ -108,7 +108,40 @@ function renderResult(tool) {
     return !!document.getElementById('dw-result-primary');
 }
 
+// 模拟用户一路点「下一步」直到结果步：入口是挂在 dw-next 上的，必须真的点它才会挂出
+function walkToResult(tool) {
+    if (!W().open(tool.id, { fresh: true })) return false;
+    for (let i = 0; i < 12; i++) {
+        const btn = document.getElementById('dw-next');
+        if (!btn) break;
+        btn.click();
+        if (document.getElementById('dw-result-primary')) return true;
+    }
+    return !!document.getElementById('dw-result-primary');
+}
+
 describe('完整测算的分享图出口', () => {
+    // 入口不是写死在页面里的：点「下一步」之后才往结果区注入那个按钮（阶段13D）。
+    // 向导的按钮每次渲染都是新的，所以绑定必须是**委托**而不是「加载时绑那一颗」——
+    // 后者在页面式时代能work（按钮是静态 DOM），迁到 spec 驱动后一次都没挂上过。
+    test('走完向导点出结果，结果区会挂出「生成分享图」入口（21 个都挂上）', async () => {
+        const broken = [];
+        const tools = R().deep();
+        for (let i = 0; i < tools.length; i++) {
+            const tool = tools[i];
+            if (!walkToResult(tool)) {
+                broken.push(tool.id + '：一路点下去没有走到结果步');
+                continue;
+            }
+            await new Promise((r) => setTimeout(r, 250));   // 注入是延后 180ms 的
+            const cta = document.querySelector('#dw-result-card .share-card-btn');
+            if (!cta) broken.push(tool.id + '：结果区没有「生成分享图」入口');
+        }
+        expect(broken).toEqual([]);
+        // 21 个逐个点一遍再等注入（每个 250ms），默认 5s 不够
+    }, 30000);
+
+
     test('21 个完整测算算完之后都能出分享图，且图上的数属于本次测算', () => {
         const broken = [];
         R().deep().forEach((tool) => {

@@ -552,14 +552,20 @@
         container.appendChild(wrap);
     }
 
+    // 阶段18-5（v1.75.0）：向导的「下一步 / 计算结果」按钮是**每次渲染重新生成**的，而这里
+    // 原先在页面加载时按 getElementById('dw-next') 直接绑一次 —— 页面式时代那颗按钮是静态
+    // DOM，绑一次管一辈子；迁到 spec 驱动（阶段17）后换成动态渲染，绑的那一颗早被替换掉了，
+    // 于是 21 个完整测算的分享图入口**一次都没挂上过**（结果区只有保存 / 导出，没有分享）。
+    // 改成事件委托（与下面 CTA 的点击同一套做法）：认的是 id，不是那一颗具体的节点。
     function bindTriggers() {
-        TRIGGERS.forEach(function (trigger) {
-            var btn = document.getElementById(trigger.buttonId);
+        var buttons = TRIGGERS.map(function (t) { return '#' + t.buttonId; }).join(', ');
+        document.addEventListener('click', function (e) {
+            var btn = (e.target && e.target.closest) ? e.target.closest(buttons) : null;
             if (!btn) return;
-            btn.addEventListener('click', function () {
-                // 结果由按钮原有处理器渲染（分类所得为 setTimeout），这里延后一拍注入
-                setTimeout(function () { injectCta(trigger.containerId); }, 180);
-            });
+            var trigger = TRIGGERS.filter(function (t) { return t.buttonId === btn.id; })[0];
+            if (!trigger) return;
+            // 结果由按钮原有处理器渲染（分类所得为 setTimeout），这里延后一拍注入
+            setTimeout(function () { injectCta(trigger.containerId); }, 180);
         });
     }
 
