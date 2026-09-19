@@ -601,6 +601,157 @@
             }
         },
         {
+            // 阶段17 17D-1（v1.52.0）：个税纵深补齐的第一个场景 ——
+            // 劳务报酬 / 稿酬 / 特许权使用费的「完整测算」。
+            //
+            // 它是第一个**自带 spec** 的 `-deep`：速算器只认一笔收入（填一个数出五个数），
+            // 而真实情况是按次、按月、跨月好几笔进来 —— 费用扣除与预扣率都是**按次**算的，
+            // 分着算能多扣一次 800 元、多用一次低档税率，合起来才是法定口径。这一层差异
+            // 就是完整测算比速算器多出来的全部意义，没法靠共享同一份 fields 得到。
+            //
+            // 口径仍然同源：每一笔的扣除、预扣率、收入额一律调 withholding-quick.js 的
+            // taxableOf / bracketOf / taxOf / incomeOf，一个税率、一条公式都没复制
+            // （单笔输入与速算器逐点相等，由 tests/withholding-deep.test.js 钉住）。
+            // 汇算那一层用内核 calculateTaxByTaxableIncome 算**增量**，不是速算器那种
+            // 「收入额 × 边际税率」的线性估算 —— 预扣 20%~40%、汇算常落在 3%/10%，
+            // 「次年能不能退一笔」全靠这个差，估算精度不够就会误导。
+            id: 'withholding-deep', name: '劳务报酬预扣预缴', subtitle: '多笔按次预扣 → 并入综合所得看补退税',
+            icon: 'fa-file-text-o', status: 'deep',
+            nextTools: ['withholding', 'annual-settlement', 'business-income'],
+            policyKey: 'withholding',
+            fields: [
+                { key: 'type', step: 'type', label: '所得类型', type: 'select', default: 'labor',
+                    options: [{ value: 'labor', label: '劳务报酬所得' }, { value: 'author', label: '稿酬所得' }, { value: 'royalty', label: '特许权使用费所得' }],
+                    hint: '三类所得的预扣率表不同：劳务报酬是 20%/30%/40% 三级超额累进，稿酬与特许权一律 20%' },
+
+                { key: 'mergeByMonth', step: 'payout', label: '同一个月内的多笔合并为「一次」', type: 'switch', default: true,
+                    hint: '法定口径：属于同一项目连续性收入的，以**一个月内**取得的收入为一次。关掉则逐笔单独预扣（不同支付方各自预扣的情形）' },
+                { key: 'payments', step: 'payout', label: '发放明细', type: 'repeater',
+                    addLabel: '添加一笔收入',
+                    hint: '每一笔填取得的月份与金额；金额 ≤ 0 的条目不参与预扣',
+                    default: [{ month: 1, amount: 30000 }],
+                    itemFields: [
+                        { key: 'month', label: '取得月份', type: 'select', default: 1,
+                            options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (m) { return { value: m, label: m + ' 月' }; }) },
+                        { key: 'amount', label: '收入金额（元）', type: 'money', default: 0, min: 0 }
+                    ] },
+
+                { key: 'otherTaxable', step: 'settle', label: '全年其他综合所得的应纳税所得额（元）', type: 'money', default: 0,
+                    hint: '工资薪金等已减 6 万基本减除、五险一金与专项附加扣除后的余额；填 0 表示全年只有这里填的这笔收入' }
+            ],
+            steps: [
+                { key: 'type', title: '所得类型', why: '三类所得的预扣率表与收入额折算比例都不同 —— 先定类型，后面的每一步才有对应的口径' },
+                { key: 'payout', title: '发放明细', why: '预扣是**按次**的：一次收入扣一次费用、用一次预扣率表。同一笔钱分几次发，扣出来的税并不一样' },
+                { key: 'settle', title: '汇算口径', why: '预扣不是终局 —— 次年并入综合所得按七级年度税率重算，多退少补。要算补退多少，得知道你其余的综合所得落在哪一档' }
+            ],
+            pitfalls: [
+                '「一次」不是按笔算的：同一项目连续性收入以**一个月内**取得的收入为一次 —— 分着算能多扣一次 800 元、多用一次低档税率，合起来才是法定口径',
+                '费用扣除是**分档**的：≤4000 元减 800，>4000 元减 20%；稿酬在扣除后**再减按 70%**（实际按收入的 56% 并入）',
+                '预扣率最高 40% 只是**预扣**：次年并入综合所得按七级年度税率重算，全年只有这笔收入的人通常能退一笔',
+                '不同支付方各自预扣，**同一个月也不要合并** —— 关掉上面的合并开关，或分开测算两次',
+                '汇算差额按「其他综合所得应纳税所得额」算增量：那一栏填 0 就表示全年只有这笔收入，实际有工资一定要填，否则会低估税负'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoWithholdingQuick;
+                if (!Q) return null;
+
+                var type = v.type || 'labor';
+                var rule = Q.ruleOf(type);
+
+                var list = Array.isArray(v.payments) ? v.payments : [];
+                var paid = [];
+                list.forEach(function (p) {
+                    var amt = Number(p && p.amount) || 0;
+                    // 金额为空 / 0 的条目不进预扣表：向导允许存在正在填的空条目，
+                    // 但别让它变成一行 0.00 混进明细（与分类所得迁移时同一条处理）
+                    if (amt > 0) paid.push({ month: Number(p.month) || 1, amount: amt });
+                });
+
+                if (!paid.length) {
+                    return {
+                        primary: { label: '全年预扣预缴个税合计', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '还没有有效条目：给每一笔收入填上大于 0 的金额，它才会进预扣表。'
+                    };
+                }
+
+                // 合并成「次」：同月相加（法定口径）还是逐笔单独 —— 这是本工具与速算器唯一的口径差，
+                // 也是它存在的理由。两种走法的金额合计相同，扣完费用后的税并不相同。
+                var times = [];
+                if (v.mergeByMonth !== false) {
+                    var byMonth = {};
+                    paid.forEach(function (p) { byMonth[p.month] = (byMonth[p.month] || 0) + p.amount; });
+                    Object.keys(byMonth).sort(function (a, b) { return Number(a) - Number(b); }).forEach(function (m) {
+                        times.push({ label: '第 ' + m + ' 月', amount: byMonth[m] });
+                    });
+                } else {
+                    paid.forEach(function (p, i) { times.push({ label: '第 ' + (i + 1) + ' 笔', amount: p.amount }); });
+                }
+
+                var amountTotal = 0, taxableTotal = 0, incomeTotal = 0, prepaidTotal = 0;
+                var tableRows = [];
+                times.forEach(function (t) {
+                    var taxable = Q.taxableOf(type, t.amount);
+                    var bracket = Q.bracketOf(type, t.amount) || { rate: 0, deduction: 0 };
+                    var tax = Q.taxOf(type, t.amount);
+
+                    amountTotal += t.amount;
+                    taxableTotal += taxable;
+                    incomeTotal += Q.incomeOf(type, t.amount);
+                    prepaidTotal += tax;
+
+                    tableRows.push([
+                        t.label,
+                        { value: t.amount, kind: 'money' },
+                        { value: taxable, kind: 'money' },
+                        { value: bracket.rate, kind: 'percent' },
+                        { value: bracket.deduction, kind: 'money' },
+                        { value: tax, kind: 'money' }
+                    ]);
+                });
+
+                // 汇算：收入额并入综合所得后按年度税率表重算，与其余综合所得**合并找档**，
+                // 所以这里算的是「增量」而不是「收入额 × 边际税率」—— 后者在跨档时会整段算错。
+                var other = Math.max(0, Number(v.otherTaxable) || 0);
+                var settled = 0;
+                if (typeof calculateTaxByTaxableIncome === 'function') {
+                    settled = Math.max(0,
+                        calculateTaxByTaxableIncome(other + incomeTotal).tax - calculateTaxByTaxableIncome(other).tax);
+                }
+                var gap = settled - prepaidTotal;
+                var direction = gap > 0.005 ? '汇算需补税' : (gap < -0.005 ? '汇算可退税' : '基本持平');
+
+                return {
+                    primary: { label: '全年预扣预缴个税合计', value: prepaidTotal, kind: 'money' },
+                    rows: [
+                        { label: '所得类型', value: rule ? rule.name : type, kind: 'text' },
+                        { label: '收入合计', value: amountTotal, kind: 'money' },
+                        { label: '计税次数', value: times.length + ' 次', kind: 'text',
+                            hint: v.mergeByMonth !== false ? '同一个月内的多笔已合并为一次' : '逐笔单独预扣' },
+                        { label: '费用扣除合计', value: amountTotal - taxableTotal, kind: 'money',
+                            hint: '≤4000 元减 800、>4000 元减 20%；稿酬再减按 30%' },
+                        { label: '预扣应纳税所得额合计', value: taxableTotal, kind: 'money' },
+                        { label: '全年预扣预缴个税合计', value: prepaidTotal, kind: 'money' },
+                        { label: '并入综合所得的收入额', value: incomeTotal, kind: 'money',
+                            hint: '劳务报酬 / 特许权按收入的 80%，稿酬按 56%' },
+                        { label: '汇算后的增量税负', value: settled, kind: 'money',
+                            hint: '（其他综合所得 + 收入额）的年度税额 − 其他综合所得的年度税额' },
+                        { label: '汇算差额', value: gap, kind: 'money', hint: '正数 = 预扣少于汇算应付' },
+                        { label: '汇算方向', value: direction, kind: 'text' }
+                    ],
+                    note: '预扣是**按次**的（每次扣一次费用、用一次预扣率），汇算是**按年**的（收入额并入综合所得适用七级年度税率）。两者之差就是次年补税或退税的来源。',
+                    extras: [{
+                        title: '逐次预扣预缴明细',
+                        note: '每一次各自减除费用、各自查预扣率表 —— 同一笔钱分几次发，扣出来的税不一样',
+                        table: {
+                            head: ['计税「次」', '收入', '减除费用后', '预扣率', '速算扣除', '预扣税额'],
+                            rows: tableRows
+                        }
+                    }]
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
@@ -2246,6 +2397,13 @@
             if (twinId === t.id) return;             // 不是 X-deep 形式，没有孪生速算器
             var twin = get(twinId);
             if (!twin) return;
+            // 17D-1（v1.52.0）起的例外：**自带 spec 的 `-deep` 不被速算器覆盖**。
+            // 完整测算版一旦比速算器多几步（劳务报酬要按次、按月算好几笔，不是一个数），
+            // 共享同一份 fields 就等于把速算器复制一遍 —— 那不叫复用，叫原地踏步。
+            // 口径同源改由两件事保证，而不是靠共用同一个对象：
+            //   ① 计算仍然调**同一个 *-quick.js 模块**（不复制税率、不复制公式）；
+            //   ② 单笔输入下的逐点对拍（tests/withholding-deep.test.js）。
+            if (t.fields || t.compute) return;
             SHARED.forEach(function (k) { t[k] = twin[k]; });
         });
     })();

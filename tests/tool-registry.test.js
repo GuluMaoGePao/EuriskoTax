@@ -55,7 +55,7 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（0 个页面式 + 9 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（0 个页面式 + 10 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
@@ -72,9 +72,12 @@ describe('工具注册表：数量与分组', () => {
         // 所以它必须跟在 vat 之后 —— 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
         // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**；business 是 17B 迁回来的第一个，
         // classification 是最后一个（v1.50.0）—— 序号不重要，重要的是它俩都在这份清单里。
+        // 17D-1（v1.52.0）：withholding-deep 是**第一个个税场景**的完整测算 —— 它不增加 category 数，
+        //   增加的是「个税场景完整度」（4/16 → 5/16，目标 10/16）。覆盖面数字看不出这一步，
+        //   所以这里必须把 id 列出来，否则「个税纵深」会被当成没有进展。
         expect(specDriven).toEqual([
             'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep', 'forward',
-            'reverse', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'reverse', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
         ]);
     });
 
@@ -89,14 +92,32 @@ describe('工具注册表：数量与分组', () => {
         //    复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
         //    而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
-        expect(twins).toHaveLength(5);
-        twins.forEach((t) => {
+        expect(twins).toHaveLength(6);
+
+        // ① 共享速算器 spec 的那 5 个（vat / cit / social / surtax-stamp / fee）：
+        //    完整测算与速算器本就问同一件事，共享同一份对象最省事，也最不容易漂。
+        const shared = twins.filter((t) => t.id !== 'withholding-deep');
+        expect(shared.map((t) => t.id).sort()).toEqual([
+            'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+        ]);
+        shared.forEach((t) => {
             const twin = R().all().find((n) => n.compute === t.compute);
             expect(twin !== undefined && twin !== null).toBe(true);   // 必须能在速算器里找到同口径孪生项
             expect(t.fields).toBe(twin.fields);     // 同一对象引用，不是结构相等
             expect(t.steps).toBe(twin.steps);
             expect(t.compute).toBe(twin.compute);
         });
+
+        // ② 自带 spec 的（17D-1 起）：速算器只认一笔收入，完整测算要按次、按月算好几笔 ——
+        //    共享同一份 fields 就等于把速算器复制一遍，那不是复用。它不再共用对象，
+        //    口径同源改由「同一个 withholding-quick.js 模块」+ 单笔输入的逐点对拍守护
+        //    （tests/withholding-deep.test.js）。这里只钉住「它确实自带且没被覆盖」。
+        const own = R().get('withholding-deep');
+        expect(own.compute).not.toBe(R().get('withholding').compute);
+        expect(own.fields).not.toBe(R().get('withholding').fields);
+        expect(Array.isArray(own.fields) && own.fields.length > 0).toBe(true);
+        expect(Array.isArray(own.steps) && own.steps.length > 0).toBe(true);
+        expect(own.policyKey).toBe('withholding');
 
         // ② 从页面迁来的（17B-1：business；17B-2：reverse；17B-3：forward；17B-4：classification）：
         //    它们**没有**同名速算器可复用（经营所得速算器是「核定 vs 查账」对比、反向倒算压根没有速算器、
