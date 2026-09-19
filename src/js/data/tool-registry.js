@@ -972,6 +972,249 @@
             }
         },
         {
+            // 阶段17 17D-3（v1.54.0）：个税纵深补齐的第三个场景 —— 股权激励。
+            //
+            // 速算器 `equity` 只认**一个行权日、一个价差**：fields 里只有一组 qty / price / cost，
+            // 而「一年内多次行权」只能靠一个标量 `ytdIncome` 手工补进去。它缺的是这四层：
+            //   ① **多批次明细**（repeater）：每一批各有形式、数量、价格、出资、月份，
+            //      合并成一个基数一次性定档 —— 而不是让用户自己先加好再填一个总数；
+            //   ② **分次各自定档 vs 合并定档的差额**：法定是合并（`combineWithinYear: true`），
+            //      而「每批各自从低档起算」会**少算税** —— 那个差额就是次年汇算要补（还可能加滞纳金）
+            //      的数。速算器永远只算合并，所以这一层它根本表达不出来；
+            //   ③ **递延纳税 20%**（非上市公司，财税〔2016〕101 号）：`equityIncentiveRules.deferred`
+            //      这个常量一直存在，quick 模块里却**没有任何函数用它** —— 这里补上对照：
+            //      行权时暂不缴、转让时按「财产转让所得」20%，计税依据是转让价减取得成本；
+            //   ④ **跨年度行权**：合并只在**同一个纳税年度内**成立，分到两个年度就各自定档。
+            //      行权窗口还能自己安排时，这是唯一合法的降档路径 —— 枚举「前 k 批当年、其余次年」即可。
+            // 口径仍然同源：收入额走 `EuriskoEquityQuick.incomeOf`（四种形式的公式一个都没复制），
+            // 税率与税额走 `taxSeparateOf` / `bracketOf`，综合所得部分走内核
+            // `calculateTaxByTaxableIncome`；单批输入与速算器逐点相等，由 tests/equity-deep.test.js 钉住。
+            id: 'equity-deep', name: '股权激励', subtitle: '多次行权合并计税，并给出递延与跨年对照',
+            icon: 'fa-line-chart', status: 'deep',
+            nextTools: ['equity', 'annual-settlement', 'salary-tax'],
+            policyKey: 'equity-incentive',
+            fields: [
+                { key: 'otherTaxable', step: 'base', label: '全年其他综合所得的应纳税所得额（元）', type: 'money', default: 60000,
+                    hint: '工资薪金等已减 6 万基本减除、三险一金与专项附加扣除后的余额；股权激励**不并入**这一栏，只用于对照「如果并入会怎样」' },
+
+                { key: 'grants', step: 'grants', label: '本年取得的股权激励批次', type: 'repeater',
+                    addLabel: '添加一批行权 / 解禁',
+                    hint: '同一纳税年度内的所有批次都要列上 —— 法定口径是**合并成一个基数**一次性定档；收入 ≤ 0 的批次不产生税额',
+                    default: [{ month: 3, type: 'option', qty: 10000, price: 20, cost: 10, grantPrice: 15 }],
+                    itemFields: [
+                        { key: 'month', label: '取得月份', type: 'select', default: 3,
+                            options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (m) { return { value: m, label: m + ' 月' }; }) },
+                        { key: 'type', label: '激励形式', type: 'select', default: 'option',
+                            options: [
+                                { value: 'option', label: '股票期权' }, { value: 'restricted', label: '限制性股票' },
+                                { value: 'appreciation', label: '股票增值权' }, { value: 'award', label: '股权奖励' }
+                            ] },
+                        { key: 'qty', label: '数量（股 / 份）', type: 'number', default: 10000, min: 0 },
+                        { key: 'price', label: '行权 / 解禁日市价（元/股）', type: 'money', default: 20 },
+                        { key: 'cost', label: '施权价 / 出资额（元/股）', type: 'money', default: 10,
+                            hint: '股票增值权填授权日每股价格；限制性股票填该批次实际出资额' },
+                        { key: 'grantPrice', label: '股票登记日市价（元/股）', type: 'money', default: 15,
+                            when: { key: 'type', in: ['restricted'] },
+                            hint: '仅限制性股票用到：按「登记日与解禁日的均价」减出资额计税' }
+                    ] },
+
+                { key: 'deferred', step: 'option', label: '非上市公司且符合条件，可递延至转让时按 20% 计税', type: 'switch', default: false,
+                    hint: '财税〔2016〕101 号：行权时暂不缴，转让该股权时按「财产转让所得」20% 计税；选择递延后不再适用单独计税' },
+                { key: 'exitPrice', step: 'option', label: '预计转让价（元/股）', type: 'money', default: 30,
+                    when: { key: 'deferred', in: [true] },
+                    hint: '递延口径的计税依据 =（转让价 − 取得成本）× 份数' },
+                { key: 'plannable', step: 'option', label: '行权时点还能自己安排（可跨年度分批）', type: 'switch', default: false,
+                    hint: '期权行权窗口、解禁节奏可自选的情形；已经行权完的批次改不了年度' }
+            ],
+            steps: [
+                { key: 'base', title: '全年口径', why: '股权激励是**全额单独适用**年度税率表、不并入综合所得 —— 这一栏只用来给出「如果并入会怎样」的对照' },
+                { key: 'grants', title: '激励批次', why: '一个纳税年度内两次以上股权激励必须**合并**计税：合并后一次性定档，而不是每批各自从低档起算' },
+                { key: 'option', title: '递延与行权安排', why: '非上市公司可递延到转让时按 20% 计税；行权窗口还能自选时，把批次分到两个纳税年度会各自定档' }
+            ],
+            pitfalls: [
+                '一个纳税年度内取得两次以上股权激励必须**合并计算**：合并后的收入一次性定档，按每批各自定档会**少算税**，汇算时要补（并可能加收滞纳金）',
+                '现行政策是**不并入**综合所得、全额单独适用年度税率表，且**不减除任何费用** —— 6 万元基本减除与专项附加扣除都用不上，所以不能拿它跟「同等金额的工资」直接比税率',
+                '与年终奖不同：这里适用的是**超额累进的年度税率表**，不存在「多发 1 元到手反而变少」的雷区 —— 年终奖那种雷区来自「÷ 12 定档、全额乘税率」的月度换算表',
+                '非上市公司符合条件的股票期权 / 限制性股票 / 股权奖励可**递延**至转让时按「财产转让所得」20% 计税；递延与单独计税只能二选一，股价涨幅越大递延越不划算',
+                '合并只在**同一个纳税年度内**成立 —— 跨年度行权会各自定档，这是唯一合法的降档路径，但需要行权时点本身可以自己安排',
+                '单独计税政策执行至 2027-12-31（以注册表状态为准）；之后按现行口径将并入综合所得'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoEquityQuick;
+                if (!Q) return null;
+
+                var T = function (x) {
+                    return typeof calculateTaxByTaxableIncome === 'function'
+                        ? calculateTaxByTaxableIncome(Math.max(0, x)).tax : 0;
+                };
+                var num = function (x) { var n = Number(x); return isFinite(n) ? n : 0; };
+                var NAME = { option: '股票期权', restricted: '限制性股票', appreciation: '股票增值权', award: '股权奖励' };
+
+                var other = Math.max(0, num(v.otherTaxable));
+                var items = Array.isArray(v.grants) ? v.grants : [];
+
+                // ① 逐批：收入额走 quick（四种形式的公式都在那里），一个都没复制
+                var list = items.map(function (g, i) {
+                    var row = {
+                        index: i,
+                        month: Math.min(12, Math.max(1, Math.round(num(g && g.month)) || 1)),
+                        type: Q.TYPES.indexOf(g && g.type) >= 0 ? g.type : 'option',
+                        qty: Math.max(0, num(g && g.qty)),
+                        price: num(g && g.price),
+                        cost: num(g && g.cost),
+                        grantPrice: num(g && g.grantPrice)
+                    };
+                    row.typeName = NAME[row.type] || row.type;
+                    row.income = Q.incomeOf(row.type, row);
+                    row.alone = Q.taxSeparateOf(row.income);   // ② 若按这一批单独定档（错误口径）
+                    return row;
+                });
+
+                var total = list.reduce(function (s, r) { return s + r.income; }, 0);
+                var sep = Q.taxSeparateOf(total);              // 法定：合并成一个基数，一次性定档
+                var br = Q.bracketOf(total);
+                var aloneSum = list.reduce(function (s, r) { return s + r.alone; }, 0);
+                var underpay = sep - aloneSum;                 // 正数 = 分次算少算了
+                var otherTax = T(other);
+                var nowTotal = sep + otherTax;
+                var merged = T(other + total);                 // 政策不延续后并入综合所得的对照
+                var gap = merged - nowTotal;
+
+                // ③ 递延纳税：行权时不缴，转让时按「财产转让所得」20% —— 税率读常量，不写死
+                var deferred = null;
+                if (v.deferred === true) {
+                    var rules = Q.rules() || {};
+                    var dRate = num(rules.deferred && rules.deferred.rate) || 0.2;
+                    var exit = Math.max(0, num(v.exitPrice));
+                    var gain = list.reduce(function (s, r) { return s + Math.max(0, (exit - r.cost) * r.qty); }, 0);
+                    deferred = { rate: dRate, gain: gain, tax: gain * dRate, diff: gain * dRate - sep, exit: exit };
+                }
+
+                // ④ 跨年度切分：合并只在同一纳税年度内成立，前 k 批当年、其余次年 → 枚举 n+1 种即可
+                var splits = null, bestSplit = null;
+                if (v.plannable === true && list.length > 1) {
+                    var sorted = list.slice().sort(function (a, b) { return a.month - b.month; });
+                    splits = [];
+                    for (var k = 0; k <= sorted.length; k++) {
+                        var cur = 0, nxt = 0;
+                        sorted.forEach(function (r, i) { if (i < k) cur += r.income; else nxt += r.income; });
+                        var tax = Q.taxSeparateOf(cur) + Q.taxSeparateOf(nxt);
+                        var row = {
+                            k: k, current: cur, next: nxt, tax: tax,
+                            desc: k === sorted.length ? '全部在当年（现行）'
+                                : (k === 0 ? '全部推到次年' : '前 ' + k + ' 批当年、其余次年')
+                        };
+                        splits.push(row);
+                        if (!bestSplit || tax < bestSplit.tax - 1e-9) bestSplit = row;
+                    }
+                }
+
+                var rows = [
+                    { label: '股权激励收入合计（合并基数）', value: total, kind: 'money',
+                        hint: '全年各批次的收入额合计，不减除任何费用' },
+                    { label: '合并后适用税率', value: br ? br.rate : 0, kind: 'percent',
+                        hint: '全额单独适用年度综合所得税率表（不 ÷ 12、不做月度换算）' },
+                    { label: '现行：股权激励应纳个税', value: sep, kind: 'money' },
+                    { label: '其他综合所得应纳税额', value: otherTax, kind: 'money' },
+                    { label: '现行：全年个税合计', value: nowTotal, kind: 'money' },
+                    { label: '若按批各自定档（错误口径）', value: aloneSum, kind: 'money',
+                        hint: '每批各自从低档起算的结果，法定不这么算' },
+                    { label: '分次算会少算（汇算要补）', value: underpay, kind: 'money',
+                        hint: '正数表示按批各自定档少算了税，年度汇算时要补' },
+                    { label: '若并入综合所得（对照）', value: merged, kind: 'money',
+                        hint: '政策 2027-12-31 到期后若不延续的口径，现行不适用' },
+                    { label: '并入差额', value: gap, kind: 'money' }
+                ];
+
+                if (deferred) {
+                    rows.push({ label: '递延：转让时应纳税额（' + Math.round(deferred.rate * 100) + '%）', value: deferred.tax, kind: 'money',
+                        hint: '计税依据 =（转让价 ' + deferred.exit + ' − 取得成本）× 份数' });
+                    rows.push({ label: '递延相对单独计税', value: deferred.diff, kind: 'money',
+                        hint: '正数表示递延更贵（股价涨幅越大越不划算）' });
+                }
+                if (bestSplit) {
+                    rows.push({ label: '最优：当年行权批次', value: bestSplit.k + ' / ' + list.length, kind: 'text' });
+                    rows.push({ label: '最优：股权激励个税合计', value: bestSplit.tax, kind: 'money' });
+                    rows.push({ label: '相对全部在当年可省', value: sep - bestSplit.tax, kind: 'money' });
+                }
+
+                var note = '现行口径：全年各批次**合并**成一个基数、全额单独适用年度税率表，'
+                    + '不并入综合所得也不减除任何费用。年度表是超额累进的，所以这里**没有**年终奖那种'
+                    + '「多发 1 元到手反而变少」的雷区 —— 多发只会多交一点，不会倒挂。';
+                if (underpay > 0.005) {
+                    note = '⚠️ 如果按每一批各自定档预扣，全年会**少算 ' + Math.round(underpay)
+                        + ' 元**：法定口径是把全年各批次合并后一次性定档（' + Math.round(total)
+                        + ' 元 → 税率 ' + Math.round((br ? br.rate : 0) * 100) + '%），'
+                        + '不是每批各从低档起算。这个差额年度汇算时要补，并可能加收滞纳金。';
+                }
+
+                var compareRows = [
+                    ['现行：合并后单独计税', { value: total, kind: 'money' }, { value: sep, kind: 'money' }, '法定口径'],
+                    ['若按批各自定档', { value: total, kind: 'money' }, { value: aloneSum, kind: 'money' },
+                        underpay > 0.005 ? '少算 ' + Math.round(underpay) + ' 元' : '与合并相同'],
+                    ['并入综合所得（对照）', { value: other + total, kind: 'money' }, { value: merged, kind: 'money' },
+                        '政策到期后若不延续']
+                ];
+                if (deferred) {
+                    compareRows.push(['递延至转让（财产转让所得）', { value: deferred.gain, kind: 'money' },
+                        { value: deferred.tax, kind: 'money' }, '非上市公司符合条件时可选']);
+                }
+
+                var extras = [{
+                    title: '本年批次明细',
+                    note: '同一纳税年度内的每一批都在这里；「若单独定档」那一列是错误口径，用来量化少算的税',
+                    table: {
+                        head: ['月份', '形式', '数量', '股权激励收入', '若单独定档的税', '占合并基数'],
+                        rows: list.slice().sort(function (a, b) { return a.month - b.month; }).map(function (r) {
+                            return [
+                                r.month + ' 月',
+                                r.typeName,
+                                { value: r.qty, kind: 'number' },
+                                { value: r.income, kind: 'money' },
+                                { value: r.alone, kind: 'money' },
+                                total > 0 ? { value: r.income / total, kind: 'percent' } : '─'
+                            ];
+                        })
+                    }
+                }, {
+                    title: '四种口径逐项对比',
+                    note: '计税基数与应纳税额一一对应；只有第一行是现行法定口径',
+                    table: {
+                        head: ['口径', '计税基数', '应纳税额', '说明'],
+                        rows: compareRows
+                    }
+                }];
+
+                if (splits) {
+                    extras.push({
+                        title: '跨年度行权的候选切法',
+                        note: '合并只在同一个纳税年度内成立 —— 前 k 批在当年、其余推到次年，两边各自定档（按月份排序枚举），已按税额升序',
+                        table: {
+                            head: ['切法', '当年基数', '次年基数', '股权激励个税合计', '说明'],
+                            rows: splits.slice().sort(function (a, b) { return a.tax - b.tax; }).map(function (r) {
+                                return [
+                                    r.desc,
+                                    { value: r.current, kind: 'money' },
+                                    { value: r.next, kind: 'money' },
+                                    { value: r.tax, kind: 'money' },
+                                    bestSplit && Math.abs(r.tax - bestSplit.tax) < 1e-9 ? '最优'
+                                        : (r.k === list.length ? '现状' : '─')
+                                ];
+                            })
+                        }
+                    });
+                }
+
+                return {
+                    primary: { label: '现行：全年个税合计', value: nowTotal, kind: 'money',
+                        hint: '股权激励单独计税 + 其他综合所得' },
+                    rows: rows,
+                    note: note,
+                    extras: extras
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
