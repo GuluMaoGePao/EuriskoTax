@@ -78,10 +78,11 @@ describe('工具注册表：数量与分组', () => {
         // 17D-2（v1.53.0）：bonus-tax-deep 年终奖择优（6/16）—— 同样不增加 category 数。
         // 17D-3（v1.54.0）：equity-deep 股权激励（7/16）—— 第三个自带 spec 的个税场景。
         // 17D-4（v1.55.0）：severance-deep 离职补偿（8/16）—— 第四个。
+        // 17D-5（v1.56.0）：early-retirement-deep 提前退休 / 内退（9/16）—— 第五个。
         expect(specDriven).toEqual([
             'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep',
-            'equity-deep', 'forward', 'reverse', 'severance-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep',
-            'withholding-deep'
+            'early-retirement-deep', 'equity-deep', 'forward', 'reverse', 'severance-deep', 'social-base-deep',
+            'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
         ]);
     });
 
@@ -96,11 +97,12 @@ describe('工具注册表：数量与分组', () => {
         //    复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
         //    而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
-        expect(twins).toHaveLength(9);
+        expect(twins).toHaveLength(10);
 
         // ① 共享速算器 spec 的那 5 个（vat / cit / social / surtax-stamp / fee）：
         //    完整测算与速算器本就问同一件事，共享同一份对象最省事，也最不容易漂。
-        const OWN_SPEC = ['bonus-tax-deep', 'equity-deep', 'severance-deep', 'withholding-deep'];
+        const OWN_SPEC = ['bonus-tax-deep', 'early-retirement-deep', 'equity-deep', 'severance-deep',
+            'withholding-deep'];
         const shared = twins.filter((t) => OWN_SPEC.indexOf(t.id) < 0);
         expect(shared.map((t) => t.id).sort()).toEqual([
             'corporate-income-tax-deep', 'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
@@ -120,12 +122,14 @@ describe('工具注册表：数量与分组', () => {
         //      bonus-tax-deep   → bonus-tax-quick.js（tests/bonus-tax-deep.test.js）
         //      equity-deep      → equity-incentive-quick.js（tests/equity-deep.test.js）
         //      severance-deep   → severance-quick.js（tests/severance-deep.test.js）
+        //      early-retirement-deep → early-retirement-quick.js（tests/early-retirement-deep.test.js）
         //    这里只钉住「它确实自带且没被覆盖」。
         [
             { id: 'withholding-deep', twin: 'withholding', policy: 'withholding' },
             { id: 'bonus-tax-deep', twin: 'bonus-tax', policy: 'bonus' },
             { id: 'equity-deep', twin: 'equity', policy: 'equity-incentive' },
-            { id: 'severance-deep', twin: 'severance', policy: 'severance' }
+            { id: 'severance-deep', twin: 'severance', policy: 'severance' },
+            { id: 'early-retirement-deep', twin: 'early-retirement', policy: 'early-retirement' }
         ].forEach((pair) => {
             const own = R().get(pair.id);
             expect(own.compute).not.toBe(R().get(pair.twin).compute);

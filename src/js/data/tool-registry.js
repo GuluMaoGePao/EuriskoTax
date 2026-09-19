@@ -1492,6 +1492,238 @@
             }
         },
         {
+            // 阶段17 17D-5（v1.56.0）：个税纵深补齐的第五个场景 —— 提前退休 / 内部退养一次性收入。
+            //
+            // 速算器 `early-retirement` 已经用 `variant` 把「真分摊」与「平均只为定档」分开了，
+            // 但它把**分摊年数 / 所属月份数当成两个自由填写的框** —— 而这两个数是**法定的**：
+            //   ① **提前退休**（财税〔2018〕164 号第五条二项）按「办理提前退休手续至法定离退休年龄
+            //      之间实际年度数」平均分摊 —— 不是想分几年就几年。多填年数就能少交税，是这条政策
+            //      最容易被钻的空子（本工具按**法定退休年龄 − 办理时年龄**折算，并量化自行填写的差额）。
+            //   ② **内部退养**（164 号第五条三项 + 国税发〔1999〕58 号）的「所属月份数」同样是法定的。
+            // 另外三层是速算器没算出来的：
+            //   ③ **免税额度**：提前退休分摊后每年减 6 万，等价于「免税额度 = 6 万 × 分摊年数」——
+            //      **随提前的年数线性增长**；离职补偿是「社平年工资 × 3」的**固定**额度；内部退养
+            //      **根本没有免税额度**（只减一次 5000）。同一笔一次性收入，三种口径差出一个数量级。
+            //   ④ **内部退养有巨大的临界区**：它与年终奖共用同一张**月度**表定档，但税基是
+            //      「当月工资 + 一次性收入**全额**」—— 定档基数跨档时，多发 1 元可能多交上万元税。
+            //      提前退休用连续的年度累进表，**没有**雷区（与股权激励同理）。本工具算出临界点并给出建议值。
+            //   ⑤ 提前退休一次性补贴**不并入**当年综合所得（内退是与当月工资合并按月度表计税）。
+            // 口径仍同源：两种情形一律走 `EuriskoEarlyRetirementQuick`；横向对照里的「离职补偿口径」
+            // 走 `EuriskoSeveranceQuick`（复刻 17D-4 那条「法定上限恰好等于免税额度」的恒等式，
+            // 让 legalCap 不额外截断）；单笔输入与速算器逐点相等，由 tests/early-retirement-deep.test.js 钉住。
+            id: 'early-retirement-deep', name: '提前退休 / 内退', subtitle: '按法定年数分摊，并查临界区',
+            icon: 'fa-hourglass-half', status: 'deep',
+            nextTools: ['early-retirement', 'severance', 'annual-settlement'],
+            policyKey: 'early-retirement',
+            fields: [
+                { key: 'variant', step: 'basis', label: '情形', type: 'select', default: 'early',
+                    options: [{ value: 'early', label: '提前退休（真分摊）' },
+                        { value: 'internal', label: '内部退养（平均只为定档）' }],
+                    hint: '两者口径完全不同：一个按年度表真分摊，一个按月度表定档后对全额计税' },
+                { key: 'age', step: 'basis', label: '办理手续时的年龄（岁，可含小数）', type: 'number', default: 53, min: 0,
+                    hint: '52.5 = 52 岁 6 个月' },
+                { key: 'legalAge', step: 'basis', label: '本人法定退休年龄（岁）', type: 'number', default: 60, min: 0,
+                    hint: '2025-01-01 起实施渐进式延迟法定退休年龄，**不再是固定的 60/55/50** —— 填本人的实际法定退休年龄' },
+
+                { key: 'subsidy', step: 'income', label: '一次性补贴收入（元）', type: 'money', default: 560000,
+                    when: { key: 'variant', in: ['early'] } },
+                { key: 'lumpSum', step: 'income', label: '内退一次性收入（元）', type: 'money', default: 300000,
+                    when: { key: 'variant', in: ['internal'] } },
+                { key: 'monthlySalary', step: 'income', label: '领取当月工资薪金（元/月）', type: 'money', default: 6000,
+                    when: { key: 'variant', in: ['internal'] },
+                    hint: '内退一次性收入与领取当月工资**合并**计税；这个数也用于后面三口径的横向对照' },
+
+                { key: 'otherTaxable', step: 'option', label: '当年其他综合所得的应纳税所得额（元）', type: 'money', default: 60000,
+                    hint: '提前退休的一次性补贴**不并入**当年综合所得 —— 填它只为量化「若并入」会多交多少' },
+                { key: 'claimedYears', step: 'option', label: '你原以为可以分摊几年', type: 'number', default: 10, min: 0,
+                    when: { key: 'variant', in: ['early'] },
+                    hint: '分摊年数按**法定实际年度数**算，不能自己选 —— 填一个不同的数看看会差多少' },
+                { key: 'avgWage', step: 'option', label: '当地上年职工年平均工资（元/年）', type: 'money', default: 120000,
+                    hint: '只用于与「离职补偿」口径做横向对照：那个口径的免税额度 = 该数 × 3' }
+            ],
+            steps: [
+                { key: 'basis', title: '情形与时间点', why: '分摊年数 / 所属月份数是**法定的**（法定退休年龄 − 办理时年龄），不是想填几年就几年' },
+                { key: 'income', title: '一次性收入', why: '提前退休按年度表真分摊；内退与领取当月工资合并、按月度表定档后对**全额**计税' },
+                { key: 'option', title: '对照', why: '三种「一次性收入」的免税逻辑完全不同，横向一比就知道自己属于哪一种、差多少钱' }
+            ],
+            pitfalls: [
+                '提前退休是**真分摊**（÷ 实际年数后按年减 6 万、算完乘回年数）；内部退养的「平均」**只用来定档**，税基仍是当月工资 + 一次性收入**全额**',
+                '分摊的年数 / 月份数是**办理手续至法定离退休年龄的实际期间**，不是想分几年就几年 —— 多填年数能少交税，但那是错的',
+                '免税额度三种三种都不同：提前退休 = **6 万 × 分摊年数**（随年数线性增长）、离职补偿 = **社平年工资 × 3**（固定）、内部退养 = **没有免税额度**（只减一次 5000）',
+                '提前退休用**年度**税率表、内部退养用**月度**税率表（与年终奖同一张），两者不是一回事',
+                '内部退养有**临界区**：定档基数跨档时税基是全额 —— 多发 1 元可能多交上万元税；提前退休用连续的年度累进表，**没有**雷区',
+                '2025-01-01 起实施渐进式延迟法定退休年龄，法定退休年龄不再是固定的 60 / 55 / 50 —— 必须填本人的实际法定退休年龄',
+                '提前退休的一次性补贴**不并入**当年综合所得、单独计税；内部退养是与领取**当月**工资合并按月度表计税，两者都不参与年度汇算'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoEarlyRetirementQuick;
+                if (!Q) return null;
+
+                var T = function (x) {
+                    return typeof calculateTaxByTaxableIncome === 'function'
+                        ? calculateTaxByTaxableIncome(Math.max(0, x)).tax : 0;
+                };
+                var num = function (x) { var n = Number(x); return isFinite(n) ? n : 0; };
+
+                var rules = Q.rules() || {};
+                var annualDed = num(rules.early && rules.early.annualDeduction) || 60000;
+                var monthlyDed = num(rules.internal && rules.internal.monthlyDeduction) || 5000;
+
+                var variant = v.variant === 'internal' ? 'internal' : 'early';
+                var age = Math.max(0, num(v.age));
+                var legalAge = Math.max(0, num(v.legalAge));
+                // 法定的实际期间：不是「想分几年就几年」
+                var years = Math.max(0, legalAge - age);
+                var months = Math.max(1, Math.round(years * 12));
+                var effYears = years > 0 ? years : 1;
+
+                var salary = Math.max(0, num(v.monthlySalary));
+                var otherTaxable = Math.max(0, num(v.otherTaxable));
+                var avgWage = Math.max(0, num(v.avgWage));
+                var amount = Math.max(0, num(variant === 'early' ? v.subsidy : v.lumpSum));
+
+                // —— 三种「一次性收入」的横向对照：同一笔钱，三种算法差出一个数量级 ——
+                var sevTax = null;
+                var Q2 = window.EuriskoSeveranceQuick;
+                if (Q2) {
+                    // 传 monthlyWage = 3 倍月均、years = 12，使法定上限**恰好等于**免税额度
+                    // （17D-4 那条恒等式），legalCap 就不会额外截断 —— 得到纯粹的
+                    // 「3 倍社平免税 + 超额部分单独适用年度表」口径。
+                    sevTax = Q2.compareOf({
+                        economic: amount, other: 0, avgWage: avgWage,
+                        monthlyWage: avgWage / 12 * 3, years: 12, otherTaxable: 0
+                    }).tax;
+                }
+                var compareRows = [
+                    ['提前退休（真分摊）', { value: Q.earlyOf({ subsidy: amount, years: effYears }).tax, kind: 'money' },
+                        { value: annualDed * years, kind: 'money' }, '6 万 × 分摊年数，年度表，乘回年数'],
+                    ['内部退养（平均只为定档）',
+                        { value: Q.internalOf({ lumpSum: amount, months: months, monthlySalary: salary }).tax, kind: 'money' },
+                        '无（只减一次 5000）', '月均定档 + **全额**计税，月度表']
+                ];
+                if (sevTax !== null) {
+                    compareRows.push(['离职补偿（3 倍社平免税）', { value: sevTax, kind: 'money' },
+                        { value: avgWage * 3, kind: 'money' }, '超额部分单独适用年度表，**不做分摊**']);
+                }
+
+                var rows, note, primary;
+
+                if (variant === 'early') {
+                    var e = Q.earlyOf({ subsidy: amount, years: effYears });
+                    var exemptCap = annualDed * years;              // 分摊免税额度 = 6 万 × 分摊年数
+                    var mergedTax = T(otherTaxable + amount) - T(otherTaxable);   // 若并入当年综合所得
+                    var claimed = Math.max(0, num(v.claimedYears));
+                    var claimedTax = claimed > 0 ? Q.earlyOf({ subsidy: amount, years: claimed }).tax : e.tax;
+                    var claimedGap = e.tax - claimedTax;            // 正数 = 自行填的年数会少算
+
+                    primary = { label: '一次性补贴应纳个税', value: e.tax, kind: 'money',
+                        hint: '分摊后每年税额 × 法定的实际年度数' };
+                    rows = [
+                        { label: '一次性补贴收入', value: amount, kind: 'money' },
+                        { label: '分摊年度数（法定实际年度数）', value: years, kind: 'text',
+                            hint: '法定退休 ' + legalAge + ' 岁 − 办理时 ' + age + ' 岁' },
+                        { label: '每年分摊额', value: e.perYear, kind: 'money' },
+                        { label: '分摊后年应纳税所得额', value: e.taxablePerYear, kind: 'money',
+                            hint: '每年分摊额 − 6 万' },
+                        { label: '适用税率', value: e.rate, kind: 'percent' },
+                        { label: '每年税额', value: e.taxPerYear, kind: 'money' },
+                        { label: '应纳个税合计', value: e.tax, kind: 'money' },
+                        { label: '税后到手', value: amount - e.tax, kind: 'money' },
+                        { label: '实际税负率', value: amount > 0 ? e.tax / amount : 0, kind: 'percent' },
+                        { label: '免税额度（6 万 × 分摊年数）', value: exemptCap, kind: 'money',
+                            hint: '随提前的年数**线性增长** —— 与离职补偿的固定额度不同' },
+                        { label: '若不分摊（错误算法）', value: e.naiveTax, kind: 'money' },
+                        { label: '分摊省下的税', value: e.spreadSaving, kind: 'money' },
+                        { label: '若并入当年综合所得（错误口径）', value: mergedTax, kind: 'money' },
+                        { label: '并入会多交', value: mergedTax - e.tax, kind: 'money' },
+                        { label: '若按你填的 ' + claimed + ' 年分摊', value: claimedTax, kind: 'money' },
+                        { label: '自行填年数的差额', value: claimedGap, kind: 'money',
+                            hint: '正数 = 你填的年数会少算税（多填年数确实能少交，但年数是法定的）' }
+                    ];
+
+                    note = '提前退休：一次性补贴 ÷ 实际年度数（法定退休 ' + legalAge + ' 岁 − 办理时 ' + age
+                        + ' 岁 = ' + years + ' 年）= 每年 ' + Math.round(e.perYear) + ' 元，减 6 万后按**年度**'
+                        + '综合所得税率表计税，再乘回年数；**不并入**当年综合所得。'
+                        + '分摊后每年减 6 万，等价于**免税额度 = 6 万 × ' + years + ' = '
+                        + Math.round(exemptCap) + ' 元** —— 与离职补偿的「社平年工资 × 3」不同，这个额度随提前的年数线性增长。';
+                    if (Math.abs(claimed - years) > 1e-9 && claimed > 0) {
+                        note += ' 分摊年数是**法定实际年度数**，不能自己选：你填的 ' + claimed + ' 年算出 '
+                            + Math.round(claimedTax) + ' 元，比法定口径' + (claimedGap > 0 ? '少算 ' : '多算 ')
+                            + Math.abs(Math.round(claimedGap)) + ' 元。';
+                    }
+                    if (years <= 0) {
+                        note = '⚠️ 办理时年龄已达法定退休年龄，不构成「提前退休」—— 请核对该填的年龄。';
+                    }
+                } else {
+                    var i = Q.internalOf({ lumpSum: amount, months: months, monthlySalary: salary });
+
+                    // 内部退养的临界区：与年终奖共用月度表定档，但税基是**全额**
+                    var rates = window.bonusMonthlyTaxRates || [];
+                    var cliffs = [];
+                    var hit = null;
+                    for (var k = 0; k < rates.length - 1; k++) {
+                        var L = rates[k].max;
+                        if (!isFinite(L)) continue;
+                        var atL = (L - salary + monthlyDed) * months;      // 定档基数刚好等于 L 时的一次性收入
+                        if (atL <= 0) continue;
+                        var base = Math.max(0, salary + atL - monthlyDed);
+                        var nx = rates[k + 1];
+                        var jump = base * (nx.rate - rates[k].rate) - (nx.deduction - rates[k].deduction);
+                        if (jump <= 0) continue;
+                        cliffs.push([{ value: L, kind: 'money' }, { value: atL, kind: 'money' },
+                            { value: jump, kind: 'money' }, { value: Math.floor(atL), kind: 'money' }]);
+                        if (amount > atL && amount - atL < jump) hit = { at: atL, jump: jump, keep: Math.floor(atL) };
+                    }
+
+                    primary = { label: '内退一次性收入应纳个税', value: i.tax, kind: 'money',
+                        hint: '月均额只用来定档，税基是当月工资 + 一次性收入全额' };
+                    rows = [
+                        { label: '内退一次性收入', value: amount, kind: 'money' },
+                        { label: '所属月份数（法定折算）', value: months, kind: 'text',
+                            hint: '（法定退休 ' + legalAge + ' 岁 − 办理时 ' + age + ' 岁）× 12' },
+                        { label: '月均额（仅用于定档）', value: i.monthly, kind: 'money' },
+                        { label: '定档基数（月均 + 当月工资 − 5000）', value: i.base, kind: 'money' },
+                        { label: '适用税率', value: i.rate, kind: 'percent' },
+                        { label: '计税基数（全额不摊）', value: i.taxable, kind: 'money',
+                            hint: '当月工资 + 一次性收入 − 5000' },
+                        { label: '应纳个税', value: i.tax, kind: 'money' },
+                        { label: '税后到手', value: amount - i.tax, kind: 'money' },
+                        { label: '实际税负率', value: amount > 0 ? i.tax / amount : 0, kind: 'percent' },
+                        { label: '免税额度', value: '无（只减一次 5000）', kind: 'text' },
+                        { label: '若误按「月均 × 月数」算', value: i.naiveTax, kind: 'money' },
+                        { label: '少算的税额', value: i.naiveGap, kind: 'money' }
+                    ];
+
+                    note = '内部退养：一次性收入与领取当月工资合并，先按月均额（÷ 所属月份数 ' + months
+                        + '）确定税率档，再对**全额**计税 —— 平均只为定档，不是分摊；它**没有免税额度**，'
+                        + '整个一次性收入只减一次 5000 元。';
+                    if (hit) {
+                        note = '⚠️ 你填的一次性收入刚跨过 ' + Math.round(hit.at) + ' 元的定档临界点：'
+                            + '多拿 1 元要多交约 ' + Math.round(hit.jump) + ' 元税 —— 定在 '
+                            + hit.keep + ' 元反而到手更多。';
+                    }
+                }
+
+                var extras = [{
+                    title: '同一笔一次性收入的三种口径',
+                    note: '只有你选的那一行是适用的；免税逻辑三种三种都不同，所以差别能到一个数量级',
+                    table: { head: ['口径', '应纳税额', '免税额度', '计税方法'], rows: compareRows }
+                }];
+                if (variant === 'internal') {
+                    extras.push({
+                        title: '内部退养的临界区（该定在多少）',
+                        note: '定档基数每跨一档，税额就按**全额**跳一次 —— 提前退休用连续的年度表，没有这个雷区',
+                        table: {
+                            head: ['月度档上限', '一次性收入临界', '多发 1 元多交', '建议定在'],
+                            rows: cliffs
+                        }
+                    });
+                }
+
+                return { primary: primary, rows: rows, note: note, extras: extras };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
