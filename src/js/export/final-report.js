@@ -21,7 +21,9 @@
     const META = {
         comprehensive: {
             legacyTitle: '个人年度个税预算表',
-            resultElId: 'step-result',
+            // 17B-3（v1.49.0）：'step-result' 随综合所得旧页面删除，改为向导的结果卡 ——
+            // 换过的旧 id 会让 exportToPDF 静默丢掉截图主体：报告只剩封面和免责页，且不报错。
+            resultElId: 'dw-result-card',
             reportTitle: () => `${new Date().getFullYear()}年度综合所得汇算清缴报告`,
             kindLabel: '综合所得年度汇算测算'
         }

@@ -21,10 +21,10 @@ const CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'css', 'tailwind.s
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 const FIXTURE = `
-<div id="forward-calculation-page" class="page hidden has-preview-bar">
+<div id="classification-calculation-page" class="page hidden has-preview-bar">
     <div class="calc-sticky-header">
         <div class="max-w-5xl mx-auto">
-            <div class="calc-top-row"><span class="calc-page-title">综合所得计税</span></div>
+            <div class="calc-top-row"><span class="calc-page-title">分类所得计税</span></div>
             <div class="step-indicator"><span class="step-title active">基本参数</span></div>
         </div>
     </div>
@@ -59,7 +59,7 @@ describe('TaskMode：任务页判定与 body 类', () => {
     });
 
     test('多步计税页算任务页，普通页不算', () => {
-        expect(window.TaskMode.isTaskPage('forward-calculation-page')).toBe(true);
+        expect(window.TaskMode.isTaskPage('classification-calculation-page')).toBe(true);
         expect(window.TaskMode.isTaskPage('mode-selection-page')).toBe(false);
         expect(window.TaskMode.isTaskPage('tools-page')).toBe(false);
     });
@@ -83,7 +83,7 @@ describe('TaskMode：任务页判定与 body 类', () => {
     });
 
     test('sync：进入任务页加上类，离开任务页必须摘干净（否则全站顶栏消失）', () => {
-        expect(window.TaskMode.sync('forward-calculation-page')).toBe(true);
+        expect(window.TaskMode.sync('classification-calculation-page')).toBe(true);
         expect(document.body.classList.contains('task-mode')).toBe(true);
 
         expect(window.TaskMode.sync('mode-selection-page')).toBe(false);
@@ -91,8 +91,8 @@ describe('TaskMode：任务页判定与 body 类', () => {
     });
 
     test('sync 幂等：重复同步同一个页面不累积状态', () => {
-        window.TaskMode.sync('forward-calculation-page');
-        window.TaskMode.sync('forward-calculation-page');
+        window.TaskMode.sync('classification-calculation-page');
+        window.TaskMode.sync('classification-calculation-page');
         expect(document.body.classList.toString()).toBe('task-mode');
     });
 });

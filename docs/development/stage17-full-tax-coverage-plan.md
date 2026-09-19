@@ -4,8 +4,9 @@
 
 > 版本：v1.0 · 2026-09-18 ｜ 状态：**进行中**
 > 进度：17A-1 / 17A-4 / 17A-5 **已落地**，17A-2（结果区与存量页面对等）**已交付 v1.45.0**；
-> 17C-1 ~ 17C-5 **全部已交付（6/6 类已齐）**；**17B-1 已交付 v1.46.0**（business 迁移完成，
-> **页面式 deep 由 4 → 3**），下一批 17B-2 = reverse。
+> 17C-1 ~ 17C-5 **全部已交付（6/6 类已齐）**；
+> **17B 全部交付完毕**：17B-1 v1.46.0（business）/ 17B-2 v1.48.0（reverse）/ 17B-3 v1.49.0（forward）/
+> **17B-4 v1.50.0（classification）—— 页面式 deep 由 4 → 0，验收口径「页面式归零」已兑现**。
 > ⚠️ **与实际施工顺序不一致**：本文件 §9 曾把 17D（个税纵深）定为 P0 并排在 17C 之前，
 >    实际先做了 17C-1 / 17C-4。理由与纠偏见文末「变更记录」（2026-09-18 第二条）—— **尚未决定是否回滚这条路**。
 > 立项依据：[`ui-design-spec.md`](../guides/ui-design-spec.md) §4.2（覆盖矩阵）/ §4.4（缺口清单）/ §12.7（强制顺序）
@@ -57,11 +58,11 @@
 
 | page | 位置 | 硬编码量级 |
 |---|---|---|
-| `forward-calculation-page` | L691 起 | 约 810 行 |
+| `forward-calculation-page` | L691 起 | 约 970 行（**v1.49.0 已删**） |
 | `reverse-calculation-page` | L1660 起 | 约 740 行（**v1.48.0 已删**） |
 | `business-calculation-page` | L2714 起 | 约 390 行（**v1.47.0 已删**） |
-| `classification-calculation-page` | L3567 起 | 约 330 行 |
-| **合计** | | **约 2270 行，占 index.html 约 40%**（已清偿约 1,900 行） |
+| ~~`classification-calculation-page`~~ | ~~L3567 起~~ | 约 330 行（**v1.50.0 已删**：含动态增删所得条目，spec 为此先补了 repeater） |
+| **合计** | | **约 2430 行，占 index.html 约 40% —— 已全部清偿（0 剩余）** |
 
 按当前写法线性外推，再铺 5 类税种约等于**再手写 2800 行**。这就是本阶段必须先做 spec 的量化理由，不是架构洁癖。
 
@@ -171,13 +172,15 @@ UI 排版规范评审通过（前置中的前置）
 
 | # | 任务 | 步数 | 备注 |
 |---|---|---|---|
-| 17B-1 | 迁移 `classification` | 2 | 样板，先跑通全链路 |
-| 17B-2 | 迁移 `business` | 3 | 含减半优惠、五级税率表 |
-| 17B-3 | 迁移 `reverse` | 3 | **验证 spec 与 `solver.js` 的结合** |
-| 17B-4 | 迁移 `forward` | 4 | 最复杂（七段结果 + 推导链），压满验证 |
-| 17B-5 | **删除 `index.html` 中对应硬编码** | — | 预计减少 1500 行以上 |
+| 17B-1 | ✅ 迁移 `business` | 3 | **v1.46.0 交付 + v1.47.0 删页收尾**（约 1,150 行）；含减半优惠、五级税率表 |
+| 17B-2 | ✅ 迁移 `reverse` | 3 | **v1.48.0 交付**（含删页，约 1,050 行）；**验证了 spec 与 `solver.js` 的结合** |
+| 17B-3 | ✅ 迁移 `forward` | 4 | **v1.49.0 交付**（含删页，约 1,900 行）；最复杂（七段结果 + 推导链 + 预算表 + 年终奖双口径），spec 压满验证 |
+| 17B-4 | ✅ 迁移 `classification` | 2 | **v1.50.0 交付**（含删页，约 1,700 行）；**殿后**因其含动态增删所得条目 —— 先给渲染器补了 **repeater**（`type:'repeater'` + `itemFields`），再迁再删；**17B 收官，页面式 deep 归零** |
+| 17B-5 | 删除 `index.html` 中对应硬编码 | — | **四项各自同版删净，共约 3,430 行 —— 已清零**（`index.html` 里不再有 `*-calculation-page`） |
 
 > 每个 17B-x 必须**单独一个版本、单独可回滚**，不得合并交付。
+> 执行顺序按上表（`business → reverse → forward → classification`）：先拿简单的把 spec 跑通，
+> 把**删页必须同版清干净**这条纪律练熟，再啃最复杂的 forward，最后留 repeater 难题给 classification。
 
 ### 17D 个税纵深补齐 —— **P0，排在 17C 之前**（2026-09-18 优先级上调）
 
@@ -224,7 +227,8 @@ UI 排版规范评审通过（前置中的前置）
 
 ### 6.1 核心验收口径（写死，不受批次影响）
 
-> **App 内完整测算（`status:'deep'`）覆盖的 `category` 数。目标 6/6，现状 1/6。**
+> **App 内完整测算（`status:'deep'`）覆盖的 `category` 数。目标 6/6，现状 6/6（17C-1 ~ 17C-5 已交付）。**
+> 附带验收：**页面式 deep 归零** —— 由 `tests/tool-registry.test.js` 的分口径断言守护（v1.50.0 兑现）。
 
 新增税种以该数字 **+1** 为验收。**不许出现「只有速算器、没有完整测算」的税种。**
 
@@ -311,3 +315,5 @@ UI 排版规范评审通过（前置中的前置）
 | 2026-09-18 | **17B-1 收尾**（v1.47.0）：经营所得旧页面死代码清理完毕（约 1,150 行） | 三类cherry-pick经验：① **不是所有引用都能一删了之** —— 历史回填 / 取值口径 / 税务助手关联入口 / 留资归因 / 分享图 / 漏斗埋点都是「改」，其中历史取值要同时兼容旧结构 `incomeDetails/taxDetails` 与向导的 `{values, primary, rows}`；② **通用渲染器必须做归属归因** —— 向导的 `dw-result-card` 被所有 spec 工具复用，加了 `data-tool-id` / `data-dw-row` / `dw-result-primary` 三个锚点，否则算增值税会被记成经营所得线索（线索表里看不出来的错）；③ **静态 HTML 契约会失效** —— 「selector 必须在 index.html 存在」对运行时渲染的节点不成立，改由向导端到端用例守护。对拍测试也顺势转为**按税法口径独立重算**的回归（页面版没了，左式不复存在）；④ **页面私有联动要沉淀成 spec 钩子，不能跟着页面一起删** —— 删时才被告警（`verify:local` 2 项转红）发现「基数 × 缴费比例 → 月缴额」这组便利输入只存在于 app.js / helper-functions.js 的私有函数里，SPEC 迁移时静默丢了。补法是在 `tool-registry.js` 加 `deriveFrom` / `derive()` / `warnings()`，动作交给 `deep-wizard-ui.js`（`applyDerived` / `bindDerivedSources` / `renderWarnings`），reverse / forward / classification 迁移时先自查一遍同类辅助输入 |
 | 2026-09-18 | **17B-1 收尾的经验**：删 page 前先问「这个页面独有的便利输入有哪些」 | 用户手里有的是**社保缴费基数**，不是「每月扣了多少养老金」—— 这类辅助不参与计税，所以不受口径守护，删起来毫无告警。17B-2（reverse）开工前应对 `reverse-calculation-page` 做一次同样的盘点 |
 | 2026-09-18 | **17B-2 交付**（v1.48.0）：reverse（反向倒算 / 谈薪）由页面式迁到 spec 驱动，**页面式 3 → 2**（只剩 forward 与 classification） | ① **便利输入这次是删之前补的** —— 迁移前就把「基数 × 比例 → 月缴额」登记进 reverse spec，并与 business 共用一份 `INSURANCE_DERIVE_FROM` / `insuranceDerive` / `socialBaseWarnings`（两边逻辑本来就是同一份，抄两遍迟早只改一遍）。**唯一没补的是页面版反向的「手填月缴额 → 反算比例」**：两个方向互相写对方的值，在同一张表单上必然抖动；② **`dw-result-card` 第二次带来「同容器不同模板」的问题** —— 谈薪卡走 negotiation 模板、经营所得卡走 income，共用容器后必须按 `容器:工具Id`（`dw-result-card:reverse`）再分一路 + `sourceKey()` 认人，否则谈薪结果会被截成一张经营所得卡；③ **对拍用例要区分 conservative 与 balanced** —— conservative 取档位下限，它在扣除变化时会**跳档**，不随扣除单调；钉单调性必须用 balanced（解方程的那个值）；④ ui-result-compliance 少一个页面条目 = 少一处免责守护，接盘的端到端用例与本次同版交付（见 `tests/reverse-migration.test.js`） |
+| 2026-09-19 | **17B-3 交付**（v1.49.0）：forward（综合所得年度汇算）由页面式迁到 spec 驱动，**页面式 2 → 1**（只剩 classification） | ① **抽内核这一步做的是 `performTaxCalculation` 的另一半** —— 它早就能注入 `deductions`，缺的是那份独有的**逐月预算表**：抽成纯 tables 内核后由 `extras.table` 透传（含跨列标题行 `{cells, spans}`，渲染器摊平），先有 `tests/budget-table.test.js` 再删页面；② **27 个字段分三步**，便利输入（婴幼儿分摊比例 0~100、学历/职业资格勾选）迁移**前**就登记进 spec，第三次没让便利输入跟着页面走；③ **`dw-result-card` 第三次认人**：同一张卡挂着 business / reverse / forward 三份配置，靠 `容器:工具Id` + `sourceKey()` 认人（照裸 id 取会把增值税的结果截进综合所得分享图）。由此还暴露一个 bug —— 向导的行节点把**标签和值渲染在同一个 div** 里，照 `textContent` 整取会得到 `'适用税率20%'`，留资情境因此出现「适用税率 适用税率20%」；改取行内最后一个 `span`；④ **干掉了两份重复实现** —— data-management 的 `saveCalculationResult` 与 tax-calculator 的 `saveToHistory` 是同一件事的两份写法（`updatedAt` / 变更信号各写一份），此后写历史只有一个出口；⑤ 两条依赖页面 DOM 的门禁断言改到 spec 侧（三个 spec 的 `housingFundRate` + `insuranceDerive` 的 FALLBACK + 向导失焦归一），**(data-management)** 那条改为「写历史入口收敛」，项数维持 259；⑥ 旧移交项：`scenario-ui.js` 的「年终奖方案对比」卡原先长在被删页面的结果区里，纯逻辑与单测仍在，UI 出口待定 |
+| 2026-09-19 | **17B-4 交付**（v1.50.0）：classification（分类所得）由页面式迁到 spec 驱动，**页面式 1 → 0 —— 验收口径「页面式归零」兑现** | ① **先把能力补出来再迁，而不是让 spec 将就** —— 它含动态增删所得条目，故先给渲染器加 `type:'repeater'`（`itemFields` + 加/删按钮，控件 id `qf-<key>-<下标>-<子键>` 以便复用既有 `fieldHtml` / 条件显隐 / 类型转换，**不抄第二套**），再写 spec，最后删页；② **口径不变、说法补齐** —— `compute` 仍调 `calculateSingleClassificationTax` / `calculateClassificationTaxTotal`（页面版内联的那份同形公式自此消失），但**修缮费每月 800 元封顶**原先只截断不解释，填 1500 看到 800 会被当成算错，现写进 hint 与 pitfalls（超出部分**结转以后月份**）；③ **这次踩到的是「删页留下的空指针」** —— `app.js` 还绑着 `back-to-mode-selection-classification`，页面没了它就在 DOMContentLoaded 里抛 TypeError，**后面所有初始化（登录态、历史记录）静默不执行**；界面看着正常、功能全残，只能靠「扫源码里引用了 index.html 中不存在的 id」发现（已清）；④ **守护照例换手** —— 新增 `tests/classification-migration.test.js`（四类所得扣除口径按税法独立重算 + 按次单独计税不合并 + repeater 增删 + 端到端守免责 / `data-tool-id` / 分享图两个行标签），接住 `ui-result-compliance` 失去的页面条目；`showClassificationStep` / `formatPreviewNum` 的用例随页面翻篇（测的是表单自己的显示接线，数字格式化已统一到 `toolbox-ui.fmtValue`）。至此 `deep-wizard-ui.js` 承载全部 9 个 deep，`index.html` 里不再有任何 `*-calculation-page` |

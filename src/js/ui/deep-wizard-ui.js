@@ -59,7 +59,14 @@
 
     function defaultsOf(tool) {
         var v = {};
-        (tool.fields || []).forEach(function (f) { v[f.key] = f.default; });
+        (tool.fields || []).forEach(function (f) {
+            // repeater 的默认值是一条数组（可以是空)：取不到就给一条空条目，别给 undefined
+            if (f.type === 'repeater') {
+                v[f.key] = (Array.isArray(f.default) && f.default.length) ? f.default : [repBlank(f)];
+            } else {
+                v[f.key] = f.default;
+            }
+        });
         return v;
     }
 
@@ -127,6 +134,7 @@
             primary: sc.primary || out.primary,
             rows: sc.rows || out.rows,
             steps: sc.steps || out.steps,
+            extras: sc.extras || out.extras,
             note: sc.note === undefined ? out.note : sc.note,
             compare: cmp
         };
@@ -224,6 +232,96 @@
             '</table>';
     }
 
+    // ====== 结果附加块（extras）======
+    // 有些「完整测算」的答案不是「一个数 + 一排明细」，而是一张**表**：正向计税要按年摊开
+    // 12 个月（累计预扣法下同年收入、不同发放节奏，每月到手并不一样），那才是它比速算器
+    // 多出来的东西。这种东西塞不进 rows（一个 label 一个值），删掉它又是实打实的降级 ——
+    // 所以渲染器加一块通用容器：spec 只出**数据**，怎么排版由渲染器负责，导出各有各的 markup。
+    //
+    // 契约：extras = [{ title, note?, table?: { head: [], rows: [[cell]] }, list?: [] }]
+    //   cell 可以是 { value, kind }（走统一的格式化），也可以是 spec 自己拼好的字符串。
+    function cellText(c) {
+        if (c === null || c === undefined) return '—';
+        if (typeof c === 'object') return TB().fmtValue(c.value, c.kind);
+        return String(c);
+    }
+
+    // 行有两种写法：裸数组 [cell]，或 utils.js 那种带 spans（跨列标题）的行模型 { cells, spans }。
+    // 后者先按 spans 摊平成同样长度的数组 —— 合并单元格在通用小表格里意义不大，
+    // 而**列数不齐**会让数字串到隔壁列去，那才是一眼看不出来的错。
+    function flattenRow(tr) {
+        if (Array.isArray(tr)) return tr;
+        var cells = [];
+        (tr.cells || []).forEach(function (c, i) {
+            cells.push(c);
+            var span = Number((tr.spans || [])[i]) || 1;
+            for (var k = 1; k < span; k++) cells.push('');
+        });
+        return cells;
+    }
+
+    function tableRowsHtml(t) {
+        return (t.rows || []).map(function (tr) {
+            var row = flattenRow(tr);
+            var tds = row.map(function (c) {
+                // 第一列按行首处理（通常是月份 / 类型），其余右对齐 —— 数字列不对齐就看不出趋势
+                var align = (row.indexOf(c) === 0) ? 'text-left text-gray-600' : 'text-right';
+                return '<td class="px-2 py-1.5 border-t border-gray-100 ' + align + '">' + esc(cellText(c)) + '</td>';
+            }).join('');
+            return '<tr>' + tds + '</tr>';
+        }).join('');
+    }
+
+    function extrasHtml(list) {
+        if (!list || !list.length) return '';
+        return list.map(function (ex) {
+            return '<div class="mt-5">' +
+                '<div class="text-sm font-medium text-gray-800 mb-2">' + esc(ex.title) + '</div>' +
+                (ex.table ? '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+                    '<thead><tr class="text-xs">' +
+                    (ex.table.head || []).map(function (h, i) {
+                        return '<th class="px-2 py-1.5 ' + (i === 0 ? 'text-left' : 'text-right') +
+                            ' text-gray-500 font-normal">' + esc(h) + '</th>';
+                    }).join('') +
+                    '</tr></thead><tbody>' + tableRowsHtml(ex.table) + '</tbody></table></div>' : '') +
+                (ex.list ? '<ul class="text-sm text-gray-600 space-y-1 list-disc pl-5">' +
+                    ex.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
+                (ex.note ? '<p class="text-xs text-gray-500 mt-2">' + esc(ex.note) + '</p>' : '') +
+                '</div>';
+        }).join('');
+    }
+
+    // 导出版：邮件正文 / Word 不吃 tailwind 类名，同一份数据在用 inline style 再排一遍
+    function extrasExportHtml(list) {
+        if (!list || !list.length) return '';
+        return list.map(function (ex) {
+            var blocks = '';
+            if (ex.table) {
+                var head = (ex.table.head || []).map(function (h, i) {
+                    return '<th style="padding:6px 8px;border-bottom:1px solid #eee;color:#4b5563;' +
+                        (i === 0 ? 'text-align:left' : 'text-align:right') + ';font-weight:500">' + esc(h) + '</th>';
+                }).join('');
+                var body = (ex.table.rows || []).map(function (tr) {
+                    return '<tr>' + flattenRow(tr).map(function (c, i) {
+                        return '<td style="padding:6px 8px;border-bottom:1px solid #eee;' +
+                            (i === 0 ? 'color:#4b5563;text-align:left' : 'text-align:right') + '">' +
+                            esc(cellText(c)) + '</td>';
+                    }).join('') + '</tr>';
+                }).join('');
+                blocks += '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+                    '<thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>';
+            }
+            if (ex.list) {
+                blocks += '<ul style="margin:8px 0;padding-left:18px;font-size:13px;color:#4b5563">' +
+                    ex.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+            }
+            if (ex.note) {
+                blocks += '<p style="margin:6px 0;font-size:12px;color:#6b7280">' + esc(ex.note) + '</p>';
+            }
+            return '<h3 style="margin:16px 0 8px;font-size:14px">' + esc(ex.title) + '</h3>' + blocks;
+        }).join('');
+    }
+
     // 导出用内容：两个导出函数默认读的是存量 4 页的**全局 results**（spec 向导没有这些全局变量，
     // 不跳过校验就会被「请先进行计算」挡回来），所以这里按同一份 out 自己拼一份报告。
     function exportHtml(tool, out) {
@@ -240,6 +338,9 @@
                 '<div style="font-size:24px;font-weight:700">' + esc(TB().fmtValue(out.primary.value, out.primary.kind)) + '</div>' +
             '</div>' +
             '<table style="width:100%;border-collapse:collapse;font-size:13px">' + rows + '</table>' +
+            // 附加块（如逐月预算表）跟着一起走：它是「完整测算」比速算器多出来的那部分，
+            // 导出里没有它，报告就退化成速算器的水平
+            extrasExportHtml(out.extras) +
             // 多口径测算必须连对比表一起导出：只看一个数就签字，正是这类工具最容易踩的坑
             (out.compare ? compareExportHtml(out.compare) : '') +
             (out.note ? '<p style="margin-top:12px;font-size:12px;color:#6b7280">' + esc(out.note) + '</p>' : '') +
@@ -340,6 +441,7 @@
                 '<div class="mt-4">' + rows + '</div>' +
                 (view.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(view.note) + '</p>' : '') +
                 stepsHtml +
+                extrasHtml(view.extras) +
                 // 免责声明：与存量 4 页同一句话、同样就地展示（不藏在页脚）
                 '<p class="result-disclaimer">' + DISCLAIMER + '</p>' +
                 '<div class="mt-6">' +
@@ -355,9 +457,131 @@
             '</div>';
     }
 
+    // ====== repeater：可增删的条目列表（17B-4：为分类所得的动态所得条目加的）======
+    //
+    // 为什么非它不可：一次测算里**条数不定**的输入没法用扁平字段表达 ——
+    // 「一笔利息 + 两套房租」写成三组固定字段，缺一组不够用、多一组又用不上。
+    // 这也是四次迁移里 classification 排在最后的原因：前面那套 steps / when / compare / extras / derive
+    // 谁都表达不了「N 条、每条还各自有条件字段」。
+    //
+    // 契约（写在 spec 里）：
+    //   { key, type: 'repeater', itemFields: [ …常规字段 ], addLabel?, default?: [ { … } ] }
+    // 值：state.values[key] = [ { <itemFields 的 key>: value } ]
+    //
+    // 实现上刻意**不新写一套类型转换**：每个条目的输入控件 id 沿用 `qf-<字段名>-<下标>-<子键>`，
+    // 于是渲染继续走 fieldHtml、取值继续走 readValues、显隐继续走 visibleFields ——
+    // 为了支持 repeater 再抄一份「空串归 0 / select 还原数字」，等于埋一个必将漂移的坑。
+    function repItemFields(f) { return f.itemFields || []; }
+    function repKey(fkey, index, key) { return fkey + '-' + index + '-' + key; }
+
+    function repBlank(f) {
+        var blank = {};
+        repItemFields(f).forEach(function (it) { blank[it.key] = it.default; });
+        return blank;
+    }
+
+    // state 里没有就拿 spec 的 default，连 default 都没有就给一条空条目 ——
+    // 空着让用户找「添加」按钮，不如直接有一条可以开始填。
+    function repList(f) {
+        var list = state.values[f.key];
+        if (Array.isArray(list) && list.length) return list;
+        if (Array.isArray(f.default) && f.default.length) return f.default;
+        return [repBlank(f)];
+    }
+
+    function repRowHtml(f, index, item) {
+        var vals = {};
+        repItemFields(f).forEach(function (it) { vals[it.key] = item[it.key]; });
+        var inputs = TB().visibleFields({ fields: repItemFields(f) }, vals).map(function (it) {
+            // 渲染即时回填：default 位置塞当前值（而不是 spec 的默认），否则「上一步 → 下一步」会丢
+            return TB().fieldHtml({
+                key: repKey(f.key, index, it.key), label: it.label, type: it.type, hint: it.hint,
+                options: it.options, min: it.min, max: it.max, default: item[it.key]
+            });
+        }).join('');
+        return '<div class="border border-gray-200 rounded-lg p-3 mb-3" data-dw-rep-of="' + esc(f.key) +
+                '" data-dw-rep-index="' + index + '">' +
+            '<div class="flex items-center justify-between mb-2">' +
+                '<span class="text-sm font-medium text-gray-800">第 ' + (index + 1) + ' 条</span>' +
+                '<button type="button" class="text-xs text-red-600 hover:text-red-700" data-dw-rep-remove="' + index + '">' +
+                    '<i class="fa fa-trash mr-1"></i>删除' +
+                '</button>' +
+            '</div>' + inputs + '</div>';
+    }
+
+    function repeaterHtml(f) {
+        return '<div class="tool-field" data-dw-repeater="' + esc(f.key) + '">' +
+            '<label class="tool-label">' + esc(f.label) + '</label>' +
+            repList(f).map(function (item, i) { return repRowHtml(f, i, item); }).join('') +
+            '<button type="button" class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm"' +
+                ' id="dw-rep-add-' + esc(f.key) + '">' +
+                '<i class="fa fa-plus mr-2"></i>' + esc(f.addLabel || '添加一条') +
+            '</button>' +
+            (f.hint ? '<div class="tool-field-hint">' + esc(f.hint) + '</div>' : '') +
+            '</div>';
+    }
+
+    // 把整份列表从 DOM 读回：行序与 repList 一致（渲染就是按它画的），每条复用 readValues
+    function repCollect(f) {
+        return repList(f).map(function (_, i) {
+            var prefixed = repItemFields(f).map(function (it) {
+                var clone = { key: repKey(f.key, i, it.key), label: it.label, type: it.type,
+                    options: it.options, min: it.min, max: it.max, default: it.default };
+                return clone;
+            });
+            var read = TB().readValues({ fields: prefixed });
+            var out = {};
+            repItemFields(f).forEach(function (it) { out[it.key] = read[repKey(f.key, i, it.key)]; });
+            return out;
+        });
+    }
+
+    function bindRepeater(tool, f) {
+        var host = document.getElementById(PAGE_ID);
+        if (!host) return;
+
+        var addBtn = document.getElementById('dw-rep-add-' + f.key);
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                // 先把屏幕上正在填的那几条收干净，再往下加一条空的 —— 否则用户填了一半点「添加」
+                // 会发现刚才的字没了（它是被 repBlank 那条覆盖的）
+                state.values[f.key] = repCollect(f).concat([repBlank(f)]);
+                render();
+            });
+        }
+
+        Array.prototype.forEach.call(host.querySelectorAll('[data-dw-rep-of="' + f.key + '"]'), function (row) {
+            var rm = row.querySelector('[data-dw-rep-remove]');
+            if (rm) {
+                rm.addEventListener('click', function () {
+                    var list = repCollect(f);
+                    list.splice(Number(rm.getAttribute('data-dw-rep-remove')) || 0, 1);
+                    // 删空留一条：条目列表没了会让「添加」按钮也变得没着落
+                    state.values[f.key] = list.length ? list : [repBlank(f)];
+                    render();
+                });
+            }
+            // 条目内的 select（多为「所得类型」）决定这一条要不要露出该类型专属的扣除字段 —— 得即时重画；
+            // 数字框只收值：一边敲一边重绘会抢光标（根源与 applyValues 的 skipEl 是同一个）
+            Array.prototype.forEach.call(row.querySelectorAll('select, input'), function (el) {
+                el.addEventListener('input', function () {
+                    state.values[f.key] = repCollect(f);
+                    applyDerived(tool);
+                });
+                el.addEventListener('change', function () {
+                    state.values[f.key] = repCollect(f);
+                    applyDerived(tool);
+                    render();
+                });
+            });
+        });
+    }
+
     function inputHtml(tool, step) {
         var fs = visibleIn(tool, fieldsOfStep(tool, step.key), state.values);
-        var inputs = fs.map(function (f) { return TB().fieldHtml(f); }).join('');
+        var inputs = fs.map(function (f) {
+            return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f);
+        }).join('');
         return '<div class="card">' +
             '<h3 class="text-lg font-bold text-primary mb-4">' + esc(step.title) + '</h3>' +
             (step.why ? '<p class="text-sm text-gray-600 mb-4">' + esc(step.why) + '</p>' : '') +
@@ -406,6 +630,8 @@
         var step = stepsOf(tool)[state.stepIndex];
         if (!step) return;
         fieldsOfStep(tool, step.key).forEach(function (f) {
+            // repeater 不在 readValues 的管辖范围内（它的控件 id 带下标），走自己的收值
+            if (f.type === 'repeater') { state.values[f.key] = repCollect(f); return; }
             state.values[f.key] = dom[f.key];
         });
         // 统一入口：任何一次收值都跑一次联动，避免某条路径忘了跑（切步 / 返回 / 条件字段变更）
@@ -555,6 +781,7 @@
         var step = steps[state.stepIndex];
         if (step && !step.result) {
             fieldsOfStep(tool, step.key).forEach(function (f) {
+                if (f.type === 'repeater') { bindRepeater(tool, f); return; }
                 if (!f.when) return;
                 var el = document.getElementById('qf-' + f.when.key);
                 if (!el) return;

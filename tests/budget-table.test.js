@@ -57,6 +57,53 @@ function bodyRows() {
     return Array.from(document.querySelectorAll('#budget-table-body tr'));
 }
 
+// 17B-3（v1.49.0）：综合所得迁到 spec 向导前先把这张表抽成纯函数（buildForwardBudgetTable）。
+// 有了它，页面版与向导版是同一份数据；所以下面几条直接对着**纯函数**断言 ——
+// 万一哪天有人「顺手优化」累加口径，页面那条还能因此跟着红。
+describe('buildForwardBudgetTable 纯数据版', () => {
+    test('表头 9 列，每一行（含跨列）的有效列数为 9', () => {
+        setupResults();
+        // 外加一笔劳务报酬与年终奖（单独计税），把「所得分项」那一节也走一遍
+        Object.assign(global.calculationResults.incomeDetails, {
+            bonus: 36000, labor: 50000, laborCalculated: 40000, laborTax: 6000
+        });
+        const table = buildForwardBudgetTable(global.calculationResults);
+
+        expect(table.head.length).toBe(9);
+        expect(table.rows.length).toBeGreaterThan(12);   // 12 个月 + 所得分项 + 汇算汇总
+        table.rows.forEach(function (row, idx) {
+            const cols = (row.cells || []).reduce(function (sum, _c, i) {
+                return sum + (Number((row.spans || [])[i]) || 1);
+            }, 0);
+            expect({ rowIndex: idx, columns: cols }).toEqual({ rowIndex: idx, columns: 9 });
+        });
+    });
+
+    test('逐月口径按累计预扣法：首月 3% 档、年末累计应缴等于年度应纳税额', () => {
+        setupResults();
+        const rows = buildForwardBudgetTable(global.calculationResults).rows;
+
+        expect(rows[0].cells[0]).toBe('1月');
+        expect(rows[0].cells[4]).toBe('3%');        // 25000 落在最低档
+        expect(rows[0].cells[5]).toBe('750.00');
+        expect(rows[0].cells[6]).toBe('29250.00');  // 税后到手
+        expect(rows[11].cells[4]).toBe('20%');      // 累计 300000 → 20% 档
+        expect(rows[11].cells[8]).toBe('43080.00'); // 累计应缴 = 年度应纳税额
+    });
+
+    test('汇算汇总行与结果区同口径（税前 / 扣除 / 应纳税额 / 退补）', () => {
+        setupResults({ taxDetails: Object.assign({}, global.calculationResults.taxDetails, { prepaidTax: 40000, refundTax: 3080 }) });
+        const rows = buildForwardBudgetTable(global.calculationResults).rows;
+        const summary = rows[rows.length - 1].cells;
+
+        expect(summary[0]).toBe('360000.00');   // 税前收入
+        expect(summary[1]).toBe('60000.00');    // 年度扣除合计
+        expect(summary[4]).toBe('43080.00');    // 应纳税额
+        expect(summary[5]).toBe('40000.00');    // 累计预缴
+        expect(summary[6]).toBe('3080.00');     // 应补税款
+    });
+});
+
 describe('updateBudgetTable 列结构不变量', () => {
     test('每一行的有效列数均为 9', () => {
         setupResults();

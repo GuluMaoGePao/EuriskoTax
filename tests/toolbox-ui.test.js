@@ -44,7 +44,7 @@ const QUICK_MODULES = [
 beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
-    loadSource('src/js/calculation/helper-functions.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删除（它是最后一个页面式 deep）。
     loadSource('src/js/calculation/tax-registry.js');
     QUICK_MODULES.forEach((f) => loadSource('src/js/calculation/' + f));
     loadSource('src/js/data/tool-registry.js');

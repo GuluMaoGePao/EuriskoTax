@@ -18,7 +18,7 @@
 | # | 类别 | 数量 | 切换方式 | 说明 |
 |---|---|---|---|---|
 | A | **App 内视图** | **14** | `showPage(pageId)` | 主 SPA `index.html` 内的顶层页面，**本文主体** |
-| B | **页内步骤**（step-pane） | 12 | 仅切 `hidden`，**不经 showPage** | 4 个深度页里的 4+3+3+2 步，**不是页面** |
+| B | **页内步骤**（step-pane） | **0** | 仅切 `hidden`，**不经 showPage** | 曾几何时是 4 个深度页里的 4+3+3+2 步，**不是页面**；17B 四次迁移（v1.46.0 → v1.50.0）后**页面式归零**，分步一律由 P15 通用向导按 spec 的 `steps` 渲染 |
 | C | **SEO 落地页** | 21（1 目录 + 20 落地） | 真 URL 跳转 | `seo/*.html`，与 20 个工具一一对应 |
 | D | **独立 HTML** | 2 | 真 URL 跳转 | `admin.html`（管理台）、`clean-cache.html` |
 | E | **浮层**（弹窗/抽屉/Toast/条） | 20 | 叠加显示 | 见 §5 |
@@ -79,15 +79,13 @@ EuriskoTax
 │   │   ├── prefer 税优与养老 ....... 3（个人养老金/税优健康险/企业年金）
 │   │   ├── social 社保与用工 ....... 3（社保公积金/企业用工成本/残保金）
 │   │   └── corp 企业与经营 ......... 4（增值税/企业所得税/附加税印花/个体经营所得）
-│   └── 【完整测算】6 个 ── status:deep
-│       ├── 页面式 2 个（各有独立页 + 私有分步逻辑，17B 待迁移的最后两个）
-│       │   ├── forward        综合所得计税（①基本参数 ②收入明细 ③扣除明细 ④结果）
-│       │   └── classification 分类所得计税（①所得信息 ②结果）
-│       └── spec 驱动 7 个（无独立页，共用 P15 `#deep-wizard-page`）
-│           ├── 17B 反向迁移回来的：business 经营所得 / reverse 反向倒算（谈薪）
-│           └── 17C 新增的 5 个：vat-deep 增值税 / corporate-income-tax-deep 企业所得税
-│               / social-base-deep 社保公积金 / surtax-stamp-deep 附加税印花税
-│               / disability-fund-deep 残保金
+│   └── 【完整测算】9 个 ── status:deep，**全部 spec 驱动**（无独立页，共用 P15 `#deep-wizard-page`）
+│       ├── 17B 反向迁移回来的 4 个：business 经营所得（v1.46.0/v1.47.0）
+│       │   / reverse 反向倒算·谈薪（v1.48.0）/ forward 综合所得（v1.49.0，27 个字段三步）
+│       │   / classification 分类所得（**v1.50.0，最后一块**：四类所得 × repeater 动态增删条目）
+│       └── 17C 新增的 5 个：vat-deep 增值税 / corporate-income-tax-deep 企业所得税
+│           / social-base-deep 社保公积金 / surtax-stamp-deep 附加税印花税
+│           / disability-fund-deep 残保金
 ├── 横向分发：5 张身份卡 → 按人找工具（employee/freelance/owner/finance/executive）
 ├── 政策依据库：27 条 / 6 类（iit 15、vat 2、cit 2、附加+印花 3、社保 2、规费 3）
 └── SEO 落地层：21 个 HTML（每个工具 1 页，源自同一份 tool-registry）
@@ -95,7 +93,7 @@ EuriskoTax
 
 **要点**
 
-- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP（9 个：2 页面式 + 7 spec 驱动，见 `tests/tool-registry.test.js` 的分口径断言）
+- `tool-registry.js`：GROUPS `31-37`（5 组）／TOOLS `119-1161`（20 个）／SCENARIOS `90-116`（5 张身份卡）／DEEP（9 个：**全部 spec 驱动**，见 `tests/tool-registry.test.js` 的分口径断言 —— 那条 `pageBased` 断言现在钉的是**空数组**）
 - `X-deep` 自动复用 `X` 的 `fields` / `compute`（**同一对象引用**，`tool-registry.js:1219-1237`）；
   由 `tests/tool-registry.test.js` 断言守护 —— 这是「同一个税种不会算出两个数」的机器保证
 - `tax-registry.js`：27 条政策依据 —— 这是**政策库**，与 20 个工具**不是同一份东西**，画图时勿混
@@ -114,10 +112,9 @@ EuriskoTax
      → 返回工具页（明确不回首页）
 
 【路径 B｜完整测算：值钱的深任务】
-工具页 → 「完整测算」组 → 6 个入口之一
-                          ├ 页面式 2 张 mode-card → 各自深度页（①…④，底部常驻预览条）
-                          └ spec 驱动 7 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
-       → 深度页多步向导（①…④，底部常驻实时预览条）
+工具页 → 「完整测算」组 → 9 个入口之一
+                          └ 全是 spec 驱动 9 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
+       → 向导多步（按 spec 的 steps，①…④ 不等；v1.46.0 起页面式归零，常驻预览条随页面一并删除）
        → 结果区（推导链 / 明细 / 预算表 / 优化建议）
        → 保存 · 导出 PDF/Word · 留资引导（reverse 被硬排除）
 
@@ -209,14 +206,15 @@ EuriskoTax
 │   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张工具卡    │
 │ ─ #toolbox-deep 558「完整测算」静态 4 张 mode-card ──────────────── │
 │   · forward 566 │ business 578 │ classification 590 │ reverse 602   │
-│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 5 张：vat / cit / social / surtax / fee）│
+│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 9 张：vat / cit / social / surtax-stamp│
+│   / fee + 反向迁移来的 business / reverse / forward / classification）                     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 | 功能入口 | → 去向 | 实现 |
 |---|---|---|
 | 工具卡 `.tool-entry` | `openTool(id)` → **通用速算器页** | `toolbox-ui.js:291-310` |
-| 4 张 mode-card | 触发隐藏 `${id}-mode-btn` → 深度页 + `goToStep(1)` | `home-ui.js:511-540`、`app.js:4-33` |
+| 4 张 mode-card | 触发隐藏 `${id}-mode-btn` → 打开 P15 通用向导（`goToStep` 已于 v1.49.0 删除） | `home-ui.js:511-540`、`app.js:4-33` |
 | `.mode-card-info-btn` | `showModeInfo()`（**不导航**） | `home-ui.js:533-539` |
 | 搜索框 | 重渲染分组；有命中时收起 deep 组 | `toolbox-ui.js:639` / `277` |
 
@@ -248,21 +246,18 @@ EuriskoTax
 
 ---
 
-### P5 `forward-calculation-page` — 综合所得计税（`index.html:691`）
+### P5 `forward` — 综合所得计税（**v1.49.0 起无独立页**，走 P15 通用向导）
 
-```
-┌─ 顶栏 693 ─────────────────────────────────────────────────────┐
-│ ← 返回 697 │ 保存 #forward-save-btn 706 │ 重置 709             │
-├─ 步骤条 715 ───────────────────────────────────────────────────┤
-│ ① 基本参数 742 → ② 收入明细 796 → ③ 扣除明细 917 → ④ 结果 1379 │
-├─ 结果区 ───────────────────────────────────────────────────────┤
-│ 推导链 #formula-steps-panel 1416 │ 税率分布 1478                │
-│ 月度个税明细 1486 │ 年度个税预算表 1495 │ 优化建议 1523          │
-│ 导出 PDF 1467 / Word 1470 │ 留资引导 #lead-result-guide         │
-├─ 底部实时预览条 #forward-preview-bar 1639 ──────────────────────┤
-│ 收入合计 │ 扣除合计 │ 预估税额                                  │
-└────────────────────────────────────────────────────────────────┘
-```
+17B-3：整页（约 970 行）已删，原来的四步（基本参数 / 收入明细 / 扣除明细 / 结果）
+改由 `tool-registry.js` 的 forward spec 驱动，渲染见 P15。几件需要记住的事：
+
+- **迁入 spec 的字段 27 个**，含页面独有的便利输入：婴幼儿**分摊比例 0~100**、
+  学历继续教育 / 职业资格的两组勾选（ `specialAdditionalDeductionCheckbox` 那三级显隐）；
+- **年度个税预算表**（原 `#budget-table`）随页面抽出来了 —— 移到 `extras.table`，
+  渲染器按 `{ cells, spans }` 摊平；`extras.table.title` 需要一个 `id`（≥ 1 行才渲染标题）；
+- **分享图认人**：三个迁移工具共用 `dw-result-card`，靠 `data-tool-id="forward"`
+  + `share-card.js` 的 `dw-result-card:forward` 一路区分模板；
+- **按钮保留**：首页卡片与工具箱的兜底最终落到 `#forward-mode-btn`，点击即打开向导。
 
 ---
 
@@ -278,39 +273,45 @@ EuriskoTax
 
 ---
 
-### P7 `business-calculation-page` — 经营所得计税（`index.html:2714`）
+### P7 `business` — 经营所得计税（**v1.47.0 起无独立页**，走 P15 通用向导）
 
-```
-┌ ← 返回 │ 保存 2729 │ 重置 2732 ──────────────────────────────┐
-│ 步骤条 2738：① 经营收入与成本 2760 → ② 扣除明细 2868          │
-│             → ③ 结果 3340                                     │
-│ 结果：扣除项明细 3228 │ 推导链 3487 │ 年度预算表 3515          │
-│ 导出 PDF 3502 / Word 3505 │ 留资引导 ✓                         │
-│ 预览条 #business-preview-bar 3546                              │
-└───────────────────────────────────────────────────────────────┘
-```
+第一块被迁走的（v1.46.0 反向迁移 + v1.47.0 清死代码，约 1,150 行）。
+对拍测试也随页面翻篇：从「页面版 vs 向导版逐点对拍」改成**按税法口径独立重算**
+（`tests/business-migration.test.js`）。
 
 ---
 
-### P8 `classification-calculation-page` — 分类所得计税（`index.html:3567`）
+### P8 `classification` — 分类所得计税（**v1.50.0 起无独立页**，走 P15 通用向导）
 
-```
-┌ ← 返回 3573 │ 保存 3582 │ 重置 3585 ──────────────────────────┐
-│ 步骤条 3591：① 所得信息 3608 → ② 结果 3736                     │
-│ 含：偶然所得提示 3647 │ 已添加所得条目 3713 │ 计税表 3814       │
-│ 推导链 3786 │ 导出 PDF 3801 / Word 3804 │ 留资引导 ✓           │
-│ 预览条 #classification-preview-bar 3845                         │
-└───────────────────────────────────────────────────────────────┘
-```
+**17B 的最后一块**（也是最难的一块）：它含**动态增删所得条目**，spec 原本不支持 ——
+所以这次是先给渲染器补 `type:'repeater'`（`itemFields` + 「添加一条 / 删除」），再迁，最后删页。
+迁走的东西：页面约 330 行、`helper-functions.js` 706 行（4 个页面式 deep 的最后一批私有联动）、
+`draft-store.js` 345 行（连同 270 行单测）、预览条（`showStepByPanes` 的最后一个调用者）、
+`field-hints` 的 `classification_*` 六个键。
 
-> **P5–P8 四个深度页共享同一套骨架**：返回/保存/重置 → 步骤条 → step-pane → 结果 → 导出 → 预览条。
-> 这正是 `deep-wizard-ui-spec.md` 要把它抽成**通用渲染器**的原因（现状是 4 份手写复制）。
+四步要点（spec 侧，见 `tool-registry.js` 的 `classification`）：
+
+- 四类所得各自一套扣除口径：利息等**全额**；租赁 ≤4000 减 800、>4000 减 20% 再扣准予扣除项目与
+  修缮费（**修缮费每月封顶 800，超出结转以后月份**）；转让减原值与合理费用；偶然所得全额；
+- **按次单独计税**：多项所得的税额＝各自之和，不合并、不累进 —— 名义税率一律 20%，
+  变的是实际税负率（`tests/classification-migration.test.js` 钉住）；
+- 空条目（收入为 0，用户正在填的那一条）不进计税表；
+- 分享图靠 `data-tool-id="classification"` + `dw-result-card:classification` 认人。
+
+> **P5–P8 四个深度页曾共享同一套骨架**：返回/保存/重置 → 步骤条 → step-pane → 结果 → 导出 → 预览条。
+> 这正是 `deep-wizard-ui-spec.md` 要把它抽成**通用渲染器**的原因（当时是 4 份手写复制）。
 >
 > **2026-09-18 回刷：通用渲染器已落地** —— `src/js/ui/deep-wizard-ui.js` 按注册表的 `steps` / `fields`
 > 渲染任意税种的向导，P15 `#deep-wizard-page` 承接。现状因此变成「两套并存」。
 >
 > **2026-09-18 回刷（17B-2 / v1.48.0）**：P6（reverse）已删除并由 P15 承接，P7（business）早在
-> v1.47.0 删除 —— 手写页只剩 P5（forward）与 P8（classification），**新增税种一律走 P15，不再写新页面**。
+> v1.47.0 删除。
+>
+> **2026-09-19 回刷（17B-3 / v1.49.0）**：P5（forward）同样删除并由 P15 承接。
+>
+> **2026-09-19 回刷（17B-4 / v1.50.0）**：P8（classification）删除并由 P15 承接 ——
+> 手写深度页**归零**：`index.html` 里不再有任何 `*-calculation-page`，`step-pane` 数量也是 0。
+> **新增税种一律走 P15，不再写新页面。**
 
 ---
 

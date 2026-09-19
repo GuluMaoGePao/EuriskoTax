@@ -114,83 +114,10 @@ function updateStepIndicator(pageId, step) {
 }
 
 // === 预览条实时更新 ===
-function formatPreviewNum(n) {
-    const num = Math.max(0, Math.round(Number(n) || 0));
-    return num.toLocaleString('zh-CN');
-}
-
-function updateCalcPreview(pageId) {
-    try {
-        if (pageId === 'forward-calculation-page') {
-            const income = parseFloat(document.getElementById('total-income-amount')?.textContent.replace(/,/g, '')) || 0;
-            const deductionEl = document.getElementById('total-deduction-amount');
-            const deduction = deductionEl ? (parseFloat(deductionEl.textContent.replace(/,/g, '')) || 0) : 0;
-            const tax = (typeof calculationResults !== 'undefined' && calculationResults?.taxDetails?.totalTax) || 0;
-            const incEl = document.getElementById('forward-preview-income');
-            const dedEl = document.getElementById('forward-preview-deduction');
-            const taxEl = document.getElementById('forward-preview-tax');
-            if (incEl) incEl.textContent = formatPreviewNum(income);
-            if (dedEl) dedEl.textContent = formatPreviewNum(deduction);
-            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { income, deduction, tax });
-        } else if (pageId === 'classification-calculation-page') {
-            const income = parseFloat(document.getElementById('classification-income')?.value) || 0;
-            // 分类所得无显式税率字段，按类型估算
-            const type = document.getElementById('classification-type')?.value || 'interest';
-            const rateMap = { interest: 20, rent: 20, transfer: 20, accidental: 20 };
-            const rate = rateMap[type] || 20;
-            const tax = (typeof classificationCalculationResults !== 'undefined' && classificationCalculationResults?.taxDetails?.totalTax) || (income * rate / 100);
-            const iEl = document.getElementById('classification-preview-income');
-            const rEl = document.getElementById('classification-preview-rate');
-            const tEl = document.getElementById('classification-preview-tax');
-            if (iEl) iEl.textContent = formatPreviewNum(income);
-            if (rEl) rEl.textContent = rate;
-            if (tEl) tEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { income, rate, tax });
-        }
-    } catch (e) {
-        // 预览条更新失败不应影响主流程
-        InteractionLog.error('预览条更新', e);
-    }
-}
-
-// 延迟刷新，确保在其他计算函数更新显示值之后再读取
-function schedulePreviewUpdate(pageId) {
-    if (window.requestAnimationFrame) {
-        requestAnimationFrame(() => updateCalcPreview(pageId));
-    } else {
-        setTimeout(() => updateCalcPreview(pageId), 0);
-    }
-}
-
-// 绑定输入实时刷新预览条
-function bindPreviewLiveUpdate() {
-    const forwardInputs = ['salary-income', 'labor-income', 'author-income', 'royalty-income', 'bonus-income',
-        'social-security-base', 'pension-insurance', 'medical-insurance', 'unemployment-insurance', 'housing-fund'];
-    forwardInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('forward-calculation-page'));
-    });
-
-    // 17B-2（v1.48.0）：反向倒算的预览条随旧页面一起删了 —— 剩下的 forward / classification 同理，
-    // 将来迁到向导后这一段也要走同一个出口（向导自己有预览，不需要这里代算）。
-    const classificationInputs = ['classification-income'];
-    classificationInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('classification-calculation-page'));
-    });
-    // classification-type 改变时刷新税率显示
-    const classificationTypeEl = document.getElementById('classification-type');
-    if (classificationTypeEl) {
-        classificationTypeEl.addEventListener('change', () => schedulePreviewUpdate('classification-calculation-page'));
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindPreviewLiveUpdate);
-} else {
-    bindPreviewLiveUpdate();
-}
+// 17B-4（v1.50.0）：最后一条常驻预览条也随分类所得页面删掉了 —— 页面式 deep 自此归零，
+// 迁到 spec 的那六个税种都不需要这里代算预览：
+// 向导自己就在步骤里逐步把数算给用户看，另起一套预览等于两个入口算同一个数，早晚不一致。
+// （v1.47.0 经营所得 / v1.48.0 反向倒算 / v1.49.0 综合所得 / v1.50.0 分类所得，四次删完。)
 
 // === 参数提示系统：初始化 tooltip 交互 ===
 // 将 data-hint 属性对应的文本注入 tooltip-text，并绑定点击展开/收起
@@ -250,45 +177,9 @@ if (document.readyState === 'loading') {
     initTooltipHints();
 }
 
-// 步骤导航
-function goToStep(step) {
-    InteractionLog.log('NAV', `goToStep(${step}) → 综合所得计税`);
-
-    // 更新步骤指示器
-    updateStepIndicator('forward-calculation-page', step);
-    
-    // 显示对应步骤内容
-    document.querySelectorAll('#forward-calculation-page .step-pane').forEach(pane => {
-        pane.classList.add('hidden');
-    });
-    
-    if (step === 1) {
-        document.getElementById('step-parameters').classList.remove('hidden');
-    } else if (step === 2) {
-        document.getElementById('step-income').classList.remove('hidden');
-        // 触发一次计算
-        updateIncomeCalculation();
-    } else if (step === 3) {
-        document.getElementById('step-deductions').classList.remove('hidden');
-        // 检查并显示默认勾选的扣除项内容
-        if (document.getElementById('special-deduction-checkbox').checked) {
-            document.getElementById('special-deduction-content').classList.remove('hidden');
-        }
-        if (document.getElementById('special-additional-deduction-checkbox').checked) {
-            document.getElementById('special-additional-deduction-content').classList.remove('hidden');
-        }
-        if (document.getElementById('other-deduction-checkbox').checked) {
-            document.getElementById('other-deduction-content').classList.remove('hidden');
-        }
-        
-        // 触发一次计算
-        updateDeductionCalculation();
-    } else if (step === 4) {
-        document.getElementById('step-result').classList.remove('hidden');
-    }
-}
-
-// 通用步骤面板切换（用于反向/经营/分类所得）
+// 17B-3（v1.49.0）：goToStep 随综合所得页面一起删了。它原先是「综合所得专用」的四分支
+// 步骤导航（并且被 draft-store 按函数名字符串绑定），现在页面式只剩分类所得，统一走
+// showStepByPanes —— 这正是 ui-design-spec §7 想要的「step 切换只有一处实现」。
 function showStepByPanes(pageId, step, paneIds) {
     paneIds.forEach(id => {
         const el = document.getElementById(id);
@@ -301,13 +192,9 @@ function showStepByPanes(pageId, step, paneIds) {
 
 
 
-// 分类所得步骤导航
-function showClassificationStep(step) {
-    showStepByPanes('classification-calculation-page', step, [
-        'classification-step-info', 'classification-step-result'
-    ]);
-}
-
+// 17B-4（v1.50.0）：分类所得的步骤导航随旧页面删掉了 —— 它是 showStepByPanes 的最后一个调用者。
+// （另外三个页面式 deep 的调用者已先一步随各自的旧页面删掉：v1.47.0 经营所得 /
+// v1.48.0 反向倒算 / v1.49.0 综合所得。函数本身留着 —— 页面式页还在用它切换 step-pane。）
 
 // 导出PDF
 // opts（可选，阶段10B 专业版汇算清缴报告复用）：

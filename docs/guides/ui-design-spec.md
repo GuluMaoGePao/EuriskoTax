@@ -149,8 +149,9 @@
 **结论（必须写在任何排期文档的第一行）**：
 
 > **完整测算按税种类别算已覆盖 6/6**（`iit` + `vat` + `cit` + `social` + `surtax/stamp` + `fee`，截至 v1.44.0）。
-> **税种类别已齐**。剩下两件：① 存量技术债 —— 个税那 4 个仍是**页面式** deep（各有独立 HTML 与私有逻辑），
-> 待 17B 反向迁移到 spec 驱动（验收口径：页面式归零）；② `iit` 类内部的**场景**补齐
+> **税种类别已齐**。剩下两件：① 存量技术债 —— 个税那 4 个**曾是**页面式 deep（各有独立 HTML 与私有逻辑），
+> **17B 已于 v1.46.0 → v1.50.0 四次迁移全部迁到 spec 驱动，验收口径「页面式归零」已兑现**
+> （`tests/tool-registry.test.js` 的 `pageBased` 断言现在钉的是空数组）；② `iit` 类内部的**场景**补齐
 > （劳务报酬预扣 / 年终奖 / 股权激励 / 离职补偿 / 提前退休 / 外籍津补贴）—— 目前只有速算器。
 
 ### 4.3 三个最容易误判的点（写进计划前必须知道）
@@ -195,7 +196,7 @@
 
 | 能力 | 状态 | UI 上的位置 |
 |---|---|---|
-| **App 内多步完整测算** | ✅ **6/6 类已齐**（个税 4 切面 + `vat` / `cit` / `social` / `surtax-stamp` / `fee` 各 1） | `#deep-mode-grid` 九张卡 → 4 个独立 page + 5 个共用 `#deep-wizard-page` |
+| **App 内多步完整测算** | ✅ **6/6 类已齐**（个税 4 切面 + `vat` / `cit` / `social` / `surtax-stamp` / `fee` 各 1） | `#deep-mode-grid` 九张卡 → **全部共用 `#deep-wizard-page`**（v1.50.0 起页面式归零，4 个独立 page 已删） |
 | 20 个单页速算器 | ✅ | 工具页 5 组 + 共用一个壳 `quick-calculator-page` |
 | 20 个 SEO 落地页 + 目录页 | ✅ | `seo/`，静态可抓取（**引流层已完成**） |
 | 计算引擎本地运行 | ✅ | 铁律；离线可用性要在 UI 上被感知（§11） |
@@ -319,9 +320,9 @@ seo/              index.html         工具总目录（20 个卡片）
 | **Tab 2** | `tools-page` | 工具：5 场景组 + 完整测算组 |
 | **Tab 3** | `profile-page` | 我的：卡片发射台 |
 | 二级 ×4 | `quick-calculator-page` | 20 个速算器共用一个壳 |
-| 二级 ×4 | `forward-calculation-page` | 综合所得，4 步向导 |
+| 二级 ×4 | ~~`forward-calculation-page`~~ | 综合所得，4 步（**v1.49.0 删除**，改 §12 向导） |
 | | `business-calculation-page` | 经营所得，3 步（**v1.47.0 删除**，改 §12 向导） |
-| | `classification-calculation-page` | 分类所得，2 步 |
+| | ~~`classification-calculation-page`~~ | 分类所得，2 步（**v1.50.0 删除**，改 §12 向导；**手写深度页至此归零**） |
 | | `reverse-calculation-page` | 反向倒算，3 步（**v1.48.0 删除**，改 §12 向导） |
 | 三级 ×5 | `profile-settings-page` | 账户设置 |
 | | `profile-tax-page` | 税务档案 |
@@ -330,7 +331,10 @@ seo/              index.html         工具总目录（20 个卡片）
 | | `profile-history-page` | 计算历史 |
 
 **关键区分**：`.page` 与 `.step-pane` 是两套**正交容器**。
-12 个 `step-pane` 是同一 page 内的分步（4+3+3+2），**step 切换不经过 `showPage()`**，只在页内加 `hidden`。
+`step-pane` 是同一 page 内的分步，**step 切换不经过 `showPage()`**，只在页内加 `hidden`。
+17B 四次迁移（v1.46.0 business / v1.48.0 reverse / v1.49.0 forward / v1.50.0 classification）后，
+页面式 `step-pane` **归零**（4+3+3+2 共 12 个全部随页面删除，
+分步改由向导按 spec 的 `steps` 渲染 —— 见 §12）。
 `formula-steps-*` 面板是结果页内的折叠区，**不是向导步骤**。
 
 ### 6.3 首页三层递减（不要再动）
@@ -493,12 +497,13 @@ seo/              index.html         工具总目录（20 个卡片）
 
 | 页 | 步数 | step-pane id |
 |---|---|---|
-| `forward-calculation-page` | 4 | `step-parameters` → `step-income` → `step-deductions` → `step-result` |
+| ~~`forward-calculation-page`~~ | 4 | ~~`step-parameters` → `step-income` → `step-deductions` → `step-result`~~ **v1.49.0 删除**：改由 `deep-wizard-page` 按 forward spec 的三步（基本参数 / 收入明细 / 扣除明细 + 结果）渲染 |
 | `business-calculation-page` | 3 | ~~各有独立 step-pane~~ **v1.47.0 删除**：改由 `deep-wizard-page` 按 spec 的 `steps` 渲染 |
 | `reverse-calculation-page` | 3 | ~~各有独立 step-pane~~ **v1.48.0 删除**：同上（`reverse-step-*` 已不存在） |
-| `classification-calculation-page` | 2 | `classification-step-info` → `classification-step-result` |
+| ~~`classification-calculation-page`~~ | 2 | ~~`classification-step-info` → `classification-step-result`~~ **v1.50.0 删除**：改由 `deep-wizard-page` 按 classification spec 的两步（所得条目 / 结果）渲染，条目用 `type:'repeater'` 动态增删 |
 
-> 17B 反向迁移的验收口径：**页面式的最终归零**。迁移过的工具在 `index.html` 里不再有私有的
+> 17B 反向迁移的验收口径：**页面式的最终归零 —— v1.50.0 已兑现**（四页全删，`step-pane` 计数为 0）。
+> 迁移过的工具在 `index.html` 里不再有私有的
 > `step-pane`，只剩下入口 `#*-mode-btn`（卡片点击还会落到它身上）—— 存续的稳定锚点是
 > 向导的三个通用节点：`#dw-next` / `#dw-result-card[data-tool-id]` / `#dw-formula-panel`。
 
@@ -762,7 +767,8 @@ seo/              index.html         工具总目录（20 个卡片）
 ### 12.7 全税种完整测算的强制顺序（不许跳步）
 
 **这是本站的核心功能**（§4.2：按税种类别，2026-09-18 施工前只覆盖 **1/6**；
-vat / cit / social / fee / 附加税印花税交付后为 **6/6** = 全部 6 类）。**税种类别已齐**，剩下的是 `iit` 场景补齐与 17B 反向迁移（验收口径：页面式归零）。
+vat / cit / social / fee / 附加税印花税交付后为 **6/6** = 全部 6 类）。**税种类别已齐**；
+17B 反向迁移（验收口径：页面式归零）**已于 v1.46.0 → v1.50.0 收官** —— 剩下的是 `iit` 场景补齐。
 目标：**6 类税种/费种，每类一套 `status:'deep'` 完整测算**。
 
 不抽 solver 就直接铺第 5 个税种，必然重演 `tax-calculator.js` 2569 行、反向求解手写 6 套的技术破产。

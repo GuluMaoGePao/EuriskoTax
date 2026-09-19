@@ -17,7 +17,7 @@ const { loadSource } = require('./helpers/load-source');
 beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
-    loadSource('src/js/calculation/helper-functions.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删除（它是最后一个页面式 deep）。
     loadSource('src/js/calculation/utils.js');   // buildReverseFormulaSteps：推导链的唯一实现
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/data/tool-registry.js');

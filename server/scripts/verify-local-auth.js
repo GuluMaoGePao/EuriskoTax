@@ -356,8 +356,24 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('auth-ui.js 集成云同步引擎', authJs.status === 200 && authJs.raw.includes('EuriskoSync') && authJs.raw.includes('afterLogin'), `HTTP ${authJs.status}`);
         const dmJs = await request(PORT, 'GET', '/src/js/data/data-management.js');
         const calcJs = await request(PORT, 'GET', '/src/js/calculation/tax-calculator.js');
-        record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
-        record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
+        // 17B-3（v1.49.0）：data-management 里那份自己写的 saveCalculationResult 随综合所得页删掉了 ——
+        // 它与 tax-calculator.saveToHistory 是同一件事的两份实现，只是各自维护一份 updatedAt / 变更信号。
+        // 此后「写历史」只有一个出口（saveToHistory，spec 向导的保存按钮也走它），
+        // 删除与清空时的变更信号仍由 data-management.notifyHistoryMutated 发出。
+        record('写历史的入口收敛为一处（tax-calculator.saveToHistory），仍带 updatedAt + 变更信号',
+            calcJs.status === 200 && calcJs.raw.includes('function saveToHistory')
+            && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated')
+            && dmJs.status === 200 && dmJs.raw.includes('function notifyHistoryMutated')
+            && dmJs.raw.includes('euriskotax:history-mutated')
+            // 重复实现必须消失：留着等于「两处各写一份」，改一处就够了 —— 改漏一处就是错
+            && !dmJs.raw.includes('function saveCalculationResult'),
+            `HTTP ${dmJs.status}/${calcJs.status}`);
+        // 向导（17B 起所有迁移工具的保存按钮都在它手上）写的是**同一份** taxCalculationHistory
+        const wizardSaveJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
+        record('向导与存量页面写同一份历史(spec 驱动的保存不再另开出口)',
+            wizardSaveJs.status === 200 && wizardSaveJs.raw.includes('saveToHistory')
+            && dmJs.status === 200 && dmJs.raw.includes("localStorage.getItem('taxCalculationHistory')"),
+            `HTTP ${wizardSaveJs.status}/${dmJs.status}`);
 
         // ---- 阶段11 内容中心前端资源静态断言（政策要点 + 公告/运营内容） ----
         const taxPolicyJs = await request(PORT, 'GET', '/src/js/data/tax-policy.js');
@@ -543,27 +559,34 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const toolRegJs = await request(PORT, 'GET', '/src/js/data/tool-registry.js');
         const wizardJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
         // v1.47.0 / v1.48.0 删掉经营所得页与反向倒算页之后，这里从「两页面版 + 经营所得向导 spec」
-        // 缩到「只剩正向一个页面版 + 两个向导 spec（business / reverse）」：
-        // 被删掉的那些控件不再活在 index.html 里（向导按 spec 运行时渲染），改到 tool-registry.js 断言。
-        // **数量变少不代表这项能力变弱了** —— 恰恰相反，反向倒算那份是这次迁移前才补登记进 spec 的。
-        const rateInputIds = ['housing-fund-rate'];
-        record('「缴费比例」为可输入数字框且默认 5%（正向页面版 + 经营所得/反向倒算两个 spec，不再是固定两档下拉）',
-            leadPage.status === 200
-            && rateInputIds.every((id) => !leadPage.raw.includes(`<select id="${id}"`)
-                && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw))
-            && toolRegJs.status === 200 && toolRegJs.raw.includes("key: 'housingFundRate'")
+        // 缩到「只剩正向一个页面版 + 两个向导 spec（business / reverse）」；
+        // v1.49.0（17B-3）把正向页也删了 —— 从此**三个已迁移的工具**（business / reverse /
+        // forward）的「缴费比例」控件都不在静态 HTML 里了，全部改到 tool-registry.js 断言。
+        // **数量变少不代表这项能力变弱了** —— 恰恰相反，反向与综合所得那份都是各自迁移前才补登记进 spec 的。
+        record('「缴费比例」不再是固定两档下拉（三个 spec：经营所得 / 反向倒算 / 综合所得，各占一份）',
+            toolRegJs.status === 200 && toolRegJs.raw.includes("key: 'housingFundRate'")
             && toolRegJs.raw.includes("type: 'percent', default: 5")
-            // 两个 spec 各有一份才是完整：漏一个，那个工具的向导里就没有「自填比例」这个框
-            && (toolRegJs.raw.match(/key: 'housingFundRate'/g) || []).length >= 2,
+            // 三个 spec 各有一份才是完整：漏一个，那个工具的向导里就没有「自填比例」这个框
+            && (toolRegJs.raw.match(/key: 'housingFundRate'/g) || []).length >= 3
+            // 页面版那一批控件随页面删干净了；留一个「看似还在接线」的旧 <select> 是假-positive 的源头
+            && leadPage.status === 200 && !leadPage.raw.includes('<select id="housing-fund-rate"'),
             `HTTP ${leadPage.status}/${toolRegJs.status}`);
         record('缴费比例输入即时重算 + 留空/越界回落默认值（清空后公积金不会静默变 0）',
-            helperFnJs.status === 200 && helperFnJs.raw.includes('function normalizeRateInput')
+            // 页面版的 normalizeRateInput 随综合所得页删掉了，等价能力现在两处承担：
+            // ① tool-registry.insuranceDerive 的 FALLBACK（清空 / 越界时按**险种自己的**默认比例算）；
+            // ② deep-wizard-ui 失焦时把非法值落回 field.default + isRateOk。
+            toolRegJs.status === 200
+            && toolRegJs.raw.includes('FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 }')
+            && wizardJs.status === 200 && wizardJs.raw.includes('function bindDerivedSources')
+            && wizardJs.raw.includes('function isRateOk')
+            && wizardJs.raw.includes("el.value = meta.default")
+            // 删页后的半吊子残留要抓：这些函数在 helper-functions.js 里**不该还活着**
+            // —— 它们操作的 DOM 已经不存在了，留着只会让人以为改这里还影响界面。
+            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function normalizeRateInput')
+            && !helperFnJs.raw.includes('function calculateSocialSecurity')
             && homeAppJs.status === 200
-            && homeAppJs.raw.includes("document.getElementById('housing-fund-rate').addEventListener('input'")
-            && homeAppJs.raw.includes('normalizeRateInput(this)')
-            // 反向倒算那份随旧页面走了：半吊子残留会写成「监听一个不存在的控件」的静默失效
-            && !homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate')"),
-            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
+            && !homeAppJs.raw.includes("document.getElementById('housing-fund-rate')"),
+            `HTTP ${wizardJs.status}/${helperFnJs.status}`);
         // 经营所得的「缴费基数 × 缴费比例 → 月缴额」原本是 app.js / helper-functions.js 的私有接线，
         // v1.47.0 删页后改由向导的 derive / warnings 两个 spec 钩子承担 —— **能力不能随删页一起丢**。
         // v1.48.0（17B-2）：反向倒算的旧页面也删了，同一份钩子抽到注册表顶部共用 ——

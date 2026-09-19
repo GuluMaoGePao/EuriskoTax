@@ -12,7 +12,9 @@ const MOCK_QA = [
         question: '年终奖如何计税？',
         answer: '年终奖可选择单独计税或并入综合所得。',
         hot: true,
-        related: { page: 'forward-calculation-page', label: '去综合所得测算' }
+        // 17B-3（v1.49.0）：综合所得已迁到 spec 驱动的向导，关联跳转随之改成 tool 形态 ——
+        // toolbar-ui 那一侧的分支不是装饰，删了它就没人接得住这类跳转。
+        related: { tool: 'forward', label: '去综合所得测算' }
     },
     {
         id: 'test_2',
@@ -551,7 +553,7 @@ describe('悬浮税助手 - 关联跳转', () => {
 
         const relatedBtn = item1.querySelector('.assistant-related-btn');
         expect(relatedBtn).not.toBeNull();
-        expect(relatedBtn.getAttribute('data-related-page')).toBe('forward-calculation-page');
+        expect(relatedBtn.getAttribute('data-related-tool')).toBe('forward');
     });
 
     test('无 related 的问答不应渲染"去测算"按钮', () => {

@@ -67,19 +67,27 @@ describe('阶段13B+ 咨询情境 - 结果页真实摘要（读已渲染 DOM）'
         document.body.innerHTML = '';
     });
 
-    test('结果页尚未渲染（仍是占位符）时返回空 —— 不编造情境', () => {
+    // 17B-3（v1.49.0）：综合所得迁到 spec 驱动的向导后，情境不再是三个静态 id，而是
+    // 向导结果卡上的 dw-result-primary + data-dw-row 行（**运行时渲染**）。下面照 business
+    // 那一套拼：卡片必须带 data-tool-id，否则 readWizardText 会拒答（见「换工具不归因」那条）。
+    function renderForwardCard(primaryText, rows) {
+        const rowHtml = rows.map((r) => '<div data-dw-row="' + r.label + '">' +
+            '<span>' + r.label + '</span><span>' + r.value + '</span></div>').join('');
         document.body.innerHTML =
-            '<div id="result-net-income">¥0</div>' +
-            '<div id="result-refund-tax">¥0</div>' +
-            '<div id="result-tax-rate">0%</div>';
+            '<div id="dw-result-card" data-tool-id="forward">' +
+            '<div id="dw-result-primary">' + primaryText + '</div>' + rowHtml + '</div>';
+    }
+
+    test('结果页尚未渲染（仍是占位符）时返回空 —— 不编造情境', () => {
+        renderForwardCard('¥0', [{ label: '适用税率', value: '0%' }]);
         expect(LeadContext.current('forward')).toBe('');
     });
 
     test('已渲染时给出「类型 + 结论 + 税率」，且金额一律不进入返回值', () => {
-        document.body.innerHTML =
-            '<div id="result-net-income">¥253,080.00</div>' +
-            '<div id="result-refund-tax">应退 ¥3,120.00</div>' +
-            '<div id="result-tax-rate">20%</div>';
+        renderForwardCard('¥253,080.00', [
+            { label: '应退税额', value: '¥3,120.00' },
+            { label: '适用税率', value: '20%' }
+        ]);
 
         const scene = LeadContext.current('forward');
         expect(scene).toBe('综合所得年度汇算 · 预计退税 · 适用税率 20%');
@@ -157,13 +165,15 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
             .forEach((id) => expect(INDEX_HTML).toContain('id="' + id + '"'));
     });
 
-    test('情境提取依赖的结果节点 id 在 index.html 中真实存在（改名会静默失效）', () => {
-        ['result-net-income', 'result-refund-tax', 'result-tax-rate',
-            'classification-result-net-income']
-            .forEach((id) => expect(INDEX_HTML).toContain('id="' + id + '"'));
-        // 经营所得 17B-1 起走 spec 驱动的向导，结果节点是**运行时渲染**的（dw-result-card +
-        // data-tool-id），静态 HTML 里没有 —— 由 tests/business-income-core.test.js 的
-        // 向导端到端用例守护，含「换工具后不再归因给 business」这条。
+    test('情境提取依赖的结果节点：四个页面式 deep 都已迁走，全改成向导运行时节点', () => {
+        // 17B-4（v1.50.0）：分类所得（最后一个页面式 deep）也走了 spec 驱动的向导 ——
+        // 它那颗静态结果节点 classification-result-net-income 随页面删掉了，改走 wizard:primary 锚点
+        // （端到端守护在 tests/classification-migration.test.js）。
+        // 于是静态 HTML 里**一个**旧结果节点都不该剩下：结果节点现在是运行时渲染的
+        // （dw-result-card + data-tool-id），由各个 migration 测试的向导端到端用例守护，
+        // 含「换工具后不再归因」这条（认不出当前工具，情境就会串味）。
+        ['classification-result-net-income', 'result-net-income', 'result-refund-tax', 'result-tax-rate']
+            .forEach((id) => expect(INDEX_HTML).not.toContain('id="' + id + '"'));
     });
 
     test('本模块必须在 lead-modal.js 之前加载（弹窗打开时同步取用）', () => {

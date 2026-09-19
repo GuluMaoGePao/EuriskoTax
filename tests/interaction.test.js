@@ -123,36 +123,11 @@ describe('showStepByPanes - 通用步骤面板切换', () => {
 // 17B-2（v1.48.0）：showReverseStep 与 setupReverseDeductionToggle 的用例随旧页面删了 ——
 // 它们测的不是业务规则，而是那张表单自己的显示/隐藏接线，页面没了就没人可测。
 // 反算口径本身的回归 guard 在 tests/reverse-migration.test.js（按税法口径独立重算，不读页面）。
-describe('showClassificationStep - 步骤导航包装函数（经营所得 v1.47.0 / 反向倒算 v1.48.0 起由 spec 驱动的向导接管，页面自己不再有步骤包装函数）', () => {
-    test('showClassificationStep 应切换分类所得页面的步骤面板（2步）', () => {
-        const page = document.createElement('div');
-        page.id = 'classification-calculation-page';
-        const indicator = document.createElement('div');
-        indicator.className = 'step-indicator';
-        for (let i = 0; i < 2; i++) {
-            const stepNum = document.createElement('div');
-            stepNum.className = 'step-number';
-            indicator.appendChild(stepNum);
-        }
-        page.appendChild(indicator);
-
-        const paneIds = ['classification-step-info', 'classification-step-result'];
-        const panes = {};
-        paneIds.forEach(id => {
-            const el = document.createElement('div');
-            el.id = id;
-            el.classList.add('hidden');
-            page.appendChild(el);
-            panes[id] = el;
-        });
-        document.body.appendChild(page);
-
-        showClassificationStep(1);
-
-        expect(panes['classification-step-info'].classList.contains('hidden')).toBe(false);
-        expect(panes['classification-step-result'].classList.contains('hidden')).toBe(true);
-    });
-});
+// 17B-4（v1.50.0）：showClassificationStep 的用例随旧页面删了 —— 与上面的 showReverseStep 同一个理由：
+// 它测的不是业务规则，而是那张表单自己的步骤显隐接线，页面没了就没人可测。
+// 分类所得口径的回归 guard 改为 tests/classification-migration.test.js（按税法口径独立重算，不读页面）。
+// 至此四个页面式 deep（经营所得 v1.47.0 / 反向倒算 v1.48.0 / 综合所得 v1.49.0 / 分类所得 v1.50.0）
+// 页面各自那批 step 包装函数都翻篇了 —— 分步这件事交给向导按 spec 的 steps 渲染。
 
 // ========== 步骤指示器更新测试 ==========
 describe('updateStepIndicator - 步骤指示器更新', () => {
@@ -227,34 +202,11 @@ describe('updateStepIndicator - 步骤指示器更新', () => {
     });
 });
 
-// ========== 预览条格式化测试 ==========
-describe('formatPreviewNum - 预览条数字格式化', () => {
-    test('应将数字格式化为千分位中文格式', () => {
-        expect(formatPreviewNum(1234567)).toBe('1,234,567');
-    });
-
-    test('负数应返回 0', () => {
-        expect(formatPreviewNum(-1000)).toBe('0');
-    });
-
-    test('NaN 应返回 0', () => {
-        expect(formatPreviewNum(NaN)).toBe('0');
-    });
-
-    test('null/undefined 应返回 0', () => {
-        expect(formatPreviewNum(null)).toBe('0');
-        expect(formatPreviewNum(undefined)).toBe('0');
-    });
-
-    test('小数应四舍五入为整数', () => {
-        expect(formatPreviewNum(1234.56)).toBe('1,235');
-        expect(formatPreviewNum(1234.4)).toBe('1,234');
-    });
-
-    test('字符串数字应正确转换', () => {
-        expect(formatPreviewNum('9999')).toBe('9,999');
-    });
-});
+// 17B-4（v1.50.0）：formatPreviewNum 的六条用例随 classification 页面整页删除 ——
+// 它只服务那条「常驻预览条」（页面式 deep 各自那一条），四个页面迁完、预览条也归零了。
+// 与上面 showClassificationStep 同一个理由：它测的不是业务规则，而是那张表单自己的显示接线。
+// 结果数字现在统一由 toolbox-ui 的 fmtValue（¥ 千分位 + 两位小数）格式化，
+// 那一处有专门用例守着（tests/quick-report.test.js / tests/scenario.test.js），这里不再重复。
 
 // ========== 保存历史记录测试 ==========
 describe('saveToHistory - 保存计算结果到历史记录', () => {

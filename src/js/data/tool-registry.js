@@ -76,6 +76,38 @@
         return out;
     }
 
+    // ====== 专项附加扣除的一批「定额 → 金额」联动（综合所得用） ======
+    // 同一类教训的第二次出现：app.js 里 children-infant-count / elderly-type /
+    // education-degree-checkbox 三个 addEventListener 才是它们的唯一实现，页面删了就没了。
+    // 这些额度（2000 / 3000 / 1500 / 400 / 3600）是**政策定额**，写死在前端当然不妥，但至少
+    // 别散落在各处的私有函数里 —— 它们每年都可能调，改的时候我只想改一处、且不靠搜索碰运气。
+    var CHILD_MONTHLY_QUOTA = 2000;                       // 每个子女 / 婴幼儿每月
+    var ELDERLY_MONTHLY_QUOTA = { none: 0, only: 3000, 'non-only': 1500 };
+    var EDUCATION_DEGREE_MONTHLY = 400;                   // 学历继续教育：元/月
+    var EDUCATION_PROFESSIONAL_ANNUAL = 3600;             // 职业资格继续教育：元/年，一次性扣除
+
+    function forwardDerive(v) {
+        var out = insuranceDerive(v) || {};
+        var r2 = function (x) { return Math.round(x * 100) / 100; };
+        // 分摊比例与社保比例同一个规矩：留空（空串）/ 越界都要落回 100 ——
+        // 让用户对着一个空框看到按 0% 算出来的结果，是页面版都不会犯的错。
+        var raw = v.childrenInfantDeductionRate;
+        var rate = (raw === '' || raw === null || typeof raw === 'undefined') ? 100 : Number(raw);
+        if (!isFinite(rate) || rate < 0 || rate > 100) rate = 100;
+        out.childrenInfantDeductionRate = rate;
+        out.childrenInfantDeduction = r2((Number(v.childrenInfantCount) || 0) * CHILD_MONTHLY_QUOTA * (rate / 100));
+
+        // 赡养老人：独生子女定额 3000；非独生按分摊协议，上限 1500 —— 上限不是金额，写主体
+        var elderly = ELDERLY_MONTHLY_QUOTA[v.elderlyType];
+        if (elderly !== undefined) out.elderlyDeduction = elderly;
+
+        // 继续教育 = 学历（按月随工作月数）+ 职业资格（一次性 3600）
+        var months = Number(v.workMonths) || 12;
+        out.educationDeduction = (v.educationDegreeCheckbox ? EDUCATION_DEGREE_MONTHLY * months : 0) +
+            (v.educationProfessionalCheckbox ? EDUCATION_PROFESSIONAL_ANNUAL : 0);
+        return out;
+    }
+
     function socialBaseWarnings(v) {
         // 低于最低标准的基数要在**填的时候**就说出来，别等到结果 Reconciliation。
         // 下限读 tax-constants.js 的全局变量（管理台可热改）—— 这里不复制第二份常量。
@@ -92,9 +124,252 @@
     // ====== 原有 4 个深度流程（多步骤 / 可保存 / 可导出） ======
     var DEEP = [
         {
+            // 阶段17 17B-3：最后一个「非 -deep」页面式流程（原先指向 index.html 里 967 行 + app.js
+            // 的一批私有联动）。口径一字未改：compute 调 performTaxCalculation —— 它本来就是纯的
+            // （扣除项支持注入），所以这次不用像 v1.46.0 那样先抽内核。
+            //
+            // 它比前面 6 个 spec 多两样东西，也都是**迁移不能顺手删掉**的那部分：
+            //   ① 逐月预算表（extras.table）—— 综合所得是按月累计预扣的：同样的年收入，
+            //      发放节奏不同，每月到手就不同。这张表是它比「月薪个税速算器」多出来的全部意义，
+            //      为此先给向导加了 extras 能力（表 / 列表两类块，导出也跟着走）。
+            //   ② 年终奖计税方式对比（compare）—— 并入 vs 单独计税差出一档税，是这类测算里
+            //      最常被问的一句「哪种更划算」。答一个数不够，得把两套账摆在一起。
             id: 'forward', name: '综合所得', subtitle: '工资 / 劳务 / 稿酬，四步出年度个税预算表',
-            icon: 'fa-calculator', status: 'deep', pageId: 'forward-calculation-page',
-            nextTools: ['salary-tax', 'annual-settlement', 'special-deduction']
+            icon: 'fa-calculator', status: 'deep',
+            nextTools: ['salary-tax', 'annual-settlement', 'special-deduction'],
+            fields: [
+                { key: 'workMonths', step: 'param', label: '年工作总月数', type: 'select', default: 12,
+                    options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
+                { key: 'prepaidTax', step: 'param', label: '全年已预缴税额', type: 'money', default: 0,
+                    hint: '填 0 或不填＝按累计预扣法自动推演工资部分的预缴 + 劳务 / 稿酬 / 特许权的预扣' },
+
+                { key: 'monthlySalaryIncome', step: 'income', label: '月工资薪金收入', type: 'money', default: 30000 },
+                { key: 'annualLaborIncome', step: 'income', label: '劳务报酬（元/年）', type: 'money', default: 0,
+                    hint: '减除 20% 费用后计入收入额' },
+                { key: 'annualAuthorIncome', step: 'income', label: '稿酬所得（元/年）', type: 'money', default: 0,
+                    hint: '减除 20% 费用后**再减按 70%** 计入收入额' },
+                { key: 'annualRoyaltyIncome', step: 'income', label: '特许权使用费（元/年）', type: 'money', default: 0,
+                    hint: '减除 20% 费用后计入收入额' },
+                { key: 'bonusIncome', step: 'income', label: '年终奖（元/年）', type: 'money', default: 0 },
+                { key: 'bonusInclude', step: 'income', label: '年终奖并入综合所得计税', type: 'switch', default: true,
+                    hint: '取消勾选＝按全年一次性奖金单独计税；填了年终奖时结果区会给两种口径的对比' },
+
+                { key: 'specialDeductionCheckbox', step: 'deduction', label: '享受专项扣除（社保 / 公积金）', type: 'switch', default: true },
+                // v1.47.0 删经营所得页面时丢过一次同样的东西（只在 app.js + helper-functions.js 的私有函数里，
+                // 页面一删就跟着没了），最后是 verify:local 变红才暴露 —— 这次先补再删。
+                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 7546,
+                    when: { key: 'specialDeductionCheckbox', in: [true] },
+                    hint: '填了就由它和下面三项比例算月缴额（月缴额以基数为准）；不填则自己填月缴额' },
+                { key: 'pensionRate', step: 'deduction', label: '养老缴费比例', type: 'percent', default: 8,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'medicalRate', step: 'deduction', label: '医疗缴费比例', type: 'percent', default: 2,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'unemploymentRate', step: 'deduction', label: '失业缴费比例', type: 'percent', default: 0.5,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 7546,
+                    when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'housingFundRate', step: 'deduction', label: '公积金缴费比例', type: 'percent', default: 5,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '各地 5%~12% 不同，按参保地口径填' },
+                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 603.68,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 养老比例' },
+                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 150.92,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 医疗比例' },
+                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 37.73,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 失业比例' },
+                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 377.3,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 公积金缴费基数 × 公积金比例' },
+
+                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '享受专项附加扣除', type: 'switch', default: true },
+                { key: 'childrenInfantCount', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（人数）', type: 'number', default: 0, min: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'childrenInfantDeductionRate', step: 'deduction', label: '扣除分摊比例', type: 'percent', default: 100,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '父母双方各扣 50% 时填 50；全额扣除填 100' },
+                { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 婴幼儿照护（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '＝ 人数 × 2000 元/月 × 分摊比例' },
+                { key: 'elderlyType', step: 'deduction', label: '赡养老人', type: 'select', default: 'none', options: [
+                    { value: 'none', label: '不适用' },
+                    { value: 'only', label: '独生子女（3000 元/月）' },
+                    { value: 'non-only', label: '非独生子女（分摊，上限 1500 元/月）' }
+                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人扣除额（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '由上面的身份自动生成；非独生子女按实际分摊额改' },
+                { key: 'housingType', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
+                    { value: 'rent', label: '住房租金' },
+                    { value: 'loan', label: '住房贷款利息' }
+                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息**只能二选一**' },
+                { key: 'rentDeduction', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 1500,
+                    when: { key: 'housingType', in: ['rent'] } },
+                { key: 'housingLoanDeduction', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 1000,
+                    when: { key: 'housingType', in: ['loan'] } },
+                { key: 'educationDegreeCheckbox', step: 'deduction', label: '学历继续教育（400 元/月）', type: 'switch', default: false,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'educationProfessionalCheckbox', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
+                { key: 'educationDeduction', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '＝ 学历 400 元/月 × 工作月数 ＋ 职业资格 3600 元/年（勾选时）' },
+                { key: 'medicalDeduction', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '只扣超过 1.5 万的部分、限额 8 万；且只在年度汇算扣，不进月度' },
+
+                { key: 'otherDeductionCheckbox', step: 'deduction', label: '有其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
+                { key: 'pensionDeductionCheckbox', step: 'deduction', label: '商业健康险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'pensionDeduction', step: 'deduction', label: '商业健康险（元/月）', type: 'money', default: 0,
+                    when: { key: 'pensionDeductionCheckbox', in: [true] } },
+                { key: 'enterpriseAnnuityCheckbox', step: 'deduction', label: '企业年金', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'enterpriseAnnuity', step: 'deduction', label: '企业年金（元/月）', type: 'money', default: 0,
+                    when: { key: 'enterpriseAnnuityCheckbox', in: [true] } },
+                { key: 'insuranceOtherDeductionCheckbox', step: 'deduction', label: '其他商业保险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'insuranceOtherDeduction', step: 'deduction', label: '其他商业保险（元/月）', type: 'money', default: 0,
+                    when: { key: 'insuranceOtherDeductionCheckbox', in: [true] } },
+                { key: 'taxDeferredPensionCheckbox', step: 'deduction', label: '税延养老保险', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'taxDeferredPension', step: 'deduction', label: '税延养老保险（元/月）', type: 'money', default: 0,
+                    when: { key: 'taxDeferredPensionCheckbox', in: [true] } },
+                { key: 'charitableDonationCheckbox', step: 'deduction', label: '公益性捐赠', type: 'switch', default: false,
+                    when: { key: 'otherDeductionCheckbox', in: [true] } },
+                { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠（元/年）', type: 'money', default: 0,
+                    when: { key: 'charitableDonationCheckbox', in: [true] }, hint: '扣除限额为应纳税所得额的 30%' }
+            ],
+            // 上面的 fields 与 reverse 逐项对齐（同一套 key、同一套 when）：两份 spec 共用下面这一对
+            // 与 reverse 逐项对齐（同一套键、同一套 when）：两份 spec 共用下面这一对钩子才不会各自漂移。
+            // derive 里装了两批联动 —— 社保那份（基数 × 比例，见 INSURANCE_DERIVE_FROM）
+            // 与专项附加这份（人数 × 2000 × 比例 / 赡养老人身份 / 继续教育勾选，见 forwardDerive）。
+            deriveFrom: INSURANCE_DERIVE_FROM,
+            derive: forwardDerive,
+            warnings: socialBaseWarnings,
+            steps: [
+                { key: 'param', title: '计算参数', why: '工作月数决定全年减除与累计预扣的基数；留空预缴额＝按累计预扣法自动推演' },
+                { key: 'income', title: '各项所得录入', why: '四类所得计入综合所得的口径不同（劳务打八折、稿酬再减按七成），先录准' },
+                { key: 'deduction', title: '扣除项明细', why: '扣除项直接决定应纳税所得额 —— 少填一项，等于自认为要多缴一份税' }
+            ],
+            pitfalls: [
+                '住房租金与住房贷款利息**只能二选一**，同时享受会被税务机关驳回',
+                '大病医疗只扣**超过 1.5 万**的部分、限额 8 万，且只在年度汇算扣 —— 月度预算表里看不到它',
+                '公益性捐赠扣除限额为应纳税所得额的 30%，超出部分当年不能扣（可结转三年）',
+                '劳务 / 稿酬 / 特许权使用费是**按次预扣**（20%~40%），年度汇算才并入综合所得按超额累进重算',
+                '月度预算表按累计预扣法算：同样的年收入，一次性发放与逐月发放，每月到手并不一样'
+            ],
+            compute: function (v) {
+                if (typeof performTaxCalculation !== 'function' || typeof computeDeductions !== 'function') return null;
+
+                var months = Number(v.workMonths) || 12;
+                var special = v.specialDeductionCheckbox !== false;
+                var additional = v.specialAdditionalDeductionCheckbox !== false;
+                var other = !!v.otherDeductionCheckbox;
+                var num = function (x) { return Number(x) || 0; };
+                var pick = function (k, on) { return on ? num(v[k]) : 0; };
+
+                // 三个总开关的语义在这里兑现：页上是「展开 / 收起」，这里是**显式置 0**
+                // —— 否则用户取消勾选后扣除照样算进去，界面上一点都看不出来。
+                var dedInput = {
+                    monthlyBasicDeduction: 5000,
+                    monthlyPensionInsurance: pick('pensionInsurance', special),
+                    monthlyMedicalInsurance: pick('medicalInsurance', special),
+                    monthlyUnemploymentInsurance: pick('unemploymentInsurance', special),
+                    monthlyHousingFund: pick('housingFund', special),
+                    monthlyElderlyDeduction: pick('elderlyDeduction', additional),
+                    monthlyChildrenInfantDeduction: pick('childrenInfantDeduction', additional),
+                    monthlyHousingDeduction: additional
+                        ? (v.housingType === 'rent' ? num(v.rentDeduction)
+                            : (v.housingType === 'loan' ? num(v.housingLoanDeduction) : 0))
+                        : 0,
+                    annualEducationDeduction: pick('educationDeduction', additional),
+                    annualMedicalDeduction: pick('medicalDeduction', additional),
+                    annualProfessionalDeduction: (additional && v.educationProfessionalCheckbox) ? 3600 : 0,
+                    monthlyPensionDeduction: pick('pensionDeduction', other && v.pensionDeductionCheckbox),
+                    monthlyEnterpriseAnnuity: pick('enterpriseAnnuity', other && v.enterpriseAnnuityCheckbox),
+                    monthlyInsuranceOtherDeduction: pick('insuranceOtherDeduction', other && v.insuranceOtherDeductionCheckbox),
+                    monthlyTaxDeferredPension: pick('taxDeferredPension', other && v.taxDeferredPensionCheckbox),
+                    annualCharitableDonation: pick('charitableDonation', other && v.charitableDonationCheckbox)
+                };
+
+                var baseInput = {
+                    workMonths: months,
+                    monthlySalaryIncome: num(v.monthlySalaryIncome),
+                    annualLaborIncome: num(v.annualLaborIncome),
+                    annualAuthorIncome: num(v.annualAuthorIncome),
+                    annualRoyaltyIncome: num(v.annualRoyaltyIncome),
+                    bonusIncome: num(v.bonusIncome),
+                    bonusInclude: !!v.bonusInclude,
+                    // 填了才算「手动指定」，0 / 留空走自动推演 —— 与页面版 collectTaxInputData 同口径
+                    userInputPrepaidTax: num(v.prepaidTax) > 0 ? num(v.prepaidTax) : undefined,
+                    deductions: computeDeductions(dedInput, months)
+                };
+
+                var core = performTaxCalculation(baseInput);
+                if (!core || !core.taxDetails) return null;
+
+                var inc = core.incomeDetails;
+                var ded = core.deductionDetails;
+                var tax = core.taxDetails;
+
+                function scenario(include) {
+                    var r = performTaxCalculation(Object.assign({}, baseInput, { bonusInclude: include }));
+                    return {
+                        key: include ? 'include' : 'separate',
+                        label: include ? '并入综合所得' : '年终奖单独计税',
+                        why: include ? '年终奖并入综合所得，与工资一起适用年度超额累进税率'
+                            : '年终奖单独按「奖金 ÷ 12」定税率，不并入当年的综合所得档次',
+                        primary: { label: '税后年收入', value: r.taxDetails.netIncome, kind: 'money' },
+                        rows: [
+                            { label: '综合所得应纳税额', value: r.taxDetails.totalTax, kind: 'money' },
+                            { label: '年终奖税额', value: r.incomeDetails.bonusTax, kind: 'money' },
+                            { label: '全年税负合计', value: r.taxDetails.totalTax + r.incomeDetails.bonusTax, kind: 'money' },
+                            { label: '应纳税所得额', value: r.taxDetails.taxableIncome, kind: 'money' },
+                            { label: '适用税率', value: r.taxDetails.applicableRate, kind: 'percent' }
+                        ]
+                    };
+                }
+                // 只在真的有年终奖时给对比 —— 没有年终奖却摆两张一样的方案表，是拿「看起来很专业」骗人
+                var compare = null;
+                if (inc.bonus > 0) {
+                    compare = {
+                        label: '年终奖计税方式对比',
+                        active: baseInput.bonusInclude ? 'include' : 'separate',
+                        scenarios: [scenario(true), scenario(false)]
+                    };
+                }
+
+                // 逐月预算表：这份数据与页面上的 #budget-table-body 同源（utils.js 的 buildForwardBudgetTable），
+                // 删页面前后每一行都应该一模一样 —— 这也是它必须赶在删页之前抽出来的原因。
+                var extras = [];
+                if (typeof buildForwardBudgetTable === 'function') {
+                    var budget = buildForwardBudgetTable(core);
+                    if (budget) {
+                        extras.push({
+                            title: '个人年度个税预算表',
+                            table: { head: budget.head, rows: budget.rows },
+                            note: '逐月按累计预扣法：每月用累计应纳税所得额定档，减去已预缴部分即当月应扣'
+                        });
+                    }
+                }
+
+                return {
+                    primary: { label: '税后年收入', value: tax.netIncome, kind: 'money' },
+                    rows: [
+                        { label: '税前年收入', value: inc.preTaxTotal, kind: 'money' },
+                        { label: '扣除合计', value: ded.total, kind: 'money' },
+                        { label: '应纳税所得额', value: tax.taxableIncome, kind: 'money' },
+                        { label: '适用税率', value: tax.applicableRate, kind: 'percent' },
+                        { label: '速算扣除数', value: tax.applicableDeduction, kind: 'money' },
+                        { label: '综合所得应纳税额', value: tax.totalTax, kind: 'money' },
+                        { label: '全年已预缴税额', value: tax.prepaidTax, kind: 'money' },
+                        { label: tax.refundTax >= 0 ? '应补税额' : '应退税额', value: Math.abs(tax.refundTax), kind: 'money' },
+                        { label: '年终奖税额', value: inc.bonusTax, kind: 'money',
+                            hint: baseInput.bonusInclude ? '已并入综合所得' : '按全年一次性奖金单独计税' },
+                        { label: '实际税负率', value: inc.preTaxTotal > 0 ? tax.totalTax / inc.preTaxTotal : 0, kind: 'percent' }
+                    ],
+                    note: '年终奖单独计税与并入综合所得是两条不同的路径，结果区已把两套账摆在一起：并入按年度累进税率，单独按「奖金 ÷ 12」定档。',
+                    steps: (typeof buildFormulaSteps === 'function') ? buildFormulaSteps(core) : [],
+                    extras: extras,
+                    compare: compare
+                };
+            }
         },
         {
             // 阶段17 17B-1：**第一个由页面式迁到 spec 驱动**的经营所得测算。
@@ -177,9 +452,133 @@
             }
         },
         {
-            id: 'classification', name: '分类所得', subtitle: '利息 / 租赁 / 转让 / 偶然所得',
-            icon: 'fa-list-alt', status: 'deep', pageId: 'classification-calculation-page',
-            nextTools: ['withholding', 'annual-settlement']
+            // 阶段17 17B-4（v1.50.0）：**最后一个页面式 deep** 也迁到 spec 上了 —— 页面式自此归零。
+            //
+            // 它之所以排在四趟迁移的最后，是因为它是唯一含「动态增删所得条目」的测算：
+            // 一笔利息、一笔房租、一笔股权转让，各有各的扣除口径，**条数不定、每条的字段还不一样**。
+            // 前三次迁移过的 practicalспособность（steps / when / compare / extras / derive）都表达不了这个，
+            // 所以这次先给渲染器补 repeater（type:'repeater' + itemFields，见 deep-wizard-ui.js），
+            // 再写这份 spec，最后才删页面 —— 与前面三次同一个顺序：**先有能力，再迁，最后删**。
+            //
+            // 口径一字未改：compute 调 tax-calculator 里早就存在的 calculateSingleClassificationTax /
+            // calculateClassificationTaxTotal。这两个函数此前被页面冷落在一边 —— 页面版的
+            // addClassificationItem 自己内联了一份同样的公式（"多一份同形实现" 的第 N 次出现），
+            // 迁移后两份终于是同一份。
+            //
+            // 顺手补上的一件事：修缮费超过 800 元那部分**不是免税，是结转以后月份**，页面直接按 800
+            // 截断却一句话没说 —— 用户填 1500 看到的是 800，会以为系统算错了。这次改到 hint / pitfalls 里讲清楚。
+            id: 'classification', name: '分类所得', subtitle: '利息 / 租赁 / 转让 / 偶然所得，按次单独计税',
+            icon: 'fa-list-alt', status: 'deep',
+            nextTools: ['withholding', 'annual-settlement'],
+            fields: [
+                // repeater：值是一条数组 [ { type, income, …条件字段} ]
+                { key: 'items', step: 'income', label: '所得条目', type: 'repeater',
+                    addLabel: '添加一条所得',
+                    hint: '每一笔分类所得单独计税 —— 类型不同，扣除口径也不同（租赁扣费用与修缮费、转让扣原值与合理费用）',
+                    default: [{ type: 'interest', income: 10000 }],
+                    itemFields: [
+                        { key: 'type', label: '所得类型', type: 'select', default: 'interest', options: [
+                            { value: 'interest', label: '利息、股息、红利所得' },
+                            { value: 'rent', label: '财产租赁所得' },
+                            { value: 'transfer', label: '财产转让所得' },
+                            { value: 'accidental', label: '偶然所得' }
+                        ] },
+                        { key: 'income', label: '收入金额', type: 'money', default: 0, min: 0 },
+                        { key: 'rentDeductions', label: '准予扣除的税费（元）', type: 'money', default: 0, min: 0,
+                            when: { key: 'type', in: ['rent'] },
+                            hint: '租赁过程中缴纳的税金、教育费附加等；不计修缮费' },
+                        { key: 'rentRepair', label: '修缮费用（元）', type: 'money', default: 0, min: 0,
+                            when: { key: 'type', in: ['rent'] },
+                            hint: '每月最多扣 800 元，当月扣不完的**结转以后月份**，不是作废' },
+                        { key: 'transferOriginal', label: '财产原值（元）', type: 'money', default: 0, min: 0,
+                            when: { key: 'type', in: ['transfer'] },
+                            hint: '取得该项财产时实际支付的成交价及相关税费' },
+                        { key: 'transferExpenses', label: '合理费用（元）', type: 'money', default: 0, min: 0,
+                            when: { key: 'type', in: ['transfer'] },
+                            hint: '转让过程中缴纳的税金及有关费用' }
+                    ] }
+            ],
+            steps: [
+                { key: 'income', title: '所得条目', why: '分类所得**按次（或按项）单独计税**：同一种类型的每一笔要分开录，各自扣除、各自适用税率' }
+            ],
+            pitfalls: [
+                '利息、股息、红利所得与偶然所得**不减除任何费用**，全额按 20% 计税',
+                '财产租赁所得：月收入 ≤ 4000 元减除费用 800 元，> 4000 元减除 20%；修缮费每月最多扣 800 元，超出的部分**结转以后月份**',
+                '财产转让所得＝转让收入 − 财产原值 − 合理费用，**原值与费用要留好凭证**，没有凭证就等于全额计税',
+                '偶然所得中的福利彩票单笔 1 万元以下免税、有奖发票单张 800 元以下免税 —— 本表按全额计税，符合条件时需自行扣除',
+                '分类所得**不并入综合所得、也不做年度汇算**，在这里缴完就是终局，多缴不退'
+            ],
+            compute: function (v) {
+                if (typeof calculateSingleClassificationTax !== 'function') return null;
+
+                var list = Array.isArray(v.items) ? v.items : [];
+                var items = [];
+                list.forEach(function (it) {
+                    var type = it.type || 'interest';
+                    var income = Number(it.income) || 0;
+                    // 收入为 0 的空条目不参与计税：页面上「添加条目」就卡着 income > 0，
+                    // 向导里允许存在空条目（用户正在填），但别让它变成一行 0.00 混进计税表
+                    if (income <= 0) return;
+
+                    // 两条口径与页面版逐字对齐：租赁是「准予扣除项目 ＋ 修缮费（封顶 800）」，
+                    // 转让是「财产原值 ＋ 合理费用」；利息 / 偶然所得本来就没有扣除
+                    var deduction = 0;
+                    if (type === 'rent') {
+                        deduction = (Number(it.rentDeductions) || 0) + Math.min(Number(it.rentRepair) || 0, 800);
+                    } else if (type === 'transfer') {
+                        deduction = (Number(it.transferOriginal) || 0) + (Number(it.transferExpenses) || 0);
+                    }
+                    items.push(calculateSingleClassificationTax(type, income, deduction));
+                });
+
+                if (!items.length) {
+                    return {
+                        primary: { label: '应纳税额合计', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '还没有有效条目：给每一条所得填上大于 0 的收入金额，它才会进计税表。',
+                        steps: []
+                    };
+                }
+
+                var results = (typeof calculateClassificationTaxTotal === 'function')
+                    ? calculateClassificationTaxTotal(items)
+                    : (function () {
+                        var t = { income: 0, taxable: 0, tax: 0 };
+                        items.forEach(function (i) { t.income += i.income; t.taxable += i.taxableIncome; t.tax += i.totalTax; });
+                        return { items: items, totalIncome: t.income, totalTaxableIncome: t.taxable, totalTax: t.tax };
+                    })();
+
+                var deductionTotal = 0;
+                items.forEach(function (i) { deductionTotal += i.deduction; });
+
+                var extras = [];
+                if (typeof buildClassificationTable === 'function') {
+                    var tbl = buildClassificationTable(results);
+                    if (tbl) {
+                        extras.push({
+                            title: '分类所得计税表',
+                            table: tbl,
+                            note: '每一条所得各自扣除、各自按 20% 计税，税额直接相加 —— 不与工资薪金合并，也不做年度汇算'
+                        });
+                    }
+                }
+
+                return {
+                    primary: { label: '税后收入', value: results.totalIncome - results.totalTax, kind: 'money' },
+                    rows: [
+                        { label: '所得类型', value: items.length > 1 ? '多项分类所得（' + items.length + ' 项）' : items[0].typeName, kind: 'text' },
+                        { label: '收入合计', value: results.totalIncome, kind: 'money' },
+                        { label: '扣除合计', value: deductionTotal, kind: 'money',
+                            hint: '租赁的费用减除与修缮费、转让的财产原值与合理费用' },
+                        { label: '应纳税所得额', value: results.totalTaxableIncome, kind: 'money' },
+                        { label: '应纳税额合计', value: results.totalTax, kind: 'money' },
+                        { label: '实际税负率', value: results.totalIncome > 0 ? results.totalTax / results.totalIncome : 0, kind: 'percent' }
+                    ],
+                    note: '同一类型的所得**每一笔单独计税**：比如两套房子的租金要按两套出租房产分别算收入与费用减除，不能合起来享受一次 800 元。',
+                    steps: (typeof buildClassificationFormulaSteps === 'function') ? buildClassificationFormulaSteps(results) : [],
+                    extras: extras
+                };
+            }
         },
         {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
@@ -306,7 +705,7 @@
                 { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠（元/年）', type: 'money', default: 0,
                     when: { key: 'charitableDonationCheckbox', in: [true] }, hint: '扣除限额为应纳税所得额的 30%' }
             ],
-            // 与 business 共用同一份「基数 × 比例 → 月缴额」钩子 —— 这次是**删页面之前**补的，
+            // 与 business / forward 共用同一份「基数 × 比例 → 月缴额」钩子 —— 这次是**删页面之前**补的，
             // 不像 v1.47.0 那样等门禁变红了才发现便利输入还在私有函数里。
             // 页面版还有一路反向的「手填月缴额 → 反算比例」，这里**故意不补**：
             // 两个方向互相写对方的值，在同一张表单上必然抖动（改额→改比例→再改额）。

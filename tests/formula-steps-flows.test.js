@@ -16,7 +16,7 @@ const ROOT = path.join(__dirname, '..');
 beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
-    loadSource('src/js/calculation/helper-functions.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删除（它是最后一个页面式 deep）。
     loadSource('src/js/calculation/utils.js');
     loadSource('src/js/calculation/salary-tax-quick.js');
     loadSource('src/js/data/tool-registry.js');
@@ -144,27 +144,26 @@ describe('分类所得推导链', () => {
         expect(summary.rows[1].value).toBe(results.totalTaxableIncome);
     });
 
-    test('updateClassificationResultDisplay 会点亮面板（渲染接线防回滚）', () => {
-        // addClassificationItem 走 UI 路径填充内部 let 数组（跨 eval 不可直接赋值）
-        document.body.innerHTML += '<details id="formula-steps-panel-classification" class="hidden">' +
-            '<div id="formula-steps-body-classification"></div></details>' +
-            '<select id="classification-type"><option value="rent" selected>财产租赁</option></select>' +
-            '<input id="classification-income" value="60000">' +
-            '<input id="rent-deductions" value="5000">' +
-            '<input id="rent-repair" value="0">' +
-            '<input id="transfer-original" value="0">' +
-            '<input id="transfer-expenses" value="0">' +
-            '<div id="rent-fields"></div><div id="transfer-fields"></div><div id="accidental-hint"></div>' +
-            '<div id="classification-items-list"></div>';
-        // resetClassificationCalculation 尾部依赖的步骤切换（navigation-ui.js 提供），此处 stub
-        global.showClassificationStep = () => {};
+    // 17B-4（v1.50.0）：分类所得页面整页删除了 —— addClassificationItem / calculateClassificationTax /
+    // updateClassificationResultDisplay 那一套「读 DOM → 算 → 点亮静态面板」的接线随之消失。
+    // 口径本身没丢：spec 的 compute 调的还是上面这条用例里那两个 tax-calculator 函数，
+    // 推导链也还是 buildClassificationFormulaSteps —— 与经营所得（17B-1）改法一致：
+    // 断言对象从「页面 DOM 被点亮」换成「spec 算出来的推导链里有那几个数」。
+    test('spec 的 compute 给出同样那几个数（推导链接线防回滚）', () => {
+        const panel = document.createElement('details');
+        panel.id = 'formula-steps-panel-classification';
+        panel.className = 'hidden';
+        const body = document.createElement('div');
+        body.id = 'formula-steps-body-classification';
+        panel.appendChild(body);
+        document.body.appendChild(panel);
 
-        addClassificationItem();          // rent 60000 − 5000 修缮 → taxable 43000
-        calculateClassificationTax();     // 全链路：计算 → 保存 → 渲染 → 接线点亮面板
+        const out = window.EuriskoToolRegistry.get('classification').compute({
+            items: [{ type: 'rent', income: 60000, rentDeductions: 5000, rentRepair: 0 }]
+        });
+        body.innerHTML = renderFormulaStepsHtml(out.steps);
 
-        const panel = document.getElementById('formula-steps-panel-classification');
-        const body = document.getElementById('formula-steps-body-classification');
-        expect(panel.classList.contains('hidden')).toBe(false);
+        expect(out.steps.length).toBeGreaterThan(0);
         expect(body.innerHTML).toContain('财产租赁所得');
         expect(body.innerHTML).toContain('43000.00');
         expect(body.innerHTML).toContain('8600.00');    // 43000 × 20%
@@ -267,28 +266,26 @@ describe('月薪个税速算器推导链（打样）', () => {
 // 防回滚：三个面板 DOM 必须在 index.html（接线不因重构漂移）
 // ==================================================================
 describe('面板 DOM 防回滚（index.html）', () => {
-    test('分类所得的推导链面板存在（经营与反向已改为向导运行时渲染）', () => {
+    test('分类所得的推导链也改由向导运行时渲染（页面式面板不复存在）', () => {
         const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-        // 17B-1（v1.47.0）/ 17B-2（v1.48.0）：经营所得与反向倒算的推导链不再有静态面板 ——
-        // 它们随各自旧页面删除，改由向导在运行时渲染（dw-formula-panel），存在性分别由
-        // tests/business-income-core.test.js 与 tests/reverse-migration.test.js 的端到端用例守护。
-        ['formula-steps-panel-classification', 'formula-steps-body-classification'
-        ].forEach((id) => {
-            expect(html).toContain('id="' + id + '"');
+        // 17B-1（v1.47.0）/ 17B-2（v1.48.0）/ 17B-3（v1.49.0）：经营所得、反向倒算、综合所得三处
+        // 静态面板先后随旧页面删除；17B-4（v1.50.0）分类所得是最后一个 —— 它的推导链同样改由向导
+        // 运行时渲染（dw-formula-panel），存在性由 tests/classification-migration.test.js 的端到端用例守护。
+        // 反过来钉：静态 HTML 里**不该再有**任一份推导链面板 —— 留一半就会出现
+        // 「静态 HTML 一份 + 运行时面板一份」的两份真相。
+        ['business', 'reverse', 'classification'].forEach((flow) => {
+            expect(html).not.toContain('id="formula-steps-panel-' + flow + '"');
+            expect(html).not.toContain('id="formula-steps-body-' + flow + '"');
         });
-        // 旧静态面板确实删干净了 —— 留一个半，就会出现「静态 HTML 一份 + 运行时面板一份」的两份真相
-        expect(html).not.toContain('id="formula-steps-panel-business"');
-        expect(html).not.toContain('id="formula-steps-panel-reverse"');
     });
 
-    test('utils.js 导出的渲染被各流程接线引用（不是死代码）', () => {
-        const helper = fs.readFileSync(path.join(ROOT, 'src/js/calculation/helper-functions.js'), 'utf8');
+    test('utils.js 导出的渲染被 spec 接线引用（不是死代码）', () => {
         const registry = fs.readFileSync(path.join(ROOT, 'src/js/data/tool-registry.js'), 'utf8');
-        // 17B-1 / 17B-2：business 与 reverse 迁到 spec 驱动后，buildXxxFormulaSteps 的接线方
-        // 从 tax-calculator.js 变成了 tool-registry 里的 spec（向导渲染时用）；
-        // 分类所得仍是页面式，接线在 helper-functions.js。
+        // 17B-1 / 17B-2 / 17B-4：business、reverse、classification 迁到 spec 驱动后，
+        // buildXxxFormulaSteps 的接线方从 tax-calculator.js（页面时代）变成了 tool-registry 里的
+        // spec（向导渲染时用）。前者越搬越少，后者才是现在的唯一调用方。
         expect(registry).toContain('buildBusinessFormulaSteps(');
         expect(registry).toContain('buildReverseFormulaSteps(');
-        expect(helper).toContain('buildClassificationFormulaSteps(');
+        expect(registry).toContain('buildClassificationFormulaSteps(');
     });
 });

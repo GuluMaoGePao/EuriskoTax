@@ -176,7 +176,10 @@
 > 其中免责声明在母规范里是八段之 **⑧**（位于结果区内部），本文 §4 把它单列为 ⑥ 仅为强调其不可省 ——
 > **归属以 §5.4 为准**。
 
-骨架串（以现有 `forward-calculation-page` 为基准，其余 3 页向其对齐）：
+骨架串（以原 `forward-calculation-page` 为基准写下的，其余各页向其对齐；
+**v1.46.0 → v1.50.0 四次迁移后四个页面式 deep 全删了** ——
+本文保留这段，是因为 P15 通用向导仍在沿用同一套 class 而不是另写一套
+（`has-preview-bar` / `.calc-preview-bar` 随最后一张常驻预览条在 v1.50.0 一并删除）：
 
 ```html
 <div id="xxx-calculation-page" class="page hidden has-preview-bar">
@@ -204,16 +207,17 @@
 **沿用** `.step-indicator / .step / .step-number / .step-title / .step-line` + `.active / .completed` 三态（`tailwind.src.css:138-177`），**不另写一套**。
 
 - 步数 ≤5 时全显；>5 时改为「当前步 N/总步数 + 右侧下拉跳步」。
-- **禁止直接删除 `goToStep`**（初版表述有误，已修正）。实测它是**全局 API 且被草稿恢复依赖**：
+- ~~**禁止直接删除 `goToStep`**~~ → **已于 v1.49.0 删除**（原初版表述有误，下面两稿也是）：
+  `goToStep` 是**不带 pageId** 的综合所得专用函数，随该页删除；在此之前 `showStepByPanes`
+  已先落地，上面列的三个依赖方（草稿 / Tax助手 / 页面联动）逐个迁走后才动手删的：
 
-  | 依赖方 | 调用点 | 说明 |
-  |---|---|---|
-  | `draft-store.js:30` | `gotoName: 'goToStep'` | **按函数名字符串恢复**，改名会导致草稿无法回到原步骤 |
-  | `app.js` | 6 处（`goToStep(1..4)`） | 均**不带 pageId**，语义已绑死在 forward 页 |
-  | `helper-functions.js:743`、`data-management.js:488`、`tax-assistant-ui.js:636` | 各 1 处 | 同上 |
+  | 依赖方 | 结局 |
+  |---|---|
+  | `draft-store.js` 的 `gotoName: 'goToStep'` | forward 条目随页面摘掉（留一个指向不存在容器的条目只会静默 return false） |
+  | `app.js` 的 `goToStep(1..4)` | 6 处随页面接线一并删除 |
+  | `helper-functions.js` / `data-management.js` / `tax-assistant-ui.js` | 分别改为向导入口（`EuriskoDeepWizard.open`） |
 
-  **正确做法**：`goToStep(step)` **保留为兼容层**，内部改为调用 `showStepByPanes('forward-calculation-page', step, [...])`；
-  新增 deep 页面**一律不调用** `goToStep`，改用带 `pageId` 的统一入口。最终目标是让 `goToStep` 退化成一行转发，而不是删掉它。
+  **新增 deep 页面一律用带 `pageId` 的统一入口**：`showStepByPanes`（页面式）或 spec 的 `steps`（向导）。
 - `≤640px` 隐藏非当前步标题（既有规则，保留）。
 
 ### 5.2 表单区
@@ -237,7 +241,7 @@
 | 控件 | 现状 | 统一为 |
 |---|---|---|
 | checkbox 折叠组 | forward/reverse 用 `label > input + span`；business 用平级兄弟 + `text-accent` | **统一 `label.inline-flex > input.form-checkbox.text-primary + span.ml-2`**，即 forward 写法 |
-| 动态条目列表 | 仅 classification 有（`#classification-items-list`） | 升为通用控件 `.repeat-list`，由 spec 的 `type:'repeat'` 驱动 |
+| 动态条目列表 | 曾仅 classification 有（`#classification-items-list`） | ✅ **v1.50.0 已统一**：`data-dw-repeater` 容器，由 spec 的 `type:'repeater'` + `itemFields` 驱动（`deep-wizard-ui.js`：`repeaterHtml` / `bindRepeater` / `repCollect`，加删按钮 `#dw-rep-add-<key>` 与 `[data-dw-rep-remove]`；控件 id `qf-<key>-<下标>-<子键>`，仍复用 `fieldHtml` 与条件显隐，**不另写一套类型转换**；默认值走 `default: [ { … } ]`） |
 
 ### 5.4 结果区区块词典（本文件的核心）
 

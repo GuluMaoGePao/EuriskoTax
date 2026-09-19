@@ -41,14 +41,17 @@
 
     // 结果容器 → 模板与取数规则（容器 id 取自 index.html 的 step-pane）
     var SOURCES = {
-        'step-result': {
+        // 17B-3（v1.49.0）：step-result 随综合所得旧页面删掉了。与 business / reverse 一样，
+        // 综合所得的分享图改从向导的结果卡取数，认人靠 sourceKey 读 data-tool-id ——
+        // 同一张卡会被三个工具轮着用，照裸 id 取会把别人的结果截进综合所得的图里。
+        'dw-result-card:forward': {
             template: 'income',
             title: '综合所得年度汇算',
-            hero: { selector: '#result-net-income', label: '税后年收入' },
+            hero: { selector: '#dw-result-card[data-tool-id="forward"] #dw-result-primary', label: '税后年收入' },
             rows: [
-                { label: '税前年收入', selector: '#result-total-income' },
-                { label: '全年应缴税额', selector: '#result-total-tax' },
-                { label: '适用税率', selector: '#result-tax-rate' }
+                { label: '税前年收入', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="税前年收入"]' },
+                { label: '全年应缴税额', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="综合所得应纳税额"]' },
+                { label: '适用税率', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="适用税率"]' }
             ]
         },
         // 17B-1 / 17B-2：经营所得与反向倒算迁到 spec 驱动后，结果节点是**运行时渲染**的通用节点，
@@ -81,13 +84,17 @@
                 { label: '全年扣除合计', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年扣除合计"]' }
             ]
         },
-        'classification-step-result': {
+        // 17B-4（v1.50.0）：分类所得同样迁到了向导，containerId 从 'classification-step-result'
+        // 改成 dw-result-card，并**按工具划一路**（dw-result-card:classification）。
+        // 不划的话它会退到下面那份兜底 'dw-result-card'（business 的配置），
+        // 分享图上就会出现「应纳个人所得税 ¥0」这种横刀夺爱的标题。
+        'dw-result-card:classification': {
             template: 'income',
             title: '分类所得计税',
-            hero: { selector: '#classification-result-net-income', label: '税后收入' },
+            hero: { selector: '#dw-result-card[data-tool-id="classification"] #dw-result-primary', label: '税后收入' },
             rows: [
-                { label: '所得类型', selector: '#classification-result-type' },
-                { label: '应纳税额', selector: '#classification-result-total-tax' }
+                { label: '应纳税额', selector: '#dw-result-card[data-tool-id="classification"] [data-dw-row="应纳税额合计"]' },
+                { label: '税负率', selector: '#dw-result-card[data-tool-id="classification"] [data-dw-row="实际税负率"]' }
             ]
         },
     };
@@ -95,10 +102,11 @@
     // 计算按钮 → 结果容器（与 lead-touchpoints / funnel-tracking 同一套映射，保持一致）
     // 17B-2（v1.48.0）：reverse-step-result 随反向倒算旧页面删除，谈薪这一路改走向导的 dw-next
     // → dw-result-card（同一收容容器，靠下面的 sourceKey 认出是谈薪那一路）。
+    // 17B-3（v1.49.0）：综合所得同样改走 dw-next → dw-result-card，上面的取值范围跟着变 ——
+    // 17B-4（v1.50.0）：分类所得跟进 —— calculate-classification-btn 随旧页面删了，
+    // 现在四个迁移工具（business / reverse / forward / classification）共用同一颗 dw-next。
     var TRIGGERS = [
-        { buttonId: 'next-to-result-btn', containerId: 'step-result' },
-        { buttonId: 'dw-next', containerId: 'dw-result-card' },   // 17B-1/17B-2：经营所得与谈薪共用的向导下一步
-        { buttonId: 'calculate-classification-btn', containerId: 'classification-step-result' }
+        { buttonId: 'dw-next', containerId: 'dw-result-card' }   // 四个迁移工具的向导下一步
     ];
 
     // 容器 id → 真正的取数配置。向导那两个工具（business / reverse）共用 dw-result-card，

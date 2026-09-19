@@ -94,68 +94,11 @@ function notifyHistoryMutated() {
     } catch (e) { /* 同步信号失败静默 */ }
 }
 
-// 保存计算结果
-function saveCalculationResult() {
-    console.log('%c[EuriskoTax] SAVE → 开始保存计算结果', 'color: #1e40af; font-weight: bold;');
-    if (Object.keys(calculationResults).length === 0) {
-        console.warn('[EuriskoTax] SAVE → 计算结果为空，无法保存');
-        showAlert('请先进行计算，再保存结果');
-        return;
-    }
-
-    try {
-        // 生成唯一ID
-        const id = Date.now().toString();
-
-        // 构建保存的数据对象
-        const savedData = {
-            id: id,
-            type: 'forward',
-            title: `综合所得计税 - ${new Date().toLocaleDateString()}`,
-            results: calculationResults,
-            date: new Date().toISOString(),
-            updatedAt: new Date().toISOString()  // 阶段10：云同步冲突判定时间戳（旧数据缺省时回退 date）
-        };
-
-        console.log('[EuriskoTax] SAVE → 保存数据:', {
-            id: id,
-            type: savedData.type,
-            title: savedData.title,
-            income: calculationResults?.incomeDetails?.total,
-            tax: calculationResults?.taxDetails?.totalTax
-        });
-
-        // 添加到历史记录
-        calculationHistory.unshift(savedData);
-
-        // 限制历史记录数量
-        if (calculationHistory.length > 50) {
-            calculationHistory = calculationHistory.slice(0, 50);
-        }
-
-        // 保存到本地存储
-        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
-
-        // 阶段8：匿名埋点信号（综合所得），由 index.html 监听器统一上报
-        try {
-            if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
-                document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type: 'forward' } }));
-            }
-        } catch (e) { /* 埋点失败静默 */ }
-
-        // 阶段10：通知云同步引擎（登录+PRO 时自动上传本端增量）
-        notifyHistoryMutated();
-
-        console.log('%c[EuriskoTax] SAVE → 保存成功，历史记录共 ' + calculationHistory.length + ' 条', 'color: #16a34a; font-weight: bold;');
-
-        // 显示保存成功提示
-        showSaveSuccessMessage();
-
-    } catch (error) {
-        console.error('[EuriskoTax] SAVE → 保存失败:', error);
-        showSaveErrorMessage();
-    }
-}
+// 17B-3（v1.49.0）：`saveCalculationResult`（综合所得页面的「保存计算结果」）随旧页面删掉了 ——
+// 它的调用点只有 app.js 那颗现已删除的按钮。此后正向历史的写入由向导自己的保存承担
+// （deep-wizard-ui 的 execSave），走的还是同一份 localStorage + notifyHistoryMutated 通道，
+// 所以「已保存的 forward 记录怎么读」这件事没变 —— loadHistoryRecords / loadRecordToForm
+// 里那条 forward 分支必须留着，否则云同步拉回来的老记录就成了读不回来的死数据。
 
 // 辅助函数：安全获取收入值
 function getIncomeValue(item) {
@@ -312,31 +255,17 @@ function viewHistoryRecord(id) {
         showAlert('经营所得测算暂不可用，请刷新页面后重试。');
         return;
     } else if (record.type === 'classification') {
-        // 切换到分类所得页面
-        showPage('classification-calculation-page');
-        
-        // 填充分类所得数据
-        const results = record.results;
-        
-        // 恢复数据
-        classificationCalculationResults = results;
-        if (results.items) {
-            classificationItems = [...results.items];
+        // 阶段17 17B-4（v1.50.0）：分类所得也迁到了 spec 驱动的向导，旧页面整页删掉了 ——
+        // 原先这里回填的是那一份 DOM（条目列表、结果区、计税表、类型分布饼图），
+        // 现在与 business / reverse / forward 同为一套处理：打开向导续算，草稿会接着上次的输入。
+        // 历史里的旧记录仍然能读：**「看得见列表」和「能续着算」是两件事**，后者靠向导草稿，不靠回填。
+        var W = window.EuriskoDeepWizard;
+        if (W && W.open('classification')) {
+            showAlert('已打开分类所得测算；向导会接着上次的输入继续。');
+            return;
         }
-        
-        // 重新计算和显示
-        updateClassificationItemsList();
-        updateClassificationResultDisplay();
-        updateClassificationBudgetTable();
-        updateClassificationCharts();
-        
-        // 更新日期
-        const dateElement = document.getElementById('classification-budget-table-date');
-        if (dateElement && results.calculationDate) {
-            dateElement.textContent = new Date(results.calculationDate).toLocaleDateString();
-        }
-        
-        showClassificationStep(2);
+        showAlert('分类所得测算暂不可用，请刷新页面后重试。');
+        return;
     } else if (record.type === 'reverse') {
         // 阶段17 17B-2（v1.48.0）：与 business 同款处理 —— 旧页面整页删掉了，
         // 不再回填那一屏 DOM（数量比 business 还多：反算目标、三种口径、两级扣除勾选）。
@@ -348,60 +277,21 @@ function viewHistoryRecord(id) {
         }
         showAlert('反向倒算测算暂不可用，请刷新页面后重试。');
         return;
+    } else if (record.type === 'forward' || record.type === 'comprehensive') {
+        // 阶段17 17B-3（v1.49.0）：与 business / reverse 同款处理 —— 综合所得整页删掉了，
+        // 不再回填那二十来个 DOM（逐年参数的 DOM 比经营所得还碎）。打开向导即可续算：
+        // 向导自带草稿，会接着上次的输入继续。comprehensive 是云同步协议里的同一个类型
+        // （history-sync 上行时把 forward 映射成它），拉回来的云端记录必须能走同一条路。
+        W = window.EuriskoDeepWizard;
+        if (W && W.open('forward')) {
+            showAlert('已打开综合所得测算；向导会接着上次的输入继续。');
+            return;
+        }
+        showAlert('综合所得测算暂不可用，请刷新页面后重试。');
+        return;
     } else {
-        // 切换到正向计税页面
-        showPage('forward-calculation-page');
-        
-        // 填充数据到表单
-        const results = record.results;
-        
-        // 基本参数
-        document.getElementById('work-months').value = results?.workMonths || 12;
-        document.getElementById('prepaid-tax').value = '';
-        
-        // 收入明细
-        document.getElementById('salary-income').value = results?.incomeDetails?.salary || 0;
-        document.getElementById('labor-income').value = results?.incomeDetails?.labor || 0;
-        document.getElementById('author-income').value = results?.incomeDetails?.author || 0;
-        document.getElementById('royalty-income').value = results?.incomeDetails?.royalty || 0;
-        document.getElementById('bonus-income').value = results?.incomeDetails?.bonus || 0;
-        document.getElementById('bonus-include').checked = results?.incomeDetails?.bonusInclude ?? false;
-        
-        // 扣除项明细
-        document.getElementById('basic-deduction').value = results?.deductionDetails?.basic || 5000;
-        
-        // 专项扣除
-        document.getElementById('social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
-        document.getElementById('pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
-        document.getElementById('medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
-        document.getElementById('unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
-        document.getElementById('housing-fund').value = results?.deductionDetails?.housingFund || 0;
-        
-        // 专项附加扣除
-        document.getElementById('elderly-deduction').value = results?.deductionDetails?.elderly || 0;
-        document.getElementById('children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
-        
-        // 住房类型
-        const housingType = (results?.deductionDetails?.housing || 0) > 1200 ? 'rent' : 'loan';
-        document.getElementById('housing-type').value = housingType;
-        
-        // 住房贷款/租金扣除
-        document.getElementById('housing-deduction').value = results?.deductionDetails?.housing || 0;
-        
-        // 继续教育扣除
-        document.getElementById('education-deduction').value = results?.deductionDetails?.education || 0;
-        
-        // 大病医疗扣除
-        document.getElementById('medical-deduction').value = results?.deductionDetails?.medical || 0;
-        
-        // 其他扣除
-        document.getElementById('other-deduction').value = results?.deductionDetails?.other || 0;
-        
-        // 重新计算
-        calculateTax();
-        goToStep(3);
-        updateBudgetTable();
-        updateCharts();
+        // 未知类型：宁可说清楚也不猜 —— 猜错会把人扔到一个不相关的页面里。
+        showAlert('这条记录没有对应的测算入口，可能来自更新的版本。');
     }
 }
 

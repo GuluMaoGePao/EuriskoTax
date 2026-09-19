@@ -7,9 +7,118 @@
 
 ---
 
+## [1.50.0] - 2026-09-19（阶段17 17B-4：分类所得迁到 spec 驱动，**页面式 deep 归零**）
+
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **70 套件 1248 例**（静态计数口径；jest 实测 1252，
+> 差额来自 `test.each` 数据驱动用例）；线上指纹 **37 项**（不改动指纹覆盖点）。
+
+### 最后一块拼图：先给渲染器补 repeater，再迁，最后删页
+
+- **能力**：`deep-wizard-ui.js` 新增 `type:'repeater'`（`itemFields` + 「添加一条 / 删除」），
+  值是一条数组 `[{ …itemFields }]`。它刻意**不新写一套类型转换** —— 条目的输入控件 id 沿用
+  `qf-<字段>-<下标>-<子键>`，于是渲染继续走 `fieldHtml`、取值继续走 `readValues`、
+  条件显隐继续走 `visibleFields`。为 repeater 再抄一份「空串归 0 / select 还原数字」，等于埋一个必将漂移的坑。
+- **spec**（`tool-registry.js` 的 `classification`）：四类所得 × 各自扣除口径（租赁的费用与修缮费、
+  转让的原值与合理费用），`compute` 仍调 `calculateSingleClassificationTax` /
+  `calculateClassificationTaxTotal` —— 页面版 `addClassificationItem` 里内联的那份同形公式自此不再存在。
+- **删除**：`classification-calculation-page`（index.html 约 330 行）、`helper-functions.js`
+  （706 行，四个页面式 deep 的最后一批私有联动）、`draft-store.js`（345 行，连同 270 行单测）、
+  app.js 的页面式按钮与初始化、field-hints 的 `classification_*` 六个键、
+  navigation-ui 的常驻预览条（`showStepByPanes` 的最后一个调用者）、
+  share-card / lead-touchpoints / funnel-tracking 里的 `calculate-classification-btn` 一路。
+  `classification-mode-btn` **保留**：首页静态卡与工具箱兜底最终都点到它。
+
+### 这一版抓到的两个真问题
+
+- **`app.js` 的空指针**：`back-to-mode-selection-classification` 随页面删了，绑定它的那句
+  `getElementById(...).addEventListener` 没删 —— DOMContentLoaded 里它在这一行抛 TypeError，
+  **后面所有初始化（登录态、历史记录）全都不执行**。界面看着正常、功能静默全残，
+  比少一个按钮严重得多。删页留下的空指针不会自己报错，只能靠扫「引用了 index.html 里不存在的 id」找。
+- **修缮费 800 元的封顶没说清**：页面按 800 截断却一句话没解释，用户填 1500 看到 800 会以为算错了。
+  这次写进 hint 与 pitfalls —— 超出的部分**结转以后月份**，不是作废。
+
+### 测试怎么跟着改的
+
+- **新增** `tests/classification-migration.test.js`：四类所得的扣除口径按税法**独立重算**
+  （利息全额 / 租赁 ≤4000 减 800、>4000 减 20% / 修缮费封顶 800 / 转让减原值与费用）、
+  「多项所得税额＝各自之和，不合并、不累进」、两笔租金不共享一次 800 元减除、
+  空条目不进计税表、计税表的分隔线；再加端到端：免责声明、`data-tool-id=classification`、
+  分享图依赖的两个行标签、repeater 的加一条 / 删一条 / 删空留一条 / 条目内条件字段。
+- **接住缺口**：`tests/ui-result-compliance.test.js` 的 RESULT_PAGES 只剩速算器那个壳 ——
+  分类所得的免责声明改由上面的端到端用例守；该文件同时新增一条反向断言：
+  四个页面式 deep 的结果页不许以「半份」的形式回来。
+- **随页面翻篇**：`showClassificationStep` 与 `formatPreviewNum` 的用例删了（它们测的是那张表单自己的
+  显示接线，不是业务规则；数字格式化现在统一由 `toolbox-ui.fmtValue` 承担，别处已有用例）。
+  `tests/formula-steps-flows.test.js` 的分类所得用例改成走 spec 的 compute（与 business 同款改法），
+  并反过来钉：静态 HTML 里**不该再有**任一份推导链面板。
+
+### 阶段17 17B 到此收官
+
+四个页面式 deep（经营所得 v1.47.0 / 反向倒算 v1.48.0 / 综合所得 v1.49.0 / 分类所得 v1.50.0）
+全部迁成了「一份 spec + 一套通用渲染器」，共约 3,400 行手写页面；
+`tests/tool-registry.test.js` 那条 `pageBased` 断言等的就是这一天 —— **它现在等于空数组**。
+
+---
+
+## [1.49.0] - 2026-09-19（阶段17 17B-3：综合所得正向计税改由 spec 驱动，旧页面约 970 行删除）
+
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **70 套件 1248 例**（静态计数口径；jest 实测 1265，
+> 差额来自 `test.each` 数据驱动用例）；线上指纹 **37 项**（不改动指纹覆盖点）。
+
+### 抽内核 → 写 spec → 删页面（约 1,900 行）
+
+- **内核**：`performTaxCalculation` 本来就支持注入 `deductions`，这次把综合所得那份独有的
+  **逐月预算表**抽成纯 tables 内核（`tests/budget-table.test.js` 先守）；spec 的 `extras.table`
+  直接透传它的输出（含跨列标题行 `{ cells, spans }`，渲染器负责摊平）。
+- **spec**（`tool-registry.js` 的 `forward`）：27 个字段按 基本参数 / 收入明细 / 扣除明细 三步，
+  `specialDeductionCheckbox` / `specialAdditionalDeductionCheckbox` / `otherDeductionCheckbox` 三个
+  switch 各带一组条件字段；**年终奖并入 vs 单独计税**用 `compare.scenarios` 给两行数让用户挑。
+  便利输入（婴幼儿分摊比例 0~100、学历继续教育 / 职业资格的勾选）删页**之前**就登记进去了 ——
+  这是 v1.47.0 删经营所得时的教训，第二次不再犯。
+- **删除**：`forward-calculation-page`（index.html 约 970 行）、app.js 约 340 行接线、
+  helper-functions 里 12 个只服务该页的联动/重置函数（约 440 行）、data-management 那份
+  `saveCalculationResult`（与 `tax-calculator.saveToHistory` 重复实现，`updatedAt` / 变更信号各写一份）、
+  draft-store 的 forward 草稿流、field-hints 的 `forward_*` 键、navigation-ui 的预览分支与 `goToStep`。
+  `forward-mode-btn` **保留**（首页静态卡与工具箱兜底最终都点到它），点击即打开向导。
+
+### `dw-result-card` 第三次带来「认不出工具」
+
+同一张结果卡现在挂着 business / reverse / forward 三份配置，且**模板与行标签各不相同**：
+
+- `share-card.js`：新增 `dw-result-card:forward` 一路，`sourceKey()` 按实时 `data-tool-id` 落配置。
+- `lead-touchpoints.js` / `funnel-tracking.js`：改钩 `dw-next`，并按 `toolId: 'forward'` 归因。
+- `lead-context.js`：三个结果锚点改成 `wizard:primary` / `wizard:refund` / `wizard:row:适用税率`；
+  顺手修掉一个由此才暴露的 bug —— 向导的行节点把**标签和值渲染在同一个 div** 里，照 `textContent`
+  整取会得到 `'适用税率20%'`，情境里出现「适用税率 适用税率20%」；现在取行内最后一个 `span`。
+- `tax-assistant` 的 12 处 `related: { page: 'forward-calculation-page' }` 改为 `{ tool: 'forward' }`；
+  `final-report.js` 那份专业版报告的截图主体改指向 `dw-result-card`。
+
+### 测试怎么跟着改的
+
+- **新增** `tests/forward-migration.test.js`：按税法口径**独立重算**（页面版没了，左式不复存在）——
+  四类所得折算率 / 六档档位边界 ±0.01 / 年终奖双口径择优 / 退税补税的方向判定 /
+  不足 12 个月时预算表的行数、劳务报酬并入后不再单独预扣的那一行；
+  再加三条端到端：`result-disclaimer`、`data-tool-id=forward`、分享图赖以为生的三个行标签。
+- **移了守护**：`tests/ui-result-compliance.test.js` 的 RESULT_PAGES 少掉 forward 那一条（= 少一处
+  免责守护），由上面三条端到端**同版**接住；`lead-context` 的跨文件契约反过来钉「三个旧 id 不该还在」；
+  两个 quick 落地页的「起征点与主站表单 #basic-deduction 一致」改为「第二份 5000 已随页面删除」。
+- **守卫**：两条依赖页面 DOM 的（缴费比例输入框 / `normalizeRateInput`）改到 spec 侧断言
+  （三个 spec 各一份 `housingFundRate` + `insuranceDerive` 的回落 + `deep-wizard-ui` 的失焦归一），
+  原 `(data-management)` 那条改为「写历史的入口收敛为一处」，项数维持 259。
+
+### 没做的
+
+- classification（分类所得）是唯一含动态增删所得条目的页面，spec 要先有 repeater 能力才能迁。
+  **17B 到这里只剩它一个页面式 deep** —— `tests/tool-registry.test.js` 那条 `pageBased` 断言
+  就是在等它归零那天变红。
+- `scenario-ui.js` 的「年终奖方案对比」卡片原先长在被删页面的结果区里，这次随页面失去宿主；
+  它的纯逻辑（`pure.buildBonusScenarios`）与对应单测仍在，UI 出口待下一步决定去向。
+
+---
+
 ## [1.48.0] - 2026-09-18（阶段17 17B-2：反向倒算（谈薪）改由 spec 驱动，旧页面约 1,050 行删除）
 
-> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **69 套件 1235 例**（静态计数口径；jest 实测 1239，
+> 门禁基线：**verify:local 259 项**（本版不改项数）；单测 **70 套件 1261 例**（静态计数口径；jest 实测 1239，
 > 差额来自 4 条 `test.each` 数据驱动用例）；线上指纹 **37 项**（不改动指纹覆盖点）。
 
 ### 先补再删：这次没让便利输入跟着页面走

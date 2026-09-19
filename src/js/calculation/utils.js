@@ -6,48 +6,53 @@ function calculateRegularIncome(totalIncome, bonusIncome, bonusInclude) {
     return totalIncome;
 }
 
-// 更新预算表
-function updateBudgetTable() {
-    if (Object.keys(calculationResults).length === 0) return;
-    
-    const workMonths = calculationResults.workMonths;
-    const tbody = document.getElementById('budget-table-body');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    const monthlySalary = calculationResults.incomeDetails.salary;
-    const monthlyBonus = calculationResults.incomeDetails.bonusInclude ? calculationResults.incomeDetails.bonus / workMonths : 0;
-    
-    const monthlyBasicDeduction = calculationResults.deductionDetails.basic;
-    const monthlyInsuranceDeduction = calculationResults.deductionDetails.pensionInsurance + 
-                                     calculationResults.deductionDetails.medicalInsurance + 
-                                     calculationResults.deductionDetails.unemploymentInsurance + 
-                                     calculationResults.deductionDetails.housingFund;
-    const monthlySpecialAdditional = calculationResults.deductionDetails.elderly + 
-                                     calculationResults.deductionDetails.childrenInfant + 
-                                     calculationResults.deductionDetails.housing + 
-                                     (calculationResults.deductionDetails.educationDegree || 0);
-    const monthlyOtherDeduction = (calculationResults.deductionDetails.otherTotal - calculationResults.deductionDetails.charitableDonation) / workMonths;
-    
+// ====== 正向计税「年度个税预算表」的**纯数据**版 ======
+// 这张表原先只活在下面的 updateBudgetTable 里：读全局 calculationResults → 直接拼 <tr> →
+// 塞进 index.html 的 #budget-table-body。页面删掉它就跟着没了，可它正是完整测算比
+// 「月薪个税速算器」多出来的东西 —— 累计预扣法下，同样的年收入，各月到手并不相同。
+// 17B-3 把综合所得迁到 spec 向导，先按老规矩**抽内核**：results → { head, rows }，
+// 页面版与 spec 版共用同一份实现，迁移前后每一行都不许变。
+//
+// row = { cells: [...], spans?: [...], cls?: [...] }
+//   spans 用来表达页面上那些跨列的「分节标题」（合并单元格在明细表里有条理上的意义）；
+//   向导的通用表格不认它，缺的列按空白渲染 —— 两种排版本来就该各管一段。
+function buildForwardBudgetTable(results) {
+    if (!results || !results.incomeDetails) return null;
+
+    const workMonths = Number(results.workMonths) || 12;
+    const inc = results.incomeDetails || {};
+    const ded = results.deductionDetails || {};
+    const tax = results.taxDetails || {};
+
+    const num = function (x) { return Number(x) || 0; };
+    const m2 = function (x) { return num(x).toFixed(2); };
+    const pct = function (r) { return (num(r) * 100).toFixed(0) + '%'; };
+    const HEAD = ['月份', '月工资收入', '扣除', '应纳税所得额', '税率', '月工资应纳税额', '税后到手', '累计收入', '累计应缴'];
+    const TAIL = 3;   // 「分项明细」那几行末尾要补的空格列数（凑满 9 列，表才不会错位）
+
+    const rows = [];
+
+    // ---- 1. 逐月明细（累计预扣法：每月用「累计应纳税所得额」定档，再减去已预缴部分）----
+    const monthlySalary = num(inc.salary);
+    const monthlyBasicDeduction = num(ded.basic);
+    const monthlyInsuranceDeduction = num(ded.pensionInsurance) + num(ded.medicalInsurance) +
+        num(ded.unemploymentInsurance) + num(ded.housingFund);
+    const monthlySpecialAdditional = num(ded.elderly) + num(ded.childrenInfant) +
+        num(ded.housing) + num(ded.educationDegree);
+    // 其他扣除里的公益捐赠是一次性的年度数，不按月摊
+    const monthlyOtherDeduction = (num(ded.otherTotal) - num(ded.charitableDonation)) / workMonths;
+    const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction +
+        monthlySpecialAdditional + monthlyOtherDeduction;
+
     let cumulativeTaxableIncome = 0;
     let cumulativeTax = 0;
-    
-    const bonusTax = calculationResults.incomeDetails.bonusTax || 0;
-    const bonusIncome = calculationResults.incomeDetails.bonus || 0;
-    const bonusInclude = calculationResults.incomeDetails.bonusInclude || false;
-    
-    // 1. 生成月度数据表格
     for (let month = 1; month <= workMonths; month++) {
         const monthlyIncome = monthlySalary;
-        const monthlyDeduction = monthlyBasicDeduction + monthlyInsuranceDeduction + monthlySpecialAdditional + monthlyOtherDeduction;
         const monthlyTaxableIncome = Math.max(0, monthlyIncome - monthlyDeduction);
-        
         cumulativeTaxableIncome += monthlyTaxableIncome;
-        
+
         let currentCumulativeTax = 0;
         let applicableRate = 0;
-        
         for (const bracket of comprehensiveTaxRates) {
             if (cumulativeTaxableIncome <= bracket.max) {
                 currentCumulativeTax = cumulativeTaxableIncome * bracket.rate - bracket.deduction;
@@ -55,172 +60,104 @@ function updateBudgetTable() {
                 break;
             }
         }
-        
-        let monthTax = currentCumulativeTax - cumulativeTax;
+        const monthTax = Math.max(0, currentCumulativeTax - cumulativeTax);
         cumulativeTax = currentCumulativeTax;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${month}月</td>
-            <td>${monthlyIncome.toFixed(2)}</td>
-            <td>${monthlyDeduction.toFixed(2)}</td>
-            <td>${monthlyTaxableIncome.toFixed(2)}</td>
-            <td>${(applicableRate * 100).toFixed(0)}%</td>
-            <td>${Math.max(0, monthTax).toFixed(2)}</td>
-            <td>${(monthlyIncome - Math.max(0, monthTax)).toFixed(2)}</td>
-            <td>${(monthlyIncome * month).toFixed(2)}</td>
-            <td>${cumulativeTax.toFixed(2)}</td>
-        `;
-        
-        tbody.appendChild(row);
+
+        rows.push({
+            cells: [month + '月', m2(monthlyIncome), m2(monthlyDeduction), m2(monthlyTaxableIncome),
+                pct(applicableRate), m2(monthTax), m2(monthlyIncome - monthTax),
+                m2(monthlyIncome * month), m2(cumulativeTax)]
+        });
     }
-    
-    // 2. 添加劳务所得、稿酬所得、特许权使用费和年底一次性奖金表格
-    const laborIncome = calculationResults.incomeDetails.labor || 0;
-    const laborTaxableIncome = calculationResults.incomeDetails.laborCalculated || 0;
-    const laborTax = calculationResults.incomeDetails.laborTax || 0;
-    const laborDeduction = laborIncome > 4000 ? laborIncome * 0.2 : 800;
-    
-    const authorIncome = calculationResults.incomeDetails.author || 0;
-    const authorTaxableIncome = calculationResults.incomeDetails.authorCalculated || 0;
-    const authorTax = calculationResults.incomeDetails.authorTax || 0;
-    const authorDeduction = authorIncome > 4000 ? authorIncome * 0.2 : 800;
-    
-    const royaltyIncome = calculationResults.incomeDetails.royalty || 0;
-    const royaltyTaxableIncome = calculationResults.incomeDetails.royaltyCalculated || 0;
-    const royaltyTax = calculationResults.incomeDetails.royaltyTax || 0;
-    const royaltyDeduction = royaltyIncome > 4000 ? royaltyIncome * 0.2 : 800;
-    
-    // 计算税率用于显示
-    const laborTaxRate = laborTaxableIncome <= 20000 ? 0.2 : (laborTaxableIncome <= 50000 ? 0.3 : 0.4);
-    const authorTaxRate = 0.2;
-    const royaltyTaxRate = 0.2;
-    
-    // 检查是否有任何其他收入或年终奖
+
+    // ---- 2. 劳务 / 稿酬 / 特许权使用费 / 年终奖（不与工资同源，单独成节）----
+    const bonusIncome = num(inc.bonus);
+    const bonusInclude = !!inc.bonusInclude;
+    const laborIncome = num(inc.labor);
+    const authorIncome = num(inc.author);
+    const royaltyIncome = num(inc.royalty);
+    // 这三类所得的费用扣除：4000 以上扣 20%，否则定额扣 800（预扣环节口径，与汇算时的减除费用无关）
+    const other = [
+        { name: '劳务所得', income: laborIncome, taxable: num(inc.laborCalculated), tax: num(inc.laborTax),
+            ded: laborIncome > 4000 ? laborIncome * 0.2 : 800,
+            rate: num(inc.laborCalculated) <= 20000 ? 0.2 : (num(inc.laborCalculated) <= 50000 ? 0.3 : 0.4) },
+        { name: '稿酬所得', income: authorIncome, taxable: num(inc.authorCalculated), tax: num(inc.authorTax),
+            ded: authorIncome > 4000 ? authorIncome * 0.2 : 800, rate: 0.2 },
+        { name: '特许权使用费', income: royaltyIncome, taxable: num(inc.royaltyCalculated), tax: num(inc.royaltyTax),
+            ded: royaltyIncome > 4000 ? royaltyIncome * 0.2 : 800, rate: 0.2 }
+    ];
     if (laborIncome > 0 || authorIncome > 0 || royaltyIncome > 0 || (bonusIncome > 0 && !bonusInclude)) {
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="9"></td>`;
-        tbody.appendChild(emptyRow);
-        
-        const categoryRow2 = document.createElement('tr');
-        categoryRow2.innerHTML = `
-            <td class="font-bold">类型</td>
-            <td class="font-bold">收入</td>
-            <td class="font-bold">扣除</td>
-            <td class="font-bold">应纳税所得额</td>
-            <td class="font-bold">税率</td>
-            <td class="font-bold">预缴税额</td>
-            <td colspan="3"></td>
-        `;
-        tbody.appendChild(categoryRow2);
-        
-        if (laborIncome > 0) {
-            const laborRow = document.createElement('tr');
-            laborRow.innerHTML = `
-                <td>劳务所得</td>
-                <td>${laborIncome.toFixed(2)}</td>
-                <td>${laborDeduction.toFixed(2)}</td>
-                <td>${laborTaxableIncome.toFixed(2)}</td>
-                <td>${(laborTaxRate * 100).toFixed(0)}%</td>
-                <td>${laborTax.toFixed(2)}</td>
-                <td colspan="3"></td>
-            `;
-            tbody.appendChild(laborRow);
-        }
-        
-        if (authorIncome > 0) {
-            const authorRow = document.createElement('tr');
-            authorRow.innerHTML = `
-                <td>稿酬所得</td>
-                <td>${authorIncome.toFixed(2)}</td>
-                <td>${authorDeduction.toFixed(2)}</td>
-                <td>${authorTaxableIncome.toFixed(2)}</td>
-                <td>${(authorTaxRate * 100).toFixed(0)}%</td>
-                <td>${authorTax.toFixed(2)}</td>
-                <td colspan="3"></td>
-            `;
-            tbody.appendChild(authorRow);
-        }
-        
-        if (royaltyIncome > 0) {
-            const royaltyRow = document.createElement('tr');
-            royaltyRow.innerHTML = `
-                <td>特许权使用费</td>
-                <td>${royaltyIncome.toFixed(2)}</td>
-                <td>${royaltyDeduction.toFixed(2)}</td>
-                <td>${royaltyTaxableIncome.toFixed(2)}</td>
-                <td>${(royaltyTaxRate * 100).toFixed(0)}%</td>
-                <td>${royaltyTax.toFixed(2)}</td>
-                <td colspan="3"></td>
-            `;
-            tbody.appendChild(royaltyRow);
-        }
-        
+        rows.push({ cells: [''], spans: [9] });
+        rows.push({
+            cells: ['类型', '收入', '扣除', '应纳税所得额', '税率', '预缴税额', ''],
+            spans: [1, 1, 1, 1, 1, 1, TAIL],
+            cls: ['font-bold', 'font-bold', 'font-bold', 'font-bold', 'font-bold', 'font-bold', '']
+        });
+        other.forEach(function (o) {
+            if (o.income <= 0) return;
+            rows.push({
+                cells: [o.name, m2(o.income), m2(o.ded), m2(o.taxable), pct(o.rate), m2(o.tax), ''],
+                spans: [1, 1, 1, 1, 1, 1, TAIL]
+            });
+        });
         if (bonusIncome > 0 && !bonusInclude) {
-            const bonusRow = document.createElement('tr');
+            // 年终奖单独计税：按「奖金 ÷ 12」去月度税率表里定档，全额适用该档税率
             let bonusTaxRate = 0;
             const monthlyBonus = bonusIncome / 12;
-            
             for (const bracket of bonusMonthlyTaxRates) {
-                if (monthlyBonus <= bracket.max) {
-                    bonusTaxRate = bracket.rate;
-                    break;
-                }
+                if (monthlyBonus <= bracket.max) { bonusTaxRate = bracket.rate; break; }
             }
-            
-            bonusRow.innerHTML = `
-                <td>年底一次性奖金</td>
-                <td>${bonusIncome.toFixed(2)}</td>
-                <td>0.00</td>
-                <td>${bonusIncome.toFixed(2)}</td>
-                <td>${(bonusTaxRate * 100).toFixed(0)}%</td>
-                <td>${bonusTax.toFixed(2)}</td>
-                <td colspan="3"></td>
-            `;
-            tbody.appendChild(bonusRow);
+            rows.push({
+                cells: ['年底一次性奖金', m2(bonusIncome), '0.00', m2(bonusIncome), pct(bonusTaxRate), m2(inc.bonusTax), ''],
+                spans: [1, 1, 1, 1, 1, 1, TAIL]
+            });
         }
     }
+
+    // ---- 3. 汇算口径汇总（与结果区同一个数：税前 / 扣除 / 应纳税所得额 / 应纳税额 / 预缴 / 退补）----
+    rows.push({ cells: ['综合所得汇算'], spans: [9], cls: ['section-title'] });
+    rows.push({
+        cells: ['税前收入', '年度扣除合计', '应纳税所得额合计', '税率', '应纳税额', '累计预缴税额', '应退/补税额'],
+        spans: [3, 1, 1, 1, 1, 1, 1]
+    });
+    rows.push({
+        cells: [m2(inc.preTaxTotal), m2(ded.total), m2(tax.taxableIncome), pct(tax.applicableRate),
+            m2(tax.totalTax), m2(tax.prepaidTax), m2(tax.refundTax)],
+        spans: [3, 1, 1, 1, 1, 1, 1],
+        cls: ['', '', '', '', '', '', tax.refundTax < 0 ? 'positive' : (tax.refundTax > 0 ? 'negative' : '')]
+    });
+
+    return { head: HEAD, rows: rows };
+}
+
+// 更新预算表（页面版 DOM 渲染：纯拼接迁走了，这里只剩「按 row 模型画 <tr>」）
+function updateBudgetTable() {
+    if (Object.keys(calculationResults).length === 0) return;
     
-    // 5. 添加综合所得汇算表格
-    // 税前收入 = 收入总额（工资+劳务+稿酬+特许权+年终奖），与结果区「税前年收入」口径一致
-    const preTaxIncome = calculationResults.incomeDetails.preTaxTotal || 0;
-    const annualDeduction = calculationResults.deductionDetails.total || 0;
-    // 应纳税所得额以税务引擎结果为准（劳务/稿酬/特许权使用费已按 20%/减 800 等规则扣除费用）
-    const annualTaxableIncome = calculationResults.taxDetails.taxableIncome || 0;
-    const annualTaxRate = calculationResults.taxDetails.applicableRate || 0;
-    const annualTax = calculationResults.taxDetails.totalTax || 0;
-    // 累计预缴税额、应退/补税额与结果区保持一致（支持用户手动填写的预缴税额）
-    const prepaidTax = calculationResults.taxDetails.prepaidTax || 0;
-    const refundTax = calculationResults.taxDetails.refundTax || 0;
+    const tbody = document.getElementById('budget-table-body');
+    if (!tbody) return;
     
-    const finalRow1 = document.createElement('tr');
-    finalRow1.innerHTML = `<td class="section-title" colspan="9">综合所得汇算</td>`;
-    tbody.appendChild(finalRow1);
+    tbody.innerHTML = '';
     
-    const finalRow2 = document.createElement('tr');
-    finalRow2.innerHTML = `
-        <td colspan="3">税前收入</td>
-        <td>年度扣除合计</td>
-        <td>应纳税所得额合计</td>
-        <td>税率</td>
-        <td>应纳税额</td>
-        <td>累计预缴税额</td>
-        <td>应退/补税额</td>
-    `;
-    tbody.appendChild(finalRow2);
-    
-    const finalRow3 = document.createElement('tr');
-    finalRow3.innerHTML = `
-        <td colspan="3">${preTaxIncome.toFixed(2)}</td>
-        <td>${annualDeduction.toFixed(2)}</td>
-        <td>${annualTaxableIncome.toFixed(2)}</td>
-        <td>${(annualTaxRate * 100).toFixed(0)}%</td>
-        <td>${annualTax.toFixed(2)}</td>
-        <td>${prepaidTax.toFixed(2)}</td>
-        <td class="${refundTax < 0 ? 'positive' : refundTax > 0 ? 'negative' : ''}">${refundTax.toFixed(2)}</td>
-    `;
-    tbody.appendChild(finalRow3);
-    
+    const table = (typeof buildForwardBudgetTable === 'function') ? buildForwardBudgetTable(calculationResults) : null;
+    if (!table) return;
+
+    (table.rows || []).forEach(function (row) {
+        const tr = document.createElement('tr');
+        const cells = row.cells || [];
+        const spans = row.spans || [];
+        const cls = row.cls || [];
+        cells.forEach(function (text, i) {
+            const td = document.createElement('td');
+            const span = Number(spans[i]) || 0;
+            if (span > 1) td.setAttribute('colspan', String(span));
+            if (cls[i]) td.className = cls[i];
+            td.textContent = String(text);
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+
     const dateElement = document.getElementById('budget-table-date');
     if (dateElement) {
         dateElement.textContent = new Date().toLocaleDateString();
@@ -231,93 +168,41 @@ function updateBudgetTable() {
 
 
 
-// 更新分类所得预算表
-function updateClassificationBudgetTable() {
-    if (Object.keys(classificationCalculationResults).length === 0) return;
-    
-    const tbody = document.getElementById('classification-budget-table-body');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    // 直接设置表格HTML内容
-    let tableHTML = '';
-    
-    // 添加每个条目
-    classificationCalculationResults.items.forEach((item, index) => {
-        // 收入行
-        tableHTML += '<tr>';
-        tableHTML += '<td>' + item.typeName + '</td>';
-        tableHTML += '<td>¥' + item.income.toFixed(2) + '</td>';
-        tableHTML += '<td>分类所得第' + (index + 1) + '项</td>';
-        tableHTML += '</tr>';
-        
-        // 扣除项目行（如果有）
-        if (item.deduction > 0) {
-            tableHTML += '<tr>';
-            tableHTML += '<td>扣除项目</td>';
-            tableHTML += '<td>¥' + item.deduction.toFixed(2) + '</td>';
-            tableHTML += '<td>' + item.typeName + '的扣除项目</td>';
-            tableHTML += '</tr>';
+// 分类所得计税表的纯行模型（阶段17 17B-4 / v1.50.0）
+//
+// 与上面那份 `buildForwardBudgetTable` 用的是同一个 row 契约（cells / spans / cls）：
+// 删除分类所得页面时，这张表必须从 DOM 拼接里抽出来并先由 tests 钉住 —— 否则「页面没了、
+// 表也没了」，用户会以为产品少了个功能而不是少了张大表格。
+// 17B-4 那天，页面版 `updateClassificationBudgetTable` 随旧页面删掉了 —— 抽出来的这份留下，
+// 由 spec 通过 extras.table 透传给向导，自此它是产品里**唯一**的一份分类所得计税表实现。
+function buildClassificationTable(results) {
+    if (!results || !results.items || results.items.length === 0) return null;
+
+    const head = ['项目', '金额 (元)', '说明'];
+    const rows = [];
+    const m2 = function (x) { return Number(x || 0).toFixed(2); };
+    const name = function (item) { return item.typeName || '分类所得'; };
+
+    // 每个条目四行（扣除行只在有扣除时出现），条目之间一条分隔线 —— 分类所得是**按次单独计税**的，
+    // 不画线的话相邻两条的「应纳税额」会被读成同一个所得项目（这条线是表意的，不是装饰）。
+    results.items.forEach(function (item, index) {
+        rows.push({ cells: [name(item), '¥' + m2(item.income), '分类所得第' + (index + 1) + '项'] });
+        if (Number(item.deduction) > 0) {
+            rows.push({ cells: ['扣除项目', '¥' + m2(item.deduction), name(item) + '的扣除项目'] });
         }
-        
-        // 应纳税所得额行
-        tableHTML += '<tr>';
-        tableHTML += '<td>应纳税所得额</td>';
-        tableHTML += '<td>¥' + item.taxableIncome.toFixed(2) + '</td>';
-        tableHTML += '<td>' + item.typeName + '的应纳税所得额</td>';
-        tableHTML += '</tr>';
-        
-        // 应纳税额行
-        tableHTML += '<tr>';
-        tableHTML += '<td>应纳税额</td>';
-        tableHTML += '<td>¥' + item.totalTax.toFixed(2) + '</td>';
-        tableHTML += '<td>' + item.typeName + '的应纳税额</td>';
-        tableHTML += '</tr>';
-        
-        // 分隔行
-        if (index < classificationCalculationResults.items.length - 1) {
-            tableHTML += '<tr>';
-            tableHTML += '<td colspan="3"><hr></td>';
-            tableHTML += '</tr>';
+        rows.push({ cells: ['应纳税所得额', '¥' + m2(item.taxableIncome), name(item) + '的应纳税所得额'] });
+        rows.push({ cells: ['应纳税额', '¥' + m2(item.totalTax), name(item) + '的应纳税额'] });
+        if (index < results.items.length - 1) {
+            rows.push({ cells: ['————————'], spans: [3] });
         }
     });
-    
-    // 添加合计行
-    if (classificationCalculationResults.items.length > 0) {
-        const totalIncome = classificationCalculationResults.totalIncome;
-        const totalTaxableIncome = classificationCalculationResults.totalTaxableIncome;
-        const totalTax = classificationCalculationResults.totalTax;
-        
-        // 总收入行
-        tableHTML += '<tr>';
-        tableHTML += '<td>总收入</td>';
-        tableHTML += '<td>¥' + totalIncome.toFixed(2) + '</td>';
-        tableHTML += '<td>所有分类所得的收入合计</td>';
-        tableHTML += '</tr>';
-        
-        // 总应纳税所得额行
-        tableHTML += '<tr>';
-        tableHTML += '<td>总应纳税所得额</td>';
-        tableHTML += '<td>¥' + totalTaxableIncome.toFixed(2) + '</td>';
-        tableHTML += '<td>所有分类所得的应纳税所得额合计</td>';
-        tableHTML += '</tr>';
-        
-        // 总应纳税额行
-        tableHTML += '<tr class="font-bold">';
-        tableHTML += '<td>总应纳税额</td>';
-        tableHTML += '<td>¥' + totalTax.toFixed(2) + '</td>';
-        tableHTML += '<td>所有分类所得的应纳税额合计</td>';
-        tableHTML += '</tr>';
-    } else {
-        // 添加空状态行
-        tableHTML += '<tr>';
-        tableHTML += '<td colspan="3" class="text-center text-gray-500 py-4">暂无分类所得条目</td>';
-        tableHTML += '</tr>';
-    }
-    
-    // 设置表格内容
-    tbody.innerHTML = tableHTML;
+
+    rows.push({ cells: ['总收入', '¥' + m2(results.totalIncome), '所有分类所得的收入合计'] });
+    rows.push({ cells: ['总应纳税所得额', '¥' + m2(results.totalTaxableIncome), '所有分类所得的应纳税所得额合计'] });
+    rows.push({ cells: ['总应纳税额', '¥' + m2(results.totalTax), '所有分类所得的应纳税额合计'],
+        cls: ['font-bold', 'font-bold', 'font-bold'] });
+
+    return { head: head, rows: rows };
 }
 
 // 更新图表
@@ -329,89 +214,6 @@ function updateCharts() {
     updateMonthlyTaxChart();
 }
 
-
-// 更新分类所得图表
-function updateClassificationCharts() {
-    // 分类所得类型分布图表
-    updateClassificationDistributionChart();
-}
-
-// 更新分类所得类型分布图表
-function updateClassificationDistributionChart() {
-    if (Object.keys(classificationCalculationResults).length === 0) return;
-    
-    const ctx = document.getElementById('classification-distribution-chart');
-    if (!ctx) return;
-    
-    const items = classificationCalculationResults.items;
-    const labels = items.map(item => item.typeName);
-    const data = items.map(item => item.income);
-    
-    if (window.classificationDistributionChart) {
-        window.classificationDistributionChart.destroy();
-    }
-    
-    // 如果没有数据，显示默认图表
-    if (labels.length === 0) {
-        window.classificationDistributionChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: ['无分类所得'],
-                datasets: [{
-                    data: [1],
-                    backgroundColor: ['#e5e7eb'],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    },
-                    title: {
-                        display: true,
-                        text: '分类所得类型分布'
-                    }
-                }
-            }
-        });
-    } else {
-        window.classificationDistributionChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: [
-                        '#3b82f6',
-                        '#10b981',
-                        '#f59e0b',
-                        '#ef4444',
-                        '#8b5cf6',
-                        '#ec4899',
-                        '#6366f1'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    },
-                    title: {
-                        display: true,
-                        text: '分类所得类型分布'
-                    }
-                }
-            }
-        });
-    }
-}
 
 // 更新税率分布饼图
 function updateTaxRateDistributionChart() {
@@ -1190,12 +992,11 @@ function buildClassificationFormulaSteps(results) {
     const items = results.items || [];
     const steps = [];
 
-    const typeNames = {
-        interest: '利息所得',
-        accidental: '偶然所得',
-        rent: '财产租赁所得',
-        transfer: '财产转让所得'
-    };
+    // 17B-4：类型名称统一读内核那份 CLASSIFICATION_TYPE_NAMES（原先这里另有一份短名，
+    // 与页面上选的是同一个所得却叫两个字 —— 导出报告里看着像两笔不同的收入）
+    const typeNames = (typeof CLASSIFICATION_TYPE_NAMES !== 'undefined')
+        ? CLASSIFICATION_TYPE_NAMES
+        : { interest: '利息所得', accidental: '偶然所得', rent: '财产租赁所得', transfer: '财产转让所得' };
 
     // 每个条目一步：收入 → 应纳税所得额 → 税额
     items.forEach(function (item, idx) {

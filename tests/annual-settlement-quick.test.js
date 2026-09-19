@@ -78,12 +78,15 @@ describe('年度汇算：落地页实现 ≡ App 内核', () => {
         expect(window.EuriskoTaxConstants.comprehensiveTaxRates.length).toBe(7);
     });
 
-    test('起征点与主站表单 #basic-deduction 的固定值一致（防止两处各写一份）', () => {
+    test('起征点与内核同源（主站表单那份已随综合所得页删除）', () => {
         const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-        const m = indexHtml.match(/id="basic-deduction"[^>]*value="(\d+)"/);
-        expect(m).not.toBeNull();
-        expect(window.EuriskoSettlementQuick.BASIC_DEDUCTION).toBe(Number(m[1]));
+        // 17B-3（v1.49.0）：主站表单那个只读的 #basic-deduction 输入框随综合所得页删了 ——
+        // 它原先是「两处各写一份 5000」的另一半（删它之前，这一条就是在给两份常量对账）。
+        // 现在年度汇算的 60000（= 5000 × 12）与月度 5000 只在速算器里各出现一次，
+        // 同源由 tax-constants 与逐点对拍守住。
+        expect(indexHtml).not.toContain('id="basic-deduction"');
         expect(window.EuriskoSettlementQuick.BASIC_DEDUCTION).toBe(5000);
+        expect(window.EuriskoSettlementQuick.ANNUAL_BASIC_DEDUCTION).toBe(5000 * 12);
     });
 
     test('六档分界点 ±0.01 元、多个月数：应纳税所得额/年度税额/已预缴/应退应补逐点相同', () => {

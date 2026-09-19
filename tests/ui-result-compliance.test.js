@@ -26,12 +26,23 @@ const OTHER_CSS = ['src/css/tokens.css', 'src/css/toolbox.css'].map(read).join('
 // 17B-1（v1.47.0）：经营所得的旧页面整页删除了，它的结果区改由 spec 驱动的向导渲染 ——
 // 向导的免责声明不在静态 HTML 里，由 tests/business-income-core.test.js 的端到端用例守护。
 // 17B-2（v1.48.0）：反向倒算同此 —— 由 tests/reverse-migration.test.js 走端到端守护。
-// 这里每少一个条目都要**有对应的替代守护**，否则免责声明就多了一个零成本删得掉的缺口。
+// 17B-3（v1.49.0）：综合所得同样 —— 由 tests/forward-migration.test.js 走端到端守护。
+// 17B-4（v1.50.0）：分类所得（最后一个页面式 deep）同样 —— 由 tests/classification-migration.test.js
+// 走端到端守护。这里每少一个条目都要**有对应的替代守护**，否则免责声明就多了一个零成本删得掉的缺口。
+// 现在清单里只剩 20 个速算器共用的那个壳 —— 深度测算的免责声明全部由各自的 migration 测试接着守。
 const RESULT_PAGES = [
-    'quick-calculator-page',
-    'forward-calculation-page',
-    'classification-calculation-page'
+    'quick-calculator-page'
 ];
+
+// 反过来钉一条：删掉的页面不许以「半份」的形式回来（留一半就会出现两个真相）。
+test('四个页面式 deep 的结果页确实删干净了（不留半份静态结果区）', () => {
+    [
+        'business-calculation-page', 'reverse-calculation-page',
+        'forward-calculation-page', 'classification-calculation-page'
+    ].forEach((id) => {
+        expect(INDEX_HTML).not.toContain('id="' + id + '"');
+    });
+});
 
 function escapeRe(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -59,7 +70,7 @@ function customClasses(css) {
 }
 
 describe('结果页免责不能有缺口', () => {
-    test('四个结果页容器都还在（防「死选择器」重演：容器改名后断言先红）', () => {
+    test('页面式结果容器都还在（防「死选择器」重演：容器改名后断言先红）', () => {
         const ids = pageSlices(INDEX_HTML).map((s) => s.id);
         RESULT_PAGES.forEach((id) => expect(ids).toContain(id));
     });

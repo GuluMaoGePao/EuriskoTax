@@ -41,25 +41,33 @@
     // 17B-1：经营所得迁到 spec 驱动的向导后不再有专属 id（向导是通用渲染器，dw-* 节点被所有
     // spec 工具复用），所以它的三个节点改用「wizard:」锚点 —— 由 readWizardText 按
     // data-tool-id 归因人。写成裸 id 会把增值税的结果当成经营所得的情境报给顾问。
+    // 17B-3（v1.49.0）：综合所得同样迁到向导，result-net-income / result-refund-tax /
+    // result-tax-rate 三个旧页面节点随之删除 —— 改同样的锚点，否则情境永远读不到东西
+    // （readText 拿到空串，留资情境里三个字段静默消失）。
+    // 17B-4（v1.50.0）：分类所得同样如此 —— 'classification-result-net-income' 随旧页面删了，
+    // 不改锚点，顾问看到的情境就是「这笔线索没算过分类所得」。
     var RESULT_MARKERS = {
-        forward: 'result-net-income',
-        comprehensive: 'result-net-income',
+        forward: 'wizard:primary',
+        comprehensive: 'wizard:primary',
         business: 'wizard:primary',
-        classification: 'classification-result-net-income'
+        classification: 'wizard:primary'
     };
 
     // 汇算结论节点：文本形如「应补 ¥1,234.56」「应退 ¥1,234.56」「不退不补 ¥0.00」
     var CONCLUSION_NODES = {
-        forward: 'result-refund-tax',
-        comprehensive: 'result-refund-tax',
+        forward: 'wizard:refund',
+        comprehensive: 'wizard:refund',
         business: 'wizard:refund'
     };
 
     // 适用税率节点：文本形如「20%」
     var RATE_NODES = {
-        forward: 'result-tax-rate',
-        comprehensive: 'result-tax-rate',
-        business: 'wizard:row:适用税率'
+        forward: 'wizard:row:适用税率',
+        comprehensive: 'wizard:row:适用税率',
+        business: 'wizard:row:适用税率',
+        // 分类所得的行名叫这个：它是**实际税负率**（税额 ÷ 收入），与上面的「适用税率」不是一个东西 ——
+        // 四类所得名义税率都是 20%，真正会因扣除而变动的是实际税负率。
+        classification: 'wizard:row:实际税负率'
     };
 
     function readText(id) {
@@ -84,7 +92,13 @@
             return '';
         }
         var row = card.querySelector('[data-dw-row="' + arg + '"]');
-        return row ? String(row.textContent || '').trim() : '';
+        if (!row) return '';
+        // 行标签和值渲染在**同一个**节点里（'<div data-dw-row="适用税率"><span>适用税率</span>
+        // <span>20%</span></div>'），而下面 rateWord 认的是纯粹的一个 '20%' —— 整行 textContent
+        // 会把标签一起带进来。取最后一个 span 就是值：不依赖 class，也不要求每行都有标签。
+        var spans = row.querySelectorAll('span');
+        var value = spans.length ? spans[spans.length - 1] : row;
+        return String(value.textContent || '').trim();
     }
 
     // 支持两种定位写法：普通 id（存量页面）与 'wizard:xxx'（spec 驱动的向导）

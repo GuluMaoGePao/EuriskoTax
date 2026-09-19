@@ -2148,6 +2148,17 @@ function saveClassificationCalculation() {
 }
 
 
+// 分类所得类型名称（阶段17 17B-4）
+// 原先有两份：helper-functions.js（页面列表用）与 utils.js（推导链标题用）。17B 迁移时若各留一份，
+// 「同一个所得类型、两处名称不一致」迟早出现 —— 界面写「利息、股息、红利所得」、导出写「利息所得」。
+// 统一到内核这一个常量，页面版 / 推导链 / spec 三处都读它。
+var CLASSIFICATION_TYPE_NAMES = {
+    interest: '利息、股息、红利所得',
+    rent: '财产租赁所得',
+    transfer: '财产转让所得',
+    accidental: '偶然所得'
+};
+
 // 计算单个分类所得条目
 function calculateSingleClassificationTax(type, income, deduction = 0) {
     const taxRate = classificationTaxRates[type]?.rate || 0.20;
@@ -2167,6 +2178,7 @@ function calculateSingleClassificationTax(type, income, deduction = 0) {
     
     return {
         type: type,
+        typeName: CLASSIFICATION_TYPE_NAMES[type] || '分类所得',
         income: income,
         deduction: deduction,
         taxableIncome: taxableIncome,

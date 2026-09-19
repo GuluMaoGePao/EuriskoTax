@@ -644,12 +644,12 @@
                         window.EuriskoToolbox.openTool('bonus-tax');
                         break;
                     }
-                    // 兜底：工具箱未初始化时，跳综合所得页并切到步骤1（参数入口）
-                    if (typeof showPage === 'function') {
-                        showPage('forward-calculation-page');
-                    }
-                    if (typeof goToStep === 'function') {
-                        goToStep(1);
+                    // 17B-3（v1.49.0）：综合所得页随迁移删了，兜底改走它迁过去的向导；
+                    // 工具箱没初始化时这是唯一还能把人送到测算里的路。
+                    var BW = window.EuriskoDeepWizard;
+                    if (BW && BW.open('forward')) break;
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('综合所得测算暂不可用，请刷新页面后重试。');
                     }
                     break;
                 case 'goTools':

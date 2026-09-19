@@ -29,7 +29,13 @@ describe('阶段13D 分享图 - 模板分流', () => {
     test('4 类结果各归其模板：谈薪 → negotiation，其余 → income', () => {
         // 17B-2（v1.48.0）：反向倒算的旧结果页删了，谈薪那一路改走 dw-result-card:reverse
         expect(ShareCard.SOURCES['dw-result-card:reverse'].template).toBe('negotiation');
-        ['step-result', 'dw-result-card', 'classification-step-result'].forEach((id) => {
+        // 17B-3（v1.49.0）：综合所得的旧结果页 step-result 随页面删了，改从向导的结果卡取数；
+        // 17B-4（v1.50.0）：分类所得同样 —— 它原先那份 'classification-step-result' 随页面删了，
+        // 改按 `:toolId` 划出 dw-result-card:classification 这一路。
+        // 四个迁移工具（business / reverse / forward / classification）共用 dw-result-card，
+        // 全靠 `:toolId` 后缀分家 —— 少划一路就会退到兜底那份 business 的配置上，把某一路的
+        // 分享图截成「应纳个人所得税」这种张冠李戴的标题。
+        ['dw-result-card:forward', 'dw-result-card:classification', 'dw-result-card'].forEach((id) => {
             expect(ShareCard.SOURCES[id].template).toBe('income');
         });
     });

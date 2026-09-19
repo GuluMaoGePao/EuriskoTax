@@ -17,7 +17,8 @@ const { loadSource } = require('./helpers/load-source');
 beforeAll(() => {
     loadSource('src/js/calculation/tax-constants.js');
     loadSource('src/js/calculation/tax-calculator.js');
-    loadSource('src/js/calculation/helper-functions.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删掉了 —— 分类所得是最后一个页面式 deep，
+    // 它的私有逻辑全部写在页面上，页面删后这个文件也一并删了（剩下的是一整个空壳）。
     loadSource('src/js/calculation/utils.js');   // renderFormulaStepsHtml：推导链渲染的唯一实现
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/calculation/vat-quick.js');
@@ -44,7 +45,12 @@ describe('多步向导：接管范围', () => {
     test('只接管 spec 驱动的完整测算，不误伤速算器与原有页面式 deep', () => {
         expect(W().has(R().get('vat-deep'))).toBe(true);    // 无 pageId，由 spec 渲染
         expect(W().has(R().get('vat'))).toBe(false);        // 速算器
-        expect(W().has(R().get('forward'))).toBe(false);    // 有独立页面，走原路
+        // 17B-3：forward 已是 spec 驱动，它必须**接得住**，
+        // 否则用户点的就是一张点不开的卡片 —— 这一条原先是在钉「有独立页面，走原路」，现在反过来钉。
+        expect(W().has(R().get('forward'))).toBe(true);
+        // 17B-4（v1.50.0）：分类所得迁完 —— 它之前被钉成 false（「页面式，等 repeater 能力」），
+        // 现在且必须反过来：spec 有了 repeater，这一条**必须接得住**，否则它就是一张点不开的卡片。
+        expect(W().has(R().get('classification'))).toBe(true);
     });
 });
 
@@ -436,6 +442,83 @@ describe('多步向导：多方案对比（compare）', () => {
         toResult();     // 未挂载假 compute，真实 spec 本来就没有 compare
         expect(document.querySelector('#dw-result-card table')).toBeFalsy();
         expect(document.querySelector('[id^="dw-cmp-"]')).toBeFalsy();
+        expect(document.getElementById('dw-result-primary')).toBeTruthy();
+    });
+});
+
+// 「完整测算」比速算器多出来的往往不是多一个字段，而是多一张**表**：综合所得要按年摊开
+// 12 个月，累计预扣法下每月到手并不是年收入的十二分之一。这块东西不是一个 label 一个值
+// 的 rows 装得下的 —— 没有通用容器，迁移到向导就只能把它删掉（＝迁移即降级）。
+describe('多步向导：结果附加块（extras）', () => {
+    const toolId = 'vat-deep';
+    let original = null;
+
+    const MONTHLY = {
+        head: ['月份', '月工资', '月税额'],
+        rows: [
+            ['1月', { value: 20000, kind: 'currency' }, { value: 600, kind: 'currency' }],
+            ['2月', { value: 20000, kind: 'currency' }, { value: 1140, kind: 'currency' }]
+        ]
+    };
+
+    function mountExtrasTool() {
+        const tool = R().get(toolId);
+        original = tool.compute;
+        tool.compute = () => ({
+            primary: { label: '目标税前月薪', value: 20000, kind: 'currency' },
+            rows: [{ label: '到手月薪', value: 15000, kind: 'currency' }],
+            extras: [
+                { title: '逐月预算表', table: MONTHLY, note: '累计预扣法下，越往后税率档位越高' },
+                { title: '优化建议', list: ['提高公积金缴存比例可压低税基'] }
+            ]
+        });
+    }
+    function toResult() {
+        W().open(toolId, { fresh: true });
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();     // → 结果步
+    }
+    afterEach(() => {
+        if (original) { R().get(toolId).compute = original; original = null; }
+    });
+
+    test('extras 的表与列表都渲染出来（表头、金额走统一格式化）', () => {
+        mountExtrasTool();
+        toResult();
+
+        const card = document.getElementById('dw-result-card');
+        expect(card.textContent).toContain('逐月预算表');
+        expect(card.textContent).toContain('优化建议');
+        expect(card.textContent).toContain('提高公积金缴存比例可压低税基');
+        expect(card.textContent).toContain(TB().fmtValue(600, 'currency'));    // 不是裸数字
+
+        const table = card.querySelector('table');
+        expect(table).toBeTruthy();
+        // 少了表头就等于不知道哪一列是什么 —— 这类表是靠列头认数的
+        expect(table.querySelectorAll('thead th').length).toBe(3);
+        expect(table.querySelectorAll('tbody tr').length).toBe(2);
+        expect(table.querySelector('tbody tr').textContent).toContain('1月');
+    });
+
+    test('导出报告带上附加块（同一份数据），拿去签字的东西不能少一张表', () => {
+        window.exportToPDF = jest.fn();
+        window.exportToWord = jest.fn();
+        mountExtrasTool();
+        toResult();
+        document.getElementById('dw-export-word').click();
+
+        const html = window.exportToWord.mock.calls[0][2].content;
+        expect(html).toContain('逐月预算表');
+        expect(html).toContain('1月');
+        expect(html).toContain(TB().fmtValue(1140, 'currency'));
+        expect(html).toContain('优化建议');
+    });
+
+    test('没有 extras 的 spec 一切照旧（不留空壳）', () => {
+        toResult();     // 真实 spec 没有 extras
+        const card = document.getElementById('dw-result-card');
+        expect(card.textContent).not.toContain('逐月预算表');
+        expect(card.querySelector('table')).toBeFalsy();
         expect(document.getElementById('dw-result-primary')).toBeTruthy();
     });
 });

@@ -43,7 +43,7 @@ beforeAll(() => {
     // 部分 quick 模块（special-deduction / expat / private-pension 等）的节税对照
     // 直接复用内核的 calculateTaxByTaxableIncome，测试里必须先加载
     loadSource('src/js/calculation/tax-calculator.js');
-    loadSource('src/js/calculation/helper-functions.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删除（它是最后一个页面式 deep）。
     loadSource('src/js/calculation/tax-registry.js');
     QUICK_MODULES.forEach((f) => loadSource('src/js/calculation/' + f));
     loadSource('src/js/data/tool-registry.js');
@@ -55,21 +55,26 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（2 个页面式 + 7 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（0 个页面式 + 9 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
-        // 17B-2（v1.48.0）：reverse 迁完，页面式由 3 → 2，且**旧页面已同版删干净**（不像 17B-1 那样留到下一版收尾）。
+        // 17B-2（v1.48.0）：reverse 迁完，页面式由 3 → 2，且**旧页面已同版删干净**（不像 17B-1 那样留到下一版收尾）；
+        // 17B-3（v1.49.0）：forward 迁完，页面式由 2 → 1；
+        // 17B-4（v1.50.0）：classification 迁完 —— 它要等 spec 先有「动态增删所得条目」的 repeater
+        // 能力才能迁，而这一条一直留着就是为了它：**归零已经兑现**。
         const pageBased = deep.filter((t) => !!t.pageId).map((t) => t.id).sort();
         const specDriven = deep.filter((t) => !t.pageId).map((t) => t.id).sort();
-        expect(pageBased).toEqual(['classification', 'forward']);   // 17B 完成后应归零
+        // 页面式 deep 归零 = 17B 全部四个迁移完成：没删干净就会漏在这里（还记得 v1.46.0 那次吗）
+        expect(pageBased).toEqual([]);
         // vat-deep（17C-1）、corporate-income-tax-deep（17C-2）、social-base-deep（17C-3）、
         // surtax-stamp-deep（17C-4）、disability-fund-deep（17C-5）：附加税的计税依据就是实缴增值税，
         // 所以它必须跟在 vat 之后 —— 这是 stage17 里唯一不许反顺序做的一对华系，钉在这里防乱序施工。
-        // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**；business 是 17B 迁回来的第一个。
+        // 到 17C-5 为止，按 tax-registry 的 6 类计**每类都有完整测算**；business 是 17B 迁回来的第一个，
+        // classification 是最后一个（v1.50.0）—— 序号不重要，重要的是它俩都在这份清单里。
         expect(specDriven).toEqual([
-            'business', 'corporate-income-tax-deep', 'disability-fund-deep', 'reverse',
-            'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
+            'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep', 'forward',
+            'reverse', 'social-base-deep', 'surtax-stamp-deep', 'vat-deep'
         ]);
     });
 
@@ -93,14 +98,17 @@ describe('工具注册表：数量与分组', () => {
             expect(t.compute).toBe(twin.compute);
         });
 
-        // ② 从页面迁来的（17B：business；17B-2 起加上 reverse）：它们**没有**同名速算器可复用
-        //    （经营所得速算器是「核定 vs 查账」对比、反向倒算压根没有速算器），所以计算走的是
-        //    从页面里抽出来的共享内核（calculateBusinessTaxCore / calculateReverseTaxCore）。
-        //    「核定 vs 查账」对比，口径不同），所以计算走的是从页面里抽出来的共享内核
+        // ② 从页面迁来的（17B-1：business；17B-2：reverse；17B-3：forward；17B-4：classification）：
+        //    它们**没有**同名速算器可复用（经营所得速算器是「核定 vs 查账」对比、反向倒算压根没有速算器、
+        //    综合所得那一溜专项附加扣除也不是月薪速算器那一套、分类所得按次计税没有对应速算器），
+        //    所以计算走的是从页面里抽出来的共享内核：
+        //    calculateBusinessTaxCore / calculateReverseTaxCore / performTaxCalculation /
+        //    calculateSingleClassificationTax + calculateClassificationTaxTotal。
         //    这里只钉三件套齐全（防止只迁一半），**口径一致**由逐点对拍证明：
-        //    business → tests/business-migration.test.js，reverse → tests/reverse-migration.test.js。
+        //    business → tests/business-migration.test.js，reverse → tests/reverse-migration.test.js，
+        //    forward → tests/forward-migration.test.js，classification → tests/classification-migration.test.js。
         const migrated = specDriven.filter((t) => !t.id.endsWith('-deep'));
-        expect(migrated.map((t) => t.id)).toEqual(['business', 'reverse']);
+        expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'forward', 'reverse']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);
