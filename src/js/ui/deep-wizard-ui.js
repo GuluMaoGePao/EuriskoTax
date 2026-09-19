@@ -452,6 +452,10 @@
                     '<button id="dw-export-word" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">' +
                     '<i class="fa fa-file-word-o mr-2"></i>导出Word报告</button>' +
                 '</div>' +
+                // 方案对比卡的宿主位（v1.51.0）：只有声明了 toCalcInput 的工具才有。
+                // 页面式时代这张卡长在综合所得页面的结果区，删页后宿主与数据源一起没了 ——
+                // 现在由渲染器按 spec 有没有取数钩子决定挂不挂，index.html 不必再为它留一块静态 HTML。
+                (typeof tool.toCalcInput === 'function' ? '<div id="dw-scenario-host" class="mt-6"></div>' : '') +
                 '<div class="mt-6"><button id="dw-prev" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">' +
                 '<i class="fa fa-arrow-left mr-2"></i>返回上一步</button></div>' +
             '</div>';
@@ -606,11 +610,26 @@
         applyDerived(tool);
         host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps);
         bind(tool, steps);
+        mountScenarioCard(tool);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
         // 分步向导每次只渲染当前步，若不回填，用户「上一步 → 下一步」就会被打回默认值 ——
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
         applyValues(state.values);
         renderWarnings(tool);
+    }
+
+    // 方案对比卡（v1.51.0）：spec 声明了 toCalcInput 才挂，取数与 compute 同源。
+    // 不在渲染器里另写一份「向导值 → 计税入参」的映射 —— 那份映射一旦有两份，
+    // 「保存的方案」与「界面上算的数」迟早对不上。
+    function mountScenarioCard(tool) {
+        var host = document.getElementById('dw-scenario-host');
+        if (!host) return;                       // 非结果步，或该工具没有这张卡
+        var ui = window.EuriskoScenarioUI;
+        if (!ui || typeof ui.mount !== 'function' || !window.EuriskoScenarios) return;
+        var ctx = null;
+        try { ctx = tool.toCalcInput(state.values); } catch (e) { ctx = null; }
+        if (!ctx || !ctx.results) return;
+        ui.mount(host, ctx);
     }
 
     // skipEl：正在输入的那个控件不回写 —— 否则用户敲到一半，光标会被自己刚触发的联动重置

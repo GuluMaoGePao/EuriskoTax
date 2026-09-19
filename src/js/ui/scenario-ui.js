@@ -9,10 +9,20 @@
 //
 // 付费边界：免费版最多 2 套本地方案，专业版最多 10 套（后续接云同步）。
 //   计税能力本身不锁定，仅限制方案数量。
+//
+// v1.51.0：这张卡原先长在综合所得页面的结果区，17B-3 删页后**宿主与数据源一起没了** ——
+//   它取数靠 `collectTaxInputData()` / `collectDeductionInput()` 两个按 id 读表单的适配器，
+//   页面一删，读的是不存在的输入框（第一个 `work-months` 就抛 TypeError）。
+//   现在改成宿主注入：谁挂载这张卡，谁通过 `mount(el, ctx)` 把 `{base, deductions, results}`
+//   递进来（综合所得向导由 spec 的 `toCalcInput` 提供，与 compute 同源）。
+//   本文件从此**不读任何页面表单** —— 换了宿主不用改这里，也不再有第二套取数口径。
 (function () {
     'use strict';
 
     const CURRENCY = '¥';
+
+    // 挂载态：root = 卡片容器，ctx = 本次测算的入参与结果
+    const state = { root: null, ctx: null };
 
     // 对比指标：best 表示该项「越小越优(max)」还是「越大越优」，用于差异高亮
     const METRICS = [
@@ -137,11 +147,19 @@
 
     // ======================= DOM 渲染 =======================
 
+    // 卡片内部一律用 class 定位（不占全局 id）：向导会反复重渲染，
+    // 全局 id 一旦撞车，hint 会写到上一张卡上 —— 那种错看界面完全看不出来。
+    function q(sel) {
+        return state.root ? state.root.querySelector(sel) : null;
+    }
+
     function showHint(message, tone) {
-        const el = document.getElementById('scenario-hint');
+        const el = q('.dw-sc-hint');
         if (!el) return;
         el.textContent = message || '';
-        el.className = 'text-xs mb-3 ' + (tone === 'ok'
+        // 整体重写 className 时必须带上 dw-sc-hint —— 它是 q() 唯一的抓手，
+        // 覆盖掉了就再也找不到这行提示（第二次提示会静默失效）。
+        el.className = 'dw-sc-hint text-xs mb-3 ' + (tone === 'ok'
             ? 'text-green-600'
             : tone === 'warn' ? 'text-orange-500' : 'text-gray-500');
     }
@@ -153,10 +171,10 @@
     }
 
     function render() {
-        const head = document.getElementById('scenario-compare-head');
-        const body = document.getElementById('scenario-compare-body');
-        const wrap = document.getElementById('scenario-table-wrap');
-        const empty = document.getElementById('scenario-empty');
+        const head = q('.dw-sc-head');
+        const body = q('.dw-sc-body');
+        const wrap = q('.dw-sc-wrap');
+        const empty = q('.dw-sc-empty');
         if (!head || !body || !wrap) return;
 
         const list = (typeof window.EuriskoScenarios !== 'undefined') ? window.EuriskoScenarios.list() : [];
@@ -218,16 +236,19 @@
 
     // ======================= 行为 =======================
 
-    function collectInputSafely() {
-        try {
-            return collectTaxInputData();
-        } catch (e) {
-            return null;
-        }
+    // 存盘只留「人填的那部分」：deductions 每次都能由入参重算出来，
+    // 带进 localStorage 只会多一份必然过期的副本。
+    function inputSnapshot(base) {
+        const snap = Object.assign({}, base || {});
+        delete snap.deductions;
+        return snap;
     }
 
-    function saveCurrent() {
-        const results = (typeof calculationResults !== 'undefined') ? calculationResults : null;
+    // 取不到上下文时**明确拒绝**：页面式时代取数异常被 try/catch 吞掉，
+    // 表现为「提示保存成功、方案却是空的」—— 那比不给按钮更难发现。
+    function saveCurrent(ctx) {
+        ctx = ctx || state.ctx;
+        const results = ctx && ctx.results;
         if (!results || !results.incomeDetails || !results.workMonths) {
             showHint('请先完成一次综合所得计算，再保存为方案。', 'warn');
             return { ok: false, reason: 'no-result' };
@@ -237,15 +258,18 @@
         const list = window.EuriskoScenarios.list();
         const res = window.EuriskoScenarios.save({
             name: '方案 ' + (list.length + 1),
-            input: collectInputSafely(),
+            input: inputSnapshot(ctx.base),
             summary: window.EuriskoScenarios.pure.buildSummary(results)
         }, { isPro: isPro });
 
+        // 先 render 再提示：render() 末尾会写一句「基础版最多保存 N 套」，
+        // 顺序反了的话，用户点完「保存」看到的是那句常驻文案，而不是「已保存（1/2）」。
         if (res.ok) {
+            render();
             showHint('已保存「' + res.scenario.name + '」（' + res.count + '/'
                 + window.EuriskoScenarios.limitFor(isPro) + '）', 'ok');
-            render();
         } else if (res.reason === 'limit') {
+            render();
             showHint(proHint(), 'warn');
         } else {
             showHint('保存失败：本地存储不可用（可能是隐私模式或空间已满）。', 'warn');
@@ -253,22 +277,14 @@
         return res;
     }
 
-    function generateBonus() {
-        const base = collectInputSafely();
-        if (!base) {
-            showHint('无法读取表单数据，请先完成一次计算。', 'warn');
-            return { ok: false };
+    function generateBonus(ctx) {
+        ctx = ctx || state.ctx;
+        if (!ctx || !ctx.base || !ctx.deductions) {
+            showHint('请先完成一次综合所得计算，再生成年终奖方案。', 'warn');
+            return { ok: false, reason: 'no-result' };
         }
 
-        let deductions;
-        try {
-            deductions = computeDeductions(collectDeductionInput(), base.workMonths);
-        } catch (e) {
-            showHint('无法读取扣除项，请先完成一次计算。', 'warn');
-            return { ok: false };
-        }
-
-        const built = buildBonusScenarios(base, deductions);
+        const built = buildBonusScenarios(ctx.base, ctx.deductions);
         if (!built.ok) {
             showHint(built.message, 'warn');
             return built;
@@ -303,33 +319,54 @@
         return { ok: true, saved: saved, blocked: blocked, note: built.note };
     }
 
-    function bind() {
-        const saveBtn = document.getElementById('scenario-save-btn');
-        if (saveBtn) saveBtn.addEventListener('click', saveCurrent);
-
-        const genBtn = document.getElementById('scenario-generate-btn');
-        if (genBtn) genBtn.addEventListener('click', generateBonus);
+    function cardHtml() {
+        return '<div class="card">' +
+            '<div class="mb-3">' +
+                '<h3 class="text-sm font-bold text-gray-800">方案对比</h3>' +
+                '<p class="text-xs text-gray-500 mt-0.5">把几套口径摆在一起比 —— 基础版 2 套、专业版 10 套</p>' +
+            '</div>' +
+            '<div class="flex flex-wrap gap-2 mb-3">' +
+                '<button type="button" class="dw-sc-save-btn btn btn-secondary text-sm flex-1">' +
+                    '<i class="fa fa-save mr-1"></i>保存当前方案</button>' +
+                '<button type="button" class="dw-sc-generate-btn btn btn-primary text-sm flex-1">' +
+                    '<i class="fa fa-magic mr-1"></i>生成年终奖方案</button>' +
+            '</div>' +
+            '<p class="dw-sc-hint text-xs mb-3 text-gray-500"></p>' +
+            '<div class="dw-sc-empty text-sm text-gray-500 py-4 text-center">' +
+                '暂无保存的方案。完成一次测算后，点「保存当前方案」，或用「生成年终奖方案」一键对比「并入 / 单独计税 / 最优拆分」。' +
+            '</div>' +
+            '<div class="dw-sc-wrap overflow-x-auto hidden">' +
+                '<table class="tax-budget-table"><thead class="dw-sc-head"></thead><tbody class="dw-sc-body"></tbody></table>' +
+            '</div>' +
+        '</div>';
     }
 
-    function init() {
-        if (typeof window.EuriskoScenarios === 'undefined') return;
+    function bind() {
+        const saveBtn = q('.dw-sc-save-btn');
+        if (saveBtn) saveBtn.addEventListener('click', function () { saveCurrent(); });
+
+        const genBtn = q('.dw-sc-generate-btn');
+        if (genBtn) genBtn.addEventListener('click', function () { generateBonus(); });
+    }
+
+    // 宿主（综合所得向导）把这一轮的入参与结果递进来；卡片自己不取数。
+    // 重复挂载（向导回退再进结果步）直接覆盖：旧 root 已经不在 DOM 里了。
+    function mount(container, ctx) {
+        if (!container || typeof window.EuriskoScenarios === 'undefined') return null;
+        state.root = container;
+        state.ctx = ctx || null;
+        container.innerHTML = cardHtml();
         bind();
         render();
-    }
-
-    if (typeof document !== 'undefined') {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
+        return container;
     }
 
     window.EuriskoScenarioUI = {
         METRICS: METRICS,
+        cardHtml: cardHtml,
+        mount: mount,
         render: render,
         bind: bind,
-        init: init,
         saveCurrent: saveCurrent,
         generateBonus: generateBonus,
         getIsPro: getIsPro,

@@ -108,6 +108,63 @@
         return out;
     }
 
+    // 「向导值 → 计税入参」：forward 的 compute 与 toCalcInput 共用这一份。
+    //
+    // 为什么非抽出来不可（v1.51.0）：页面式时代这段映射长在 DOM 里 ——
+    // `collectTaxInputData()` / `collectDeductionInput()` 两个适配器按 id 读那张表单。
+    // 17B-3 删掉综合所得页面后，读的是**不存在的输入框**：前者在 `work-months` 那一行就抛
+    // TypeError，而「方案对比」卡正是靠它取数，于是整张卡随着页面一起失去数据源。
+    // 抽成一个函数后，取数只有这一处；谁要算综合所得都找它，不存在第二套口径。
+    function forwardCalc(v) {
+        if (typeof performTaxCalculation !== 'function' || typeof computeDeductions !== 'function') return null;
+
+        var months = Number(v.workMonths) || 12;
+        var special = v.specialDeductionCheckbox !== false;
+        var additional = v.specialAdditionalDeductionCheckbox !== false;
+        var other = !!v.otherDeductionCheckbox;
+        var num = function (x) { return Number(x) || 0; };
+        var pick = function (k, on) { return on ? num(v[k]) : 0; };
+
+        // 三个总开关的语义在这里兑现：页上是「展开 / 收起」，这里是**显式置 0**
+        // —— 否则用户取消勾选后扣除照样算进去，界面上一点都看不出来。
+        var dedInput = {
+            monthlyBasicDeduction: 5000,
+            monthlyPensionInsurance: pick('pensionInsurance', special),
+            monthlyMedicalInsurance: pick('medicalInsurance', special),
+            monthlyUnemploymentInsurance: pick('unemploymentInsurance', special),
+            monthlyHousingFund: pick('housingFund', special),
+            monthlyElderlyDeduction: pick('elderlyDeduction', additional),
+            monthlyChildrenInfantDeduction: pick('childrenInfantDeduction', additional),
+            monthlyHousingDeduction: additional
+                ? (v.housingType === 'rent' ? num(v.rentDeduction)
+                    : (v.housingType === 'loan' ? num(v.housingLoanDeduction) : 0))
+                : 0,
+            annualEducationDeduction: pick('educationDeduction', additional),
+            annualMedicalDeduction: pick('medicalDeduction', additional),
+            annualProfessionalDeduction: (additional && v.educationProfessionalCheckbox) ? 3600 : 0,
+            monthlyPensionDeduction: pick('pensionDeduction', other && v.pensionDeductionCheckbox),
+            monthlyEnterpriseAnnuity: pick('enterpriseAnnuity', other && v.enterpriseAnnuityCheckbox),
+            monthlyInsuranceOtherDeduction: pick('insuranceOtherDeduction', other && v.insuranceOtherDeductionCheckbox),
+            monthlyTaxDeferredPension: pick('taxDeferredPension', other && v.taxDeferredPensionCheckbox),
+            annualCharitableDonation: pick('charitableDonation', other && v.charitableDonationCheckbox)
+        };
+
+        var base = {
+            workMonths: months,
+            monthlySalaryIncome: num(v.monthlySalaryIncome),
+            annualLaborIncome: num(v.annualLaborIncome),
+            annualAuthorIncome: num(v.annualAuthorIncome),
+            annualRoyaltyIncome: num(v.annualRoyaltyIncome),
+            bonusIncome: num(v.bonusIncome),
+            bonusInclude: !!v.bonusInclude,
+            // 填了才算「手动指定」，0 / 留空走自动推演 —— 与页面版 collectTaxInputData 同口径
+            userInputPrepaidTax: num(v.prepaidTax) > 0 ? num(v.prepaidTax) : undefined,
+            deductions: computeDeductions(dedInput, months)
+        };
+
+        return { base: base, deductions: base.deductions, months: months, results: performTaxCalculation(base) };
+    }
+
     function socialBaseWarnings(v) {
         // 低于最低标准的基数要在**填的时候**就说出来，别等到结果 Reconciliation。
         // 下限读 tax-constants.js 的全局变量（管理台可热改）—— 这里不复制第二份常量。
@@ -254,55 +311,18 @@
                 '劳务 / 稿酬 / 特许权使用费是**按次预扣**（20%~40%），年度汇算才并入综合所得按超额累进重算',
                 '月度预算表按累计预扣法算：同样的年收入，一次性发放与逐月发放，每月到手并不一样'
             ],
+            // 方案对比的取数钩子（v1.51.0）：与 compute **同一个** forwardCalc，不是第二份映射。
+            // 渲染器见到它才在结果区挂「方案对比」卡 —— 没声明的工具就没有这张卡。
+            toCalcInput: function (v) {
+                var c = forwardCalc(v);
+                return c ? { base: c.base, deductions: c.deductions, results: c.results, months: c.months } : null;
+            },
             compute: function (v) {
-                if (typeof performTaxCalculation !== 'function' || typeof computeDeductions !== 'function') return null;
+                var c = forwardCalc(v);
+                if (!c || !c.results || !c.results.taxDetails) return null;
 
-                var months = Number(v.workMonths) || 12;
-                var special = v.specialDeductionCheckbox !== false;
-                var additional = v.specialAdditionalDeductionCheckbox !== false;
-                var other = !!v.otherDeductionCheckbox;
-                var num = function (x) { return Number(x) || 0; };
-                var pick = function (k, on) { return on ? num(v[k]) : 0; };
-
-                // 三个总开关的语义在这里兑现：页上是「展开 / 收起」，这里是**显式置 0**
-                // —— 否则用户取消勾选后扣除照样算进去，界面上一点都看不出来。
-                var dedInput = {
-                    monthlyBasicDeduction: 5000,
-                    monthlyPensionInsurance: pick('pensionInsurance', special),
-                    monthlyMedicalInsurance: pick('medicalInsurance', special),
-                    monthlyUnemploymentInsurance: pick('unemploymentInsurance', special),
-                    monthlyHousingFund: pick('housingFund', special),
-                    monthlyElderlyDeduction: pick('elderlyDeduction', additional),
-                    monthlyChildrenInfantDeduction: pick('childrenInfantDeduction', additional),
-                    monthlyHousingDeduction: additional
-                        ? (v.housingType === 'rent' ? num(v.rentDeduction)
-                            : (v.housingType === 'loan' ? num(v.housingLoanDeduction) : 0))
-                        : 0,
-                    annualEducationDeduction: pick('educationDeduction', additional),
-                    annualMedicalDeduction: pick('medicalDeduction', additional),
-                    annualProfessionalDeduction: (additional && v.educationProfessionalCheckbox) ? 3600 : 0,
-                    monthlyPensionDeduction: pick('pensionDeduction', other && v.pensionDeductionCheckbox),
-                    monthlyEnterpriseAnnuity: pick('enterpriseAnnuity', other && v.enterpriseAnnuityCheckbox),
-                    monthlyInsuranceOtherDeduction: pick('insuranceOtherDeduction', other && v.insuranceOtherDeductionCheckbox),
-                    monthlyTaxDeferredPension: pick('taxDeferredPension', other && v.taxDeferredPensionCheckbox),
-                    annualCharitableDonation: pick('charitableDonation', other && v.charitableDonationCheckbox)
-                };
-
-                var baseInput = {
-                    workMonths: months,
-                    monthlySalaryIncome: num(v.monthlySalaryIncome),
-                    annualLaborIncome: num(v.annualLaborIncome),
-                    annualAuthorIncome: num(v.annualAuthorIncome),
-                    annualRoyaltyIncome: num(v.annualRoyaltyIncome),
-                    bonusIncome: num(v.bonusIncome),
-                    bonusInclude: !!v.bonusInclude,
-                    // 填了才算「手动指定」，0 / 留空走自动推演 —— 与页面版 collectTaxInputData 同口径
-                    userInputPrepaidTax: num(v.prepaidTax) > 0 ? num(v.prepaidTax) : undefined,
-                    deductions: computeDeductions(dedInput, months)
-                };
-
-                var core = performTaxCalculation(baseInput);
-                if (!core || !core.taxDetails) return null;
+                var baseInput = c.base;
+                var core = c.results;
 
                 var inc = core.incomeDetails;
                 var ded = core.deductionDetails;

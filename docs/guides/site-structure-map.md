@@ -97,6 +97,8 @@ EuriskoTax
 - `X-deep` 自动复用 `X` 的 `fields` / `compute`（**同一对象引用**，`tool-registry.js:1219-1237`）；
   由 `tests/tool-registry.test.js` 断言守护 —— 这是「同一个税种不会算出两个数」的机器保证
 - `tax-registry.js`：27 条政策依据 —— 这是**政策库**，与 20 个工具**不是同一份东西**，画图时勿混
+- 「方案对比」卡（v1.51.0）：原先长在综合所得页面的结果区，删页后**宿主与数据源一起没了**；现由 spec 的
+  `toCalcInput` 钩子挂载到向导结果区（仅 forward 声明，其余 8 个 deep 没有），取数与 `compute` 同源
 - 注意：`index.html:5413` 的注释写「15 个落地页」是**过期的**，实际 **20 个**
 
 ---
