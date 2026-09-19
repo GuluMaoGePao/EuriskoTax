@@ -54,70 +54,71 @@ describe('多步向导：接管范围', () => {
     });
 });
 
-// 通用样例取**与速算器共享 spec** 的那一个（vat-deep 在 17C-1 纵深后改为自带 spec，
-// 它的步数与字段随深度涨，不适合再当「形状固定」的样例）。
+// 通用样例取**与速算器共享 spec** 的那一个。vat-deep（17C-1 v1.58.0）、
+// corporate-income-tax-deep（17C-2 v1.59.0）、social-base-deep（17C-3 v1.60.0）、
+// disability-fund-deep（17C-5 v1.61.0）都陆续做深改成自带 spec 了 —— 它们的步数与字段
+// 随深度涨，不适合再当「形状固定」的样例；现在只剩附加税印花税还是共享的。
 describe('多步向导：spec 形状', () => {
     test('结果步由渲染器自动追加，不在每个 spec 里重复声明', () => {
-        const steps = W().stepsOf(R().get('disability-fund-deep'));
-        expect(steps).toHaveLength(3);                       // 人数与工资总额 + 分档减缴与封顶 + 结果
+        const steps = W().stepsOf(R().get('surtax-stamp-deep'));
+        expect(steps).toHaveLength(3);                       // 税种选择 + 计税依据 + 结果
         expect(steps[steps.length - 1].title).toBe('计算结果');
         expect(steps[steps.length - 1].result).toBe(true);
     });
 
     test('字段按 step 归组，规模步只问规模', () => {
-        const t = R().get('disability-fund-deep');
-        expect(W().fieldsOfStep(t, 'scale').map((f) => f.key))
-            .toEqual(['variant', 'headcount', 'avgAnnualWage', 'wageTotal']);
-        expect(W().fieldsOfStep(t, 'exempt').length).toBe(3);
+        const t = R().get('surtax-stamp-deep');
+        expect(W().fieldsOfStep(t, 'identity').map((f) => f.key)).toEqual(['variant']);
+        expect(W().fieldsOfStep(t, 'basis').length).toBe(7);
     });
 });
 
 describe('多步向导：渲染与走查', () => {
     test('打开向导：步骤条与第一步渲染出来，并切到向导页', () => {
-        expect(W().open('disability-fund-deep', { fresh: true })).toBe(true);
+        expect(W().open('surtax-stamp-deep', { fresh: true })).toBe(true);
         const host = document.getElementById('deep-wizard-page');
         expect(host.querySelectorAll('.step-number')).toHaveLength(3);
-        expect(host.querySelector('.step-title.active').textContent).toBe('人数与工资总额');
+        expect(host.querySelector('.step-title.active').textContent).toBe('税种选择');
         expect(host.querySelector('#qf-variant')).toBeTruthy();
         expect(window.showPage).toHaveBeenCalledWith('deep-wizard-page');
     });
 
-    test('条件字段跟随计税口径切换（残保金 → 工会经费）', () => {
-        W().open('disability-fund-deep', { fresh: true });
-        document.getElementById('qf-variant').value = 'union';
+    test('条件字段跟随计税口径切换（附加税 → 印花税）', () => {
+        W().open('surtax-stamp-deep', { fresh: true });
+        document.getElementById('qf-variant').value = 'stamp';
         document.getElementById('qf-variant').dispatchEvent(new Event('change'));
-        expect(document.getElementById('qf-wageTotal')).toBeTruthy();   // 工会经费：工资总额
-        expect(document.getElementById('qf-headcount')).toBeFalsy();     // 残保金：在职人数
+        document.getElementById('dw-next').click();
+        expect(document.getElementById('qf-amount')).toBeTruthy();     // 印花税：凭证金额
+        expect(document.getElementById('qf-vat')).toBeFalsy();         // 附加税：实缴增值税
     });
 
     test('分步填值不丢：上一步再回来，已填的值仍在', () => {
-        W().open('disability-fund-deep', { fresh: true });
+        W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-socialAverageMonthly').value = '9000';
+        document.getElementById('qf-vat').value = '50000';
         document.getElementById('dw-prev').click();     // 回第 1 步
         document.getElementById('dw-next').click();     // 再进第 2 步
-        expect(document.getElementById('qf-socialAverageMonthly').value).toBe('9000');
+        expect(document.getElementById('qf-vat').value).toBe('50000');
     });
 
     test('结果步算出的税与同源速算器一致（不许两套口径）', () => {
-        W().open('disability-fund-deep', { fresh: true });
+        W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-socialAverageMonthly').value = '9000';
+        document.getElementById('qf-vat').value = '50000';
         document.getElementById('dw-next').click();     // 进结果步
         const shown = document.getElementById('deep-wizard-page').textContent;
-        const direct = R().get('disability-fund').compute({
-            variant: 'levy', headcount: 50, disabled: 0,      // 在职人数用默认值（向导里没改）
-            socialAverageMonthly: 9000, avgAnnualWage: 120000
+        const direct = R().get('surtax-stamp').compute({
+            variant: 'surtax', location: 'urban', vat: 50000, consumption: 0, halve: true
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });
 
     test('断点续算：中途退出再进来，停在同一步且值还在', () => {
-        W().open('disability-fund-deep', { fresh: true });
+        W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();     // 走到结果步并落草稿
         // 重新打开（非 fresh）应回到结果步
-        W().open('disability-fund-deep');
+        W().open('surtax-stamp-deep');
         const host = document.getElementById('deep-wizard-page');
         expect(host.querySelector('.step-title.active').textContent).toBe('计算结果');
     });
@@ -329,30 +330,55 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
     });
 });
 
-// 最后一个税种类别（残保金与工会经费，17C-5）：它的两步是「人数/工资总额 → 分档减缴」，
-// 字段比前面几个都少，但每一步都有 `when` 条件（按 variant 切换 levy / union 两套字段）——
-// 它能跑通说明向导对「选择器 + 条件字段」的组合是稳的，这一轮 6 类才算真的齐了。
+// 最后一个税种类别（残保金与工会经费，17C-5）。v1.61.0 纵深后改为**自带 spec**，
+// 两步变三步：先定算哪一项与社平工资，再收「上年月平均在职人数」或「全年工资总额」
+// （按 variant 切换整组字段），最后才是分档减缴与招人定价 / 拨缴与扣除 ——
+// 每一步都有 `when` 条件，它能跑通说明向导对「选择器 + 条件字段」的组合是稳的。
 describe('多步向导：最后一个税种类别（残保金与工会经费）', () => {
-    test('第一步只问规模，分档减缴留给第二步', () => {
+    test('第一步只定算哪一项与社平工资，人数留在第二步', () => {
         W().open('disability-fund-deep', { fresh: true });
-        expect(document.querySelector('.step-title.active').textContent).toBe('人数与工资总额');
-        expect(document.getElementById('qf-headcount')).toBeTruthy();
+        expect(document.querySelector('.step-title.active').textContent).toBe('算哪一项与社平工资');
+        expect(document.getElementById('qf-variant')).toBeTruthy();
+        expect(document.getElementById('qf-socialAverage')).toBeTruthy();
+        expect(document.getElementById('qf-regularCount')).toBeFalsy();
         expect(document.getElementById('qf-disabled')).toBeFalsy();
     });
 
-    test('改了人数再回来，规模步填的值仍在（分步填值不丢）', () => {
+    test('第二步按 variant 换整组字段：残保金收人数拆解、工会经费收工资总额', () => {
         W().open('disability-fund-deep', { fresh: true });
-        document.getElementById('qf-headcount').value = '80';
-        document.getElementById('dw-next').click();     // → 分档减缴与封顶
+        document.getElementById('dw-next').click();     // → 上年月平均在职人数 / 全年工资总额
+        expect(document.getElementById('qf-regularCount')).toBeTruthy();
+        expect(document.getElementById('qf-seasonalCount')).toBeTruthy();
+        expect(document.getElementById('qf-dispatchCount')).toBeTruthy();
+        expect(document.getElementById('qf-monthlyWage')).toBeFalsy();
+
         document.getElementById('dw-prev').click();     // 回第 1 步
-        expect(document.getElementById('qf-headcount').value).toBe('80');
+        document.getElementById('qf-variant').value = 'union';
+        document.getElementById('qf-variant').dispatchEvent(new Event('change'));
+        document.getElementById('dw-next').click();
+        expect(document.getElementById('qf-monthlyWage')).toBeTruthy();
+        expect(document.getElementById('qf-annualBonus')).toBeTruthy();
+        expect(document.getElementById('qf-regularCount')).toBeFalsy();
     });
 
-    test('结果步与同源速算器一致', () => {
+    test('改了人数再回来，人数步填的值仍在（分步填值不丢）', () => {
         W().open('disability-fund-deep', { fresh: true });
-        document.getElementById('qf-headcount').value = '80';
+        document.getElementById('dw-next').click();     // → 上年月平均在职人数
+        document.getElementById('qf-regularCount').value = '80';
+        document.getElementById('dw-next').click();     // → 分档减缴
+        document.getElementById('dw-prev').click();     // 回第 2 步
+        expect(document.getElementById('qf-regularCount').value).toBe('80');
+    });
+
+    test('结果步与同源速算器一致（没有季节性用工与派遣时，月平均 = 常年人数）', () => {
+        W().open('disability-fund-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('dw-next').click();     // → 结果
+        document.getElementById('qf-regularCount').value = '80';
+        document.getElementById('qf-seasonalCount').value = '0';
+        document.getElementById('qf-dispatchCount').value = '0';
+        for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
+            document.getElementById('dw-next').click();
+        }
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('disability-fund').compute({
             variant: 'levy', headcount: 80, disabled: 0,
@@ -373,10 +399,11 @@ describe('多步向导：最后一个税种类别（残保金与工会经费）'
 // 为什么临时换掉一个已有 spec 的 compute：DEEP 数组由 registry 私有持有，deep() 返回的是副本，
 // 没法塞一条新 spec 进去；借一个已经是 spec 驱动的壳最省事 —— 但用完必须还，
 // 否则后面凡是用到它的用例都会读到假结果（而且假得很难查）。
-// 壳取 disability-fund-deep：它自己**没有** compare，正好用来验证「没有 compare 时一切照旧」。
+// 壳取 surtax-stamp-deep：它自己**没有** compare，正好用来验证「没有 compare 时一切照旧」。
+// （17C-5 后 disability-fund-deep 改为自带 spec 且带 extras，不再适合当「空壳」。）
 describe('多步向导：多方案对比（compare）', () => {
     const money = v => TB().fmtValue(v, 'currency');
-    const toolId = 'disability-fund-deep';
+    const toolId = 'surtax-stamp-deep';
 
     // 三份口径的主结果与明细都不同，才能逼出「切换后整块结果都要跟着换」
     function fakeCompute() {
@@ -494,8 +521,9 @@ describe('多步向导：多方案对比（compare）', () => {
 // 12 个月，累计预扣法下每月到手并不是年收入的十二分之一。这块东西不是一个 label 一个值
 // 的 rows 装得下的 —— 没有通用容器，迁移到向导就只能把它删掉（＝迁移即降级）。
 describe('多步向导：结果附加块（extras）', () => {
-    // 壳取 disability-fund-deep：它自己**没有** extras，正好用来验证「没有 extras 时一切照旧」
-    const toolId = 'disability-fund-deep';
+    // 壳取 surtax-stamp-deep：它自己**没有** extras，正好用来验证「没有 extras 时一切照旧」
+    // （17C-5 后 disability-fund-deep 改为自带 spec 且带 extras，不再适合当「空壳」。）
+    const toolId = 'surtax-stamp-deep';
     let original = null;
 
     const MONTHLY = {

@@ -131,6 +131,35 @@
         });
     }
 
+    // 阶段17 17C-5 纵深（v1.61.0）：残保金与工会经费的文案同样一律从常量读，不复制一份。
+    // 与上面同构，也必须放在文件最前面（DEEP_SPECS 在 TOOLS 之前求值）。
+    function dfRules() {
+        return (typeof disabilityFundRules !== 'undefined' && disabilityFundRules) || {};
+    }
+
+    function ufRules() {
+        return (typeof unionFeeRules !== 'undefined' && unionFeeRules) || {};
+    }
+
+    function feeNote(which) {
+        var d = dfRules();
+        var u = ufRules();
+        if (which === 'headcount') return d.headcountNote || '';
+        if (which === 'wageCap') return d.wageCapNote || '';
+        if (which === 'small') return (d.smallExempt || {}).note || '';
+        if (which === 'ratio') return d.ratioNote || '';
+        if (which === 'expiry') return d.tiersExpiryNote || '';
+        if (which === 'unionWageBase') return u.wageBaseNote || '';
+        if (which === 'unionNoUnion') return u.noUnionNote || '';
+        if (which === 'unionDeduction') return u.deductionNote || '';
+        return '';
+    }
+
+    // 工会经费「月薪阶梯」对照表用的几档工资（高薪看封顶、低薪看保底，两头都要有）
+    function unionWageLadder() {
+        return [3000, 4800, 8000, 24000, 30000, 50000];
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -3446,9 +3475,452 @@
         // 它的「完整」在决策侧：不只给应缴额，还量化「再招 1 人省多少」与「超过 30 人后会跳出多少」。
         // 至此按 tax-registry 的 6 类计，**每类都有完整测算**（页面式 4 个 + spec 驱动 5 个）。
         {
-            id: 'disability-fund-deep', name: '残保金与工会经费', subtitle: '人数 / 工资总额 → 分档减缴 → 申报口径',
+            // 阶段17 17C-5（v1.48.0 铺齐 → **v1.61.0 做深**）。
+            //
+            // 17C-5 v1.48.0 交付的是「铺齐」：本条目当时只有元数据，字段与计算**共享速算器**。
+            // 速算器已经算到了「30 人临界点 + 分档减缴 + 边际节省」—— 但它的字段就叫
+            // 「**在职职工人数**」，HR 手上那个数通常是**常年正式在册**的 25 人，
+            // 而法定要的是「**上年各月在职人数之和 ÷ 12**」（季节性用工折算、劳务派遣择一计入）。
+            // 实测：常年 25 人看着「30 人以下免征」，法定月平均 **45 人** → 一年差 **7.29 万**。
+            //
+            // 四处具体的口径差：
+            //
+            //   ① **在职职工人数是上年月平均，不是年末在册**（财税〔2015〕72 号）：
+            //      季节性用工**折算年平均人数**，劳务派遣由派遣单位与用工单位**协商计入一方**
+            //      （不得重复计算）。这与 17C-2 的「从业人数看全年季度平均值」是同一类错，
+            //      但**公式不同**：cit 是（季初 + 季末）÷ 2 再 ÷ 4，残保金是各月之和 ÷ 12。
+            //      实测：常年 25 + 季节性 24 人×4 月（折算 8）+ 派遣 12 人 = **45 人**
+            //      → 0.675 缺口 × 12 万 × 90% = **7.29 万/年**，而按 25 人是 **0**。
+            //
+            //   ② **「招几个才免征」取决于人数，不是一个固定比例**（100 人是第二个临界点）：
+            //      1 名残疾人达到 1.5% 需要公司在职 ≤ **66 人**（1 ÷ 1.5% = 66.67）；
+            //      达到 1%（减半档）需要 ≤ **100 人**。所以 67~100 人招 1 个人**只能减半**，
+            //      101 人以上招 1 个人连 1% 都够不着 —— 速算器只给「还差几人免征」，
+            //      不给「招 1 个人够不够」这个**人数分界**。
+            //
+            //   ③ **招残疾人 vs 缴残保金的成本对照**（速算器完全没有，是「要不要招一个人」的定价）：
+            //      两种情形必须分开答，否则一定被当成算错 ——
+            //        A **岗位本来就要招人**：招残疾人 vs 招非残疾人用工成本一样，**净省 = 残保金减少额**；
+            //        B **专为省残保金增设岗位**：净成本 = 年薪 ×（1 + 单位社保公积金费率）− 残保金减少额。
+            //      实测：100 人公司招第 1 人省 **13.2 万**，而雇一个人的用工成本是 **16.74 万**
+            //      → 专门招一个人**不划算**（除非岗位年薪压到 **9.46 万**以下）。
+            //
+            //   ④ **工会经费的基数是工资总额，与社保缴费基数两个方向都不同**：
+            //      社保有 60% 保底与 300% 封顶，工资总额**两头都不夹** ——
+            //      月薪 3 万：社保按 2.4 万封顶、工会经费按 3 万；月薪 3000：社保按 4800 保底、
+            //      工会经费按 3000。拿社保基数估工会经费**两头都会估错**。
+            //      另：**计提 ≠ 扣除**，企税扣除要凭《工会经费收入专用收据》；未建会按 2% 收筹备金且**全额上缴**。
+            //
+            //   ⑤ 现行分档减缴与 30 人免征**均执行至 2027-12-31**，到期恢复按 100% 征收 ——
+            //      做三年预算时不能只按 90% / 50% 估。
+            //
+            // 口径仍同源：人数折算、招人对照、工资总额口径一律走 `EuriskoDisabilityFundQuick`
+            // （新增 headcountOf / exemptPlanOf / hireCompareOf / unionBaseOf 四个可复用函数），
+            // 单位社保公积金费率读 `socialInsuranceRules`（与 17C-3 同一个源）。
+            id: 'disability-fund-deep', name: '残保金与工会经费',
+            subtitle: '上年月平均定人数、招人成本定价、工资总额两头都不夹',
             icon: 'fa-wheelchair', status: 'deep',
-            nextTools: ['employer-cost', 'social-base', 'corporate-income-tax']
+            nextTools: ['disability-fund', 'employer-cost', 'social-base', 'corporate-income-tax'],
+            policyKey: 'disability-fund',
+            fields: [
+                { key: 'variant', step: 'target', label: '算哪一项', type: 'select', default: 'levy',
+                    options: [{ value: 'levy', label: '残疾人就业保障金' }, { value: 'union', label: '工会经费' }] },
+                { key: 'socialAverage', step: 'target', label: '当地社平工资（月）', type: 'money', default: 8000,
+                    hint: '残保金：年平均工资按社平 **2 倍**封顶（不是社保那个 300%）；工会经费：用于对照社保缴费基数' },
+
+                // 残保金：上年月平均在职职工人数（不是年末在册）
+                { key: 'regularCount', step: 'base', label: '常年用工人数（全年在岗）', type: 'number', default: 25, min: 0,
+                    when: { key: 'variant', in: ['levy'] },
+                    hint: '速算器只给一个「在职职工人数」，通常就被填成这个数 —— 但法定还要加季节性折算与派遣' },
+                { key: 'seasonalCount', step: 'base', label: '季节性用工人数', type: 'number', default: 24, min: 0,
+                    when: { key: 'variant', in: ['levy'] } },
+                { key: 'seasonalMonths', step: 'base', label: '季节性用工月数', type: 'number', default: 4, min: 0,
+                    when: { key: 'variant', in: ['levy'] },
+                    hint: feeNote('headcount') },
+                { key: 'dispatchCount', step: 'base', label: '劳务派遣用工人数', type: 'number', default: 12, min: 0,
+                    when: { key: 'variant', in: ['levy'] } },
+                { key: 'dispatchHere', step: 'base', label: '派遣用工由本单位计入', type: 'switch', default: true,
+                    when: { key: 'variant', in: ['levy'] },
+                    hint: '由派遣单位与用工单位**协商计入一方**，不得重复计算 —— 这一项能把人数整段降下来' },
+
+                // 工会经费：全年工资总额（国家统计局口径，无保底无封顶）
+                { key: 'monthlyWage', step: 'base', label: '月固定工资', type: 'money', default: 30000,
+                    when: { key: 'variant', in: ['union'] } },
+                { key: 'monthlyAllowance', step: 'base', label: '月津贴补贴', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['union'] } },
+                { key: 'annualBonus', step: 'base', label: '全年奖金', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['union'] },
+                    hint: feeNote('unionWageBase') },
+                { key: 'paidMonths', step: 'base', label: '计薪月数', type: 'select', default: 12,
+                    when: { key: 'variant', in: ['union'] },
+                    options: [12, 11, 10, 9, 8, 7, 6].map(function (m) { return { value: m, label: m + ' 个月' }; }) },
+
+                { key: 'avgAnnualWage', step: 'detail', label: '上年在职职工年平均工资', type: 'money', default: 120000,
+                    when: { key: 'variant', in: ['levy'] },
+                    hint: feeNote('wageCap') + '；口径按国家统计局《工资总额组成的规定》：**含奖金、津贴、加班**' },
+                { key: 'disabled', step: 'detail', label: '已安排残疾人数', type: 'number', default: 0, min: 0,
+                    when: { key: 'variant', in: ['levy'] } },
+                { key: 'hireAnnualWage', step: 'detail', label: '拟招岗位年薪', type: 'money', default: 120000,
+                    when: { key: 'variant', in: ['levy'] },
+                    hint: '用于「招残疾人 vs 缴残保金」的成本对照；填 0 表示按公司年平均工资' },
+                { key: 'hasUnion', step: 'detail', label: '已建立工会组织', type: 'switch', default: true,
+                    when: { key: 'variant', in: ['union'] }, hint: feeNote('unionNoUnion') },
+                { key: 'actual', step: 'detail', label: '实际拨缴金额', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['union'] },
+                    hint: feeNote('unionDeduction') + '；填 0 表示按法定 2% 拨缴' }
+            ],
+            steps: [
+                { key: 'target', title: '算哪一项与社平工资', why: '残保金看**上年在职职工人数**、工会经费看**全年工资总额** —— 两个基数不是一个口径，先定算哪一项' },
+                { key: 'base', title: '上年月平均在职人数 / 全年工资总额', why: '残保金的在职人数是**上年各月之和 ÷ 12**（季节性用工折算、派遣择一计入），不是年末在册；工会经费的工资总额**没有 60% 保底与 300% 封顶**' },
+                { key: 'detail', title: '分档减缴与招人定价 / 拨缴与扣除', why: '「招几个才免征」取决于人数（100 人是第二个临界点）；招残疾人 vs 缴残保金是**定价**问题，两种情形要分开答；工会经费**计提 ≠ 扣除**' }
+            ],
+            pitfalls: [
+                '在职职工人数是**上年各月在职人数之和 ÷ 12**，不是年末在册 —— 常年 25 人看着免征，法定月平均 **45 人** → 一年 **7.29 万**',
+                '季节性用工要**折算年平均人数**（人数 × 月数 ÷ 12），劳务派遣由派遣单位与用工单位**协商计入一方**、不得重复',
+                '这个「年度平均」与 17C-2 企业所得税的从业人数**公式不同**：cit 是（季初 + 季末）÷ 2 再 ÷ 4，残保金是各月之和 ÷ 12',
+                '**100 人是第二个临界点**：1 名残疾人达到 1.5% 需要 ≤ **66 人**、达到 1% 需要 ≤ **100 人**，101 人以上招 1 个人连减半档都够不着',
+                '**第一个残疾人最值钱**：分档减缴是边际递减的（100 人公司第 1 人省 13.2 万、第 2 人只省 3 万；45 人公司第 1 人省 7.29 万、第 2 人一分钱都省不了）',
+                '**岗位本来就要招人** → 招残疾人净省全额残保金；**专为省残保金增设岗位** → 净亏（雇一个人要付 1.395 倍工资）',
+                '专门招一个人是否划算，看拟招岗位年薪 ≤ 残保金减少额 ÷ 1.395 —— 100 人公司的盈亏平衡年薪是 **9.46 万**',
+                '工会经费的基数是**工资总额**，与社保缴费基数**两个方向都不同**：月薪 3 万社保封顶 2.4 万、月薪 3000 社保保底 4800',
+                '工会经费**计提 ≠ 扣除**：企税扣除要凭《工会经费收入专用收据》，超提部分不得扣除',
+                '未建立工会的按工资总额 2% 收**建会筹备金**，且**全额上缴**（没有 60% 留存）',
+                '现行分档减缴与 30 人以下暂免**均执行至 2027-12-31**，到期恢复按 100% 征收 —— 做三年预算别只按 90% 估',
+                '计费工资按当地社平 **2 倍**封顶（不是社保的 3 倍），两条封顶线不是一起停的'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoDisabilityFundQuick;
+                if (!Q) return null;
+                var yuan = function (x) { return (Math.round((Number(x) || 0) * 100) / 100).toFixed(2); };
+                var pct = function (r) { return Math.round((Number(r) || 0) * 10000) / 100 + '%'; };
+                var socialAverage = Number(v.socialAverage) || 0;
+
+                // ===== 工会经费：基数是工资总额，与社保缴费基数两个方向都不同 =====
+                if (v.variant === 'union') {
+                    var months = Number(v.paidMonths) || 12;
+                    var ub = Q.unionBaseOf({
+                        monthlyWage: v.monthlyWage, monthlyAllowance: v.monthlyAllowance,
+                        annualBonus: v.annualBonus, paidMonths: months, socialAverage: socialAverage
+                    });
+                    var u = Q.unionFeeOf({ wageTotal: ub.wageTotal, hasUnion: !!v.hasUnion, actual: v.actual });
+                    var rowsU = [
+                        { label: '全年工资总额（国家统计局口径）', value: ub.wageTotal, kind: 'money',
+                            hint: '（月工资 ' + yuan(v.monthlyWage) + ' + 津贴 ' + yuan(v.monthlyAllowance) + '）× '
+                                + months + ' 个月 + 奖金 ' + yuan(v.annualBonus) + '；**没有 60% 保底与 300% 封顶**' },
+                        { label: '社保缴费基数口径（同一批人，年）', value: ub.socialAnnual, kind: 'money',
+                            hint: '月薪 ' + yuan(v.monthlyWage) + ' → 社保基数 ' + yuan(ub.socialMonthlyBase)
+                                + ' 元/月（60% 保底 / 300% 封顶）' },
+                        { label: '两个口径的差额', value: ub.gapAnnual, kind: 'money',
+                            hint: ub.gapAnnual > 0 ? '⚠️ 工资总额**高于**社保基数（社保被封顶，工会经费没有）'
+                                : ub.gapAnnual < 0 ? '⚠️ 工资总额**低于**社保基数（社保被保底，工会经费没有）'
+                                    : '两个口径一致' },
+                        { label: '工会经费（工资总额 × 2%）', value: ub.feeOnWage, kind: 'money' },
+                        { label: '若误按社保基数估（错）', value: ub.feeOnSocialBase, kind: 'money',
+                            hint: '差 ' + yuan(ub.feeGap) + ' 元 —— 拿社保基数估工会经费**两头都会估错**' },
+                        { label: '月均计提', value: u.fee / 12, kind: 'money', hint: '按 12 个月均摊，便于做月度预算' },
+                        { label: '上缴上级工会', value: u.remitted, kind: 'money',
+                            hint: u.hasUnion ? '建会：40% 上缴、60% 留存' : '⚠️ 未建会：建会筹备金**全额上缴**' },
+                        { label: '本单位留存', value: u.retained, kind: 'money' },
+                        { label: '企业所得税扣除限额', value: u.limit, kind: 'money',
+                            hint: '不超过工资薪金总额 2%' },
+                        { label: '实际拨缴', value: u.actual, kind: 'money' },
+                        { label: '实际可扣除', value: u.deductible, kind: 'money',
+                            hint: '凭证：《工会经费收入专用收据》或税务机关代收凭据' },
+                        { label: '超限额需纳税调增', value: u.overDeduction, kind: 'money',
+                            hint: u.overDeduction > 0 ? '⚠️ 多提的部分企税不得扣除' : '未超限额' }
+                    ];
+
+                    var noteU = '工会经费按**全年工资总额** ' + yuan(ub.wageTotal) + ' 元的 '
+                        + pct(u.rate) + ' 计提 = ' + yuan(u.fee) + ' 元'
+                        + (u.hasUnion ? '（40% 上缴 ' + yuan(u.remitted) + ' 元、60% 留存 ' + yuan(u.retained) + ' 元）'
+                            : '（未建会：建会筹备金 **全额上缴** ' + yuan(u.remitted) + ' 元）')
+                        + '。这个基数与社保缴费基数**两个方向都不同**：社保有 60% 保底与 300% 封顶，'
+                        + '工资总额两头都不夹 —— 同一批人按社保基数是 ' + yuan(ub.socialAnnual)
+                        + ' 元，按工资总额是 ' + yuan(ub.wageTotal) + ' 元，'
+                        + (ub.feeGap > 0 ? '**少估 ' + yuan(ub.feeGap) + ' 元**' : ub.feeGap < 0 ? '**多估 ' + yuan(-ub.feeGap) + ' 元**' : '两者一致')
+                        + '。企税扣除要凭《工会经费收入专用收据》'
+                        + (u.overDeduction > 0 ? '，本次超提 ' + yuan(u.overDeduction) + ' 元不得扣除' : '，本次可全额扣除')
+                        + '。';
+
+                    return {
+                        primary: { label: '应拨缴工会经费', value: u.fee, kind: 'money',
+                            hint: '工资总额 ' + yuan(ub.wageTotal) + ' 元 × 2%' },
+                        rows: rowsU,
+                        note: noteU,
+                        extras: [{
+                            title: '工资总额 vs 社保缴费基数（两个方向都不同）',
+                            note: feeNote('unionWageBase'),
+                            table: {
+                                head: ['月薪', '社保缴费基数（60% 保底 / 300% 封顶）', '工会经费基数（工资总额）', '年工会经费', '按社保基数估（错）', '差额'],
+                                rows: unionWageLadder().map(function (w) {
+                                    var o = Q.unionBaseOf({
+                                        monthlyWage: w, monthlyAllowance: 0, annualBonus: 0,
+                                        paidMonths: 12, socialAverage: socialAverage
+                                    });
+                                    return [{ value: w, kind: 'money' }, { value: o.socialMonthlyBase, kind: 'money' },
+                                        { value: o.wageTotal, kind: 'money' }, { value: o.feeOnWage, kind: 'money' },
+                                        { value: o.feeOnSocialBase, kind: 'money' }, { value: o.feeGap, kind: 'money' }];
+                                })
+                            }
+                        }, {
+                            title: '工资总额口径（什么进基数、什么不进）',
+                            note: '与社保缴费基数同一个口径（17C-3 沉淀的 wageComposition），但社保有保底与封顶、这里没有',
+                            table: {
+                                head: ['计入工资总额', '不计入工资总额'],
+                                rows: (function () {
+                                    var wc = ((window.socialInsuranceRules || {}).wageComposition || {});
+                                    var inc = wc.included || [];
+                                    var exc = wc.excluded || [];
+                                    var out = [];
+                                    for (var i = 0; i < Math.max(inc.length, exc.length); i++) {
+                                        out.push([inc[i] ? inc[i].label : '—', exc[i] || '—']);
+                                    }
+                                    return out;
+                                })()
+                            }
+                        }],
+                        steps: [{
+                            title: '① 全年工资总额（无保底、无封顶）',
+                            rows: [
+                                { label: '月固定工资', value: v.monthlyWage, format: 'money' },
+                                { label: '月津贴补贴', value: v.monthlyAllowance, format: 'money' },
+                                { label: '全年奖金', value: v.annualBonus, format: 'money' },
+                                { label: '计薪月数', value: months, format: 'text' },
+                                { label: '全年工资总额', value: ub.wageTotal, format: 'money' }
+                            ],
+                            footnote: feeNote('unionWageBase')
+                        }, {
+                            title: '② 与社保缴费基数对照',
+                            rows: [
+                                { label: '当地社平工资（月）', value: socialAverage, format: 'money' },
+                                { label: '社保基数下限（60%）', value: Math.round(socialAverage * 0.6 * 100) / 100, format: 'money' },
+                                { label: '社保基数上限（300%）', value: Math.round(socialAverage * 3 * 100) / 100, format: 'money' },
+                                { label: '社保缴费基数（月）', value: ub.socialMonthlyBase, format: 'money' },
+                                { label: '两个口径年差额', value: ub.gapAnnual, format: 'money' }
+                            ],
+                            footnote: '月薪高于社平 3 倍时社保被封顶、工资总额没有；月薪低于社平 60% 时社保被保底、工资总额没有'
+                        }, {
+                            title: '③ 计提 2% 与分成',
+                            rows: [
+                                { label: '工资总额', value: ub.wageTotal, format: 'money' },
+                                { label: '计提比例', value: u.rate, format: 'percent' },
+                                { label: '应拨缴工会经费', value: u.fee, format: 'money' },
+                                { label: '上缴上级工会', value: u.remitted, format: 'money' },
+                                { label: '本单位留存', value: u.retained, format: 'money' }
+                            ],
+                            footnote: u.hasUnion ? '建会：40% 上缴、60% 留存' : feeNote('unionNoUnion')
+                        }, {
+                            title: '④ 企业所得税扣除（计提 ≠ 扣除）',
+                            rows: [
+                                { label: '扣除限额（工资总额 2%）', value: u.limit, format: 'money' },
+                                { label: '实际拨缴', value: u.actual, format: 'money' },
+                                { label: '实际可扣除', value: u.deductible, format: 'money' },
+                                { label: '超限额需纳税调增', value: u.overDeduction, format: 'money' }
+                            ],
+                            footnote: feeNote('unionDeduction')
+                        }]
+                    };
+                }
+
+                // ===== 残保金 =====
+                var h = Q.headcountOf({
+                    regularCount: v.regularCount, seasonalCount: v.seasonalCount,
+                    seasonalMonths: v.seasonalMonths, dispatchCount: v.dispatchCount,
+                    dispatchHere: !!v.dispatchHere
+                });
+                var levyInput = {
+                    headcount: h.monthlyAverage, disabled: v.disabled,
+                    socialAverageMonthly: socialAverage, avgAnnualWage: v.avgAnnualWage
+                };
+                var r = Q.levyOf(levyInput);
+                var naive = Q.levyOf(Object.assign({}, levyInput, { headcount: h.naive }));
+                var plan = Q.exemptPlanOf({ headcount: h.monthlyAverage, disabled: v.disabled });
+                var cmp = Q.hireCompareOf(Object.assign({}, levyInput, { hireAnnualWage: v.hireAnnualWage }));
+                // 政策到期后（2027-12-31）若无延续文件，恢复按 100% 征收
+                var expired = Math.round(r.base * 100) / 100;
+
+                var rows = [
+                    { label: '上年在职职工人数（月平均）', value: h.monthlyAverage, kind: 'text',
+                        hint: feeNote('headcount') },
+                    { label: '其中：常年用工', value: h.regularCount, kind: 'text' },
+                    { label: '其中：季节性用工折算', value: h.seasonalEquivalent, kind: 'text',
+                        hint: h.seasonalCount + ' 人 × ' + h.seasonalMonths + ' 个月 ÷ 12' },
+                    { label: '其中：劳务派遣计入', value: h.dispatchEquivalent, kind: 'text',
+                        hint: h.dispatchHere ? '由本单位计入（不得与派遣单位重复计算）' : '由派遣单位计入' },
+                    { label: '速算器口径（只填常年正式在册）', value: h.naive, kind: 'text',
+                        hint: h.gap > 0 ? '⚠️ 少算 ' + h.gap + ' 人 —— 漏了季节性折算与劳务派遣' : '与法定口径一致' },
+                    { label: '30 人以下暂免（按月平均判断）', value: h.exempt ? '是（在职 ' + h.monthlyAverage + ' 人）' : '否（在职 ' + h.monthlyAverage + ' 人）', kind: 'text',
+                        hint: h.exempt ? '在职 ' + h.monthlyAverage + ' 人 ≤ 30，暂免征收' : '在职 ' + h.monthlyAverage + ' 人 > 30，全额计算' },
+                    { label: '按速算器口径（' + h.naive + ' 人）是否免征', value: h.naiveExempt ? '是（免征）' : '否', kind: 'text',
+                        hint: h.naiveExempt && !h.exempt ? '⚠️ 这是错的结果：按 ' + h.naive + ' 人免征，按法定 '
+                            + h.monthlyAverage + ' 人**不免征**' : '' },
+                    { label: '少算人数导致的差额', value: r.payable - naive.payable, kind: 'money',
+                        hint: '法定 ' + yuan(r.payable) + ' − 速算器口径 ' + yuan(naive.payable) },
+                    { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text',
+                        hint: '在职 ' + h.monthlyAverage + ' 人 × ' + pct(r.ratio) + '，保留小数' },
+                    { label: '缺口人数', value: r.gap.toFixed(2) + ' 人', kind: 'text' },
+                    { label: '实际安排比例', value: r.arrangedRatio, kind: 'percent' },
+                    { label: '计费工资（社平 2 倍封顶）', value: r.avgWageUsed, kind: 'money',
+                        hint: r.capped ? '已封顶，上限 ' + yuan(r.wageCap) + ' 元/年（社平 × 12 × 2）' : '未触及封顶' },
+                    { label: '应缴费额（缺口 × 计费工资）', value: r.base, kind: 'money' },
+                    { label: '分档减缴系数', value: r.multiplier, kind: 'percent', hint: r.tier.label },
+                    { label: '政策到期后（2028 起按 100%）', value: expired, kind: 'money',
+                        hint: feeNote('expiry') },
+                    { label: '达到免征还需招', value: plan.needExempt + ' 人', kind: 'text',
+                        hint: plan.needExempt > 0 ? '安排比例达到 ' + pct(plan.ratio) + ' 即免征' : '已达免征比例' },
+                    { label: '达到减半档（' + pct(plan.halfRatio) + '）还需招', value: plan.needHalf + ' 人', kind: 'text',
+                        hint: '1 名残疾人达到 ' + pct(plan.ratio) + ' 需在职 ≤ ' + plan.onePersonExemptUpTo
+                            + ' 人、达到 ' + pct(plan.halfRatio) + ' 需 ≤ ' + plan.onePersonHalfUpTo + ' 人' },
+                    { label: '再招 1 名残疾人可省', value: cmp.saving, kind: 'money',
+                        hint: '第 ' + (r.disabled + 1) + ' 人：应缴 ' + yuan(cmp.before) + ' → ' + yuan(cmp.after) },
+                    { label: '招 1 人的用工成本（年薪 + 单位社保公积金）', value: cmp.hireCost, kind: 'money',
+                        hint: '年薪 ' + yuan(cmp.hireAnnualWage) + ' ×（1 + ' + pct(cmp.totalRate) + '）' },
+                    { label: '情形 A：岗位本来就要招人 → 净省', value: cmp.netReplace, kind: 'money',
+                        hint: '招残疾人 vs 招非残疾人，用工成本一样，净省全额残保金减少额' },
+                    { label: '情形 B：专为省残保金增设岗位 → 净支出', value: cmp.netAdd, kind: 'money',
+                        hint: cmp.netAdd > 0 ? '⚠️ 不划算：雇一个人要付 ' + yuan(cmp.hireCost)
+                            + '，只省下 ' + yuan(cmp.saving) : '划算：省下的比雇人的成本还多' },
+                    { label: '盈亏平衡年薪', value: cmp.breakEvenWage, kind: 'money',
+                        hint: '拟招岗位年薪降到这个数以下，情形 B 才划算；现填 '
+                            + yuan(cmp.hireAnnualWage) + ' → ' + (cmp.worthIt ? '划算' : '不划算') }
+                ];
+                if (h.exempt) {
+                    var over = Q.levyOf(Object.assign({}, levyInput, { headcount: h.smallExemptUpTo + 1 }));
+                    rows.push({
+                        label: '超过 30 人后（按 31 人）应缴', value: over.payable, kind: 'money',
+                        hint: '临界点不是起征点：成本从 0 直接跳到这个数'
+                    });
+                }
+
+                var note = '在职职工人数是**上年各月在职人数之和 ÷ 12**：常年 ' + h.regularCount
+                    + ' 人 + 季节性折算 ' + h.seasonalEquivalent + ' 人 + 派遣计入 '
+                    + h.dispatchEquivalent + ' 人 = **' + h.monthlyAverage + ' 人**'
+                    + (h.gap > 0 ? '（速算器那一个「在职职工人数」通常被填成常年 ' + h.naive
+                        + ' 人，**少算 ' + h.gap + ' 人**）' : '')
+                    + '。应安排 ' + r.required.toFixed(2) + ' 人，缺口 ' + r.gap.toFixed(2) + ' 人，'
+                    + '计费工资 ' + yuan(r.avgWageUsed) + ' 元'
+                    + (r.capped ? '（社平 2 倍封顶）' : '')
+                    + ' → 应缴费额 ' + yuan(r.base) + ' 元 × ' + pct(r.multiplier)
+                    + '（' + r.tier.label + '）= **' + yuan(r.payable) + ' 元**'
+                    + (h.gap > 0 ? '，而按 ' + h.naive + ' 人算是 ' + yuan(naive.payable) + ' 元，**差 ' + yuan(r.payable - naive.payable) + ' 元**' : '')
+                    + '。再招 1 名残疾人可省 **' + yuan(cmp.saving) + ' 元**'
+                    + (cmp.netReplace > 0 ? '（岗位本来就要招人 → 净省这个数）' : '')
+                    + '；但专为省残保金增设岗位要付 ' + yuan(cmp.hireCost) + ' 元，'
+                    + (cmp.worthIt ? '划算' : '**不划算**')
+                    + '（盈亏平衡年薪 ' + yuan(cmp.breakEvenWage) + ' 元）。'
+                    + '另：现行减缴与 30 人免征均至 2027-12-31，到期后按 **' + yuan(expired) + ' 元**征收。';
+
+                return {
+                    primary: { label: '应缴残疾人就业保障金', value: r.payable, kind: 'money',
+                        hint: '在职 ' + h.monthlyAverage + ' 人（常年 ' + h.regularCount
+                            + ' + 季节 ' + h.seasonalEquivalent + ' + 派遣 ' + h.dispatchEquivalent + '）' },
+                    rows: rows,
+                    note: note,
+                    extras: [{
+                        title: '在职职工人数口径（上年月平均，不是年末在册）',
+                        note: feeNote('headcount'),
+                        table: {
+                            head: ['项目', '人数'],
+                            rows: [
+                                ['常年用工（全年在岗）', h.regularCount],
+                                ['季节性用工折算（' + h.seasonalCount + ' 人 × ' + h.seasonalMonths + ' 月 ÷ 12）', h.seasonalEquivalent],
+                                ['劳务派遣（' + (h.dispatchHere ? '本单位计入' : '派遣单位计入') + '）', h.dispatchEquivalent],
+                                ['**上年月平均在职人数**', h.monthlyAverage],
+                                ['速算器口径（只填常年正式在册）', h.naive],
+                                ['差额（少算的人数）', h.gap],
+                                ['30 人以下暂免（法定）', h.exempt ? '是' : '否'],
+                                ['30 人以下暂免（速算器口径）', h.naiveExempt ? '是（⚠️ 错）' : '否']
+                            ]
+                        }
+                    }, {
+                        title: '「招几个才免征」取决于人数（100 人是第二个临界点）',
+                        note: '1 名残疾人达到 ' + pct(plan.ratio) + ' 需在职 ≤ ' + plan.onePersonExemptUpTo
+                            + ' 人、达到 ' + pct(plan.halfRatio) + ' 需 ≤ ' + plan.onePersonHalfUpTo + ' 人',
+                        table: {
+                            head: ['在职人数', '达到免征（' + pct(plan.ratio) + '）需招', '达到减半（' + pct(plan.halfRatio) + '）需招'],
+                            rows: plan.ladder.map(function (o) {
+                                return [o.headcount, o.needExempt + ' 人', o.needHalf + ' 人'];
+                            })
+                        }
+                    }, {
+                        title: '招残疾人 vs 缴残保金（两种情形要分开答）',
+                        note: '单位社保公积金费率 ' + pct(cmp.employerRate) + ' + 公积金 ' + pct(cmp.housingRate)
+                            + ' = ' + pct(cmp.totalRate) + '；用工成本 = 年薪 ×（1 + ' + pct(cmp.totalRate) + '）',
+                        table: {
+                            head: ['项目', '金额'],
+                            rows: [
+                                ['当前应缴（' + r.disabled + ' 名残疾人）', { value: cmp.before, kind: 'money' }],
+                                ['再招 1 名后应缴', { value: cmp.after, kind: 'money' }],
+                                ['残保金减少额', { value: cmp.saving, kind: 'money' }],
+                                ['招 1 人的用工成本', { value: cmp.hireCost, kind: 'money' }],
+                                ['情形 A：岗位本来就要招人 → 净省', { value: cmp.netReplace, kind: 'money' }],
+                                ['情形 B：专为省残保金增设岗位 → 净支出', { value: cmp.netAdd, kind: 'money' }],
+                                ['盈亏平衡年薪', { value: cmp.breakEvenWage, kind: 'money' }],
+                                ['结论', cmp.worthIt ? '岗位年薪 ' + yuan(cmp.hireAnnualWage) + ' ≤ 盈亏平衡，情形 B 也划算'
+                                    : '岗位年薪 ' + yuan(cmp.hireAnnualWage) + ' > 盈亏平衡，只有情形 A 划算']
+                            ]
+                        }
+                    }],
+                    steps: [{
+                        title: '① 上年在职职工人数 → 月平均',
+                        rows: [
+                            { label: '常年用工（全年在岗）', value: h.regularCount, format: 'text' },
+                            { label: '季节性用工折算', value: h.seasonalEquivalent, format: 'text',
+                                note: h.seasonalCount + ' 人 × ' + h.seasonalMonths + ' 个月 ÷ 12' },
+                            { label: '劳务派遣计入', value: h.dispatchEquivalent, format: 'text',
+                                note: h.dispatchHere ? '本单位计入' : '派遣单位计入' },
+                            { label: '上年月平均在职人数', value: h.monthlyAverage, format: 'text' },
+                            { label: '速算器口径（只填常年正式在册）', value: h.naive, format: 'text' }
+                        ],
+                        footnote: h.gap > 0
+                            ? '少算 ' + h.gap + ' 人 —— 季节性用工与劳务派遣都要进这个口径'
+                            : feeNote('headcount')
+                    }, {
+                        title: '② 应安排人数与差额人数',
+                        rows: [
+                            { label: '在职职工人数', value: h.monthlyAverage, format: 'text' },
+                            { label: '规定安排比例', value: r.ratio, format: 'percent' },
+                            { label: '应安排残疾人数', value: r.required.toFixed(2), format: 'text' },
+                            { label: '已安排残疾人数', value: r.disabled, format: 'text' },
+                            { label: '差额人数', value: r.gap.toFixed(2), format: 'text' }
+                        ],
+                        footnote: '应安排人数可以是小数（31 人 → 0.465 人），不要四舍五入'
+                    }, {
+                        title: '③ 计费工资（社平 2 倍封顶）',
+                        rows: [
+                            { label: '本单位年平均工资', value: r.avgWageInput, format: 'money' },
+                            { label: '当地社平工资（月）', value: socialAverage, format: 'money' },
+                            { label: '封顶（社平 × 12 × 2）', value: r.wageCap, format: 'money' },
+                            { label: '计费工资', value: r.avgWageUsed, format: 'money' },
+                            { label: '应缴费额', value: r.base, format: 'money' }
+                        ],
+                        footnote: feeNote('wageCap')
+                    }, {
+                        title: '④ 分档减缴（按实际安排比例）',
+                        rows: [
+                            { label: '实际安排比例', value: r.arrangedRatio, format: 'percent' },
+                            { label: '适用档次', value: r.tier.label, format: 'text' },
+                            { label: '分档系数', value: r.multiplier, format: 'percent' },
+                            { label: '应缴残保金', value: r.payable, format: 'money' }
+                        ],
+                        footnote: '1 名残疾人达到 ' + pct(plan.ratio) + ' 需在职 ≤ ' + plan.onePersonExemptUpTo
+                            + ' 人、达到 ' + pct(plan.halfRatio) + ' 需 ≤ ' + plan.onePersonHalfUpTo + ' 人'
+                    }, {
+                        title: '⑤ 招残疾人 vs 缴残保金（定价）',
+                        rows: [
+                            { label: '当前应缴', value: cmp.before, format: 'money' },
+                            { label: '再招 1 名后应缴', value: cmp.after, format: 'money' },
+                            { label: '残保金减少额', value: cmp.saving, format: 'money' },
+                            { label: '招 1 人的用工成本', value: cmp.hireCost, format: 'money' },
+                            { label: '情形 A：岗位本来就要招人 → 净省', value: cmp.netReplace, format: 'money' },
+                            { label: '情形 B：专为省残保金增设岗位 → 净支出', value: cmp.netAdd, format: 'money' },
+                            { label: '盈亏平衡年薪', value: cmp.breakEvenWage, format: 'money' }
+                        ],
+                        footnote: '岗位本来就要招人 → 招残疾人净省全额残保金；专为省残保金增设岗位 → 雇一个人要付 '
+                            + pct(1 + cmp.totalRate) + ' 倍工资'
+                    }]
+                };
+            }
         }
     ];
 
