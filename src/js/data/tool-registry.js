@@ -2397,6 +2397,276 @@
             }
         },
         {
+            // 阶段17 17D-8（v1.64.0）：个税场景完整度 **11/16 → 12/16** 的第八个场景 —— 专项附加扣除。
+            //
+            // 速算器 `special-deduction` 已经算到了「七项各能扣多少 → 少交多少税」这道减法
+            // （而且它是**两段计税相减**、不是「扣除额 × 税率」）—— 但它收的是**一个**
+            // 「扣除前全年应纳税所得额」，于是下面三层它一个都表达不出来：
+            //   ① **夫妻之间怎么分摊**：扣除抵的是**各自**的应纳税所得额，放在税率高的
+            //      一方身上才省得多。实测：夫月薪 6000（3% 档）、妻月薪 3 万（20% 档），
+            //      子女教育 2.4 万全给夫只省 **144 元**（其余全浪费），给妻省 **4800 元**
+            //      —— **差 4656 元**，而速算器只算一个人，这个问题它根本答不了；
+            //   ② **按实际符合条件的月份累计**：年中满 3 岁 / 满 60 岁 / 毕业 / 贷款还清 /
+            //      年中起租都不是满 12 个月，速算器一律按 12 个月满算（孩子年中满 3 岁，
+            //      7 个月 = 14000 而不是 24000，**多算 1 万扣除**）；
+            //   ③ **逐项的边际节税**：跨档时各项「单独省」之和 ≠ 合计省。
+            // 另外两条法定的硬约束：赡养老人非独生子女**每人不超过 1500 元/月**、
+            // 房贷利息与住房租金**同一年度只能二选一**。
+            //
+            // 口径同源：一切计算走 special-deduction-quick 新增的 fullOf（它自己又读
+            // specialDeductionRules 的七项标准、走内核 calculateTaxByTaxableIncome 计税），
+            // 单人 + 满 12 个月时与 annualOf / savingOf 逐点相等，由测试钉住。
+            id: 'special-deduction-deep', name: '专项附加扣除', subtitle: '七项逐项核定 + 夫妻间怎么分摊最省',
+            icon: 'fa-child', status: 'deep',
+            nextTools: ['special-deduction', 'annual-settlement', 'salary-tax', 'private-pension'],
+            policyKey: 'special-deduction',
+            fields: [
+                { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 15000, min: 0,
+                    hint: '扣除只抵**本人**的应纳税所得额，所以夫妻两人的收入都要填，才能算出「给谁更省」' },
+                { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 1500, min: 0 },
+                { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0,
+                    hint: '个人养老金（≤12000）/ 企业年金 / 税优健康险（≤2400）等 —— 它们与专项附加扣除**叠加**享受' },
+                { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
+                    hint: '填 0 表示按单身（或配偶无综合所得）计算' },
+                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseOtherDeduction', step: 'income', label: '配偶其他扣除（元/年）', type: 'money', default: 0, min: 0 },
+
+                { key: 'children', step: 'children', label: '子女教育：符合条件的子女个数', type: 'number', default: 1, min: 0,
+                    hint: '每个子女 2000 元/月；3 岁至全日制学历教育结束' },
+                { key: 'childMonths', step: 'children', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
+                    hint: '**按实际符合条件的月份累计** —— 年中满 3 岁、年中入学都不是满 12 个月' },
+                { key: 'childShare', step: 'children', label: '由谁扣除', type: 'select', default: 'auto',
+                    options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人 100%' },
+                        { value: 'spouse', label: '配偶 100%' }, { value: 'split', label: '双方各 50%' }],
+                    hint: '《暂行办法》只给这两个选项（100% 一方 或 各 50%），**选定后一个纳税年度内不得变更**' },
+                { key: 'infants', step: 'children', label: '3 岁以下婴幼儿个数', type: 'number', default: 0, min: 0,
+                    hint: '每个婴幼儿 2000 元/月（2023 年起由 1000 提高至 2000）' },
+                { key: 'infantMonths', step: 'children', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12 },
+                { key: 'infantShare', step: 'children', label: '由谁扣除', type: 'select', default: 'auto',
+                    options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人 100%' },
+                        { value: 'spouse', label: '配偶 100%' }, { value: 'split', label: '双方各 50%' }] },
+
+                { key: 'housing', step: 'housing', label: '住房', type: 'select', default: 'none',
+                    options: [{ value: 'none', label: '不适用' }, { value: 'loan', label: '住房贷款利息（1000 元/月）' },
+                        { value: 'rent', label: '住房租金（按城市档）' }],
+                    hint: '**房贷利息与住房租金同一纳税年度只能二选一**，不可叠加' },
+                { key: 'loanMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
+                    when: { key: 'housing', in: ['loan'] },
+                    hint: '1000 元/月；**同一住房贷款累计不超过 240 个月**，且一生只能享受一次首套' },
+                { key: 'loanShare', step: 'housing', label: '由谁扣除', type: 'select', default: 'auto',
+                    when: { key: 'housing', in: ['loan'] },
+                    options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人 100%' },
+                        { value: 'spouse', label: '配偶 100%' }] },
+                { key: 'rentTier', step: 'housing', label: '租房城市档', type: 'select', default: '1',
+                    when: { key: 'housing', in: ['rent'] },
+                    options: [{ value: '1', label: '直辖市 / 省会等（1500 元/月）' },
+                        { value: '2', label: '市辖区户籍人口 >100 万（1100 元/月）' },
+                        { value: '3', label: '其他（800 元/月）' }],
+                    hint: '由**签订租赁住房合同的承租人**扣除；配偶在主要工作城市有自有住房的，视同本人有房' },
+                { key: 'rentMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
+                    when: { key: 'housing', in: ['rent'] } },
+                { key: 'elderly', step: 'housing', label: '赡养老人', type: 'select', default: 'none',
+                    options: [{ value: 'none', label: '不适用' }, { value: 'only', label: '独生子女（3000 元/月）' },
+                        { value: 'shared', label: '非独生子女（与兄弟姐妹分摊）' }],
+                    hint: '被赡养人年满 60 岁；**本人与配偶各自赡养各自的父母**，所以这一项不存在「给谁扣」的问题' },
+                { key: 'elderlyMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
+                    hint: '老人年中满 60 岁，就只从满 60 岁的那个月算起' },
+                { key: 'elderlyMonthly', step: 'housing', label: '分摊月扣除额（元/月）', type: 'money', default: 1500, min: 0,
+                    when: { key: 'elderly', in: ['shared'] },
+                    hint: '兄弟姐妹分摊每月 3000 元的额度，**每人不超过 1500 元/月**；可平均分摊 / 约定分摊 / 指定分摊（指定分摊优先），需签书面协议' },
+
+                { key: 'degreeMonths', step: 'other', label: '学历（学位）继续教育（月）', type: 'number', default: 0, min: 0, max: 12,
+                    hint: '400 元/月，**同一学历最长 48 个月**；本科及以下可选择由父母按子女教育（2000 元/月）扣除 —— 二选一' },
+                { key: 'certCount', step: 'other', label: '职业资格证书（本）', type: 'number', default: 0, min: 0,
+                    hint: '取得相关证书的**当年**一次性扣 3600 元；与学历继续教育可以同时享受' },
+                { key: 'medicalSelfPaid', step: 'other', label: '大病医疗：医保目录内个人自付累计（元）', type: 'money', default: 0, min: 0,
+                    hint: '超 1.5 万元的部分才可扣、限额 8 万元，**只能在年度汇算时办**；本人 / 配偶 / 未成年子女的都算' },
+                { key: 'medicalShare', step: 'other', label: '由谁扣除', type: 'select', default: 'auto',
+                    options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人' },
+                        { value: 'spouse', label: '配偶' }] }
+            ],
+            steps: [
+                { key: 'income', title: '两个人的收入基础', why: '扣除抵的是**各自**的应纳税所得额 —— 不知道两人的税率，就谈不上「给谁更省」' },
+                { key: 'children', title: '子女与婴幼儿', why: '这两项是唯一允许在夫妻之间选 100% 或各 50% 的，也是最常被随手填给自己的' },
+                { key: 'housing', title: '住房与赡养老人', why: '房贷利息与住房租金**二选一**；赡养老人非独生子女分摊**每人不超过 1500 元/月**' },
+                { key: 'other', title: '继续教育与大病医疗', why: '学历继续教育按月累计且有 48 个月上限；职业资格只在取得当年；大病医疗只能汇算时扣' }
+            ],
+            pitfalls: [
+                '**夫妻之间怎么分摊最省**：扣除抵的是**各自**的应纳税所得额，放在税率高的一方身上省得多 —— 实测夫月薪 6000（3% 档）、妻月薪 3 万（20% 档），子女教育 2.4 万全给夫只省 144 元、给妻省 **4800 元**，差 4656 元',
+                '扣除抵的是**应纳税所得额**不是税额，「扣除额 × 税率」在跨档时必然**高估**；扣除额超过本人应纳税所得额的部分**用不上**（落到 3% 档的人扣再多也只省 3%）',
+                '**按实际符合条件的月份累计**：孩子年中满 3 岁、老人年中满 60 岁、年中毕业、贷款年中还清都不是满 12 个月 —— 按 12 个月满算会高估扣除',
+                '**赡养老人非独生子女每人不超过 1500 元/月**（兄弟姐妹分摊每月 3000 元的额度）；可平均分摊 / 约定分摊 / 指定分摊，**指定分摊优先**，需签订书面分摊协议',
+                '**住房贷款利息与住房租金同一纳税年度只能二选一**；房贷累计不超过 240 个月且只能享受一次首套；租金由**签订租赁合同的承租人**扣除，配偶在同一城市有自住房的视同有房',
+                '学历继续教育 400 元/月、同一学历最长 **48 个月**；**本科及以下可以选择由父母按子女教育 2000 元/月扣除**，两者二选一；职业资格继续教育在**取得证书当年**一次性 3600 元',
+                '每年 12 月要确认次年信息；**忘了确认只是当月到手变少，汇算时补扣不会少扣税** —— 这不是损失，别为此慌'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoSpecialDeductionQuick;
+                if (!Q) return null;
+
+                var r = Q.fullOf({
+                    selfMonthlyIncome: v.selfMonthlyIncome,
+                    selfMonthlyInsurance: v.selfMonthlyInsurance,
+                    selfOtherDeduction: v.selfOtherDeduction,
+                    spouseMonthlyIncome: v.spouseMonthlyIncome,
+                    spouseMonthlyInsurance: v.spouseMonthlyInsurance,
+                    spouseOtherDeduction: v.spouseOtherDeduction,
+                    children: v.children, childMonths: v.childMonths, childShare: v.childShare,
+                    infants: v.infants, infantMonths: v.infantMonths, infantShare: v.infantShare,
+                    housing: v.housing, loanMonths: v.loanMonths, loanShare: v.loanShare,
+                    rentTier: v.rentTier, rentMonths: v.rentMonths,
+                    elderly: v.elderly, elderlyMonths: v.elderlyMonths, elderlyMonthly: v.elderlyMonthly,
+                    degreeMonths: v.degreeMonths, certCount: v.certCount,
+                    medicalSelfPaid: v.medicalSelfPaid, medicalShare: v.medicalShare
+                });
+
+                if (!r.items.length) {
+                    return {
+                        primary: { label: '全年可少交个税', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '七项一项都没填：先在后面几步里选上你符合条件的项目，才会进入核定表。',
+                        steps: []
+                    };
+                }
+
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var ownerText = function (owner) { return Q.ownerTextOf(owner, r.hasSpouse); };
+                var best = r.best;
+                var wasted = best.wastedSelf + best.wastedSpouse;
+
+                var rows = [
+                    { label: '七项年度扣除合计', value: r.totalAnnual, kind: 'money',
+                        hint: '按月标准 × 实际享受月数 × 分摊比例核定' },
+                    { label: '落在本人身上', value: best.deductionSelf, kind: 'money' }
+                ];
+                if (r.hasSpouse) rows.push({ label: '落在配偶身上', value: best.deductionSpouse, kind: 'money' });
+
+                rows.push(
+                    { label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, kind: 'money',
+                        hint: '全年工资 − 6 万 − 五险一金 − 其他扣除（不含专项附加扣除）' },
+                    { label: '本人适用税率（扣除前）', value: r.self.bracket ? r.self.bracket.rate : 0, kind: 'percent' },
+                    { label: '本人扣除后个税', value: best.taxSelf, kind: 'money' }
+                );
+                if (r.hasSpouse) {
+                    rows.push(
+                        { label: '配偶扣除前应纳税所得额', value: r.spouse.taxableBefore, kind: 'money' },
+                        { label: '配偶适用税率（扣除前）', value: r.spouse.bracket ? r.spouse.bracket.rate : 0, kind: 'percent' },
+                        { label: '配偶扣除后个税', value: best.taxSpouse, kind: 'money' }
+                    );
+                }
+                rows.push(
+                    { label: '家庭全年个税（按最省的分摊）', value: best.totalTax, kind: 'money',
+                        hint: '不享受任何专项附加扣除时是 ' + Math.round(r.baselineTax) + ' 元' },
+                    { label: '朴素估算（扣除额 × 税率）', value: r.totalAnnual * (r.self.bracket ? r.self.bracket.rate : 0), kind: 'money',
+                        hint: '很多人这么估，但跨档时它必然高估' }
+                );
+                if (r.hasSpouse && Math.abs(r.splitGain) >= 1) {
+                    rows.push({ label: '全给自己要多交', value: r.splitGain, kind: 'money',
+                        hint: '最优分摊 vs 七项全部填在自己名下 —— 这一格就是「夫妻间怎么分」值多少钱' });
+                }
+                if (wasted >= 1) {
+                    rows.push({ label: '扣除没用上的部分', value: wasted, kind: 'money',
+                        hint: '扣除额超过本人（或配偶）应纳税所得额的部分**不产生节税**，换个分摊对象就能用上' });
+                }
+                if (r.housingCompare) {
+                    var hc = r.housingCompare;
+                    rows.push({ label: '住房二选一的另一个口径', value: hc.chosen === 'loan' ? hc.rent : hc.loan, kind: 'money',
+                        hint: '房贷利息与住房租金**同一年度只能二选一**：另一个口径按你选的城市档估算，仅供判断' });
+                }
+
+                var extras = [{
+                    title: '七项逐项核定（月数 × 标准 × 分摊）',
+                    note: '月标准与上限全部取自 specialDeductionRules；「谁省得多就给谁」是逐个方案真算出来的',
+                    table: {
+                        head: ['项目', '年扣除额', '由谁扣除', '核定依据'],
+                        rows: r.items.map(function (it) {
+                            return [it.label, money(it.annual), ownerText(best.owners[it.key]), it.note];
+                        })
+                    }
+                }, {
+                    title: '分摊方案对照（家庭全年个税）',
+                    note: '扣除抵的是**各自**的应纳税所得额 —— 同一笔扣除放在不同人身上，省下的税可以差一个数量级',
+                    table: {
+                        head: ['方案', '本人扣除', '配偶扣除', '家庭全年个税', '少交'],
+                        rows: r.plans.slice().sort(function (a, b) { return a.totalTax - b.totalTax; }).slice(0, 4).map(function (p) {
+                            return [
+                                Object.keys(p.owners).map(function (k) { return ownerText(p.owners[k]); }).join(' / ') || '本人',
+                                money(p.deductionSelf), money(p.deductionSpouse), money(p.totalTax), money(p.saving)
+                            ];
+                        })
+                    }
+                }, {
+                    title: '逐项边际节税（去掉这一项会多交多少）',
+                    note: '跨档时各项单独贡献之和 ≠ 合计节税 —— 因为后面的扣除会掉到更低的档上',
+                    table: {
+                        head: ['项目', '年扣除额', '这一项实际省下'],
+                        rows: r.marginal.map(function (m) {
+                            return [m.label, money(m.annual), money(m.contribution)];
+                        })
+                    }
+                }];
+                if (r.housingCompare) {
+                    var hc2 = r.housingCompare;
+                    extras.push({
+                        title: '住房贷款利息 vs 住房租金（年度只能二选一）',
+                        note: '两者**不可叠加**；租金通常更高，但要求你在主要工作城市没有自有住房',
+                        table: {
+                            head: ['口径', '年扣除额'],
+                            rows: [['住房贷款利息（1000 元/月）', money(hc2.loan)],
+                                ['住房租金（按所选城市档）', money(hc2.rent)],
+                                ['差额', money(hc2.gap)]]
+                        }
+                    });
+                }
+
+                var note = '七项核定合计 ' + Math.round(r.totalAnnual) + ' 元（本人 ' + Math.round(best.deductionSelf)
+                    + (r.hasSpouse ? ' + 配偶 ' + Math.round(best.deductionSpouse) : '')
+                    + '），家庭全年个税 ' + Math.round(best.totalTax) + ' 元，比不享受时少交 **'
+                    + Math.round(r.saving) + ' 元**。';
+                if (r.hasSpouse && Math.abs(r.splitGain) >= 1) {
+                    note += ' 其中「怎么分」值 ' + Math.round(r.splitGain) + ' 元 —— 全填在自己名下的话要多交这么多。';
+                }
+                if (wasted >= 1) {
+                    note += ' 另有 ' + Math.round(wasted) + ' 元扣除**用不上**（超过本人应纳税所得额的部分不产生节税）。';
+                }
+                if (r.housingCompare) {
+                    note += ' 房贷利息与住房租金只能二选一（本例差额 ' + Math.round(r.housingCompare.gap) + ' 元）。';
+                }
+
+                var steps = [{
+                    title: '① 逐项核定：月标准 × 实际月数 × 分摊',
+                    rows: r.items.map(function (it) {
+                        return { label: it.label, value: it.annual, format: 'money', note: it.note + ' → ' + ownerText(best.owners[it.key]) };
+                    }).concat([{ label: '年度扣除合计', value: r.totalAnnual, format: 'money' }])
+                }, {
+                    title: '② 扣除落到各自的应纳税所得额上',
+                    rows: [{ label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, format: 'money',
+                        note: '全年工资 − 6 万 − 五险一金 − 其他扣除' },
+                        { label: '本人扣除后', value: Math.max(0, r.self.taxableBefore - best.deductionSelf), format: 'money' },
+                        { label: '本人个税', value: best.taxSelf, format: 'money' }].concat(r.hasSpouse ? [
+                            { label: '配偶扣除前应纳税所得额', value: r.spouse.taxableBefore, format: 'money' },
+                            { label: '配偶扣除后', value: Math.max(0, r.spouse.taxableBefore - best.deductionSpouse), format: 'money' },
+                            { label: '配偶个税', value: best.taxSpouse, format: 'money' }
+                        ] : [])
+                }, {
+                    title: '③ 家庭税负与最省的分摊',
+                    rows: [
+                        { label: '不享受任何专项附加扣除', value: r.baselineTax, format: 'money' },
+                        { label: '按最省的分摊', value: best.totalTax, format: 'money' },
+                        { label: '全年少交', value: r.saving, format: 'money' },
+                        { label: '七项全部填在自己名下', value: r.allSelf.totalTax, format: 'money' },
+                        { label: '「怎么分」值多少', value: r.splitGain, format: 'money' }
+                    ],
+                    footnote: '子女教育与婴幼儿照护只给了两个法定选项：一方 100% 或双方各 50%，选定后一个纳税年度内不得变更；赡养老人非独生子女每人不超过 1500 元/月；房贷利息与住房租金同一年度二选一。'
+                }];
+
+                return {
+                    primary: { label: '全年可少交个税', value: r.saving, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
