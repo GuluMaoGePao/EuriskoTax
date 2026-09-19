@@ -27,6 +27,23 @@
 (function () {
     'use strict';
 
+    // 阶段17 17D-6（v1.57.0）：外籍津补贴免税的**八类项目代号**，与 expatAllowanceRules.items 一一对应。
+    //
+    // 为什么要这一份代号表：`expatAllowanceRules.items` 存的是「中文名 + 免税条件」，
+    // 是给人看的；而 repeater 每一项要存一个**可持久化的值**。若直接把中文名当值，
+    // 改一次措辞就把历史与草稿全废了。所以这里只存顺序 —— 名字仍然从常量里取，
+    // 一条文案都没复制（见 expat-deep 的 options 构造）。
+    //
+    // 放在文件最前面而不是靠近用到的地方：下面的 DEEP_SPECS 数组在**求值那一刻**
+    // 就要调 expatItemOptions()，那是 `var` 提升拯救不了的（提升只给 undefined）。
+    var EXPAT_ITEM_CODES = ['housing', 'meal', 'relocation', 'laundry', 'travel', 'home', 'language', 'education'];
+
+    function expatItemOptions() {
+        var r = (typeof expatAllowanceRules !== 'undefined' && expatAllowanceRules.items) || [];
+        return r.map(function (it, i) { return { value: EXPAT_ITEM_CODES[i], label: it.label }; })
+            .concat([{ value: 'other', label: '其他（八类之外，一律不免）' }]);
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -1718,6 +1735,251 @@
                             rows: cliffs
                         }
                     });
+                }
+
+                return { primary: primary, rows: rows, note: note, extras: extras };
+            }
+        },
+        {
+            // 阶段17 17D-6（v1.57.0）：个税纵深补齐的第六个（也是最后一个）场景 —— 外籍个人津补贴免税。
+            //
+            // 速算器 `expat` 只收一个标量 `allowanceAnnual`「全年可免税的津补贴合计」——
+            // 于是**核定「哪些钱真的能免」这件事被推给了用户**，而它恰恰是这条政策最容易错的地方：
+            //   ① **现金发放的补贴不能免**：八类里的前四类（住房 / 伙食 / 搬迁 / 洗衣）一律要求
+            //      「以**非现金形式或实报实销形式**取得」。外企最常发的就是随工资走的**现金住房补贴** ——
+            //      填进速算器的 6 万，可能一半根本不能免。deep 逐项问「取得形式」，算出真正能免的数。
+            //   ② **八类之外一律不免**：车辆补贴 / 司机、俱乐部会员费、税务平衡款（tax equalization）、
+            //      超标准部分……都不在名单里。速算器一个框，用户自然会一股脑全填进去。
+            //   ③ **探亲费每年不超过 2 次**：填 4 次，能免的只有一半 —— 这是可以量化的一条。
+            //   ④ **语言训练费 / 子女教育费 / 探亲费须经税务机关审核批准为合理的部分**，deep 在明细里标出来。
+            // 还有一层是**速算器讲了结论但没讲道理**的：
+            //   ⑤ 两条路径降的是**同一个**应纳税所得额，而 T(x) − T(x − a) 关于 a 单调不减 ——
+            //      所以**只需要比金额，不用比税率**：金额大的那条一定更省（或一样）。
+            //      用户以为要算两次税再比，其实真正的工作量全在**核定金额**上，这正是本工具在做的。
+            //   ⑥ **一经选择、一个纳税年度内不得变更** —— 所以必须**年初就选对**，年中改不了；
+            //      而政策**执行至 2027-12-31**，2027 是最后一个可选年度，2028 年起津补贴全额并入计税。
+            // 口径仍同源：两条路径一律走 `EuriskoExpatAllowanceQuick`（税率表与到期日取注册表声明的常量）；
+            // 专项附加扣除那一侧走 `EuriskoSpecialDeductionQuick`（七项标准取自 specialDeductionRules）；
+            // 单笔输入与速算器逐点相等，由 tests/expat-deep.test.js 钉住。
+            id: 'expat-deep', name: '外籍津补贴免税', subtitle: '逐项核定可免金额，再二选一',
+            icon: 'fa-globe', status: 'deep',
+            nextTools: ['expat', 'special-deduction', 'annual-settlement'],
+            policyKey: 'expat-allowance',
+            fields: [
+                { key: 'taxableBefore', step: 'basis', label: '扣除前全年应纳税所得额（元）', type: 'money', default: 300000,
+                    hint: '已减 6 万基本减除与三险一金、但**还没扣**津补贴免税 / 专项附加扣除之前的余额' },
+
+                { key: 'items', step: 'allowance', label: '津补贴逐项（按类别与取得形式填）', type: 'repeater',
+                    addLabel: '添加一项津补贴',
+                    hint: '**只有八类项目、且以非现金或实报实销形式取得的**才能免 —— 逐项填才知道真正能免多少',
+                    default: [
+                        { kind: 'housing', amount: 60000, form: 'reimburse', times: 0 },
+                        { kind: 'home', amount: 40000, form: 'reimburse', times: 4 },
+                        { kind: 'education', amount: 30000, form: 'cash', times: 0 },
+                        { kind: 'other', amount: 20000, form: 'reimburse', times: 0 }
+                    ],
+                    itemFields: [
+                        { key: 'kind', label: '项目类别', type: 'select', default: 'housing', options: expatItemOptions() },
+                        { key: 'amount', label: '全年金额（元）', type: 'money', default: 0, min: 0 },
+                        { key: 'form', label: '取得形式', type: 'select', default: 'cash', options: [
+                            { value: 'reimburse', label: '实报实销' },
+                            { value: 'inkind', label: '非现金形式' },
+                            { value: 'cash', label: '现金发放（不可免）' }
+                        ] },
+                        { key: 'times', label: '探亲次数（仅探亲费看这一栏）', type: 'number', default: 0, min: 0,
+                            hint: '每年不超过 2 次；其他项目填 0 即可' }
+                    ] },
+
+                { key: 'children', step: 'special', label: '子女教育：符合条件的子女个数', type: 'number', default: 1, min: 0 },
+                { key: 'housing', step: 'special', label: '住房（贷款利息与租金二选一）', type: 'select', default: 'rent',
+                    options: [{ value: 'none', label: '都不享受' }, { value: 'rent', label: '住房租金' },
+                        { value: 'loan', label: '住房贷款利息' }] },
+                { key: 'rentTier', step: 'special', label: '租房城市档', type: 'select', default: 1,
+                    options: [{ value: 1, label: '直辖市 / 省会等（1500 元/月）' },
+                        { value: 2, label: '市辖区人口 > 100 万（1100 元/月）' },
+                        { value: 3, label: '市辖区人口 ≤ 100 万（800 元/月）' }],
+                    when: { key: 'housing', in: ['rent'] } },
+                { key: 'elderly', step: 'special', label: '赡养老人', type: 'select', default: 'none',
+                    options: [{ value: 'none', label: '不享受' }, { value: 'only', label: '独生子女（3000 元/月）' },
+                        { value: 'shared', label: '非独生子女分摊（≤1500 元/月）' }] },
+                { key: 'specialDirect', step: 'special', label: '大病医疗 / 继续教育等其他专项附加扣除（元/年）', type: 'money', default: 0,
+                    hint: '大病医疗超起扣线的据实部分（限额 8 万）、学历继续教育 400 元/月、职业资格 3600 元/年' }
+            ],
+            steps: [
+                { key: 'basis', title: '税基', why: '两条路径降的是**同一个**应纳税所得额 —— 所以只需比金额，不用比税率' },
+                { key: 'allowance', title: '津补贴逐项', why: '只有八类、且非现金或实报实销的才能免；探亲费每年还不超过 2 次' },
+                { key: 'special', title: '专项附加扣除对照', why: '二选一的另一条路：把它的法定金额也算准，才知道该选哪条' }
+            ],
+            pitfalls: [
+                '**现金发放的补贴不能免**：住房 / 伙食 / 搬迁 / 洗衣费必须**以非现金形式或实报实销形式**取得 —— 随工资发的现金住房补贴不在免税范围内',
+                '**八类之外一律不免**：车辆补贴与司机费用、俱乐部会员费、税务平衡款、超标准部分……都不在名单里',
+                '探亲费**每年不超过 2 次**，超出次数对应的部分不免；探亲费、语言训练费、子女教育费还须**经税务机关审核批准为合理的部分**',
+                '津补贴免税与专项附加扣除**二选一、不可叠加**，且**一经选择在一个纳税年度内不得变更** —— 必须年初就选对，年中不能改',
+                '两条路径降的是同一个应纳税所得额，T(x) − T(x − a) 随 a 单调不减 —— **金额大的那条一定更省**，不用比税率',
+                '政策**执行至 2027-12-31**：2027 是最后一个可选年度，2028 年起津补贴全额并入工资薪金计税',
+                '适用于**符合居民个人条件的外籍个人**（含港澳台居民）—— 非居民个人走的是另一套（按月单独计税）'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoExpatAllowanceQuick;
+                if (!Q) return null;
+                var S = window.EuriskoSpecialDeductionQuick;
+
+                var rules = Q.rules() || {};
+                var ruleItems = rules.items || [];
+                var num = function (x) { var n = Number(x); return isFinite(n) ? n : 0; };
+                var codes = EXPAT_ITEM_CODES;
+
+                // 前四类必须「非现金或实报实销」；现金一律不可免
+                var FORM_OK = { reimburse: true, inkind: true, cash: false };
+                // 须经税务机关审核批准为合理的部分（不阻塞计算，只在明细里标出来）
+                var NEED_APPROVE = { home: true, language: true, education: true };
+                var HOME_MAX_TIMES = 2;      // 探亲费每年不超过 2 次
+
+                var list = Array.isArray(v.items) ? v.items : [];
+                var detail = [];
+                var claimed = 0, exempt = 0;
+                var cutCash = 0, cutList = 0, cutTimes = 0;
+
+                list.forEach(function (it) {
+                    it = it || {};
+                    var amount = Math.max(0, num(it.amount));
+                    var kind = String(it.kind || 'other');
+                    var idx = codes.indexOf(kind);
+                    var inList = idx >= 0 && idx < ruleItems.length;
+                    var label = inList ? ruleItems[idx].label : '其他';
+                    var condition = inList ? ruleItems[idx].condition : '八类之外，一律不免';
+
+                    var formOk = inList && FORM_OK[it.form] === true;
+                    var times = Math.max(0, Math.round(num(it.times)));
+                    var timesFactor = (kind === 'home' && times > HOME_MAX_TIMES) ? HOME_MAX_TIMES / times : 1;
+
+                    var okAmount = inList ? amount : 0;
+                    var formAmount = formOk ? okAmount : 0;
+                    var itemExempt = formAmount * timesFactor;
+
+                    claimed += amount;
+                    exempt += itemExempt;
+                    cutList += amount - okAmount;
+                    cutCash += okAmount - formAmount;
+                    cutTimes += formAmount - itemExempt;
+
+                    var reason = !inList ? '不在八类之内'
+                        : (!formOk ? '现金发放，不符合「非现金或实报实销」' : (timesFactor < 1 ? '探亲超过 2 次，按比例核减' : '符合'));
+                    detail.push([label, { value: amount, kind: 'money' }, { value: itemExempt, kind: 'money' },
+                        reason + (NEED_APPROVE[kind] ? '（须经税务机关审核批准）' : '')]);
+                });
+
+                // 专项附加扣除那一侧：法定金额由 special-deduction-quick 算（七项标准不复制）
+                var housing = String(v.housing || 'none');
+                var specialTotal = 0;
+                var specialItems = null;
+                if (S) {
+                    var sd = S.annualOf({
+                        children: Math.max(0, num(v.children)), childShare: 100,
+                        housing: housing, rentTier: v.rentTier, rentMonths: 12, loanMonths: 12,
+                        elderly: String(v.elderly || 'none')
+                    });
+                    specialTotal = sd.totalAnnual + Math.max(0, num(v.specialDirect));
+                    specialItems = sd.items;
+                } else {
+                    specialTotal = Math.max(0, num(v.children)) * 2000 * 12;
+                }
+
+                var cmp = Q.compareOf({
+                    taxableBefore: v.taxableBefore,
+                    allowanceAnnual: exempt,
+                    specialAnnual: specialTotal
+                });
+                // 速算器口径：把填进去的金额当成全部可免
+                var naive = Q.compareOf({
+                    taxableBefore: v.taxableBefore,
+                    allowanceAnnual: claimed,
+                    specialAnnual: specialTotal
+                });
+
+                var taxableBefore = cmp.taxableBefore;
+                var betterText = { allowance: '选津补贴免税', special: '选专项附加扣除', same: '两者相同' }[cmp.better] || '—';
+                var pickSaved = cmp.better === 'special' ? cmp.special.saved : cmp.allowance.saved;
+                var status = cmp.status;
+                var daysLeft = status && status.daysLeft !== null && status.daysLeft !== undefined ? status.daysLeft : null;
+
+                // 「以为可以叠加」的错误口径：两条路的金额一起扣。二选一是**互斥**的，
+                // 所以这个数只是用来量化「搞错了会少算多少税」。
+                var T = function (x) {
+                    return typeof calculateTaxByTaxableIncome === 'function'
+                        ? calculateTaxByTaxableIncome(Math.max(0, x)).tax : 0;
+                };
+                var stackedSaved = T(taxableBefore) - Math.max(0, T(taxableBefore - exempt - specialTotal));
+                var bestSaved = Math.max(cmp.allowance.saved, cmp.special.saved);
+
+                var primary = { label: '核定后可免税的津补贴（元/年）', value: exempt, kind: 'money',
+                    hint: '填进来的 ' + Math.round(claimed) + ' 元里，只有这么多真正符合免税条件' };
+
+                var rows = [
+                    { label: '填进来的津补贴合计', value: claimed, kind: 'money' },
+                    { label: '核定后可免合计', value: exempt, kind: 'money' },
+                    { label: '核减：不在八类之内', value: cutList, kind: 'money' },
+                    { label: '核减：现金发放', value: cutCash, kind: 'money' },
+                    { label: '核减：探亲超过 2 次', value: cutTimes, kind: 'money' },
+                    { label: '专项附加扣除合计（法定）', value: specialTotal, kind: 'money',
+                        hint: '由 special-deduction-quick 按七项标准算出' },
+                    { label: '建议', value: betterText, kind: 'text' },
+                    { label: '选津补贴免税可省', value: cmp.allowance.saved, kind: 'money' },
+                    { label: '选专项附加扣除可省', value: cmp.special.saved, kind: 'money' },
+                    { label: '两者差额', value: cmp.diff, kind: 'money' },
+                    { label: '月均差额', value: cmp.monthlyDiff, kind: 'money' },
+                    { label: '若误以为可叠加（错误口径）', value: stackedSaved, kind: 'money',
+                        hint: '两条路是**互斥**的，一起扣在多年前是常见的错法' },
+                    { label: '叠加口径少算的税', value: stackedSaved - bestSaved, kind: 'money' },
+                    { label: '若按填进来的金额全免（速算器口径）', value: naive.allowance.saved, kind: 'money',
+                        hint: '速算器只有一个「合计」框，会把它当成全部可免' },
+                    { label: '速算器口径少算的税', value: naive.allowance.saved - cmp.allowance.saved, kind: 'money' },
+                    { label: '政策到期后（2028 起）多交', value: cmp.allowance.saved, kind: 'money',
+                        hint: rules.expiresOn + ' 之后津补贴全额并入工资薪金计税' },
+                    { label: '政策到期影响', value: cmp.afterExpiryGap, kind: 'money' }
+                ];
+                if (daysLeft !== null) {
+                    rows.push({ label: '距政策到期', value: daysLeft + ' 天', kind: 'text',
+                        hint: '剩余不足一年时，当年这一次选择更要一次选对' });
+                }
+
+                var note = '两条路径降的是**同一个**应纳税所得额（' + Math.round(taxableBefore)
+                    + ' 元），所以 T(x) − T(x − a) 随金额单调不减 —— **金额大的那条一定更省**，'
+                    + '不用比税率。真正的工作量在核定金额：填进来的 ' + Math.round(claimed)
+                    + ' 元里，核定后可免 ' + Math.round(exempt) + ' 元（'
+                    + (cutList > 0 ? '八类之外核减 ' + Math.round(cutList) + '、' : '')
+                    + (cutCash > 0 ? '现金发放核减 ' + Math.round(cutCash) + '、' : '')
+                    + (cutTimes > 0 ? '探亲超次核减 ' + Math.round(cutTimes) + '、' : '')
+                    + '），专项附加扣除 ' + Math.round(specialTotal) + ' 元 —— 建议' + betterText + '。';
+                if (naive.allowance.saved - cmp.allowance.saved > 0) {
+                    note += ' 速算器只有一个「合计」框，会把它当成全部可免，'
+                        + '那样会**少算税 ' + Math.round(naive.allowance.saved - cmp.allowance.saved) + ' 元**。';
+                }
+                note += ' 两条路**互斥**：若误以为可叠加，能省 ' + Math.round(stackedSaved)
+                    + ' 元 —— 比正确口径多 ' + Math.round(stackedSaved - bestSaved) + ' 元，那是拿不到的。';
+                if (daysLeft !== null && daysLeft >= 0) {
+                    note += ' 政策' + rules.expiresOn + '到期（还剩 ' + daysLeft + ' 天），'
+                        + '2028 年起津补贴全额并入计税 —— 每年多交约 '
+                        + Math.round(cmp.allowance.saved) + ' 元。';
+                } else if (daysLeft !== null) {
+                    note = '⚠️ 政策已于 ' + rules.expiresOn + ' 到期：津补贴免税已不适用，只能走专项附加扣除。';
+                }
+
+                var extras = [{
+                    title: '逐项核定明细',
+                    note: '每一项的「能免多少」取决于类别与取得形式 —— 这一层速算器表达不出来',
+                    table: { head: ['项目', '填的金额', '核定可免', '依据'], rows: detail }
+                }];
+                if (specialItems) {
+                    var sdRows = Object.keys(specialItems).filter(function (k) { return specialItems[k] > 0; })
+                        .map(function (k) { return [k, { value: specialItems[k], kind: 'money' }]; });
+                    if (sdRows.length) {
+                        extras.push({
+                            title: '专项附加扣除构成',
+                            note: '与津补贴免税二选一，不可叠加',
+                            table: { head: ['项目', '年度扣除额'], rows: sdRows }
+                        });
+                    }
                 }
 
                 return { primary: primary, rows: rows, note: note, extras: extras };
