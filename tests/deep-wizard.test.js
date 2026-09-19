@@ -54,22 +54,24 @@ describe('多步向导：接管范围', () => {
     });
 });
 
-// 通用样例取**与速算器共享 spec** 的那一个。vat-deep（17C-1 v1.58.0）、
-// corporate-income-tax-deep（17C-2 v1.59.0）、social-base-deep（17C-3 v1.60.0）、
-// disability-fund-deep（17C-5 v1.61.0）都陆续做深改成自带 spec 了 —— 它们的步数与字段
-// 随深度涨，不适合再当「形状固定」的样例；现在只剩附加税印花税还是共享的。
+// 通用样例取**与速算器共享 spec** 的那一个 —— 但 17C 五条做完后（v1.58.0 ~ v1.62.0）
+// vat-deep / corporate-income-tax-deep / social-base-deep / disability-fund-deep /
+// surtax-stamp-deep 已全部改成自带 spec，**共享的已经归零**。这里仍用附加税印花税当样例：
+// 它是这轮最后一个做深的，步数（3 步）与条件字段（按 variant 切换整组）都最典型，
+// 而且它**有孪生速算器**，「结果步与速算器同口径」这条断言才有意义。
 describe('多步向导：spec 形状', () => {
     test('结果步由渲染器自动追加，不在每个 spec 里重复声明', () => {
         const steps = W().stepsOf(R().get('surtax-stamp-deep'));
-        expect(steps).toHaveLength(3);                       // 税种选择 + 计税依据 + 结果
+        expect(steps).toHaveLength(4);                       // 算哪一项 + 计税依据 + 减半与到期 + 结果
         expect(steps[steps.length - 1].title).toBe('计算结果');
         expect(steps[steps.length - 1].result).toBe(true);
     });
 
-    test('字段按 step 归组，规模步只问规模', () => {
+    test('字段按 step 归组，减半那一步只问减半', () => {
         const t = R().get('surtax-stamp-deep');
-        expect(W().fieldsOfStep(t, 'identity').map((f) => f.key)).toEqual(['variant']);
-        expect(W().fieldsOfStep(t, 'basis').length).toBe(7);
+        expect(W().fieldsOfStep(t, 'identity').map((f) => f.key))
+            .toEqual(['variant', 'location', 'signedWhere']);
+        expect(W().fieldsOfStep(t, 'policy').map((f) => f.key)).toEqual(['halve']);
     });
 });
 
@@ -77,8 +79,8 @@ describe('多步向导：渲染与走查', () => {
     test('打开向导：步骤条与第一步渲染出来，并切到向导页', () => {
         expect(W().open('surtax-stamp-deep', { fresh: true })).toBe(true);
         const host = document.getElementById('deep-wizard-page');
-        expect(host.querySelectorAll('.step-number')).toHaveLength(3);
-        expect(host.querySelector('.step-title.active').textContent).toBe('税种选择');
+        expect(host.querySelectorAll('.step-number')).toHaveLength(4);
+        expect(host.querySelector('.step-title.active').textContent).toBe('算哪一项与所在地');
         expect(host.querySelector('#qf-variant')).toBeTruthy();
         expect(window.showPage).toHaveBeenCalledWith('deep-wizard-page');
     });
@@ -88,24 +90,26 @@ describe('多步向导：渲染与走查', () => {
         document.getElementById('qf-variant').value = 'stamp';
         document.getElementById('qf-variant').dispatchEvent(new Event('change'));
         document.getElementById('dw-next').click();
-        expect(document.getElementById('qf-amount')).toBeTruthy();     // 印花税：凭证金额
-        expect(document.getElementById('qf-vat')).toBeFalsy();         // 附加税：实缴增值税
+        expect(document.getElementById('qf-stampMode')).toBeTruthy();  // 印花税：凭证形态
+        expect(document.getElementById('qf-vatPayable')).toBeFalsy();  // 附加税：实缴增值税
     });
 
     test('分步填值不丢：上一步再回来，已填的值仍在', () => {
         W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-vat').value = '50000';
+        document.getElementById('qf-vatPayable').value = '50000';
         document.getElementById('dw-prev').click();     // 回第 1 步
         document.getElementById('dw-next').click();     // 再进第 2 步
-        expect(document.getElementById('qf-vat').value).toBe('50000');
+        expect(document.getElementById('qf-vatPayable').value).toBe('50000');
     });
 
     test('结果步算出的税与同源速算器一致（不许两套口径）', () => {
         W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();
-        document.getElementById('qf-vat').value = '50000';
-        document.getElementById('dw-next').click();     // 进结果步
+        document.getElementById('qf-vatPayable').value = '50000';
+        document.getElementById('qf-creditRefund').value = '0';   // 不做留抵退税调整
+        document.getElementById('dw-next').click();
+        document.getElementById('dw-next').click();               // 进结果步
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('surtax-stamp').compute({
             variant: 'surtax', location: 'urban', vat: 50000, consumption: 0, halve: true
@@ -115,6 +119,7 @@ describe('多步向导：渲染与走查', () => {
 
     test('断点续算：中途退出再进来，停在同一步且值还在', () => {
         W().open('surtax-stamp-deep', { fresh: true });
+        document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();
         document.getElementById('dw-next').click();     // 走到结果步并落草稿
         // 重新打开（非 fresh）应回到结果步
@@ -127,23 +132,26 @@ describe('多步向导：渲染与走查', () => {
 // 第二个税种走同一套渲染器 —— 这是「渲染器通用」还是「只适配 vat」的分水岭。
 // 附加税印花税的字段结构与 vat 完全不同（另一个 variant 选择器、17 个税目、计税依据是别的税种），
 // 它若能跑通，说明新增一个完整测算确实只剩「写一条 spec」这件事。
+// 注：它做深后的完整回归在 tests/surtax-deep.test.js —— 这里只留「同一套渲染器能跑」的那几条。
 describe('多步向导：第二个税种（附加税与印花税）', () => {
     test('切到印花税后，附加税字段消失、税目与凭证金额出现', () => {
         W().open('surtax-stamp-deep', { fresh: true });
-        expect(document.querySelector('.step-title.active').textContent).toBe('税种选择');
+        expect(document.querySelector('.step-title.active').textContent).toBe('算哪一项与所在地');
         document.getElementById('qf-variant').value = 'stamp';
         document.getElementById('qf-variant').dispatchEvent(new Event('change'));
         document.getElementById('dw-next').click();
         expect(document.getElementById('qf-item')).toBeTruthy();        // 印花税：税目
         expect(document.getElementById('qf-amount')).toBeTruthy();      // 印花税：凭证金额
-        expect(document.getElementById('qf-vat')).toBeFalsy();          // 附加税：实缴增值税
-        expect(document.getElementById('qf-location')).toBeFalsy();     // 附加税：所在地
+        expect(document.getElementById('qf-vatPayable')).toBeFalsy();   // 附加税：实缴增值税
+        expect(document.getElementById('qf-location')).toBeFalsy();     // 附加税：所在地（在第 1 步）
     });
 
     test('结果步与同源速算器一致', () => {
         W().open('surtax-stamp-deep', { fresh: true });
         document.getElementById('dw-next').click();         // → 计税依据
-        document.getElementById('qf-vat').value = '50000';
+        document.getElementById('qf-vatPayable').value = '50000';
+        document.getElementById('qf-creditRefund').value = '0';      // 不做留抵退税调整
+        document.getElementById('dw-next').click();         // → 减半与到期
         document.getElementById('dw-next').click();         // → 结果
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('surtax-stamp').compute({
@@ -399,11 +407,12 @@ describe('多步向导：最后一个税种类别（残保金与工会经费）'
 // 为什么临时换掉一个已有 spec 的 compute：DEEP 数组由 registry 私有持有，deep() 返回的是副本，
 // 没法塞一条新 spec 进去；借一个已经是 spec 驱动的壳最省事 —— 但用完必须还，
 // 否则后面凡是用到它的用例都会读到假结果（而且假得很难查）。
-// 壳取 surtax-stamp-deep：它自己**没有** compare，正好用来验证「没有 compare 时一切照旧」。
-// （17C-5 后 disability-fund-deep 改为自带 spec 且带 extras，不再适合当「空壳」。）
+// 壳取 forward（综合所得）：它自己**没有** compare，正好用来验证「没有 compare 时一切照旧」。
+// 选壳的标准是「既没有 compare 也没有 extras」—— 17C-5 做深后 disability-fund-deep 带上了
+// extras、17C-4 做深后 surtax-stamp-deep 也带上了，两个都不能再当空壳（v1.61.0 就踩过一次）。
 describe('多步向导：多方案对比（compare）', () => {
     const money = v => TB().fmtValue(v, 'currency');
-    const toolId = 'surtax-stamp-deep';
+    const toolId = 'forward';
 
     // 三份口径的主结果与明细都不同，才能逼出「切换后整块结果都要跟着换」
     function fakeCompute() {
@@ -435,6 +444,17 @@ describe('多步向导：多方案对比（compare）', () => {
         const tool = R().get(toolId);
         original = tool.compute;
         tool.compute = fakeCompute;
+    }
+    // 「没有 compare 时一切照旧」不靠「恰好哪个 spec 是干净的壳」—— 17C-5 / 17C-4 做深后
+    // disability-fund-deep 与 surtax-stamp-deep 先后带上了 extras，壳是会随深度失效的。
+    // 直接挂一个只有 primary + rows 的假 compute，断言就与「当前哪些 spec 带表」无关了。
+    function mountPlainTool() {
+        const tool = R().get(toolId);
+        original = tool.compute;
+        tool.compute = () => ({
+            primary: { label: '目标税前月薪', value: 20000, kind: 'currency' },
+            rows: [{ label: '到手月薪', value: 15000, kind: 'currency' }]
+        });
     }
     function toResult() {
         W().open(toolId, { fresh: true });
@@ -510,7 +530,8 @@ describe('多步向导：多方案对比（compare）', () => {
     });
 
     test('没有 compare 的 spec 一切照旧：结果区不带对比表', () => {
-        toResult();     // 未挂载假 compute，真实 spec 本来就没有 compare
+        mountPlainTool();
+        toResult();
         expect(document.querySelector('#dw-result-card table')).toBeFalsy();
         expect(document.querySelector('[id^="dw-cmp-"]')).toBeFalsy();
         expect(document.getElementById('dw-result-primary')).toBeTruthy();
@@ -521,9 +542,10 @@ describe('多步向导：多方案对比（compare）', () => {
 // 12 个月，累计预扣法下每月到手并不是年收入的十二分之一。这块东西不是一个 label 一个值
 // 的 rows 装得下的 —— 没有通用容器，迁移到向导就只能把它删掉（＝迁移即降级）。
 describe('多步向导：结果附加块（extras）', () => {
-    // 壳取 surtax-stamp-deep：它自己**没有** extras，正好用来验证「没有 extras 时一切照旧」
-    // （17C-5 后 disability-fund-deep 改为自带 spec 且带 extras，不再适合当「空壳」。）
-    const toolId = 'surtax-stamp-deep';
+    // 壳取 forward（综合所得）：它自己**没有** extras，正好用来验证「没有 extras 时一切照旧」
+    // （17C-5 做深后 disability-fund-deep、17C-4 做深后 surtax-stamp-deep 都带上了 extras，
+    // 都不能再当空壳 —— 选壳前先确认它没有 compare / extras。）
+    const toolId = 'forward';
     let original = null;
 
     const MONTHLY = {
@@ -591,7 +613,14 @@ describe('多步向导：结果附加块（extras）', () => {
     });
 
     test('没有 extras 的 spec 一切照旧（不留空壳）', () => {
-        toResult();     // 真实 spec 没有 extras
+        // 同 compare 那条：不靠「恰好哪个 spec 没有 extras」，直接挂一个不带 extras 的假 compute
+        const tool = R().get(toolId);
+        original = tool.compute;
+        tool.compute = () => ({
+            primary: { label: '目标税前月薪', value: 20000, kind: 'currency' },
+            rows: [{ label: '到手月薪', value: 15000, kind: 'currency' }]
+        });
+        toResult();
         const card = document.getElementById('dw-result-card');
         expect(card.textContent).not.toContain('逐月预算表');
         expect(card.querySelector('table')).toBeFalsy();

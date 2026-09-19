@@ -100,21 +100,21 @@ describe('工具注册表：数量与分组', () => {
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
         expect(twins).toHaveLength(11);
 
-        // ① 共享速算器 spec 的那 1 个（surtax-stamp）：
-        //    完整测算与速算器本就问同一件事，共享同一份对象最省事，也最不容易漂。
-        //    注：vat-deep 在 17C-1 纵深（v1.58.0）后改为自带 spec —— 速算器只认一个
-        //    `inputTax` 标量，而「这笔进项能不能抵」恰恰是增值税最贵的一类错误；
-        //    corporate-income-tax-deep 在 17C-2 纵深（v1.59.0）后同样自带 —— 三门槛看的是
-        //    全年季度平均值、加计扣除能整档掉到 5%、亏损会过期，速算器都表达不出来；
-        //    social-base-deep 在 17C-3 纵深（v1.60.0）后同样自带 —— 速算器把「税前月薪」
-        //    直接当缴费基数，而法定是「本人上年度月平均工资」（含奖金津贴加班）；
-        //    disability-fund-deep 在 17C-5 纵深（v1.61.0）后同样自带 —— 速算器把「在职职工
-        //    人数」当成常年正式在册，而法定是上年月平均（含季节性折算与劳务派遣）。
+        // ① 共享速算器 spec 的**已经归零**（v1.62.0 收官）。17C 五条做完后，11 个有孪生
+        //    速算器的 -deep 全部改成自带 spec —— 速算器只认「一个数」，而完整测算要算的
+        //    恰恰是那几层口径：
+        //      vat-deep（v1.58.0）：只认一个 `inputTax` 标量，「这笔进项能不能抵」表达不出来；
+        //      corporate-income-tax-deep（v1.59.0）：三门槛看全年季度平均值、加计扣除整档掉到 5%、亏损过期；
+        //      social-base-deep（v1.60.0）：把「税前月薪」当缴费基数，法定是本人上年度月平均工资；
+        //      disability-fund-deep（v1.61.0）：把「在职职工人数」当年末在册，法定是上年月平均；
+        //      surtax-stamp-deep（v1.62.0）：只有一个「实际缴纳的增值税」框，留抵退税要扣、
+        //      即征即退不扣、进口不附征三处方向不同；印花税只有「一张凭证一个税目一个金额」。
+        //    口径同源改由「仍然调同一个 *-quick.js 模块」+ 单笔输入逐点对拍守护（见各 deep 测试）。
         const OWN_SPEC = ['bonus-tax-deep', 'corporate-income-tax-deep', 'disability-fund-deep',
             'early-retirement-deep', 'equity-deep', 'expat-deep', 'severance-deep',
-            'social-base-deep', 'vat-deep', 'withholding-deep'];
+            'social-base-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'];
         const shared = twins.filter((t) => OWN_SPEC.indexOf(t.id) < 0);
-        expect(shared.map((t) => t.id).sort()).toEqual(['surtax-stamp-deep']);
+        expect(shared.map((t) => t.id).sort()).toEqual([]);
         shared.forEach((t) => {
             const twin = R().all().find((n) => n.compute === t.compute);
             expect(twin !== undefined && twin !== null).toBe(true);   // 必须能在速算器里找到同口径孪生项
@@ -143,7 +143,8 @@ describe('工具注册表：数量与分组', () => {
             { id: 'vat-deep', twin: 'vat', policy: 'vat-small-scale' },
             { id: 'corporate-income-tax-deep', twin: 'corporate-income-tax', policy: 'corporate-small-low-profit' },
             { id: 'social-base-deep', twin: 'social-base', policy: 'social-insurance' },
-            { id: 'disability-fund-deep', twin: 'disability-fund', policy: 'disability-fund' }
+            { id: 'disability-fund-deep', twin: 'disability-fund', policy: 'disability-fund' },
+            { id: 'surtax-stamp-deep', twin: 'surtax-stamp', policy: 'surtax' }
         ].forEach((pair) => {
             const own = R().get(pair.id);
             expect(own.compute).not.toBe(R().get(pair.twin).compute);

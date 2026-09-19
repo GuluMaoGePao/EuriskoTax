@@ -160,6 +160,46 @@
         return [3000, 4800, 8000, 24000, 30000, 50000];
     }
 
+    // 阶段17 17C-4 纵深（v1.62.0）：附加税印花税的常量与税目选项同样一律从常量读，不复制一份。
+    // 与上面同构，也必须放在文件最前面（DEEP_SPECS 在 TOOLS 之前求值）。
+    function ssRules() {
+        return (typeof surtaxRules !== 'undefined' && surtaxRules) || {};
+    }
+
+    function sdRules() {
+        return (typeof stampDutyRules !== 'undefined' && stampDutyRules) || {};
+    }
+
+    function surtaxNote(which) {
+        var r = ssRules();
+        if (which === 'base') return (r.city || {}).baseNote || '';
+        if (which === 'credit') return (r.creditRefund || {}).note || '';
+        if (which === 'instant') return (r.instantRefund || {}).note || '';
+        if (which === 'importVat') return (r.importVat || {}).note || '';
+        if (which === 'halveExpiry') return '“六税两费”减半执行至 ' + ((r.halve || {}).expiresOn || '2027-12-31')
+            + '；到期后若无延续文件，附加税与印花税恢复按法定税率全额征收';
+        return '';
+    }
+
+    function stampNote(which) {
+        var d = sdRules();
+        if (which === 'overseas') return d.overseasNote || '';
+        if (which === 'increment') return d.incrementNote || '';
+        if (which === 'excludeVat') return d.excludeVat ? '计税依据不包括列明的增值税税款；合同里单独列明税额，能直接省下对应税率的那部分印花税' : '';
+        if (which === 'mixed') return d.fromHigherWhenMixed ? '同一凭证载有两个以上税目事项的，分别列明金额的分别适用税率；未分别列明金额的，从高适用税率' : '';
+        return '';
+    }
+
+    // 印花税 17 个税目的下拉项 —— 从常量读，标签里的税率读法优先用 quick 的 rateText
+    // （quick 未加载时退化成只显示税目名，不影响 key）
+    function stampItemOptions() {
+        var Q = (typeof window !== 'undefined') ? window.EuriskoSurtaxQuick : null;
+        return (sdRules().items || []).map(function (it) {
+            var text = (Q && Q.rateText) ? Q.rateText(it.rate) : '';
+            return { value: it.key, label: it.name + (text ? '（' + text + '）' : '') };
+        });
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -3462,12 +3502,593 @@
                 };
             }
         },
-        // 阶段17 17C-4：附加税印花税的完整测算。排在 vat deep 之后 ——
-        // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。
         {
-            id: 'surtax-stamp-deep', name: '附加税与印花税', subtitle: '城建税 + 教育费附加 + 印花税，分步核计税依据',
+            // 阶段17 17C-4（v1.48.0 铺齐 → **v1.62.0 做深**）。排在 vat deep 之后 ——
+            // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。
+            //
+            // 17C-4 v1.48.0 交付的是「铺齐」：本条目当时只有元数据，字段与计算**共享速算器**。
+            // 速算器已经算到了「城建税三档 7/5/1% + 教育费附加 3% + 地方教育附加 2% + 六税两费减半
+            // + 印花税 17 个税目 + 不含列明的增值税」—— 但它的「实际缴纳的增值税」只是一个输入框，
+            // 而法定口径要做**三处方向各不相同的调整**；印花税那边则只有「一张凭证、一个税目、一个金额」。
+            //
+            // 四处具体的口径差：
+            //
+            //   ① 附加税的计税依据是「**依法实际缴纳**」的增值税、消费税，不是申报表的应纳数，
+            //      更不是销售额。三处调整**方向相反**，记反一处就是整段错 ——
+            //        · 增值税期末留抵退税额：**允许**从计税依据中扣除（财税〔2018〕80 号）；
+            //        · 即征即退 / 先征后返退还的增值税：**不扣**，已征的附加税也**不退还**；
+            //        · 进口货物 / 境外单位代扣代缴的增值税：**根本不附征**（城建税法第三条）。
+            //      实测（市区、减半后综合 6%）：申报期应纳 10 万、本期留抵退税 3 万 →
+            //      计税依据 **7 万**（不是 10 万），附加税 4200 而非 6000，**差 1800**；
+            //      同样 3 万若是即征即退 → 计税依据**仍是 10 万**（扣了反而少缴 1800）；
+            //      进口环节缴增值税 50 万 → 不附征，误算进去就**多缴 3 万**。
+            //
+            //   ② 小规模纳税人月销售额 10 万（季度 30 万）以下**免征增值税 → 附加税跟着免**，
+            //      而且是**整段跳变**不是渐进：季度 28 万 → 附加税 0；季度 31 万 → 按 1% 缴增值税
+            //      3100 元、附加税 186 元。
+            //
+            //   ③ 印花税同一份凭证载有**两个以上税目**：分别列明金额的**分别适用**税率，
+            //      **未分别列明的从高**适用（第九条）—— 这是「签合同多写几行字」能直接省的钱。
+            //      实测：设备买卖 100 万（万分之三）+ 租赁 10 万（千分之一），分别列明 → 400（减半 200）；
+            //      未分别列明 → 110 万 × 千分之一 = 1100（**减半 550**），**差 350**。
+            //
+            //   ④ 另外三处速算器收不下的口径：
+            //        · 签订时**无法确定金额**的：先按 **5 元**贴花，结算时按实际金额**多退少补**
+            //          （框架协议最常见：结算 1000 万 → 1500，已贴 5 元 → **应补 1495**）；
+            //        · 营业账簿只对**增加部分**计税（第十一条）：上年 500 万 → 本年 800 万，
+            //          增加额 300 万 × 0.25‰ = 750（减半 **375**），误按 800 万全额是 **1000**，**差 625**；
+            //        · 在**境外书立、境内使用**的应税凭证**同样要贴花** —— 不是「国外签的就不用贴」。
+            //
+            // 口径仍同源：三处调整、多税目从高、先贴 5 元、账簿增加额一律走 `EuriskoSurtaxQuick`
+            // （新增 surtaxBaseOf / stampMixedOf / stampSettlementOf / accountBookOf 四个可复用函数）。
+            id: 'surtax-stamp-deep', name: '附加税与印花税',
+            subtitle: '实缴增值税的三处调整、多税目从高、账簿只对增加额',
             icon: 'fa-tags', status: 'deep',
-            nextTools: ['vat', 'corporate-income-tax', 'business-income']
+            nextTools: ['surtax-stamp', 'vat', 'corporate-income-tax', 'business-income'],
+            policyKey: 'surtax',
+            fields: [
+                { key: 'variant', step: 'identity', label: '算哪一项', type: 'select', default: 'surtaxGeneral',
+                    options: [
+                        { value: 'surtaxGeneral', label: '附加税（一般纳税人）' },
+                        { value: 'surtaxSmall', label: '附加税（小规模纳税人）' },
+                        { value: 'stamp', label: '印花税' }
+                    ],
+                    hint: '附加税跟着**实际缴纳的增值税**走、印花税跟着**凭证金额**走 —— 两个基数不是一个口径，先定算哪一项' },
+                { key: 'location', step: 'identity', label: '纳税人所在地', type: 'select', default: 'urban',
+                    options: [{ value: 'urban', label: '市区（城建税 7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }],
+                    when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] },
+                    hint: '三档按**所在地**划分，不是按企业规模' },
+                { key: 'signedWhere', step: 'identity', label: '凭证书立地', type: 'select', default: 'domestic',
+                    options: [{ value: 'domestic', label: '境内书立' }, { value: 'overseas', label: '境外书立、境内使用' }],
+                    when: { key: 'variant', in: ['stamp'] },
+                    hint: stampNote('overseas') },
+
+                // ===== 附加税：计税依据是「依法实际缴纳」的数，三处调整方向各不相同 =====
+                { key: 'vatPayable', step: 'basis', label: '申报期实际缴纳的增值税（境内）', type: 'money', default: 100000,
+                    when: { key: 'variant', in: ['surtaxGeneral'] }, hint: surtaxNote('base') },
+                { key: 'quarterlySales', step: 'basis', label: '本季度销售额', type: 'money', default: 280000,
+                    when: { key: 'variant', in: ['surtaxSmall'] },
+                    hint: '季度销售额 ≤ 30 万（月 10 万）**免征增值税 → 附加税跟着免**；超过后按 1% 征收率缴增值税' },
+                { key: 'creditRefund', step: 'basis', label: '本期收到的增值税期末留抵退税', type: 'money', default: 30000,
+                    when: { key: 'variant', in: ['surtaxGeneral'] },
+                    hint: surtaxNote('credit') + ' —— **要扣**' },
+                { key: 'instantRefund', step: 'basis', label: '本期收到的即征即退 / 先征后返退税', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['surtaxGeneral'] },
+                    hint: surtaxNote('instant') + ' —— **不扣**，与留抵退税方向相反' },
+                { key: 'importVat', step: 'basis', label: '进口环节 / 代扣代缴的增值税', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] },
+                    hint: surtaxNote('importVat') + ' —— **不附征**' },
+                { key: 'consumption', step: 'basis', label: '实际缴纳的消费税', type: 'money', default: 0,
+                    when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] } },
+
+                // ===== 印花税：一张凭证的四种形态 =====
+                { key: 'stampMode', step: 'basis', label: '凭证形态', type: 'select', default: 'single',
+                    options: [
+                        { value: 'single', label: '单税目、金额已列明' },
+                        { value: 'mixed', label: '同一凭证载有两个以上税目' },
+                        { value: 'undetermined', label: '签订时金额未列明（先贴 5 元）' },
+                        { value: 'capital', label: '营业账簿（只对增加额计税）' }
+                    ],
+                    when: { key: 'variant', in: ['stamp'] } },
+                { key: 'item', step: 'basis', label: '税目', type: 'select', default: 'sale',
+                    options: stampItemOptions(),
+                    when: { key: 'stampMode', in: ['single', 'mixed', 'undetermined'] } },
+                { key: 'amount', step: 'basis', label: '凭证金额', type: 'money', default: 1000000,
+                    when: { key: 'stampMode', in: ['single'] } },
+                { key: 'stampVat', step: 'basis', label: '单独列明的增值税', type: 'money', default: 0,
+                    when: { key: 'stampMode', in: ['single'] }, hint: stampNote('excludeVat') },
+                { key: 'secondItem', step: 'basis', label: '第二个税目', type: 'select', default: 'lease',
+                    options: stampItemOptions(), when: { key: 'stampMode', in: ['mixed'] } },
+                { key: 'secondAmount', step: 'basis', label: '第二个税目金额', type: 'money', default: 100000,
+                    when: { key: 'stampMode', in: ['mixed'] } },
+                { key: 'secondVat', step: 'basis', label: '第二个税目单独列明的增值税', type: 'money', default: 0,
+                    when: { key: 'stampMode', in: ['mixed'] } },
+                { key: 'separatelyStated', step: 'basis', label: '是否分别列明金额', type: 'select', default: 'separate',
+                    options: [{ value: 'separate', label: '分别列明（分别适用税率）' }, { value: 'mixed', label: '未分别列明（从高适用）' }],
+                    when: { key: 'stampMode', in: ['mixed'] }, hint: stampNote('mixed') },
+                { key: 'settledAmount', step: 'basis', label: '实际结算金额', type: 'money', default: 10000000,
+                    when: { key: 'stampMode', in: ['undetermined'] },
+                    hint: '签订时金额未列明的先按 **5 元**贴花，结算时按实际金额计税、**多退少补**' },
+                { key: 'prevCapital', step: 'basis', label: '上年末实收资本（股本）+ 资本公积', type: 'money', default: 5000000,
+                    when: { key: 'stampMode', in: ['capital'] } },
+                { key: 'currCapital', step: 'basis', label: '本年末实收资本（股本）+ 资本公积', type: 'money', default: 8000000,
+                    when: { key: 'stampMode', in: ['capital'] }, hint: stampNote('increment') },
+
+                { key: 'halve', step: 'policy', label: '享受“六税两费”减半', type: 'switch', default: true,
+                    hint: surtaxNote('halveExpiry') }
+            ],
+            steps: [
+                { key: 'identity', title: '算哪一项与所在地', why: '附加税跟着**实际缴纳的增值税**走、印花税跟着**凭证金额**走；城建税三档按**所在地**划分，不是按企业规模' },
+                { key: 'basis', title: '实缴增值税的三处调整 / 凭证金额与税目', why: '留抵退税**要扣**、即征即退**不扣**、进口代扣代缴**不附征** —— 三处方向不同；印花税同一凭证多税目未分别列明要**从高**' },
+                { key: 'policy', title: '减半与到期对照', why: '“六税两费”减半执行至 2027-12-31，做三年预算不能只按减半后的数估' }
+            ],
+            pitfalls: [
+                '附加税的计税依据是**依法实际缴纳**的增值税 + 消费税，不是申报表的应纳数，更不是销售额',
+                '**留抵退税要扣**、**即征即退不扣**（已缴的附加税也不退还）—— 同样是退税，处理方向相反',
+                '进口货物或境外单位向境内销售劳务、服务、无形资产缴纳的增值税**不征收**城建税，不要把它算进计税依据',
+                '小规模纳税人季度销售额 ≤ 30 万（月 10 万）**免征增值税 → 附加税跟着免**，且是整段跳变不是渐进',
+                '同一凭证载有两个以上税目：**未分别列明金额的从高适用**税率 —— 合同里多写几行金额就能省下这笔钱',
+                '印花税计税依据**不含单独列明的增值税**；没列明的按合同全额计征',
+                '营业账簿只对**增加部分**计税，不是每年按实收资本 + 资本公积总额重贴一遍（误算会多缴）',
+                '签订时**金额未列明**的先按 **5 元**贴花，结算时按实际金额**多退少补** —— 不是「等结算完再贴」',
+                '**境外书立、境内使用**的应税凭证同样要贴花，不是「国外签的合同就不用贴」',
+                '证券交易印花税**不享受**六税两费减半，且**只对出让方**征收',
+                '“六税两费”减半执行至 **2027-12-31**，到期后若无延续文件恢复按法定税率全额征收'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoSurtaxQuick;
+                if (!Q) return null;
+                var yuan = function (x) { return (Math.round((Number(x) || 0) * 100) / 100).toFixed(2); };
+                var pct = function (r) { return Math.round((Number(r) || 0) * 10000) / 100 + '%'; };
+                var halve = !!v.halve;
+
+                // ===== 印花税 =====
+                if (v.variant === 'stamp') {
+                    var mode = v.stampMode || 'single';
+                    var overseas = v.signedWhere === 'overseas';
+                    var stampVatNote = stampNote('excludeVat');
+                    var overseasRow = overseas
+                        ? [{ label: '凭证书立地', value: '境外书立、境内使用', kind: 'text', hint: stampNote('overseas') }]
+                        : [{ label: '凭证书立地', value: '境内书立', kind: 'text' }];
+
+                    // ④ 营业账簿只对增加部分计税
+                    if (mode === 'capital') {
+                        var ab = Q.accountBookOf({ prevCapital: v.prevCapital, currCapital: v.currCapital, halve: halve });
+                        return {
+                            primary: { label: '应纳印花税（营业账簿）', value: ab.tax, kind: 'money',
+                                hint: '实收资本（股本）+ 资本公积**增加额** ' + yuan(ab.increment) + ' 元 × ' + ab.rateText },
+                            rows: overseasRow.concat([
+                                { label: '上年末实收资本（股本）+ 资本公积', value: ab.prevCapital, kind: 'money' },
+                                { label: '本年末实收资本（股本）+ 资本公积', value: ab.currCapital, kind: 'money' },
+                                { label: '**增加额**（计税依据）', value: ab.increment, kind: 'money',
+                                    hint: stampNote('increment') },
+                                { label: '税率', value: ab.rateText, kind: 'text' },
+                                { label: '法定税额（未减半）', value: ab.statutoryTax, kind: 'money' },
+                                { label: '减半优惠', value: Math.max(ab.statutoryTax - ab.tax, 0), kind: 'money' },
+                                { label: '若误按本年末全额贴（错）', value: ab.fullTax, kind: 'money',
+                                    hint: ab.gap > 0 ? '⚠️ **多缴 ' + yuan(ab.gap) + ' 元** —— 账簿只对增加部分计税' : '与按增加额一致' }
+                            ]),
+                            note: '营业账簿按实收资本（股本）、资本公积**合计金额的增加部分**计税：'
+                                + yuan(ab.currCapital) + ' − ' + yuan(ab.prevCapital) + ' = **' + yuan(ab.increment)
+                                + ' 元** × ' + ab.rateText + ' = ' + yuan(ab.tax) + ' 元'
+                                + (halve ? '（减半后）' : '（未享受减半）')
+                                + '。不是每年按总额重贴一遍 —— 误按 ' + yuan(ab.currCapital)
+                                + ' 元全额贴是 ' + yuan(ab.fullTax) + ' 元，'
+                                + (ab.gap > 0 ? '**多缴 ' + yuan(ab.gap) + ' 元**' : '两者一致')
+                                + (ab.decreased ? '。注意：本年末**低于**上年末，增加额为 0，本年无需贴花（减少不退税）' : '')
+                                + '。',
+                            extras: [{
+                                title: '营业账簿：按增加额 vs 按总额（误算会多缴）',
+                                note: stampNote('increment'),
+                                table: {
+                                    head: ['项目', '金额'],
+                                    rows: [
+                                        ['上年末实收资本（股本）+ 资本公积', { value: ab.prevCapital, kind: 'money' }],
+                                        ['本年末实收资本（股本）+ 资本公积', { value: ab.currCapital, kind: 'money' }],
+                                        ['**增加额**（合法计税依据）', { value: ab.increment, kind: 'money' }],
+                                        ['按增加额应纳', { value: ab.tax, kind: 'money' }],
+                                        ['按总额误算', { value: ab.fullTax, kind: 'money' }],
+                                        ['差额（多缴）', { value: ab.gap, kind: 'money' }]
+                                    ]
+                                }
+                            }],
+                            steps: [{
+                                title: '① 确定增加额（不是总额）',
+                                rows: [
+                                    { label: '上年末实收资本（股本）+ 资本公积', value: ab.prevCapital, format: 'money' },
+                                    { label: '本年末实收资本（股本）+ 资本公积', value: ab.currCapital, format: 'money' },
+                                    { label: '增加额', value: ab.increment, format: 'money' }
+                                ],
+                                footnote: stampNote('increment')
+                            }, {
+                                title: '② 按 0.25‰ 计税',
+                                rows: [
+                                    { label: '计税依据（增加额）', value: ab.increment, format: 'money' },
+                                    { label: '税率', value: ab.rateText, format: 'text' },
+                                    { label: '法定税额', value: ab.statutoryTax, format: 'money' },
+                                    { label: '应纳印花税', value: ab.tax, format: 'money' }
+                                ],
+                                footnote: halve ? '“六税两费”减半后' : '未享受减半'
+                            }]
+                        };
+                    }
+
+                    // ④ 签订时金额未列明：先贴 5 元，结算时多退少补
+                    if (mode === 'undetermined') {
+                        var st = Q.stampSettlementOf({ item: v.item, settledAmount: v.settledAmount, vat: v.stampVat, halve: halve });
+                        var s0 = st.settled;
+                        return {
+                            primary: { label: '结算时应补印花税', value: st.topUp > 0 ? st.topUp : 0, kind: 'money',
+                                hint: '结算税额 ' + yuan(st.tax) + ' 元 − 已贴 ' + yuan(st.prepaid) + ' 元' },
+                            rows: overseasRow.concat([
+                                { label: '税目', value: s0.name, kind: 'text' },
+                                { label: '税率', value: s0.rateText, kind: 'text' },
+                                { label: '签订时是否已贴花', value: '已按 ' + yuan(st.prepaid) + ' 元贴花', kind: 'text',
+                                    hint: '签订时无法确定金额的，先按 5 元贴花' },
+                                { label: '实际结算金额', value: st.settledAmount, kind: 'money' },
+                                { label: '计税依据（不含列明的增值税）', value: s0.base, kind: 'money', hint: stampVatNote },
+                                { label: '结算时应纳税额', value: st.tax, kind: 'money' },
+                                { label: '**应补（多退少补）**', value: st.topUp, kind: 'money',
+                                    hint: st.topUp > 0 ? '结算金额大于已贴部分，需补缴' : st.topUp < 0 ? '可申请退还 ' + yuan(st.refundable) + ' 元' : '刚好' },
+                                { label: '法定税额（未减半）', value: s0.statutoryTax, kind: 'money' }
+                            ]),
+                            note: '签订时金额未列明的应税凭证，先按 **' + yuan(st.prepaid) + ' 元**贴花，'
+                                + '以后结算时再按实际金额计税、**多退少补**。本次实际结算 '
+                                + yuan(st.settledAmount) + ' 元（' + s0.name + ' ' + s0.rateText + '）'
+                                + ' → 应纳税额 ' + yuan(st.tax) + ' 元，'
+                                + (st.topUp > 0 ? '**应补 ' + yuan(st.topUp) + ' 元**'
+                                    : st.topUp < 0 ? '**可申请退还 ' + yuan(st.refundable) + ' 元**' : '不需补退')
+                                + '。注意：签的时候就该贴那 5 元，等结算完才贴，中间这段时间属于未按规定贴花。',
+                            extras: [{
+                                title: '未列明金额：先贴 5 元，结算多退少补',
+                                note: '《印花税法》第六条：应税合同、产权转移书据未列明金额的，先按 5 元贴花，以后结算时按实际金额计税',
+                                table: {
+                                    head: ['项目', '金额'],
+                                    rows: [
+                                        ['签订时先贴花', { value: st.prepaid, kind: 'money' }],
+                                        ['实际结算金额', { value: st.settledAmount, kind: 'money' }],
+                                        ['结算时应纳税额', { value: st.tax, kind: 'money' }],
+                                        [st.topUp > 0 ? '**应补缴**' : '**应退还**', { value: Math.abs(st.topUp), kind: 'money' }]
+                                    ]
+                                }
+                            }],
+                            steps: [{
+                                title: '① 签订时先按 5 元贴花',
+                                rows: [
+                                    { label: '签订时金额是否列明', value: '未列明', format: 'text' },
+                                    { label: '先贴花金额', value: st.prepaid, format: 'money' }
+                                ],
+                                footnote: '未列明金额的应税凭证，先按 5 元贴花，不是等结算完再贴'
+                            }, {
+                                title: '② 结算时按实际金额计税',
+                                rows: [
+                                    { label: '实际结算金额', value: st.settledAmount, format: 'money' },
+                                    { label: '税率', value: s0.rateText, format: 'text' },
+                                    { label: '结算时应纳税额', value: st.tax, format: 'money' },
+                                    { label: '已贴花', value: st.prepaid, format: 'money' },
+                                    { label: '应补（退）', value: st.topUp, format: 'money' }
+                                ],
+                                footnote: '多退少补：结算金额小于预计的，多贴的部分可申请退还'
+                            }]
+                        };
+                    }
+
+                    // ③ 同一凭证载有两个以上税目：分别列明 vs 从高
+                    if (mode === 'mixed') {
+                        var mx = Q.stampMixedOf({
+                            item: v.item, amount: v.amount, vat: v.stampVat,
+                            secondItem: v.secondItem, secondAmount: v.secondAmount, secondVat: v.secondVat,
+                            halve: halve, separatelyStated: v.separatelyStated !== 'mixed'
+                        });
+                        var f1 = mx.first;
+                        var f2 = mx.second;
+                        return {
+                            primary: { label: '应纳印花税（同一凭证多税目）', value: mx.tax, kind: 'money',
+                                hint: mx.separatelyStated ? '分别列明金额，分别适用税率' : '未分别列明金额，**从高**适用 ' + mx.higherRateText },
+                            rows: overseasRow.concat([
+                                { label: '税目一', value: f1.name + '（' + f1.rateText + '）', kind: 'text' },
+                                { label: '税目一计税金额', value: f1.base, kind: 'money' },
+                                { label: '税目二', value: f2.name + '（' + f2.rateText + '）', kind: 'text' },
+                                { label: '税目二计税金额', value: f2.base, kind: 'money' },
+                                { label: '是否分别列明金额', value: mx.separatelyStated ? '是（分别适用税率）' : '否（**从高适用**）', kind: 'text' },
+                                { label: '分别列明时应纳', value: mx.separated, kind: 'money' },
+                                { label: '未分别列明时（从高 ' + mx.higherRateText + '）', value: mx.merged, kind: 'money',
+                                    hint: '合并金额 ' + yuan(mx.mergedAmount) + ' 元 × ' + mx.higherRateText },
+                                { label: '**两种写法的差额**', value: mx.gap, kind: 'money',
+                                    hint: mx.gap > 0 ? '⚠️ 合同里把两个税目的金额分开写，能省下 ' + yuan(mx.gap) + ' 元' : '两种写法一致' },
+                                { label: '法定合计（未减半）', value: mx.statutoryTax, kind: 'money' }
+                            ]),
+                            note: '同一凭证载有两个以上税目事项：'
+                                + (mx.separatelyStated
+                                    ? '**分别列明金额**的分别适用税率 —— ' + f1.name + ' ' + yuan(f1.base) + ' 元 × '
+                                        + f1.rateText + ' + ' + f2.name + ' ' + yuan(f2.base) + ' 元 × ' + f2.rateText
+                                        + ' = **' + yuan(mx.separated) + ' 元**'
+                                    : '**未分别列明金额**的**从高适用**税率 —— 合并 ' + yuan(mx.mergedAmount)
+                                        + ' 元 × ' + mx.higherRateText + '（' + mx.higherName + '）= **' + yuan(mx.merged) + ' 元**')
+                                + '。两种写法差 **' + yuan(mx.gap) + ' 元**'
+                                + (mx.gap > 0 ? ' —— 这一行金额写不写清楚，直接决定缴多少。' : '。')
+                                + '另：计税依据不含单独列明的增值税。',
+                            extras: [{
+                                title: '分别列明 vs 未分别列明（从高）',
+                                note: stampNote('mixed'),
+                                table: {
+                                    head: ['写法', '计税方式', '应纳税额'],
+                                    rows: [
+                                        ['分别列明金额', f1.name + ' ' + yuan(f1.base) + ' × ' + f1.rateText + '，'
+                                            + f2.name + ' ' + yuan(f2.base) + ' × ' + f2.rateText, { value: mx.separated, kind: 'money' }],
+                                        ['未分别列明（从高）', '合并 ' + yuan(mx.mergedAmount) + ' × ' + mx.higherRateText
+                                            + '（' + mx.higherName + '）', { value: mx.merged, kind: 'money' }],
+                                        ['**差额**', '合同里分开写金额能省下的', { value: mx.gap, kind: 'money' }]
+                                    ]
+                                }
+                            }],
+                            steps: [{
+                                title: '① 两个税目分别计税',
+                                rows: [
+                                    { label: f1.name, value: f1.base, format: 'money', note: f1.rateText },
+                                    { label: f2.name, value: f2.base, format: 'money', note: f2.rateText },
+                                    { label: '分别列明合计', value: mx.separated, format: 'money' }
+                                ],
+                                footnote: stampNote('excludeVat')
+                            }, {
+                                title: '② 未分别列明：从高适用',
+                                rows: [
+                                    { label: '合并金额', value: mx.mergedAmount, format: 'money' },
+                                    { label: '从高税目', value: mx.higherName, format: 'text' },
+                                    { label: '从高税率', value: mx.higherRateText, format: 'text' },
+                                    { label: '从高应纳税额', value: mx.merged, format: 'money' },
+                                    { label: '与分别列明的差额', value: mx.gap, format: 'money' }
+                                ],
+                                footnote: stampNote('mixed')
+                            }]
+                        };
+                    }
+
+                    // 单税目、金额已列明
+                    var s = Q.stampDutyOf({ item: v.item, amount: v.amount, vat: v.stampVat, halve: halve });
+                    return {
+                        primary: { label: '应纳印花税', value: s.tax, kind: 'money',
+                            hint: s.name + ' ' + yuan(s.base) + ' 元 × ' + s.rateText },
+                        rows: overseasRow.concat([
+                            { label: '税目', value: s.name, kind: 'text' },
+                            { label: '税率', value: s.rateText, kind: 'text' },
+                            { label: '计税依据', value: s.baseName, kind: 'text' },
+                            { label: '凭证金额', value: s.amount, kind: 'money', hint: stampVatNote },
+                            { label: '其中单独列明的增值税', value: s.vat, kind: 'money' },
+                            { label: '计税金额（不含列明的增值税）', value: s.base, kind: 'money' },
+                            { label: '法定税额（未减半）', value: s.statutoryTax, kind: 'money' },
+                            { label: '减半优惠', value: s.saved, kind: 'money',
+                                hint: s.halveApplicable ? '' : '证券交易印花税不享受减半' },
+                            { label: '到期后（2028 起按法定税率）', value: s.statutoryTax, kind: 'money',
+                                hint: surtaxNote('halveExpiry') },
+                            { label: '备注', value: s.note || '—', kind: 'text' }
+                        ]),
+                        note: s.name + '按应税凭证所列金额 ' + yuan(s.amount) + ' 元'
+                            + (s.vat > 0 ? '（扣除单独列明的增值税 ' + yuan(s.vat) + ' 元）' : '')
+                            + '计税 = ' + yuan(s.base) + ' 元 × ' + s.rateText
+                            + ' = **' + yuan(s.tax) + ' 元**'
+                            + (halve && !s.halveApplicable ? '（证券交易印花税**不享受**六税两费减半）' : '')
+                            + '。若这份凭证还载有其他税目事项，未分别列明金额的会**从高适用**税率；'
+                            + '签订时金额未列明的先按 5 元贴花、结算时多退少补。',
+                        extras: [{
+                            title: '六税两费减半范围（证券交易不在内）',
+                            note: surtaxNote('halveExpiry'),
+                            table: {
+                                head: ['项目', '是否减半', '法定税额', '减半后'],
+                                rows: [
+                                    [s.name, s.halveApplicable ? '是' : '**否**（证券交易）',
+                                        { value: s.statutoryTax, kind: 'money' }, { value: s.tax, kind: 'money' }]
+                                ]
+                            }
+                        }, {
+                            title: '同一凭证多税目 / 未列明金额（换一种写法缴多少）',
+                            note: stampNote('mixed'),
+                            table: {
+                                head: ['凭证形态', '计税方式'],
+                                rows: [
+                                    ['单税目、金额已列明', '按所列金额 × 本税目税率'],
+                                    ['同一凭证两个以上税目（分别列明）', '分别适用各自税率'],
+                                    ['同一凭证两个以上税目（未分别列明）', '**从高适用**税率'],
+                                    ['签订时金额未列明', '先按 5 元贴花，结算时多退少补'],
+                                    ['营业账簿', '只对**增加部分**计税（0.25‰）']
+                                ]
+                            }
+                        }],
+                        steps: [{
+                            title: '① 确定计税依据（不含列明的增值税）',
+                            rows: [
+                                { label: '凭证金额', value: s.amount, format: 'money' },
+                                { label: '单独列明的增值税', value: s.vat, format: 'money' },
+                                { label: '计税金额', value: s.base, format: 'money' }
+                            ],
+                            footnote: stampNote('excludeVat')
+                        }, {
+                            title: '② 按税目税率计税',
+                            rows: [
+                                { label: '税目', value: s.name, format: 'text' },
+                                { label: '税率', value: s.rateText, format: 'text' },
+                                { label: '计税金额', value: s.base, format: 'money' },
+                                { label: '法定税额', value: s.statutoryTax, format: 'money' },
+                                { label: '应纳印花税', value: s.tax, format: 'money' }
+                            ],
+                            footnote: s.halveApplicable ? '“六税两费”减半后' : '证券交易印花税不享受减半，且只对出让方征收'
+                        }]
+                    };
+                }
+
+                // ===== 附加税 =====
+                var isSmall = v.variant === 'surtaxSmall';
+                var b = Q.surtaxBaseOf({
+                    taxpayer: isSmall ? 'small' : 'general',
+                    vatPayable: v.vatPayable, consumption: v.consumption,
+                    creditRefund: v.creditRefund, instantRefund: v.instantRefund,
+                    importVat: v.importVat, quarterlySales: v.quarterlySales
+                });
+                var r = Q.surtaxOf({
+                    vat: Math.max(b.domesticVat - b.deductedCredit, 0),
+                    consumption: b.consumption, location: v.location, halve: halve
+                });
+                var rNaive = Q.surtaxOf({ vat: b.vatPayable + b.importVat, consumption: b.consumption, location: v.location, halve: halve });
+                var rFull = Q.surtaxOf({
+                    vat: Math.max(b.domesticVat - b.deductedCredit, 0),
+                    consumption: b.consumption, location: v.location, halve: false
+                });
+
+                var rows = [
+                    { label: '纳税人类型', value: isSmall ? '小规模纳税人' : '一般纳税人', kind: 'text' }
+                ];
+                if (isSmall) {
+                    rows.push({ label: '本季度销售额', value: b.quarterlySales, kind: 'money',
+                        hint: b.smallExempt ? '≤ 30 万，免征增值税 → **附加税跟着免**' : '> 30 万，按 1% 征收率缴增值税' });
+                    rows.push({ label: '实际缴纳的增值税（1% 征收率）', value: b.smallVat, kind: 'money' });
+                } else {
+                    rows.push({ label: '申报期实际缴纳的增值税（境内）', value: b.vatPayable, kind: 'money' });
+                    rows.push({ label: '减：增值税期末留抵退税', value: -b.deductedCredit, kind: 'money',
+                        hint: b.deductedCredit > 0 ? surtaxNote('credit') : '本期无留抵退税' });
+                }
+                rows.push({ label: '实际缴纳的消费税', value: b.consumption, kind: 'money' });
+                rows.push({ label: '**计税依据**', value: b.base, kind: 'money',
+                    hint: surtaxNote('base') });
+                rows.push({ label: '若误按申报表应纳数（含进口）', value: b.naiveBase, kind: 'money',
+                    hint: b.importVat > 0 ? surtaxNote('importVat') : '' });
+                rows.push({ label: '两种口径的差额', value: b.gap, kind: 'money',
+                    hint: b.gap > 0 ? '⚠️ 多算 ' + yuan(b.gap) + ' 元计税依据' : b.gap < 0 ? '少算 ' + yuan(-b.gap) + ' 元' : '一致' });
+                rows.push({ label: '所在地', value: r.locationLabel, kind: 'text' });
+                rows.push({ label: '城建税税率', value: r.cityRate, kind: 'percent' });
+                rows.push({ label: '城建税', value: r.cityTax, kind: 'money' });
+                rows.push({ label: '教育费附加（3%）', value: r.educationTax, kind: 'money' });
+                rows.push({ label: '地方教育附加（2%）', value: r.localEducationTax, kind: 'money' });
+                rows.push({ label: '**附加税费合计**', value: r.total, kind: 'money' });
+                rows.push({ label: '综合负担率', value: r.effectiveRate, kind: 'percent' });
+                rows.push({ label: '减半优惠', value: r.saved, kind: 'money' });
+                rows.push({ label: '到期后（2028 起按 100%）', value: rFull.total, kind: 'money',
+                    hint: surtaxNote('halveExpiry') });
+                if (b.instantRefund > 0) {
+                    rows.push({ label: '本期即征即退 / 先征后返退税', value: b.instantRefund, kind: 'money',
+                        hint: surtaxNote('instant') + ' —— **不扣**，与留抵退税方向相反' });
+                }
+                if (b.importVat > 0) {
+                    rows.push({ label: '进口环节 / 代扣代缴的增值税', value: b.importVat, kind: 'money',
+                        hint: surtaxNote('importVat') + ' —— 误算进去会多缴 ' + yuan(rNaive.total - r.total) + ' 元' });
+                }
+                rows.push({ label: '按错误口径（含进口、不扣留抵退税）应缴', value: rNaive.total, kind: 'money',
+                    hint: rNaive.total !== r.total ? '差 ' + yuan(rNaive.total - r.total) + ' 元' : '与法定口径一致' });
+
+                var note = '附加税以**依法实际缴纳**的增值税、消费税为计税依据：'
+                    + (isSmall
+                        ? '本季度销售额 ' + yuan(b.quarterlySales) + ' 元'
+                            + (b.smallExempt ? ' ≤ 30 万，**免征增值税 → 附加税跟着免**' : ' > 30 万，按 1% 征收率缴增值税 ' + yuan(b.smallVat) + ' 元')
+                        : '境内实际缴纳增值税 ' + yuan(b.vatPayable) + ' 元'
+                            + (b.deductedCredit > 0 ? ' − 留抵退税 ' + yuan(b.deductedCredit) + ' 元' : ''))
+                    + (b.consumption > 0 ? ' + 消费税 ' + yuan(b.consumption) + ' 元' : '')
+                    + ' = **' + yuan(b.base) + ' 元**'
+                    + (b.instantRefund > 0 ? '（即征即退 ' + yuan(b.instantRefund) + ' 元**不扣**）' : '')
+                    + (b.importVat > 0 ? '；进口 / 代扣代缴的 ' + yuan(b.importVat) + ' 元**不附征**' : '')
+                    + '。' + r.locationLabel + '：城建税 ' + pct(r.cityRate) + ' + 教育费附加 3% + 地方教育附加 2%'
+                    + ' = ' + pct(r.statutoryRate)
+                    + (halve ? '，六税两费减半后 ' + pct(r.effectiveRate) : '')
+                    + ' → **' + yuan(r.total) + ' 元**'
+                    + (b.gap > 0 ? '。若误按申报表应纳数 ' + yuan(b.naiveBase) + ' 元算，会缴 ' + yuan(rNaive.total)
+                        + ' 元，**多缴 ' + yuan(rNaive.total - r.total) + ' 元**' : '')
+                    + '。另：减半执行至 2027-12-31，到期后按 ' + yuan(rFull.total) + ' 元征收。';
+
+                var compareRows = Object.keys(r.compare).map(function (k) {
+                    var c = r.compare[k];
+                    return [c.label, { value: c.rate, kind: 'percent' }, { value: c.effectiveRate, kind: 'percent' },
+                        { value: c.total, kind: 'money' }];
+                });
+
+                return {
+                    primary: { label: '附加税费合计', value: r.total, kind: 'money',
+                        hint: '计税依据 ' + yuan(b.base) + ' 元 × ' + pct(r.effectiveRate) },
+                    rows: rows,
+                    note: note,
+                    extras: [{
+                        title: '计税依据的三处调整（方向各不相同）',
+                        note: surtaxNote('base'),
+                        table: {
+                            head: ['项目', '金额', '是否进计税依据'],
+                            rows: [
+                                [isSmall ? '按 1% 征收率实际缴纳的增值税' : '申报期实际缴纳的增值税（境内）',
+                                    { value: b.domesticVat, kind: 'money' }, '进'],
+                                ['减：增值税期末留抵退税额', { value: -b.deductedCredit, kind: 'money' }, '**扣**'],
+                                ['即征即退 / 先征后返退还的增值税', { value: b.instantRefund, kind: 'money' }, '**不扣**'],
+                                ['进口环节 / 代扣代缴的增值税', { value: b.importVat, kind: 'money' }, '**不附征**'],
+                                ['实际缴纳的消费税', { value: b.consumption, kind: 'money' }, '进'],
+                                ['**法定计税依据**', { value: b.base, kind: 'money' }, '—'],
+                                ['误按申报表应纳数（含进口）', { value: b.naiveBase, kind: 'money' }, '—'],
+                                ['**差额**', { value: b.gap, kind: 'money' }, '—']
+                            ]
+                        }
+                    }, {
+                        title: '三档所在地的综合负担率（城建税按所在地，不按企业规模）',
+                        note: '市区 7% + 教育费附加 3% + 地方教育附加 2% = 12%；县城、镇 10%；其他 6%',
+                        table: {
+                            head: ['所在地', '法定综合负担率', halve ? '减半后' : '实际执行', '应缴附加税费'],
+                            rows: compareRows
+                        }
+                    }, {
+                        title: '减半到期对照（六税两费至 2027-12-31）',
+                        note: surtaxNote('halveExpiry'),
+                        table: {
+                            head: ['口径', '综合负担率', '应缴附加税费'],
+                            rows: [
+                                ['法定（未减半）', { value: r.statutoryRate, kind: 'percent' }, { value: rFull.total, kind: 'money' }],
+                                ['现行减半' + (halve ? '（当前）' : ''), { value: r.effectiveRate, kind: 'percent' }, { value: r.total, kind: 'money' }],
+                                ['**差额**', { value: r.statutoryRate - r.effectiveRate, kind: 'percent' }, { value: r.saved, kind: 'money' }]
+                            ]
+                        }
+                    }],
+                    steps: [{
+                        title: '① 确定「依法实际缴纳」的增值税',
+                        rows: isSmall
+                            ? [
+                                { label: '本季度销售额', value: b.quarterlySales, format: 'money' },
+                                { label: '免征门槛（季度）', value: b.smallThreshold.quarterly, format: 'money' },
+                                { label: '是否免征增值税', value: b.smallExempt ? '是（附加税跟着免）' : '否', format: 'text' },
+                                { label: '实际缴纳的增值税（1%）', value: b.smallVat, format: 'money' }
+                            ]
+                            : [
+                                { label: '申报期实际缴纳的增值税', value: b.vatPayable, format: 'money' },
+                                { label: '减：期末留抵退税额', value: b.deductedCredit, format: 'money' },
+                                { label: '即征即退 / 先征后返（不扣）', value: b.instantRefund, format: 'money' },
+                                { label: '进口 / 代扣代缴（不附征）', value: b.importVat, format: 'money' }
+                            ],
+                        footnote: isSmall
+                            ? '季度销售额 ≤ 30 万（月 10 万）免征增值税 → 附加税跟着免，且是整段跳变'
+                            : surtaxNote('credit') + '；' + surtaxNote('instant')
+                    }, {
+                        title: '② 计税依据（增值税 + 消费税）',
+                        rows: [
+                            { label: '实际缴纳的增值税', value: b.domesticVat - b.deductedCredit, format: 'money' },
+                            { label: '实际缴纳的消费税', value: b.consumption, format: 'money' },
+                            { label: '计税依据', value: b.base, format: 'money' }
+                        ],
+                        footnote: surtaxNote('base')
+                    }, {
+                        title: '③ 城建税三档 + 两项附加',
+                        rows: [
+                            { label: '所在地', value: r.locationLabel, format: 'text' },
+                            { label: '城建税税率', value: r.cityRate, format: 'percent' },
+                            { label: '教育费附加', value: 0.03, format: 'percent' },
+                            { label: '地方教育附加', value: 0.02, format: 'percent' },
+                            { label: '城建税', value: r.cityTax, format: 'money' },
+                            { label: '教育费附加', value: r.educationTax, format: 'money' },
+                            { label: '地方教育附加', value: r.localEducationTax, format: 'money' }
+                        ],
+                        footnote: '三档按**纳税人所在地**划分（市区 7% / 县城、镇 5% / 其他 1%），不是按企业规模'
+                    }, {
+                        title: '④ 六税两费减半与到期对照',
+                        rows: [
+                            { label: '法定合计', value: rFull.total, format: 'money' },
+                            { label: '减半比例', value: halve ? 0.5 : 1, format: 'percent' },
+                            { label: '减半优惠', value: r.saved, format: 'money' },
+                            { label: '应缴附加税费', value: r.total, format: 'money' }
+                        ],
+                        footnote: surtaxNote('halveExpiry')
+                    }]
+                };
+            }
         },
         // 阶段17 17C-5：**最后一个税种类别**（§4.4 P2）。排在最后不是因为它不重要 ——
         // 它低频但单次申报金额大，且它是唯一一个「临界点比公式更要命」的类别。

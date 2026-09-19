@@ -88,6 +88,170 @@
         };
     }
 
+    /**
+     * 阶段17 17C-4（v1.62.0）①：附加税的计税依据是「**依法实际缴纳**」的增值税、消费税 ——
+     * 不是申报表的应纳数，更不是销售额。三处调整**方向各不相同**，记反一处就是整段错：
+     *
+     *   ① 增值税期末留抵退税额：**允许**从计税依据中扣除（财税〔2018〕80 号）；
+     *   ② 即征即退 / 先征后返退还的增值税：**不扣**，且已征的附加税也**不退还**；
+     *   ③ 进口货物或境外单位代扣代缴的增值税：**根本不附征**（城建税法第三条）。
+     *
+     * 实测（市区、减半，综合 6%）：
+     *   申报期应纳 10 万、本期留抵退税 3 万 → 计税依据 **7 万**（不是 10 万），附加税 4200 而非 **6000**，差 **1800**；
+     *   同样 3 万若是即征即退 → 计税依据**仍是 10 万**，附加税 **6000**（扣了反而少缴 1800）；
+     *   进口环节缴增值税 50 万 → **不附征**，误算进去就多缴 **3 万**。
+     */
+    function surtaxBaseOf(input) {
+        input = input || {};
+        var isSmall = input.taxpayer === 'small';
+        var quarterly = num(input.quarterlySales);
+        var vatPayable = num(input.vatPayable);
+        var consumption = num(input.consumption);
+        // 小规模纳税人**不抵扣进项**，本来就没有期末留抵、也就没有留抵退税 —— 这一项只对一般纳税人生效
+        var creditRefund = isSmall ? 0 : num(input.creditRefund);
+        var instantRefund = num(input.instantRefund);
+        var importVat = num(input.importVat);
+
+        // 小规模：季度销售额 ≤ 30 万（月 10 万）免征增值税 → 附加税跟着免（整段跳变，不是渐近）
+        var smallExempt = isSmall && quarterly > 0 && quarterly <= SURTAX.smallThreshold.quarterly;
+        var smallVat = (isSmall && !smallExempt) ? round(quarterly * SURTAX.smallThreshold.rate) : 0;
+        var domesticVat = smallExempt ? 0 : (isSmall ? smallVat : vatPayable);
+
+        // ① 留抵退税**要扣**（但不能扣成负数）
+        var deductedCredit = Math.min(creditRefund, domesticVat);
+        var base = round(domesticVat - deductedCredit + consumption);
+        // ② 即征即退**不扣** —— 它只出现在对照行里，说明「同样是退税，处理相反」
+        // ③ 进口 / 代扣代缴的增值税**不进**计税依据
+        var naiveBase = round((isSmall ? smallVat : vatPayable) + consumption + importVat);
+
+        return {
+            taxpayer: input.taxpayer || 'general',
+            isSmall: isSmall,
+            quarterlySales: quarterly,
+            smallExempt: smallExempt,
+            smallVat: smallVat,
+            vatPayable: vatPayable,
+            consumption: consumption,
+            creditRefund: creditRefund,
+            deductedCredit: deductedCredit,
+            instantRefund: instantRefund,
+            importVat: importVat,
+            domesticVat: domesticVat,
+            base: base,
+            naiveBase: naiveBase,
+            gap: round(naiveBase - base),
+            exempt: base <= 0,
+            smallThreshold: SURTAX.smallThreshold,
+            notes: {
+                credit: SURTAX.creditRefund.note,
+                instant: SURTAX.instantRefund.note,
+                importVat: SURTAX.importVat.note,
+                base: SURTAX.city.baseNote
+            }
+        };
+    }
+
+    /**
+     * ② 同一份凭证载有两个以上税目：**分别列明金额**的分别适用税率，**未分别列明**的**从高**适用（第九条）
+     *
+     * 这是「签合同多写几行字」能直接省的钱 —— 实测：设备买卖 100 万（万分之三）+ 租赁 10 万（千分之一），
+     * 分别列明 → 300 + 100 = 400（减半 200）；未分别列明 → 110 万 × 千分之一 = 1100（减半 **550**），差 **350**。
+     */
+    function stampMixedOf(input) {
+        input = input || {};
+        var first = stampDutyOf({
+            item: input.item, amount: input.amount, vat: input.vat, halve: input.halve
+        });
+        var second = stampDutyOf({
+            item: input.secondItem, amount: input.secondAmount, vat: input.secondVat, halve: input.halve
+        });
+        var separated = round(first.tax + second.tax);
+        var separatedStatutory = round(first.statutoryTax + second.statutoryTax);
+
+        // 未分别列明：从高适用税率，计税依据合并
+        var higher = first.rate >= second.rate ? first : second;
+        var merged = stampDutyOf({
+            item: higher.key,
+            amount: num(input.amount) + num(input.secondAmount),
+            vat: num(input.vat) + num(input.secondVat),
+            halve: input.halve
+        });
+
+        var separatelyStated = input.separatelyStated !== false;
+        return {
+            first: first,
+            second: second,
+            higherKey: higher.key,
+            higherName: higher.name,
+            higherRate: higher.rate,
+            higherRateText: higher.rateText,
+            separated: separated,
+            separatedStatutory: separatedStatutory,
+            merged: merged.tax,
+            mergedStatutory: merged.statutoryTax,
+            mergedAmount: num(input.amount) + num(input.secondAmount),
+            gap: round(merged.tax - separated),
+            gapStatutory: round(merged.statutoryTax - separatedStatutory),
+            separatelyStated: separatelyStated,
+            tax: separatelyStated ? separated : merged.tax,
+            statutoryTax: separatelyStated ? separatedStatutory : merged.statutoryTax
+        };
+    }
+
+    /**
+     * ③ 签订时**无法确定金额**的：先按 **5 元**贴花，以后结算时按实际金额计税、**多退少补**（第六条）
+     *
+     * 框架协议 / 长期供货合同最常见。实测：结算时实际 1000 万买卖合同 → 3000（减半 **1500**），
+     * 已先贴 5 元 → 应补 **1495**；签的时候不贴、结算时才补，这一段时间是滞纳风险。
+     */
+    function stampSettlementOf(input) {
+        input = input || {};
+        var prepaid = STAMP.undeterminedPrepaid || 5;
+        var settled = stampDutyOf({
+            item: input.item, amount: input.settledAmount, vat: input.vat, halve: input.halve
+        });
+        var topUp = round(settled.tax - prepaid);
+        return {
+            prepaid: prepaid,
+            settledAmount: num(input.settledAmount),
+            settled: settled,
+            tax: settled.tax,
+            statutoryTax: settled.statutoryTax,
+            topUp: topUp,
+            refundable: topUp < 0 ? round(-topUp) : 0
+        };
+    }
+
+    /**
+     * ④ 营业账簿只对**增加部分**计税（第十一条）：按实收资本（股本）+ 资本公积的**增加额** × 0.25‰，
+     *    不是每年按注册资本总额重贴一遍。速算器只有一个「凭证金额」框，填进去就被当成全额。
+     *
+     * 实测：上年末 500 万 → 本年末 800 万，增加额 300 万 → 750（减半 **375**）；
+     * 误按 800 万全额 → 2000（减半 **1000**），差 **625**。
+     */
+    function accountBookOf(input) {
+        input = input || {};
+        var prev = num(input.prevCapital);
+        var curr = num(input.currCapital);
+        var increment = Math.max(round(curr - prev), 0);
+        var inc = stampDutyOf({ item: 'accountBook', amount: increment, vat: 0, halve: input.halve });
+        var full = stampDutyOf({ item: 'accountBook', amount: curr, vat: 0, halve: input.halve });
+        return {
+            prevCapital: prev,
+            currCapital: curr,
+            increment: increment,
+            decreased: curr < prev,
+            tax: inc.tax,
+            statutoryTax: inc.statutoryTax,
+            fullTax: full.tax,
+            fullStatutoryTax: full.statutoryTax,
+            gap: round(full.tax - inc.tax),
+            gapStatutory: round(full.statutoryTax - inc.statutoryTax),
+            rate: inc.rate,
+            rateText: inc.rateText
+        };
+    }
+
     function itemOf(key) {
         var items = STAMP.items;
         for (var i = 0; i < items.length; i++) {
@@ -177,6 +341,10 @@
         rateText: rateText,
         surtaxOf: surtaxOf,
         stampDutyOf: stampDutyOf,
-        stampDutySumOf: stampDutySumOf
+        stampDutySumOf: stampDutySumOf,
+        surtaxBaseOf: surtaxBaseOf,
+        stampMixedOf: stampMixedOf,
+        stampSettlementOf: stampSettlementOf,
+        accountBookOf: accountBookOf
     };
 })();
