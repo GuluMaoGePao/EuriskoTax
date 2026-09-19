@@ -106,6 +106,31 @@
         return (citRules().quarterlyAverage || {}).formula || '';
     }
 
+    // 阶段17 17C-3 纵深（v1.60.0）：社保基数核定的四处「速算器收了数却没说口径」。
+    // 与上面同构 —— 文案与档次一律从 `socialInsuranceRules` 读，一条都不复制。
+    // 同样必须放在文件最前面，原因见上。
+    function socialRules() {
+        return (typeof socialInsuranceRules !== 'undefined' && socialInsuranceRules) || {};
+    }
+
+    function socialNote(which) {
+        var r = socialRules();
+        if (which === 'wage') return (r.wageComposition || {}).note || '';
+        if (which === 'adjust') return (r.wageComposition || {}).adjustNote || '';
+        if (which === 'taxFree') return (r.housingFund || {}).taxFreeNote || '';
+        if (which === 'flexible') return (r.flexible || {}).note || '';
+        if (which === 'refund') return (r.flexible || {}).refundNote || '';
+        if (which === 'compliance') return (r.compliance || {}).note || '';
+        return '';
+    }
+
+    // 灵活就业的自选缴费档次（60% ~ 300%，读常量，不写死）
+    function socialLevelOptions() {
+        return ((socialRules().flexible || {}).levels || [0.6, 1, 3]).map(function (x) {
+            return { value: x, label: Math.round(x * 100) + '%（社平 × ' + x + '）' };
+        });
+    }
+
     // ====== 分组（按「人/场景」而不是按税种 —— 用户不按税种思考） ======
     var GROUPS = [
         { id: 'salary', name: '工资与到手', icon: 'fa-money', desc: '月薪个税、谈薪倒算、年终奖、专项附加扣除、年度汇算' },
@@ -3007,13 +3032,406 @@
                 return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
             }
         },
-        // 阶段17 17C-3：社保公积金的完整测算（§4.4 P1，HR 高频）。
-        // 它的「完整」在结果侧：速算器只给月度六行，完整测算给出**逐项明细 + 全年汇总** ——
-        // 社保是按年看的支出，年度预算表才是 HR 真正要拿走的那一版。
         {
-            id: 'social-base-deep', name: '社保公积金', subtitle: '基数核定 → 逐项明细 → 全年汇总',
+            // 阶段17 17C-3（v1.48.0 铺齐 → **v1.60.0 做深**）。
+            //
+            // 17C-3 v1.48.0 交付的是「铺齐」：本条目当时只有元数据，字段与计算**共享社保速算器**。
+            // 速算器的字段就叫「**税前月薪**」，compute 直接拿它当缴费基数 ——
+            // 而法定的缴费基数是「**本人上年度月平均工资**」，工资总额里**含奖金、津贴补贴、
+            // 加班工资**。于是「月薪 1 万 + 年终奖 12 万」的人，基数被算成 1 万，法定是 2 万：
+            // 个人侧一年差 **2.7 万**、单位侧差 **4.74 万**。这是本工具最贵的一类错误。
+            //
+            // 四处具体的口径差：
+            //
+            //   ① **基数是上年度月平均工资，不是本月工资**（国家统计局《关于工资总额组成的规定》）：
+            //      工资总额 = 计时/计件工资 + 奖金 + 津贴补贴 + 加班加点工资 + 特殊情况下支付的工资；
+            //      上年度工作不满 12 个月的按**实际计薪月数**平均；基数**一年一调**
+            //      （多数地区每年 7 月随上年度社平工资公布调整），不是每月跟着工资变。
+            //      实测：月薪 1 万 + 年终奖 12 万 → 上年度工资总额 24 万 ÷ 12 = **2 万/月**。
+            //
+            //   ② **公积金免税的两个上限是「且」的关系**（财税〔2006〕10 号）：
+            //      比例 ≤ 12% **且** 基数 ≤ 社平 3 倍。公积金基数可与社保基数不同
+            //      （部分地区另行公布上下限），超出的部分**并入工资计税**。
+            //      速算器内部算了这个数，但**没有暴露公积金基数这一栏**，用户填不了。
+            //      实测：公积金基数 3 万、社平 8000（3 倍 = 2.4 万）、比例 12%
+            //      → 个人实缴 3600/月，免税部分只有 2880/月，**超标 720/月并入工资计税**。
+            //
+            //   ③ **申报基数不足额的代价**（社保费 2019 年起由税务部门征收）：
+            //      补缴 + 按日加收**万分之五**滞纳金（年化 **18.25%**）+ 欠缴数额 **1~3 倍**罚款。
+            //      实测：核定的基数 2 万却按下限 4800 申报（差 1.52 万）→ 一年少缴 **6.93 万**，
+            //      若被追溯 1 年，补缴 + 滞纳金 + 罚款合计 **14.5 万 ~ 28.4 万**。
+            //
+            //   ④ **灵活就业是另一套制度**，不是「单位职工的简化版」：
+            //      养老按 **20%** 缴且**全部个人承担**（单位职工是单位 16% + 个人 8%），
+            //      其中 8% 进个人账户、12% 进统筹；基数在社平 60%~300% 之间**自选**；
+            //      而且**统筹部分不退还** —— 断缴 / 身故 / 出国定居只退个人账户那 8%。
+            //      实测：按 60% 档（社平 8000 × 60% = 4800）缴养老保险一年 11520 元，
+            //      其中只有 **4608 元**（40%）进个人账户，6912 元进统筹，**拿不回来**。
+            //
+            // 口径仍同源：基数上下限、五项费率、公积金免税额、累计预扣一律走
+            // `EuriskoSocialQuick`（新增 wageBaseOf / housingTaxFreeOf / flexibleOf /
+            // complianceGapOf 四个可复用函数，同样读 tax-constants）。
+            id: 'social-base-deep', name: '社保公积金',
+            subtitle: '上年度月平均定基数、公积金双上限定免税、申报差额定价',
             icon: 'fa-users', status: 'deep',
-            nextTools: ['employer-cost', 'net-salary', 'salary-tax']
+            nextTools: ['social-base', 'employer-cost', 'net-salary', 'salary-tax'],
+            policyKey: 'social-insurance',
+            fields: [
+                { key: 'identity', step: 'identity', label: '参保身份', type: 'select', default: 'employee',
+                    options: [{ value: 'employee', label: '单位职工（五险一金，单位与个人分担）' },
+                        { value: 'flexible', label: '灵活就业（只能缴养老与医疗，全部个人承担）' }] },
+                { key: 'socialAverage', step: 'identity', label: '当地上年度社平工资（月）', type: 'money', default: 8000,
+                    hint: '决定缴费基数上下限（60% 保底 / 300% 封顶）与公积金免税基数上限（社平 3 倍）' },
+
+                // 单位职工：基数 = 本人上年度月平均工资（工资总额口径）
+                { key: 'monthlyWage', step: 'base', label: '月固定工资', type: 'money', default: 10000,
+                    when: { key: 'identity', in: ['employee'] } },
+                { key: 'annualBonus', step: 'base', label: '全年奖金（年终奖 / 季度奖 / 绩效奖）', type: 'money', default: 120000,
+                    when: { key: 'identity', in: ['employee'] },
+                    hint: '奖金属于**工资总额**，要计入缴费基数口径 —— 速算器只按「税前月薪」算，这里补上' },
+                { key: 'monthlyAllowance', step: 'base', label: '月津贴补贴', type: 'money', default: 0,
+                    when: { key: 'identity', in: ['employee'] } },
+                { key: 'monthlyOvertime', step: 'base', label: '月加班工资', type: 'money', default: 0,
+                    when: { key: 'identity', in: ['employee'] } },
+                { key: 'paidMonths', step: 'base', label: '上年度实际计薪月数', type: 'select', default: 12,
+                    when: { key: 'identity', in: ['employee'] },
+                    options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + ' 个月' }; }),
+                    hint: '上年度工作不满 12 个月的按**实际月数**平均（年中入职 / 新参加工作从起薪之月起）' },
+
+                // 灵活就业：基数在 60%~300% 之间**自选**
+                { key: 'level', step: 'base', label: '缴费档次（社平工资的百分比）', type: 'select', default: 0.6,
+                    when: { key: 'identity', in: ['flexible'] }, options: socialLevelOptions(),
+                    hint: socialNote('flexible') },
+                { key: 'withMedical', step: 'base', label: '同时缴纳职工医疗保险', type: 'switch', default: true,
+                    when: { key: 'identity', in: ['flexible'] } },
+
+                { key: 'housingRate', step: 'detail', label: '住房公积金比例（%）', type: 'percent', default: 12,
+                    when: { key: 'identity', in: ['employee'] }, hint: '法定 5% ~ 12%' },
+                { key: 'housingBaseMode', step: 'detail', label: '公积金缴存基数', type: 'select', default: 'same',
+                    when: { key: 'identity', in: ['employee'] },
+                    options: [{ value: 'same', label: '与社保缴费基数一致' },
+                        { value: 'separate', label: '单独填写（部分地区上下限另行公布）' }] },
+                { key: 'housingBase', step: 'detail', label: '公积金缴存基数（元/月）', type: 'money', default: 30000,
+                    when: { key: 'housingBaseMode', in: ['separate'] },
+                    hint: '超过社平 3 倍的部分，对应缴存额**不免个税**，要并入工资计税' },
+                { key: 'specialMonthly', step: 'detail', label: '专项附加扣除（月）', type: 'money', default: 0,
+                    when: { key: 'identity', in: ['employee'] } },
+                { key: 'declaredBase', step: 'detail', label: '单位实际申报的缴费基数', type: 'money', default: 4800,
+                    when: { key: 'identity', in: ['employee'] },
+                    hint: '填 0 表示按上面核定的基数足额申报；低于实际基数即**未足额缴纳**' },
+                { key: 'auditYears', step: 'detail', label: '假设被追溯的年数', type: 'number', default: 1, min: 1,
+                    when: { key: 'identity', in: ['employee'] } }
+            ],
+            steps: [
+                { key: 'identity', title: '参保身份与社平工资', why: '单位职工与灵活就业是**两套制度**：前者单位与个人分担、有公积金，后者只能缴养老与医疗且**全部个人承担**，基数还是自选的' },
+                { key: 'base', title: '缴费基数核定', why: '单位职工的基数是**本人上年度月平均工资**（含奖金、津贴、加班），不是本月工资；基数一年一调，不是每月跟着工资变' },
+                { key: 'detail', title: '缴纳比例与申报基数', why: '公积金只有「比例 ≤12% 且基数 ≤ 社平 3 倍」的部分免征个税；申报基数低于实际基数要补缴并加收滞纳金' }
+            ],
+            pitfalls: [
+                '缴费基数是**本人上年度月平均工资**，**不是本月工资** —— 奖金、津贴补贴、加班工资都属于工资总额，都要进基数口径',
+                '缴了 1 万月薪 + 12 万年终奖的人，法定基数是 **2 万**不是 1 万：个人侧一年差 **2.7 万**、单位侧差 **4.74 万**',
+                '基数**一年一调**（多数地区每年 7 月随上年度社平工资公布调整），不是每月跟着工资变',
+                '公积金免税的两个上限是「**且**」的关系：比例 ≤12% **且** 基数 ≤ 社平 3 倍，超出部分**并入工资计税**',
+                '公积金基数可与社保基数**不同**（部分地区上下限另行公布），超速算器没有这一栏，填不了',
+                '按最低基数申报是**未足额缴纳**：补缴 + 按日万分之五滞纳金（年化 **18.25%**）+ 欠缴数额 **1~3 倍**罚款',
+                '灵活就业养老按 **20%** 缴且**全部个人承担**，其中只有 **8% 进个人账户**、12% 进统筹',
+                '灵活就业的基数在社平 **60%~300% 之间自选**，与单位职工「按实际工资定」根本不同',
+                '**统筹部分不退还**：断缴、身故、出国定居只退还个人账户（8%）那一部分',
+                '工伤、生育个人不缴（生育已并入医保），算到手时扣掉就多扣了',
+                '缴费基数仍受 **60% 保底 / 300% 封顶**约束：工资 3000 按下限缴、工资 5 万只按 3 倍封顶数缴'
+            ],
+            compute: function (v) {
+                var S = window.EuriskoSocialQuick;
+                if (!S) return null;
+                var num = function (x) { var n = Number(x); return isFinite(n) && n > 0 ? n : 0; };
+                var yuan = function (x) { return (Math.round((Number(x) || 0) * 100) / 100).toFixed(2); };
+                var pct = function (r) { return Math.round((Number(r) || 0) * 10000) / 100 + '%'; };
+                var yr = function (x) { return Math.round((Number(x) || 0) * 12 * 100) / 100; };
+                var socialAverage = num(v.socialAverage);
+
+                // ===== 灵活就业：另一套制度（20% 全额自付，8% 进个人账户）=====
+                if (v.identity === 'flexible') {
+                    var f = S.flexibleOf({ socialAverage: socialAverage, level: v.level, withMedical: !!v.withMedical });
+                    var rowsF = [
+                        { label: '缴费基数（自选档次）', value: f.base, kind: 'money',
+                            hint: '社平 ' + yuan(socialAverage) + ' × ' + Math.round(f.level * 100) + '%' },
+                        { label: '养老保险（个人 / 月，20%）', value: f.pensionMonthly, kind: 'money',
+                            hint: '**全部个人承担**：单位职工是单位 16% + 个人 8%，灵活就业是 20% 一人出' },
+                        { label: '其中：记入个人账户（8%）', value: f.personalAccountMonthly, kind: 'money',
+                            hint: '这一部分才是「自己的」' },
+                        { label: '其中：记入统筹基金（12%）', value: f.poolMonthly, kind: 'money',
+                            hint: '**不退还**：断缴、身故、出国定居都拿不回来' },
+                        { label: '职工医疗保险（个人 / 月）', value: f.medicalMonthly, kind: 'money',
+                            hint: f.withMedical ? '比例 ' + pct(f.medicalRate) + '，由统筹地区确定' : '未勾选，不计入' },
+                        { label: '月缴合计', value: f.monthlyTotal, kind: 'money' },
+                        { label: '年缴合计', value: f.annualTotal, kind: 'money' },
+                        { label: '全年记入个人账户', value: f.annualPersonalAccount, kind: 'money',
+                            hint: '年缴 ' + yuan(f.annualTotal) + ' 中只有 ' + yuan(f.annualPersonalAccount) + ' 元是自己的' },
+                        { label: '全年记入统筹基金', value: f.annualPool, kind: 'money',
+                            hint: '占养老缴费的 ' + pct(f.poolRate / f.pensionRate) + '，不退还' },
+                        { label: '若当年退保 / 身故可退还', value: f.annualPersonalAccount, kind: 'money',
+                            hint: f.refundNote }
+                    ];
+
+                    var levels = ((S.rules() || {}).flexible || {}).levels || [0.6, 1, 3];
+                    var stepsF = [{
+                        title: '自选档次 → 缴费基数',
+                        rows: [
+                            { label: '当地上年度社平工资（月）', value: socialAverage, format: 'money' },
+                            { label: '自选档次', value: Math.round(f.level * 100) + '%', format: 'text' },
+                            { label: '缴费基数', value: f.base, format: 'money' }
+                        ],
+                        footnote: '单位职工是「按本人上年度月平均工资定」，灵活就业是**自选** —— 这是两套制度最根本的差别'
+                    }, {
+                        title: '养老保险 20% 的拆分',
+                        rows: [
+                            { label: '月缴（20%）', value: f.pensionMonthly, format: 'money' },
+                            { label: '记入个人账户（8%）', value: f.personalAccountMonthly, format: 'money' },
+                            { label: '记入统筹基金（12%）', value: f.poolMonthly, format: 'money' },
+                            { label: '月缴合计（含医保）', value: f.monthlyTotal, format: 'money' }
+                        ],
+                        footnote: f.refundNote
+                    }];
+
+                    var noteF = '灵活就业在当地社平 ' + yuan(socialAverage) + ' 元的 '
+                        + Math.round(f.level * 100) + '% 档（基数 ' + yuan(f.base) + ' 元/月）参保：'
+                        + '养老保险按 ' + pct(f.pensionRate) + ' 缴、' + yuan(f.pensionMonthly)
+                        + ' 元/月，**全部个人承担**（单位职工是单位 16% + 个人 8%）。'
+                        + '其中只有 ' + pct(f.personalAccountRate) + '（' + yuan(f.personalAccountMonthly)
+                        + ' 元/月）进个人账户，剩下 ' + pct(f.poolRate) + '（' + yuan(f.poolMonthly)
+                        + ' 元/月）进统筹基金 —— **统筹部分不退还**。'
+                        + (f.withMedical ? ' 加职工医保 ' + yuan(f.medicalMonthly) + ' 元/月，' : '')
+                        + '月缴合计 **' + yuan(f.monthlyTotal) + ' 元**、年缴 **' + yuan(f.annualTotal)
+                        + ' 元**，其中全年只有 **' + yuan(f.annualPersonalAccount) + ' 元**是自己的。';
+
+                    return {
+                        primary: { label: '灵活就业月缴合计', value: f.monthlyTotal, kind: 'money',
+                            hint: '基数 ' + yuan(f.base) + ' 元/月（社平 ' + Math.round(f.level * 100) + '% 档）' },
+                        rows: rowsF,
+                        note: noteF,
+                        extras: [{
+                            title: '各档次缴费对照（养老 + 医疗）',
+                            note: '基数在社平 60%~300% 之间自选；缴得多不等于「自己的」多 —— 只有 8% 进个人账户',
+                            table: {
+                                head: ['档次', '缴费基数', '月缴', '年缴', '全年个人账户', '全年统筹（不退还）'],
+                                rows: levels.map(function (lv) {
+                                    var o = S.flexibleOf({ socialAverage: socialAverage, level: lv, withMedical: !!v.withMedical });
+                                    return [Math.round(lv * 100) + '%', { value: o.base, kind: 'money' },
+                                        { value: o.monthlyTotal, kind: 'money' }, { value: o.annualTotal, kind: 'money' },
+                                        { value: o.annualPersonalAccount, kind: 'money' }, { value: o.annualPool, kind: 'money' }];
+                                })
+                            }
+                        }],
+                        steps: stepsF
+                    };
+                }
+
+                // ===== 单位职工 =====
+                var wb = S.wageBaseOf({
+                    monthlyWage: v.monthlyWage, monthlyAllowance: v.monthlyAllowance,
+                    monthlyOvertime: v.monthlyOvertime, annualBonus: v.annualBonus,
+                    paidMonths: v.paidMonths, socialAverage: socialAverage
+                });
+                var housingBase = v.housingBaseMode === 'separate' ? num(v.housingBase) : wb.base;
+                var rateInput = (Number(v.housingRate) || 0) / 100;
+                var input = {
+                    wage: wb.monthlyAverage, socialAverage: socialAverage,
+                    housingRate: rateInput, housingBase: housingBase, specialMonthly: v.specialMonthly
+                };
+                var s = S.socialInsuranceOf(input);
+                var n = S.netSalaryOf(input);
+                var hf = S.housingTaxFreeOf({ housingBase: housingBase, housingRate: rateInput, socialAverage: socialAverage });
+                var comp = S.complianceGapOf({ actualBase: wb.base, declaredBase: v.declaredBase, years: v.auditYears });
+
+                var rows = [
+                    { label: '缴费基数（法定：本人上年度月平均工资）', value: wb.base, kind: 'money',
+                        hint: socialNote('wage') + '；' + socialNote('adjust') },
+                    { label: '上年度工资总额', value: wb.annualTotal, kind: 'money',
+                        hint: '（月工资 ' + yuan(wb.monthlyWage) + ' + 津贴 ' + yuan(wb.monthlyAllowance)
+                            + ' + 加班 ' + yuan(wb.monthlyOvertime) + '）× ' + wb.months + ' 个月 + 奖金 '
+                            + yuan(wb.annualBonus) },
+                    { label: '上年度月平均工资', value: wb.monthlyAverage, kind: 'money',
+                        hint: '工资总额 ÷ 实际计薪月数 ' + wb.months + ' 个月' },
+                    { label: '速算器口径（只按本月固定工资）', value: wb.naiveBase, kind: 'money',
+                        hint: wb.gap > 0
+                            ? '⚠️ 少算 ' + yuan(wb.gap) + ' 元基数 —— 速算器的字段就叫「税前月薪」，直接拿它当基数'
+                            : '与法定口径一致（本月工资就是上年度月平均）' },
+                    { label: '基数上下限', value: yuan(wb.baseMin) + ' ~ ' + yuan(wb.baseMax), kind: 'text',
+                        hint: '社平 60% 保底 / 300% 封顶' },
+                    { label: '公积金缴存基数', value: hf.housingBase, kind: 'money',
+                        hint: v.housingBaseMode === 'separate' ? '单独填写（与社保基数不同）' : '与社保缴费基数一致' },
+                    { label: '住房公积金（个人 / 月）', value: hf.personal, kind: 'money',
+                        hint: '比例 ' + pct(hf.housingRate) + '，单位同比例再缴 ' + yuan(s.housingEmployer) + ' 元/月' },
+                    { label: '公积金免税部分', value: hf.taxFree, kind: 'money',
+                        hint: '比例 ≤ ' + pct(hf.capRate) + ' **且** 基数 ≤ 社平 ' + hf.capRatio + ' 倍（'
+                            + yuan(hf.capBase) + ' 元）' },
+                    { label: '公积金超标并入工资计税', value: hf.taxable, kind: 'money',
+                        hint: hf.taxable > 0
+                            ? '⚠️ 基数超社平 3 倍 ' + yuan(hf.exceededBase) + ' 元，对应缴存额要并入工资计个税'
+                            : '未超标（比例与基数两个上限都在内）' }
+                ];
+                s.items.forEach(function (it) {
+                    rows.push({
+                        label: it.name + '（个人 / 月）',
+                        value: it.personal,
+                        kind: 'money',
+                        hint: '个人 ' + pct(it.personalRate) + '、单位 ' + pct(it.employerRate) + ' → 单位 '
+                            + yuan(it.employer) + ' 元/月' + (it.personalRate ? '' : '（个人不缴）')
+                    });
+                });
+                rows.push({ label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' });
+                rows.push({ label: '单位缴纳 / 月', value: s.employerTotal, kind: 'money' });
+                rows.push({ label: '到手（第 1 月）', value: n.net1, kind: 'money' });
+                rows.push({ label: '到手（第 12 月）', value: n.net12, kind: 'money',
+                    hint: '累计预扣逐级跳档，比第 1 月少 ' + yuan(n.net1 - n.net12) + ' 元是正常结果' });
+                rows.push({ label: '全年个人缴纳', value: yr(s.personalTotal), kind: 'money', hint: '月缴 × 12' });
+                rows.push({ label: '全年单位缴纳', value: yr(s.employerTotal), kind: 'money', hint: '月缴 × 12' });
+                rows.push({ label: '全年个税', value: n.annualTax, kind: 'money' });
+                rows.push({ label: '员工全年到手', value: n.annualNet, kind: 'money' });
+                rows.push({ label: '企业全年用工成本（1 人）', value: yr(s.wage + s.employerTotal), kind: 'money' });
+
+                if (!comp.compliant) {
+                    rows.push({ label: '申报基数', value: comp.declaredBase, kind: 'money',
+                        hint: '⚠️ 低于核定的 ' + yuan(comp.actualBase) + ' 元，差 ' + yuan(comp.gapBase) + ' 元' });
+                    rows.push({ label: '一年少缴（单位 + 个人）', value: comp.annualGap, kind: 'money',
+                        hint: '单位 ' + pct(comp.employerRate) + ' + 个人 ' + pct(comp.personalRate) + '，月差 '
+                            + yuan(comp.monthlyGap) + ' 元' });
+                    rows.push({ label: '追溯 ' + comp.years + ' 年的欠缴额', value: comp.totalArrears, kind: 'money' });
+                    rows.push({ label: '滞纳金（按日万分之五）', value: comp.lateFee, kind: 'money',
+                        hint: '年化 ' + pct(comp.lateFeeDailyRate * 365) + '，按平均欠缴 ' + (comp.years / 2) + ' 年估算' });
+                    rows.push({ label: '罚款（1 ~ 3 倍）', value: comp.penaltyMin + ' ~ ' + comp.penaltyMax, kind: 'text' });
+                    rows.push({ label: '合计代价', value: comp.totalMin + ' ~ ' + comp.totalMax, kind: 'text',
+                        hint: '补缴 + 滞纳金 + 罚款；' + socialNote('compliance') });
+                }
+
+                var note = '缴费基数是**本人上年度月平均工资**：上年度工资总额 ' + yuan(wb.annualTotal)
+                    + ' 元 ÷ ' + wb.months + ' 个月 = ' + yuan(wb.monthlyAverage) + ' 元/月'
+                    + (wb.clamped === 'below' ? '（低于社平 60%，按下限 ' + yuan(wb.base) + ' 元保底）'
+                        : wb.clamped === 'above' ? '（高于社平 300%，按上限 ' + yuan(wb.base) + ' 元封顶）' : '')
+                    + ' → **缴费基数 ' + yuan(wb.base) + ' 元**。';
+                if (wb.gap > 0) {
+                    note += ' ⚠️ 速算器只按「税前月薪」算会得 ' + yuan(wb.naiveBase) + ' 元，**少算 '
+                        + yuan(wb.gap) + ' 元基数** —— 奖金、津贴、加班都属于工资总额，都要进这个口径。';
+                }
+                note += ' 公积金：基数 ' + yuan(hf.housingBase) + ' 元 × ' + pct(hf.housingRate) + ' = '
+                    + yuan(hf.personal) + ' 元/月，其中免税 ' + yuan(hf.taxFree) + ' 元'
+                    + (hf.taxable > 0 ? '，**超标 ' + yuan(hf.taxable) + ' 元要并入工资计税**（基数超社平 3 倍）' : '')
+                    + '。';
+                note += ' 个人五险一金 **' + yuan(s.personalTotal) + ' 元/月**，单位 **'
+                    + yuan(s.employerTotal) + ' 元/月**。';
+                if (!comp.compliant) {
+                    note += ' ⚠️ 单位按 ' + yuan(comp.declaredBase) + ' 元申报（比核定基数低 '
+                        + yuan(comp.gapBase) + ' 元）：一年少缴 ' + yuan(comp.annualGap) + ' 元，追溯 '
+                        + comp.years + ' 年的代价是 **' + yuan(comp.totalMin) + ' ~ ' + yuan(comp.totalMax)
+                        + ' 元**（补缴 + 滞纳金 + 1~3 倍罚款）。';
+                }
+
+                var extras = [{
+                    title: '工资总额口径（什么进基数、什么不进）',
+                    note: socialNote('wage') + '；' + socialNote('adjust'),
+                    table: {
+                        head: ['计入缴费基数', '不计入缴费基数'],
+                        rows: (function () {
+                            var inc = ((S.rules() || {}).wageComposition || {}).included || [];
+                            var exc = ((S.rules() || {}).wageComposition || {}).excluded || [];
+                            var n2 = Math.max(inc.length, exc.length);
+                            var out = [];
+                            for (var i = 0; i < n2; i++) {
+                                out.push([inc[i] ? inc[i].label : '—', exc[i] || '—']);
+                            }
+                            return out;
+                        })()
+                    }
+                }, {
+                    title: '五险一金逐项明细',
+                    note: '工伤、生育个人不缴（生育已并入职工医保）—— 「个人 0 元」不是漏算',
+                    table: {
+                        head: ['项目', '个人比例', '单位比例', '个人（月）', '单位（月）'],
+                        rows: s.items.map(function (it) {
+                            return [it.name, pct(it.personalRate), pct(it.employerRate),
+                                { value: it.personal, kind: 'money' }, { value: it.employer, kind: 'money' }];
+                        }).concat([
+                            ['住房公积金', pct(s.housingRate), pct(s.housingRate),
+                                { value: s.housingPersonal, kind: 'money' }, { value: s.housingEmployer, kind: 'money' }],
+                            ['合计', '—', '—', { value: s.personalTotal, kind: 'money' }, { value: s.employerTotal, kind: 'money' }]
+                        ])
+                    }
+                }, {
+                    title: '申报基数对照（按社保法第八十六条）',
+                    note: socialNote('compliance'),
+                    table: {
+                        head: ['项目', '金额'],
+                        rows: [
+                            ['核定的缴费基数', { value: comp.actualBase, kind: 'money' }],
+                            ['单位申报的基数', { value: comp.declaredBase, kind: 'money' }],
+                            ['基数差额', { value: comp.gapBase, kind: 'money' }],
+                            ['每月少缴（单位 + 个人）', { value: comp.monthlyGap, kind: 'money' }],
+                            ['每年少缴', { value: comp.annualGap, kind: 'money' }],
+                            ['追溯 ' + comp.years + ' 年欠缴额', { value: comp.totalArrears, kind: 'money' }],
+                            ['滞纳金（日万分之五，年化 ' + pct(comp.lateFeeDailyRate * 365) + '）', { value: comp.lateFee, kind: 'money' }],
+                            ['罚款（1 倍）', { value: comp.penaltyMin, kind: 'money' }],
+                            ['罚款（3 倍）', { value: comp.penaltyMax, kind: 'money' }],
+                            ['合计代价（最低 ~ 最高）', comp.compliant ? '足额申报，无代价'
+                                : yuan(comp.totalMin) + ' ~ ' + yuan(comp.totalMax) + ' 元']
+                        ]
+                    }
+                }];
+
+                var steps = [{
+                    title: '本人上年度月平均工资 → 缴费基数',
+                    rows: [
+                        { label: '上年度工资总额', value: wb.annualTotal, format: 'money',
+                            note: '（月工资 + 津贴补贴 + 加班工资）× 计薪月数 + 全年奖金' },
+                        { label: '实际计薪月数', value: wb.months, format: 'text' },
+                        { label: '上年度月平均工资', value: wb.monthlyAverage, format: 'money' },
+                        { label: '速算器口径（只按本月工资）', value: wb.naiveBase, format: 'money' },
+                        { label: '缴费基数', value: wb.base, format: 'money' }
+                    ],
+                    footnote: wb.gap > 0
+                        ? '速算器少算 ' + yuan(wb.gap) + ' 元基数 —— 奖金、津贴、加班都属于工资总额'
+                        : '基数一年一调（多数地区每年 7 月随上年度社平工资公布调整），不是每月跟着工资变'
+                }, {
+                    title: '基数上下限（60% 保底 / 300% 封顶）',
+                    rows: [
+                        { label: '当地上年度社平工资（月）', value: socialAverage, format: 'money' },
+                        { label: '下限（60%）', value: wb.baseMin, format: 'money' },
+                        { label: '上限（300%）', value: wb.baseMax, format: 'money' },
+                        { label: '核定结果', value: { below: '按下限保底', above: '按上限封顶', within: '未触及上下限', none: '未填工资' }[wb.clamped], format: 'text' }
+                    ],
+                    footnote: '工资 3000 按下限缴、工资 5 万只按 3 倍封顶数缴 —— 缴费基数不是工资'
+                }, {
+                    title: '公积金免税的两个上限（且的关系）',
+                    rows: [
+                        { label: '公积金缴存基数', value: hf.housingBase, format: 'money' },
+                        { label: '免税基数上限（社平 3 倍）', value: hf.capBase, format: 'money' },
+                        { label: '缴存比例', value: hf.housingRate, format: 'percent' },
+                        { label: '个人缴存额', value: hf.personal, format: 'money' },
+                        { label: '免税部分', value: hf.taxFree, format: 'money' },
+                        { label: '超标并入工资计税', value: hf.taxable, format: 'money' }
+                    ],
+                    footnote: '比例 ≤12% **且** 基数 ≤ 社平 3 倍，两个条件都满足才免征个税'
+                }, {
+                    title: '申报基数差额与代价',
+                    rows: [
+                        { label: '核定的缴费基数', value: comp.actualBase, format: 'money' },
+                        { label: '单位申报的基数', value: comp.declaredBase, format: 'money' },
+                        { label: '每月少缴（单位 + 个人）', value: comp.monthlyGap, format: 'money' },
+                        { label: '追溯 ' + comp.years + ' 年欠缴额', value: comp.totalArrears, format: 'money' },
+                        { label: '滞纳金（日万分之五）', value: comp.lateFee, format: 'money' },
+                        { label: '合计代价（最低）', value: comp.totalMin, format: 'money' }
+                    ],
+                    footnote: comp.compliant ? '足额申报，无代价' : socialNote('compliance')
+                }];
+
+                return {
+                    primary: { label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money',
+                        hint: '缴费基数 ' + yuan(wb.base) + ' 元（上年度月平均 ' + yuan(wb.monthlyAverage) + ' 元）' },
+                    rows: rows,
+                    note: note,
+                    extras: extras,
+                    steps: steps
+                };
+            }
         },
         // 阶段17 17C-4：附加税印花税的完整测算。排在 vat deep 之后 ——
         // 附加税的计税依据是「实际缴纳的增值税」，顺序不是随意排的。

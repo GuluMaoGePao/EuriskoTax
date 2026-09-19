@@ -217,28 +217,52 @@ describe('多步向导：第三个税种（企业所得税）', () => {
 // 第四个税种（社保公积金，17C-3）：字段全在「月」这个量级上，但结果侧要出全年汇总 ——
 // 它与前三个税种的结构都不同（没有 variant 选择器、没有条件字段），
 // 它能跑通说明渲染器不依赖任何某个税种的特定字段形状。
+// 第四个税种（社保公积金）。17C-3 纵深（v1.60.0）后 social-base-deep 改为**自带 spec**：
+// 速算器的字段就叫「税前月薪」，compute 直接拿它当缴费基数，而法定是**本人上年度月平均工资**
+// （工资总额里含奖金、津贴、加班），于是「月薪 1 万 + 年终奖 12 万」的基数被算成 1 万、
+// 法定是 2 万。它也是唯一一个**按身份切换整组字段**的税种（单位职工 / 灵活就业） ——
+// 能跑通说明 `when` 条件字段不只支持「显示/隐藏一个框」，还能换掉一整步的字段集合。
 describe('多步向导：第四个税种（社保公积金）', () => {
-    test('第一步只核定基数，比例与扣除留给第二步', () => {
+    test('第一步先定参保身份与社平工资', () => {
         W().open('social-base-deep', { fresh: true });
-        expect(document.querySelector('.step-title.active').textContent).toBe('核定缴费基数');
-        expect(document.getElementById('qf-wage')).toBeTruthy();
+        expect(document.querySelector('.step-title.active').textContent).toBe('参保身份与社平工资');
+        expect(document.getElementById('qf-identity')).toBeTruthy();
         expect(document.getElementById('qf-socialAverage')).toBeTruthy();
+        expect(document.getElementById('qf-monthlyWage')).toBeFalsy();
         expect(document.getElementById('qf-housingRate')).toBeFalsy();
+    });
+
+    test('第二步按身份给不同字段：单位职工收工资总额、灵活就业收自选档次', () => {
+        W().open('social-base-deep', { fresh: true });
+        document.getElementById('dw-next').click();     // → 缴费基数核定
+        expect(document.getElementById('qf-monthlyWage')).toBeTruthy();
+        expect(document.getElementById('qf-annualBonus')).toBeTruthy();
+
+        document.getElementById('dw-prev').click();     // 回第 1 步
+        document.getElementById('qf-identity').value = 'flexible';
+        document.getElementById('qf-identity').dispatchEvent(new Event('change'));
+        document.getElementById('dw-next').click();     // 回到第二步
+        expect(document.getElementById('qf-level')).toBeTruthy();
+        expect(document.getElementById('qf-monthlyWage')).toBeFalsy();
     });
 
     test('改了工资再回来，基数步填的值仍在（分步填值不丢）', () => {
         W().open('social-base-deep', { fresh: true });
-        document.getElementById('qf-wage').value = '20000';
-        document.getElementById('dw-next').click();     // → 缴纳比例与扣除
-        document.getElementById('dw-prev').click();     // 回第 1 步
-        expect(document.getElementById('qf-wage').value).toBe('20000');
+        document.getElementById('dw-next').click();     // → 缴费基数核定
+        document.getElementById('qf-monthlyWage').value = '20000';
+        document.getElementById('dw-next').click();     // → 缴纳比例与申报基数
+        document.getElementById('dw-prev').click();     // 回第 2 步
+        expect(document.getElementById('qf-monthlyWage').value).toBe('20000');
     });
 
-    test('结果步与同源速算器一致', () => {
+    test('结果步算出的数与直接调 compute 一致（无奖金时与速算器同口径）', () => {
         W().open('social-base-deep', { fresh: true });
-        document.getElementById('qf-wage').value = '20000';
         document.getElementById('dw-next').click();
-        document.getElementById('dw-next').click();     // → 结果
+        document.getElementById('qf-monthlyWage').value = '20000';
+        document.getElementById('qf-annualBonus').value = '0';
+        for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
+            document.getElementById('dw-next').click();
+        }
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('social-base').compute({
             wage: 20000, socialAverage: 8000, housingRate: 12, specialMonthly: 0

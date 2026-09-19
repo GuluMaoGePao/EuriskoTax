@@ -72,6 +72,193 @@
         };
     }
 
+    /**
+     * 阶段17 17C-3（v1.60.0）①：缴费基数 = **本人上年度月平均工资**，不是本月工资
+     *
+     * 速算器 `social-base` 的字段就叫「税前月薪」，compute 直接拿它当基数 ——
+     * 于是「月薪 1 万 + 年终奖 12 万」的人基数被算成 1 万，而法定是 2 万：
+     * 奖金、津贴补贴、加班工资都属于**工资总额**（国家统计局《关于工资总额组成的规定》），
+     * 都要进缴费基数口径。上年度工作不满 12 个月的按**实际计薪月数**平均。
+     *
+     * 返回值里同时给出 `naiveBase`（只按本月固定工资核定的基数）——
+     * 那正是速算器口径，两者的差就是「少缴了多少」。
+     */
+    function wageBaseOf(input) {
+        input = input || {};
+        var months = Math.max(Math.floor(num(input.paidMonths)) || 12, 1);
+        var monthlyWage = num(input.monthlyWage);
+        var allowance = num(input.monthlyAllowance);
+        var overtime = num(input.monthlyOvertime);
+        var bonus = num(input.annualBonus);
+
+        var annualTotal = round((monthlyWage + allowance + overtime) * months + bonus);
+        var monthlyAverage = round(annualTotal / months);
+
+        var legal = baseOf({ wage: monthlyAverage, socialAverage: input.socialAverage });
+        var naive = baseOf({ wage: monthlyWage, socialAverage: input.socialAverage });
+
+        return {
+            months: months,
+            monthlyWage: monthlyWage,
+            monthlyAllowance: allowance,
+            monthlyOvertime: overtime,
+            annualBonus: bonus,
+            annualTotal: annualTotal,
+            monthlyAverage: monthlyAverage,
+            socialAverage: legal.socialAverage,
+            base: legal.base,
+            baseMin: legal.min,
+            baseMax: legal.max,
+            clamped: legal.clamped,
+            // 速算器口径：只按本月固定工资核定（用于「差多少」的对照）
+            naiveBase: naive.base,
+            naiveClamped: naive.clamped,
+            gap: round(legal.base - naive.base)
+        };
+    }
+
+    /**
+     * ② 住房公积金免税的**两个上限是「且」的关系**（财税〔2006〕10 号）
+     *
+     * 免税要同时满足：缴存比例 ≤ 12% **且** 缴存基数 ≤ 设区城市上年度职工月平均工资 × 3。
+     * 公积金基数可与社保基数不同（部分地区另行公布上下限），所以这里单独收 ——
+     * 速算器内部算了这个数，但**没有暴露公积金基数这一栏**，用户填不了。
+     */
+    function housingTaxFreeOf(input) {
+        input = input || {};
+        var fund = R.housingFund;
+        var base = num(input.housingBase);
+        var rate = resolveRate(input.housingRate, fund.defaultRate, fund.minRate, fund.maxRate);
+        var socialAverage = num(input.socialAverage);
+        var personal = round(base * rate);
+
+        var capBase = socialAverage > 0
+            ? Math.min(base, round(fund.taxFreeBaseCapRatio * socialAverage))
+            : base;
+        var taxFree = round(Math.min(rate, fund.taxFreeRateCap) * capBase);
+
+        return {
+            housingBase: base,
+            housingRate: rate,
+            personal: personal,
+            capBase: capBase,
+            capRate: fund.taxFreeRateCap,
+            capRatio: fund.taxFreeBaseCapRatio,
+            taxFree: taxFree,
+            taxable: Math.max(round(personal - taxFree), 0),
+            // 超标的来源：基数超社平 3 倍就会超标（比例被法定夹在 12% 以内，超不了）
+            exceededBase: Math.max(round(base - capBase), 0),
+            note: fund.taxFreeNote
+        };
+    }
+
+    /**
+     * ④ 灵活就业人员参保 —— 与单位职工是**两套制度**
+     *
+     * 养老保险按 20% 缴纳，全部由个人承担（单位职工是单位 16% + 个人 8%）；
+     * 其中 8% 记入个人账户、12% 记入统筹基金。基数在当地社平 60%~300% 之间**自选** ——
+     * 这与单位职工「按本人上年度月平均工资定」根本不同。
+     * 最该说清的是：**统筹部分不退还**，断缴 / 身故 / 出国定居只退个人账户那 8%。
+     */
+    function flexibleOf(input) {
+        input = input || {};
+        var f = R.flexible || {};
+        var average = num(input.socialAverage);
+        var level = num(input.level) || 0.6;
+        var base = round(average * level);
+
+        var pensionRate = f.pensionRate === undefined ? 0.2 : f.pensionRate;
+        var accountRate = f.personalAccountRate === undefined ? 0.08 : f.personalAccountRate;
+        var poolRate = f.poolRate === undefined ? 0.12 : f.poolRate;
+        var medicalRate = f.medicalRate === undefined ? 0.09 : f.medicalRate;
+
+        var pensionMonthly = round(base * pensionRate);
+        var accountMonthly = round(base * accountRate);
+        var poolMonthly = round(base * poolRate);
+        var medicalMonthly = input.withMedical === false ? 0 : round(base * medicalRate);
+
+        return {
+            socialAverage: average,
+            level: level,
+            base: base,
+            pensionRate: pensionRate,
+            personalAccountRate: accountRate,
+            poolRate: poolRate,
+            medicalRate: input.withMedical === false ? 0 : medicalRate,
+            withMedical: input.withMedical !== false,
+            pensionMonthly: pensionMonthly,
+            personalAccountMonthly: accountMonthly,
+            poolMonthly: poolMonthly,
+            medicalMonthly: medicalMonthly,
+            monthlyTotal: round(pensionMonthly + medicalMonthly),
+            annualTotal: round((pensionMonthly + medicalMonthly) * 12),
+            annualPension: round(pensionMonthly * 12),
+            annualPersonalAccount: round(accountMonthly * 12),
+            annualPool: round(poolMonthly * 12),
+            annualMedical: round(medicalMonthly * 12),
+            // 「缴了 11520，只有 3840 是自己的」—— 断缴 / 身故 / 出国定居只退这一部分
+            refundableRate: pensionRate > 0 ? accountRate / pensionRate : 0,
+            note: f.note || '',
+            refundNote: f.refundNote || ''
+        };
+    }
+
+    /**
+     * ③ 申报基数不足额的代价（《社会保险法》第八十六条）
+     *
+     * 用人单位未按时足额缴纳的：责令限期补缴 + 自欠缴之日起按日加收**万分之五**滞纳金
+     * （年化 18.25%）+ 逾期仍不缴的处欠缴数额 **1 倍以上 3 倍以下**罚款。
+     * 滞纳金按「平均欠缴时长 = 追溯年数 ÷ 2」估算（每月欠缴的时长不同，取中值）。
+     */
+    function complianceGapOf(input) {
+        input = input || {};
+        var c = R.compliance || {};
+        var actual = num(input.actualBase);
+        var declared = num(input.declaredBase);
+        var years = Math.max(num(input.years), 1);
+        var months = Math.round(years * 12);
+        // 申报基数填 0 / 留空 = 按核定基数足额申报，此时没有差额
+        var gapBase = declared > 0 ? Math.max(round(actual - declared), 0) : 0;
+
+        var items = R.items || [];
+        var employerRate = items.reduce(function (s, it) { return s + it.employerRate; }, 0);
+        var personalRate = items.reduce(function (s, it) { return s + it.personalRate; }, 0);
+
+        var monthlyEmployerGap = round(gapBase * employerRate);
+        var monthlyPersonalGap = round(gapBase * personalRate);
+        var annualGap = round((monthlyEmployerGap + monthlyPersonalGap) * 12);
+
+        var dailyRate = c.lateFeeDailyRate === undefined ? 0.0005 : c.lateFeeDailyRate;
+        // 按「平均欠缴时长 = 追溯年数 ÷ 2 年」估算：欠缴总额 × 日万分之五 × 平均天数
+        var totalArrears = round(annualGap * years);
+        var lateFee = round(totalArrears * dailyRate * 365 * (years / 2));
+        var penaltyMin = round(totalArrears * (c.penaltyMin === undefined ? 1 : c.penaltyMin));
+        var penaltyMax = round(totalArrears * (c.penaltyMax === undefined ? 3 : c.penaltyMax));
+
+        return {
+            actualBase: actual,
+            declaredBase: declared,
+            gapBase: gapBase,
+            years: years,
+            months: months,
+            employerRate: employerRate,
+            personalRate: personalRate,
+            monthlyEmployerGap: monthlyEmployerGap,
+            monthlyPersonalGap: monthlyPersonalGap,
+            monthlyGap: round(monthlyEmployerGap + monthlyPersonalGap),
+            annualGap: annualGap,
+            totalArrears: totalArrears,
+            lateFeeDailyRate: dailyRate,
+            lateFee: lateFee,
+            penaltyMin: penaltyMin,
+            penaltyMax: penaltyMax,
+            totalMin: round(totalArrears + lateFee + penaltyMin),
+            totalMax: round(totalArrears + lateFee + penaltyMax),
+            compliant: gapBase <= 0,
+            note: c.note || ''
+        };
+    }
+
     // 五险一金：个人与单位分项 + 公积金免税额度（超出部分要并回工资计税）
     function socialInsuranceOf(input) {
         input = input || {};
@@ -102,11 +289,12 @@
         var housingEmployer = round(housingBase * rate);
 
         // 免税上限：比例 12% 与「社平 3 倍」两个条件同时满足（社平未知时不封顶）
-        var taxFreeBase = baseInfo.socialAverage > 0
-            ? Math.min(housingBase, round(fund.taxFreeBaseCapRatio * baseInfo.socialAverage))
-            : housingBase;
-        var housingTaxFree = round(Math.min(rate, fund.taxFreeRateCap) * taxFreeBase);
-        var housingTaxable = Math.max(round(housingPersonal - housingTaxFree), 0);
+        var hf = housingTaxFreeOf({
+            housingBase: housingBase, housingRate: input.housingRate,
+            socialAverage: baseInfo.socialAverage
+        });
+        var housingTaxFree = hf.taxFree;
+        var housingTaxable = hf.taxable;
 
         var personalTotal = round(personalInsurance + housingPersonal);
         var employerTotal = round(employerInsurance + housingEmployer);
@@ -255,6 +443,10 @@
         socialInsuranceOf: socialInsuranceOf,
         netSalaryOf: netSalaryOf,
         employerCostOf: employerCostOf,
-        scheduleOf: scheduleOf
+        scheduleOf: scheduleOf,
+        wageBaseOf: wageBaseOf,
+        housingTaxFreeOf: housingTaxFreeOf,
+        flexibleOf: flexibleOf,
+        complianceGapOf: complianceGapOf
     };
 })();

@@ -100,17 +100,20 @@ describe('工具注册表：数量与分组', () => {
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
         expect(twins).toHaveLength(11);
 
-        // ① 共享速算器 spec 的那 3 个（social / surtax-stamp / fee）：
+        // ① 共享速算器 spec 的那 2 个（surtax-stamp / fee）：
         //    完整测算与速算器本就问同一件事，共享同一份对象最省事，也最不容易漂。
         //    注：vat-deep 在 17C-1 纵深（v1.58.0）后改为自带 spec —— 速算器只认一个
         //    `inputTax` 标量，而「这笔进项能不能抵」恰恰是增值税最贵的一类错误；
         //    corporate-income-tax-deep 在 17C-2 纵深（v1.59.0）后同样自带 —— 三门槛看的是
-        //    全年季度平均值、加计扣除能整档掉到 5%、亏损会过期，速算器都表达不出来。
+        //    全年季度平均值、加计扣除能整档掉到 5%、亏损会过期，速算器都表达不出来；
+        //    social-base-deep 在 17C-3 纵深（v1.60.0）后同样自带 —— 速算器把「税前月薪」
+        //    直接当缴费基数，而法定是「本人上年度月平均工资」（含奖金津贴加班）。
         const OWN_SPEC = ['bonus-tax-deep', 'corporate-income-tax-deep', 'early-retirement-deep',
-            'equity-deep', 'expat-deep', 'severance-deep', 'vat-deep', 'withholding-deep'];
+            'equity-deep', 'expat-deep', 'severance-deep', 'social-base-deep', 'vat-deep',
+            'withholding-deep'];
         const shared = twins.filter((t) => OWN_SPEC.indexOf(t.id) < 0);
         expect(shared.map((t) => t.id).sort()).toEqual([
-            'disability-fund-deep', 'social-base-deep', 'surtax-stamp-deep'
+            'disability-fund-deep', 'surtax-stamp-deep'
         ]);
         shared.forEach((t) => {
             const twin = R().all().find((n) => n.compute === t.compute);
@@ -138,7 +141,8 @@ describe('工具注册表：数量与分组', () => {
             { id: 'early-retirement-deep', twin: 'early-retirement', policy: 'early-retirement' },
             { id: 'expat-deep', twin: 'expat', policy: 'expat-allowance' },
             { id: 'vat-deep', twin: 'vat', policy: 'vat-small-scale' },
-            { id: 'corporate-income-tax-deep', twin: 'corporate-income-tax', policy: 'corporate-small-low-profit' }
+            { id: 'corporate-income-tax-deep', twin: 'corporate-income-tax', policy: 'corporate-small-low-profit' },
+            { id: 'social-base-deep', twin: 'social-base', policy: 'social-insurance' }
         ].forEach((pair) => {
             const own = R().get(pair.id);
             expect(own.compute).not.toBe(R().get(pair.twin).compute);
