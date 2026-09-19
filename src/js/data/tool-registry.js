@@ -2667,6 +2667,255 @@
             }
         },
         {
+            // 阶段17 17D-9（v1.65.0）：个税场景完整度 **12/16 → 13/16** 的第九个场景 —— 个人养老金。
+            //
+            // 三个速算器（private-pension / health-insurance / annuity）各自只算自己那一项：
+            // 12000、2400、个人 4%。但**它们扣的是同一份应纳税所得额**，于是三层答不出来：
+            //   ① **叠加会跨档**：三项「各自单独省」之和 ≠ 合起来省。实测月薪 1 万（扣除前
+            //      4.8 万）+ 三件套满额 2.59 万：单独之和 **2592**，合并 **1617.6** —— **差 974**；
+            //   ② **年金 4% 的基数不是月薪**：是**本人上年度月平均工资**（含奖金），且超过当地
+            //      社平 300% 的部分**不计入**（与社保基数同源的两个坑）。实测月薪 1.5 万 + 年终奖
+            //      12 万 → 上年月均 2.5 万、社平 8000 → 基数封顶 **2.4 万**，年免税 **11520**
+            //      而不是按月薪算的 7200；
+            //   ③ **领取环节的税三件套各不相同**：养老金按**领取额全额 3%**（本金 + 收益一起计）、
+            //      年金按月领走**月度**税率表、税优健康险**赔付免税**。所以 3% 税率档的人缴
+            //      个人养老金**净收益为 0**，一旦账户有收益就是**净亏**（领 1.8 万缴 540 > 省 360）。
+            //
+            // 口径同源：一切计算走 private-pension-quick 新增的 stackOf / personOf / itemsOf，
+            // 限额读各自的 rules、计税走内核 calculateTaxByTaxableIncome，年金与领取侧复用
+            // annuity-quick / health-insurance-quick；单笔输入下与 compareOf 逐点相等（测试钉住）。
+            id: 'private-pension-deep', name: '个人养老金与税优三件套',
+            subtitle: '养老金 12000 / 健康险 2400 / 年金 4%：扣的是同一份应纳税所得额',
+            icon: 'fa-piggy-bank', status: 'deep',
+            nextTools: ['private-pension', 'health-insurance', 'annuity', 'special-deduction', 'annual-settlement'],
+            policyKey: 'private-pension',
+            fields: [
+                { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 15000, min: 0,
+                    hint: '三项税优扣的都是**同一个**应纳税所得额，所以它必须由收入推出来，而不是让你自己填一个数' },
+                { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 1500, min: 0 },
+                { key: 'selfSpecialDeduction', step: 'income', label: '本人专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
+                { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
+                    hint: '12000 是**每个人**的额度，不是一家人的 —— 填了配偶才能算出「家里的钱该给谁缴」' },
+                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseSpecialDeduction', step: 'income', label: '配偶专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseOtherDeduction', step: 'income', label: '配偶其他扣除（元/年）', type: 'money', default: 0, min: 0 },
+
+                { key: 'pensionSelf', step: 'pension', label: '个人养老金：今年缴费额（元）', type: 'money', default: 12000, min: 0,
+                    hint: '上限 **12000 元/年**，超额部分当年不可扣、**也不能结转到以后年度**' },
+                { key: 'years', step: 'pension', label: '预计缴费年数', type: 'number', default: 10, min: 1 },
+                { key: 'growthMultiple', step: 'pension', label: '预期领取额是累计缴费的几倍', type: 'number', default: 1.5, min: 1, step: 0.1,
+                    hint: '领取环节的 3% 是**按领取额全额**计的（本金 + 收益一起计） —— 填 1 表示只回本金，1.5 表示连本带收益领 1.5 倍' },
+
+                { key: 'healthPremium', step: 'other', label: '税优健康险：今年保费（元）', type: 'money', default: 2400, min: 0,
+                    hint: '限额 **2400 元/年**（200 元/月），须是带「税优识别码」的合规产品；**赔付环节免税**' },
+                { key: 'joinAnnuity', step: 'other', label: '是否参加企业 / 职业年金', type: 'select', default: 'no',
+                    options: [{ value: 'no', label: '不参加' }, { value: 'yes', label: '参加' }] },
+                { key: 'annuityPrevMonthlyWage', step: 'other', label: '本人上年度月平均工资（元）', type: 'money', default: 15000, min: 0,
+                    when: { key: 'joinAnnuity', in: ['yes'] },
+                    hint: '年金 4% 的基数**不是当月工资**：是本人**上年度月平均工资**，含奖金津贴 —— 与社保缴费基数同一个口径' },
+                { key: 'annuitySocialAverage', step: 'other', label: '当地上年度职工月平均工资（元）', type: 'money', default: 8000, min: 0,
+                    when: { key: 'joinAnnuity', in: ['yes'] },
+                    hint: '基数封顶：超过社平 **300%** 的部分不计入缴费基数' },
+                { key: 'personalRate', step: 'other', label: '个人缴费比例（%）', type: 'percent', default: 4, min: 0,
+                    when: { key: 'joinAnnuity', in: ['yes'] },
+                    hint: '不超过 **4%** 的部分当期从应纳税所得额中扣除；**超过 4% 的部分要并入工资计税**' },
+                { key: 'employerRate', step: 'other', label: '单位缴费比例（%）', type: 'percent', default: 8, min: 0,
+                    when: { key: 'joinAnnuity', in: ['yes'] },
+                    hint: '单位缴费是**递延**不是免税 —— 计入个人账户时暂不纳税，领取时照样要交' },
+                { key: 'monthlyWithdraw', step: 'other', label: '预计月领取额（元）', type: 'money', default: 2000, min: 0,
+                    when: { key: 'joinAnnuity', in: ['yes'] },
+                    hint: '年金领取按**月度**税率表单独计税，不并入综合所得、不参与汇算' }
+            ],
+            steps: [
+                { key: 'income', title: '两个人的应纳税所得额', why: '三项税优扣的都是同一个数，先把它从收入里推出来 —— 也才能算「家里的钱该给谁缴」' },
+                { key: 'pension', title: '个人养老金', why: '12000 的额度、领取时 3% 的税 —— 后者按**领取额全额**计，本金和收益一起算' },
+                { key: 'other', title: '税优健康险与企业年金', why: '健康险 2400 且赔付免税；年金 4% 的基数是**上年度月平均工资**且封顶社平 3 倍，超 4% 还要并回工资' }
+            ],
+            pitfalls: [
+                '**三项扣的是同一份应纳税所得额，叠加会跨档**：各自单独省之和 ≠ 合起来省。实测月薪 1 万（扣除前 4.8 万）+ 三件套满额 2.59 万：单独之和 2592、合并 **1617.6**，差 974',
+                '**年金 4% 的基数不是月薪**：是本人**上年度月平均工资**（含奖金），且超过当地社平 **300%** 的部分不计入。月薪 1.5 万 + 年终奖 12 万 → 上年月均 2.5 万、社平 8000 → 基数封顶 2.4 万，年免税 **11520** 而不是按月薪算的 7200',
+                '个人缴费**超过 4% 的部分要并入工资计税**（税后扣缴、照常进账户），不是「多缴多免税」',
+                '**领取环节三件套各不相同**：个人养老金按**领取额全额 × 3%**（本金 + 收益一起计）、年金按月领走**月度**税率表、税优健康险**赔付免税**',
+                '**3% 税率档的人缴个人养老金净收益为 0**（现在省 3%、将来领取得缴 3%），账户一旦有收益就是净亏 —— 实测领 1.8 万（1.5 倍）缴 540 > 省 360',
+                '12000 是**每个人**的额度（夫妻各自 12000），且**当年有效、不结转**；当年忘了缴不能补到次年',
+                '当年没扣也不用慌：个人养老金可以在**次年汇算时**填报扣除（3 月 1 日 — 6 月 30 日），税额一样不少'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoPrivatePensionQuick;
+                if (!Q) return null;
+
+                var r = Q.stackOf({
+                    selfMonthlyIncome: v.selfMonthlyIncome,
+                    selfMonthlyInsurance: v.selfMonthlyInsurance,
+                    selfSpecialDeduction: v.selfSpecialDeduction,
+                    selfOtherDeduction: v.selfOtherDeduction,
+                    spouseMonthlyIncome: v.spouseMonthlyIncome,
+                    spouseMonthlyInsurance: v.spouseMonthlyInsurance,
+                    spouseSpecialDeduction: v.spouseSpecialDeduction,
+                    spouseOtherDeduction: v.spouseOtherDeduction,
+                    pensionSelf: v.pensionSelf,
+                    years: v.years,
+                    growthMultiple: v.growthMultiple,
+                    healthPremium: v.healthPremium,
+                    joinAnnuity: v.joinAnnuity,
+                    annuityPrevMonthlyWage: v.annuityPrevMonthlyWage,
+                    annuitySocialAverage: v.annuitySocialAverage,
+                    personalRate: (Number(v.personalRate) || 0) / 100,
+                    employerRate: (Number(v.employerRate) || 0) / 100,
+                    monthlyWithdraw: v.monthlyWithdraw
+                });
+
+                if (!r.items.length) {
+                    return {
+                        primary: { label: '今年可少交个税', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '三项一项都没填：先把个人养老金 / 税优健康险 / 企业年金填上一个，才会进入核定表。',
+                        steps: []
+                    };
+                }
+
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var rows = [
+                    { label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, kind: 'money',
+                        hint: '全年工资 − 6 万 − 五险一金 − 专项附加扣除 − 其他扣除' },
+                    { label: '本人适用税率（扣除前）', value: r.self.bracket ? r.self.bracket.rate : 0, kind: 'percent' },
+                    { label: '三项合计可扣除', value: r.totalDeductible, kind: 'money' },
+                    { label: '扣除后应纳税所得额', value: r.taxableAfter, kind: 'money' },
+                    { label: '三项合计少交', value: r.savingCombined, kind: 'money',
+                        hint: '合并扣除后的真实节税（不是「扣除额 × 税率」）' },
+                    { label: '三项各自单算之和', value: r.separateSum, kind: 'money',
+                        hint: '三个速算器各算各的口径 —— 叠加跨档时它必然高估' },
+                    { label: '叠加跨档的差额', value: r.stackingGap, kind: 'money',
+                        hint: '单独之和 − 合并实际：差额越大说明跨档越多' }
+                ];
+                if (r.totalAddBack > 0) {
+                    rows.push({ label: '年金超 4% 并入工资', value: r.totalAddBack, kind: 'money',
+                        hint: '超过基数 4% 的部分要并入工资计税，税后扣缴、照常进账户' });
+                }
+                var annuityItem = r.items.filter(function (it) { return it.key === 'annuity'; })[0];
+                if (annuityItem) {
+                    rows.push({ label: '年金缴费基数（月）', value: annuityItem.base, kind: 'money',
+                        hint: '上年度月平均工资，封顶社平 3 倍 = ' + Math.round(annuityItem.baseCap) + ' 元'
+                            + (annuityItem.baseCapped ? '（已封顶）' : '') });
+                }
+                if (r.items.some(function (it) { return it.key === 'pension'; })) {
+                    rows.push(
+                        { label: '养老金缴费期累计节税', value: r.pensionSavedYears, kind: 'money',
+                            hint: r.years + ' 年累计' },
+                        { label: '领取时按 3% 计税', value: r.pensionWithdrawTax, kind: 'money',
+                            hint: '领取额 ' + Math.round(r.pensionWithdrawTotal) + ' 元 × 3%（本金 + 收益一起计）' },
+                        { label: '养老金净优惠', value: r.pensionNetBenefit, kind: 'money',
+                            hint: '缴费期累计节税 − 领取时交的税' },
+                        { label: '划算的领取额上限', value: r.breakEvenWithdraw, kind: 'money',
+                            hint: '领取额超过这个数，净优惠就转负（≈ 累计缴费的 ' + r.breakEvenMultiple.toFixed(2) + ' 倍）' }
+                    );
+                    if (!r.worthIt) {
+                        rows.push({ label: '是否划算', value: '不划算（当前税率 ≤ 3%）', kind: 'text' });
+                    }
+                }
+
+                var extras = [{
+                    title: '三件套逐项核定（限额 / 可扣 / 领取环节）',
+                    note: '年限额全部读各自的 rules；年金基数按「上年度月平均工资、封顶社平 3 倍」自己算',
+                    table: {
+                        head: ['项目', '年缴费', '可扣除', '领取环节的税'],
+                        rows: r.items.map(function (it) {
+                            return [it.label, money(it.contribution), money(it.deductible), it.withdrawNote];
+                        })
+                    }
+                }, {
+                    title: '叠加 vs 各自单算（跨档时两者不等）',
+                    note: '三项扣的是**同一个**应纳税所得额 —— 合成一笔之后可能掉到更低的档上',
+                    table: {
+                        head: ['项目', '可扣除', '单独算', '合并后的实际贡献'],
+                        rows: r.marginal.map(function (m) {
+                            var sep = r.separate.filter(function (s) { return s.key === m.key; })[0];
+                            return [m.label, money(m.deductible), money(sep ? sep.saving : 0), money(m.contribution)];
+                        }).concat([['合计', money(r.totalDeductible), money(r.separateSum), money(r.savingCombined)]])
+                    }
+                }, {
+                    title: '领取环节三件套对照',
+                    note: '缴费环节都是「暂不征税」，差别全在领取：3% 全额 / 月度税率表 / 免税',
+                    table: {
+                        head: ['项目', '领取口径', '预计领取额', '领取时交税'],
+                        rows: r.items.map(function (it) {
+                            if (it.key === 'pension') {
+                                return ['个人养老金', '领取额全额 × 3%', money(r.pensionWithdrawTotal), money(r.pensionWithdrawTax)];
+                            }
+                            if (it.key === 'annuity' && r.annuity) {
+                                return ['企业 / 职业年金', '按月领取 × 月度税率表', money(r.annuity.accountTotal),
+                                    money(r.annuity.withdrawTaxTotal)];
+                            }
+                            if (it.key === 'health') {
+                                return ['税优健康险', '保险赔款免征个税', money(0), money(0)];
+                            }
+                            return [it.label, '—', money(0), money(0)];
+                        })
+                    }
+                }];
+                if (r.hasSpouse && r.plans.length > 1) {
+                    extras.push({
+                        title: '家里的 12000 该给谁缴（每人各 12000，本人只能扣本人的）',
+                        note: '个人养老金**不能由配偶代扣** —— 所以「谁缴」决定「省多少」，放在税率高的一方身上才省得多',
+                        table: {
+                            head: ['投法', '本人缴', '配偶缴', '家庭全年个税', '少交'],
+                            rows: r.plans.map(function (p) {
+                                return [p.label, money(p.pensionSelf), money(p.pensionSpouse), money(p.totalTax), money(p.saving)];
+                            })
+                        }
+                    });
+                }
+
+                var note = '三项合计可扣 ' + Math.round(r.totalDeductible) + ' 元，今年少交 **'
+                    + Math.round(r.savingCombined) + ' 元**（三个速算器各算各的会给出 ' + Math.round(r.separateSum)
+                    + ' 元，叠加跨档差 ' + Math.round(r.stackingGap) + ' 元）。';
+                if (r.items.some(function (it) { return it.key === 'pension'; })) {
+                    note += ' 养老金 ' + r.years + ' 年累计节税 ' + Math.round(r.pensionSavedYears)
+                        + ' 元，领取时（按 ' + r.multiple + ' 倍估算）交 ' + Math.round(r.pensionWithdrawTax)
+                        + ' 元，净优惠 **' + Math.round(r.pensionNetBenefit) + ' 元**';
+                    if (!r.worthIt) note += '（当前税率 ≤ 3%，这个数随账户收益增大而转负）';
+                    note += '。';
+                }
+                if (r.hasSpouse && r.plans.length > 1) {
+                    note += ' 家里的额度给 **' + (r.bestPlan.key === 'both' ? '两个人各缴满' : (r.bestPlan.key === 'spouse' ? '配偶' : '本人'))
+                        + '** 最省。';
+                }
+
+                var steps = [{
+                    title: '① 三项各自核定（限额内的部分才可扣）',
+                    rows: r.items.map(function (it) {
+                        return { label: it.label, value: it.deductible, format: 'money', note: it.note };
+                    }).concat([{ label: '合计可扣除', value: r.totalDeductible, format: 'money' }])
+                }, {
+                    title: '② 从同一份应纳税所得额里合并扣除',
+                    rows: [
+                        { label: '扣除前应纳税所得额', value: r.self.taxableBefore, format: 'money' },
+                        { label: '合并扣除后', value: r.taxableAfter, format: 'money' },
+                        { label: '合并口径少交', value: r.savingCombined, format: 'money' },
+                        { label: '三项各自单算之和', value: r.separateSum, format: 'money' },
+                        { label: '跨档差额', value: r.stackingGap, format: 'money' }
+                    ],
+                    footnote: '叠加会跨档，所以「各自单独省」之和 ≠ 合计省；年金超过基数 4% 的部分还要并回工资计税。'
+                }, {
+                    title: '③ 领取环节与净优惠',
+                    rows: r.items.filter(function (it) { return it.key === 'pension'; }).length ? [
+                        { label: '缴费期累计节税', value: r.pensionSavedYears, format: 'money' },
+                        { label: '预计领取额', value: r.pensionWithdrawTotal, format: 'money' },
+                        { label: '领取时按 3% 计税', value: r.pensionWithdrawTax, format: 'money' },
+                        { label: '净优惠', value: r.pensionNetBenefit, format: 'money' },
+                        { label: '划算的领取额上限', value: r.breakEvenWithdraw, format: 'money' }
+                    ] : [{ label: '未填个人养老金', value: 0, format: 'money' }],
+                    footnote: '个人养老金按领取额**全额** 3%（本金 + 收益一起计）；年金按月领走月度税率表；税优健康险赔付免税。'
+                }];
+
+                return {
+                    primary: { label: '今年三项合计可少交个税', value: r.savingCombined, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
+        },
+        {
             // 阶段17 17B-2：**第一个带多口径对比的 spec 迁移**。
             // 原来它指向 reverse-calculation-page（index.html 一整页 + app.js 私有逻辑），
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染 —— 这一步之后旧页面进入拆除期（下一小步删）。
