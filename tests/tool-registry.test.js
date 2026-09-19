@@ -55,7 +55,7 @@ describe('工具注册表：数量与分组', () => {
     // 阶段17 17C-1 后 deep 不再只有一种：分成「页面式」（各有独立 HTML 页与私有逻辑）与
     // 「spec 驱动」（无 pageId，由 deep-wizard-ui.js 按注册表渲染）。**分开统计，别笼统计总数** ——
     // 阶段17 的进度刻度就是「spec 驱动的在涨、页面式的最终归零」（17B 反向迁移的验收口径）。
-    test('20 个速算器 + 深度流程（0 个页面式 + 11 个 spec 驱动）', () => {
+    test('20 个速算器 + 深度流程（0 个页面式 + 12 个 spec 驱动）', () => {
         expect(R().all()).toHaveLength(20);
         const deep = R().deep();
         // 17B-1（v1.46.0）：business 从页面式迁到 spec 驱动，页面式由 4 → 3；
@@ -80,7 +80,12 @@ describe('工具注册表：数量与分组', () => {
         // 17D-4（v1.55.0）：severance-deep 离职补偿（8/16）—— 第四个。
         // 17D-5（v1.56.0）：early-retirement-deep 提前退休 / 内退（9/16）—— 第五个。
         // 17D-6（v1.57.0）：expat-deep 外籍津补贴免税（10/16）—— 第六个，个税 10/16 目标达成。
+        // 17D-7（v1.63.0）：annual-settlement-deep 年度汇算清缴（11/16）—— 第七个。10/16 达标后
+        //   继续往 16/16 走：汇算是「退税还是补税」这条最常被问的问题，而速算器那五个框
+        //   只认「一处任职、全年 12 个月、只有工资」这一种人生 —— 年中入职、有劳务报酬、
+        //   有大病医疗的人，它一律算成「不补不退」。
         expect(specDriven).toEqual([
+            'annual-settlement-deep',
             'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep',
             'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'reverse', 'severance-deep',
             'social-base-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
@@ -98,7 +103,7 @@ describe('工具注册表：数量与分组', () => {
         //    复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，
         //    而增值税还是 surtax / stamp 的计税依据，漂一点会顺着依赖链放大。
         const twins = specDriven.filter((t) => t.id.endsWith('-deep'));
-        expect(twins).toHaveLength(11);
+        expect(twins).toHaveLength(12);
 
         // ① 共享速算器 spec 的**已经归零**（v1.62.0 收官）。17C 五条做完后，11 个有孪生
         //    速算器的 -deep 全部改成自带 spec —— 速算器只认「一个数」，而完整测算要算的
@@ -110,7 +115,7 @@ describe('工具注册表：数量与分组', () => {
         //      surtax-stamp-deep（v1.62.0）：只有一个「实际缴纳的增值税」框，留抵退税要扣、
         //      即征即退不扣、进口不附征三处方向不同；印花税只有「一张凭证一个税目一个金额」。
         //    口径同源改由「仍然调同一个 *-quick.js 模块」+ 单笔输入逐点对拍守护（见各 deep 测试）。
-        const OWN_SPEC = ['bonus-tax-deep', 'corporate-income-tax-deep', 'disability-fund-deep',
+        const OWN_SPEC = ['annual-settlement-deep', 'bonus-tax-deep', 'corporate-income-tax-deep', 'disability-fund-deep',
             'early-retirement-deep', 'equity-deep', 'expat-deep', 'severance-deep',
             'social-base-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'];
         const shared = twins.filter((t) => OWN_SPEC.indexOf(t.id) < 0);
@@ -144,7 +149,8 @@ describe('工具注册表：数量与分组', () => {
             { id: 'corporate-income-tax-deep', twin: 'corporate-income-tax', policy: 'corporate-small-low-profit' },
             { id: 'social-base-deep', twin: 'social-base', policy: 'social-insurance' },
             { id: 'disability-fund-deep', twin: 'disability-fund', policy: 'disability-fund' },
-            { id: 'surtax-stamp-deep', twin: 'surtax-stamp', policy: 'surtax' }
+            { id: 'surtax-stamp-deep', twin: 'surtax-stamp', policy: 'surtax' },
+            { id: 'annual-settlement-deep', twin: 'annual-settlement', policy: 'settlement' }
         ].forEach((pair) => {
             const own = R().get(pair.id);
             expect(own.compute).not.toBe(R().get(pair.twin).compute);

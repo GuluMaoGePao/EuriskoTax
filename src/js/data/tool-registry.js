@@ -27,6 +27,10 @@
 (function () {
     'use strict';
 
+    // 阶段17 17D-7（v1.63.0）：汇算清缴里「劳务 / 稿酬 / 特许权使用费」的中文名。
+    // 同样必须放在文件最前面（DEEP_SPECS 在 TOOLS 之前求值）；名字取自 otherIncomeRules，不复制文案。
+    var SETTLEMENT_OTHER_LABEL = { labor: '劳务报酬', author: '稿酬', royalty: '特许权使用费' };
+
     // 阶段17 17D-6（v1.57.0）：外籍津补贴免税的**八类项目代号**，与 expatAllowanceRules.items 一一对应。
     //
     // 为什么要这一份代号表：`expatAllowanceRules.items` 存的是「中文名 + 免税条件」，
@@ -2139,6 +2143,257 @@
                 }
 
                 return { primary: primary, rows: rows, note: note, extras: extras };
+            }
+        },
+        {
+            // 阶段17 17D-7（v1.63.0）：个税场景完整度 **10/16 → 11/16** 的第七个场景 —— 年度汇算清缴。
+            //
+            // 速算器那五个输入框（月薪 / 任职月数 / 五险一金 / 专项附加 / 已预缴）
+            // 只认「一处任职、全年 12 个月、只有工资」这一种人生，而汇算真正会出错的三层它一个都表达不出来：
+            //   ① **基本减除费用在汇算时是年定额 6 万元，不按任职月数折算**（个税法第六条）——
+            //      累计预扣法里的「5000 × 任职月数」只是**预扣**阶段的算法。年中入职 6 个月、
+            //      月薪 2 万的人，汇算应纳税额 2580、已预缴 5580 → **退 3000**；速算器按 5000×6 算，
+            //      得出「不补不退」—— 把退税算没了。
+            //   ② **劳务报酬 / 稿酬 / 特许权使用费按「收入额」并入**（劳务、特许权 80%，稿酬 56%），
+            //      预扣却最高按 40% 扣。全年劳务 10 万：预扣 25000、汇算应纳税额 600 → **退 24400**。
+            //      速算器根本没有这几个框，这笔钱在它眼里不存在。
+            //   ③ **大病医疗只能在汇算时扣**（平时预扣不扣），且是「超 1.5 万的部分、限额 8 万」。
+            // 另外两件速算器给不出的结论：**免办判定**（补税 ≤400 元，或综合所得收入 ≤12 万元）
+            // 与**年终奖两口径对照**（汇算时还能改成并入，低收入者并入往往全退）。
+            //
+            // 口径仍然同源：一切计算走 annual-settlement-quick 的 settlementFullOf
+            // （它自己又调 withholding-quick 的收入额与预扣率、bonus-quick 的单独计税、
+            //   special-deduction 常量里的大病医疗限额）—— 单段 12 个月、无劳务稿酬、无大病、
+            //   无年终奖时与速算器 settlementOf 逐点相等，由 tests/annual-settlement-deep.test.js 钉住。
+            id: 'annual-settlement-deep', name: '年度汇算清缴', subtitle: '多段任职 + 劳务稿酬并入 → 退补与免办判定',
+            icon: 'fa-balance-scale', status: 'deep',
+            nextTools: ['annual-settlement', 'salary-tax', 'withholding', 'bonus-tax'],
+            policyKey: 'settlement',
+            fields: [
+                { key: 'jobs', step: 'income', label: '任职段（多处任职 / 年中跳槽各填一段）', type: 'repeater',
+                    addLabel: '添加一段任职',
+                    hint: '每一段**独立**按累计预扣法预扣：新单位不掌握上一家的累计，从 0 重新开始 —— 这就是跳槽后要补税的根源',
+                    default: [{ monthlyIncome: 15000, months: 12, monthlyInsurance: 1500, monthlySpecial: 1000 }],
+                    itemFields: [
+                        { key: 'monthlyIncome', label: '税前月薪（元）', type: 'money', default: 15000, min: 0 },
+                        { key: 'months', label: '任职月数', type: 'number', default: 12, min: 1, max: 12 },
+                        { key: 'monthlyInsurance', label: '五险一金（个人 / 月）', type: 'money', default: 1500, min: 0 },
+                        { key: 'monthlySpecial', label: '专项附加扣除（月）', type: 'money', default: 1000, min: 0 }
+                    ] },
+                { key: 'labor', step: 'income', label: '全年劳务报酬（含税）', type: 'money', default: 0, min: 0,
+                    hint: '汇算按**收入额 80%** 并入；预扣阶段最高却按 40% 扣 —— 差额就是退税的来源' },
+                { key: 'author', step: 'income', label: '全年稿酬（含税）', type: 'money', default: 0, min: 0,
+                    hint: '汇算按**收入额 56%** 并入（减除 20% 费用后再减按 70%）' },
+                { key: 'royalty', step: 'income', label: '全年特许权使用费（含税）', type: 'money', default: 0, min: 0,
+                    hint: '汇算按**收入额 80%** 并入' },
+
+                { key: 'specialOverride', step: 'deduction', label: '专项附加扣除怎么取', type: 'select', default: 'auto',
+                    options: [{ value: 'auto', label: '按各任职段申报的合计' },
+                        { value: 'manual', label: '我要另填全年实际享受的金额' }],
+                    hint: '多处任职时，同一个项目（比如子女教育）在两家都申报了也**只能扣一份** —— 那种情况选第二项' },
+                { key: 'annualSpecial', step: 'deduction', label: '全年专项附加扣除（元）', type: 'money', default: 24000, min: 0,
+                    when: { key: 'specialOverride', in: ['manual'] },
+                    hint: '七项合计的**全年**数：子女教育 2000 元/月 · 婴幼儿照护 2000 元/月 · 赡养老人 3000 元/月 ……' },
+                { key: 'medicalSelfPay', step: 'deduction', label: '大病医疗：医保目录内个人自付累计（元）', type: 'money', default: 0, min: 0,
+                    hint: '**只能在年度汇算时扣**：超过 1.5 万元的部分才可扣，年度限额 8 万元 —— 平时预扣一分钱也扣不到' },
+                { key: 'otherDeduction', step: 'deduction', label: '其他扣除（元/年）', type: 'money', default: 0, min: 0,
+                    hint: '个人养老金（≤12000）、企业年金 / 职业年金、税优健康险（≤2400）、商业养老保险等' },
+
+                { key: 'bonus', step: 'bonus', label: '全年一次性奖金（元）', type: 'money', default: 0, min: 0,
+                    hint: '填 0 表示没有；有奖金时下面会给出「单独计税 vs 并入综合所得」的全年税额对照' },
+                { key: 'bonusDeclared', step: 'bonus', label: '汇算时怎么算这笔奖金', type: 'select', default: 'separate',
+                    options: [{ value: 'separate', label: '单独计税（单位通常这么申报）' },
+                        { value: 'merged', label: '并入综合所得（汇算时可以改）' }] },
+
+                { key: 'prepaidTax', step: 'prepaid', label: '全年已预缴个税（元）', type: 'money', default: 0, min: 0,
+                    hint: '填 0 则按累计预扣法自动推演；想更准就照个税 App「已申报税额合计」填（不含年终奖单独计税那部分）' }
+            ],
+            steps: [
+                { key: 'income', title: '全年综合所得', why: '汇算的范围只有**四项**（工资薪金 / 劳务报酬 / 稿酬 / 特许权使用费）：年终奖单独计税、股权激励、离职补偿、经营所得与分类所得都不参与' },
+                { key: 'deduction', title: '全年扣除', why: '汇算的减除费用是**年定额 6 万**，不按任职月数折算；大病医疗还只能在这里扣' },
+                { key: 'bonus', title: '年终奖口径', why: '同一个人在「单独计税」与「并入综合所得」下全年税额可以差几千元，汇算时还能改一次' },
+                { key: 'prepaid', title: '已预缴', why: '应退 / 应补 = 全年应纳税额 − 全年已预缴 —— 这一道减法就是汇算的全部' }
+            ],
+            pitfalls: [
+                '基本减除费用在汇算时是**年定额 6 万元，不按任职月数折算** —— 年中入职 / 离职的人照样扣满 6 万，速算器那种「5000 × 月数」是预扣口径，会把退税算成 0',
+                '劳务报酬 / 稿酬 / 特许权使用费并入汇算时按**收入额**（劳务、特许权 80%，稿酬 56%），预扣阶段劳务最高却按 **40%** 扣 —— 这是「一年没怎么交税却被扣了一大笔」最常见的原因',
+                '**大病医疗只能在汇算时扣除**：医保目录内个人自付累计超 1.5 万的部分才可扣，限额 8 万；不办汇算就等于放弃这笔扣除',
+                '已依法预缴且**需补税**，但年度综合所得收入 ≤ **12 万元**、或补税金额 ≤ **400 元**的，**无需办理**汇算；退税是权利不是义务 —— 不办理视为放弃退税，不加收滞纳金',
+                '补税逾期要按日加收**万分之五**滞纳金（年化 18.25%），并可能在纳税记录中留下不良记录',
+                '**年终奖单独计税与并入综合所得二选一**：收入低、扣除大的人并入往往更省（甚至全退），高收入的人通常单独计税更省 —— 汇算时还能改一次',
+                '住房贷款利息与住房租金**同一年度只能二选一**；专项附加扣除忘了在 12 月确认次年信息，只是当月到手变少，**汇算时补扣不会少扣税**'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoSettlementQuick;
+                if (!Q) return null;
+
+                var jobs = Array.isArray(v.jobs) ? v.jobs : [];
+                var manual = String(v.specialOverride || 'auto') === 'manual';
+                var r = Q.settlementFullOf({
+                    jobs: jobs,
+                    labor: v.labor, author: v.author, royalty: v.royalty,
+                    annualSpecial: manual ? Number(v.annualSpecial) : undefined,
+                    medicalSelfPay: v.medicalSelfPay,
+                    otherDeduction: v.otherDeduction,
+                    bonus: v.bonus,
+                    bonusDeclared: v.bonusDeclared,
+                    prepaidTax: v.prepaidTax
+                });
+
+                if (!r.jobs.length && r.otherGross <= 0 && r.bonus <= 0) {
+                    return {
+                        primary: { label: '应退 / 应补', value: 0, kind: 'money' },
+                        rows: [],
+                        note: '还没有收入：至少填一段任职（或一笔劳务报酬 / 稿酬），才会进入汇算表。',
+                        steps: []
+                    };
+                }
+
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var abs = Math.abs(r.diff);
+                var primaryLabel = r.diff < 0 ? '应退个税' : (r.diff > 0 ? '应补个税' : '不补不退');
+                var ex = r.exempt;
+                var late = ex.needFile ? Q.lateFeeOf(abs, 30) : null;
+
+                var rows = [
+                    { label: '汇算收入额合计', value: r.incomeAmountTotal, kind: 'money',
+                        hint: '工资薪金全额 + 劳务/稿酬/特许权的**收入额**（80% / 56%）' },
+                    { label: '减除费用', value: r.basicDeduction, kind: 'money', hint: '年定额 6 万元，不按任职月数折算' },
+                    { label: '专项扣除（五险一金）', value: r.insuranceTotal, kind: 'money' },
+                    { label: '专项附加扣除', value: r.specialTotal, kind: 'money',
+                        hint: r.medical.deduction > 0 ? '含大病医疗 ' + Math.round(r.medical.deduction) + ' 元（只在汇算时扣）' : '七项合计' },
+                    { label: '其他扣除', value: r.otherDeduction, kind: 'money' },
+                    { label: '扣除合计', value: r.deductionTotal, kind: 'money' },
+                    { label: '应纳税所得额', value: r.taxable, kind: 'money' },
+                    { label: '适用税率', value: r.bracket ? r.bracket.rate : 0, kind: 'percent' },
+                    { label: '全年应纳税额', value: r.annualTax, kind: 'money' },
+                    { label: '全年已预缴', value: r.prepaidTax, kind: 'money',
+                        hint: r.providedPrepaid ? '使用你填写的值' : '按累计预扣法推演（看个税 App「已申报税额」更准）' },
+                    { label: '应退 / 应补', value: (r.diff < 0 ? '退税 ' : (r.diff > 0 ? '补税 ' : '')) + Math.round(abs) + ' 元', kind: 'text',
+                        hint: '应退 / 应补 = 全年应纳税额 − 全年已预缴（负数为退税）' },
+                    { label: '要不要办理', value: ex.reason, kind: 'text' }
+                ];
+                if (late) {
+                    rows.push({ label: '若逾期 30 天办理', value: late.fee, kind: 'money',
+                        hint: '滞纳金按日万分之五（年化 18.25%）= 补税额 × 0.05% × 天数' });
+                }
+                rows.push({ label: '速算器口径算出的退补', value: r.naive.diff, kind: 'money',
+                    hint: '速算器按「5000 × 任职月数」当减除费用，且没有劳务 / 稿酬 / 大病这几个框' });
+                rows.push({ label: '与速算器口径的差', value: r.naiveGap, kind: 'money',
+                    hint: '这一格就是「完整测算比速算器多出来的那部分钱」' });
+                if (r.bonus > 0) {
+                    rows.push({ label: '年终奖：单独计税', value: r.bonusSeparateTotal, kind: 'money',
+                        hint: '综合所得部分 ' + Math.round(r.bonusSeparateTotal - r.bonusTaxSeparate) + ' + 年终奖单独 ' + Math.round(r.bonusTaxSeparate) });
+                    rows.push({ label: '年终奖：并入综合所得', value: r.bonusMergedTotal, kind: 'money' });
+                    rows.push({ label: '年终奖怎么算更省', value: r.bonusBetter === 'merged' ? '并入综合所得' : (r.bonusBetter === 'separate' ? '单独计税' : '两者相同'), kind: 'text' });
+                    rows.push({ label: '两种口径差额', value: r.bonusGap, kind: 'money' });
+                }
+
+                var extras = [];
+                if (r.jobs.length) {
+                    extras.push({
+                        title: '任职段明细（各段独立预扣）',
+                        note: '新单位不掌握上一家的累计收入，累计预扣从 0 重新开始 —— 档位被重置、速算扣除数被扣两次',
+                        table: {
+                            head: ['任职段', '月收入', '月数', '收入', '五险一金', '专项附加', '已预缴'],
+                            rows: r.jobs.map(function (j, i) {
+                                return ['第 ' + (i + 1) + ' 段', money(j.monthlyIncome), String(j.months) + ' 个月',
+                                    money(j.income), money(j.insurance), money(j.special), money(j.prepaid)];
+                            })
+                        }
+                    });
+                }
+                if (r.other.length) {
+                    extras.push({
+                        title: '劳务 / 稿酬 / 特许权：收入额折算与预扣对照',
+                        note: '预扣按含税金额算、汇算按收入额算 —— 两头的口径不同，差额就是退（补）税',
+                        table: {
+                            head: ['所得', '含税金额', '汇算收入额', '折算率', '支付方已预扣'],
+                            rows: r.other.map(function (o) {
+                                return [SETTLEMENT_OTHER_LABEL[o.type] || o.type, money(o.gross), money(o.incomeAmount),
+                                    Math.round(o.incomeAmount / o.gross * 100) + '%', money(o.prepaid)];
+                            })
+                        }
+                    });
+                }
+                if (r.medical.selfPay > 0) {
+                    extras.push({
+                        title: '大病医疗扣除核定',
+                        note: '医保目录内个人自付累计超 ' + Math.round(r.medical.threshold) + ' 元的部分才可扣，年度限额 '
+                            + Math.round(r.medical.cap) + ' 元 —— 且只在汇算时扣',
+                        table: {
+                            head: ['项目', '金额'],
+                            rows: [['个人自付累计', money(r.medical.selfPay)],
+                                ['起扣线以下（不可扣）', money(r.medical.cutBelowThreshold)],
+                                ['超过限额部分（不可扣）', money(r.medical.cutOverCap)],
+                                ['汇算可扣', money(r.medical.deduction)]]
+                        }
+                    });
+                }
+                if (r.bonus > 0) {
+                    extras.push({
+                        title: '年终奖两口径对照（全年个税合计）',
+                        note: '汇算时还能改一次：并入综合所得后，之前按单独计税扣的税一并参与清算',
+                        table: {
+                            head: ['口径', '全年个税合计'],
+                            rows: [['单独计税（单位通常这么申报）', money(r.bonusSeparateTotal)],
+                                ['并入综合所得', money(r.bonusMergedTotal)],
+                                ['差额', money(r.bonusGap)]]
+                        }
+                    });
+                }
+
+                var note = '汇算收入额 ' + Math.round(r.incomeAmountTotal) + ' 元，扣除合计 '
+                    + Math.round(r.deductionTotal) + ' 元（6 万定额 + 五险一金 ' + Math.round(r.insuranceTotal)
+                    + ' + 专项附加 ' + Math.round(r.specialTotal)
+                    + (r.otherDeduction > 0 ? ' + 其他扣除 ' + Math.round(r.otherDeduction) : '')
+                    + '），全年应纳税额 ' + Math.round(r.annualTax) + ' 元、已预缴 ' + Math.round(r.prepaidTax)
+                    + ' 元 → ' + (r.diff < 0 ? '**应退 ' + Math.round(abs) + ' 元**' : (r.diff > 0 ? '**应补 ' + Math.round(abs) + ' 元**' : '不补不退'))
+                    + '。' + ex.reason + '。';
+                if (Math.abs(r.naiveGap) >= 1) {
+                    note += ' 速算器按「5000 × 任职月数」当减除费用、且没有劳务 / 稿酬 / 大病这几个框，'
+                        + '它会算出 ' + Math.round(r.naive.diff) + ' 元 —— **差 ' + Math.round(Math.abs(r.naiveGap)) + ' 元**。';
+                }
+                if (r.bonus > 0) {
+                    note += ' 年终奖' + (r.bonusBetter === 'merged' ? '**并入综合所得**更省' : (r.bonusBetter === 'separate' ? '**单独计税**更省' : '两种口径相同'))
+                        + '（' + Math.round(r.bonusSeparateTotal) + ' vs ' + Math.round(r.bonusMergedTotal)
+                        + '，差 ' + Math.round(r.bonusGap) + ' 元）。';
+                }
+
+                var steps = [{
+                    title: '① 收入额：四项综合所得怎么折算',
+                    rows: [
+                        { label: '工资薪金（全额）', value: r.salaryIncome, format: 'money' },
+                        { label: '劳务 / 稿酬 / 特许权（收入额）', value: r.otherIncomeTotal, format: 'money',
+                            note: r.otherGross > 0 ? '含税 ' + Math.round(r.otherGross) + ' 元 × 折算率（劳务/特许权 80%、稿酬 56%）' : '本年没有这三项所得' },
+                        { label: '并入的年终奖', value: r.bonusDeclared === 'merged' ? r.bonus : 0, format: 'money' },
+                        { label: '汇算收入额合计', value: r.incomeAmountTotal, format: 'money' }
+                    ]
+                }, {
+                    title: '② 扣除：6 万定额 + 三项扣除',
+                    rows: [
+                        { label: '基本减除费用（年定额）', value: r.basicDeduction, format: 'money', note: '不按任职月数折算 —— 年中入职也扣满 6 万' },
+                        { label: '专项扣除（五险一金）', value: r.insuranceTotal, format: 'money' },
+                        { label: '专项附加扣除', value: r.specialTotal, format: 'money',
+                            note: r.medical.deduction > 0 ? '含大病医疗 ' + Math.round(r.medical.deduction) + ' 元（只在汇算时扣）' : '七项合计' },
+                        { label: '其他扣除', value: r.otherDeduction, format: 'money' },
+                        { label: '扣除合计', value: r.deductionTotal, format: 'money' },
+                        { label: '应纳税所得额', value: r.taxable, format: 'money' }
+                    ]
+                }, {
+                    title: '③ 应退 / 应补 = 应纳税额 − 已预缴',
+                    rows: [
+                        { label: '全年应纳税额', value: r.annualTax, format: 'money',
+                            note: r.bracket ? '适用税率 ' + Math.round(r.bracket.rate * 100) + '%，速算扣除数 ' + r.bracket.deduction : '' },
+                        { label: '全年已预缴', value: r.prepaidTax, format: 'money',
+                            note: r.providedPrepaid ? '你填写的值' : '按累计预扣法推演' },
+                        { label: '差额（正 = 应补，负 = 应退）', value: r.diff, format: 'money' },
+                        { label: '要不要办理', value: ex.reason, format: 'text' }
+                    ],
+                    footnote: '已依法预缴且需补税，但年度综合所得收入 ≤ 12 万元、或补税金额 ≤ 400 元的，无需办理年度汇算（国家税务总局公告 2019 年第 44 号）。'
+                }];
+
+                return { primary: { label: primaryLabel, value: abs, kind: 'money' }, rows: rows, note: note, extras: extras, steps: steps };
             }
         },
         {

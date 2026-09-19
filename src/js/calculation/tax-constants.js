@@ -820,6 +820,37 @@ var unionFeeRules = {
     deductionNote: '企业所得税前扣除需凭《工会经费收入专用收据》或税务机关代收凭据；按规定拨缴的 2% 可全额扣除，超提部分不得扣除'
 };
 
+// 综合所得年度汇算清缴 —— 规则（阶段17 17D-7，v1.63.0）
+//
+// 三处口径是速算器那五个输入框表达不出来的，也正是「完整测算」比它多出来的三层：
+//   1. **基本减除费用在汇算时是年定额 6 万元，不按任职月数折算**（个税法第六条）：
+//      应纳税所得额 = 收入额 − 6 万元 − 专项扣除 − 专项附加扣除 − 依法确定的其他扣除。
+//      累计预扣法里的「5000 × 任职月数」只是**预扣**阶段的算法 —— 年中入职 / 离职的人
+//      汇算时照样扣满 6 万，于是普遍有退税，而速算器会把它算成 0。
+//   2. **劳务报酬 / 稿酬 / 特许权使用费并入汇算时按「收入额」**（劳务、特许权 80%，稿酬 56%），
+//      预扣阶段劳务最高却按 40% 预扣率扣 —— 预扣 40%、汇算常落在 3% / 10%，差额就是退税的来源。
+//   3. **大病医疗只能在汇算时扣除**（平时预扣预缴不扣），且是「超 1.5 万的部分、限额 8 万」。
+//
+// 免办（国家税务总局公告 2019 年第 44 号第二条）：**已依法预缴**且需补税，但
+//   ① 年度综合所得收入不超过 12 万元，或 ② 补税金额不超过 400 元的，无需办理年度汇算。
+//   退税是权利不是义务：不办理视为放弃退税，不加收滞纳金；补税逾期则按日万分之五。
+var settlementRules = {
+    rateTable: 'comprehensiveTaxRates',
+    annualBasicDeduction: 60000,      // 汇算口径：年定额，不按任职月数折算
+    monthlyBasicDeduction: 5000,      // 累计预扣法口径：**只用于推演已预缴**，不是汇算的扣除
+    scope: ['工资薪金', '劳务报酬', '稿酬', '特许权使用费'],
+    notInScope: ['全年一次性奖金（选择单独计税时）', '股权激励所得', '解除劳动关系一次性补偿',
+        '提前退休 / 内部退养一次性收入', '经营所得', '利息股息红利 / 财产租赁 / 财产转让 / 偶然所得'],
+    windowFrom: '次年 3 月 1 日',
+    windowTo: '次年 6 月 30 日',
+    exemptIncomeCap: 120000,          // 需补税但综合所得收入 ≤ 12 万 → 无需办理
+    exemptDiffCap: 400,               // 需补税但补税金额 ≤ 400 元 → 无需办理
+    lateFeeDailyRate: 0.0005,         // 滞纳金按日万分之五
+    lateFeeAnnualRate: 0.1825,        // 年化 18.25%
+    lateFeeNote: '未按期办理补税的，自汇算期届满次日起按日加收万分之五滞纳金（年化 18.25%），'
+        + '并可能在《个人所得税纳税记录》中留下不良记录'
+};
+
 // 社保/公积金缴费基数最低标准 —— 全国口径兜底值，同时也是表单的初始默认基数。
 //
 // 阶段12 C1 契约（运行时热更新，勿破坏）：
@@ -853,6 +884,7 @@ window.EuriskoTaxConstants = {
     privatePensionRules: privatePensionRules,
     expatAllowanceRules: expatAllowanceRules,
     earlyRetirementRules: earlyRetirementRules,
+    settlementRules: settlementRules,
     vatRules: vatRules,
     corporateIncomeTaxRules: corporateIncomeTaxRules,
     surtaxRules: surtaxRules,
