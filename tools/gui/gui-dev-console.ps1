@@ -3066,7 +3066,7 @@ Add-SectionCard -TabCtx $tab3Ctx `
         } },
     @{ Text = "打开 tests 目录`n测试代码所在目录"; Desc = "在资源管理器中打开 tests/ 目录，查看/编辑测试代码文件。"; Color = "120, 120, 140";
        OnClick = { Start-Process "explorer.exe" (Join-Path $ProjectRoot "tests") } },
-    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/test-report.md，查看已编写的测试说明和结果记录。"; Color = "120, 120, 140";
+    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/test-report.md（历史快照：文中 203 用例 / 6 套件是 2026-09-07 的数字，现状 1750 例 / 94 套件见 CHANGELOG）。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\test-report.md") } }
 )
 
@@ -3077,7 +3077,7 @@ Add-SectionCard -TabCtx $tab3Ctx `
     -AccentColor $C_WARN -Buttons @(
     @{ Text = "运行性能基准测试`nnpm run test:performance"; Desc = "运行 scripts 中的性能基准脚本，结果输出到下方日志区。"; Color = "225, 165, 80";
        OnClick = { Invoke-AsyncCommand -Name "perf" -Command "npm run test:performance" -WorkingDir $ProjectRoot } },
-    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 performance-optimization-report.md，阅读项目性能优化历史和建议。"; Color = "120, 120, 140";
+    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 performance-optimization-report.md（历史快照：测量点来自 2026-08 的代码，计税层之后已重写，只作参考）。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\performance-optimization-report.md") } },
     @{ Text = "运行 Jest 性能单测`ntax-assistant-perf"; Desc = "单独运行 tests/tax-assistant-perf.test.js，针对税务助手模块的性能测试。"; Color = "165, 105, 210";
        OnClick = { Invoke-AsyncCommand -Name "perftest" -Command "npx jest tests/tax-assistant-perf.test.js" -WorkingDir $ProjectRoot } }

@@ -289,6 +289,72 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 
 ---
 
+## 视觉回归截图基线（阶段19-0 新增）
+
+Tokens 改版（阶段19 要动首页结构 / 结果页布局 / 令牌层）没有视觉回归就是赌博 —— `src/css/tokens.css`
+文件头写的那句「本项目没有视觉回归」正是本次要补上的一环。
+
+`ui-screenshot-baseline.js` 把 **6 个关键页面 × 2 个断点（375 / 1280）** 的截图固化成基线，
+每个阶段结束后重拍比对，**变了才需要人眼确认**（方案里的验收方式就是人眼确认，hash 只回答"变没变"）。
+
+```bash
+node tools/ops/ui-screenshot-baseline.js                 # 生成 / 覆盖基线
+node tools/ops/ui-screenshot-baseline.js --check         # 与基线比对（不覆盖，产物落在 .tmp/）
+node tools/ops/ui-screenshot-baseline.js --only home,tools
+```
+
+产物：`screenshots/baseline/*.png`（12 张，入仓）+ `manifest.json`（sha256 / 字节数 / 资源就绪标记）。
+
+基线之所以能靠 sha256 比对（而不是引 pixelmatch 这类像素库），是因为脚本在截图前掐掉了五类时序噪声，
+每一条都是实测踩出来的，改动前请先读脚本里对应的注释：**冻结动画 / 光标 / 滚动位置**、
+**每张开拍前清空 storage**（否则上一轮留下的「最近使用」会让首页 baseline 只在第一次是对的）、
+**隐藏滚动条**（375px 首页超高，滑块位置漂移会让每一轮都产生假 diff）、**等 CDN 资源就绪**
+（`index.html` 引了 6 个外网 CDN，图标是字体，字体没到就是空白方块）、
+**冻结时间相关内容**（问候语按小时分段、日期行按天、今日税感的「剩 N 天」按天倒计时 ——
+基线拍于上午、复查跑到中午，「上午好」变「中午好」，两张 home 当场双红；
+冻结的是**确定性**不是真实性，占位结构照抄真实渲染）。
+
+> ⚠️ 已知限制一：浏览器**冷启动会挂**（把 agent-browser 守护进程和无头 Chrome 一起杀掉后重跑，
+> 实测卡在第一张 7 分钟不出图，open 卡在等外网 CDN）。遇到就先起服务并用
+> `node <cli> open http://127.0.0.1:3000/` 把浏览器热起来再跑 ——
+> `<cli>` 取 `npm root -g` 下 `agent-browser/package.json` 的 `bin` 字段；
+> 注意别用 `npx`（Windows 下 spawn EINVAL），本项目里一律用 node 直接跑 CLI。
+
+### ✅ Tailwind 构建链路：tailwind.css 已修好，admin.css 待办（阶段19-2）
+
+**症状与根因**：每阶段都要跑 `build:css` 并提交产物，前提是**本地产物可复现**，而此前实测**不可复现**
+（入仓 98677 B / 本地重建 93664 B）。Tailwind 版本不是原因（声明 / 实际安装 / lock 三者都是 3.4.17）。
+结论：入仓的 `tailwind.css` 是**过期产物** —— 它生成于那些旧类仍被使用的时候，此后一直没被重建过。
+
+**纯重建已于 v1.79.0 执行**，class 级差分审计结论：
+
+| 方向 | 数量 | 判定 |
+|---|---|---|
+| 将被删除（仅入仓有）| **36** | **全部零裸用** → 纯删历史残余：`result-hero*` / `calc-preview-*` / `result-metric*` / `result-pitfall*` / `mt-[2px]` / `h-64` / `bg-accent` … |
+| 将被新增（仅重建有）| **6** | 2 个真实 + 4 个扫描假阳性 |
+
+新增的 4 个 `!xxx`（`!active` `!label` `!step` `!table`）是 **Tailwind 文本扫描的假阳性** ——
+它们的真身是 JS 里的**取反表达式**（`if (!step) return;` / `if (!label || …)`），被当成 `!` important 修饰的类名，
+生成了也没人用，无害。另外 2 个 `list-disc` / `pl-5` 来自 `deep-wizard-ui.js:287` 的 extras 列表渲染，
+但**目前没有任何 spec 提供 `extras.list`**（契约见该文件 241 行），这条分支从未渲染 ——
+所以重建后**零视觉变化**，截图基线 **12/12 一致**三重佐证。
+
+> **审查方法（下次动 `tailwind.src.css` 前照做，别指望 diff）**：minified 产物是单行文件，
+> diff 永远只有一行，**看不出任何门道**。可靠做法是类级差分：抽出两份 CSS 的类名集合 → 取差集 →
+> 逐个回查 content 范围是否被裸用。两个坑：
+> ① 回查的**左边界必须排除 `:` 与 `!`**，否则 `sm:gap-6` 会被当成用了裸 `gap-6`、`!pl-3` 当成用了裸 `pl-3`
+> （第一版脚本就是这样误报了 6 个，差点把一次安全重建判成危险）；
+> ② 被删的 36 个类里有些辗转只剩 `id` 在用（`result-tax-bar-fill` 是 `getElementById` 的参数，不是 class）——
+> Tailwind 照样扫到并保留，别慌着删 `.result-tax-bar`。
+> content 范围见 `tailwind.config.js`；**只有 `index.html` 真的加载了 `tailwind.css`**，
+> `admin.html` / `clean-cache.html` 虽在 content 里却不加载（它们各自内联样式），审查时不必为它们纠结。
+
+**仍未修的另一半**：`src/css/admin.css`（52539 B）同样不可复现（本地重建 51614 B，差 925 B）——
+同一类问题、**同一套方法**可处理，尚未执行。管理后台页面的视觉验证成本更高，暂不与前台合并做。
+在它修好前，`build:css` 依旧不要整条跑 —— 那会把两条链路的变更混在同一次提交里。
+
+---
+
 ## 相关文档
 
 - [部署指南](../docs/tech-reports/watchdog-deployment-guide.md) — 完整部署流程（本地开发）
