@@ -2,7 +2,7 @@
 
 <!-- subtitle: 阶段17 的 UI 前置 —— 先把排版钉死，再写通用渲染器 -->
 
-> 版本：v1.0 · 2026-09-18 ｜ 状态：**待评审**（先规划后开工，本文件通过前不写渲染器代码）
+> 版本：v1.0 · 2026-09-18 ｜ 状态：**✅ 已定稿并落地**（阶段17 的 17A 通用渲染器 `src/js/ui/deep-wizard-ui.js` 已按本文实现，并已铺完 21 个 spec 驱动完整测算；2026-09-20 订正：此前一直写着「待评审」）
 > 上游：[`ui-design-spec.md`](ui-design-spec.md) §8 页型 D（多步向导）/ §4.2（覆盖矩阵）
 > 下游：[`../development/stage17-full-tax-coverage-plan.md`](../development/stage17-full-tax-coverage-plan.md) 17A-1 ~ 17A-4
 > 设计令牌真源：`src/css/tokens.css` ｜ Tailwind 配置：`tailwind.config.js`

@@ -189,7 +189,7 @@ EuriskoTax
 ```
 ┌─ mode-selection-page ─────────────────────────────────────────────┐
 │ ① 欢迎 + 今日税感        #home-greeting 430 / #home-tax-feel 435  │
-│ ② 搜索入口卡片           #toolbox-search-entry 449 「24 个 ›」    │
+│ ② 搜索入口卡片           #toolbox-search-entry 449 「41 个 ›」    │
 │ ③ 我是谁（5 张身份卡）    #home-scenarios 464                      │
 │ ④ 最近使用               #home-recent-tools-card 470（默认隐藏）   │
 │ ⑤ 最近计算               #home-recent-list 490 「全部 ›」488       │
