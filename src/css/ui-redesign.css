@@ -1,0 +1,366 @@
+/**
+ * 阶段19 UI 重构 · 新增样式层（src/css/ui-redesign.css）
+ *
+ * 为什么独立一个文件，而不是直接改 tokens.css / toolbox.css / tailwind.css：
+ *   tokens.css 是**唯一真源**，被 toolbox.css（App）与 seo/landing.css（21 个落地页）
+ *   同时消费；tailwind.css 是构建产物（npm run build:css 生成，改了要重新入仓）。
+ *   重构期需要一个"可以放心加、随时能整体摘掉"的沙箱层 —— 本文件就是这个沙箱，
+ *   只放**组件类**（新令牌一律进 tokens.css），一旦出问题，
+ *   删掉 index.html 里这一行 link 即可回滚。
+ *
+ * 三条硬约束（19-x 全程遵守）：
+ *   1. **本层自身只增不改**：本文件只新增类，不覆盖任何现有变量与现有类。
+ *      「接线」另当别论 —— 让既有样式改取本层令牌（如 toolbox.css 的 hover 用 --sh-2）
+ *      确实会动到既有文件，那类改动逐个记在 CHANGELOG 的对应阶段小节。
+ *   2. **先定义后接线**：本文件里的类在未被 index.html / JS 引用前，对页面**零影响**。
+ *      因此本文件可以安全先行入仓，接线放到 19-1 之后逐阶段做。
+ *   3. **取值只来自 tokens.css**：本文件不引入任何新的字面色值与魔法数字，
+ *      需要新取值时先往 tokens.css 的对应分组里加，再在这里引用。
+ *
+ * 加载位置：index.html 中排在 tailwind.css **之后**（工具类之后），
+ * 这样新组件类在与工具类同名冲突时由本层胜出，不需要 !important。
+ */
+
+/* ==========================================================================
+   1. 令牌：本层**不定义**任何变量 —— 一律取自 src/css/tokens.css
+   ==========================================================================
+
+   这里原本自带一份 :root / .dark 副本（19-0 的临时做法），19-1 已迁回 tokens.css。
+   
+   为什么必须迁走：tokens.css 是**唯一真源**，被 toolbox.css（App）与
+   seo/landing.css（21 个落地页）同时消费。令牌若留在本层，落地页就取不到，
+   而本层的组件类迟早也要被两处共用 —— 那时必然出现两份值各自漂移。
+   
+   本层从这一版起只放**消费令牌的组件类**（第 2 节起），不持有任何字面色值；
+   取值来源仍遵守第 3 条硬约束：需要新的值，先往 tokens.css 对应分组里加，再在这里引用。
+   （§3.7 那一组 —— 表面分层 / 语义 bg-line / 阴影三档 / 画布色板 —— 已在 tokens.css 就位。）*/
+
+
+/* ==========================================================================
+   2. 组件类（§3.3 / §3.5 / §3.6 / §3.10 逐阶段接线）
+   —— 所有类目前**均未被引用**，入仓即零视觉变化。
+   ========================================================================== */
+
+/* --- 2.1 卡片：抬升一档（替代全站平铺的白卡）--- */
+.card-elevated {
+    background: var(--c-surface-0);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-1);
+    transition: box-shadow var(--dur-micro) var(--ease);
+}
+.card-elevated:hover {
+    box-shadow: var(--sh-2);
+}
+
+/* --- 2.2 Mission Hero：首页首屏唯一焦点（§3.3.2）---
+   全站唯一使用品牌渐变 + 大留白的区域，高度 ≤ 一屏 45%。 */
+.hero-card {
+    position: relative;
+    overflow: hidden;
+    padding: var(--sp-6);
+    border-radius: var(--r-hero);
+    background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-accent) 100%);
+    color: #fff;
+    box-shadow: var(--sh-3);
+}
+.hero-card__title {
+    font-size: var(--fs-2xl);
+    font-weight: 600;
+    line-height: 1.3;
+}
+.hero-card__sub {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-sm);
+    opacity: .92;
+}
+/* Hero 内的主按钮：白底品牌字（渐变底上唯一的实心按钮） */
+.hero-card__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-4);
+    padding: var(--sp-3) var(--sp-6);
+    min-height: 44px;              /* 触控目标下限（可访问性） */
+    border-radius: var(--r-ctrl);
+    background: #fff;
+    color: var(--c-brand);
+    font-weight: 600;
+    box-shadow: var(--sh-1);
+}
+.hero-card__cta:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.3 行动条（Action Bar）：结果页四按钮常驻行（§3.5）---
+   手机上横向可滑，桌面均分；每个按钮 ≥ 44px 触控高度。 */
+.action-bar {
+    display: flex;
+    gap: var(--sp-2);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--c-border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.action-bar__btn {
+    flex: 1 0 auto;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    min-width: 72px;
+    min-height: 44px;
+    padding: var(--sp-2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-micro);
+}
+.action-bar__btn:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.4 省钱卡：结果旁的高优先级卡（§3.5）---
+   只报**确定的、能给政策依据**的优化空间，绝不猜测。 */
+.save-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border: 1px solid var(--c-success-line);
+    border-radius: var(--r-card);
+    background: var(--c-success-bg);
+    color: var(--c-success-text);
+}
+.save-card__amount {
+    font-family: var(--font-numeric);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+}
+
+/* --- 2.5 Chip：身份 chip / 筛选 chip / 状态微标签 --- */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-1) var(--sp-3);
+    min-height: 32px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-pill);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+}
+.chip[aria-pressed="true"],
+.chip--active {
+    border-color: var(--c-brand-line);
+    background: var(--c-brand-subtle);
+    color: var(--c-brand);
+    font-weight: 600;
+}
+.chip:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.6 进度条：权益进度 / 档案完成度（§3.6 / §3.8 ②）--- */
+.progress-line {
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+    overflow: hidden;
+}
+.progress-line__fill {
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: var(--c-brand);
+    transition: width var(--dur-page) var(--ease);
+}
+
+/* ==========================================================================
+   3. 双轴导航（§3.3）—— 19-2 接线
+   ========================================================================== */
+
+/* --- 3.1 事件轴：横向滑动卡片组 ---
+   手机 scroll-snap 横滑（首屏露 1.5 张暗示可滑），桌面转网格。
+   事件卡是首页转化主力，**任何断点都不折叠**。 */
+.event-rail {
+    display: grid;
+    gap: var(--sp-3);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+@media (max-width: 767px) {
+    .event-rail {
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        /* 负边距 + 内边距：让卡片能贴边滚动到容器外沿 */
+        margin-inline: calc(-1 * var(--sp-4));
+        padding-inline: var(--sp-4);
+        scrollbar-width: none;
+    }
+    .event-rail::-webkit-scrollbar { display: none; }
+}
+
+.event-card {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    width: min(78vw, 260px);
+    padding: var(--sp-4);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+    box-shadow: var(--sh-1);
+    text-align: left;
+    transition: box-shadow var(--dur-micro) var(--ease),
+                transform var(--dur-micro) var(--ease);
+}
+@media (min-width: 768px) {
+    .event-card { width: auto; }
+}
+.event-card:hover {
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+}
+.event-card:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+.event-card__title {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.event-card__hint {
+    margin-top: var(--sp-1);
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+}
+/* 事件卡一律用生活语言，**不得出现税种名与术语**（§3.3.3） */
+
+/* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
+.identity-card {
+    padding: var(--sp-4);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+    text-align: left;
+}
+.identity-card[aria-pressed="true"] {
+    border-color: var(--c-brand);
+    background: var(--c-brand-subtle);
+}
+.identity-card:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+.identity-card__title {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.identity-card__desc {
+    margin-top: var(--sp-1);
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+
+/* ==========================================================================
+   4. 效率层（§3.10）—— 19-9 之后接线
+   ========================================================================== */
+
+/* --- 4.1 主体切换器（顶栏右侧，仅在已建主体时显示）--- */
+.entity-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    max-width: 200px;
+    padding: var(--sp-1) var(--sp-3);
+    min-height: 36px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-pill);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+}
+.entity-switcher__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.entity-switcher:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 4.2 台账表格（§3.10.4）--- */
+.ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+}
+.ledger-table th,
+.ledger-table td {
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--c-border);
+    text-align: left;
+}
+.ledger-table th {
+    background: var(--c-surface-2);
+    font-weight: 600;
+    color: var(--c-text-2);
+}
+/* 金额列一律等宽 + 右对齐 + 千分位（§3.7 排版原则 3） */
+.ledger-table td.num,
+.ledger-table th.num {
+    font-family: var(--font-numeric);
+    text-align: right;
+}
+
+/* --- 4.3 批量计算：粘贴区与预览表（§3.10.5）--- */
+.batch-paste {
+    width: 100%;
+    min-height: 160px;
+    padding: var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    background: var(--c-surface-1);
+    font-family: var(--font-numeric);
+    font-size: var(--fs-sm);
+    resize: vertical;
+}
+.batch-paste:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+/* 批量页顶部必须明示"数据不出本机"（§3.10.5 合规卖点） */
+.batch-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    border: 1px solid var(--c-info-line);
+    border-radius: var(--r-card);
+    background: var(--c-info-bg);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+}
+
+/* ==========================================================================
+   5. 可访问性：尊重"减少动态效果"
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+    .card-elevated,
+    .event-card,
+    .progress-line__fill,
+    .action-bar__btn {
+        transition: none;
+    }
+    .event-card:hover { transform: none; }
+}

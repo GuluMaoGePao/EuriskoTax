@@ -1,0 +1,122 @@
+[
+  {
+    "id": "home",
+    "name": "首页",
+    "width": 375,
+    "height": 812,
+    "file": "home-375.png",
+    "bytes": 68469,
+    "sha256": "4f4dbaaa7f1ef93f9eb262489a48a45251111d3156f0f026e6790ffabbd1bbd3",
+    "ready": true
+  },
+  {
+    "id": "home",
+    "name": "首页",
+    "width": 1280,
+    "height": 900,
+    "file": "home-1280.png",
+    "bytes": 95312,
+    "sha256": "1e3a43828636fdf590d20e4ed6fdd37e1519b512cf0a300632939c431da9815f",
+    "ready": true
+  },
+  {
+    "id": "tools",
+    "name": "工具页",
+    "width": 375,
+    "height": 812,
+    "file": "tools-375.png",
+    "bytes": 72006,
+    "sha256": "7bf35a1ee80d166c614723e7dbcc4e054e50ba386e065fbb2996aaf7fcb163e4",
+    "ready": true
+  },
+  {
+    "id": "tools",
+    "name": "工具页",
+    "width": 1280,
+    "height": 900,
+    "file": "tools-1280.png",
+    "bytes": 158044,
+    "sha256": "52d5db47fc76314cbe850b051bef84771693d5507d30fb58d3a1f5b95d1b1145",
+    "ready": true
+  },
+  {
+    "id": "quick",
+    "name": "速算器（月薪个税）",
+    "width": 375,
+    "height": 812,
+    "file": "quick-375.png",
+    "bytes": 62767,
+    "sha256": "f0ca8c468a201d70b00fcabe996785593a699e246bf905bda2434a4dd8d43b1a",
+    "ready": true
+  },
+  {
+    "id": "quick",
+    "name": "速算器（月薪个税）",
+    "width": 1280,
+    "height": 900,
+    "file": "quick-1280.png",
+    "bytes": 110421,
+    "sha256": "f41d140ca2af4cd61fe43a08f25ed64bef00e64f0c77c0bd003a5a68fb0fb1c8",
+    "ready": true
+  },
+  {
+    "id": "deep-step1",
+    "name": "深度向导第1步（年终奖）",
+    "width": 375,
+    "height": 812,
+    "file": "deep-step1-375.png",
+    "bytes": 53952,
+    "sha256": "4966c970970c2dbb8212d35f73ee47c9c43936290269c43dbb26247da778308f",
+    "ready": true
+  },
+  {
+    "id": "deep-step1",
+    "name": "深度向导第1步（年终奖）",
+    "width": 1280,
+    "height": 900,
+    "file": "deep-step1-1280.png",
+    "bytes": 76237,
+    "sha256": "cc2a533206b1d9458101af6295593939fd3892ad1b112df7e73b394433788200",
+    "ready": true
+  },
+  {
+    "id": "deep-result",
+    "name": "深度测算结果步（年终奖）",
+    "width": 375,
+    "height": 812,
+    "file": "deep-result-375.png",
+    "bytes": 79247,
+    "sha256": "1a65b0734a5fec30434e1fd41e314814c1a265ea84514f840aae77fb14c3c258",
+    "ready": true
+  },
+  {
+    "id": "deep-result",
+    "name": "深度测算结果步（年终奖）",
+    "width": 1280,
+    "height": 900,
+    "file": "deep-result-1280.png",
+    "bytes": 117992,
+    "sha256": "79a54ba9b8f5a802206f35bc7f6317b06dd66ecc689883b47a3721fd477bcc6c",
+    "ready": true
+  },
+  {
+    "id": "profile",
+    "name": "我的页",
+    "width": 375,
+    "height": 812,
+    "file": "profile-375.png",
+    "bytes": 70685,
+    "sha256": "9461cd093c1182d4961f3d8f64ad0607032b7bdfb1d7de7567f524b3afc0dc90",
+    "ready": true
+  },
+  {
+    "id": "profile",
+    "name": "我的页",
+    "width": 1280,
+    "height": 900,
+    "file": "profile-1280.png",
+    "bytes": 101139,
+    "sha256": "a421bdc860d7a0cdd5ddc8ea9a615de300bdb32f4f1c88ec8b56485f054b29b3",
+    "ready": true
+  }
+]

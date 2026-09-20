@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.76.0';
+        window.__APP_VERSION__ = '1.80.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -112,6 +112,9 @@
          位置放在 head 末尾是为了与旧运行时一致（Play CDN 同样是 append 到 head 尾部），
          换位置会改变 tokens.css / toolbox.css 与工具类之间的先后关系。 -->
     <link rel="stylesheet" href="src/css/tailwind.css">
+    <!-- 阶段19 UI 重构：新令牌 + 新组件类的沙箱层（只增不改；未接线前零视觉变化）。
+         排在 tailwind.css 之后，使新组件类在同名冲突时由本层胜出。详见文件头注释。 -->
+    <link rel="stylesheet" href="src/css/ui-redesign.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 初始化遮罩：auth-ui 加载完成后自动隐藏，防止旧UI闪现 -->
@@ -445,11 +448,11 @@
                     </div>
                 </div>
 
-                <!-- 卡片2：搜索入口（24 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
+                <!-- 卡片2：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
                 <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
                     <i class="fa fa-search tool-search-entry-icon"></i>
                     <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
-                    <span class="tool-search-entry-count">24 个 ›</span>
+                    <span class="tool-search-entry-count">41 个 ›</span>
                 </button>
 
                 <!-- 卡片3：我是谁（先认身份再选工具 —— 用户不知道年终奖归哪一类，但知道自己是上班族） -->
@@ -526,7 +529,7 @@
                         <i class="fa fa-info-circle text-primary mt-0.5 mr-2"></i>
                         <div>
                             <h4 class="font-medium text-primary mb-1 text-sm">关于本站</h4>
-                            <p class="text-xs text-gray-600">EuriskoTax 税费计算器：覆盖个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 <strong>20 个速算器</strong>，外加 4 个多步骤完整测算（按年填全、出完整预算表），<strong>共 24 个入口全部内置</strong>。先按身份选场景，找不到就搜（「年终奖」「增值税」「残保金」），每个结果都给出拆解、易错口径与政策依据，也都能保存与导出 PDF。全部计算在你的浏览器本地完成，不上传任何数据；结果仅供参考，实际纳税请以税务部门核算为准。</p>
+                            <p class="text-xs text-gray-600">EuriskoTax 税费计算器：覆盖个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 <strong>20 个速算器</strong>，外加 <strong>21 个多步骤完整测算</strong>（按年填全、出完整预算表），<strong>共 41 个入口全部内置</strong>。先按身份选场景，找不到就搜（「年终奖」「增值税」「残保金」），每个结果都给出拆解、易错口径与政策依据，也都能保存与导出 PDF。全部计算在你的浏览器本地完成，不上传任何数据；结果仅供参考，实际纳税请以税务部门核算为准。</p>
                         </div>
                     </div>
                 </div>
@@ -534,7 +537,7 @@
             </div>
         </div>
 
-        <!-- 工具页：24 个入口只按「人/场景」分一套类。
+        <!-- 工具页：41 个入口只按「人/场景」分一套类。
              早期把「深度测算」与「工具箱」并列，那是实现形态的分界（向导 vs 一屏算完），
              不是用户心智的分界 —— 现在形态差异降为最后一组的一行说明。 -->
         <div id="tools-page" class="page hidden">
@@ -1438,7 +1441,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.76.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.80.0</p>
                         <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

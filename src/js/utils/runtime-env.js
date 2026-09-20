@@ -186,8 +186,10 @@
         var card = document.createElement('div');
         card.setAttribute('role', 'dialog');
         card.setAttribute('aria-modal', 'true');
+        // 浮层卡片：投影取令牌第三档（深色下自动换成更黑的那组）。
+        // 注：内联 cssText 同样能解析 var() —— 变量从 :root 继承下来，与本元素无关。
         card.style.cssText = 'max-width:420px;margin:0 auto;background:#fff;border-radius:16px;padding:20px;text-align:center;' +
-            'box-shadow:0 20px 50px rgba(0,0,0,.3);';
+            'box-shadow:var(--sh-3);';
 
         var title = document.createElement('div');
         title.style.cssText = 'font-size:15px;font-weight:700;color:#1e293b;';

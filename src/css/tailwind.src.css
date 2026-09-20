@@ -61,7 +61,7 @@
                 top: calc(100% + 6px);
                 left: 50%;
                 transform: translateX(-50%);
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                box-shadow: var(--sh-2);
                 pointer-events: none;
             }
             .dark .tooltip .tooltip-text {
@@ -324,6 +324,9 @@
             /* 用户信息横幅上的头像圆角大块 */
             .profile-avatar-tile {
                 @apply w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center shrink-0;
+                /* 全站唯一一处 inset 内阴影：三档层次与 --sh-up 都表达不了"向内"这一个方向，
+                   而为它单开一个只被引用一次的令牌，正是令牌层要避免的那种角色膨胀。
+                   已在 tokens.css 的「已知字面值」清单登记。 */
                 box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
             }
 
@@ -421,7 +424,7 @@
             /* 大图标 - 渐变填充 */
             .mode-card-icon {
                 @apply w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3 text-xl sm:text-2xl text-white;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                box-shadow: var(--sh-2);
                 transition: transform 0.3s ease;
             }
             .mode-card:hover .mode-card-icon { transform: scale(1.08); }
@@ -575,7 +578,7 @@
             /* sticky 预览条 */
             .calc-preview-bar {
                 @apply sticky bottom-0 bg-white z-30;
-                box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
+                box-shadow: var(--sh-up);
                 border-top: 2px solid transparent;
                 border-image: linear-gradient(90deg, #1e40af 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
             }
@@ -748,13 +751,12 @@
                 .calc-sticky-header .calc-page-title { @apply truncate; }
             }
 
-            /* 输入框聚焦增强 */
+            /* 输入框聚焦增强 —— 焦点环统一取 --sh-focus（阶段19 19-1 收口）。
+               深浅两色不必各写一份：--sh-focus 吃的是 --c-brand-rgb，
+               而它在 .dark 下会被换成浅蓝三元组，焦点环自动跟着换色。 */
             .input-field:focus {
-                box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.12);
+                box-shadow: var(--sh-focus);
                 border-color: #1e40af;
-            }
-            .dark .input-field:focus {
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
             }
 
             /* 按钮按下反馈 */
@@ -808,7 +810,7 @@
         }
         .dark .card {
             @apply bg-gray-800 text-gray-100;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            box-shadow: var(--sh-1);
         }
         .dark .input-field {
             @apply border-gray-600 text-gray-100 placeholder-gray-500;
@@ -816,7 +818,7 @@
         }
         .dark .input-field:focus {
             border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            box-shadow: var(--sh-focus);
             background-color: #374151;
         }
         .dark .label {
@@ -848,23 +850,27 @@
             @apply text-gray-100 bg-gray-700;
         }
 
-        /* === 深色模式增强：对比度与阴影（轻盈版） === */
+        /* === 深色模式增强：对比度与阴影 ===
+           阴影不再逐条写死，一律取 --sh-* 令牌，深浅两档由 tokens.css 的 .dark 段统一切换。
+           原先这里还有一段 @media (max-width:640px) 专门把移动端深色阴影调得更轻 ——
+           改成令牌后深浅由 .dark 档负责，那段就只会写出同值，属于必删的重复代码。 */
         .dark .home-card {
             @apply bg-gray-800 border border-gray-700;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            box-shadow: var(--sh-1);
         }
         .dark .home-card:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: var(--sh-2);
         }
         .dark .home-card-title {
             @apply text-gray-200;
         }
         .dark .mode-card {
             @apply bg-gray-800 border border-gray-700;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            box-shadow: var(--sh-1);
         }
+        /* hover 原先还叠了一条 1px 品牌描边环；收口后"浮起"这件事统一交给 --sh-2 表达 */
         .dark .mode-card:hover {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2), 0 0 0 1px rgba(59,130,246,0.25);
+            box-shadow: var(--sh-2);
         }
         .dark .recent-card {
             @apply bg-gray-700 border border-gray-600;
@@ -876,11 +882,11 @@
             @apply bg-gray-800/95 border-gray-700;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+            box-shadow: var(--sh-1);
         }
+        /* 向上投影由浅色那条 .calc-preview-bar 的 --sh-up 提供，此处不必重复写 */
         .dark .calc-preview-bar {
             @apply bg-gray-800;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.18);
             border-image: linear-gradient(90deg, #3b82f6 0%, #60a5fa 35%, #f59e0b 65%, #ef4444 100%) 1;
         }
         .dark .calc-preview-value {
@@ -889,9 +895,10 @@
         .dark .calc-preview-label {
             @apply text-gray-400;
         }
+        /* 选中步骤的光环与焦点环是同一件事（都表示"你现在在这儿"），一并收口 */
         .dark .step-number.active {
             @apply bg-blue-600 text-white;
-            box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
+            box-shadow: var(--sh-focus);
         }
         .dark .step-number.completed {
             @apply bg-green-700 text-white;
@@ -901,7 +908,6 @@
         }
         .dark .tooltip .tooltip-text {
             @apply bg-gray-700 text-gray-100 border border-gray-600;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         .dark .tooltip.is-open .tooltip-text {
             @apply visible opacity-100;
@@ -912,22 +918,6 @@
         }
         .dark .btn-secondary:hover {
             @apply bg-gray-600;
-        }
-
-        /* 移动端深色模式：更轻盈的阴影 */
-        @media (max-width: 640px) {
-            .dark .home-card {
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-            }
-            .dark .mode-card {
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-            }
-            .dark .calc-sticky-header {
-                box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            }
-            .dark .calc-preview-bar {
-                box-shadow: 0 -1px 6px rgba(0,0,0,0.15);
-            }
         }
 
         /* ====== 悬浮税助手样式 ====== */
@@ -948,7 +938,7 @@
             /* 原为字面的 100，与模态同级，导致浮动球盖住底部 Tab 栏。
                改取层级表的值：高于 Tab 栏(45)、低于遮罩(90)。 */
             z-index: var(--z-fab);
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+            box-shadow: var(--sh-2);
             border: none;
             font-size: 18px;
             touch-action: none;
@@ -963,7 +953,7 @@
         }
         .assistant-fab:hover {
             transform: translateX(var(--peek-x)) scale(1.08);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+            box-shadow: var(--sh-3);
         }
         .assistant-fab:active {
             transform: translateX(var(--peek-x)) scale(0.95);
@@ -972,7 +962,7 @@
             transition: none !important;
             transform: translateX(var(--peek-x)) scale(1.1);
             cursor: grabbing;
-            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.55);
+            box-shadow: var(--sh-3);
         }
         .assistant-fab-logo {
             width: 32px;
@@ -1042,7 +1032,7 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--sh-3);
         }
         .assistant-drawer.assistant-drawer-open {
             transform: translateX(0);
@@ -1412,7 +1402,7 @@
             background: white;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            box-shadow: var(--sh-3);
             z-index: 50;
             max-height: 260px;
             overflow-y: auto;
@@ -1722,7 +1712,7 @@
         /* 深色模式 */
         .dark .assistant-fab {
             background: linear-gradient(135deg, #2563eb, #4f46e5);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+            /* 投影不必在这儿再写一份：基础那条已经是 var(--sh-2)，深色档由令牌自动加重 */
         }
         .dark .assistant-overlay {
             background: rgba(0, 0, 0, 0.6);

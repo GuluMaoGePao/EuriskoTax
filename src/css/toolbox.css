@@ -89,7 +89,10 @@
 
 .tool-entry:hover {
     border-color: #c7d7fb;
-    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    /* 可点卡片 hover：统一取阴影第二档。
+       原为字面的品牌蓝辉光 0 6px 14px -6px rgba(30,64,175,.25) —— 与其他三类可点卡
+       各写一份同值副本，且深色模式没有对应档位，改为令牌后自动跟随 --sh-2。 */
+    box-shadow: var(--sh-2);
     transform: translateY(-1px);
 }
 
@@ -212,7 +215,10 @@
 
 .tool-input:focus {
     border-color: #1e40af;
-    box-shadow: 0 0 0 3px rgba(30, 64, 175, .12);
+    /* 焦点环：取全站唯一的 --sh-focus。
+       原为同色但透明度仅 .12 —— 浅到几乎看不见，键盘用户很难确认焦点落在哪。
+       提到 .35 后与 --sh-focus 走同一条线（深色下由 --c-brand-rgb 自动换成浅蓝）。 */
+    box-shadow: var(--sh-focus);
 }
 
 .tool-input-unit {
@@ -358,7 +364,7 @@
 
 .tool-search-entry:hover {
     border-color: #c7d7fb;
-    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    box-shadow: var(--sh-2);
 }
 
 .tool-search-entry-icon {
@@ -414,7 +420,7 @@
 
 .scenario-card:hover {
     border-color: #c7d7fb;
-    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    box-shadow: var(--sh-2);
     transform: translateY(-1px);
 }
 
@@ -494,7 +500,7 @@
 
 .tool-next-item:hover {
     border-color: #c7d7fb;
-    box-shadow: 0 6px 14px -6px rgba(30, 64, 175, .25);
+    box-shadow: var(--sh-2);
 }
 
 .tool-next-item .fa:first-child {
