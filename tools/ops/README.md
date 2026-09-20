@@ -289,21 +289,30 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 
 ---
 
-## 视觉回归截图基线（阶段19-0 新增）
+## 视觉回归截图基线（阶段19-0 新增，19-1 补深色档）
 
 Tokens 改版（阶段19 要动首页结构 / 结果页布局 / 令牌层）没有视觉回归就是赌博 —— `src/css/tokens.css`
 文件头写的那句「本项目没有视觉回归」正是本次要补上的一环。
 
-`ui-screenshot-baseline.js` 把 **6 个关键页面 × 2 个断点（375 / 1280）** 的截图固化成基线，
+`ui-screenshot-baseline.js` 把 **6 个关键页面 × 2 个断点（375 / 1280）× 2 套主题（浅 / 深）** 的截图固化成基线，
 每个阶段结束后重拍比对，**变了才需要人眼确认**（方案里的验收方式就是人眼确认，hash 只回答"变没变"）。
 
 ```bash
-node tools/ops/ui-screenshot-baseline.js                 # 生成 / 覆盖基线
-node tools/ops/ui-screenshot-baseline.js --check         # 与基线比对（不覆盖，产物落在 .tmp/）
+node tools/ops/ui-screenshot-baseline.js                          # 生成 / 覆盖浅色基线
+node tools/ops/ui-screenshot-baseline.js --theme dark             # 生成 / 覆盖深色基线
+node tools/ops/ui-screenshot-baseline.js --check --theme light    # 与基线比对（不覆盖，产物落在 .tmp/）
 node tools/ops/ui-screenshot-baseline.js --only home,tools
 ```
 
-产物：`screenshots/baseline/*.png`（12 张，入仓）+ `manifest.json`（sha256 / 字节数 / 资源就绪标记）。
+产物：`screenshots/baseline/*.png`（**24 张**，入仓，深色文件名带 `-dark` 后缀）+ `manifest.json`
+（sha256 / 字节数 / 资源就绪标记 / 主题）。
+
+> **为什么必须有深色基线（19-1 补）**：`tokens.css` 的 `.dark` 段是**另一套**阴影值（深色靠"更黑"不靠
+> "更灰"，透明度 .30/.40/.50）。浅色 12 张全绿**证明不了深色没问题** —— 19-1 的验收要求
+> 「深色模式逐页过一遍」在只有浅色基线时根本没有产物可看。
+>
+> **`--theme` 一次只拍一套，清单按 (页面@断点@主题) 合并写入**：直接覆盖会把上一次的主题冲掉，
+> 24 张永远凑不齐（表现为另一主题 `--check` 全部 missing）。两个主题各跑一次即可并存。
 
 基线之所以能靠 sha256 比对（而不是引 pixelmatch 这类像素库），是因为脚本在截图前掐掉了五类时序噪声，
 每一条都是实测踩出来的，改动前请先读脚本里对应的注释：**冻结动画 / 光标 / 滚动位置**、
@@ -319,6 +328,33 @@ node tools/ops/ui-screenshot-baseline.js --only home,tools
 > `node <cli> open http://127.0.0.1:3000/` 把浏览器热起来再跑 ——
 > `<cli>` 取 `npm root -g` 下 `agent-browser/package.json` 的 `bin` 字段；
 > 注意别用 `npx`（Windows 下 spawn EINVAL），本项目里一律用 node 直接跑 CLI。
+
+### 对比度审计（阶段19-1 验收项「对比度仍达 AA」）
+
+阶段19-1 的验收口径是「对比度仍达 AA」，但此前**没有任何手段能回答这个问题**：全站几十处
+`/50` `/90` 透明度修饰符 + 深浅两套主题，读 CSS 推不出实际渲染色。`ui-contrast-audit.js`
+走真机：把页面切到与截图基线**完全相同的状态**（复用 `ui-lib/screenshot-kit.js`），用
+`getComputedStyle` 取实际渲染的前景色与**沿祖先链合成**的有效背景色，按 WCAG 2.1 算对比度。
+
+```bash
+node tools/ops/ui-contrast-audit.js                     # 浅色 + 深色，6 页 × 2 断点（24 组）
+node tools/ops/ui-contrast-audit.js --theme dark
+node tools/ops/ui-contrast-audit.js --only home,tools
+node tools/ops/ui-contrast-audit.js --json report.json  # 导出明细（不入仓）
+node tools/ops/ui-contrast-audit.js --strict            # 有确定失败项则退出码 1（供门禁用）
+```
+
+判定口径只守两条线：**正文 4.5:1、大字 3:1**（大字 = ≥24px，或 ≥18.66px 且 font-weight ≥700）。
+
+> **渐变是能判定的，只有背景图（url()）取不到色**。
+> 第一版只要祖先链上有 `background-image` 就整体标「待人工确认」，结果 22 处白字压渐变全进了人工桶 ——
+> 而这批里**真的有不达标的**（助手头 `from-blue-500` 那端白字只有 3.68:1）。现改为解析
+> `linear-gradient` 的**全部色停点**、逐点算并取**最差**值：线性渐变只在色停之间插值，
+> 最差色停即保守下界，**宁可多报，不可放过**。仍取不到色的只剩 `url()` 背景图，那才单列「待人工」。
+>
+> 判定背景时还有一条容易写反的规则：**由内向外走，遇到不透明的一层就停**（CSS 是"近的盖住远的"）。
+> 只找"第一个 background-image"就开算会把自带 `bg-white` / `bg-blue-600` 的按钮误判成
+> 压在父级渐变上（白字对白底 1.05:1 的假警报），本项目里已因此误报过三处。
 
 ### ✅ Tailwind 构建链路：tailwind.css 已修好，admin.css 待办（阶段19-2）
 
