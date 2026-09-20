@@ -568,7 +568,9 @@
         }
 
         return '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">' +
-            '<div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-t-xl">' +
+            // 渐变起点原为 blue-500(#3b82f6)：白字压在它上面只有 3.68:1，不达 AA（16/18px 非大字）。
+            // 起点降到 blue-600(#2563eb) 后为 5.15:1；终点 indigo-600 本来就有 6.4:1，不动。
+            '<div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">' +
                 '<div class="flex justify-between items-center">' +
                     '<div class="flex items-center">' +
                         '<div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">' +

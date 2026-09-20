@@ -348,7 +348,7 @@
                     <div class="flex items-center mb-2">
                         <i class="fa ${type.icon} ${type.color} mr-2"></i>
                         <span class="text-xs font-medium text-gray-700">${type.name}</span>
-                        <span class="ml-auto text-xs text-gray-400">${dateStr}</span>
+                        <span class="ml-auto text-xs text-gray-500">${dateStr}</span>
                     </div>
                     <div class="text-xs text-gray-500 mb-1 truncate">${title}</div>
                     <div class="text-sm font-bold text-primary">应纳税 ${taxStr}</div>
@@ -442,7 +442,7 @@
                     <span class="tax-reminder-dot ${item.color}"></span>
                     <div class="flex-1 min-w-0">
                         <div class="text-sm text-gray-700 truncate">${item.name}</div>
-                        <div class="text-xs text-gray-400">${item.date}</div>
+                        <div class="text-xs text-gray-500">${item.date}</div>
                     </div>
                     <span class="text-xs ${urgencyColor} font-medium ml-2 flex-shrink-0">${daysText}</span>
                 </div>

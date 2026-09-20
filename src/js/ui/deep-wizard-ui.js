@@ -410,7 +410,7 @@
         var rows = (view.rows || []).map(function (r) {
             return '<div class="flex items-center justify-between py-2 border-b border-gray-100" data-dw-row="' + esc(r.label) + '">' +
                 '<span class="text-sm text-gray-600">' + esc(r.label) +
-                (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-400" title="' + esc(r.hint) + '"></i>' : '') +
+                (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-500" title="' + esc(r.hint) + '"></i>' : '') +
                 '</span>' +
                 '<span class="font-medium">' + esc(TB().fmtValue(r.value, r.kind)) + '</span></div>';
         }).join('');
@@ -447,7 +447,9 @@
                 // 免责声明：与存量 4 页同一句话、同样就地展示（不藏在页脚）
                 '<p class="result-disclaimer">' + DISCLAIMER + '</p>' +
                 '<div class="mt-6">' +
-                    '<button id="dw-save" class="btn bg-green-600 text-white hover:bg-green-700 w-full mb-3">' +
+                    // bg-green-600 上的白字只有 3.30:1，不达 AA；green-700 为 5.02:1。
+                // hover 同步降一档（700 → 800），保持「按下更深」的观感不变。
+                '<button id="dw-save" class="btn bg-green-700 text-white hover:bg-green-800 w-full mb-3">' +
                     '<i class="fa fa-save mr-2"></i>保存计算结果</button>' +
                     '<button id="dw-export-pdf" class="btn btn-secondary w-full mb-3">' +
                     '<i class="fa fa-download mr-2"></i>导出PDF报告</button>' +

@@ -418,7 +418,11 @@
             .dark .mode-card-accent,
             .dark .mode-card-success,
             .dark .mode-card-secondary {
-                background: linear-gradient(135deg, rgba(30,41,59,0.6) 0%, #1f2937 70%);
+                /* 起点原为 rgba(30,41,59,.6)：**半透明**色停会把它下面那层一起透上来，
+                   合成出一片中灰（实测 rgb(120,127,137)），卡片标题 3.69:1、副标题 1.6:1 全不达标。
+                   深色档的渐变必须是**不透明**的深色 —— 这是它与浅色档写法的唯一差别，
+                   也是"半透明色停 + 浅色文字"这个组合最容易踩的坑。 */
+                background: linear-gradient(135deg, #1e293b 0%, #111827 70%);
             }
 
             /* 大图标 - 渐变填充 */
@@ -438,7 +442,9 @@
             }
             .dark .mode-card-title { @apply text-gray-100; }
             .mode-card-subtitle {
-                @apply text-xs text-gray-500;
+                /* 卡片底是浅色渐变（sky-100 那端），gray-500 在上面只有 4.21:1，
+                   12px 说明文字差一点点不达 AA；gray-600 为 6.6:1。 */
+                @apply text-xs text-gray-600;
             }
             .dark .mode-card-subtitle { @apply text-gray-400; }
             .mode-card-info-btn {
@@ -494,7 +500,9 @@
                 @apply bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100;
             }
             .dark .tip-card {
-                @apply from-gray-700 to-gray-800 border-gray-600;
+                /* 原为 from-gray-700：卡片上的 text-primary（深色档是浅蓝 #60a5fa）
+                   在 gray-700 上只有 4.05:1，14px 标题差一点。整档降到 gray-800 → gray-900 后 5.77:1。 */
+                @apply from-gray-800 to-gray-900 border-gray-700;
             }
 
             /* 卡片入场动画 */
@@ -525,7 +533,7 @@
 
             /* 空状态 */
             .home-empty-state {
-                @apply text-center py-6 text-gray-400 text-sm;
+                @apply text-center py-6 text-gray-500 text-sm;
             }
             .home-empty-state i {
                 @apply text-3xl mb-2 block opacity-40;
@@ -534,7 +542,9 @@
                 @apply text-xs;
             }
             .home-empty-state .empty-hint {
-                @apply mt-2 inline-flex items-center text-[11px] text-primary/70 bg-primary/5 rounded-full px-3 py-1;
+                /* text-primary 不接 /70：11px 的说明文字再打七折只有 3.95:1，不达 AA 的 4.5。
+                   弱化层级交给右侧这颗 bg-primary/5 药丸底表达，不再靠压低文字对比度。 */
+                @apply mt-2 inline-flex items-center text-[11px] text-primary bg-primary/5 rounded-full px-3 py-1;
             }
 
             /* === 阶段2：计算页紧凑顶栏 + sticky预览条 === */
@@ -644,7 +654,7 @@
             .result-pitfall ul { @apply mt-2 space-y-1; }
             .result-pitfall li { @apply text-xs text-amber-900 leading-relaxed list-disc ml-4; }
 
-            .result-disclaimer { @apply mt-4 text-xs text-gray-400 leading-relaxed; }
+            .result-disclaimer { @apply mt-4 text-xs text-gray-500 leading-relaxed; }
 
             @media (max-width: 640px) {
                 .calc-preview-value { @apply text-xs; }
@@ -705,7 +715,7 @@
             }
             @media (max-width: 640px) {
                 .step-progress-text {
-                    @apply inline-block text-[10px] text-gray-400 ml-auto;
+                    @apply inline-block text-[10px] text-gray-500 ml-auto;
                 }
             }
 
@@ -837,6 +847,20 @@
         .dark .hover\:bg-gray-100:hover { @apply hover:bg-gray-700; }
         .dark .hover\:bg-gray-50:hover { @apply hover:bg-gray-700; }
         .dark .hover\:text-gray-700:hover { @apply hover:text-gray-200; }
+        /* === 品牌浅蓝块（bg-blue-50 / blue-100 + blue-600 文字）的深色档 ===
+           问题形态：这些块的底色是**写死的浅蓝**工具类，而块内文字被上表的 gray-600 → gray-300 换成了浅色。
+           深色模式下一只手把底色留在 #eff6ff，另一只手把文字刷成浅灰 —— 实测 1.35:1，整段读不了。
+           为什么在这里补而不是去改各处 class：index.html 里有十来处同形写法，逐处加 dark: 变体要动十几个
+           位点且容易漏；沿用紧邻上方「.dark .bg-gray-50」那套兜底表写法即可一处覆盖全部同形块，
+           且**浅色档完全不受影响**（这些规则全在 .dark 作用域内）。 */
+        .dark .bg-blue-50 { @apply bg-blue-900/40; }
+        .dark .bg-blue-100 { @apply bg-blue-900/60; }
+        .dark .border-blue-100 { @apply border-blue-800; }
+        .dark .border-blue-200 { @apply border-blue-800; }
+        .dark .text-blue-500 { @apply text-blue-300; }
+        .dark .text-blue-600 { @apply text-blue-300; }
+        .dark .text-blue-700 { @apply text-blue-200; }
+        .dark .hover\:bg-blue-50:hover { @apply hover:bg-blue-900/40; }
         .dark .tax-budget-table th {
             @apply bg-gray-700 text-gray-100 border-gray-600;
         }
@@ -1070,7 +1094,9 @@
 
         .assistant-header {
             padding: 16px 20px;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            /* 原为 blue-500 → indigo-500：白字标题压在 blue-500 那端只有 3.68:1，不达 AA。
+               两端各降一档到 blue-600 / indigo-600（5.15:1 与 6.4:1），观感仍是"蓝紫渐变"。 */
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
             color: white;
             flex-shrink: 0;
         }
@@ -1125,14 +1151,14 @@
             box-sizing: border-box;
         }
         .assistant-search::placeholder {
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .assistant-search-icon {
             position: absolute;
             left: 12px;
             top: 50%;
             transform: translateY(-50%);
-            color: #9ca3af;
+            color: var(--c-text-3);
             font-size: 14px;
         }
 
@@ -1328,7 +1354,7 @@
         }
         .assistant-qa-arrow {
             font-size: 12px;
-            color: #9ca3af;
+            color: var(--c-text-3);
             transition: transform 0.2s;
             flex-shrink: 0;
         }
@@ -1359,7 +1385,7 @@
         .assistant-empty {
             text-align: center;
             padding: 40px 20px;
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .assistant-empty i {
             font-size: 36px;
@@ -1384,7 +1410,7 @@
             background: none;
             border: none;
             cursor: pointer;
-            color: #9ca3af;
+            color: var(--c-text-3);
             font-size: 16px;
             padding: 2px;
             line-height: 1;
@@ -1413,7 +1439,7 @@
             align-items: center;
             padding: 8px 12px;
             font-size: 11px;
-            color: #9ca3af;
+            color: var(--c-text-3);
             border-bottom: 1px solid #f3f4f6;
         }
         .assistant-suggest-clear {
@@ -1440,7 +1466,7 @@
             color: #1d4ed8;
         }
         .assistant-suggest-item i {
-            color: #9ca3af;
+            color: var(--c-text-3);
             font-size: 12px;
             flex-shrink: 0;
         }
@@ -1503,7 +1529,7 @@
             transform: translateY(-1px);
         }
         .dark .assistant-hot-title {
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .dark .assistant-hot-chip {
             background: rgba(239, 68, 68, 0.12);
@@ -1570,7 +1596,7 @@
             align-items: center;
             gap: 6px;
             font-size: 12px;
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .assistant-fb-btn {
             background: none;
@@ -1601,7 +1627,7 @@
         }
         .assistant-fb-count {
             font-size: 11px;
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .assistant-related-btn {
             margin-left: auto;
@@ -1650,7 +1676,7 @@
         .dark .assistant-fav-btn,
         .dark .assistant-fb-btn {
             border-color: #4b5563;
-            color: #9ca3af;
+            color: var(--c-text-3);
         }
         .dark .assistant-fav-btn.fav-active {
             background: rgba(245, 158, 11, 0.15);

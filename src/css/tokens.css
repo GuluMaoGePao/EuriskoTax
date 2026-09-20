@@ -10,14 +10,19 @@
  * 消费范围（渐进接入）：
  *   ✅ 已接入：src/css/toolbox.css（工具箱 + 底部 Tab 栏 + 桌面 Tab 行）
  *   ✅ 已接入：seo/landing.css（21 个落地页：共享语义色取自本文件，落地页局部色集中在其 :root 一段）
- *   ⏳ 待接入：tailwind.config.js（原因见下）
+ *   🟡 部分接入：tailwind.config.js —— **仅文字类**品牌色（text-primary 及 /70 /80 等透明度变体）
+ *      取自本文件的 --c-brand-rgb；背景 / 描边 / 渐变类仍是 config 里的 hex 副本。
  *
- * 为什么不直接把 Tailwind config 变量化：
- *   Tailwind 透明度修饰符（bg-primary/90、focus:ring-primary/50）依赖 <alpha-value>，
- *   本地构建用的 v3.4.17 原生支持，这条旧 blocker 已消失。
- *   剩下的真实阻力是**没有视觉回归**：全站几十处 /50 /90 一旦有一处颜色不对，
- *   纯 DOM 断言看不出来，只能靠人眼翻。因此 Tailwind config 保留 hex 副本，
- *   与本文件**同值镜像**（改色必须两边同步），全量变量化留到可做视觉回归时执行。
+ * 为什么只接了一半（19-1 深色对比度审计的产物，不是预先设计）：
+ *   深色档审计（tools/ops/ui-contrast-audit.js）查出 text-primary 在深色底上只有 1.68:1，
+ *   根因就是这个 hex 写在 config 里、吃不到本文件 .dark 段的换色。但**整体**变量化的代价更大：
+ *   bg-primary / border-primary / from-primary 一旦跟着变浅蓝，压在它们上面的白字
+ *   会从"达标"变成"不达标" —— 属于修好一片、弄坏一片。故按「AA 只管文字对比度」这条边界切一半。
+ *
+ * 剩下的真实阻力：Tailwind 透明度修饰符（bg-primary/90、focus:ring-primary/50）依赖 <alpha-value>，
+ *   本地构建用的 v3.4.17 原生支持（这条旧 blocker 已消失），且**没有视觉回归**的历史也已终结
+ *   （19-0 起有 12×2 张截图基线 + 对比度审计两道手段）。因此"做过半"是可控的：
+ *   未接的那一半一旦有朝一日全量变量化，必须连同截图基线与审计一起回归。
  *
  * 命名约定：<类别>-<角色>[-<状态>]
  */
@@ -62,6 +67,7 @@
     --c-warning-text: #b45309;  /* amber-700 */
     --c-warning-bg:   #fffbeb;  /* amber-50：提示框底 */
     --c-warning-line: #fde68a;  /* amber-200：提示框描边 */
+    --c-danger-text:  #b91c1c;  /* red-700：白底可读档，与 success-text / warning-text 同一分工 */
     --c-brand-line:   #c7d2fe;  /* 品牌描边：比 subtle 深一档 —— subtle(#eff6ff) 当边框在白底几乎看不见 */
     /* 品牌色 rgba 三元组（投影 / 半透明遮罩需要）：与 --c-brand 同色，改色时两处必须同步 */
     --c-brand-rgb: 30, 64, 175;
@@ -233,6 +239,9 @@
     --c-danger:       #f87171;
 
     --c-brand-rgb: 96, 165, 250;
+    --c-success-text: #6ee7b7;
+    --c-warning-text: #fcd34d;
+    --c-danger-text:  #fca5a5;
     /* 「白底可读档」暂无深色对应的消费方（落地页不提供深色模式），接入时再按深色对比度补 */
 
     --c-text:         #f9fafb;

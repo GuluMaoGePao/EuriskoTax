@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.80.0';
+        window.__APP_VERSION__ = '1.81.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -99,10 +99,12 @@
             }
         })();
         // 色值 / 字号 / 间距的统一取值来源见 src/css/tokens.css。
-        // Tailwind 主题（含同值的 hex 副本、boxShadow / fontFamily 扩展）已迁到仓库根的
-        // tailwind.config.js —— 改色仍需与 tokens.css 同步改两处。
-        // 保留 hex 而非引用 CSS 变量：全站大量使用透明度修饰符（bg-primary/90、
-        // focus:ring-primary/50），变量化后一旦编译器不支持 <alpha-value> 会静默失效。
+        // Tailwind 主题（boxShadow / fontFamily 扩展、以及大部分色值的同值 hex 副本）在仓库根的
+        // tailwind.config.js —— 改色仍要与 tokens.css 同步改两处。
+        // 唯一的例外是「文字类」品牌色：它在 config 里挂了 `rgba(var(--c-brand-rgb, …), …)`，
+        // 直接吃 tokens.css 的 .dark 换色（深色档下深蓝文字实测只有 1.68:1，不达 AA，见 19-1 记录）。
+        // 背景 / 描边 / 渐变类仍是 hex，理由见 config 文件头注释 —— 那几类一起变浅蓝
+        // 会让「浅蓝底 + 白字」反过来不达标，收益不抵风险。
     </script>
     <!-- Tailwind v3 产物：构建期编译（npm run build:css），不再走 cdn.tailwindcss.com 运行时。
          为什么必须离线编译：Play CDN 把 config 交给编译器那一步在本项目实测失效
@@ -163,16 +165,16 @@
                     <div>
                         <label for="login-email" class="label">邮箱</label>
                         <div class="relative">
-                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="email" id="login-email" class="input-field pl-10" placeholder="请输入邮箱">
                         </div>
                     </div>
                     <div>
                         <label for="login-password" class="label">密码</label>
                         <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="password" id="login-password" class="input-field pl-10 pr-10" placeholder="请输入密码">
-                            <i id="login-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="login-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
                     <div class="flex items-center justify-between">
@@ -190,12 +192,12 @@
                 <!-- 注册表单 -->
                 <form id="register-form" class="space-y-4 hidden">
                     <div class="text-right -mb-1">
-                        <span class="text-xs text-gray-400">带 <i class="req-star" aria-hidden="true">*</i> 的为必填项，请如实填写</span>
+                        <span class="text-xs text-gray-500">带 <i class="req-star" aria-hidden="true">*</i> 的为必填项，请如实填写</span>
                     </div>
                     <div>
                         <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
-                            <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="text" id="register-username" class="input-field pl-10" placeholder="请输入用户名">
                         </div>
                         <p id="register-username-error" class="field-error hidden" role="alert"></p>
@@ -203,7 +205,7 @@
                     <div>
                         <label for="register-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
-                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="email" id="register-email" class="input-field pl-10" placeholder="请输入邮箱">
                         </div>
                         <p id="register-email-error" class="field-error hidden" role="alert"></p>
@@ -212,7 +214,7 @@
                         <label for="register-code" class="label">邮箱验证码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
-                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
                             </div>
                             <button type="button" id="send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
@@ -225,7 +227,7 @@
                     <div>
                         <label for="register-phone" class="label">手机号（选填）</label>
                         <div class="relative">
-                            <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="tel" id="register-phone" class="input-field pl-10" placeholder="请输入手机号">
                         </div>
                         <p id="register-phone-error" class="field-error hidden" role="alert"></p>
@@ -233,25 +235,25 @@
                     <div>
                         <label for="register-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="请输入密码（至少 6 位）">
-                            <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                         <p id="register-password-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
                         <label for="register-confirm-password" class="label">确认密码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码">
-                            <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                         <p id="register-confirm-password-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div>
                         <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
-                            <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="公测期邀请码（一码一用）" autocomplete="off">
                         </div>
                         <p id="register-invite-code-error" class="field-error hidden" role="alert"></p>
@@ -290,7 +292,7 @@
                     <div>
                         <label for="reset-email" class="label">注册邮箱</label>
                         <div class="relative">
-                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="email" id="reset-email" class="input-field pl-10" placeholder="请输入注册邮箱">
                         </div>
                     </div>
@@ -298,7 +300,7 @@
                         <label for="reset-code" class="label">邮箱验证码</label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
-                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
                             </div>
                             <button type="button" id="reset-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
@@ -309,17 +311,17 @@
                     <div>
                         <label for="reset-new-password" class="label">新密码</label>
                         <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少 6 位）">
-                            <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
                     <div>
                         <label for="reset-confirm-password" class="label">确认新密码</label>
                         <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码">
-                            <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
                     <button type="button" id="reset-submit" class="btn btn-primary w-full py-3 text-lg">
@@ -331,7 +333,7 @@
                         <button type="button" id="guest-entry-btn" class="text-sm text-gray-600 hover:text-primary transition-colors">
                             免登录使用 →
                         </button>
-                        <p class="text-xs text-gray-400 mt-1.5">不注册也能用全部计税功能，数据仅存本机</p>
+                        <p class="text-xs text-gray-500 mt-1.5">不注册也能用全部计税功能，数据仅存本机</p>
                     </div>
                 </div>
                 
@@ -390,10 +392,10 @@
                             <div id="user-dropdown" class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 hidden z-50 origin-top-right animate-dropdown">
                                 <!-- 「版本与权益」不再在此重复入口：顶栏 pill（#topbar-plan-badge）就在菜单按钮左侧，同屏两个入口互相稀释（阶段14 入口收敛） -->
                                 <a href="#" id="profile-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
-                                    <i class="fa fa-user-circle text-gray-400"></i>个人中心
+                                    <i class="fa fa-user-circle text-gray-500"></i>个人中心
                                 </a>
                                 <a href="#" id="logout-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
-                                    <i class="fa fa-sign-out text-gray-400"></i>退出登录
+                                    <i class="fa fa-sign-out text-gray-500"></i>退出登录
                                 </a>
                             </div>
                         </div>
@@ -462,7 +464,7 @@
                             <i class="fa fa-user-circle-o text-primary mr-2"></i>
                             <span>我是谁</span>
                         </div>
-                        <span class="text-xs text-gray-400">按身份挑工具</span>
+                        <span class="text-xs text-gray-500">按身份挑工具</span>
                     </div>
                     <div id="home-scenarios" class="scenario-grid">
                         <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
@@ -476,7 +478,7 @@
                             <i class="fa fa-clock-o text-primary mr-2"></i>
                             <span>最近使用</span>
                         </div>
-                        <button id="home-recent-tools-clear" type="button" class="text-xs text-gray-400 hover:text-primary">清空</button>
+                        <button id="home-recent-tools-clear" type="button" class="text-xs text-gray-500 hover:text-primary">清空</button>
                     </div>
                     <div id="home-recent-tools" class="tool-entry-list"></div>
                 </div>
@@ -502,7 +504,7 @@
                             <i class="fa fa-calendar text-orange-500 mr-2"></i>
                             <span>税务提醒</span>
                         </div>
-                        <span class="text-xs text-gray-400" id="home-calendar-year">2026</span>
+                        <span class="text-xs text-gray-500" id="home-calendar-year">2026</span>
                     </div>
                     <div id="home-calendar-list" class="space-y-1">
                         <!-- 由 home-ui.js 动态填充 -->
@@ -691,7 +693,7 @@
             <div class="max-w-3xl mx-auto py-4 px-4">
                 <!-- 顶部：返回 + 标题 + 政策时效 -->
                 <div class="flex items-start gap-3 mb-3">
-                    <button id="quick-back-btn" class="mt-1 text-gray-400 hover:text-primary" title="返回首页">
+                    <button id="quick-back-btn" class="mt-1 text-gray-500 hover:text-primary" title="返回首页">
                         <i class="fa fa-arrow-left"></i>
                     </button>
                     <div class="flex-1 min-w-0">
@@ -708,7 +710,7 @@
                             <i class="fa fa-pencil-square-o text-primary mr-2"></i>
                             <span>填写参数</span>
                         </div>
-                        <span class="text-xs text-gray-400">改动即时重算</span>
+                        <span class="text-xs text-gray-500">改动即时重算</span>
                     </div>
                     <div id="quick-form" class="grid sm:grid-cols-2 gap-x-4"></div>
                 </div>
@@ -740,7 +742,7 @@
                         <span class="flex items-center text-sm font-medium text-gray-700">
                             <i class="fa fa-book text-primary mr-2"></i>政策依据
                         </span>
-                        <i class="fa fa-angle-down text-gray-400 text-xs"></i>
+                        <i class="fa fa-angle-down text-gray-500 text-xs"></i>
                     </summary>
                     <div class="mt-2">
                         <div id="quick-policy-basis-body" class="text-xs text-gray-600 space-y-2"></div>
@@ -1024,7 +1026,7 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">反馈内容 <span class="text-red-500">*</span></label>
                     <textarea id="feedback-content" rows="5" maxlength="5000" placeholder="请描述您遇到的问题或想要的功能建议…" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
-                    <p class="text-right text-xs text-gray-400 mt-1"><span id="feedback-content-count">0</span>/5000</p>
+                    <p class="text-right text-xs text-gray-500 mt-1"><span id="feedback-content-count">0</span>/5000</p>
                 </div>
                 <!-- 附图（选填）：自动压缩为小图后随反馈提交，仅开发者与账号本人可见 -->
                 <div class="mt-4">
@@ -1034,7 +1036,7 @@
                         <i class="fa fa-camera"></i>添加截图或图片（最多 3 张）
                     </button>
                     <input type="file" id="feedback-file-input" accept="image/*" multiple class="hidden">
-                    <p class="text-xs text-gray-400 mt-2"><i class="fa fa-info-circle mr-1"></i>支持 png / jpg / webp，图片将自动压缩后再提交，仅用于协助定位问题</p>
+                    <p class="text-xs text-gray-500 mt-2"><i class="fa fa-info-circle mr-1"></i>支持 png / jpg / webp，图片将自动压缩后再提交，仅用于协助定位问题</p>
                 </div>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end space-x-3">
@@ -1098,7 +1100,7 @@
                         </ul>
                     </div>
                 </div>
-                <p class="text-[11px] text-gray-400 mb-6 leading-relaxed">
+                <p class="text-[11px] text-gray-500 mb-6 leading-relaxed">
                     <i class="fa fa-info-circle mr-1"></i>计税、社保口径、政策要点与更新公告对所有用户开放（含未登录），分档的只有云端能力。
                 </p>
 
@@ -1148,7 +1150,7 @@
                 </div>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-between items-center">
-                <p class="text-xs text-gray-400">公测期领取体验不限次数 · 到期后可再次领取</p>
+                <p class="text-xs text-gray-500">公测期领取体验不限次数 · 到期后可再次领取</p>
                 <button id="upgrade-cancel-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-5 py-2 rounded-lg text-sm">关闭</button>
             </div>
         </div>
@@ -1441,8 +1443,8 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.80.0</p>
-                        <p class="text-xs text-gray-400 mt-1">© 2026 EuriskoTax 税费计算器</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.81.0</p>
+                        <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
                         </p>
@@ -1543,12 +1545,12 @@
                             <p class="text-sm font-semibold text-gray-800">扫码联系客服</p>
                             <p id="lead-advisor" class="hidden text-[11px] text-blue-600 mt-1"></p>
                             <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，客服会协助您核对填写的参数是否有误。</p>
-                            <p class="text-[11px] text-gray-400 mt-1.5">服务时间：工作日 9:00–18:00</p>
+                            <p class="text-[11px] text-gray-500 mt-1.5">服务时间：工作日 9:00–18:00</p>
                         </div>
                     </div>
                 </div>
 
-                <div id="lead-divider" class="hidden text-center text-[11px] text-gray-400 mb-4">
+                <div id="lead-divider" class="hidden text-center text-[11px] text-gray-500 mb-4">
                     <span class="inline-flex items-center gap-3 w-full">
                         <span class="h-px bg-gray-200 flex-1"></span>也可以留下联系方式，客服会在 1 个工作日内联系您<span class="h-px bg-gray-200 flex-1"></span>
                     </span>
@@ -1560,13 +1562,13 @@
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
                             <h4 class="text-xs font-bold text-gray-800">联系方式</h4>
-                            <span class="text-[11px] text-gray-400 ml-auto">手机号或微信，任填一项</span>
+                            <span class="text-[11px] text-gray-500 ml-auto">手机号或微信，任填一项</span>
                         </div>
                         <div class="space-y-3">
                             <div>
                                 <label for="lead-name" class="block text-xs font-medium text-gray-600 mb-1">怎么称呼您 <span class="text-red-500">*</span></label>
                                 <div class="relative">
-                                    <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                    <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                     <input id="lead-name" type="text" maxlength="50" placeholder="如：张先生 / 李会计" autocomplete="name" class="input-field" />
                                 </div>
                             </div>
@@ -1574,14 +1576,14 @@
                                 <div>
                                     <label for="lead-phone" class="block text-xs font-medium text-gray-600 mb-1">手机号码</label>
                                     <div class="relative">
-                                        <i class="fa fa-mobile absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
+                                        <i class="fa fa-mobile absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500"></i>
                                         <input id="lead-phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" autocomplete="tel" class="input-field" />
                                     </div>
                                 </div>
                                 <div>
                                     <label for="lead-wechat" class="block text-xs font-medium text-gray-600 mb-1">微信账号</label>
                                     <div class="relative">
-                                        <i class="fa fa-weixin absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <i class="fa fa-weixin absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                         <input id="lead-wechat" type="text" maxlength="64" placeholder="微信号" class="input-field" />
                                     </div>
                                 </div>
@@ -1592,7 +1594,7 @@
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
                             <h4 class="text-xs font-bold text-gray-800">补充信息</h4>
-                            <span class="text-[11px] text-gray-400 ml-auto">全部选填</span>
+                            <span class="text-[11px] text-gray-500 ml-auto">全部选填</span>
                         </div>
                         <div class="space-y-3">
                             <!-- 所在城市：计算页不再让用户选参保城市（各地口径差异大，选错反而误导），
@@ -1607,22 +1609,22 @@
                                  后端 buildLead 本就只做长度约束，前端过去多拦一道等于凭空丢弃 lead_submit。
                                  控件位置与建议文案保留（大多数人仍会顺手选），只是不再阻断。 -->
                             <div>
-                                <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-gray-400 text-[11px]">选填，便于按当地口径核对</span></label>
+                                <label for="lead-city" class="block text-xs font-medium text-gray-600 mb-1">所在城市 <span class="text-gray-500 text-[11px]">选填，便于按当地口径核对</span></label>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div class="relative">
-                                        <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <i class="fa fa-map-marker absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                         <select id="lead-province" aria-label="省份 / 直辖市" class="input-field">
                                             <option value="">省份 / 直辖市</option>
                                         </select>
                                     </div>
                                     <div id="lead-city-select-wrap" class="relative">
-                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                         <select id="lead-city" aria-label="城市" class="input-field" disabled>
                                             <option value="">城市</option>
                                         </select>
                                     </div>
                                     <div id="lead-city-input-wrap" class="relative hidden">
-                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <i class="fa fa-map-o absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                         <input id="lead-city-other" type="text" maxlength="20" placeholder="请填写城市（如：海外地区）" autocomplete="address-level2" class="input-field" />
                                     </div>
                                 </div>
@@ -1652,7 +1654,7 @@
                             <div>
                                 <label for="lead-company" class="block text-xs font-medium text-gray-600 mb-1">单位 / 公司（选填）</label>
                                 <div class="relative">
-                                    <i class="fa fa-building-o absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                    <i class="fa fa-building-o absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                     <input id="lead-company" type="text" maxlength="100" autocomplete="organization" class="input-field" />
                                 </div>
                             </div>
@@ -1685,9 +1687,9 @@
                     <input id="lead-consent" type="checkbox" form="lead-form" class="mt-0.5" />
                     <span class="text-[11px] text-gray-500 leading-relaxed">我已阅读并同意<a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>，并同意客服通过电话或微信与我联系。</span>
                 </label>
-                <p class="text-[11px] text-gray-400 mt-1.5 pl-6 leading-relaxed">不采集收入金额 · 测算结果仅供参考，不构成税务建议</p>
+                <p class="text-[11px] text-gray-500 mt-1.5 pl-6 leading-relaxed">不采集收入金额 · 测算结果仅供参考，不构成税务建议</p>
                 <button type="submit" form="lead-form" id="lead-submit-btn" class="btn btn-primary w-full mt-3 py-2.5 rounded-lg font-semibold"><i class="fa fa-paper-plane-o mr-1.5"></i>提交信息</button>
-                <p class="text-[11px] text-gray-400 mt-2 text-center leading-relaxed">提交后客服会与您联系，无需其他操作</p>
+                <p class="text-[11px] text-gray-500 mt-2 text-center leading-relaxed">提交后客服会与您联系，无需其他操作</p>
             </div>
         </div>
     </div>
@@ -1884,16 +1886,23 @@
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                                 <h3 id="profile-display-name" class="text-xl sm:text-2xl font-bold text-white truncate max-w-full min-w-0">用户名</h3>
-                                <span id="profile-plan-badge" class="hidden shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-white/25 text-white border border-white/30">专业版</span>
+                                <!-- 徽章原本是 bg-white/25 + 白字：半透明白压在品牌渐变上合成出的浅蓝底，
+                                     白字只有 3.30:1。改实心 blue-900（白字 12.9:1），边框保留白描边。 -->
+                                <span id="profile-plan-badge" class="hidden shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-900 text-white border border-white/30">专业版</span>
                             </div>
-                            <p id="profile-display-email" class="text-white/75 break-all text-sm mt-1 leading-relaxed">email@example.com</p>
-                            <p id="profile-plan-note" class="text-white/80 text-xs mt-1 leading-relaxed hidden"></p>
+                            <!-- 两行说明文字原本是 text-white/75 与 /80：14px/12px 的小字在渐变最亮那端
+                                 （via-blue-600）分别只有 3.61:1 与 3.88:1。半透明在这里换不来层级，
+                                 只换来不达标 —— 层级交给字号（14 / 12px）与顺序表达。 -->
+                            <p id="profile-display-email" class="text-white break-all text-sm mt-1 leading-relaxed">email@example.com</p>
+                            <p id="profile-plan-note" class="text-white text-xs mt-1 leading-relaxed hidden"></p>
                         </div>
                         <div class="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2 justify-center">
                             <button type="button" id="profile-nav-upgrade" class="inline-flex items-center justify-center w-full sm:w-auto bg-white text-primary hover:bg-blue-50 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
                                 <i class="fa fa-crown mr-2"></i><span>版本与权益</span>
                             </button>
-                            <a href="#" id="profile-nav-settings" class="inline-flex items-center justify-center w-full sm:w-auto bg-white/15 border border-white/30 text-white hover:bg-white/25 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
+                            <!-- 原为 bg-white/15 + 白字：半透明白压在品牌渐变上合成出的浅蓝底，白字只有 3.97:1。
+                                 改用深蓝半透明（bg-blue-900/40）：底更暗，白字 6.7:1，仍是半透明玻璃质感。 -->
+                            <a href="#" id="profile-nav-settings" class="inline-flex items-center justify-center w-full sm:w-auto bg-blue-900/40 border border-white/30 text-white hover:bg-blue-900/60 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
                                 <i class="fa fa-cog mr-2"></i><span>账户设置</span>
                             </a>
                         </div>
@@ -1914,7 +1923,7 @@
             <!-- 底部操作 -->
             <div class="bg-white rounded-lg shadow-card mt-6 p-4 sm:p-5">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <p class="text-xs text-gray-400 flex items-center justify-center sm:justify-start">
+                    <p class="text-xs text-gray-500 flex items-center justify-center sm:justify-start">
                         <i class="fa fa-shield mr-2 text-gray-300"></i>当前为本地登录会话，可在「账户设置」中管理密码与账号安全
                     </p>
                     <button id="profile-logout-link" class="btn bg-gray-100 text-gray-600 hover:bg-gray-200 w-full sm:w-auto">
@@ -1945,7 +1954,7 @@
                     </div>
                     <div>
                         <h3 class="text-lg font-bold text-gray-800">账号信息</h3>
-                        <p class="text-xs text-gray-400">登录账号与联系方式</p>
+                        <p class="text-xs text-gray-500">登录账号与联系方式</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1965,7 +1974,7 @@
                                 <i class="fa fa-save mr-1"></i>保存
                             </button>
                         </div>
-                        <p class="text-xs text-gray-400 mt-1.5">保存后立即生效，无需提交整个页面</p>
+                        <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面</p>
                     </div>
                 </div>
             </div>
@@ -1978,7 +1987,7 @@
                     </div>
                     <div>
                         <h3 class="text-lg font-bold text-gray-800">账号安全</h3>
-                        <p class="text-xs text-gray-400">通过邮箱验证码验证身份后设置新密码</p>
+                        <p class="text-xs text-gray-500">通过邮箱验证码验证身份后设置新密码</p>
                     </div>
                 </div>
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
@@ -1992,7 +2001,7 @@
                         <label class="label">邮箱验证码</label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
-                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="text" id="profile-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
                             </div>
                             <button type="button" id="profile-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm shrink-0" disabled>
@@ -2004,14 +2013,14 @@
                         <label class="label">新密码</label>
                         <div class="relative">
                             <input type="password" id="profile-password" class="input-field pr-10 !pl-3" placeholder="请输入新密码（至少 6 位）">
-                            <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="profile-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
                     <div class="form-group">
                         <label class="label">确认新密码</label>
                         <div class="relative">
                             <input type="password" id="profile-confirm-password" class="input-field pr-10 !pl-3" placeholder="请再次输入新密码">
-                            <i id="profile-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"></i>
+                            <i id="profile-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
                 </div>
@@ -2028,7 +2037,7 @@
                     </div>
                     <div>
                         <h3 class="text-lg font-bold text-gray-800">危险区域</h3>
-                        <p class="text-xs text-gray-400">以下操作不可恢复，请谨慎执行</p>
+                        <p class="text-xs text-gray-500">以下操作不可恢复，请谨慎执行</p>
                     </div>
                 </div>
                 <div class="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -2176,7 +2185,7 @@
                     <button id="cloud-sync-now-btn" class="btn btn-primary flex items-center justify-center" disabled>
                         <i class="fa fa-refresh mr-2"></i>立即同步
                     </button>
-                    <span id="cloud-sync-account" class="text-xs text-gray-400"></span>
+                    <span id="cloud-sync-account" class="text-xs text-gray-500"></span>
                 </div>
             </div>
 
@@ -2258,7 +2267,7 @@
                 <!-- 备案信息：ICP 号与公安联网备案号。
                      备案号**下发后**才渲染（未备案时展示备案号同样违规），
                      所以这里留空容器，只改 src/js/ui/site-filing-ui.js 里的配置即可生效。 -->
-                <div id="site-filing" class="text-xs text-gray-400 w-full text-center md:text-left mt-2"></div>
+                <div id="site-filing" class="text-xs text-gray-500 w-full text-center md:text-left mt-2"></div>
         </div>
     </footer>
 

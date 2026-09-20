@@ -12,7 +12,7 @@
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    color: #9ca3af;
+    color: var(--c-text-3);
     font-size: 13px;
 }
 
@@ -53,7 +53,7 @@
 
 .tool-group-desc {
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--c-text-3);
 }
 
 .tool-grid-1 {
@@ -148,40 +148,40 @@
 }
 
 .tool-badge-deep {
-    background: rgba(30, 64, 175, .1);
-    color: #1e40af;
+    background: rgba(var(--c-brand-rgb), .1);
+    color: var(--c-brand);
 }
 
 .tool-badge-native {
     background: rgba(16, 185, 129, .12);
-    color: #047857;
+    color: var(--c-success-text);
 }
 
 .tool-badge-seo {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--c-surface-2);
+    color: var(--c-text-3);
 }
 
 .tool-badge-ok {
     background: rgba(16, 185, 129, .12);
-    color: #047857;
+    color: var(--c-success-text);
 }
 
 .tool-badge-warn {
     background: rgba(245, 158, 11, .14);
-    color: #b45309;
+    color: var(--c-warning-text);
 }
 
 .tool-badge-danger {
     background: rgba(239, 68, 68, .12);
-    color: #b91c1c;
+    color: var(--c-danger-text, #b91c1c);
 }
 
 .tool-empty {
     padding: 18px 12px;
     text-align: center;
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--c-text-3);
 }
 
 /* ====== 速算器表单 ====== */
@@ -227,7 +227,7 @@
     top: 50%;
     transform: translateY(-50%);
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--c-text-3);
     pointer-events: none;
 }
 
@@ -242,7 +242,7 @@
 .tool-field-hint {
     margin-top: 4px;
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--c-text-3);
     line-height: 1.5;
 }
 
@@ -250,13 +250,16 @@
 .tool-result-primary {
     padding: 14px 16px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #1e40af, #3b82f6);
+    /* 终点原为 blue-500(#3b82f6)：12px 标签白字压在它那端只有 3.1:1（再叠 .85 透明度更差）。
+       终点收到 blue-600(#2563eb) 后白字 5.15:1，起点 primary 那端本来就有 8.8:1。 */
+    background: linear-gradient(135deg, #1e40af, #2563eb);
     color: #fff;
 }
 
 .tool-result-primary-label {
     font-size: 12px;
-    opacity: .85;
+    /* 不再用 opacity 弱化：白字 × .85 在蓝色端只剩 4.17:1，12px 说明文字不达 AA。
+       层级靠字号（12px vs 24px/800）表达，不靠压低对比度。 */
 }
 
 .tool-result-primary-value {
@@ -315,7 +318,7 @@
 .tool-pitfall-head {
     font-size: 12px;
     font-weight: 700;
-    color: #b45309;
+    color: var(--c-warning-text);
     margin-bottom: 6px;
 }
 
@@ -368,14 +371,14 @@
 }
 
 .tool-search-entry-icon {
-    color: #9ca3af;
+    color: var(--c-text-3);
     font-size: 13px;
 }
 
 .tool-search-entry-text {
     flex: 1 1 auto;
     font-size: 13px;
-    color: #9ca3af;
+    color: var(--c-text-3);
 }
 
 .tool-search-entry-count {

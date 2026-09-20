@@ -547,7 +547,11 @@
 
         var wrap = document.createElement('div');
         wrap.id = CTA_BLOCK_ID;
-        wrap.className = 'mt-6 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-4 sm:p-5';
+        // 深色档：这块 CTA 的底色是渐变，上表的 .dark .bg-* 兜底表管不到渐变（它改的是 background-color）。
+    // 原样保留就是一张浅蓝底配浅灰字（实测 1.01:1），故显式给 dark: 变体。
+    // 注意 dark: 变体由 tailwind.config.js 的 darkMode:'class' 生成，改后须重建 tailwind.css。
+    wrap.className = 'mt-6 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-4 sm:p-5' +
+        ' dark:from-slate-800 dark:to-blue-950 dark:border-slate-700';
         wrap.innerHTML = ctaHtml(containerId);
         container.appendChild(wrap);
     }
