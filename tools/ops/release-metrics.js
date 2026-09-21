@@ -52,11 +52,53 @@ function collectTestFiles(dir) {
     return out.sort();
 }
 
+// test.each([...]) 在源码里只占一行声明，jest 却按数据条目展开成 N 个用例。
+// 行首正则数不到它（`test` 后面跟的是 `.each` 而非 `(`），口径因此比 jest 实测少算 ——
+// 实测对照才发现（19-1 验收时 1750 vs 1754，差额全在 reverse-migration.test.js 的一处 each）。
+// 只处理数组形式：模板字符串表格（test.each`...`）本仓库未用，若引入需以 jest 实跑数为准手工核对。
+function countEachCases(src) {
+    let total = 0;
+    const re = /\b(?:test|it)\.each\s*\(\s*\[/g;
+    let m;
+    while ((m = re.exec(src))) {
+        const start = m.index + m[0].length - 1; // 停在 '['
+        let depth = 0;
+        let end = -1;
+        for (let i = start; i < src.length; i++) {
+            if (src[i] === '[') depth++;
+            else if (src[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        if (end < 0) break;
+        let items = 0;
+        let nested = 0;
+        let nonEmpty = false;
+        for (let i = start + 1; i < end; i++) {
+            const ch = src[i];
+            if (ch === '[' || ch === '(' || ch === '{') nested++;
+            else if (ch === ']' || ch === ')' || ch === '}') nested--;
+            else if (ch === ',' && nested === 0) items++;
+            else if (/\S/.test(ch)) nonEmpty = true;
+        }
+        if (nonEmpty) items += 1;
+        total += items;
+        re.lastIndex = end;
+    }
+    return total;
+}
+
+// 口径只数「真实会被执行的用例」，注释里举的写法不算 —— 否则在注释中说明
+// `test.each([...])` 这句话本身会被上面两条规则各数一次（实测踩到：口径凭空多 1 例）。
+// 只剔整行注释（行首 //、/*、*），不动行内的 `//`：行内形式会误伤字符串里的 URL 之类。
+function stripCommentLines(src) {
+    return src.split(/\r?\n/).map((l) => (/^\s*(\/\/|\/\*|\*)/.test(l) ? '' : l)).join('\n');
+}
+
 function measureCounts() {
     const files = collectTestFiles(path.join(ROOT, 'tests'));
-    const testCases = files.reduce(
-        (n, f) => n + (fs.readFileSync(f, 'utf8').match(/^[ \t]*test\s*\(/gm) || []).length, 0
-    );
+    const testCases = files.reduce((n, f) => {
+        const src = stripCommentLines(fs.readFileSync(f, 'utf8'));
+        return n + (src.match(/^[ \t]*(?:test|it)\s*\(/gm) || []).length + countEachCases(src);
+    }, 0);
     return {
         suiteFiles: files.length,
         testCases,
