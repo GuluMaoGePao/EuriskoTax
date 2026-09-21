@@ -465,6 +465,8 @@
     // ====== 通用速算器页 ======
     // 从历史记录打开时带进来的那一份输入（阶段18-2）：只服务于速算器这一页，换工具即作废
     var quickSeed = null;
+    // 阶段19-7：视图偏好变更时用来重画当前速算器表单（换工具时指向新那份 build）
+    var modeRebuild = null;
 
     function visibleFields(tool, values) {
         return (tool.fields || []).filter(function (f) {
@@ -472,6 +474,76 @@
             return f.when.in.indexOf(values[f.when.key]) !== -1;
         });
     }
+
+    // ====== 阶段19-7：视图密度（简明 / 完整）======
+    // 模式只在这里读一次，渲染层不各自判断 localStorage —— 否则两份默认值迟早分家。
+    function modeLib() { return window.EuriskoModePref; }
+
+    // 偏好模块不在时按**完整**渲染：宁可多显示一组参数，也绝不在用户不知情时把它们收起来。
+    // （index.html 里 mode-pref.js 排在 toolbox-ui.js 之前，正常情况下它一定在。）
+    function isFullMode() {
+        var p = modeLib();
+        return !p || p.get() === p.FULL;
+    }
+
+    // 未声明 level 的字段一律 basic（注册表是纯增量声明，存量 20 个速算器不必逐个改）
+    function isAdvanced(f) { return f && f.level === 'advanced'; }
+
+    function partitionFields(fields) {
+        var basic = [], advanced = [];
+        (fields || []).forEach(function (f) { (isAdvanced(f) ? advanced : basic).push(f); });
+        return { basic: basic, advanced: advanced };
+    }
+
+    // advanced 字段**永远留在 DOM 里**（收进可展开的折叠块），从不 display:none：
+    // ① 简明视图下用户也能临时展开用一次，不必为了一个参数去改全局偏好；
+    // ② readValues 始终能读到它们，切换视图不会丢已填的值（三条守护测试之三）。
+    // renderFn 可选：完整测算向导有 repeater 字段，得用自己的渲染器（默认就是速算器这份 fieldHtml）
+    function advancedBlockHtml(fields, values, renderFn) {
+        if (!fields.length) return '';
+        var draw = typeof renderFn === 'function' ? renderFn : function (f) { return fieldHtml(f, values); };
+        var open = isFullMode() ? ' open' : '';
+        return '<details class="tool-advanced-block mt-3"' + open + '>' +
+            '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
+            '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span>' +
+            '<span class="text-xs text-gray-500">' + fields.length + ' 项 · 不填按默认值</span>' +
+            '</summary>' +
+            '<div class="mt-3">' + fields.map(draw).join('') + '</div>' +
+            '</details>';
+    }
+
+    // 页头那颗 pill：就地切换、即时生效。两个分段都常驻，当前档高亮 ——
+    // 不做成「点一下切换」的单按钮：那样用户看不出下一次点击会发生什么。
+    function modePillHtml() {
+        var p = modeLib();
+        if (!p) return '';
+        var full = p.get() === p.FULL;
+        function seg(mode, label, on) {
+            return '<button type="button" class="mode-pill-seg' + (on ? ' is-on' : '') + '" data-mode="' + mode + '"' +
+                ' aria-pressed="' + (on ? 'true' : 'false') + '">' + label + '</button>';
+        }
+        return '<div class="mode-pill" role="group" aria-label="视图密度" title="简明：只填必填项，直接出结论 ｜ 完整：可调全部参数，看逐项推导">' +
+            seg(p.SIMPLE, '简明', !full) + seg(p.FULL, '完整', full) +
+            '</div>';
+    }
+
+    // onSwitch 留给需要「先收值再重画」的宿主（完整测算向导的 pill 就用它）
+    function renderModePillIn(hostId, onSwitch) {
+        var host = document.getElementById(hostId);
+        if (!host) return;
+        host.innerHTML = modePillHtml();
+        host.querySelectorAll('.mode-pill-seg').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var p = modeLib();
+                if (!p) return;
+                // 值不用重读：advanced 字段始终在 DOM 里，重画时会自己读一遍当前值
+                p.set(btn.getAttribute('data-mode') === p.FULL ? p.FULL : p.SIMPLE);
+                if (typeof onSwitch === 'function') onSwitch();
+            });
+        });
+    }
+
+    function renderModePill() { renderModePillIn('quick-mode-pill'); }
 
     // values 可选：给「回填一份已有输入」用（阶段18-2 从历史记录打开）。不传就是原行为 ——
     // 用 spec 声明的 default。deep-wizard-ui.js 复用这一个函数渲染字段，第二参缺省即不受影响。
@@ -1094,7 +1166,8 @@
         var stepsHtml = '';
         if (out.steps && out.steps.length) {
             if (typeof renderFormulaStepsHtml === 'function') {
-                stepsHtml = '<details class="mt-4 tool-formula-panel">' +
+                // 完整视图：推导链默认展开（简明视图保持折叠，结论先给用户）
+                stepsHtml = '<details class="mt-4 tool-formula-panel"' + (isFullMode() ? ' open' : '') + '>' +
                     '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
                     '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
                     '<span class="text-xs text-gray-500">每一步都可核对</span>' +
@@ -1122,7 +1195,57 @@
         renderSavingNudge(tool, values);
         renderProfileNudge(tool, values);
         renderCompareNudge(tool, values, out);
+        renderModeHint(tool);
         return out;
+    }
+
+    // ====== 阶段19-7：算满 3 次才问一次的「要不要看更多参数」======
+    // 阈值定在 3 次：第 1 次就问是在教用户用产品（他连结果长什么样都还没看熟），
+    // 3 次说明他已经知道这里能算出什么，此时「还有参数可调」才是信息而不是打扰。
+    var MODE_HINT_KEY = 'euriskoPrefModeHint';
+    var MODE_HINT_TIMES = 3;
+
+    function calcCount() {
+        if (window.EuriskoLocalData && typeof window.EuriskoLocalData.getData === 'function') {
+            var h = window.EuriskoLocalData.getData('taxCalculationHistory');
+            if (Array.isArray(h)) return h.length;
+        }
+        try { return (JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []).length; }
+        catch (e) { return 0; }
+    }
+
+    function renderModeHint(tool) {
+        var box = document.getElementById('quick-mode-hint');
+        if (!box) return;
+        var dismissed = false;
+        try { dismissed = localStorage.getItem(MODE_HINT_KEY) === '1'; } catch (e) { /* ignore */ }
+        if (isFullMode() || dismissed || calcCount() < MODE_HINT_TIMES) {
+            box.classList.add('hidden'); box.innerHTML = ''; return;
+        }
+        box.classList.remove('hidden');
+        box.innerHTML = '' +
+            '<div class="p-4">' +
+            '<div class="flex items-start gap-2">' +
+            '<i class="fa fa-sliders text-primary mt-0.5"></i>' +
+            '<div class="flex-1">' +
+            '<div class="text-sm font-medium text-gray-800">还有参数可调</div>' +
+            '<div class="text-xs text-gray-500 mt-1">切到「完整」能看到' + esc(tool && tool.name || '') +
+            '的全部可调项与逐项推导 —— 计算口径不变，只是显示更多。</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="mt-3 flex items-center gap-2">' +
+            '<button type="button" id="mode-hint-switch" class="btn bg-primary text-white text-xs px-3 py-1.5">切换</button>' +
+            '<button type="button" id="mode-hint-dismiss" class="text-xs text-gray-500 px-2 py-1.5">不用了</button>' +
+            '</div>' +
+            '</div>';
+        var sw = document.getElementById('mode-hint-switch');
+        var no = document.getElementById('mode-hint-dismiss');
+        var p = modeLib();
+        if (sw && p) sw.addEventListener('click', function () { p.set(p.FULL); });
+        if (no) no.addEventListener('click', function () {
+            try { localStorage.setItem(MODE_HINT_KEY, '1'); } catch (e) { /* ignore */ }
+            box.classList.add('hidden'); box.innerHTML = '';
+        });
     }
 
     // ====== 结果页「下一步」======
@@ -1214,7 +1337,9 @@
             if (quickSeed) {
                 Object.keys(quickSeed).forEach(function (k) { values[k] = quickSeed[k]; });
             }
-            formEl.innerHTML = visibleFields(tool, values).map(function (f) { return fieldHtml(f, values); }).join('');
+            var parts = partitionFields(visibleFields(tool, values));
+            formEl.innerHTML = parts.basic.map(function (f) { return fieldHtml(f, values); }).join('') +
+                advancedBlockHtml(parts.advanced, values);
             formEl.querySelectorAll('input, select').forEach(function (el) {
                 el.addEventListener('input', function () {
                     // 条件字段变化时需要重建表单（如切换增值税计税场景）
@@ -1229,7 +1354,10 @@
             renderResult(tool, readValues(tool));
         }
 
+        renderModePill();
         build();
+        // 偏好一变就地重画：记住本次的 build，换工具时它自然指向新工具那份
+        modeRebuild = build;
     }
 
     // ====== 导航：底部 Tab 栏（手机）+ 顶部 Tab 行（桌面） ======
@@ -1364,6 +1492,18 @@
         initTabBar();
     }
 
+    // 阶段19-7：偏好一变就地重画两处 pill 与当前速算器表单。
+    // 订阅挂在模块上、只挂一次 —— 挂进 renderQuickPage 里的话，每渲染一个工具就多一个监听。
+    if (modeLib() && typeof modeLib().onChange === 'function') {
+        modeLib().onChange(function () {
+            renderModePillIn('quick-mode-pill');
+            renderModePillIn('settings-mode-pill');
+            if (modeRebuild) modeRebuild();
+        });
+    }
+    // 账户设置页那颗是静态 HTML 里的容器，进页面前先画一次（之后由订阅跟上）
+    renderModePillIn('settings-mode-pill');
+
     window.EuriskoToolbox = {
         init: init,
         // 阶段17 17A-5：字段渲染 / 读值 / 条件显隐是速算器与多步向导的**公共部分**。
@@ -1372,6 +1512,13 @@
         fieldHtml: fieldHtml,
         readValues: readValues,
         visibleFields: visibleFields,
+        // 阶段19-7：视图密度 —— 两块 UI（pill 与「更多参数」折叠块）由速算器出，
+        // deep 向导复用同一份（两份措辞分家只是时间问题，不给自己这个机会）。
+        modePillHtml: modePillHtml,
+        renderModePillIn: renderModePillIn,
+        advancedBlockHtml: advancedBlockHtml,
+        partitionFields: partitionFields,
+        isFullMode: isFullMode,
         fmtValue: fmtValue,
         renderToolbox: renderToolbox,
         renderScenarios: renderScenarios,

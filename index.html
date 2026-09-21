@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.88.0';
+        window.__APP_VERSION__ = '1.89.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -754,6 +754,9 @@
                         <p id="quick-subtitle" class="text-xs text-gray-500 mt-0.5"></p>
                     </div>
                     <div id="quick-policy-badge" class="flex-shrink-0"></div>
+                    <!-- 阶段19-7：视图密度开关（简明 / 完整），就地切换、即时生效、记住偏好。
+                         内容由 toolbox-ui.js 按 window.EuriskoModePref 渲染（游客也可用）。 -->
+                    <div id="quick-mode-pill" class="flex-shrink-0"></div>
                 </div>
 
                 <div class="quick-layout">
@@ -804,6 +807,10 @@
                 <!-- 与上次对比（阶段19-5b §3.8 ③）：同工具算过第二次才出现，比的是真算出来的差额。
                      没有「上次」就不显示 —— 摆个比不出来的对比卡，等于骗用户这里有过结论。 -->
                 <div id="quick-compare-nudge" class="home-card mt-3 hidden"></div>
+
+                <!-- 视图密度轻提示（阶段19-7）：只在简明视图、算满 3 次时问一次。
+                     不放在结果页最上面 —— 用户是来看结果的，不是来看产品教他开功能的。 -->
+                <div id="quick-mode-hint" class="home-card mt-3 hidden"></div>
 
                 <!-- 易错口径 -->
                 <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
@@ -1529,7 +1536,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.88.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.89.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1856,6 +1863,9 @@
     <script src="src/js/calculation/vat-quick.js"></script>
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>
+    <!-- 阶段19-7：视图密度偏好（简明 / 完整）—— 必须排在 toolbox-ui.js 与 deep-wizard-ui.js 之前
+         （两个渲染器在渲染时就读它，晚加载会出现「首屏按简明渲染、切一次才对」） -->
+    <script src="src/js/ui/mode-pref.js"></script>
     <script src="src/js/ui/toolbox-ui.js"></script>
     <!-- 阶段17 通用多步测算向导：复用 toolbox-ui 暴露的 fieldHtml / readValues / visibleFields / fmtValue，
          必须排在 toolbox-ui.js 之后 -->
@@ -2094,6 +2104,22 @@
                         <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- 视图密度（阶段19-7）：与速算器 / 完整测算页右上角那颗是同一个开关、同一份偏好。
+                 放在设置页而不是塞进我的页卡片流 —— 它是一次性的偏好，不是日常入口。 -->
+            <div class="card mb-5">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+                        <i class="fa fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">视图密度</h3>
+                        <p class="text-xs text-gray-500">只影响显示多少参数，不影响计算口径与可用工具</p>
+                    </div>
+                </div>
+                <div id="settings-mode-pill" class="flex items-center gap-2"></div>
+                <p class="text-xs text-gray-500 mt-2">简明：只填必填项、直接出结论 ｜ 完整：可调全部参数、看逐项推导。任意测算页右上角也能就地切换。</p>
             </div>
 
             <!-- 账号安全：修改密码 -->

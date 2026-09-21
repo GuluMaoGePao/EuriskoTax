@@ -43,17 +43,53 @@
         return !!tool && tool.status === 'deep' && !tool.pageId;
     }
 
-    function stepsOf(tool) {
+    // ====== 阶段19-7：视图密度（简明 / 完整）======
+    // 与速算器共用同一份偏好（window.EuriskoModePref），只读、不自己存一份 —— 两份默认值必然分家。
+    var ADV_STEP = '__advanced';
+
+    function modeLib() { return window.EuriskoModePref; }
+
+    // 偏好模块不在时（index.html 脚本顺序排错 / 只用渲染器的老测试）按**完整**渲染：
+    // 宁可多显示一步，也绝不在用户不知情时把参数收起来 —— 藏参数是这个特性唯一不可逆的风险。
+    function isFullMode() {
+        var p = modeLib();
+        return !p || p.get() === p.FULL;
+    }
+
+    function isAdvanced(x) { return !!x && x.level === 'advanced'; }
+
+    function stepKeyOfField(tool, f) {
+        var first = (tool.steps && tool.steps[0] && tool.steps[0].key) || 'main';
+        return f.step || first;
+    }
+
+    // full 参数化：切换视图时要能拿到**切换前**那份步骤表（否则收值会收错一步）
+    function stepsOfWith(tool, full) {
         var list = (tool.steps || [{ key: 'main', title: '填写数据', why: '' }]).slice();
+        // 简明视图：advanced 步**合并**成一步，而不是删掉 —— 删掉等于把这些参数藏起来，
+        // 用户既看不见也改不了；合并后它们仍以 spec 的 default 参与计算（口径不变）。
+        if (!full && list.some(isAdvanced)) {
+            list = list.filter(function (s) { return !isAdvanced(s); }).concat([{
+                key: ADV_STEP, title: '补充参数（可选）',
+                why: '不填也能算：以下参数按默认值参与测算，改了才用你的数'
+            }]);
+        }
         // 结果步由渲染器统一追加 —— 每个完整测算都有，不该在每个 spec 里重复声明
         list.push({ key: '__result', title: '计算结果', result: true });
         return list;
     }
 
+    function stepsOf(tool) { return stepsOfWith(tool, isFullMode()); }
+
     function fieldsOfStep(tool, stepKey) {
-        var first = (tool.steps && tool.steps[0] && tool.steps[0].key) || 'main';
+        if (stepKey === ADV_STEP) {
+            var advKeys = (tool.steps || []).filter(isAdvanced).map(function (s) { return s.key; });
+            return (tool.fields || []).filter(function (f) {
+                return advKeys.indexOf(stepKeyOfField(tool, f)) !== -1;
+            });
+        }
         return (tool.fields || []).filter(function (f) {
-            return (f.step || first) === stepKey;
+            return stepKeyOfField(tool, f) === stepKey;
         });
     }
 
@@ -92,6 +128,8 @@
                         '</div>' +
                     '</div>' +
                     '<div class="flex items-center space-x-1">' +
+                        // 阶段19-7：视图密度 pill（与速算器同一颗、同一份措辞，内容在 bind() 里填）
+                        '<div id="dw-mode-pill"></div>' +
                         '<button id="dw-reset" class="calc-action-btn" title="重置"><i class="fa fa-refresh"></i></button>' +
                     '</div>' +
                 '</div>' +
@@ -421,7 +459,8 @@
         var stepsHtml = '';
         if (view.steps && view.steps.length) {
             if (typeof renderFormulaStepsHtml === 'function') {
-                stepsHtml = '<details id="dw-formula-panel" class="mt-4">' +
+                // 完整视图：推导链默认展开（简明视图保持折叠 —— 先给结论，想核对再展开）
+                stepsHtml = '<details id="dw-formula-panel" class="mt-4"' + (isFullMode() ? ' open' : '') + '>' +
                     '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
                     '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
                     '<span class="text-xs text-gray-500">每一步都可核对</span>' +
@@ -588,11 +627,28 @@
         });
     }
 
+    function drawField(f) {
+        return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f);
+    }
+
+    // 步内 advanced 字段一样只折叠、不隐藏：与速算器共用同一个块和同一份措辞（不写第二套）
+    function advancedBlock(fields) {
+        if (!fields.length) return '';
+        var tb = TB();
+        if (tb && typeof tb.advancedBlockHtml === 'function') {
+            return tb.advancedBlockHtml(fields, state.values, drawField);
+        }
+        return '<details class="tool-advanced-block mt-3"' + (isFullMode() ? ' open' : '') + '>' +
+            '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
+            '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span></summary>' +
+            '<div class="mt-3">' + fields.map(drawField).join('') + '</div></details>';
+    }
+
     function inputHtml(tool, step) {
         var fs = visibleIn(tool, fieldsOfStep(tool, step.key), state.values);
-        var inputs = fs.map(function (f) {
-            return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f);
-        }).join('');
+        var adv = fs.filter(isAdvanced);
+        var basic = fs.filter(function (f) { return !isAdvanced(f); });
+        var inputs = basic.map(drawField).join('') + advancedBlock(adv);
         return '<div class="card">' +
             '<h3 class="text-lg font-bold text-primary mb-4">' + esc(step.title) + '</h3>' +
             (step.why ? '<p class="text-sm text-gray-600 mb-4">' + esc(step.why) + '</p>' : '') +
@@ -624,6 +680,8 @@
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
         applyValues(state.values);
         renderWarnings(tool);
+        // 简明 ↔ 完整会改变步数：记下「此刻是否停在结果步」，切换后好把用户放回结果步
+        state.atResult = !!(steps[state.stepIndex] && steps[state.stepIndex].result);
     }
 
     // 方案对比卡（v1.51.0）：spec 声明了 toCalcInput 才挂，取数与 compute 同源。
@@ -661,9 +719,14 @@
 
     // 只把**当前步**的字段写回 state.values：分步渲染时其他步的字段不在 DOM 里，
     // 若按整表覆盖，readValues 会把缺失项填回 default —— 切一次步骤，前面填的值全丢。
-    function collect(tool) {
+    // stepKey 可选：切换视图时由调用方指定「屏幕上刚才显示的是哪一步」（此时模式已变，
+    // 光看 state.stepIndex 会指向新步骤表里的另一步，收值就收错了）
+    function collect(tool, stepKey) {
         var dom = TB().readValues(tool);
-        var step = stepsOf(tool)[state.stepIndex];
+        // 注意：stepKey 可能是**切换前**那一步 —— 它在新的步骤表里已经不存在了（被合并进
+        // 「补充参数」），所以不能拿 stepKey 去 stepsOf() 里找（找不到就会静默不收值 = 丢数据）。
+        // fieldsOfStep 是按 spec 归组的，与当前视图无关，这里直接用它。
+        var step = stepKey ? { key: stepKey } : stepsOf(tool)[state.stepIndex];
         if (!step) return;
         fieldsOfStep(tool, step.key).forEach(function (f) {
             // repeater 不在 readValues 的管辖范围内（它的控件 id 带下标），走自己的收值
@@ -769,6 +832,24 @@
             showPageFn('tools-page');
         });
 
+        // 阶段19-7：视图密度 pill —— 切换后就地重画。先收值再切：
+        // 当前步填的东西此刻只在 DOM 里，不收就会在重画时被 default 盖掉。
+        var pill = document.getElementById('dw-mode-pill');
+        if (pill) {
+            var tb = TB();
+            if (tb && typeof tb.modePillHtml === 'function') {
+                pill.innerHTML = tb.modePillHtml();
+                pill.querySelectorAll('.mode-pill-seg').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var p = modeLib();
+                        if (!p) return;
+                        collect(tool);
+                        p.set(btn.getAttribute('data-mode') === p.FULL ? p.FULL : p.SIMPLE);
+                    });
+                });
+            }
+        }
+
         var reset = document.getElementById('dw-reset');
         if (reset) reset.addEventListener('click', function () {
             state.values = defaultsOf(tool);
@@ -857,11 +938,30 @@
         return true;
     }
 
+    // 阶段19-7：偏好一变就地重画（向导没开时 state.toolId 为空，直接跳过）
+    if (modeLib() && typeof modeLib().onChange === 'function') {
+        modeLib().onChange(function (mode, prev) {
+            if (!state.toolId) return;
+            var tool = R() && R().get(state.toolId);
+            if (!tool) return;
+            // 先收值再重画：当前步填的东西此刻只在 DOM 里，不收就会被 default 盖掉（切换 = 丢数据）。
+            // 用 prev 那份步骤表定位「刚才显示的是哪一步」—— 模式已经切了，stepIndex 已指向别处。
+            var prevSteps = stepsOfWith(tool, prev === modeLib().FULL);
+            var prevStep = prevSteps[Math.min(state.stepIndex, prevSteps.length - 1)];
+            if (prevStep && !prevStep.result) collect(tool, prevStep.key);
+            // 简明 → 完整会凭空多出几步：原本在看结果的，切换后仍应看结果，而不是被挤回中间某步
+            if (state.atResult) state.stepIndex = stepsOf(tool).length - 1;
+            render();
+        });
+    }
+
     window.EuriskoDeepWizard = {
         open: open,
         has: has,
         // 暴露给单测：断言「结果步自动追加」「字段按 step 归组」这类肉眼难守的约束
         stepsOf: stepsOf,
-        fieldsOfStep: fieldsOfStep
+        fieldsOfStep: fieldsOfStep,
+        // 暴露给单测：断言「切换视图不丢值」这类肉眼极难发现的回归
+        values: function () { return state.values; }
     };
 })();

@@ -670,6 +670,40 @@
 }
 
 /* ==========================================================================
+   4.6 阶段19-7：视图密度（简明 / 完整）
+   —— pill 是就地切换的开关，不是模式弹窗：两个分段常驻，当前档高亮，
+      用户看得见「下一次点击会发生什么」。实心底沿用 19-4 的 --c-btn-primary-*，
+      不取 --c-brand（深色档白字只有 2.54:1）。
+   ========================================================================== */
+.mode-pill {
+    display: inline-flex;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--c-surface-1);
+}
+.mode-pill-seg {
+    padding: 4px 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--c-text-2);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.mode-pill-seg.is-on {
+    background: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+/* 「更多参数（可选）」折叠块：简明视图收起、完整视图默认展开，
+   但**两视图都常驻在 DOM 里** —— 不填也能算，想改随时能改。 */
+.tool-advanced-block {
+    border-top: 1px dashed var(--c-border);
+    padding-top: 10px;
+}
+
+/* ==========================================================================
    5. 可访问性：尊重"减少动态效果"
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
