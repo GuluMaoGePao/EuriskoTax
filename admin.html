@@ -25,7 +25,7 @@
                 </div>
                 <div class="leading-tight">
                     <div class="font-bold text-gray-800 text-sm">EuriskoTax 管理台</div>
-                    <div class="text-[10px] text-gray-400 hidden sm:block">内部运维 · 线索跟进 / 权益发放 / 内容与配置</div>
+                    <div class="text-[10px] text-gray-600 hidden sm:block">内部运维 · 线索跟进 / 权益发放 / 内容与配置</div>
                 </div>
             </div>
             <nav id="main-nav" class="ml-6 hidden md:flex items-center">
@@ -45,7 +45,7 @@
                 <button data-nav="support" title="客服排障话术库" class="tab-btn"><i class="fa fa-life-ring mr-1.5"></i>排障</button>
             </nav>
             <div class="ml-auto flex items-center gap-3 shrink-0">
-                <span id="connection-state" class="hidden text-xs text-gray-400"></span>
+                <span id="connection-state" class="hidden text-xs text-gray-600"></span>
                 <button id="logout-btn" class="hidden px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
                     <i class="fa fa-sign-out mr-1"></i>退出
                 </button>
@@ -74,7 +74,7 @@
                     <i class="fa fa-lock text-2xl"></i>
                 </div>
                 <h1 class="text-xl font-bold text-gray-800">管理员登录</h1>
-                <p class="text-xs text-gray-400 mt-1">请输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
+                <p class="text-xs text-gray-600 mt-1">请输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
             </div>
             <label class="label" for="login-token-input">访问令牌</label>
             <input id="login-token-input" type="password" autocomplete="off" spellcheck="false"
@@ -102,7 +102,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-dashboard text-primary"></i>运营总览</h2>
-                    <p class="page-desc">平台运行概况：用户规模、计算量、线索转化与近期趋势。</p>
+                    <p class="page-desc" style="color:#4b5563">平台运行概况：用户规模、计算量、线索转化与近期趋势。</p>
                 </div>
                 <button data-act="refresh-overview" class="btn btn-ghost btn-xs"><i class="fa fa-refresh"></i>刷新数据</button>
             </div>
@@ -124,7 +124,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-user-plus text-primary"></i>转化线索</h2>
-                    <p class="page-desc">用户主动留下联系方式的咨询意向，是「免费工具 → 付费服务」的核心转化口径。</p>
+                    <p class="page-desc" style="color:#4b5563">用户主动留下联系方式的咨询意向，是「免费工具 → 付费服务」的核心转化口径。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <select id="leads-status-filter" class="field-sm" title="按跟进状态筛选">
@@ -196,7 +196,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-comments-o text-primary"></i>用户反馈</h2>
-                    <p class="page-desc">用户提交的 Bug、建议与其他反馈，逐条跟进处理。</p>
+                    <p class="page-desc" style="color:#4b5563">用户提交的 Bug、建议与其他反馈，逐条跟进处理。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <select id="feedback-status-filter" class="field-sm" title="按处理状态筛选">
@@ -227,7 +227,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-users text-primary"></i>用户与权益</h2>
-                    <p class="page-desc">注册账号及其版本权益（基础版 / 专业版）。</p>
+                    <p class="page-desc" style="color:#4b5563">注册账号及其版本权益（基础版 / 专业版）。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <input id="users-query" type="search" placeholder="用户名或邮箱" class="field-sm w-48">
@@ -277,7 +277,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-link text-primary"></i>注册邀请码</h2>
-                    <p class="page-desc">新用户注册时的准入码，一码一用，只影响「能否注册」，不影响用户权益。</p>
+                    <p class="page-desc" style="color:#4b5563">新用户注册时的准入码，一码一用，只影响「能否注册」，不影响用户权益。</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <input id="invite-count" type="number" min="1" max="100" value="5" class="field-sm w-20" title="本次生成数量（1-100）">
@@ -318,7 +318,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-ticket text-primary"></i>专业版兑换码</h2>
-                    <p class="page-desc">线下收款后发放给客户的付费凭证，用于自助开通专业版，全程无需后台改库。</p>
+                    <p class="page-desc" style="color:#4b5563">线下收款后发放给客户的付费凭证，用于自助开通专业版，全程无需后台改库。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <input id="procode-batch-filter" type="text" class="field-sm w-40" placeholder="按批次筛选">
@@ -347,7 +347,7 @@
             <div class="panel mb-4">
                 <div class="panel-head">
                     <h3 class="panel-title"><i class="fa fa-plus-circle text-primary"></i>生成新兑换码</h3>
-                    <span class="text-[11px] text-gray-400">有效期留空即为「永久专业版」，请谨慎发放</span>
+                    <span class="text-[11px] text-gray-600">有效期留空即为「永久专业版」，请谨慎发放</span>
                 </div>
                 <div class="panel-body">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -370,7 +370,7 @@
                     </div>
                     <div class="mt-4 flex items-center gap-3">
                         <button data-act="gen-procodes" class="btn btn-primary"><i class="fa fa-plus"></i>生成兑换码</button>
-                        <span class="text-[11px] text-gray-400">生成后请立即复制并交付客户，避免凭证外泄。</span>
+                        <span class="text-[11px] text-gray-600">生成后请立即复制并交付客户，避免凭证外泄。</span>
                     </div>
                 </div>
             </div>
@@ -406,7 +406,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-bullhorn text-primary"></i>内容中心</h2>
-                    <p class="page-desc">统一管理政策要点、更新公告与运营内容，发布后按投放对象触达用户。</p>
+                    <p class="page-desc" style="color:#4b5563">统一管理政策要点、更新公告与运营内容，发布后按投放对象触达用户。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <select id="content-type-filter" class="field-sm" title="内容类型">
@@ -430,7 +430,11 @@
                     <input id="content-query" type="search" placeholder="标题 / 问题 / 正文 / item_id" class="field-sm w-56">
                     <button data-act="search-content" class="btn btn-primary btn-xs"><i class="fa fa-search"></i>查询</button>
                     <button data-act="new-content" class="btn btn-ghost btn-xs"><i class="fa fa-plus"></i>新建内容</button>
-                    <button data-act="publish-content" class="btn btn-success btn-xs"><i class="fa fa-paper-plane"></i>发布</button>
+                    <!-- 对比度修复：bg-success(emerald-500) 白字只有 2.54:1，且产物里
+                         没有更深的绿实底类（bg-green/emerald-700 都不在），而 admin.css 因「本地
+                         重建不可复现」（19-2 遗留）暂不能重建 —— 只能内联实底 green-700(#15803d，
+                         白字 5.02:1)。内联样式优先级高于 .btn-success:hover，hover 不再变色。 -->
+                    <button data-act="publish-content" class="btn btn-success btn-xs" style="background-color:#15803d"><i class="fa fa-paper-plane"></i>发布</button>
                 </div>
             </div>
             <div class="hint mb-4">
@@ -448,7 +452,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-life-ring text-primary"></i>排障话术库</h2>
-                    <p class="page-desc">客服「先自查、再回复」的标准清单：每条含典型症状、处理步骤与可直接复制的话术。</p>
+                    <p class="page-desc" style="color:#4b5563">客服「先自查、再回复」的标准清单：每条含典型症状、处理步骤与可直接复制的话术。</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <input id="support-query" type="search" placeholder="搜索现象 / 关键词" class="field-sm w-56">
@@ -480,7 +484,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-percent text-primary"></i>税制参数（热改税率）</h2>
-                    <p class="page-desc">税率表与缴费基数下限的热更新入口，保存即对所有用户生效，无需发版。</p>
+                    <p class="page-desc" style="color:#4b5563">税率表与缴费基数下限的热更新入口，保存即对所有用户生效，无需发版。</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button data-act="taxrates-refresh" class="btn btn-muted btn-xs"><i class="fa fa-refresh"></i>刷新</button>
@@ -505,7 +509,7 @@
             <div class="page-head">
                 <div>
                     <h2 class="page-title"><i class="fa fa-map-marker text-primary"></i>社保基数（城市参数库）</h2>
-                    <p class="page-desc">各城市的社保/公积金缴费基数上下限与公积金可选比例，保存即生效，无需发版。<strong>注意</strong>：计算页已回退为「全国口径提示 + 用户自改」，本参数库暂不参与端上校验，仅供顾问人工核对与后续 SEO 落地页复用。</p>
+                    <p class="page-desc" style="color:#4b5563">各城市的社保/公积金缴费基数上下限与公积金可选比例，保存即生效，无需发版。<strong>注意</strong>：计算页已回退为「全国口径提示 + 用户自改」，本参数库暂不参与端上校验，仅供顾问人工核对与后续 SEO 落地页复用。</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button data-act="citysocial-refresh" class="btn btn-muted btn-xs"><i class="fa fa-refresh"></i>刷新</button>
@@ -526,7 +530,7 @@
             </div>
         </section>
 
-        <footer class="mt-10 text-center text-[11px] text-gray-400 leading-relaxed">
+        <footer class="mt-10 text-center text-[11px] text-gray-600 leading-relaxed">
             EuriskoTax Admin Console · 所有请求均携带 <span class="mono">X-Admin-Token</span> 校验 · 本页已禁止搜索引擎收录
         </footer>
     </main>
