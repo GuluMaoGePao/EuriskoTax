@@ -654,6 +654,8 @@
         var actions = document.getElementById('quick-actions');
         if (actions) actions.innerHTML = '';
         hideProfileNudge();
+        var saving = document.getElementById('quick-saving-nudge');
+        if (saving) { saving.classList.add('hidden'); saving.innerHTML = ''; }
         var compare = document.getElementById('quick-compare-nudge');
         if (compare) { compare.classList.add('hidden'); compare.innerHTML = ''; }
     }
@@ -761,15 +763,30 @@
                 hideProfileNudge(box);
             });
         }
+
+        // 19-6a：卡片只能一项项补，改已有内容要有个去处 —— 否则用户改个城市都无处下手
+        var manage = box.querySelector('.profile-manage');
+        if (manage) {
+            manage.addEventListener('click', function () {
+                showPageFn('profile-tax-page');
+            });
+        }
     }
 
     // 补完一项后重画：进度条要走动，否则用户不知道自己刚才那一下生效了。
+    // 重画**画回刚才那一张卡**（速算器 / 完整测算各一台）—— 写死回速算器那台的话，
+    // 在完整测算里点一下选项会毫无反应。
+    var lastNudgeBox = null;
+
     function profileAfterPatch(tool, values, obj) {
         var lib = profileLib();
         if (!lib) return;
         var next = lib.patch(obj);
         if (lib.pure.completeness(next).percent >= 100) profileJustCompleted = true;
-        renderProfileNudge(tool, values);
+        var box = (lastNudgeBox && document.body.contains(lastNudgeBox))
+            ? lastNudgeBox
+            : document.getElementById('quick-profile-nudge');
+        renderProfileNudgeInto(box, tool, values);
     }
 
     function renderProfileNudge(tool, values) {
@@ -778,8 +795,16 @@
 
     // 容器由调用方给：速算器传 #quick-profile-nudge，完整测算结果步传 #dw-profile-nudge
     // （19-5b 起两处共用同一份渲染与绑定 —— 引导的口径只有一处，不会两边各长一套）。
+    // 引导卡一次只问一项，改已经填过的东西要有个去处（19-6a：我的 → 税务档案）
+    function manageLinkHtml() {
+        return '<div class="profile-nudge-manage">' +
+            '<button type="button" class="profile-manage">在「我的 → 税务档案」里查看 / 修改</button>' +
+            '</div>';
+    }
+
     function renderProfileNudgeInto(box, tool, values) {
         if (!box) return;
+        lastNudgeBox = box;
         var lib = profileLib();
         if (!lib || typeof lib.absorb !== 'function') {
             // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
@@ -805,7 +830,8 @@
                 '<span class="profile-nudge-pct">100%</span>' +
                 '</div>' +
                 '<div class="profile-nudge-bar"><span class="profile-nudge-bar-fill" style="width:100%"></span></div>' +
-                '<div class="profile-nudge-done"><i class="fa fa-check-circle"></i>已补全 —— 下次测算会带上你的情况，不必重新解释一遍。</div>';
+                '<div class="profile-nudge-done"><i class="fa fa-check-circle"></i>已补全 —— 下次测算会带上你的情况，不必重新解释一遍。</div>' +
+                manageLinkHtml();
             return;
         }
 
@@ -819,8 +845,126 @@
             '<div class="profile-nudge-bar"><span class="profile-nudge-bar-fill" style="width:' + c.percent + '%"></span></div>' +
             '<div class="profile-nudge-ask">' + esc(first.ask) + '</div>' +
             profileControlsHtml(first) +
-            '<button type="button" class="profile-nudge-skip profile-skip">暂不，先算别的</button>';
+            '<button type="button" class="profile-nudge-skip profile-skip">暂不，先算别的</button>' +
+            manageLinkHtml();
         bindProfileNudge(box, tool, values);
+    }
+
+    // ====== 省钱卡（阶段19-6a · 留存机制 §3.8 ④）======
+    // plan 要的是「确定性文案」。所以两个场景都必须**算得出来**或**档案里真有**：
+    // ① 年终奖择优 —— 速算器本来就收了「全年其他应纳税所得额」，两套口径都是真算的差额；
+    // ② 专项附加扣除漏填 —— 档案里勾过、这次没算进去，只说"漏了什么"，
+    //    **不编金额**（几个子女、是否分摊都不知道，硬算出来的 ¥1,200 是假的）。
+    // 比不出来就不显示 —— 与「与上次对比」同一条规矩。
+    function taxOfComprehensive(x) {
+        if (typeof window.calculateTaxByTaxableIncome !== 'function') return null;
+        var r = window.calculateTaxByTaxableIncome(Math.max(0, Number(x) || 0));
+        var t = r && Number(r.tax);
+        return Number.isFinite(t) ? t : null;
+    }
+
+    function bonusSavingTip(tool, values) {
+        var Q = window.EuriskoBonusQuick;
+        if (!Q || tool.id !== 'bonus-tax') return null;
+        var bonus = Number(values.bonus);
+        var other = Number(values.annualTaxable);
+        if (!(bonus > 0)) return null;
+        // 没填「全年其他应纳税所得额」就比不了并入 —— 这时提示他去填，而不是给个编出来的差额
+        if (!(other > 0)) {
+            return {
+                title: '还差一个数才能比「并入综合所得」',
+                body: '填了「全年其他应纳税所得额」才能比较两种口径 —— 年终奖单独计税不一定更省。',
+                ctaText: '去填这个数',
+                focus: 'qf-annualTaxable'
+            };
+        }
+        var tOther = taxOfComprehensive(other);
+        var tAll = taxOfComprehensive(other + bonus);
+        if (tOther === null || tAll === null) return null;
+        var gap = tAll - (tOther + Q.taxOf(bonus));   // 正数 = 并入更贵 = 单独计税更省
+        if (Math.abs(gap) <= 0.005) return null;      // 两种口径一样：没有"还能再省"，不占位
+        return {
+            title: gap > 0 ? '单独计税更省' : '并入综合所得更省',
+            amount: Math.abs(gap),
+            body: gap > 0
+                ? '当前结果就是单独计税口径 —— 已按更省的那个给你（一年只能用一次单独计税）。'
+                : '这笔奖金并入全年综合所得更省 —— 去「年终奖择优」按全年填一遍，它会连最优拆分一起给。',
+            ctaText: '算两种口径的差额',
+            toolId: 'bonus-tax-deep'
+        };
+    }
+
+    // 本次输入里到底有没有带专项附加扣除：有值才算填了（填 0 等于没享受，不是"忘了"）
+    var DEDUCTION_INPUT_RE = /(children|infant|elderly|housing|loan|rent|degreeMonths|certCount|medical|deduction|special)/i;
+
+    function deductionMissTip(tool, values) {
+        if (tool.id === 'special-deduction') return null;   // 它本身就是在核定额度的
+        if (tool.group !== 'salary') return null;
+        var lib = profileLib();
+        if (!lib) return null;
+        var picked = (lib.get().deductions || []).slice();
+        if (!picked.length) return null;
+        var filled = Object.keys(values || {}).some(function (k) {
+            return DEDUCTION_INPUT_RE.test(k) && Number(values[k]) > 0;
+        });
+        if (filled) return null;
+        var item = lib.pure.itemOf('deductions');
+        var labels = picked.map(function (v) {
+            var opt = (item ? item.options : []).filter(function (o) { return o.value === v; })[0];
+            return opt ? opt.label : v;
+        }).join('、');
+        return {
+            title: '档案里有扣除，这次没算进去',
+            body: '你的档案里勾选了：' + labels + '。这次测算没带上 —— 补上能少缴，' +
+                '具体额度跟你的适用税率有关，这里不替你估。',
+            ctaText: '核定能扣多少',
+            toolId: 'special-deduction'
+        };
+    }
+
+    function savingTipOf(tool, values) {
+        return bonusSavingTip(tool, values) || deductionMissTip(tool, values);
+    }
+
+    function renderSavingNudge(tool, values) {
+        var box = document.getElementById('quick-saving-nudge');
+        if (!box) return;
+        var tip = savingTipOf(tool, values);
+        if (!tip) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+        box.classList.remove('hidden');
+        box.innerHTML = '' +
+            '<div class="saving-nudge-head">' +
+            '<span class="saving-nudge-title"><i class="fa fa-bolt"></i>还能少缴</span>' +
+            (Number.isFinite(tip.amount)
+                ? '<span class="saving-nudge-amount">' + esc(fmtValue(tip.amount, 'money')) + '</span>'
+                : '') +
+            '</div>' +
+            '<div class="saving-nudge-lead">' + esc(tip.title) + '</div>' +
+            '<div class="saving-nudge-body">' + esc(tip.body) + '</div>' +
+            '<button type="button" class="saving-nudge-cta"' +
+            (tip.toolId ? ' data-tool-id="' + esc(tip.toolId) + '"' : '') +
+            (tip.focus ? ' data-focus="' + esc(tip.focus) + '"' : '') + '>' +
+            '<i class="fa fa-arrow-right"></i>' + esc(tip.ctaText) + '</button>';
+
+        var cta = box.querySelector('.saving-nudge-cta');
+        if (!cta) return;
+        cta.addEventListener('click', function () {
+            var focusId = this.getAttribute('data-focus');
+            if (focusId) {
+                var el = document.getElementById(focusId);
+                if (el) {
+                    el.focus();
+                    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+                    return;
+                }
+            }
+            var toolId = this.getAttribute('data-tool-id');
+            if (toolId) openTool(toolId, { values: values });
+        });
     }
 
     // ====== 与上次对比（阶段19-5b · 留存机制 §3.8 ③）======
@@ -975,6 +1119,7 @@
         renderNextSteps(tool, values, out);
         renderQuickActions(tool, values, out);
         renderResultBar(tool, out);
+        renderSavingNudge(tool, values);
         renderProfileNudge(tool, values);
         renderCompareNudge(tool, values, out);
         return out;
@@ -1245,6 +1390,9 @@
         // 同一份实现两处复用，引导口径只有一处。
         mountProfileNudge: mountProfileNudge,
         renderCompareNudge: renderCompareNudge,
+        // 阶段19-6a：省钱卡（§3.8 ④）。导出 savingTipOf 是为了单测能直接问「这个场景该不该出卡」
+        renderSavingNudge: renderSavingNudge,
+        savingTipOf: savingTipOf,
         // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
         policyBasisOf: policyBasisOf,
         policyBasisText: policyBasisText,

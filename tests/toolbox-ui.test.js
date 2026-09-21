@@ -78,6 +78,7 @@ beforeEach(() => {
         <div id="quick-actions"></div>
         <div id="quick-profile-nudge" class="hidden"></div>
         <div id="quick-compare-nudge" class="hidden"></div>
+        <div id="quick-saving-nudge" class="hidden"></div>
         <div id="quick-pitfalls"></div>
         <details id="quick-policy-basis" class="hidden">
             <div id="quick-policy-basis-body"></div>
@@ -354,6 +355,65 @@ describe('与上次对比', () => {
         input.dispatchEvent(new window.Event('input', { bubbles: true }));
         expect(compare().classList.contains('hidden')).toBe(false);
         expect(compare().textContent).toContain('9月1日');
+    });
+});
+
+// 阶段19-6a：留存机制 §3.8 ④ 省钱卡。
+// 钉的是「确定性」三个字：能算出来的才给数字，算不出来就只说漏了什么、让人去核。
+describe('省钱卡', () => {
+    const tool = (id) => window.EuriskoToolRegistry.get(id);
+    const tipOf = (id, values) => window.EuriskoToolbox.savingTipOf(tool(id), values || {});
+
+    // 只清 localStorage 不够：tax-profile.js 在 localStorage 不可用时降级到内存，
+    // 内存那份不会因为删了 key 就消失（read() 会拿 memory 兜底）—— 必须走 reset。
+    afterEach(() => {
+        window.EuriskoTaxProfile.reset();
+        localStorage.removeItem('taxProfile');
+    });
+
+    test('年终奖：没填「其他应纳税所得额」就比不了并入 —— 提示去填，不给编出来的差额', () => {
+        const tip = tipOf('bonus-tax', { bonus: 36000, annualTaxable: 0 });
+        expect(tip).toBeTruthy();
+        expect(tip.amount).toBeUndefined();
+        expect(tip.focus).toBe('qf-annualTaxable');
+    });
+
+    test('年终奖：填了才比，且方向随档位变化（两个方向各钉一次）', () => {
+        // 其他所得已在高档位：奖金单独计税按 3% 走，并入会把它抬到更高档
+        const sep = tipOf('bonus-tax', { bonus: 36000, annualTaxable: 200000 });
+        expect(sep.title).toBe('单独计税更省');
+        expect(sep.amount).toBeGreaterThan(0);
+
+        // 其他所得极低：并入后仍吃低档，比单独计税（全额 20%）便宜
+        const inc = tipOf('bonus-tax', { bonus: 150000, annualTaxable: 1000 });
+        expect(inc.title).toBe('并入综合所得更省');
+        expect(inc.amount).toBeGreaterThan(0);
+    });
+
+    test('两种口径一样就不出现（没有「还能再省」，占位就是噪音）', () => {
+        // 奖金极小、低档：两套口径差额在 0.005 以内
+        expect(tipOf('bonus-tax', { bonus: 1, annualTaxable: 100 })).toBeFalsy();
+    });
+
+    test('档案里勾了扣除、这次没带上 —— 只说漏了什么，不编金额', () => {
+        localStorage.setItem('taxProfile', JSON.stringify({ deductions: ['rent', 'elderly'] }));
+        const tip = tipOf('salary-tax', {});
+        expect(tip).toBeTruthy();
+        expect(tip.body).toContain('住房租金');
+        expect(tip.body).toContain('赡养老人');
+        expect(tip.amount).toBeUndefined();      // 几个子女、怎么分摊都不知道，硬算就是假数据
+        expect(tip.toolId).toBe('special-deduction');
+    });
+
+    test('这次已经带了扣除就不再提醒；填 0 仍要提醒（那就是没带上，多半是忘了）', () => {
+        localStorage.setItem('taxProfile', JSON.stringify({ deductions: ['children'] }));
+        expect(tipOf('salary-tax', { children: 0 })).toBeTruthy();
+        expect(tipOf('salary-tax', { children: 1 })).toBeFalsy();
+    });
+
+    test('核定额度的那个工具自己不提醒（它就是在算这个）', () => {
+        localStorage.setItem('taxProfile', JSON.stringify({ deductions: ['rent'] }));
+        expect(tipOf('special-deduction', {})).toBeFalsy();
     });
 });
 

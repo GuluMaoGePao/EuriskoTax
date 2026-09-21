@@ -929,6 +929,11 @@ async function loadProfileSettings() {
 
 function loadProfileTax() {
     loadTaxProfile();
+    // 阶段19-6a：「我的情况」卡（身份 / 城市 / 社保 / 扣除 / 年终奖的查看与修改）。
+    // 放在这里渲染而不是 init 时：进页面才读一次存储，避免启动时白读一遍。
+    if (window.EuriskoTaxProfileEditor && typeof window.EuriskoTaxProfileEditor.render === 'function') {
+        window.EuriskoTaxProfileEditor.render();
+    }
 }
 
 function loadProfileCalendar() {

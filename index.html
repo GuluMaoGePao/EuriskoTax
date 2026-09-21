@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.86.0';
+        window.__APP_VERSION__ = '1.87.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -795,6 +795,10 @@
 
                 <!-- 税务档案完成度引导（阶段19-5 §3.8 ②）：算完后才出现，一次「暂不」永久收声。
                      挂在行动条之后：先让用户拿到结果和出口，再谈补全 —— 顺序反了就是把引导当路障。 -->
+                <!-- 省钱卡（阶段19-6a · 留存机制 §3.8 ④）：只说算得出来的优化空间。
+                     比不出来就不显示 —— 与对比卡同一条规矩。 -->
+                <div id="quick-saving-nudge" class="home-card mt-3 hidden"></div>
+
                 <div id="quick-profile-nudge" class="home-card mt-3 hidden"></div>
 
                 <!-- 与上次对比（阶段19-5b §3.8 ③）：同工具算过第二次才出现，比的是真算出来的差额。
@@ -1525,7 +1529,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.86.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.87.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1884,6 +1888,8 @@
     <script src="src/js/calculation/engine.js"></script>
     <!-- 阶段19-5：税务档案（留存机制 §3.8 ②）—— 纯存储层，引导卡由 toolbox-ui.js 渲染 -->
     <script src="src/js/data/tax-profile.js"></script>
+    <!-- 阶段19-6a：档案的「查看 / 修改」界面（我的 → 税务档案），只调 tax-profile.js 的 API -->
+    <script src="src/js/ui/tax-profile-editor.js"></script>
     <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
     <script src="src/js/data/scenario-store.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>
@@ -2155,9 +2161,14 @@
                 </div>
             </div>
             
+            <!-- 阶段19-6a：阶段19-5 的档案（身份 / 城市 / 社保 / 扣除 / 年终奖）此前只能一项项补、
+                 补完没有出口。这张卡就是它的「查看 / 修改」入口 —— 只有写没有读改的档案，
+                 用户只会觉得它在偷自己的数据。下面那张是默认数值（预填写什么数），是另一件事。 -->
+            <div id="profile-whoami-card" class="card mb-4 hidden"></div>
+
             <div class="card">
                 <div class="flex flex-col gap-2 mb-6 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 class="text-xl font-bold text-gray-800">税务档案</h3>
+                    <h3 class="text-xl font-bold text-gray-800">默认参数（预填数值）</h3>
                     <span class="text-xs text-gray-500">
                         <i class="fa fa-info-circle mr-1"></i>保存常用扣除配置，便于下次计算时快速应用
                     </span>
