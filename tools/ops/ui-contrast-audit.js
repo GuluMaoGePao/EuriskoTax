@@ -29,8 +29,17 @@
  *   node tools/ops/ui-contrast-audit.js                     # 浅色 + 深色，6 页 × 2 断点
  *   node tools/ops/ui-contrast-audit.js --theme dark
  *   node tools/ops/ui-contrast-audit.js --only home,tools
+ *   node tools/ops/ui-contrast-audit.js --scope admin        # 管理台 11 视图 × 2 断点（仅浅色）
+ *   node tools/ops/ui-contrast-audit.js --scope all          # 主站 + 管理台
  *   node tools/ops/ui-contrast-audit.js --json report.json  # 导出明细
  *   node tools/ops/ui-contrast-audit.js --strict            # 有确定失败项则退出码 1（供门禁用）
+ *
+ * 管理台为什么是独立 scope（v1.81.1 起）：
+ *   ① 无深色主题 —— admin.html 没有主题切换，.dark 挂上去也没有对应的 CSS 生效，
+ *      跑深色只会产出与浅色全同的结果，纯属浪费 11 × 2 次运行；
+ *   ② 视图是"登录 + 10 个 section"，prepare 只做 DOM 显隐切换（不走 switchTab 的
+ *      数据加载）—— 静态服务器没有 /api，走真实 switchTab 会弹错误 toast（红底白字
+ *      4.2 秒），那是"无后端"的噪声，不是 admin.html 本身的对比度问题。
  *
  * 产物：默认只打印报告；--json 时写出结构化明细（不入仓，属体检结果不是基线）。
  */
@@ -61,9 +70,41 @@ const jsonArg = (() => {
     return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
 })();
 const strict = argv.includes('--strict');
+const scopeArg = (() => {
+    const i = argv.indexOf('--scope');
+    const v = i >= 0 && argv[i + 1] ? argv[i + 1].toLowerCase() : 'main';
+    return ['main', 'admin', 'all'].includes(v) ? v : 'main';
+})();
 
 const themes = themeArg ? [themeArg] : ['light', 'dark'];
 const targets = onlyArg ? kit.TARGETS.filter(t => onlyArg.includes(t.id)) : kit.TARGETS;
+
+/**
+ * 管理台目标（--scope admin）：登录视图 + 10 个 section。
+ * prepare 直接改 DOM 显隐（见文件头说明：不走 switchTab，避开无后端时的错误 toast）。
+ * 视图 id 取自 admin.html 的 view-* / data-nav 命名。
+ */
+const ADMIN_VIEWS = ['overview', 'leads', 'feedback', 'users', 'invites',
+    'procodes', 'content', 'taxrates', 'citysocial', 'support'];
+const ADMIN_TARGETS = [{ id: 'admin-login', name: '管理台登录', prepare: '' }]
+    .concat(ADMIN_VIEWS.map(v => ({
+        id: 'admin-' + v,
+        name: '管理台 · ' + v,
+        prepare: `
+            (function(){
+                var lv = document.getElementById('login-view'); if (lv) lv.classList.add('hidden');
+                var av = document.getElementById('app-view'); if (av) av.classList.remove('hidden');
+                document.querySelectorAll('.view-section').forEach(function(s){ s.classList.add('hidden'); });
+                document.querySelectorAll('.tab-btn[data-nav]').forEach(function(b){ b.classList.toggle('active', b.dataset.nav === '${v}'); });
+                var sec = document.getElementById('view-${v}');
+                if (sec) sec.classList.remove('hidden');
+            })()`
+    })));
+
+/** 运行清单：主站 6 页 × 两主题；管理台 11 视图 × 仅浅色（见文件头） */
+const runList = [];
+if (scopeArg !== 'admin') for (const theme of themes) for (const t of targets) runList.push({ theme, t, path: '/' });
+if (scopeArg !== 'main') for (const t of ADMIN_TARGETS) runList.push({ theme: 'light', t, path: '/admin.html' });
 const { ab, waitForReady } = kit.createBrowser('ui-a11y');
 
 // ============================ 页面内扫描脚本 ============================
@@ -283,45 +324,47 @@ async function auditOne(url, vp, target, theme) {
 
 (async function main() {
     const server = await kit.startServer(portArg);
-    const url = 'http://127.0.0.1:' + portArg + '/';
-    console.log('静态服务器已启动：' + url);
-    console.log('主题：' + themes.join(', ') + ' · 页面：' + targets.map(t => t.id).join(', '));
+    const base = 'http://127.0.0.1:' + portArg;
+    console.log('静态服务器已启动：' + base + '/');
+    console.log('范围：' + scopeArg +
+        (scopeArg !== 'admin' ? ' · 主题：' + themes.join(', ') + ' · 页面：' + targets.map(t => t.id).join(', ') : '') +
+        (scopeArg !== 'main' ? ' · 管理台：' + ADMIN_TARGETS.map(t => t.id).join(', ') + '（仅浅色）' : ''));
     console.log('');
 
-    const report = { at: new Date().toISOString(), runs: [] };
+    const report = { at: new Date().toISOString(), scope: scopeArg, runs: [] };
     let hardFail = 0, softFail = 0, notReady = 0, themeWrong = 0;
 
-    for (const theme of themes) {
-        for (const t of targets) {
-            for (const vp of kit.VIEWPORTS) {
-                const label = theme + ' / ' + t.id + ' / ' + vp.w;
-                process.stdout.write('  审计 ' + label + ' … ');
-                try {
-                    const r = await auditOne(url, vp, t, theme);
-                    const d = r.data;
-                    const hard = (d.shown || []).filter(x => !x.bgi);
-                    const soft = (d.shown || []).filter(x => x.bgi);
-                    hardFail += hard.length;
-                    softFail += soft.length;
-                    if (!r.ready) notReady++;
-                    if (r.themeState !== theme) themeWrong++;
-                    report.runs.push({
-                        theme, page: t.id, pageName: t.name, width: vp.w,
-                        ready: r.ready, themeState: r.themeState,
-                        total: d.total, unique: d.count, items: d.shown || []
-                    });
-                    console.log('不达标 ' + d.count + ' 处（确定 ' + hard.length +
-                        ' / 待人工 ' + soft.length + '）' +
-                        (r.ready ? '' : ' [资源未就绪]') +
-                        (r.themeState === theme ? '' : ' [主题未生效:' + r.themeState + ']'));
-                    for (const x of hard.slice(0, 5)) {
-                        console.log('      ' + x.cr + ':1 (需 ' + x.need + ')  ' + x.p);
-                        console.log('        「' + x.t + '」  fg=' + x.fg + '  bg=' + x.bg +
-                            '  ' + x.fs + 'px/' + x.fw + (x.n > 1 ? '  ×' + x.n : ''));
-                    }
-                } catch (e) {
-                    console.log('失败：' + String(e.message || e).split('\n')[0]);
+    for (const run of runList) {
+        const theme = run.theme;
+        const t = run.t;
+        for (const vp of kit.VIEWPORTS) {
+            const label = theme + ' / ' + t.id + ' / ' + vp.w;
+            process.stdout.write('  审计 ' + label + ' … ');
+            try {
+                const r = await auditOne(base + run.path, vp, t, theme);
+                const d = r.data;
+                const hard = (d.shown || []).filter(x => !x.bgi);
+                const soft = (d.shown || []).filter(x => x.bgi);
+                hardFail += hard.length;
+                softFail += soft.length;
+                if (!r.ready) notReady++;
+                if (r.themeState !== theme) themeWrong++;
+                report.runs.push({
+                    theme, page: t.id, pageName: t.name, width: vp.w,
+                    ready: r.ready, themeState: r.themeState,
+                    total: d.total, unique: d.count, items: d.shown || []
+                });
+                console.log('不达标 ' + d.count + ' 处（确定 ' + hard.length +
+                    ' / 待人工 ' + soft.length + '）' +
+                    (r.ready ? '' : ' [资源未就绪]') +
+                    (r.themeState === theme ? '' : ' [主题未生效:' + r.themeState + ']'));
+                for (const x of hard.slice(0, 5)) {
+                    console.log('      ' + x.cr + ':1 (需 ' + x.need + ')  ' + x.p);
+                    console.log('        「' + x.t + '」  fg=' + x.fg + '  bg=' + x.bg +
+                        '  ' + x.fs + 'px/' + x.fw + (x.n > 1 ? '  ×' + x.n : ''));
                 }
+            } catch (e) {
+                console.log('失败：' + String(e.message || e).split('\n')[0]);
             }
         }
     }

@@ -340,9 +340,24 @@ node tools/ops/ui-screenshot-baseline.js --only home,tools
 node tools/ops/ui-contrast-audit.js                     # 浅色 + 深色，6 页 × 2 断点（24 组）
 node tools/ops/ui-contrast-audit.js --theme dark
 node tools/ops/ui-contrast-audit.js --only home,tools
+node tools/ops/ui-contrast-audit.js --scope admin        # 管理台 11 视图 × 2 断点（22 组，仅浅色）
+node tools/ops/ui-contrast-audit.js --scope all          # 主站 + 管理台
 node tools/ops/ui-contrast-audit.js --json report.json  # 导出明细（不入仓）
 node tools/ops/ui-contrast-audit.js --strict            # 有确定失败项则退出码 1（供门禁用）
 ```
+
+**管理台是独立 scope**（v1.81.1 起，此前 admin.html 从未被审计过）：
+
+- **没有深色主题** —— admin.html 无主题切换，`.dark` 挂上去也没有对应 CSS 生效，跑深色只会
+  产出与浅色全同的结果，白费 22 次运行。
+- **视图 = 登录页 + 10 个 section**，prepare 只做 DOM 显隐切换，**不走 `switchTab()`**：
+  静态服务器没有 `/api`，走真实切换会触发数据加载失败的错误 toast（红底白字 4.2 秒）——
+  那是"无后端"的噪声，不是 admin.html 本身的对比度问题。
+- 因此管理台的审计**只覆盖静态结构与空态**，不含真实数据行（数据在 /api 可用时才渲染）。
+- **入仓的 admin.css 产物里组件类排在工具类之后**（与标准 Tailwind 输出顺序相反），同
+  specificity 时后者胜 —— 想用 `text-gray-600` 工具类去覆盖 `.page-desc` 这类组件类的颜色
+  **压不过**（实测审计仍是旧值）。要改组件类文字色只能：改 admin.src.css 并重建产物
+  （受 19-2 遗留限制暂不可行），或在 admin.html 里用内联 style。
 
 判定口径只守两条线：**正文 4.5:1、大字 3:1**（大字 = ≥24px，或 ≥18.66px 且 font-weight ≥700）。
 
