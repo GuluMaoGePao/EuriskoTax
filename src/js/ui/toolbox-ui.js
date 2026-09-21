@@ -653,6 +653,7 @@
         if (bar) bar.classList.add('hidden');
         var actions = document.getElementById('quick-actions');
         if (actions) actions.innerHTML = '';
+        hideProfileNudge();
     }
 
     function bindResultBar() {
@@ -667,6 +668,151 @@
         bar.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); }
         });
+    }
+
+    // ====== 税务档案完成度引导（阶段19-5 · 留存机制 §3.8 ②）======
+    // 「补全过一次自己的情况」= 沉没成本 = 换设备成本变高，这是竞品集体放弃的那一块（plan §2.1）。
+    // 三条边界：
+    //   ① 算完才出现，且排在行动条之后 —— 先给结果和出口，再谈补全；顺序反了引导就是路障。
+    //   ② 一次「暂不」永久收声（nudgeDismissed 落盘），不靠重复弹窗刷存在感。
+    //   ③ 每次只问**一句**（缺的第一项），不摆一张五项的表格让人填 —— 那是注册页，不是测算后。
+    var profileJustCompleted = false;
+
+    function profileLib() { return window.EuriskoTaxProfile; }
+
+    function hideProfileNudge() {
+        var box = document.getElementById('quick-profile-nudge');
+        if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+    }
+
+    function profileControlsHtml(item) {
+        if (item.kind === 'text') {
+            return '<div class="profile-nudge-ctrl">' +
+                '<input id="profile-text-input" class="profile-nudge-input" type="text" maxlength="20" placeholder="如 北京">' +
+                '<button type="button" id="profile-save" class="profile-chip profile-chip-primary">保存</button>' +
+                '</div>';
+        }
+        if (item.kind === 'multi') {
+            return '<div class="profile-nudge-ctrl">' +
+                item.options.map(function (o) {
+                    return '<button type="button" class="profile-chip" data-profile-pick="' + esc(o.value) + '">' + esc(o.label) + '</button>';
+                }).join('') +
+                '<button type="button" id="profile-save" class="profile-chip profile-chip-primary">保存</button>' +
+                '</div>';
+        }
+        return '<div class="profile-nudge-ctrl">' +
+            item.options.map(function (o) {
+                return '<button type="button" class="profile-chip" data-profile-set="' + esc(o.value) + '">' + esc(o.label) + '</button>';
+            }).join('') +
+            '</div>';
+    }
+
+    function bindProfileNudge(tool, values) {
+        var box = document.getElementById('quick-profile-nudge');
+        var lib = profileLib();
+        if (!box || !lib) return;
+
+        // 当前正在问哪一项：单选项没有「保存」按钮，靠它知道该写哪个 key
+        var nudgeKey = box.getAttribute('data-nudge-key') || '';
+        box.querySelectorAll('[data-profile-set]').forEach(function (el) {
+            el.addEventListener('click', function () {
+                var obj = {};
+                obj[nudgeKey] = this.getAttribute('data-profile-set');
+                profileAfterPatch(tool, values, obj);
+            });
+        });
+
+        box.querySelectorAll('[data-profile-pick]').forEach(function (el) {
+            el.addEventListener('click', function () {
+                this.classList.toggle('is-on');
+            });
+        });
+
+        var save = document.getElementById('profile-save');
+        if (save) {
+            save.addEventListener('click', function () {
+                var key = nudgeKey;
+                var obj = {};
+                if (key === 'city') {
+                    var input = document.getElementById('profile-text-input');
+                    var v = input ? String(input.value || '').trim() : '';
+                    if (!v) { if (input) input.focus(); return; }
+                    obj.city = v;
+                } else if (key === 'deductions') {
+                    var picks = box.querySelectorAll('[data-profile-pick].is-on');
+                    if (!picks.length) return; // 没选就什么都不写：空数组不算"填了"，写了也没意义
+                    obj.deductions = Array.prototype.map.call(picks, function (p) {
+                        return p.getAttribute('data-profile-pick');
+                    });
+                } else {
+                    return;
+                }
+                profileAfterPatch(tool, values, obj);
+            });
+        }
+
+        var skip = document.getElementById('profile-skip');
+        if (skip) {
+            skip.addEventListener('click', function () {
+                lib.dismissNudge();
+                hideProfileNudge();
+            });
+        }
+    }
+
+    // 补完一项后重画：进度条要走动，否则用户不知道自己刚才那一下生效了。
+    function profileAfterPatch(tool, values, obj) {
+        var lib = profileLib();
+        if (!lib) return;
+        var next = lib.patch(obj);
+        if (lib.pure.completeness(next).percent >= 100) profileJustCompleted = true;
+        renderProfileNudge(tool, values);
+    }
+
+    function renderProfileNudge(tool, values) {
+        var box = document.getElementById('quick-profile-nudge');
+        if (!box) return;
+        var lib = profileLib();
+        if (!lib || typeof lib.absorb !== 'function') {
+            // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
+            console.warn('[toolbox] EuriskoTaxProfile 未加载（data/tax-profile.js），档案引导跳过');
+            hideProfileNudge();
+            return;
+        }
+
+        // 先吸收这次输入的**确定部分**：算了月薪个税就已经说明"有社保基数"，不必再问一遍
+        lib.absorb(tool.id, values);
+        var profile = lib.get();
+        var c = lib.pure.completeness(profile);
+
+        if (profile.nudgeDismissed) { hideProfileNudge(); return; }
+        if (c.percent >= 100 && !profileJustCompleted) { hideProfileNudge(); return; }
+
+        box.classList.remove('hidden');
+        if (c.percent >= 100) {
+            box.removeAttribute('data-nudge-key');
+            box.innerHTML = '' +
+                '<div class="profile-nudge-head">' +
+                '<span class="profile-nudge-title"><i class="fa fa-id-card-o"></i>税务档案</span>' +
+                '<span class="profile-nudge-pct">100%</span>' +
+                '</div>' +
+                '<div class="profile-nudge-bar"><span class="profile-nudge-bar-fill" style="width:100%"></span></div>' +
+                '<div class="profile-nudge-done"><i class="fa fa-check-circle"></i>已补全 —— 下次测算会带上你的情况，不必重新解释一遍。</div>';
+            return;
+        }
+
+        var first = c.missing[0];
+        box.setAttribute('data-nudge-key', first.key);
+        box.innerHTML = '' +
+            '<div class="profile-nudge-head">' +
+            '<span class="profile-nudge-title"><i class="fa fa-id-card-o"></i>税务档案</span>' +
+            '<span class="profile-nudge-pct">' + c.percent + '%</span>' +
+            '</div>' +
+            '<div class="profile-nudge-bar"><span class="profile-nudge-bar-fill" style="width:' + c.percent + '%"></span></div>' +
+            '<div class="profile-nudge-ask">' + esc(first.ask) + '</div>' +
+            profileControlsHtml(first) +
+            '<button type="button" id="profile-skip" class="profile-nudge-skip">暂不，先算别的</button>';
+        bindProfileNudge(tool, values);
     }
 
     function renderResult(tool, values) {
@@ -727,6 +873,7 @@
         renderNextSteps(tool, values, out);
         renderQuickActions(tool, values, out);
         renderResultBar(tool, out);
+        renderProfileNudge(tool, values);
         return out;
     }
 
@@ -795,6 +942,8 @@
         if (linkEl) linkEl.href = (tool.seoPath || '/seo/index.html') + '?source=app_quick';
 
         // 换工具时先收掉上一份结果的吸底条与行动条：留着上一个工具的金额是最坏的一种"看起来成功"
+        // 同时清掉"刚补完档案"的一次性状态 —— 它只对刚才那次补全负责，换工具就翻篇。
+        profileJustCompleted = false;
         hideResultExtras();
 
         if (pitEl) {

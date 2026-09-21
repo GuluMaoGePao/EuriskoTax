@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.84.0';
+        window.__APP_VERSION__ = '1.85.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -793,6 +793,10 @@
                      现在独立成块：有没有相关工具都在，顺序排在结果正下方。 -->
                 <div id="quick-actions" class="home-card mt-3 quick-actions"></div>
 
+                <!-- 税务档案完成度引导（阶段19-5 §3.8 ②）：算完后才出现，一次「暂不」永久收声。
+                     挂在行动条之后：先让用户拿到结果和出口，再谈补全 —— 顺序反了就是把引导当路障。 -->
+                <div id="quick-profile-nudge" class="home-card mt-3 hidden"></div>
+
                 <!-- 易错口径 -->
                 <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
 
@@ -1517,7 +1521,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.84.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.85.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1874,6 +1878,8 @@
     <script src="src/js/export/quick-report.js"></script>
     <!-- 计算引擎命名空间：聚合纯计算函数（仅引用、不承载逻辑），供方案对比/单测复用 -->
     <script src="src/js/calculation/engine.js"></script>
+    <!-- 阶段19-5：税务档案（留存机制 §3.8 ②）—— 纯存储层，引导卡由 toolbox-ui.js 渲染 -->
+    <script src="src/js/data/tax-profile.js"></script>
     <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
     <script src="src/js/data/scenario-store.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>

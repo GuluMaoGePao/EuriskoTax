@@ -48,6 +48,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-registry.js');
     QUICK_MODULES.forEach((f) => loadSource('src/js/calculation/' + f));
     loadSource('src/js/data/tool-registry.js');
+    loadSource('src/js/data/tax-profile.js');
     loadSource('src/js/ui/toolbox-ui.js');
 });
 
@@ -75,6 +76,7 @@ beforeEach(() => {
         <div id="quick-form"></div>
         <div id="quick-result-card"><div id="quick-result"></div></div>
         <div id="quick-actions"></div>
+        <div id="quick-profile-nudge" class="hidden"></div>
         <div id="quick-pitfalls"></div>
         <details id="quick-policy-basis" class="hidden">
             <div id="quick-policy-basis-body"></div>
@@ -98,6 +100,8 @@ beforeEach(() => {
             <button class="top-tab" data-tab="profile-page"></button>
         </nav>
     `;
+    // 档案是跨用例持久化的（localStorage），不清会让「算完才引导」这类断言被上一个用例污染
+    localStorage.removeItem('taxProfile');
     // 显式传 null：清掉上一个用例可能设置的身份筛选，保证每个用例都从完整工具页开始
     window.EuriskoToolbox.renderToolbox('', null);
 });
@@ -238,6 +242,67 @@ describe('结果页「下一步」', () => {
         btn.click(); // window.EuriskoQuickReport 未定义
         expect(btn.disabled).toBe(false);
         expect(btn.textContent).toContain('导出 PDF');
+    });
+});
+
+// 阶段19-5：留存机制 §3.8 ② 税务档案完成度引导。
+// 这些断言钉的是「用户到底看不看得到、点不点得动」—— 单测全绿但真机上没出现的事，
+// 在这个仓库里已经出过两次（18-x 静默失败），所以引导卡也要走一遍点击。
+describe('税务档案完成度引导', () => {
+    const nudge = () => document.getElementById('quick-profile-nudge');
+
+    test('算完后出现引导卡，且只问一句（缺失的第一项）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(nudge().classList.contains('hidden')).toBe(false);
+        expect(nudge().textContent).toContain('税务档案');
+        // 一次只问一项：摆一张五项表格让人填，那是注册页不是测算后
+        expect(nudge().querySelectorAll('.profile-nudge-ask')).toHaveLength(1);
+        expect(nudge().querySelector('.profile-nudge-bar-fill')).toBeTruthy();
+    });
+
+    // 留着上一次的引导，等于告诉用户"你刚才那一步成功了" —— 和吸底条留着旧金额是同一类假成功
+    test('算不出来时不留上一份引导（与吸底条、行动条一起收掉）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(nudge().classList.contains('hidden')).toBe(false);
+
+        const tool = window.EuriskoToolRegistry.get('vat');
+        const origin = tool.compute;
+        tool.compute = () => { throw new Error('boom'); };
+        try {
+            const input = document.getElementById('qf-sales');
+            input.value = '123';
+            input.dispatchEvent(new window.Event('input', { bubbles: true }));
+            expect(nudge().classList.contains('hidden')).toBe(true);
+        } finally {
+            tool.compute = origin;
+        }
+    });
+
+    test('点一个选项即写入档案，进度条前进', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const before = nudge().querySelector('.profile-nudge-pct').textContent;
+        nudge().querySelector('[data-profile-set]').click();
+        const after = nudge().querySelector('.profile-nudge-pct').textContent;
+        expect(after).not.toBe(before);
+        expect(window.EuriskoTaxProfile.get().identity).not.toBe('');
+    });
+
+    test('「暂不」后收声：再算一次也不再出现（不靠重复弹窗刷存在感）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        nudge().querySelector('#profile-skip').click();
+        expect(nudge().classList.contains('hidden')).toBe(true);
+        expect(window.EuriskoTaxProfile.get().nudgeDismissed).toBe(true);
+
+        document.querySelector('[data-tool-id="bonus-tax"]').click();
+        expect(nudge().classList.contains('hidden')).toBe(true);
+    });
+
+    test('档案已满时不引导（没东西可补还弹就是骚扰）', () => {
+        window.EuriskoTaxProfile.patch({
+            identity: 'employee', city: '北京', social: 'yes', deductions: ['rent'], bonus: 'no'
+        });
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(nudge().classList.contains('hidden')).toBe(true);
     });
 });
 

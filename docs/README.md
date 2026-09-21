@@ -18,7 +18,7 @@
 
 - **当前版本**：**v1.80.0**（2026-09-20，阶段19-3：全站阴影收口到 `--sh-*` 令牌 + 焦点环统一）。**开发分支 `feature/stage15-17-wip`** —— v1.18.0 起的所有版本都在这条分支上，**尚未合回 main**；main 与公网线上停在 **v1.17.0**（合回路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)）
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，`https://euriskotax.zeabur.app`；ICP 备案通过后迁腾讯云轻量（上海），执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)
-- **测试**：95 套件 1813 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **测试**：96 套件 1836 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
   - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）

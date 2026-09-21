@@ -417,6 +417,50 @@
 }
 .quick-action-btn-primary:hover { filter: brightness(1.06); }
 
+/* --- 税务档案完成度引导（阶段19-5 · 留存机制 §3.8 ②）---
+   全部取既有令牌，不新增色值：深色档由令牌成对给出，不必在这里写第二份。
+   进度条与选中态复用 --c-btn-primary-*（实心底 + 白字），与行动条同一套解法。 */
+.profile-nudge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-nudge-title {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+}
+.profile-nudge-pct { font-size: var(--fs-xs); color: var(--c-text-2); }
+.profile-nudge-bar {
+    margin-top: 8px; height: 6px; border-radius: 999px;
+    background: var(--c-surface-2); overflow: hidden;
+}
+.profile-nudge-bar-fill {
+    display: block; height: 100%; border-radius: 999px;
+    background: var(--c-btn-primary-bg); transition: width .25s ease;
+}
+.profile-nudge-ask { margin-top: 10px; font-size: var(--fs-sm); color: var(--c-text); }
+.profile-nudge-done { margin-top: 10px; font-size: var(--fs-sm); color: var(--c-text-2); }
+.profile-nudge-ctrl { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-chip {
+    padding: 6px 10px; border-radius: var(--r-ctrl);
+    border: 1px solid var(--c-border); background: var(--c-surface-1);
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+}
+.profile-chip:hover { background: var(--c-surface-2); color: var(--c-text); }
+.profile-chip.is-on,
+.profile-chip-primary {
+    background: var(--c-btn-primary-bg);
+    border-color: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+.profile-chip-primary:hover { filter: brightness(1.06); }
+.profile-nudge-input {
+    flex: 1 1 140px; min-width: 0; padding: 6px 10px;
+    border-radius: var(--r-ctrl); border: 1px solid var(--c-border);
+    background: var(--c-surface-1); color: var(--c-text); font-size: var(--fs-xs);
+}
+.profile-nudge-skip {
+    margin-top: 10px; padding: 0; border: 0; background: none;
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+    text-decoration: underline;
+}
+
 /* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
 .identity-card {
     padding: var(--sp-4);
