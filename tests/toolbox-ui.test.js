@@ -73,7 +73,8 @@ beforeEach(() => {
         <div id="quick-subtitle"></div>
         <div id="quick-policy-badge"></div>
         <div id="quick-form"></div>
-        <div id="quick-result"></div>
+        <div id="quick-result-card"><div id="quick-result"></div></div>
+        <div id="quick-actions"></div>
         <div id="quick-pitfalls"></div>
         <details id="quick-policy-basis" class="hidden">
             <div id="quick-policy-basis-body"></div>
@@ -82,6 +83,10 @@ beforeEach(() => {
         <div id="quick-next" class="hidden"></div>
         <a id="quick-seo-link"></a>
         <button id="quick-back-btn"></button>
+        <div id="quick-result-bar" class="hidden">
+            <span id="quick-result-bar-label"></span>
+            <span id="quick-result-bar-value"></span>
+        </div>
         <nav id="bottom-tabbar" class="hidden">
             <button class="bottom-tab" data-tab="mode-selection-page"></button>
             <button class="bottom-tab" data-tab="tools-page"></button>
@@ -324,6 +329,170 @@ describe('最近使用', () => {
     });
 });
 
+// ====== 阶段19-3：工具页降载 ======
+// 41 个入口一次全铺开等于没有目录：场景组默认折叠、记忆展开、卡片带状态微标签、
+// 进页面就聚焦搜索。三条验收都钉在这儿：**入口可达性不能因为降载而变差**。
+describe('阶段19-3：41 个入口全部可达', () => {
+    test('20 个速算器 + 21 个完整测算，每个都有落点', () => {
+        const R = window.EuriskoToolRegistry;
+        const quick = R.all().map((t) => t.id);
+        const deep = R.deep().map((t) => t.id);
+        expect(quick).toHaveLength(20);
+        expect(deep).toHaveLength(21);
+
+        const inGroups = new Set(Array.from(document.querySelectorAll('#toolbox-groups [data-tool-id]'))
+            .map((el) => el.getAttribute('data-tool-id')));
+        quick.forEach((id) => expect(inGroups.has(id)).toBe(true));
+
+        // 完整测算有两种落点：静态 mode card（4 个）/ 动态渲染进 #toolbox-deep-extra
+        deep.forEach((id) => {
+            const byCard = !!document.getElementById(id + '-mode-card');
+            const byEntry = !!document.querySelector('#toolbox-deep-extra [data-tool-id="' + id + '"]');
+            expect(byCard || byEntry).toBe(true);
+        });
+    });
+
+    test('折叠不删 DOM：入口始终在文档里（降载不能降掉可达性）', () => {
+        expect(document.querySelectorAll('#toolbox-groups .tool-entry')).toHaveLength(20);
+        expect(document.querySelectorAll('#toolbox-groups .tool-group.is-collapsed')).toHaveLength(5);
+    });
+});
+
+describe('阶段19-3：场景组折叠与记忆', () => {
+    beforeEach(() => {
+        localStorage.removeItem('euriskoToolGroupOpen');
+        window.EuriskoToolbox.renderToolbox('', null);
+    });
+
+    test('默认折叠 5 个场景组（41 个入口不该一次全铺开）', () => {
+        const groups = document.querySelectorAll('#toolbox-groups .tool-group');
+        expect(groups).toHaveLength(5);
+        Array.from(groups).forEach((g) => expect(g.classList.contains('is-collapsed')).toBe(true));
+        // 折叠时组头要写明里面有几个，否则用户不知道该不该展开
+        expect(document.querySelector('#toolbox-groups .tool-group-count').textContent).toMatch(/\d+ 个/);
+    });
+
+    test('点组头展开，并记住展开状态（下次进来还是展开的）', () => {
+        const head = document.querySelector('#toolbox-groups [data-group-toggle="salary"]');
+        head.click();
+        expect(document.getElementById('toolbox-groups').querySelector('[data-group="salary"]')
+            .classList.contains('is-collapsed')).toBe(false);
+        expect(head.getAttribute('aria-expanded')).toBe('true');
+        expect(JSON.parse(localStorage.getItem('euriskoToolGroupOpen') || '{}').salary).toBe(true);
+
+        // 重新渲染 = 下次进页面：记忆生效
+        window.EuriskoToolbox.renderToolbox('', null);
+        expect(document.querySelector('#toolbox-groups [data-group="salary"]')
+            .classList.contains('is-collapsed')).toBe(false);
+        // 没点过的组仍然折叠
+        expect(document.querySelector('#toolbox-groups [data-group="corp"]')
+            .classList.contains('is-collapsed')).toBe(true);
+    });
+
+    test('再点一次收起，记忆随之改回', () => {
+        const head = document.querySelector('#toolbox-groups [data-group-toggle="salary"]');
+        head.click();
+        document.querySelector('#toolbox-groups [data-group-toggle="salary"]').click();
+        expect(JSON.parse(localStorage.getItem('euriskoToolGroupOpen') || '{}').salary).toBe(false);
+    });
+
+    // 搜索时折叠毫无意义：用户就是要看结果 —— 且强制展开**不写进记忆**，
+    // 否则搜一次就把所有组的默认状态改掉了。
+    test('搜索态强制展开，且不污染记忆', () => {
+        window.EuriskoToolbox.renderToolbox('增值税');
+        const groups = document.querySelectorAll('#toolbox-groups .tool-group');
+        expect(groups.length).toBeGreaterThan(0);
+        Array.from(groups).forEach((g) => expect(g.classList.contains('is-collapsed')).toBe(false));
+        expect(localStorage.getItem('euriskoToolGroupOpen')).toBeNull();
+    });
+
+    test('按身份筛选同样展开（挑完身份还要再点开一层，等于没筛）', () => {
+        window.EuriskoToolbox.openScenario('employee');
+        expect(document.querySelector('#toolbox-groups [data-group="scenario"]')
+            .classList.contains('is-collapsed')).toBe(false);
+    });
+});
+
+describe('阶段19-3：卡片状态微标签', () => {
+    beforeEach(() => {
+        localStorage.removeItem('taxCalculationHistory');
+        window.EuriskoToolbox.renderToolbox('', null);
+    });
+
+    test('算过：读 taxCalculationHistory，写明天数（与首页「最近计算」同源）', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: 'h1', toolId: 'vat', type: 'quick', date: new Date(Date.now() - 3 * 86400000).toISOString() },
+            { id: 'h2', toolId: 'vat', type: 'quick', date: new Date(Date.now() - 10 * 86400000).toISOString() }
+        ]));
+        window.EuriskoToolbox.renderToolbox('', null);
+        const card = document.querySelectorAll('#toolbox-groups [data-tool-id="vat"]')[0];
+        // 两条历史取**最近**那一条：3 天前，不是 10 天前
+        expect(card.textContent).toContain('算过 · 3 天前');
+    });
+
+    test('今天算过的说「今天算过」，超过 30 天只说「算过」（不吓人也不假精确）', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: 'h1', toolId: 'salary-tax', type: 'quick', date: new Date().toISOString() },
+            { id: 'h2', toolId: 'vat', type: 'quick', date: new Date(Date.now() - 90 * 86400000).toISOString() }
+        ]));
+        window.EuriskoToolbox.renderToolbox('', null);
+        expect(document.querySelector('#toolbox-groups [data-tool-id="salary-tax"]').textContent).toContain('今天算过');
+        expect(document.querySelector('#toolbox-groups [data-tool-id="vat"]').textContent).toContain('算过');
+        expect(document.querySelector('#toolbox-groups [data-tool-id="vat"]').textContent).not.toContain('天前');
+    });
+
+    test('没算过的工具不带「算过」标签（不编造痕迹）', () => {
+        expect(document.querySelector('#toolbox-groups [data-tool-id="vat"]').textContent).not.toContain('算过');
+    });
+
+    // 热门 / 可对比的判据在注册表（tool.hot / tool.comparable），UI 不许自己猜 —— 无埋点期间
+    // 热门是人工维护的名单，接了埋点应换成真实热度。
+    test('热门 / 可对比来自注册表标记', () => {
+        expect(document.querySelector('#toolbox-groups [data-tool-id="salary-tax"]').textContent).toContain('热门');
+        expect(document.querySelector('#toolbox-groups [data-tool-id="bonus-tax"]').textContent).toContain('可对比');
+        expect(document.querySelector('#toolbox-groups [data-tool-id="vat"]').textContent).not.toContain('热门');
+    });
+});
+
+describe('阶段19-3：进入工具页自动聚焦搜索框', () => {
+    const goto = (pageId) => {
+        document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+    };
+
+    test('桌面（≥768px）：切进工具页就聚焦，41 个入口靠搜比靠翻快', () => {
+        window.innerWidth = 1024;
+        goto('mode-selection-page');
+        window.EuriskoToolbox.syncNav();
+        goto('tools-page');
+        window.EuriskoToolbox.syncNav();
+        expect(document.activeElement).toBe(document.getElementById('toolbox-search'));
+    });
+
+    test('手机（<768px）：不聚焦 —— 键盘一上来顶掉半屏，用户还没决定搜什么', () => {
+        window.innerWidth = 375;
+        document.getElementById('toolbox-search').blur();
+        goto('profile-page');
+        window.EuriskoToolbox.syncNav();
+        goto('tools-page');
+        window.EuriskoToolbox.syncNav();
+        expect(document.activeElement).not.toBe(document.getElementById('toolbox-search'));
+    });
+
+    test('只在「刚切进来」时聚焦一次，页面内反复同步不抢焦点', () => {
+        window.innerWidth = 1024;
+        goto('mode-selection-page');
+        window.EuriskoToolbox.syncNav();
+        goto('tools-page');
+        window.EuriskoToolbox.syncNav();
+        expect(document.activeElement).toBe(document.getElementById('toolbox-search'));
+        // 用户已经在别处操作：再同步不该把焦点抢回搜索框
+        document.getElementById('quick-back-btn').focus();
+        window.EuriskoToolbox.syncNav();
+        expect(document.activeElement).toBe(document.getElementById('quick-back-btn'));
+    });
+});
+
 describe('政策依据：页内展开，不外跳', () => {
     // 微信 / PWA standalone 里外链会被拦或直接跳出应用 —— 结果页自证其说的最后一环就断了。
     // 这类约束改一次 UI 就可能悄悄退回去，只能钉成断言。
@@ -365,5 +534,157 @@ describe('政策依据：页内展开，不外跳', () => {
         expect(window.EuriskoToolbox.policyBasisOf({})).toEqual([]);
         expect(window.EuriskoToolbox.policyBasisOf(null)).toEqual([]);
         expect(() => window.EuriskoToolbox.policyBasisText([])).not.toThrow();
+    });
+});
+
+// ====== 阶段19-4：结果页双栏 + 行动条 ======
+// 双栏本身是 CSS 的事（jsdom 没有布局引擎），所以这里钉两类东西：
+// ① **结构**：输入与结果被分进两个列容器，且所有既有 id 都还在（share-card / lead-context /
+//    quick-report 都按 id 取数，结构一动就整条链断）；② **行为**：算完必有常驻出口、
+//    算不出来时旧金额立刻收掉。
+describe('阶段19-4：速算器页双栏结构', () => {
+    const html = fs.readFileSync(path.join(PROJECT_ROOT, 'index.html'), 'utf8');
+    const css = fs.readFileSync(path.join(PROJECT_ROOT, 'src/css/ui-redesign.css'), 'utf8');
+
+    const pageOf = (id) => html.slice(html.indexOf(`id="${id}"`));
+
+    test('输入与结果各占一列，且列的顺序是「先输入、后结果」', () => {
+        const page = pageOf('quick-calculator-page').slice(0, 3000);
+        expect(page).toContain('class="quick-layout"');
+        expect(page).toContain('quick-col-input');
+        expect(page).toContain('quick-col-result');
+        expect(page.indexOf('quick-col-input')).toBeLessThan(page.indexOf('id="quick-form"'));
+        expect(page.indexOf('id="quick-form"')).toBeLessThan(page.indexOf('quick-col-result'));
+        expect(page.indexOf('quick-col-result')).toBeLessThan(page.indexOf('id="quick-result"'));
+    });
+
+    // 只做一份 DOM：两套结构（手机一套 / 桌面一套）必然有一套先烂 —— 这是 18-x 那批静默失败的通病。
+    test('双栏由 CSS 断点决定，不做两份 DOM', () => {
+        const declarationsOnly = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        expect(declarationsOnly).toMatch(/@media \(min-width: 1024px\)[\s\S]*\.quick-layout/);
+        expect(declarationsOnly).toMatch(/\.quick-col-input\s*\{[^}]*position:\s*sticky/);
+        // 输入栏 ≤420px（§3.7「列表宜宽、表单宜窄」是硬约束，不是建议）
+        expect(declarationsOnly).toContain('minmax(0, 420px)');
+        // 桌面下结果就在视野里，吸底条必须让位
+        expect(declarationsOnly).toMatch(/@media \(min-width: 1024px\)[\s\S]*\.quick-result-bar\s*\{[^}]*display:\s*none/);
+    });
+
+    test('吸底条只写一份，且默认 hidden（算出结果才出现）', () => {
+        const page = pageOf('quick-calculator-page');
+        expect(page.match(/id="quick-result-bar"/g)).toHaveLength(1);
+        expect(page).toMatch(/id="quick-result-bar"[^>]*class="quick-result-bar hidden"/);
+        // 键盘可达：它是个按钮，不是装饰
+        expect(page).toMatch(/id="quick-result-bar"[^>]*role="button"/);
+    });
+});
+
+describe('阶段19-4：行动条四按钮常驻', () => {
+    test('算完就有四个出口（保存 / 导出 / 复制 / 下一步）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const btns = document.querySelectorAll('#quick-actions .quick-action-btn');
+        expect(btns).toHaveLength(4);
+        ['quick-save-history', 'quick-export-pdf', 'quick-copy-result'].forEach((id) => {
+            expect(document.getElementById(id)).toBeTruthy();
+        });
+        // 一屏一主行动：只有「保存」是实心，其余是次级
+        expect(document.querySelectorAll('#quick-actions .quick-action-btn-primary')).toHaveLength(1);
+        expect(document.getElementById('quick-save-history').classList.contains('quick-action-btn-primary')).toBe(true);
+    });
+
+    // 病根：这四个按钮原本挂在「算完还能干什么」里，而那一块只在有相关工具时才渲染 ——
+    // 出口被别人的数据决定。这里直接把那块拿掉，四个出口必须还在。
+    test('与「相关工具」解耦：那一块不在了，出口照样在', () => {
+        document.getElementById('quick-next').remove();
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);
+    });
+
+    test('有同名完整测算时第四步是「按年填全的完整版」（速算器是同一件事的浅版）', () => {
+        expect(window.EuriskoToolbox.deepCounterpartOf({ id: 'vat' })).toBe('vat-deep');
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(document.getElementById('quick-open-deep')).toBeTruthy();
+        expect(document.getElementById('quick-open-deep').getAttribute('data-deep-id')).toBe('vat-deep');
+    });
+
+    test('没有完整测算时第四步回工具页，不留空位也不临时变三按钮', () => {
+        expect(window.EuriskoToolbox.deepCounterpartOf({ id: 'net-salary' })).toBe('');
+        document.querySelector('[data-tool-id="net-salary"]').click();
+        expect(document.getElementById('quick-open-deep')).toBeNull();
+        expect(document.getElementById('quick-back-tools')).toBeTruthy();
+        expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);
+    });
+});
+
+describe('阶段19-4：结果吸底条', () => {
+    test('手机滚到哪儿都能看到主金额，且与结果卡上的数是同一个', () => {
+        document.querySelector('[data-tool-id="salary-tax"]').click();
+        const bar = document.getElementById('quick-result-bar');
+        expect(bar.classList.contains('hidden')).toBe(false);
+        const primary = document.querySelector('#quick-result .tool-result-primary-value').textContent;
+        expect(document.getElementById('quick-result-bar-value').textContent).toBe(primary);
+        // 标签是结果口径（"应纳个税"之类），不是工具名 —— 用户要看的是这个数是什么
+        expect(document.getElementById('quick-result-bar-label').textContent)
+            .toBe(document.querySelector('#quick-result .tool-result-primary-label').textContent);
+    });
+
+    // 留着上一次的金额是最坏的一种"看起来成功"：算不出来时必须一起收掉。
+    test('算不出来时吸底条与行动条一起收掉（不留上一次的金额）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(document.getElementById('quick-result-bar').classList.contains('hidden')).toBe(false);
+
+        const tool = window.EuriskoToolRegistry.get('vat');
+        const origin = tool.compute;
+        tool.compute = () => { throw new Error('boom'); };
+        try {
+            document.querySelector('[data-tool-id="vat"]').click();
+            expect(document.getElementById('quick-result-bar').classList.contains('hidden')).toBe(true);
+            expect(document.getElementById('quick-actions').innerHTML).toBe('');
+        } finally {
+            tool.compute = origin;
+        }
+    });
+
+    test('点吸底条回到结果卡（键盘 Enter 同样生效）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const bar = document.getElementById('quick-result-bar');
+        const card = document.getElementById('quick-result-card');
+        const scrolled = jest.fn();
+        card.scrollIntoView = scrolled;
+        bar.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        expect(scrolled).toHaveBeenCalled();
+        scrolled.mockClear();
+        bar.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        expect(scrolled).toHaveBeenCalled();
+    });
+});
+
+describe('阶段19-4：复制结果', () => {
+    test('复制的是明文：工具名 + 主结果 + 明细，带一句免责', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const text = window.EuriskoToolbox.resultTextOf(
+            window.EuriskoToolRegistry.get('vat'),
+            { primary: { label: '应纳增值税', value: 3000, kind: 'money' }, rows: [{ label: '不含税销售额', value: 100000, kind: 'money' }] }
+        );
+        expect(text).toContain('增值税');
+        expect(text).toContain('应纳增值税');
+        expect(text).toContain('不含税销售额');
+        // 可带走的东西必须有声明（与导出报告 / 分享图同一口径）
+        expect(text).toContain('仅供参考');
+    });
+
+    test('复制失败也不假成功（按钮回到原样，让用户再来一次）', () => {
+        const written = [];
+        Object.defineProperty(window.navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: (t) => { written.push(t); return Promise.reject(new Error('denied')); } }
+        });
+        document.querySelector('[data-tool-id="vat"]').click();
+        const btn = document.getElementById('quick-copy-result');
+        btn.click();
+        expect(written).toHaveLength(1);
+        // 走降级路径：execCommand 在 jsdom 里不存在，故最终是「失败」而不是静默装作成功
+        return Promise.resolve().then(() => {
+            expect(btn.disabled).toBe(false);
+        });
     });
 });

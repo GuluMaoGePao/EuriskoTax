@@ -65,7 +65,13 @@ const TARGETS = [
     {
         id: 'tools',
         name: '工具页',
-        prepare: `if (window.showPage) window.showPage('tools-page');`
+        // 阶段19-3 起场景组默认折叠：prepare 里**展开全部组**再拍。
+        // 折叠态的画面里只有 6 行组头，41 个入口与卡片微标签一个都拍不到 ——
+        // 那等于把这张基线的价值也一起折叠掉了（对比度审计复用同一份 prepare，同理）。
+        // 只摘 class、不写 localStorage：拍一张图不能把用户的展开记忆改掉。
+        // 「默认折叠」这件事本身由单测钉住（tests/toolbox-ui.test.js）。
+        prepare: `if (window.showPage) window.showPage('tools-page');
+            document.querySelectorAll('.tool-group').forEach(function(g){ g.classList.remove('is-collapsed'); });`
     },
     {
         id: 'quick',

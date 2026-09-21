@@ -33,6 +33,17 @@
     var TAB_PAGES = [HOME_PAGE, TOOLS_PAGE, PROFILE_PAGE];
 
     var currentScenario = null;
+    // 上一次 syncNav 看到的页面：用来判断「是不是刚切进工具页」（避免反复抢焦点）
+    var lastNavPage = null;
+
+    // 聚焦工具页搜索框（仅桌面；手机弹键盘会顶掉半屏）
+    function focusSearchIfDesktop() {
+        // jsdom 与无布局环境下 innerWidth 可能是 0 —— 这时按桌面处理，别把功能整个关掉
+        var w = window.innerWidth || 0;
+        if (w > 0 && w < 768) return;
+        var el = document.getElementById('toolbox-search');
+        if (el && typeof el.focus === 'function') el.focus();
+    }
 
     function R() { return window.EuriskoToolRegistry; }
 
@@ -153,6 +164,90 @@
         } catch (e) { return []; }
     }
 
+    // ====== 分组展开状态（阶段19-3：场景组默认折叠 + 记忆）======
+    // 41 个入口一次全铺开，等于没有目录。折叠**只加 class 不重建 DOM** —— 入口始终在文档里
+    // （可达性不受影响），重建则会把「最近使用」这类动态区已经绑好的事件一起冲掉。
+    var GROUP_OPEN_KEY = 'euriskoToolGroupOpen';
+
+    function readGroupOpen() {
+        try { return JSON.parse(localStorage.getItem(GROUP_OPEN_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+
+    // 记忆优先；没记过的按 defaultOpen（场景组默认折叠，「最近使用」默认展开 —— 它只有几条，
+    // 是回访用户的快捷通道，收起来等于把这层价值也收掉了）。
+    function isGroupOpen(id, defaultOpen) {
+        if (!id) return !!defaultOpen;
+        var m = readGroupOpen();
+        if (Object.prototype.hasOwnProperty.call(m, id)) return m[id] === true;
+        return !!defaultOpen;
+    }
+
+    function setGroupOpen(id, open) {
+        if (!id) return;
+        try {
+            var m = readGroupOpen();
+            m[id] = !!open;
+            localStorage.setItem(GROUP_OPEN_KEY, JSON.stringify(m));
+        } catch (e) { /* 隐私模式忽略 */ }
+    }
+
+    function applyGroupOpen(groupEl, open) {
+        if (!groupEl) return;
+        if (open) groupEl.classList.remove('is-collapsed');
+        else groupEl.classList.add('is-collapsed');
+        var head = groupEl.querySelector ? groupEl.querySelector('[data-group-toggle]') : null;
+        if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function bindGroupToggles(scope) {
+        if (!scope || !scope.querySelectorAll) return;
+        scope.querySelectorAll('[data-group-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var group = btn.closest ? btn.closest('.tool-group') : btn.parentNode;
+                var open = group ? group.classList.contains('is-collapsed') : false;
+                setGroupOpen(btn.getAttribute('data-group-toggle'), open);
+                applyGroupOpen(group, open);
+            });
+        });
+    }
+
+    // ====== 卡片状态微标签（阶段19-3）======
+    // 判据全部来自真源，这里不猜：算过读 taxCalculationHistory（与首页「最近计算」同一份），
+    // 热门 / 可对比读注册表标记（tool.hot / tool.comparable）。
+    var flagIndexCache = null;
+
+    function refreshFlags() { flagIndexCache = null; }
+
+    function flagIndex() {
+        if (flagIndexCache) return flagIndexCache;
+        var map = {};
+        try {
+            (JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []).forEach(function (r) {
+                if (!r || !r.toolId) return;
+                var t = Date.parse(r.date || '') || 0;
+                if (!map[r.toolId] || t > map[r.toolId]) map[r.toolId] = t;
+            });
+        } catch (e) { /* 忽略坏数据 */ }
+        flagIndexCache = map;
+        return map;
+    }
+
+    function flagHtml(tool) {
+        var out = '';
+        var ts = flagIndex()[tool.id] || 0;
+        if (ts) {
+            var days = Math.floor((Date.now() - ts) / 86400000);
+            var text = '算过';
+            if (days <= 0) text = '今天算过';
+            else if (days === 1) text = '昨天算过';
+            else if (days <= 30) text = '算过 · ' + days + ' 天前';
+            out += '<span class="tool-entry-flag tool-entry-flag-done">' + text + '</span>';
+        }
+        if (tool.hot) out += '<span class="tool-entry-flag tool-entry-flag-hot">热门</span>';
+        if (tool.comparable) out += '<span class="tool-entry-flag">可对比</span>';
+        return out ? '<div class="tool-entry-flags">' + out + '</div>' : '';
+    }
+
     // ====== 卡片渲染 ======
     // 角标只说用户听得懂的话：曾经用过「App 内可算 / 网页版 / 深度」这类内部术语，
     // 用户不知道什么是「深度」，也不知道为什么有的工具会跳走 —— 现在全部内置，角标即可省略。
@@ -164,20 +259,31 @@
             '<div class="tool-entry-body">' +
             '<div class="tool-entry-title">' + esc(tool.name) + badge + '</div>' +
             '<div class="tool-entry-desc">' + esc(tool.subtitle || '') + '</div>' +
+            flagHtml(tool) +
             '</div>' +
             '<i class="fa fa-angle-right tool-entry-arrow"></i>' +
             '</div>';
     }
 
-    function groupSectionHtml(title, desc, tools, isDeep) {
+    function groupSectionHtml(title, desc, tools, isDeep, opts) {
         if (!tools.length) return '';
+        opts = opts || {};
+        var gid = opts.id || '';
+        // 搜索 / 按身份筛选时**一律展开**：这时候用户就是要看结果，折叠是纯粹的障碍。
+        // 强制展开不写进记忆（否则搜一次就把所有组的默认状态改掉了）。
+        var open = !!opts.forceOpen || isGroupOpen(gid, !!opts.defaultOpen);
         return '' +
-            '<div class="tool-group">' +
-            '<div class="tool-group-head">' +
+            '<div class="tool-group' + (open ? '' : ' is-collapsed') + '" data-group="' + esc(gid) + '">' +
+            '<button type="button" class="tool-group-head" data-group-toggle="' + esc(gid) + '"' +
+            ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
+            '<i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>' +
             '<span class="tool-group-title">' + esc(title) + '</span>' +
+            '<span class="tool-group-count">' + tools.length + ' 个</span>' +
             (desc ? '<span class="tool-group-desc">' + esc(desc) + '</span>' : '') +
-            '</div>' +
+            '</button>' +
+            '<div class="tool-group-body">' +
             '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, isDeep); }).join('') + '</div>' +
+            '</div>' +
             '</div>';
     }
 
@@ -213,6 +319,7 @@
         var card = document.getElementById('home-recent-tools-card');
         var box = document.getElementById('home-recent-tools');
         if (!box) return;
+        refreshFlags();
         var list = recentTools();
         if (!list.length) {
             if (card) card.classList.add('hidden');
@@ -249,26 +356,32 @@
 
         var result = R().search(keyword);
         var html = '';
+        // 微标签读的是历史：每次重渲染都重新取一次，否则刚算完的那一条不显示「今天算过」
+        refreshFlags();
+        var forceOpen = !!currentScenario || !!result.matched;
 
         if (currentScenario) {
             var scen = R().scenarios().filter(function (s) { return s.id === currentScenario; })[0];
-            if (scen) html += groupSectionHtml('为你推荐（' + scen.name + '）', scen.desc, R().byScenario(currentScenario), false);
+            if (scen) html += groupSectionHtml('为你推荐（' + scen.name + '）', scen.desc, R().byScenario(currentScenario), false,
+                { id: 'scenario', forceOpen: forceOpen, defaultOpen: true });
         } else if (result.matched) {
             R().groups().forEach(function (g) {
                 var tools = (result.tools || []).filter(function (t) { return t.group === g.id; });
-                html += groupSectionHtml(g.name, g.desc, tools, false);
+                html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
             });
         } else {
             var recent = recentTools();
-            if (recent.length) html += groupSectionHtml('最近使用', '', recent, false);
+            if (recent.length) html += groupSectionHtml('最近使用', '', recent, false,
+                { id: 'recent', forceOpen: forceOpen, defaultOpen: true });
             R().groups().forEach(function (g) {
                 var tools = R().byGroup(g.id);
-                html += groupSectionHtml(g.name, g.desc, tools, false);
+                html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
             });
         }
 
         container.innerHTML = html || '<div class="tool-empty">没有匹配的工具，试试「年终奖」「增值税」「社保」</div>';
         bindEntries(container);
+        bindGroupToggles(container);
 
         // 深度测算组是静态 HTML（4 张 mode card，带既有隐藏按钮与 info 按钮），
         // 这里只控制显隐：按身份筛选或搜索无命中时收起，避免与搜索结果互相干扰。
@@ -277,6 +390,15 @@
             var hideDeep = !!currentScenario || (result.matched && (!result.deep || result.deep.length === 0));
             if (hideDeep) deepBox.classList.add('hidden');
             else deepBox.classList.remove('hidden');
+            // 完整测算组是静态 HTML（4 张 mode card 的事件在别处绑定），这里只补折叠与计数，
+            // 绝不重建它的 DOM —— 重建会让那 4 颗隐藏按钮的初始化逻辑全部失效。
+            applyGroupOpen(deepBox, forceOpen || isGroupOpen('deep', false));
+            var deepCount = document.getElementById('toolbox-deep-count');
+            if (deepCount) deepCount.textContent = (R().deep() || []).length + ' 个';
+            if (deepBox.getAttribute('data-group-bound') !== '1') {
+                bindGroupToggles(deepBox);
+                deepBox.setAttribute('data-group-bound', '1');
+            }
         }
         renderDeepEntries();
         renderScenarioChip();
@@ -395,6 +517,158 @@
         return values;
     }
 
+    // ====== 结果页行动条（阶段19-4：四按钮常驻）======
+    // 与「相关工具」解耦：那一整块只在有 nextTools 时才渲染，而保存 / 导出是每次测算都要有的出口 ——
+    // 挂在它下面等于把出口交给了别人的数据（没有相关工具的速算器算完连保存都没有）。
+    function deepCounterpartOf(tool) {
+        var list = (R() && typeof R().deep === 'function') ? R().deep() : [];
+        var id = tool.id + '-deep';
+        for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) return id;
+        return '';
+    }
+
+    function resultTextOf(tool, out) {
+        var lines = [tool.name, out.primary.label + '：' + fmtValue(out.primary.value, out.primary.kind)];
+        (out.rows || []).forEach(function (r) {
+            lines.push('· ' + r.label + '：' + fmtValue(r.value, r.kind));
+        });
+        if (out.note) lines.push('注：' + out.note);
+        lines.push('（由 EuriskoTax 测算，仅供参考；正式申报以税务机关核定为准）');
+        return lines.join('\n');
+    }
+
+    function legacyCopy(text) {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            return ok;
+        } catch (e) { return false; }
+    }
+
+    // 微信内置浏览器 / 非安全上下文里 navigator.clipboard 常常不存在或直接抛错 ——
+    // 必须有降级路径，否则按钮点了没反应（用户只会以为"这个功能坏了"）。
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text).then(
+                function () { return true; },
+                function () { return legacyCopy(text); }
+            );
+        }
+        return Promise.resolve(legacyCopy(text));
+    }
+
+    function renderQuickActions(tool, values, out) {
+        var box = document.getElementById('quick-actions');
+        if (!box) return;
+        // 第四个按钮 = 下一步：有同名的完整测算就进完整版（速算器与完整测算本就是同一件事的
+        // 两种深度，§3.9.2），没有就回工具页 —— 恒为四按钮，不留空位也不临时变三按钮。
+        var deepId = deepCounterpartOf(tool);
+        var fourth = deepId
+            ? '<button type="button" id="quick-open-deep" class="quick-action-btn" data-deep-id="' + esc(deepId) + '"><i class="fa fa-list-ol"></i>按年填全的完整版</button>'
+            : '<button type="button" id="quick-back-tools" class="quick-action-btn"><i class="fa fa-th"></i>换个工具</button>';
+
+        box.innerHTML = '' +
+            '<button type="button" id="quick-save-history" class="quick-action-btn quick-action-btn-primary"><i class="fa fa-bookmark-o"></i>保存到历史</button>' +
+            '<button type="button" id="quick-export-pdf" class="quick-action-btn"><i class="fa fa-file-pdf-o"></i>导出 PDF</button>' +
+            '<button type="button" id="quick-copy-result" class="quick-action-btn"><i class="fa fa-copy"></i>复制结果</button>' +
+            fourth;
+
+        var saveBtn = document.getElementById('quick-save-history');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function () {
+                var ok = saveToHistory(tool, values, out);
+                this.innerHTML = ok ? '<i class="fa fa-check"></i>已保存到历史' : '<i class="fa fa-exclamation-circle"></i>保存失败';
+                this.disabled = true;
+            });
+        }
+
+        var pdfBtn = document.getElementById('quick-export-pdf');
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', function () {
+                var lib = window.EuriskoQuickReport;
+                var ok = lib && typeof lib.exportQuickResult === 'function'
+                    ? lib.exportQuickResult(tool, values, out)
+                    : false;
+                // 失败时保持按钮可点：提示已由导出模块给出，用户修好环境可再来一次
+                if (ok) {
+                    this.innerHTML = '<i class="fa fa-check"></i>已导出 PDF';
+                    this.disabled = true;
+                }
+            });
+        }
+
+        var copyBtn = document.getElementById('quick-copy-result');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var btn = this;
+                copyText(resultTextOf(tool, out)).then(function (ok) {
+                    btn.innerHTML = ok ? '<i class="fa fa-check"></i>已复制' : '<i class="fa fa-exclamation-circle"></i>复制失败';
+                    // 成功也回到原样：复制是带走的动作，不像保存那样一次性
+                    setTimeout(function () {
+                        btn.innerHTML = '<i class="fa fa-copy"></i>复制结果';
+                    }, 1600);
+                });
+            });
+        }
+
+        var deepBtn = document.getElementById('quick-open-deep');
+        if (deepBtn) {
+            deepBtn.addEventListener('click', function () {
+                // 带上已经填好的参数：用户不必把同样的数字再输一遍
+                openTool(this.getAttribute('data-deep-id'), { values: values });
+            });
+        }
+
+        var toolsBtn = document.getElementById('quick-back-tools');
+        if (toolsBtn) {
+            toolsBtn.addEventListener('click', function () { showPageFn(TOOLS_PAGE); });
+        }
+    }
+
+    // ====== 结果吸底条（阶段19-4：手机滚动时主金额常驻）======
+    // 桌面双栏下结果就在旁边，不需要 —— 由 CSS 在 ≥1024px 隐藏。这里**不判宽度**：
+    // JS 判断点会与 CSS 漂移，且 resize 时还得重算，两份真相迟早打架。
+    function renderResultBar(tool, out) {
+        // 幂等地补绑一次：DOM 若被整体替换过（如从别的页面重建），元素上的标记会随之丢失，
+        // 这里会重新绑 —— 只依赖 init 时绑一次的话，那种情况下点击就静默失效。
+        bindResultBar();
+        var bar = document.getElementById('quick-result-bar');
+        if (!bar) return;
+        var labelEl = document.getElementById('quick-result-bar-label');
+        var valueEl = document.getElementById('quick-result-bar-value');
+        if (labelEl) labelEl.textContent = out.primary.label || tool.name;
+        if (valueEl) valueEl.textContent = fmtValue(out.primary.value, out.primary.kind);
+        bar.classList.remove('hidden');
+    }
+
+    // 算不出来时必须把吸底条与行动条收掉：留着上一次的金额是最坏的一种"看起来成功"。
+    function hideResultExtras() {
+        var bar = document.getElementById('quick-result-bar');
+        if (bar) bar.classList.add('hidden');
+        var actions = document.getElementById('quick-actions');
+        if (actions) actions.innerHTML = '';
+    }
+
+    function bindResultBar() {
+        var bar = document.getElementById('quick-result-bar');
+        var card = document.getElementById('quick-result-card');
+        if (!bar || !card || bar.getAttribute('data-bar-bound') === '1') return;
+        bar.setAttribute('data-bar-bound', '1');
+        function jump() {
+            if (card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        bar.addEventListener('click', jump);
+        bar.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); }
+        });
+    }
+
     function renderResult(tool, values) {
         var box = document.getElementById('quick-result');
         if (!box) return null;
@@ -403,14 +677,17 @@
             out = tool.compute(values);
         } catch (e) {
             box.innerHTML = '<div class="tool-empty">计算失败：' + esc(e.message || e) + '</div>';
+            hideResultExtras();
             return null;
         }
         if (!out) {
             box.innerHTML = '<div class="tool-empty">计算模块未加载，请刷新页面后重试</div>';
+            hideResultExtras();
             return null;
         }
         if (out.error) {
             box.innerHTML = '<div class="tool-empty">' + esc(out.error) + '</div>';
+            hideResultExtras();
             return null;
         }
 
@@ -448,11 +725,15 @@
             (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + esc(out.note) + '</div>' : '');
 
         renderNextSteps(tool, values, out);
+        renderQuickActions(tool, values, out);
+        renderResultBar(tool, out);
         return out;
     }
 
     // ====== 结果页「下一步」======
-    // 结果不该是终点：给出相关工具（互链）、保存历史、导出 PDF，把一次测算接成一条动线。
+    // 结果不该是终点：给出相关工具（互链），把一次测算接成一条动线。
+    // 阶段19-4：保存 / 导出 / 复制 / 完整版这四个动作从这里搬到了常驻的 #quick-actions ——
+    // 它们挂在"有没有相关工具"上是本末倒置（没有相关工具就一个出口都没有）。
     function renderNextSteps(tool, values, out) {
         var box = document.getElementById('quick-next');
         if (!box) return;
@@ -467,40 +748,11 @@
                     '<span>' + esc(t.name) + '</span>' +
                     '<i class="fa fa-angle-right"></i>' +
                     '</button>';
-            }).join('') + '</div>' +
-            '<div class="tool-next-actions">' +
-            '<button type="button" id="quick-save-history" class="tool-next-btn"><i class="fa fa-bookmark-o"></i>保存到历史</button>' +
-            // 阶段16：导出 PDF 不再是多步骤流程的专利 —— 速算器算完同样能带走一份
-            '<button type="button" id="quick-export-pdf" class="tool-next-btn"><i class="fa fa-file-pdf-o"></i>导出 PDF</button>' +
-            '</div>';
+            }).join('') + '</div>';
 
         box.querySelectorAll('.tool-next-item').forEach(function (el) {
             el.addEventListener('click', function () { openTool(this.getAttribute('data-tool-id')); });
         });
-
-        var saveBtn = document.getElementById('quick-save-history');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function () {
-                var ok = saveToHistory(tool, values, out);
-                this.innerHTML = ok ? '<i class="fa fa-check"></i>已保存到历史' : '<i class="fa fa-exclamation-circle"></i>保存失败';
-                this.disabled = true;
-            });
-        }
-
-        var pdfBtn = document.getElementById('quick-export-pdf');
-        if (pdfBtn) {
-            pdfBtn.addEventListener('click', function () {
-                var lib = window.EuriskoQuickReport;
-                var ok = lib && typeof lib.exportQuickResult === 'function'
-                    ? lib.exportQuickResult(tool, values, out)
-                    : false;
-                // 失败时保持按钮可点：提示已由导出模块给出，用户修好环境可再来一次
-                if (ok) {
-                    this.innerHTML = '<i class="fa fa-check"></i>已导出 PDF';
-                    this.disabled = true;
-                }
-            });
-        }
     }
 
     // 写入与首页「最近计算」同一份存储（taxCalculationHistory），
@@ -541,6 +793,9 @@
         if (subEl) subEl.textContent = tool.subtitle || '';
         if (badgeEl) badgeEl.innerHTML = policyBadgeOf(tool.policyKey);
         if (linkEl) linkEl.href = (tool.seoPath || '/seo/index.html') + '?source=app_quick';
+
+        // 换工具时先收掉上一份结果的吸底条与行动条：留着上一个工具的金额是最坏的一种"看起来成功"
+        hideResultExtras();
 
         if (pitEl) {
             pitEl.innerHTML = (tool.pitfalls || []).length
@@ -584,6 +839,12 @@
         var activeEl = document.querySelector('.page.active');
         var activeId = activeEl ? activeEl.id : null;
         var visible = TAB_PAGES.indexOf(activeId) !== -1;
+
+        // 阶段19-3：进工具页就聚焦搜索框 —— 41 个入口靠翻不如靠搜。
+        // 只在「刚切进来」的那一次聚焦：页面内反复同步时不抢用户的焦点。
+        // 手机不聚焦：键盘一上来顶掉半屏，而用户还没决定搜什么。
+        if (activeId === TOOLS_PAGE && lastNavPage !== TOOLS_PAGE) focusSearchIfDesktop();
+        lastNavPage = activeId;
 
         // 底部 Tab 栏（<768px）：显式切 hidden 类，不只依赖 media query ——
         // tests/toolbox-ui.test.js 断言的正是这个类，只靠 CSS 控制会让测试失去意义。
@@ -664,8 +925,7 @@
                 currentScenario = null;
                 renderToolbox('');
                 showPageFn(TOOLS_PAGE);
-                var input = document.getElementById('toolbox-search');
-                if (input) input.focus();
+                focusSearchIfDesktop();
             });
         }
 
@@ -697,6 +957,10 @@
             });
         }
 
+        // 吸底条的点击 / 键盘跳转只绑一次：它不在 renderResult 重建的范围内，
+        // 每次重算都绑一遍会让监听器越堆越多（点一下滚多次）。
+        bindResultBar();
+
         initTabBar();
     }
 
@@ -715,6 +979,13 @@
         openScenario: openScenario,
         updateTabBar: updateTabBar,   // 兼容旧名，等价于 syncNav
         syncNav: syncNav,
+        // 阶段19-4：暴露给单测 —— 双栏是 CSS 管的事，JS 这一侧可断言的是「算完有常驻出口」与
+        // 「算不出来时旧金额立刻收掉」，单测钉这两条就能防住最常见的两类回归。
+        renderQuickActions: renderQuickActions,
+        renderResultBar: renderResultBar,
+        hideResultExtras: hideResultExtras,
+        deepCounterpartOf: deepCounterpartOf,
+        resultTextOf: resultTextOf,
         // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
         policyBasisOf: policyBasisOf,
         policyBasisText: policyBasisText,

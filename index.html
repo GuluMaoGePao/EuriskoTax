@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.82.0';
+        window.__APP_VERSION__ = '1.84.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -602,12 +602,18 @@
                 </div>
 
                 <!-- 完整测算：按年填全、出完整预算表（保存/导出已不是它的专利，全都支持），排在最后 -->
-                <div id="toolbox-deep" class="tool-group">
-                    <div class="tool-group-head">
+                <!-- 阶段19-3：与上面 5 个场景组一样默认折叠、点标题展开并记住状态。
+                     折叠只加 class（applyGroupOpen），内层的 4 张 mode card 与它们的隐藏按钮由
+                     app.js / home-ui.js 初始化 —— 任何时候都不要用 innerHTML 重建这一块。 -->
+                <div id="toolbox-deep" class="tool-group is-collapsed" data-group="deep">
+                    <button type="button" class="tool-group-head" data-group-toggle="deep" aria-expanded="false">
+                        <i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>
                         <i class="fa fa-list-ol tool-group-icon"></i>
                         <span class="tool-group-title">完整测算</span>
+                        <span id="toolbox-deep-count" class="tool-group-count"></span>
                         <span class="tool-group-desc">按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快</span>
-                    </div>
+                    </button>
+                    <div class="tool-group-body">
                     <div id="deep-mode-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- 综合所得 -->
                         <div class="mode-card mode-card-primary" id="forward-mode-card">
@@ -721,6 +727,7 @@
                          定档且不减费用 —— 错把它并入发放当月会算出 89580，虚增 **62960**）；
                          新增税种无需再改本文件。 -->
                     <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -731,8 +738,12 @@
              今后新增一个完整测算只需在 tool-registry.js 加一条 spec，不必再改本文件。 -->
         <div id="deep-wizard-page" class="page hidden has-preview-bar"></div>
 
+        <!-- 阶段19-4：桌面（≥1024px）双栏 —— 左「填写参数」sticky、右「测算结果」实时联动，
+             手机保持单列 + 结果吸底条。改动时**保留所有既有 id**（quick-form / quick-result /
+             quick-next …），只加一层布局容器：toolbox-ui.js、share-card、lead-context 与单测
+             都按 id 找这些节点，结构重组会让它们同时失效。 -->
         <div id="quick-calculator-page" class="page hidden">
-            <div class="max-w-3xl mx-auto py-4 px-4">
+            <div class="quick-page-inner mx-auto py-4 px-4">
                 <!-- 顶部：返回 + 标题 + 政策时效 -->
                 <div class="flex items-start gap-3 mb-3">
                     <button id="quick-back-btn" class="mt-1 text-gray-500 hover:text-primary" title="返回首页">
@@ -745,6 +756,8 @@
                     <div id="quick-policy-badge" class="flex-shrink-0"></div>
                 </div>
 
+                <div class="quick-layout">
+                <div class="quick-col quick-col-input">
                 <!-- 输入区 -->
                 <div class="home-card">
                     <div class="home-card-header">
@@ -756,9 +769,11 @@
                     </div>
                     <div id="quick-form" class="grid sm:grid-cols-2 gap-x-4"></div>
                 </div>
+                </div>
 
+                <div class="quick-col quick-col-result">
                 <!-- 结果区 -->
-                <div class="home-card mt-3">
+                <div class="home-card" id="quick-result-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
                             <i class="fa fa-line-chart text-primary mr-2"></i>
@@ -771,6 +786,12 @@
                          可带走的东西有声明、看得最久的那一屏反而没有。文案与 SEO 落地页同源。 -->
                     <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
                 </div>
+
+                <!-- 行动条：四按钮**常驻**（阶段19-4）。
+                     此前它们挂在「算完还能干什么」里，而那一整块只在有相关工具时才渲染 ——
+                     没有相关工具的速算器算完连「保存 / 导出」都没有，结果页在这里断了。
+                     现在独立成块：有没有相关工具都在，顺序排在结果正下方。 -->
+                <div id="quick-actions" class="home-card mt-3 quick-actions"></div>
 
                 <!-- 易错口径 -->
                 <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
@@ -793,12 +814,23 @@
                     </div>
                 </details>
 
-                <!-- 算完还能干什么：相关工具 + 保存历史（结果页不该是终点） -->
+                <!-- 算完还能干什么：相关工具（结果页不该是终点） -->
                 <div id="quick-next" class="home-card mt-3 hidden"></div>
 
                 <div class="mt-3 mb-6 text-xs text-center">
                     <a id="quick-seo-link" href="/seo/index.html" target="_blank" rel="noopener" class="text-primary hover:underline">查看完整说明与静态税率表 →</a>
                 </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- 结果吸底条（手机 <1024px）：滚动时底部常驻主金额，点一下回到结果卡。
+                 桌面双栏下结果本来就在视野里，不需要 —— 由 CSS 隐藏（不做两份 DOM）。 -->
+            <div id="quick-result-bar" class="quick-result-bar hidden" role="button" tabindex="0"
+                 aria-label="查看测算结果详情">
+                <span class="quick-result-bar-label" id="quick-result-bar-label">测算结果</span>
+                <span class="quick-result-bar-value" id="quick-result-bar-value">—</span>
+                <span class="quick-result-bar-cta">详情 <i class="fa fa-angle-up"></i></span>
             </div>
         </div>
 
@@ -1485,7 +1517,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.82.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.84.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

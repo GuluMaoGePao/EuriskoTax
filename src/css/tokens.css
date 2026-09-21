@@ -64,6 +64,10 @@
     --c-hero-from:    #1e40af;
     --c-hero-to:      #1e3a8a;
     --c-hero-cta-ink: #1e40af;
+    /* 实心主按钮（阶段19-4：结果页行动条）。与 Hero 同一个坑：不能直接拿 --c-brand 当底，
+       深色档它变成浅蓝 #60a5fa，白字只有 2.54:1（实测）。底与字两档都固定，不跟主题反色。 */
+    --c-btn-primary-bg:  #1e40af;
+    --c-btn-primary-ink: #ffffff;
     --c-success:      #10b981;  /* 退税（利好） */
     --c-warning:      #f59e0b;  /* 政策到期提醒 */
     --c-danger:       #ef4444;  /* 补税（需付出） */
@@ -249,6 +253,9 @@
     --c-hero-from:    #1e40af;
     --c-hero-to:      #1e3a8a;
     --c-hero-cta-ink: #1e40af;
+    /* 深色档同样不跟 --c-brand 反色（见浅色档 --c-btn-primary-* 的注释） */
+    --c-btn-primary-bg:  #1e40af;
+    --c-btn-primary-ink: #ffffff;
     --c-success:      #34d399;
     --c-warning:      #fbbf24;
     --c-danger:       #f87171;

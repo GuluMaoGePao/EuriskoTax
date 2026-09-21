@@ -248,6 +248,175 @@
 }
 /* 事件卡一律用生活语言，**不得出现税种名与术语**（§3.3.3） */
 
+/* --- 3.1b 工具页：场景组折叠 + 卡片状态微标签（§3.4 / 19-3）——
+   41 个入口一次全铺开等于没有目录，故场景组默认折叠；
+   折叠只加 class、**不重建 DOM**（重建会冲掉「最近使用」等动态区已绑定的事件）。 */
+.tool-group-head {
+    /* 组头由 div 改成 button（可点、可键盘聚焦），故先抹掉浏览器默认外观 */
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.tool-group-head:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+    border-radius: var(--r-ctrl);
+}
+.tool-group-caret {
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+    transition: transform var(--dur-micro) var(--ease);
+}
+.tool-group.is-collapsed .tool-group-caret { transform: rotate(-90deg); }
+/* 折叠时看不到内容，组头必须说清里面有几个 —— 否则用户不知道该不该展开 */
+.tool-group-count {
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+.tool-group.is-collapsed .tool-group-body { display: none; }
+
+/* 微标签：算过 / 热门 / 可对比 —— 让 41 个入口带上「我的痕迹」 */
+.tool-entry-flags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: var(--sp-1);
+}
+.tool-entry-flag {
+    font-size: var(--fs-micro);
+    line-height: 1.4;
+    padding: 1px 6px;
+    border-radius: 999px;
+    white-space: nowrap;
+    background: var(--c-surface-2);
+    color: var(--c-text-2);
+}
+.tool-entry-flag-done {
+    background: rgba(var(--c-brand-rgb), .1);
+    color: var(--c-brand);
+}
+.tool-entry-flag-hot {
+    background: rgba(245, 158, 11, .14);
+    color: var(--c-warning-text);
+}
+
+/* --- 3.1c 速算器结果页：桌面双栏 + 手机吸底条（§3.5 / 19-4）---
+   改的是「算完那一刻看得见什么」：桌面把输入与结果并排（结果实时联动，不用上下翻），
+   手机仍单列但把主金额钉在底部 —— 否则「算完还要往回找数字」。 */
+.quick-page-inner { max-width: 720px; }        /* 表单宜窄（§3.7）：手机与平板不变 */
+.quick-layout { display: grid; gap: var(--sp-3, 12px); grid-template-columns: minmax(0, 1fr); }
+
+@media (min-width: 1024px) {
+    .quick-page-inner { max-width: 1100px; }    /* 双栏要装得下 420 + 结果 */
+    .quick-layout {
+        /* 输入栏 ≤420px（§3.7 硬约束），结果栏吃掉剩下的 —— 用 minmax(0,1fr) 而不是
+           auto：结果里的长数字（如「应纳税所得额 1,234,567.89」）否则会把栅格撑破。 */
+        grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+        align-items: start;
+        gap: var(--sp-4, 16px);
+    }
+    /* sticky 而非 fixed：随页面滚动、停在自己的列里，不与顶栏/底栏抢层级。
+       top 取顶栏高度 + 一点呼吸，别顶在导航条下面。 */
+    .quick-col-input {
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 96px);
+        overflow: auto;
+    }
+}
+
+/* 结果吸底条：只在手机/平板（<1024px）出现，桌面双栏下结果就在旁边 */
+.quick-result-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--tabbar-h-mobile) + var(--inset-bottom) + 8px);
+    z-index: 45;                       /* 低于底栏 50+、高于内容 */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--h-result-bar);
+    padding: 0 14px;
+    border-radius: var(--r-card);
+    background: var(--c-surface-1);
+    border: 1px solid var(--c-border);
+    /* 向上投影（--sh-up）：吸底条是"浮在内容之上"的一层，影子要投在上边缘，
+       深色档由 tokens.css 换成更黑的版本，这里不写字面值。 */
+    box-shadow: var(--sh-up);
+    color: var(--c-text);
+    cursor: pointer;
+}
+/* 平板形态（≥768px）没有底栏，占位要跟着退掉 */
+@media (min-width: 768px) {
+    .quick-result-bar { bottom: calc(var(--inset-bottom) + 8px); }
+}
+@media (min-width: 1024px) {
+    .quick-result-bar { display: none; }
+}
+.quick-result-bar-label {
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+    white-space: nowrap;
+}
+.quick-result-bar-value {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-base);
+    font-weight: 700;
+    /* 金额等宽 + 千分位（§3.7 排版原则 3） */
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.quick-result-bar-cta {
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+    white-space: nowrap;
+}
+/* 吸底条会压住最后一屏内容：给它留出高度（仅 <1024px 生效） */
+@media (max-width: 1023px) {
+    .quick-layout { padding-bottom: calc(var(--h-result-bar) + 12px); }
+}
+
+/* 行动条：四按钮常驻（保存 / 导出 / 复制 / 完整版） */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-action-btn {
+    flex: 1 1 auto;
+    min-width: 96px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: var(--r-ctrl);
+    border: 1px solid var(--c-border);
+    background: var(--c-surface-1);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+    cursor: pointer;
+}
+.quick-action-btn:hover { background: var(--c-surface-2); color: var(--c-text); }
+.quick-action-btn:disabled { opacity: .6; cursor: default; }
+/* 一屏一主行动（§3.7 排版原则 1）：只有「保存」是实心，其余是次级 */
+/* 底**不能取 --c-brand**：深色档它是文字色浅蓝，白字只剩 2.54:1（对比度审计实测）。
+   与 Hero 同一个坑、同一种解法 —— 底与字都取专用令牌，两档同值。 */
+.quick-action-btn-primary {
+    background: var(--c-btn-primary-bg);
+    border-color: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+.quick-action-btn-primary:hover { filter: brightness(1.06); }
+
 /* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
 .identity-card {
     padding: var(--sp-4);

@@ -369,7 +369,7 @@
             //   ② 年终奖计税方式对比（compare）—— 并入 vs 单独计税差出一档税，是这类测算里
             //      最常被问的一句「哪种更划算」。答一个数不够，得把两套账摆在一起。
             id: 'forward', name: '综合所得', subtitle: '工资 / 劳务 / 稿酬，四步出年度个税预算表',
-            icon: 'fa-calculator', status: 'deep',
+            icon: 'fa-calculator', status: 'deep', comparable: true,
             nextTools: ['salary-tax', 'annual-settlement', 'special-deduction'],
             fields: [
                 { key: 'workMonths', step: 'param', label: '年工作总月数', type: 'select', default: 12,
@@ -1171,7 +1171,7 @@
             // 口径仍然同源：奖金税一律走 withholding 那样的 quick 模块 `EuriskoBonusQuick`，
             // 综合所得部分走内核 `calculateTaxByTaxableIncome`，一个税率、一条公式都没复制。
             id: 'bonus-tax-deep', name: '年终奖择优', subtitle: '并入还是单独计税，并给出最优分配点',
-            icon: 'fa-star', status: 'deep',
+            icon: 'fa-star', status: 'deep', comparable: true,
             nextTools: ['bonus-tax', 'annual-settlement', 'salary-tax'],
             policyKey: 'bonus',
             fields: [
@@ -3361,7 +3361,7 @@
             // 另一个决定：**不保留经营所得子模式**（incomeType 固定 comprehensive）——
             // 经营所得的反向需求由「经营所得」完整测算承接，两个入口算同一件事迟早互相打架。
             id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推税前收入',
-            icon: 'fa-refresh', status: 'deep',
+            icon: 'fa-refresh', status: 'deep', comparable: true,
             nextTools: ['net-salary', 'salary-tax', 'employer-cost'],
             fields: [
                 // ---- 第一步：倒算目标 ----
@@ -3606,7 +3606,7 @@
             // 附加税走 `EuriskoSurtaxStampQuick`（税率取 surtaxRules）；
             // 单笔输入与速算器逐点相等，由 tests/vat-deep.test.js 钉住。
             id: 'vat-deep', name: '增值税', subtitle: '逐笔核定进项能不能抵，再比计税方法',
-            icon: 'fa-shopping-cart', status: 'deep',
+            icon: 'fa-shopping-cart', status: 'deep', comparable: true,
             nextTools: ['vat', 'surtax-stamp', 'corporate-income-tax', 'business-income'],
             policyKey: 'vat-small-scale',
             fields: [
@@ -5766,7 +5766,7 @@
             // propertyTransferRules），这里只负责收集与呈现 —— 与 17D-11 同一个约定：**不复制公式**。
             id: 'property-transfer', name: '卖房要交多少税',
             subtitle: '满五唯一免在哪、核定 1% 能不能选、换购能退多少',
-            icon: 'fa-home', status: 'deep',
+            icon: 'fa-home', status: 'deep', comparable: true,
             nextTools: ['classification', 'surtax-stamp'],
             fields: [
                 { key: 'usage', step: 'property', label: '转让的是', type: 'select', default: 'residence',
@@ -6029,7 +6029,7 @@
             // 这里只负责收集与呈现 —— 与前三版同一个约定：**不复制税率、不复制公式**。
             id: 'non-resident', name: '非居民 / 无住所要缴多少税',
             subtitle: '90 天 · 183 天 · 满六年，这次问题不是扣多少',
-            icon: 'fa-passport', status: 'deep',
+            icon: 'fa-passport', status: 'deep', comparable: true,
             nextTools: ['expat', 'forward', 'withholding'],
             fields: [
                 { key: 'role', step: 'residence', label: '在境内单位的职务', type: 'select', default: 'staff',
@@ -6325,7 +6325,10 @@
         // ---- 工资与到手 ----
         {
             id: 'salary-tax', name: '月薪个税', subtitle: '按累计预扣法逐月算，看每月到手多少',
-            group: 'salary', icon: 'fa-money', status: 'native', seoPath: '/seo/salary-tax.html',
+            // hot / comparable 是工具页卡片的「状态微标签」依据（阶段19-3），真源在这里而不是渲染层：
+            // hot = 无埋点期间人工维护的高发场景名单（依据 §2 用户画像），接了埋点后应换成真实热度；
+            // comparable = 这个工具算完会自己给出两套口径的对比表（不是让用户重填一遍再自己比）。
+            group: 'salary', icon: 'fa-money', status: 'native', seoPath: '/seo/salary-tax.html', hot: true,
             policyKey: 'comprehensive',
             nextTools: ['bonus-tax', 'annual-settlement', 'social-base'],
             fields: [
@@ -6445,6 +6448,7 @@
         {
             id: 'bonus-tax', name: '年终奖个税', subtitle: '单独计税还是并入综合所得更省',
             group: 'salary', icon: 'fa-star', status: 'native', seoPath: '/seo/bonus-tax.html',
+            hot: true, comparable: true,
             policyKey: 'bonus',
             nextTools: ['salary-tax', 'annual-settlement', 'net-salary'],
             fields: [
@@ -6548,7 +6552,7 @@
         },
         {
             id: 'annual-settlement', name: '年度汇算清缴', subtitle: '退税还是补税，一次算清',
-            group: 'salary', icon: 'fa-balance-scale', status: 'native', seoPath: '/seo/annual-settlement.html',
+            group: 'salary', icon: 'fa-balance-scale', status: 'native', seoPath: '/seo/annual-settlement.html', hot: true,
             policyKey: 'settlement',
             nextTools: ['salary-tax', 'bonus-tax', 'special-deduction'],
             fields: [
@@ -6587,7 +6591,7 @@
         // ---- 一次性收入与特殊所得 ----
         {
             id: 'withholding', name: '劳务报酬个税', subtitle: '800 元扣除与三档预扣率',
-            group: 'special', icon: 'fa-file-text-o', status: 'native', seoPath: '/seo/labor-withholding.html',
+            group: 'special', icon: 'fa-file-text-o', status: 'native', seoPath: '/seo/labor-withholding.html', hot: true,
             policyKey: 'withholding',
             nextTools: ['annual-settlement', 'business-income', 'salary-tax'],
             fields: [
@@ -7530,6 +7534,7 @@
         {
             id: 'business-income', name: '个体户经营所得', subtitle: '核定征收 vs 查账征收哪个划算',
             group: 'corp', icon: 'fa-briefcase', status: 'native', seoPath: '/seo/business-income.html',
+            hot: true, comparable: true,
             policyKey: 'business-income',
             nextTools: ['vat', 'surtax-stamp', 'social-base'],
             fields: [
