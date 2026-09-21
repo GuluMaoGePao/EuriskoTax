@@ -60,7 +60,9 @@
     overflow: hidden;
     padding: var(--sp-6);
     border-radius: var(--r-hero);
-    background: linear-gradient(135deg, var(--c-brand) 0%, var(--c-accent) 100%);
+    /* 底用 --c-hero-from/to，不直接用 --c-brand：深色档的 --c-brand 是**文字色**（浅蓝），
+       拿去当底时 Hero 的白字只有 2.34:1（19-2 首轮审计实测）。见 tokens.css 的 --c-hero-* 注释。 */
+    background: linear-gradient(135deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
     color: #fff;
     box-shadow: var(--sh-3);
 }
@@ -84,7 +86,8 @@
     min-height: 44px;              /* 触控目标下限（可访问性） */
     border-radius: var(--r-ctrl);
     background: #fff;
-    color: var(--c-brand);
+    /* 白底按钮上的字：深色档若跟着 --c-brand 变浅蓝，就成了「白底浅蓝字」（实测 2.54:1） */
+    color: var(--c-hero-cta-ink);
     font-weight: 600;
     box-shadow: var(--sh-1);
 }

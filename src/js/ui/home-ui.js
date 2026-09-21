@@ -31,9 +31,12 @@
         }
     };
 
-    // ====== 数据：税务节点表（配置化，便于后续扩展） ======
-    // type: ongoing(进行中) | upcoming(即将到来) | expired(已结束但仍提示)
-    const TAX_NODES = [
+    // ====== 数据：税务节点表 ======
+    // 真源在 home-mission.js（阶段19-2）—— 那里要用节点表做 Mission 判定与待办推导。
+    // 这里**只是兜底**：tests/home-page.test.js 只 eval 本文件（不加载 home-mission.js），
+    // 若改成硬依赖会立刻红。两份必须逐字一致 —— 改节点口径时先改 home-mission.js 再同步这里。
+    // type: settlement(汇算区间) | policy(政策有效期) | prepaid(按期申报)
+    const TAX_NODES = (window.EuriskoHomeMission && window.EuriskoHomeMission.nodes) || [
         {
             id: 'comprehensive-settlement',
             name: '综合所得汇算清缴',
@@ -279,6 +282,182 @@
                 <span>${r.text}</span>
             </div>
         `).join('');
+    }
+
+    // ====== 渲染：Mission Hero（阶段19-2）======
+    // 首屏那句话与那颗按钮由 home-mission.js 判定（首访 / 有历史 / 临近节点），这里只负责落 DOM。
+    // 依赖缺失（home-mission.js 没加载、或 DOM 里没有 Hero 容器）时**静默跳过**，不弹错、不改其余卡片。
+    function renderMission() {
+        const titleEl = document.getElementById('home-mission-title');
+        const subEl = document.getElementById('home-mission-subtitle');
+        if (!titleEl && !subEl) return;
+        const M = window.EuriskoHomeMission;
+        if (!M || typeof M.detectMission !== 'function') return;
+
+        const mission = M.detectMission({ history: readHistoryForMission() });
+        if (titleEl) titleEl.textContent = mission.title;
+        if (subEl) subEl.textContent = mission.subtitle;
+
+        const cta = document.getElementById('home-mission-cta');
+        const ctaText = document.getElementById('home-mission-cta-text');
+        if (ctaText) ctaText.textContent = mission.cta.text;
+        if (cta) {
+            cta.setAttribute('data-mission-action', mission.cta.action);
+            cta.setAttribute('data-mission-target', String(mission.cta.target || ''));
+        }
+
+        // 次要动作只在「有历史」态出现（换个方案对比 = 回到事件轴重新挑）
+        const alt = document.getElementById('home-mission-alt');
+        if (alt) {
+            if (mission.altCta) {
+                alt.textContent = mission.altCta.text + ' ›';
+                alt.setAttribute('data-mission-action', mission.altCta.action);
+                alt.setAttribute('data-mission-target', String(mission.altCta.target || ''));
+                alt.classList.remove('hidden');
+            } else {
+                alt.classList.add('hidden');
+            }
+        }
+    }
+
+    // Mission 要读历史：优先内存镜像，兜底 localStorage（与 renderRecentCalculations 同一口径）
+    function readHistoryForMission() {
+        if (typeof syncCalculationHistoryFromStorage === 'function') {
+            try { syncCalculationHistoryFromStorage(); } catch (e) { /* 测试环境可能没有，忽略 */ }
+        }
+        if (typeof calculationHistory !== 'undefined' && Array.isArray(calculationHistory)) {
+            return calculationHistory;
+        }
+        try {
+            const list = JSON.parse(localStorage.getItem('taxCalculationHistory') || '[]');
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Hero 的 CTA：只有两种动作 —— 滚到事件轴 / 打开上次那条记录
+    function setupMissionCta() {
+        const bind = function (el) {
+            if (!el) return;
+            el.addEventListener('click', function () {
+                const action = this.getAttribute('data-mission-action');
+                const target = this.getAttribute('data-mission-target');
+                if (action === 'scroll') {
+                    const anchor = document.getElementById(target || 'home-event-rail');
+                    if (anchor && typeof anchor.scrollIntoView === 'function') {
+                        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    return;
+                }
+                if (action === 'open-last' && target && typeof viewHistoryRecord === 'function') {
+                    viewHistoryRecord(target);
+                }
+            });
+        };
+        bind(document.getElementById('home-mission-cta'));
+        bind(document.getElementById('home-mission-alt'));
+    }
+
+    // ====== 渲染：上轴 · 事件卡「我遇到了什么事」（阶段19-2）======
+    // 数据是生活语言（不发年终奖→bonus-tax），渲染成横向滑动卡片组；**任何断点都不折叠**。
+    function renderEventRail() {
+        const rail = document.getElementById('home-event-rail');
+        if (!rail) return;
+        const M = window.EuriskoHomeMission;
+        const cards = M && Array.isArray(M.eventCards) ? M.eventCards : [];
+        if (!cards.length) return;
+
+        rail.innerHTML = cards.map(c => `
+            <button type="button" class="event-card" data-event="${c.id}" data-tool="${c.target}"
+                    data-alt-tool="${c.altTarget || ''}" data-decide="${c.decide ? '1' : ''}">
+                <div class="event-card__title"><i class="fa ${c.icon} text-primary mr-2"></i>${c.title}</div>
+                <div class="event-card__hint">${c.desc}</div>
+                <div class="mt-2 text-xs text-primary">${c.decide ? '先判定，再算 ›' : '去算 ›'}</div>
+            </button>
+        `).join('');
+
+        rail.querySelectorAll('.event-card').forEach(btn => {
+            btn.addEventListener('click', function () {
+                openEventTarget(this.getAttribute('data-tool'),
+                    this.getAttribute('data-alt-tool'),
+                    this.getAttribute('data-decide') === '1');
+            });
+        });
+    }
+
+    // 打开事件卡落到哪个工具：第 8 张（开店 / 私活）先问一句再进 —— 劳务报酬与经营所得的
+    // 口径完全不同，猜错就是算错，这是自由职业者最大的断点（plan §3.3.3）
+    function openEventTarget(toolId, altToolId, needDecide) {
+        const open = function (id) {
+            if (!id) return;
+            if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                window.EuriskoToolbox.openTool(id);
+            }
+        };
+        if (needDecide && typeof showConfirm === 'function') {
+            showConfirm(
+                '这笔收入更接近哪一种？算错口径，结果会差很多。\n\n· 按次结算、对方代扣（劳务报酬）\n· 持续经营、自负盈亏（经营所得）',
+                function () { open(toolId); },      // 确定 → 劳务报酬
+                function () { open(altToolId); }    // 取消 → 经营所得
+            );
+            return;
+        }
+        open(toolId);
+    }
+
+    // ====== 渲染：我的税务资产（阶段19-2）======
+    // 只给回访用户看：待办与截止（税务日历 × 已保存测算）+ 今年税负概览（≥2 次测算才出现）。
+    function renderAssets() {
+        const card = document.getElementById('home-assets-card');
+        const box = document.getElementById('home-assets-list');
+        if (!card || !box) return;
+        const M = window.EuriskoHomeMission;
+        if (!M) return;
+
+        const history = readHistoryForMission();
+        const todos = M.buildTodos({ history });
+        const overview = M.buildYearOverview(history);
+        const yearEl = document.getElementById('home-assets-year');
+        if (yearEl) yearEl.textContent = `${overview.year} 年`;
+
+        const parts = [];
+
+        todos.forEach(t => {
+            const days = t.daysLeft > 0 ? `剩 ${t.daysLeft} 天` : '今天截止';
+            parts.push(`
+                <div class="flex items-center gap-2">
+                    <i class="fa fa-clock-o ${t.daysLeft <= 7 ? 'text-danger' : 'text-primary'}"></i>
+                    <span class="flex-1 truncate">${t.name}</span>
+                    <span class="text-xs text-gray-500">${t.deadline}</span>
+                    <span class="text-xs ${t.daysLeft <= 7 ? 'text-danger' : 'text-gray-500'}">${days}</span>
+                </div>
+            `);
+        });
+
+        if (overview.visible) {
+            const bars = overview.items.slice(0, 4).map(x => `
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 w-20 truncate">${x.name}</span>
+                    <span class="progress-line flex-1"><span class="progress-line__fill" style="width:${x.pct}%"></span></span>
+                    <span class="text-xs text-gray-500">¥${x.tax.toFixed(0)}</span>
+                </div>
+            `).join('');
+            parts.push(`
+                <div class="mt-1">
+                    <div class="text-xs text-gray-500 mb-1">今年已测算的税额构成（共 ¥${overview.total.toFixed(0)}）</div>
+                    ${bars}
+                </div>
+            `);
+        }
+
+        if (!parts.length) {
+            card.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+        card.classList.remove('hidden');
+        box.innerHTML = parts.join('');
     }
 
     // ====== 渲染：最近计算（横向滑动） ======
@@ -585,15 +764,35 @@
         HomePerf.measure('initHome → 渲染最近计算', renderRecentCalculations);
         HomePerf.measure('initHome → 渲染税务日历', renderTaxCalendar);
         HomePerf.measure('initHome → 渲染税务小贴士', renderTaxTip);
-        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 5 });
+        // 阶段19-2：首屏 Mission（三态判定）+ 上轴事件卡 + 我的税务资产
+        HomePerf.measure('initHome → 渲染 Mission Hero', renderMission);
+        HomePerf.measure('initHome → 渲染事件卡上轴', renderEventRail);
+        HomePerf.measure('initHome → 渲染我的税务资产', renderAssets);
+        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 8 });
 
+        setupMissionCta();
         setupModeCards();
         setupInteractions();
     }
 
+    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近使用与最近计算，还要刷新 Mission 与资产 ——
+    // 「首访 → 有历史」的切换就发生在保存之后，只刷最近计算会留下一个还在问「你今年要交多少税」的过期首屏。
+    function refreshHomeRecent() {
+        // 「最近使用」由别的模块负责刷新（本文件里没有 renderRecentTools），有就顺手带上
+        if (typeof refreshRecentTools === 'function') {
+            try { refreshRecentTools(); } catch (e) { /* 别的模块不可用不影响首页刷新 */ }
+        }
+        renderRecentCalculations();
+        renderMission();
+        renderAssets();
+    }
+
     // 暴露到全局
     window.initHome = initHome;
-    window.refreshHomeRecent = renderRecentCalculations; // 保存计算后可调用刷新
+    window.refreshHomeRecent = refreshHomeRecent; // 保存计算后可调用刷新
+    window.renderEventRail = renderEventRail;
+    window.renderMission = renderMission;
+    window.renderAssets = renderAssets;
 
     // DOM 就绪后自动初始化
     if (document.readyState === 'loading') {

@@ -368,8 +368,9 @@ describe('工具注册表：App 内速算器（native）可用', () => {
 });
 
 describe('工具注册表：信息架构（场景 / 相关工具）', () => {
-    test('5 个身份场景，引用的工具都存在', () => {
-        expect(R().scenarios()).toHaveLength(5);
+    // 阶段19-2：6 张身份卡（「企业财务 / HR」拆成「企业财务 / 会计」+「HR / 薪酬」）
+    test('6 个身份场景，引用的工具都存在', () => {
+        expect(R().scenarios()).toHaveLength(6);
         const bad = [];
         R().scenarios().forEach((s) => {
             s.tools.forEach((id) => { if (!R().get(id)) bad.push(s.id + ' → ' + id); });

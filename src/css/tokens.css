@@ -55,6 +55,15 @@
     --c-brand-hover:  #1b3899;
     --c-brand-subtle: #eff6ff;
     --c-accent:       #3b82f6;
+    /* Mission Hero 专用的**底**与**字**（阶段19-2 实测踩出来的）：
+       Hero 是「品牌渐变底 + 白字」，不能直接用 --c-brand / --c-accent ——
+       accent(#3b82f6) 上的白字只有 3.68:1，14px 副文案不达 AA；而深色档的 --c-brand 是
+       **文字色**（浅蓝 #60a5fa），拿去当底会让白字只剩 2.34:1。
+       故 Hero 的底**两档都取深蓝**（深色档同样是深底，不是「越深越黑」那一套），
+       CTA 是白底按钮、字取深蓝（深色档也不能跟着变浅蓝，那会变成白底浅蓝字 2.54:1）。 */
+    --c-hero-from:    #1e40af;
+    --c-hero-to:      #1e3a8a;
+    --c-hero-cta-ink: #1e40af;
     --c-success:      #10b981;  /* 退税（利好） */
     --c-warning:      #f59e0b;  /* 政策到期提醒 */
     --c-danger:       #ef4444;  /* 补税（需付出） */
@@ -234,6 +243,12 @@
     --c-brand-hover:  #93c5fd;
     --c-brand-subtle: #1e3a8a;
     --c-accent:       #93c5fd;
+    /* 深色档的 --c-brand 是浅蓝（深色下它主要当**文字色**），但 Hero 要的是**深底 + 白字**，
+       跟着取浅蓝会让白字只剩 2.34:1（实测）。故 Hero 的底与 CTA 字在深色档**沿用同一组深蓝**，
+       不跟 --c-brand 反色 —— 见浅色档 --c-hero-* 那段注释。 */
+    --c-hero-from:    #1e40af;
+    --c-hero-to:      #1e3a8a;
+    --c-hero-cta-ink: #1e40af;
     --c-success:      #34d399;
     --c-warning:      #fbbf24;
     --c-danger:       #f87171;

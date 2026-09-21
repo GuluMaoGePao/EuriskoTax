@@ -59,6 +59,18 @@ beforeEach(() => {
                     </div>
                     <div id="home-recent-list" class="recent-scroll"></div>
                 </div>
+                <!-- 阶段19-2：Mission Hero（首屏那句话）+ 上轴事件卡 + 我的税务资产 -->
+                <section id="home-mission" class="hero-card">
+                    <h2 id="home-mission-title"></h2>
+                    <p id="home-mission-subtitle"></p>
+                    <button id="home-mission-cta"><span id="home-mission-cta-text"></span></button>
+                    <button id="home-mission-alt" class="hidden"></button>
+                </section>
+                <div id="home-event-rail" class="event-rail"></div>
+                <div id="home-assets-card" class="hidden">
+                    <span id="home-assets-year"></span>
+                    <div id="home-assets-list"></div>
+                </div>
                 <!-- 卡片4：税务提醒 -->
                 <div class="home-card">
                     <div class="home-card-header">
@@ -85,6 +97,8 @@ beforeEach(() => {
     `;
 
     // 加载 home-ui.js（IIFE 模式，可直接 eval）
+    // home-mission.js 必须**先**加载：首页的节点表与三态判定在它那里，home-ui.js 是消费者
+    loadSource('src/js/ui/home-mission.js');
     loadSource('src/js/ui/home-ui.js');
 });
 
@@ -286,5 +300,99 @@ describe('主页 - 其他交互绑定', () => {
         // 快进 setTimeout
         jest.runAllTimers();
         jest.useRealTimers();
+    });
+});
+
+// ====== 阶段19-2：Mission Hero（首屏那句话）======
+describe('主页 - Mission Hero', () => {
+    test('首访：问「你今年要交多少税」，CTA 滚到事件轴', () => {
+        localStorage.clear();
+        global.window.refreshHomeRecent();
+
+        expect(document.getElementById('home-mission-title').textContent).toContain('你今年要交多少税');
+        expect(document.getElementById('home-mission-cta-text').textContent).toBe('开始测算');
+        expect(document.getElementById('home-mission-cta').getAttribute('data-mission-action')).toBe('scroll');
+        expect(document.getElementById('home-mission-cta').getAttribute('data-mission-target')).toBe('home-events');
+        // 首访没有「换个方案对比」—— 还没有方案可换
+        expect(document.getElementById('home-mission-alt').classList.contains('hidden')).toBe(true);
+    });
+
+    test('有历史：改成「上次测算…」并给出「继续」与次要动作', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: 'm1', type: 'comprehensive', title: '月薪个税', date: new Date().toISOString(), results: { taxDetails: { totalTax: 1200 } } }
+        ]));
+        global.window.refreshHomeRecent();
+
+        const title = document.getElementById('home-mission-title').textContent;
+        // 9 月可能撞上年度汇算的 30 天窗口 → 只断言「不再问你今年要交多少税」且带上测算名
+        expect(title).not.toContain('你今年要交多少税');
+        expect(title + document.getElementById('home-mission-subtitle').textContent).toContain('月薪个税');
+        expect(document.getElementById('home-mission-cta-text').textContent).toBeTruthy();
+    });
+
+    test('点击主 CTA：scroll 动作滚到事件轴，open-last 动作打开上次记录', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: 'm2', type: 'comprehensive', title: '月薪个税', date: new Date().toISOString(), results: { taxDetails: { totalTax: 1200 } } }
+        ]));
+        global.window.refreshHomeRecent();
+
+        const cta = document.getElementById('home-mission-cta');
+        const action = cta.getAttribute('data-mission-action');
+        if (action === 'open-last') {
+            cta.click();
+            expect(global.viewHistoryRecord).toHaveBeenCalledWith('m2');
+        } else {
+            // scroll 动作：目标元素存在就不该抛错（jsdom 没有 scrollIntoView 实现，代码里做了类型检查）
+            expect(() => cta.click()).not.toThrow();
+        }
+    });
+});
+
+// ====== 阶段19-2：上轴「我遇到了什么事」======
+describe('主页 - 事件卡上轴', () => {
+    test('渲染 9 张事件卡，且都带落点', () => {
+        const cards = document.querySelectorAll('#home-event-rail .event-card');
+        expect(cards).toHaveLength(9);
+        cards.forEach(c => {
+            expect(c.getAttribute('data-tool')).toBeTruthy();
+            expect(c.textContent.trim()).not.toBe('');
+        });
+    });
+
+    test('点击事件卡应打开对应工具（不是打开搜索页）', () => {
+        global.window.EuriskoToolbox = { openTool: jest.fn(), openScenario: jest.fn() };
+        const first = document.querySelector('#home-event-rail .event-card');
+        const tool = first.getAttribute('data-tool');
+        first.click();
+        expect(global.window.EuriskoToolbox.openTool).toHaveBeenCalledWith(tool);
+    });
+
+    test('事件卡标题是生活语言：不出现税种术语', () => {
+        const titles = [...document.querySelectorAll('#home-event-rail .event-card__title')].map(e => e.textContent);
+        const terms = ['所得', '税率', '计税', '预扣', '汇算', '申报'];
+        titles.forEach(t => terms.forEach(x => expect(t).not.toContain(x)));
+    });
+});
+
+// ====== 阶段19-2：我的税务资产（仅回访用户）======
+describe('主页 - 我的税务资产', () => {
+    test('新客：资产卡保持隐藏（空状态会劝退）', () => {
+        localStorage.clear();
+        global.window.refreshHomeRecent();
+        expect(document.getElementById('home-assets-card').classList.contains('hidden')).toBe(true);
+    });
+
+    test('回访用户：显示由「已保存测算 × 税务日历」推导出的待办', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: 'a1', type: 'business', toolId: 'business', title: '经营所得', date: new Date().toISOString(), results: { taxDetails: { totalTax: 3000 } } },
+            { id: 'a2', type: 'business', toolId: 'business', title: '经营所得', date: new Date().toISOString(), results: { taxDetails: { totalTax: 1000 } } }
+        ]));
+        global.window.refreshHomeRecent();
+
+        const card = document.getElementById('home-assets-card');
+        expect(card.classList.contains('hidden')).toBe(false);
+        const text = document.getElementById('home-assets-list').textContent;
+        expect(text).toContain('经营所得');
+        expect(document.getElementById('home-assets-year').textContent).toContain(String(new Date().getFullYear()));
     });
 });

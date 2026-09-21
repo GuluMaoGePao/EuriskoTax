@@ -135,9 +135,11 @@ describe('工具页', () => {
 });
 
 describe('首页「我是谁」场景入口', () => {
-    test('渲染 5 张身份卡', () => {
+    // 阶段19-2：原「企业财务 / HR」拆成「企业财务 / 会计」与「HR / 薪酬」两张 —— 会计关心企税与附加，
+    // HR 关心用工成本与社保，塞在一张卡里默认视图给谁都不对。身份卡 5 → 6，工具可达性不受影响。
+    test('渲染 6 张身份卡', () => {
         window.EuriskoToolbox.renderScenarios();
-        expect(document.querySelectorAll('#home-scenarios .scenario-card')).toHaveLength(5);
+        expect(document.querySelectorAll('#home-scenarios .scenario-card')).toHaveLength(6);
     });
 
     test('按身份筛选：只出该身份的工具，并显示可清除的筛选条', () => {

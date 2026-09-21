@@ -6301,14 +6301,22 @@
             tools: ['business-income', 'vat', 'surtax-stamp', 'social-base', 'disability-fund']
         },
         {
-            id: 'finance', name: '企业财务 / HR', icon: 'fa-building',
-            desc: '用工成本、企税增值税、附加与印花',
-            tools: ['employer-cost', 'corporate-income-tax', 'vat', 'surtax-stamp', 'disability-fund']
+            // 阶段19-2：原来这一张叫「企业财务 / HR」，把**会计**与**薪酬**两类人塞在一张卡里 ——
+            // 前者关心企税与附加、后者关心用工成本与社保，默认视图给谁都不对。现拆成两张，
+            // 身份卡凑到 6 张（下轴「我是谁」）；工具可达性不受影响，身份只改默认视图。
+            id: 'finance', name: '企业财务 / 会计', icon: 'fa-building',
+            desc: '企税、增值税、附加与印花',
+            tools: ['corporate-income-tax', 'vat', 'surtax-stamp', 'disability-fund', 'business-income']
         },
         {
             id: 'executive', name: '高管 / 股东 / 临近退休', icon: 'fa-trophy',
             desc: '股权激励、离职补偿、退休与年金',
             tools: ['equity', 'severance', 'early-retirement', 'annuity', 'expat']
+        },
+        {
+            id: 'hr', name: 'HR / 薪酬', icon: 'fa-users',
+            desc: '发工资、算用工成本、社保与残保金',
+            tools: ['employer-cost', 'social-base', 'disability-fund', 'salary-tax', 'severance']
         }
     ];
 

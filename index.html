@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.81.1';
+        window.__APP_VERSION__ = '1.82.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -428,48 +428,78 @@
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
 
-                <!-- 卡片1：欢迎 + 今日税感 -->
+                <!-- 卡片1：Mission Hero（阶段19-2）—— 首屏唯一焦点，回答「你现在该办的事」。
+                     三态文案由 home-mission.js 判定、home-ui.js 渲染：首访 / 有历史 / 临近节点。
+                     底是品牌渐变（终点取 --c-brand-deep，保证白字达 AA；取 --c-accent 时副文案只有 3.68:1），
+                     文字继承 .hero-card 的白色 —— 这里不要再叠 text-gray-*，那是深底上的深灰字。 -->
+                <section id="home-mission" class="hero-card">
+                    <p class="text-xs opacity-90 mb-3">
+                        <span id="home-greeting">你好 👋</span> · <span id="home-date-text">今天是 ...</span>
+                    </p>
+                    <h2 id="home-mission-title" class="hero-card__title">你今年要交多少税？</h2>
+                    <p id="home-mission-subtitle" class="hero-card__sub">41 个场景，全在你手机里算完，数据不出本机</p>
+                    <button id="home-mission-cta" type="button" class="hero-card__cta">
+                        <i class="fa fa-arrow-down"></i>
+                        <span id="home-mission-cta-text">开始测算</span>
+                    </button>
+                    <!-- 次要动作（「有历史」态才有）：主 CTA 是「继续」，这里给「换个方案对比」 -->
+                    <button id="home-mission-alt" type="button" class="hidden mt-3 text-xs text-white underline opacity-90">换个方案对比 ›</button>
+                </section>
+
+                <!-- 卡片2：上轴「我遇到了什么事」（阶段19-2）—— 9 张事件卡。
+                     数据（生活语言 → 落到哪个工具）在 home-mission.js，渲染在 home-ui.js。
+                     手机横向滑动、桌面转网格，**任何断点都不折叠** —— 事件卡是首页转化主力，
+                     依据是「身份不是人人都说得清，但每个人都认得自己遇到了什么事」。 -->
                 <div class="home-card">
-                    <div class="flex items-start justify-between mb-3">
-                        <div>
-                            <h2 id="home-greeting" class="text-lg sm:text-xl font-bold text-gray-800 mb-1">你好 👋</h2>
-                            <p class="text-sm text-gray-500" id="home-date-text">今天是 ...</p>
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-compass text-primary mr-2"></i>
+                            <span>我遇到了什么事</span>
                         </div>
-                        <img src="images/logo.png" alt="EuriskoTax" class="w-24 h-24 opacity-90 hidden sm:block -my-6">
+                        <span class="text-xs text-gray-500">不用先懂税，认得自己的事就行</span>
                     </div>
-                    <div id="home-tax-feel" class="tip-card">
-                        <div class="flex items-start">
-                            <i class="fa fa-calendar-check-o text-primary mt-0.5 mr-3 text-lg"></i>
-                            <div class="flex-1">
-                                <h4 class="font-medium text-primary mb-1 text-sm">📅 今日税感</h4>
-                                <div id="home-tax-feel-content" class="text-sm text-gray-600 space-y-1">
-                                    <!-- 由 home-ui.js 动态填充 -->
-                                </div>
-                            </div>
-                        </div>
+                    <div id="home-event-rail" class="event-rail">
+                        <!-- 由 home-ui.js 按 home-mission.js 的 eventCards 渲染 -->
                     </div>
                 </div>
 
-                <!-- 卡片2：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
-                <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
-                    <i class="fa fa-search tool-search-entry-icon"></i>
-                    <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
-                    <span class="tool-search-entry-count">41 个 ›</span>
-                </button>
+                <!-- 卡片3：我的税务资产（阶段19-2）—— 仅**回访用户**可见（新客隐藏，空状态会劝退）。
+                     内容不是凭空列的节点：待办与截止 = 税务日历 × 已保存的测算；
+                     今年税负概览要 ≥2 次测算才出现（1 条数据画「构成」是自欺欺人）。 -->
+                <div id="home-assets-card" class="home-card hidden">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-briefcase text-primary mr-2"></i>
+                            <span>我的税务资产</span>
+                        </div>
+                        <span id="home-assets-year" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div id="home-assets-list" class="flex flex-col gap-2">
+                        <!-- 由 home-ui.js 按 home-mission.js 的 buildTodos / buildYearOverview 渲染 -->
+                    </div>
+                </div>
 
-                <!-- 卡片3：我是谁（先认身份再选工具 —— 用户不知道年终奖归哪一类，但知道自己是上班族） -->
+                <!-- 卡片4：下轴「我是谁」（身份卡）—— 作用是**设置默认视角**，不是筛选工具：
+                     41 个入口永远都能进，身份只改默认密度与常用排序（偏好接线在阶段19-7）。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
                             <i class="fa fa-user-circle-o text-primary mr-2"></i>
                             <span>我是谁</span>
                         </div>
-                        <span class="text-xs text-gray-500">按身份挑工具</span>
+                        <span class="text-xs text-gray-500">选一个当默认视角，不限制你能用什么</span>
                     </div>
                     <div id="home-scenarios" class="scenario-grid">
                         <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
                     </div>
                 </div>
+
+                <!-- 卡片5：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
+                <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
+                    <i class="fa fa-search tool-search-entry-icon"></i>
+                    <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
+                    <span class="tool-search-entry-count">41 个 ›</span>
+                </button>
 
                 <!-- 卡片4：最近使用（跨形态：速算器与深度流程混排） -->
                 <div id="home-recent-tools-card" class="home-card hidden">
@@ -511,16 +541,28 @@
                     </div>
                 </div>
 
-                <!-- 卡片5：税务小贴士 -->
+                <!-- 卡片7：呼吸卡（阶段19-2）—— 今日税感与税务小贴士合并成一张，放在页脚前。
+                     两者都是「看了有用、不看也不阻塞」的内容，各占一张卡只会把首页拉长。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
                             <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
-                            <span>税务小贴士</span>
+                            <span>今日税感 · 小贴士</span>
                         </div>
                         <button id="home-next-tip" class="text-xs text-primary hover:underline">换一条 ›</button>
                     </div>
-                    <div id="home-tip-content" class="text-sm text-gray-600 leading-relaxed">
+                    <div id="home-tax-feel" class="tip-card">
+                        <div class="flex items-start">
+                            <i class="fa fa-calendar-check-o text-primary mt-0.5 mr-3 text-lg"></i>
+                            <div class="flex-1">
+                                <h4 class="font-medium text-primary mb-1 text-sm">📅 今日税感</h4>
+                                <div id="home-tax-feel-content" class="text-sm text-gray-600">
+                                    <!-- 由 home-ui.js 动态填充 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="home-tip-content" class="text-sm text-gray-600 leading-relaxed mt-3">
                         <!-- 由 home-ui.js 动态填充 -->
                     </div>
                 </div>
@@ -1443,7 +1485,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.81.1</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.82.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1730,6 +1772,9 @@
     <!-- 自有 JS 不带 ?v= 指纹：服务器端已对 JS/CSS 改为 ETag 协商缓存（no-cache），
          内容更新即下发新文件，不再依赖 URL 指纹（旧 1 年 immutable 会锁死无指纹的
          ES module import 链路）；离线兜底由 Service Worker network-first + ignoreSearch 保证 -->
+    <!-- 阶段19-2：首页 Mission 层（纯逻辑：三态判定 / 事件卡数据 / 待办与概览）。
+         必须排在 home-ui.js **之前** —— home-ui 的节点表以这里为真源（缺了就用它自己那份兜底）。 -->
+    <script src="src/js/ui/home-mission.js"></script>
     <script src="src/js/ui/home-ui.js"></script>
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
