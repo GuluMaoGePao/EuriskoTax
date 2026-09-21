@@ -460,6 +460,9 @@
                 // 页面式时代这张卡长在综合所得页面的结果区，删页后宿主与数据源一起没了 ——
                 // 现在由渲染器按 spec 有没有取数钩子决定挂不挂，index.html 不必再为它留一块静态 HTML。
                 (typeof tool.toCalcInput === 'function' ? '<div id="dw-scenario-host" class="mt-6"></div>' : '') +
+                // 阶段19-5b：税务档案引导卡的宿主位。与速算器共用同一份渲染（toolbox-ui），
+                // 不在这里抄第二份 —— 两处各长一套的话，「暂不」只在一处生效这种错迟早出现。
+                '<div id="dw-profile-nudge" class="mt-6 hidden"></div>' +
                 '<div class="mt-6"><button id="dw-prev" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">' +
                 '<i class="fa fa-arrow-left mr-2"></i>返回上一步</button></div>' +
             '</div>';
@@ -615,6 +618,7 @@
         host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps);
         bind(tool, steps);
         mountScenarioCard(tool);
+        mountProfileNudge(tool);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
         // 分步向导每次只渲染当前步，若不回填，用户「上一步 → 下一步」就会被打回默认值 ——
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
@@ -634,6 +638,15 @@
         try { ctx = tool.toCalcInput(state.values); } catch (e) { ctx = null; }
         if (!ctx || !ctx.results) return;
         ui.mount(host, ctx);
+    }
+
+    // 阶段19-5b：档案引导卡宿主由渲染器建，内容交给 toolbox-ui 那份实现填（口径只有一处）。
+    // 「暂不」是落盘的（taxProfile.nudgeDismissed），所以两处都关掉一次就都闭嘴。
+    function mountProfileNudge(tool) {
+        var host = document.getElementById('dw-profile-nudge');
+        var tb = window.EuriskoToolbox;
+        if (!host || !tb || typeof tb.mountProfileNudge !== 'function') return;
+        tb.mountProfileNudge('dw-profile-nudge', tool, state.values);
     }
 
     // skipEl：正在输入的那个控件不回写 —— 否则用户敲到一半，光标会被自己刚触发的联动重置

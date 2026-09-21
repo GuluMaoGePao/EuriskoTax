@@ -461,6 +461,29 @@
     text-decoration: underline;
 }
 
+/* --- 与上次对比（阶段19-5b · 留存机制 §3.8 ③）---
+   差额用语义色但**必须带文字**（「少缴 / 多缴」）—— 只给颜色等于没说哪边好。
+   语义色一律取 *-text 那一档（它是为白底/深色底上的文字配的，不是实心底）。 */
+.compare-nudge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.compare-nudge-title {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+}
+.compare-nudge-diff { font-size: var(--fs-xs); color: var(--c-text-2); }
+.compare-nudge-diff.is-lower { color: var(--c-success-text); }
+.compare-nudge-diff.is-higher { color: var(--c-danger-text); }
+.compare-nudge-body {
+    margin-top: 8px; display: flex; flex-wrap: wrap; gap: 12px;
+    font-size: var(--fs-xs); color: var(--c-text-2);
+}
+.compare-nudge-body b { color: var(--c-text); font-weight: 600; }
+.compare-nudge-cta {
+    margin-top: 10px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.compare-nudge-tip { margin-top: 10px; font-size: var(--fs-xs); color: var(--c-text-2); }
+
 /* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
 .identity-card {
     padding: var(--sp-4);

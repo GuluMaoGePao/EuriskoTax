@@ -77,6 +77,7 @@ beforeEach(() => {
         <div id="quick-result-card"><div id="quick-result"></div></div>
         <div id="quick-actions"></div>
         <div id="quick-profile-nudge" class="hidden"></div>
+        <div id="quick-compare-nudge" class="hidden"></div>
         <div id="quick-pitfalls"></div>
         <details id="quick-policy-basis" class="hidden">
             <div id="quick-policy-basis-body"></div>
@@ -289,7 +290,7 @@ describe('税务档案完成度引导', () => {
 
     test('「暂不」后收声：再算一次也不再出现（不靠重复弹窗刷存在感）', () => {
         document.querySelector('[data-tool-id="vat"]').click();
-        nudge().querySelector('#profile-skip').click();
+        nudge().querySelector('.profile-skip').click();
         expect(nudge().classList.contains('hidden')).toBe(true);
         expect(window.EuriskoTaxProfile.get().nudgeDismissed).toBe(true);
 
@@ -303,6 +304,56 @@ describe('税务档案完成度引导', () => {
         });
         document.querySelector('[data-tool-id="vat"]').click();
         expect(nudge().classList.contains('hidden')).toBe(true);
+    });
+});
+
+// 阶段19-5b：留存机制 §3.8 ③ 与上次对比。
+// 钉的是「比得出来才出现、比不出来就闭嘴」：一张比不出差额的对比卡，比没有更糟 ——
+// 用户会以为这里有过结论。
+describe('与上次对比', () => {
+    const compare = () => document.getElementById('quick-compare-nudge');
+    const seed = (rec) => localStorage.setItem('taxCalculationHistory', JSON.stringify([rec]));
+    const vat = () => window.EuriskoToolRegistry.get('vat');
+
+    afterEach(() => localStorage.removeItem('taxCalculationHistory'));
+
+    test('第一次测算没有「上次」，不出现', () => {
+        localStorage.removeItem('taxCalculationHistory');
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(compare().classList.contains('hidden')).toBe(true);
+    });
+
+    test('同工具第二次算：出现差额，并写明少缴还是多缴', () => {
+        seed({ id: 'h-old', toolId: 'vat', date: new Date('2026-09-01').toISOString(), result_data: { totalTax: 5000 } });
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(compare().classList.contains('hidden')).toBe(false);
+        expect(compare().textContent).toMatch(/少缴|多缴|与上次一样/);
+        // 两个数都要给出来（上次 / 这次），只给差额等于让用户自己信
+        expect(compare().querySelectorAll('.compare-nudge-body b')).toHaveLength(2);
+    });
+
+    test('别的工具的历史不拿来比（口径不同不能硬凑）', () => {
+        seed({ id: 'h-old', toolId: 'bonus-tax', date: new Date('2026-09-01').toISOString(), result_data: { totalTax: 5000 } });
+        document.querySelector('[data-tool-id="vat"]').click();
+        expect(compare().classList.contains('hidden')).toBe(true);
+    });
+
+    test('取不到上次的税额就不显示（不猜、不补 0）', () => {
+        seed({ id: 'h-old', toolId: 'vat', date: new Date('2026-09-01').toISOString() });
+        window.EuriskoToolbox.renderCompareNudge(vat(), {}, { primary: { value: 100 } });
+        expect(compare().classList.contains('hidden')).toBe(true);
+    });
+
+    test('刚保存的那条不与自己比（比的是更早那次）', () => {
+        seed({ id: 'h-old', toolId: 'vat', date: new Date('2026-09-01').toISOString(), result_data: { totalTax: 5000 } });
+        document.querySelector('[data-tool-id="vat"]').click();
+        // 保存这次 → 历史里多一条自己的；再算一次，仍应拿 9/1 那条比
+        document.getElementById('quick-save-history').click();
+        const input = document.getElementById('qf-sales');
+        input.value = '20000';
+        input.dispatchEvent(new window.Event('input', { bubbles: true }));
+        expect(compare().classList.contains('hidden')).toBe(false);
+        expect(compare().textContent).toContain('9月1日');
     });
 });
 

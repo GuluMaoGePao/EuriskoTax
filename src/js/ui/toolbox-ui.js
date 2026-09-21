@@ -654,6 +654,8 @@
         var actions = document.getElementById('quick-actions');
         if (actions) actions.innerHTML = '';
         hideProfileNudge();
+        var compare = document.getElementById('quick-compare-nudge');
+        if (compare) { compare.classList.add('hidden'); compare.innerHTML = ''; }
     }
 
     function bindResultBar() {
@@ -680,16 +682,16 @@
 
     function profileLib() { return window.EuriskoTaxProfile; }
 
-    function hideProfileNudge() {
-        var box = document.getElementById('quick-profile-nudge');
-        if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+    function hideProfileNudge(box) {
+        var el = box || document.getElementById('quick-profile-nudge');
+        if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
     }
 
     function profileControlsHtml(item) {
         if (item.kind === 'text') {
             return '<div class="profile-nudge-ctrl">' +
-                '<input id="profile-text-input" class="profile-nudge-input" type="text" maxlength="20" placeholder="如 北京">' +
-                '<button type="button" id="profile-save" class="profile-chip profile-chip-primary">保存</button>' +
+                '<input class="profile-nudge-input" type="text" maxlength="20" placeholder="如 北京">' +
+                '<button type="button" class="profile-chip profile-chip-primary profile-save">保存</button>' +
                 '</div>';
         }
         if (item.kind === 'multi') {
@@ -697,7 +699,7 @@
                 item.options.map(function (o) {
                     return '<button type="button" class="profile-chip" data-profile-pick="' + esc(o.value) + '">' + esc(o.label) + '</button>';
                 }).join('') +
-                '<button type="button" id="profile-save" class="profile-chip profile-chip-primary">保存</button>' +
+                '<button type="button" class="profile-chip profile-chip-primary profile-save">保存</button>' +
                 '</div>';
         }
         return '<div class="profile-nudge-ctrl">' +
@@ -707,8 +709,9 @@
             '</div>';
     }
 
-    function bindProfileNudge(tool, values) {
-        var box = document.getElementById('quick-profile-nudge');
+    // 卡内一律按 class 在**容器作用域**内定位：19-5b 起这张卡同时挂在速算器与完整测算结果步上，
+    // 用全局 id 的话第二张卡会写到第一张上去（scenario-ui.js 早年被这个坑过一次）。
+    function bindProfileNudge(box, tool, values) {
         var lib = profileLib();
         if (!box || !lib) return;
 
@@ -728,13 +731,13 @@
             });
         });
 
-        var save = document.getElementById('profile-save');
+        var save = box.querySelector('.profile-save');
         if (save) {
             save.addEventListener('click', function () {
                 var key = nudgeKey;
                 var obj = {};
                 if (key === 'city') {
-                    var input = document.getElementById('profile-text-input');
+                    var input = box.querySelector('.profile-nudge-input');
                     var v = input ? String(input.value || '').trim() : '';
                     if (!v) { if (input) input.focus(); return; }
                     obj.city = v;
@@ -751,11 +754,11 @@
             });
         }
 
-        var skip = document.getElementById('profile-skip');
+        var skip = box.querySelector('.profile-skip');
         if (skip) {
             skip.addEventListener('click', function () {
                 lib.dismissNudge();
-                hideProfileNudge();
+                hideProfileNudge(box);
             });
         }
     }
@@ -770,7 +773,12 @@
     }
 
     function renderProfileNudge(tool, values) {
-        var box = document.getElementById('quick-profile-nudge');
+        renderProfileNudgeInto(document.getElementById('quick-profile-nudge'), tool, values);
+    }
+
+    // 容器由调用方给：速算器传 #quick-profile-nudge，完整测算结果步传 #dw-profile-nudge
+    // （19-5b 起两处共用同一份渲染与绑定 —— 引导的口径只有一处，不会两边各长一套）。
+    function renderProfileNudgeInto(box, tool, values) {
         if (!box) return;
         var lib = profileLib();
         if (!lib || typeof lib.absorb !== 'function') {
@@ -811,8 +819,102 @@
             '<div class="profile-nudge-bar"><span class="profile-nudge-bar-fill" style="width:' + c.percent + '%"></span></div>' +
             '<div class="profile-nudge-ask">' + esc(first.ask) + '</div>' +
             profileControlsHtml(first) +
-            '<button type="button" id="profile-skip" class="profile-nudge-skip">暂不，先算别的</button>';
-        bindProfileNudge(tool, values);
+            '<button type="button" class="profile-nudge-skip profile-skip">暂不，先算别的</button>';
+        bindProfileNudge(box, tool, values);
+    }
+
+    // ====== 与上次对比（阶段19-5b · 留存机制 §3.8 ③）======
+    // plan 原文是「结果页存为方案 A → 第二次自动提示『与 A 对比』」。方案库（scenario-store）
+    // 那张对比表只覆盖综合所得口径，速算器若存进去，缺的指标会被 fmtValue 补成 ¥0.00 ——
+    // 那是假数据，比没有更糟。所以速算器侧改为跟**同工具的上一次测算**比：
+    // 那份数据本来就在 taxCalculationHistory 里，两次是同一口径同一个 compute，差额是真算出来的。
+    var lastSavedHistoryId = null;
+
+    function readHistory() {
+        try {
+            var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // 取上一次同工具的记录（排除刚保存的那条自己，否则「这次」会跟「这次」比）
+    function previousSameToolRecord(toolId) {
+        var list = readHistory();
+        for (var i = list.length - 1; i >= 0; i--) {
+            var r = list[i];
+            if (!r || r.toolId !== toolId) continue;
+            if (lastSavedHistoryId && r.id === lastSavedHistoryId) continue;
+            return r;
+        }
+        return null;
+    }
+
+    // 历史里税额的落点有两种（速算器写 result_data.totalTax，完整测算写 results.primary.value）；
+    // 取不到就返回 null —— 不猜、不补 0。
+    function taxAmountOf(record) {
+        if (!record) return null;
+        var v = record.result_data ? Number(record.result_data.totalTax) : NaN;
+        if (!Number.isFinite(v) && record.results) {
+            v = record.results.taxDetails ? Number(record.results.taxDetails.totalTax) : NaN;
+            if (!Number.isFinite(v) && record.results.primary) v = Number(record.results.primary.value);
+        }
+        return Number.isFinite(v) ? v : null;
+    }
+
+    function dateLabelOf(iso) {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '上次';
+        return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    }
+
+    // 挂到指定容器（deep 向导结果步走这一条入口）
+    function mountProfileNudge(containerId, tool, values) {
+        var box = document.getElementById(containerId);
+        if (!box || !tool) return;
+        renderProfileNudgeInto(box, tool, values || {});
+    }
+
+    function renderCompareNudge(tool, values, out) {
+        var box = document.getElementById('quick-compare-nudge');
+        if (!box) return;
+        var prev = previousSameToolRecord(tool.id);
+        var prevTax = taxAmountOf(prev);
+        var nowTax = Number(out && out.primary ? out.primary.value : NaN);
+        // 比不出来就不显示：第一次测算没有「上次」，口径不同也不硬凑
+        if (!prev || prevTax === null || !Number.isFinite(nowTax)) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+
+        var diff = nowTax - prevTax;
+        var diffText = Math.abs(diff) < 0.005
+            ? '与上次一样'
+            : (diff < 0 ? '少缴 ' : '多缴 ') + fmtValue(Math.abs(diff), 'money');
+        var deepId = deepCounterpartOf(tool);
+
+        box.classList.remove('hidden');
+        box.innerHTML = '' +
+            '<div class="compare-nudge-head">' +
+            '<span class="compare-nudge-title"><i class="fa fa-balance-scale"></i>和上次比</span>' +
+            '<span class="compare-nudge-diff' + (Math.abs(diff) < 0.005 ? '' : (diff < 0 ? ' is-lower' : ' is-higher')) + '">' + esc(diffText) + '</span>' +
+            '</div>' +
+            '<div class="compare-nudge-body">' +
+            '<span>上次（' + esc(dateLabelOf(prev.date)) + '）<b>' + esc(fmtValue(prevTax, 'money')) + '</b></span>' +
+            '<span>这次 <b>' + esc(fmtValue(nowTax, 'money')) + '</b></span>' +
+            '</div>' +
+            (deepId
+                ? '<button type="button" class="compare-nudge-cta" data-deep-id="' + esc(deepId) + '">按年填全做多方案对比<i class="fa fa-angle-right"></i></button>'
+                : '<div class="compare-nudge-tip">想留着以后比，就点上面的「保存到历史」。</div>');
+
+        var cta = box.querySelector('.compare-nudge-cta');
+        if (cta) {
+            cta.addEventListener('click', function () {
+                openTool(this.getAttribute('data-deep-id'), { values: values });
+            });
+        }
     }
 
     function renderResult(tool, values) {
@@ -874,6 +976,7 @@
         renderQuickActions(tool, values, out);
         renderResultBar(tool, out);
         renderProfileNudge(tool, values);
+        renderCompareNudge(tool, values, out);
         return out;
     }
 
@@ -907,8 +1010,11 @@
     function saveToHistory(tool, values, out) {
         try {
             var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            var id = 'quick-' + Date.now();
+            // 记住刚存的这条：「与上次对比」要拿它之外的最近一条，否则这次会跟这次比
+            lastSavedHistoryId = id;
             list.push({
-                id: 'quick-' + Date.now(),
+                id: id,
                 date: new Date().toISOString(),
                 type: 'quick',
                 title: tool.name,
@@ -1135,6 +1241,10 @@
         hideResultExtras: hideResultExtras,
         deepCounterpartOf: deepCounterpartOf,
         resultTextOf: resultTextOf,
+        // 阶段19-5b：档案引导卡与「与上次对比」卡都挂到别处去（deep 向导结果步用前者）；
+        // 同一份实现两处复用，引导口径只有一处。
+        mountProfileNudge: mountProfileNudge,
+        renderCompareNudge: renderCompareNudge,
         // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
         policyBasisOf: policyBasisOf,
         policyBasisText: policyBasisText,
