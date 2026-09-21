@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.87.0';
+        window.__APP_VERSION__ = '1.88.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1529,7 +1529,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.87.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.88.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1892,6 +1892,9 @@
     <script src="src/js/ui/tax-profile-editor.js"></script>
     <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
     <script src="src/js/data/scenario-store.js"></script>
+    <!-- 阶段19-6b：我的页权益进度条（§3.6 ①）—— 排在 plan.js / history-sync.js / scenario-store.js 之后
+         （三个库都是运行时才读，加载顺序不致命，但按依赖顺序读起来不用回头猜） -->
+    <script src="src/js/ui/profile-benefits.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>
     <script src="src/js/app.js"></script>
     <!-- 阶段13B：企业微信活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
@@ -1990,9 +1993,9 @@
                             <p id="profile-plan-note" class="text-white text-xs mt-1 leading-relaxed hidden"></p>
                         </div>
                         <div class="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2 justify-center">
-                            <button type="button" id="profile-nav-upgrade" class="inline-flex items-center justify-center w-full sm:w-auto bg-white text-primary hover:bg-blue-50 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
-                                <i class="fa fa-crown mr-2"></i><span>版本与权益</span>
-                            </button>
+                            <!-- 「版本与权益」按钮已从横幅移到下方权益进度条里（id 不变，仍是全局第 2 处升级入口）：
+                                 横幅上那颗按钮旁边就是档位徽标，用户看得见自己是哪个版本，却看不见"用掉了多少、
+                                 云同步开没开" —— 权益要说清的是后者，所以它该长在进度条旁边（阶段19-6b §3.6 ①）。 -->
                             <!-- 原为 bg-white/15 + 白字：半透明白压在品牌渐变上合成出的浅蓝底，白字只有 3.97:1。
                                  改用深蓝半透明（bg-blue-900/40）：底更暗，白字 6.7:1，仍是半透明玻璃质感。 -->
                             <a href="#" id="profile-nav-settings" class="inline-flex items-center justify-center w-full sm:w-auto bg-blue-900/40 border border-white/30 text-white hover:bg-blue-900/60 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
@@ -2003,10 +2006,31 @@
                 </div>
             </div>
 
-            <!-- 数据概览（统计卡由 JS 动态生成） -->
+            <!-- 权益进度条（阶段19-6b §3.6 ①）：档位刻度 + 方案用量 + 云同步状态 + 升级入口。
+                 内容由 src/js/ui/profile-benefits.js 填充（取不到的数据整行不出现，不补 0）；
+                 未登录 / 拿不到档位时整张卡保持隐藏。
+                 ⚠️ 这颗 #profile-nav-upgrade 就是**全局第 2 处**升级入口（另一处是顶栏 pill），
+                 它只是从上面的横幅搬到了这里 —— id 不变、数量不变（阶段14 入口收敛约束）。 -->
+            <div id="profile-benefits-card" class="bg-white rounded-lg shadow-card mb-5 p-4 sm:p-5 hidden">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1 h-4 rounded-full bg-primary"></span>
+                        <h4 class="text-sm font-bold text-gray-700">我的权益</h4>
+                    </div>
+                    <span id="profile-benefits-tier" class="text-xs font-semibold text-gray-600"></span>
+                </div>
+                <div id="profile-benefits-steps" class="benefit-steps mt-3"></div>
+                <p id="profile-benefits-usage" class="benefit-line mt-3 hidden"></p>
+                <p id="profile-benefits-sync" class="benefit-line hidden"></p>
+                <button type="button" id="profile-nav-upgrade" class="mt-3 inline-flex items-center justify-center w-full sm:w-auto bg-primary hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
+                    <i class="fa fa-crown mr-2"></i><span>了解专业版</span>
+                </button>
+            </div>
+
+            <!-- 资产概览（统计卡由 JS 动态生成） -->
             <div class="flex items-center gap-2 mb-3 mt-1 px-1">
                 <span class="w-1 h-4 rounded-full bg-primary"></span>
-                <h4 class="text-sm font-bold text-gray-700">数据概览</h4>
+                <h4 class="text-sm font-bold text-gray-700">资产概览</h4>
             </div>
             <div id="profile-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6"></div>
 

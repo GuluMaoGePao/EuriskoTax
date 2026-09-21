@@ -697,42 +697,53 @@ async function loadProfile() {
 // 因为 Tailwind 自 1.38.0 起是构建期编译（见 tailwind.config.js 的 content 扫描）：
 // 运行期拼出来的类名扫不到，产物里根本没有对应规则 —— 表现是「这条样式整条消失」，
 // 而不是旧 CDN 运行时那样「慢一点但还有」。
+// 阶段19-6b：这四张卡此前是「计算次数 / 档案数量 / 历史记录 / 本月提醒」——
+//   计算次数与历史记录**永远显示同一个数**（都读 taxCalculationHistory.length），
+//   档案数量只有 0/1 两档（tax_profile 存没存过），本月提醒由当前月份决定、与个人数据无关。
+//   四格里两格是同义反复、一格是开关、一格是日历 —— 这不叫资产概览。
+// 现在四格全部换成**从本机数据真算得出**的量：测算次数 / 已存方案 / 覆盖税种 / 上次测算。
+//   取不到的一律显示「—」（见 computeProfileAssets 返回 null 的分支）：
+//   宁可空着，也不摆一个会被读成"你一套方案都没存"的 0。
 const PROFILE_STATS_CONFIG = [
     {
         id: 'profile-stats-calculations',
         icon: 'fa-calculator',
-        label: '计算次数',
+        label: '测算次数',
         cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200',
         iconBg: 'w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-blue-600 font-medium',
-        valueClass: 'text-xl sm:text-2xl font-bold text-blue-800'
+        valueClass: 'text-2xl sm:text-3xl font-bold text-blue-800',
+        subClass: 'text-xs text-blue-700'
     },
     {
-        id: 'profile-stats-profiles',
-        icon: 'fa-file-text-o',
-        label: '档案数量',
+        id: 'profile-stats-scenarios',
+        icon: 'fa-clone',
+        label: '已存方案',
         cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200',
         iconBg: 'w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-green-600 font-medium',
-        valueClass: 'text-xl sm:text-2xl font-bold text-green-800'
+        valueClass: 'text-2xl sm:text-3xl font-bold text-green-800',
+        subClass: 'text-xs text-green-700'
     },
     {
-        id: 'profile-stats-history',
-        icon: 'fa-history',
-        label: '历史记录',
+        id: 'profile-stats-kinds',
+        icon: 'fa-sitemap',
+        label: '覆盖税种',
         cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200',
         iconBg: 'w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-purple-600 font-medium',
-        valueClass: 'text-xl sm:text-2xl font-bold text-purple-800'
+        valueClass: 'text-2xl sm:text-3xl font-bold text-purple-800',
+        subClass: 'text-xs text-purple-700'
     },
     {
-        id: 'profile-stats-reminders',
-        icon: 'fa-calendar-check-o',
-        label: '本月提醒',
+        id: 'profile-stats-last',
+        icon: 'fa-clock-o',
+        label: '上次测算',
         cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200',
         iconBg: 'w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-orange-600 font-medium',
-        valueClass: 'text-xl sm:text-2xl font-bold text-orange-800'
+        valueClass: 'text-2xl sm:text-3xl font-bold text-orange-800',
+        subClass: 'text-xs text-orange-700'
     }
 ];
 
@@ -741,7 +752,7 @@ function renderProfileStats() {
     const grid = document.getElementById('profile-stats-grid');
     if (!grid || grid.children.length > 0) return; // 已渲染则跳过
 
-    grid.innerHTML = PROFILE_STATS_CONFIG.map(({ id, icon, label, cardClass, iconBg, labelClass, valueClass }) => `
+    grid.innerHTML = PROFILE_STATS_CONFIG.map(({ id, icon, label, cardClass, iconBg, labelClass, valueClass, subClass }) => `
         <div class="${cardClass}">
             <div class="flex items-center">
                 <div class="${iconBg}">
@@ -749,7 +760,8 @@ function renderProfileStats() {
                 </div>
                 <div class="min-w-0">
                     <p class="${labelClass}">${label}</p>
-                    <p id="${id}" class="${valueClass}">0</p>
+                    <p id="${id}" class="${valueClass}">—</p>
+                    <p id="${id}-sub" class="${subClass}"></p>
                 </div>
             </div>
         </div>
@@ -764,7 +776,7 @@ function renderProfileStats() {
 const PROFILE_CARDS_CONFIG = [
     {
         id: 'profile-card-history',
-        group: 'tools',
+        group: 'data',
         icon: 'fa-history',
         title: '计算历史',
         desc: '查看、复算与清理已保存的测算记录',
@@ -773,7 +785,7 @@ const PROFILE_CARDS_CONFIG = [
     },
     {
         id: 'profile-card-tax',
-        group: 'tools',
+        group: 'tax',
         icon: 'fa-file-text-o',
         title: '税务档案',
         desc: '保存常用扣除配置，测算时一键套用',
@@ -782,7 +794,7 @@ const PROFILE_CARDS_CONFIG = [
     },
     {
         id: 'profile-card-data',
-        group: 'tools',
+        group: 'data',
         icon: 'fa-database',
         title: '数据管理',
         desc: '云端同步、数据导出与本地备份',
@@ -791,10 +803,16 @@ const PROFILE_CARDS_CONFIG = [
     },
     {
         id: 'profile-card-calendar',
-        group: 'tools',
+        group: 'tax',
         icon: 'fa-calendar',
         title: '税务日历',
         desc: '汇算清缴、申报截止等关键时间提醒',
+        // 阶段19-6b：资产概览里那张「本月提醒」撤了（它只由当前月份决定，与个人数据无关），
+        // 提醒归位到这里 —— 该办几件事，写在日历卡上，而不是摆在与数据无关的一格里。
+        badgeFn: () => {
+            const n = getMonthlyReminders();
+            return n > 0 ? `本月 ${n} 项` : '';
+        },
         iconWrapClass: 'w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar text-xl text-orange-600'
     },
@@ -848,14 +866,21 @@ const PROFILE_CARDS_CONFIG = [
 ];
 
 // 分组标题：key 与卡片配置的 group 对应，数组顺序即分组展示顺序
+// 阶段19-6b（§3.6 ③）：原先是「常用功能 / 服务与支持」两组平铺，9 张卡等权罗列 ——
+//   与测算直接相关的（历史 / 数据管理）和税务属性的（档案 / 日历）混在一组，
+//   找"我的档案"要在四张卡里翻。按场景拆成三组后，每组都是一句话能说清的场景。
+//   ⚠️ plan 原文还列了第四组「我的产出」（方案对比 · 报告 · 分享记录），本版**没有做**：
+//   这三项目前都没有对应的独立页面（方案对比是结果页里的一个区块，不是我的页子页），
+//   硬造三个入口只会点进去是空壳 —— 入口等页面先落地，不反过来拿入口凑数。
 const PROFILE_CARD_GROUPS = [
-    { key: 'tools', title: '常用功能', desc: '测算记录、档案与数据' },
-    { key: 'service', title: '服务与支持', desc: '客服、反馈与帮助' }
+    { key: 'data', title: '我的数据', desc: '测算记录 · 云同步 · 导出' },
+    { key: 'tax', title: '我的税务', desc: '档案 · 日历' },
+    { key: 'service', title: '服务与支持', desc: '客服 · 反馈 · 帮助' }
 ];
 
 // 单张功能卡片（横向紧凑式：图标 + 标题/说明 + 箭头）
 // 所有类名均为完整静态字符串，避免动态拼接触发 Tailwind CDN 重扫导致卡顿。
-function profileCardHtml({ id, title, desc, tag, iconWrapClass, iconClass }) {
+function profileCardHtml({ id, title, desc, tag, badge, iconWrapClass, iconClass }) {
     return `
         <div class="bg-white rounded-lg shadow-card cursor-pointer profile-card-hover h-full" id="${id}">
             <div class="p-4 sm:p-5 flex items-center gap-3.5 sm:gap-4">
@@ -866,6 +891,7 @@ function profileCardHtml({ id, title, desc, tag, iconWrapClass, iconClass }) {
                     <div class="flex items-center gap-2 flex-wrap">
                         <h3 class="font-semibold text-gray-800 text-[15px] leading-snug">${title}</h3>
                         ${tag ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${tag}</span>` : ''}
+                        ${badge ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">${badge}</span>` : ''}
                     </div>
                     <p class="text-xs text-gray-500 mt-1 leading-relaxed">${desc}</p>
                 </div>
@@ -890,25 +916,100 @@ function renderProfileCards() {
                 <h4 class="text-sm font-bold text-gray-700">${group.title}</h4>
                 <span class="text-[11px] text-gray-400">${group.desc}</span>
             </div>`;
-        return head + cards.map(profileCardHtml).join('');
+        // badge 是渲染时算一次的（如税务日历的「本月 N 项」）：它随月份变，不随会话变，
+        // 没必要为此把整张卡片改成每次进页面重渲染 —— renderProfileCards 只在首次进我的页时跑。
+        return head + cards.map((c) => profileCardHtml(Object.assign({}, c, {
+            badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
+        }))).join('');
     }).join('');
+}
+
+// 单条历史里的税额：与 CSV 导出、首页年度税负概览同一套取数口径（别各写一份）
+function recordTaxOf(item) {
+    const result = (item && (item.results || item.result_data)) || {};
+    const tax = (result.taxDetails && result.taxDetails.totalTax) ?? result.totalTax ?? 0;
+    return parseFloat(tax) || 0;
+}
+
+// 「N 天前」：只到天 / 月，不精确到小时 —— 精度在这里是噪音
+function agoLabel(now, then) {
+    const days = Math.floor((now.getTime() - then.getTime()) / 86400000);
+    if (days <= 0) return '今天';
+    if (days === 1) return '昨天';
+    if (days < 30) return `${days} 天前`;
+    return `${Math.floor(days / 30)} 个月前`;
+}
+
+/**
+ * 资产概览四格的取值（纯函数，jest 可直接单测，不依赖 DOM）。
+ * 取不到的量一律返回 null → 渲染成「—」：空着只是没信息，补 0 会变成假信息
+ * （"已存方案 0" 会被读成"你一套都没存"，而真相可能只是方案库没加载）。
+ */
+function computeProfileAssets(history, options) {
+    const opts = options || {};
+    const now = opts.now || new Date();
+    const list = Array.isArray(history) ? history : [];
+
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthCount = list.filter((h) => String((h && (h.date || h.updatedAt)) || '').slice(0, 7) === ym).length;
+
+    const kinds = new Set();
+    list.forEach((h) => {
+        const k = h && (h.type || h.toolId || h.tool_id);
+        if (k) kinds.add(k);
+    });
+
+    // 最近一次按时间取最大：history 是 unshift 入栈，但云同步合并后顺序不保证
+    let lastAt = null;
+    let last = null;
+    list.forEach((h) => {
+        const t = new Date((h && (h.date || h.updatedAt)) || 0);
+        if (isNaN(t.getTime())) return;
+        if (!lastAt || t > lastAt) { lastAt = t; last = h; }
+    });
+
+    const sc = opts.scenarios;
+    const tax = last ? recordTaxOf(last) : 0;
+    return {
+        calcCount: list.length,
+        calcSub: list.length ? `本月 ${monthCount} 次` : '还没有测算记录',
+        scenarioCount: sc ? sc.count : null,
+        scenarioSub: sc ? (sc.limit ? `上限 ${sc.limit} 套` : '不限量') : '方案库未加载',
+        kindCount: list.length ? kinds.size : null,
+        kindSub: '',
+        lastText: lastAt ? agoLabel(now, lastAt) : null,
+        // 有税额就说税额，没有就退回测算名 —— 不为了填满一格去编一个数
+        lastSub: last ? (tax ? `上次算出 ¥${Math.round(tax).toLocaleString('zh-CN')}` : (last.title || '')) : '还没有测算记录'
+    };
+}
+
+// 方案用量快照：库不在就返回 null（同上，不编 0）
+function readScenarioSnapshot() {
+    const S = (typeof window !== 'undefined') ? window.EuriskoScenarios : null;
+    if (!S || typeof S.list !== 'function' || typeof S.limitFor !== 'function') return null;
+    const user = (apiClient && typeof apiClient.getCurrentUser === 'function') ? apiClient.getCurrentUser() : null;
+    const P = (typeof window !== 'undefined') ? window.EuriskoPlan : null;
+    const isPro = !!(user && P && typeof P.isPro === 'function' && P.isPro(user.plan, user.plan_expires_at));
+    return { count: S.list().length, limit: S.limitFor(isPro) };
 }
 
 function updateProfileStats() {
     // 与主页统一读 taxCalculationHistory（本地唯一数据源），修复此前读空服务端历史导致统计恒 0
     const history = getLocalHistory();
-    const taxProfile = localStorage.getItem('tax_profile');
+    const stats = computeProfileAssets(history, { now: new Date(), scenarios: readScenarioSnapshot() });
 
     // profile-stats-* 元素由「我的/个人中心」打开时动态注入（见 renderProfileStats），
     // 云同步完成回调可能先于个人中心渲染到达（首页加载即触发 doSync），此处必须容忍缺失。
-    const calcEl = document.getElementById('profile-stats-calculations');
-    const histEl = document.getElementById('profile-stats-history');
-    const profEl = document.getElementById('profile-stats-profiles');
-    const remEl = document.getElementById('profile-stats-reminders');
-    if (calcEl) calcEl.textContent = history.length;
-    if (histEl) histEl.textContent = history.length;
-    if (profEl) profEl.textContent = taxProfile ? 1 : 0;
-    if (remEl) remEl.textContent = getMonthlyReminders();
+    const put = (id, value, sub) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = (value === null || value === undefined) ? '—' : String(value);
+        const subEl = document.getElementById(`${id}-sub`);
+        if (subEl) subEl.textContent = sub || '';
+    };
+    put('profile-stats-calculations', stats.calcCount, stats.calcSub);
+    put('profile-stats-scenarios', stats.scenarioCount, stats.scenarioSub);
+    put('profile-stats-kinds', stats.kindCount, stats.kindSub);
+    put('profile-stats-last', stats.lastText, stats.lastSub);
 }
 
 function getMonthlyReminders() {
@@ -1510,6 +1611,10 @@ function planNoteText(user) {
 function renderPlanBadges(userArg) {
     const user = userArg || (apiClient && typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null);
     const tier = planTierOf(user); // null = 未登录
+    // 阶段19-6b：权益进度条与徽标同源（未登录 user=null → 整卡隐藏），档位一变就一起刷
+    if (window.EuriskoProfileBenefits && typeof window.EuriskoProfileBenefits.render === 'function') {
+        window.EuriskoProfileBenefits.render(user);
+    }
     const topbarBadge = document.getElementById('topbar-plan-badge');
     const profileBadge = document.getElementById('profile-plan-badge');
     const planNote = document.getElementById('profile-plan-note');

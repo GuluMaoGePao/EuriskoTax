@@ -632,6 +632,43 @@
     font-size: var(--fs-xs);
 }
 
+/* --- 4.4 我的页：权益进度条（§3.6 ①）---
+   三格各一档，当前档位及之前点亮 —— 它表达的是**档位在阶梯上的位置**，
+   不是"距离专业版还差百分之几"：基础版到专业版之间没有分母，任何百分比都是编出来的。
+   （真有分母的是方案用量：那个是 count/limit，以文字形式写在下面一行。） */
+.benefit-steps {
+    display: flex;
+    gap: var(--sp-2);
+}
+.benefit-step {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.benefit-step__bar {
+    display: block;
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+}
+.benefit-step.is-done .benefit-step__bar,
+.benefit-step.is-current .benefit-step__bar {
+    background: var(--c-brand);
+}
+.benefit-step__label {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+}
+.benefit-step.is-current .benefit-step__label {
+    color: var(--c-text);
+    font-weight: 600;
+}
+.benefit-line {
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+}
+
 /* ==========================================================================
    5. 可访问性：尊重"减少动态效果"
    ========================================================================== */

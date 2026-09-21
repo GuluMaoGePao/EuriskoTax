@@ -86,11 +86,12 @@ document.querySelectorAll('[id^="back-from-"]').forEach(btn => {
 
 ```javascript
 // auth-ui.js 中的配置示例
+// 阶段19-6b 后：四格都换成从本机数据真算得出的量，取不到显示「—」而不是 0
 const PROFILE_STATS_CONFIG = [
-    { id: 'calc-count', icon: 'fa-calculator', label: '计算次数', value: '0', color: 'blue' },
-    { id: 'profile-count', icon: 'fa-folder', label: '档案数量', value: '0', color: 'green' },
-    { id: 'history-count', icon: 'fa-history', label: '历史记录', value: '0', color: 'purple' },
-    { id: 'reminder-count', icon: 'fa-bell', label: '本月提醒', value: '0', color: 'orange' }
+    { id: 'profile-stats-calculations', icon: 'fa-calculator', label: '测算次数' },
+    { id: 'profile-stats-scenarios', icon: 'fa-clone', label: '已存方案' },
+    { id: 'profile-stats-kinds', icon: 'fa-sitemap', label: '覆盖税种' },
+    { id: 'profile-stats-last', icon: 'fa-clock-o', label: '上次测算' }
 ];
 
 const PROFILE_CARDS_CONFIG = [
