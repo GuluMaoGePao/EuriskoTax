@@ -49,6 +49,9 @@ beforeAll(() => {
     QUICK_MODULES.forEach((f) => loadSource('src/js/calculation/' + f));
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/data/tax-profile.js');
+    // 阶段19-8：参数记忆与带参链接（index.html 里也排在 toolbox-ui.js 之前）
+    loadSource('src/js/ui/param-memory.js');
+    loadSource('src/js/ui/param-link.js');
     loadSource('src/js/ui/toolbox-ui.js');
 });
 
@@ -104,6 +107,9 @@ beforeEach(() => {
     `;
     // 档案是跨用例持久化的（localStorage），不清会让「算完才引导」这类断言被上一个用例污染
     localStorage.removeItem('taxProfile');
+    // 阶段19-8：参数记忆同样跨用例持久化 —— 不清的话，上一个用例填过的值会被当成
+    // 「上次输入」带进下一个用例，断言默认值的地方会莫名变红
+    if (window.EuriskoParamMemory) window.EuriskoParamMemory.clearAll();
     // 显式传 null：清掉上一个用例可能设置的身份筛选，保证每个用例都从完整工具页开始
     window.EuriskoToolbox.renderToolbox('', null);
 });

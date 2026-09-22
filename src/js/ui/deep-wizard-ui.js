@@ -495,6 +495,14 @@
                     '<button id="dw-export-word" class="btn bg-purple-600 text-white hover:bg-purple-700 w-full">' +
                     '<i class="fa fa-file-word-o mr-2"></i>导出Word报告</button>' +
                 '</div>' +
+                // 阶段19-8：报表之外还要有"带走一条数"的路 —— 保存到历史与导出是整份，
+                // 而多数时候用户只是想把结果贴进自己的表或聊天框。做成一行小字链接：
+                // 它们不是主行动，不能和上面三颗实心按钮抢重量。
+                '<div class="dw-copy-row">' +
+                    '<button type="button" id="dw-copy-result" class="dw-copy-link"><i class="fa fa-copy mr-1"></i>复制结果</button>' +
+                    '<button type="button" id="dw-copy-table" class="dw-copy-link"><i class="fa fa-table mr-1"></i>复制为表格</button>' +
+                    '<button type="button" id="dw-copy-link" class="dw-copy-link"><i class="fa fa-link mr-1"></i>复制链接</button>' +
+                '</div>' +
                 // 方案对比卡的宿主位（v1.51.0）：只有声明了 toCalcInput 的工具才有。
                 // 页面式时代这张卡长在综合所得页面的结果区，删页后宿主与数据源一起没了 ——
                 // 现在由渲染器按 spec 有没有取数钩子决定挂不挂，index.html 不必再为它留一块静态 HTML。
@@ -627,8 +635,11 @@
         });
     }
 
+    // 阶段19-8：向导里的回车是「下一步」，所以键盘上那颗键要显示成"下一步"而不是默认符号。
+    // 速算器那边是"看结果"（go），这里是"下一步"（next）—— 语义由各自的宿主决定，
+    // fieldHtml 只负责把它写进控件，不猜用户要什么。
     function drawField(f) {
-        return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f);
+        return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f, state.values, { enterkeyhint: 'next' });
     }
 
     // 步内 advanced 字段一样只折叠、不隐藏：与速算器共用同一个块和同一份措辞（不写第二套）
@@ -672,6 +683,8 @@
         // 而此刻 DOM 还是上一步的样子，会在渲染前把当前步的值冲回默认）。
         applyDerived(tool);
         host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps);
+        // 回车推进只绑一次（host 长期存在，每次 render 只换 innerHTML）
+        bindEnterNext(host);
         bind(tool, steps);
         mountScenarioCard(tool);
         mountProfileNudge(tool);
@@ -824,6 +837,70 @@
         return String(raw).trim() !== '' && isFinite(n) && n >= 0 && n <= 100;
     }
 
+    // ====== 阶段19-8：回车 = 下一步（键盘走完一次完整测算）======
+    // 验收口径是「键盘可全程无鼠标完成一次测算」：Tab 顺序由 DOM 顺序天然给出，
+    // 缺的就是这一下 —— 每填完一个框都要去找那颗「下一步」，等于键盘没用。
+    // 结果步不接管回车：那里没有输入框，若把回车接到「保存」上，
+    // 用户只是想换行，却把一条结果存进了历史。
+    function bindEnterNext(host) {
+        if (!host || host.getAttribute('data-dw-enter') === '1') return;
+        host.setAttribute('data-dw-enter', '1');
+        host.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var t = e.target;
+            if (!t || t.tagName !== 'INPUT') return;
+            var next = document.getElementById('dw-next');
+            if (!next) return;                      // 结果步：不抢任何按钮
+            e.preventDefault();
+            var tool = R() && R().get(state.toolId);
+            // 先收值：下一步按钮的处理器自己也会收一次，但 repeater 的增删依赖"此刻"的值，
+            // 这里收一次是为了让 state 与 DOM 在任何一条路径下都一致。
+            if (tool) collect(tool);
+            next.click();
+        });
+    }
+
+    // 阶段19-8：结果页的三个「带走」动作（明文 / 表格 / 带参链接）。
+    // 与速算器共用 toolbox-ui 的那份实现 —— 表格形状只有一种，"粘进 Excel 列对齐"才验得住。
+    function bindCopyRow(tool) {
+        var tb = TB();
+        if (!tb || typeof tb.copyText !== 'function') return;
+        function bindOne(id, textFn, busyText) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            var origin = btn.innerHTML;
+            btn.addEventListener('click', function () {
+                var text = '';
+                try { text = textFn() || ''; } catch (e) { text = ''; }
+                if (!text) {
+                    btn.innerHTML = '<i class="fa fa-exclamation-circle"></i>生成失败';
+                    setTimeout(function () { btn.innerHTML = origin; }, 1600);
+                    return;
+                }
+                tb.copyText(text).then(function (ok) {
+                    btn.innerHTML = ok ? '<i class="fa fa-check"></i>已复制' : '<i class="fa fa-exclamation-circle"></i>复制失败';
+                    setTimeout(function () { btn.innerHTML = origin; }, 1600);
+                });
+            });
+        }
+        function out() {
+            if (state.lastResult) return state.lastResult;
+            try { return viewOut(tool.compute(state.values)); } catch (e) { return null; }
+        }
+        bindOne('dw-copy-result', function () {
+            var o = out();
+            return o ? tb.resultTextOf(tool, o) : '';
+        });
+        bindOne('dw-copy-table', function () {
+            var o = out();
+            return o ? tb.tableTextOf(tool, o) : '';
+        });
+        bindOne('dw-copy-link', function () {
+            var l = window.EuriskoParamLink;
+            return l && typeof l.build === 'function' ? l.build(state.toolId, state.values) : '';
+        });
+    }
+
     function bind(tool, steps) {
         var back = document.getElementById('dw-back');
         if (back) back.addEventListener('click', function () {
@@ -857,6 +934,9 @@
             state.compareKey = null;
             render();
         });
+
+        // 阶段19-8：结果页的一行「带走」动作（复制明文 / 表格 / 链接）
+        if (steps[state.stepIndex] && steps[state.stepIndex].result) bindCopyRow(tool);
 
         var prev = document.getElementById('dw-prev');
         if (prev) prev.addEventListener('click', function () {

@@ -706,6 +706,28 @@
 /* ==========================================================================
    5. 可访问性：尊重"减少动态效果"
    ========================================================================== */
+/* --- 阶段19-8 · 效率层 E5：参数记忆提示 + 结果「带走」一行（速算器 / 完整测算共用）---
+   全部取既有令牌，不新增色值：深色档由令牌成对给出，不必在这里写第二份。
+   刻意在提示容器上**不写 display**：它由 .hidden 控制显隐，而本层排在 tailwind.css
+   之后会胜出 —— 写了 display:flex 就等于把 hidden 废掉（提示永远显示）。 */
+.tool-memory-hint { margin-bottom: 10px; font-size: var(--fs-xs); color: var(--c-text-2); }
+.tool-memory-clear {
+    margin-left: 8px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* 行动条下面那一行「复制为表格 / 复制链接」：它们不是主行动，做成小字链接，
+   不与四颗按钮抢重量（四按钮常驻是 19-4 的规矩）。 */
+.quick-copy-row { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 14px; }
+/* 完整测算结果页同一行：贴在「保存 / 导出 PDF / 导出 Word」三颗实心按钮之后 */
+.dw-copy-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+.quick-copy-link,
+.dw-copy-link {
+    padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+    display: inline-flex; align-items: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .card-elevated,
     .event-card,

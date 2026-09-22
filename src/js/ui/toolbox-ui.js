@@ -72,6 +72,12 @@
         if (typeof window.showPage === 'function') window.showPage(pageId);
     }
 
+    // ====== 阶段19-8：效率层 E5（参数记忆 / 带参链接）======
+    // 两个模块都是**可选**的：取不到就整块功能不出现（速算器照常用），
+    // 绝不因为"记忆读不出来"把测算本身拖挂 —— 那是用便利换可用，不划算。
+    function memoryLib() { return window.EuriskoParamMemory; }
+    function linkLib() { return window.EuriskoParamLink; }
+
     // 政策时效徽标：只问 tax-registry，不自己算日期（阶段15 原则 6）
     function policyBadgeOf(policyKey) {
         if (!policyKey || !window.EuriskoTaxRegistry || typeof window.EuriskoTaxRegistry.statusOf !== 'function') return '';
@@ -467,6 +473,15 @@
     var quickSeed = null;
     // 阶段19-7：视图偏好变更时用来重画当前速算器表单（换工具时指向新那份 build）
     var modeRebuild = null;
+    // 阶段19-8：「清空」那一瞬间要按 spec 默认值重画，并**停掉一次记忆写入** ——
+    // 否则重画触发的重算会立刻把默认值又记回去，等于清空了个寂寞（用户点一下，提示马上回来）。
+    var memorySuppressed = false;
+
+    function specDefaults(tool) {
+        var d = {};
+        (tool.fields || []).forEach(function (f) { d[f.key] = f.default; });
+        return d;
+    }
 
     function visibleFields(tool, values) {
         return (tool.fields || []).filter(function (f) {
@@ -547,21 +562,26 @@
 
     // values 可选：给「回填一份已有输入」用（阶段18-2 从历史记录打开）。不传就是原行为 ——
     // 用 spec 声明的 default。deep-wizard-ui.js 复用这一个函数渲染字段，第二参缺省即不受影响。
-    function fieldHtml(f, values) {
+    // opts 可选（阶段19-8 键盘走查）：
+    //   · inputmode：数字键盘（手机上 type=number 只保证能输数字，不保证弹出九宫格）
+    //   · enterkeyhint：告诉手机键盘这颗回车键该显示「前往 / 下一步」，
+    //     速算器是"看结果"、向导是"下一步" —— 由调用方按自己的语义传，这里不猜。
+    function fieldHtml(f, values, opts) {
         var cur = values && values[f.key] !== undefined ? values[f.key] : f.default;
         var id = 'qf-' + f.key;
         var hint = f.hint ? '<div class="tool-field-hint">' + esc(f.hint) + '</div>' : '';
+        var ekh = opts && opts.enterkeyhint ? ' enterkeyhint="' + esc(opts.enterkeyhint) + '"' : '';
         var input = '';
         if (f.type === 'select') {
-            input = '<select id="' + id + '" class="tool-input">' + f.options.map(function (o) {
+            input = '<select id="' + id + '" class="tool-input"' + ekh + '>' + f.options.map(function (o) {
                 return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>';
             }).join('') + '</select>';
         } else if (f.type === 'switch') {
             input = '<label class="tool-switch"><input type="checkbox" id="' + id + '"' + (cur ? ' checked' : '') + '><span>' + (cur ? '是' : '否') + '</span></label>';
         } else if (f.type === 'percent') {
-            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" step="0.1" min="0"><span class="tool-input-unit">%</span></div>';
+            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" step="0.1" min="0" inputmode="decimal"' + ekh + '><span class="tool-input-unit">%</span></div>';
         } else {
-            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '"' +
+            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" inputmode="decimal"' + ekh +
                 (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>' +
                 '<span class="tool-input-unit">' + (f.type === 'money' ? '元' : '') + '</span></div>';
         }
@@ -609,6 +629,32 @@
         return lines.join('\n');
     }
 
+    // ====== 阶段19-8：复制为表格（TSV）======
+    // 与「复制结果」是两种去处：明文是贴进聊天框给人读的，表格是贴进 Excel 接着算的。
+    // 金额列刻意输出**裸数字**（不带 ¥、不带千分位）—— 带符号会被 Excel 认成文本，
+    // 贴进去不能求和，那这个按钮就白做了（验收口径就是"粘进 Excel 列对齐"）。
+    function tableCellOf(value, kind) {
+        if (kind === 'percent') {
+            var v = Number(value) || 0;
+            return (v * 100).toFixed(2) + '%';
+        }
+        if (kind === 'money') {
+            var n = Number(value);
+            return isFinite(n) ? n.toFixed(2) : '';
+        }
+        return value === undefined || value === null ? '' : String(value);
+    }
+
+    function tableTextOf(tool, out) {
+        var lines = [tool.name, '项目\t数值'];
+        lines.push(out.primary.label.replace(/\t/g, ' ') + '\t' + tableCellOf(out.primary.value, out.primary.kind));
+        (out.rows || []).forEach(function (r) {
+            lines.push(String(r.label).replace(/\t/g, ' ') + '\t' + tableCellOf(r.value, r.kind));
+        });
+        if (out.note) lines.push('注\t' + String(out.note).replace(/\t/g, ' '));
+        return lines.join('\n');
+    }
+
     function legacyCopy(text) {
         try {
             var ta = document.createElement('textarea');
@@ -635,6 +681,28 @@
         return Promise.resolve(legacyCopy(text));
     }
 
+    // 次级复制动作（表格 / 链接）共用一套反馈：成功与失败都要说出来，且都回到原样 ——
+    // 复制是「带走」的动作，不像保存那样一次性，按钮不该变成"已完成"的死状态。
+    function bindCopyButton(id, textFn) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        var origin = btn.innerHTML;
+        function restore() { btn.innerHTML = origin; }
+        btn.addEventListener('click', function () {
+            var text = '';
+            try { text = textFn() || ''; } catch (e) { text = ''; }
+            if (!text) {
+                btn.innerHTML = '<i class="fa fa-exclamation-circle"></i>生成失败';
+                setTimeout(restore, 1600);
+                return;
+            }
+            copyText(text).then(function (ok) {
+                btn.innerHTML = ok ? '<i class="fa fa-check"></i>已复制' : '<i class="fa fa-exclamation-circle"></i>复制失败';
+                setTimeout(restore, 1600);
+            });
+        });
+    }
+
     function renderQuickActions(tool, values, out) {
         var box = document.getElementById('quick-actions');
         if (!box) return;
@@ -649,7 +717,13 @@
             '<button type="button" id="quick-save-history" class="quick-action-btn quick-action-btn-primary"><i class="fa fa-bookmark-o"></i>保存到历史</button>' +
             '<button type="button" id="quick-export-pdf" class="quick-action-btn"><i class="fa fa-file-pdf-o"></i>导出 PDF</button>' +
             '<button type="button" id="quick-copy-result" class="quick-action-btn"><i class="fa fa-copy"></i>复制结果</button>' +
-            fourth;
+            fourth +
+            // 阶段19-8：表格与链接是「带走」的两种形状，做成一行小字链接而不是第五颗按钮 ——
+            // 行动条是四按钮常驻（19-4 的规矩），加按钮会把它撑成五颗，主次关系反而散了。
+            '<div class="quick-copy-row">' +
+            '<button type="button" id="quick-copy-table" class="quick-copy-link"><i class="fa fa-table mr-1"></i>复制为表格（贴进 Excel）</button>' +
+            '<button type="button" id="quick-copy-link" class="quick-copy-link"><i class="fa fa-link mr-1"></i>复制链接（带参数，数据不出本机）</button>' +
+            '</div>';
 
         var saveBtn = document.getElementById('quick-save-history');
         if (saveBtn) {
@@ -688,6 +762,12 @@
                 });
             });
         }
+
+        bindCopyButton('quick-copy-table', function () { return tableTextOf(tool, out); });
+        bindCopyButton('quick-copy-link', function () {
+            var l = linkLib();
+            return l && typeof l.build === 'function' ? l.build(tool.id, values) : '';
+        });
 
         var deepBtn = document.getElementById('quick-open-deep');
         if (deepBtn) {
@@ -1189,6 +1269,11 @@
             stepsHtml +
             (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + esc(out.note) + '</div>' : '');
 
+        // 阶段19-8：只在**算得出来**时记参数。记一份算不出结果的参数，下次带出来就是
+        // "页面坏了" —— 而带出这件事本身是静默的，用户只会把账算在算法头上。
+        var memo = memoryLib();
+        if (!memorySuppressed && memo && typeof memo.set === 'function') memo.set(tool.id, values);
+
         renderNextSteps(tool, values, out);
         renderQuickActions(tool, values, out);
         renderResultBar(tool, out);
@@ -1299,10 +1384,57 @@
         }
     }
 
+    // 阶段19-8：带出上次输入必须**说出来**，并给一个「清空」。
+    // 静默地把默认值换成上次的值，用户会以为那是自己填的 —— 于是"算出来的数不对"
+    // 这笔账会记在算法头上，那是让 UI 的锅由计算背。
+    function renderMemoryHint(tool, mem, onClear) {
+        var box = document.getElementById('quick-memory-hint');
+        if (!box) return;
+        if (!mem || !mem.values) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        var m = memoryLib();
+        var age = m && typeof m.ageLabel === 'function' ? m.ageLabel(mem.at) : '';
+        box.classList.remove('hidden');
+        box.innerHTML = '<span class="tool-memory-text"><i class="fa fa-history mr-1"></i>已带出上次输入' +
+            (age ? '（' + esc(age) + '）' : '') + '</span>' +
+            '<button type="button" id="quick-memory-clear" class="tool-memory-clear">清空</button>';
+        var btn = document.getElementById('quick-memory-clear');
+        if (btn) {
+            btn.addEventListener('click', function () {
+                if (m && typeof m.clear === 'function') m.clear(tool.id);
+                box.classList.add('hidden');
+                box.innerHTML = '';
+                if (typeof onClear === 'function') onClear();
+            });
+        }
+    }
+
+    // 阶段19-8：回车 = 跳到结果。速算器本来就是「改动即时重算」，回车不需要再算一遍，
+    // 它要做的是把视口带到结果上 —— 键盘走完一次测算差的正是这一下（手机上尤其：结果在
+    // 首屏之外，不滚过去等于没算）。绑在 #quick-form 上（它长期存在，换工具只换 innerHTML），
+    // 所以这里用标记防重复绑，而不是每次 build 都绑一遍。
+    function bindEnterToResult(formEl) {
+        if (!formEl || formEl.getAttribute('data-enter-bound') === '1') return;
+        formEl.setAttribute('data-enter-bound', '1');
+        formEl.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var tag = e.target && e.target.tagName;
+            if (tag !== 'INPUT' && tag !== 'SELECT') return;
+            e.preventDefault();
+            var card = document.getElementById('quick-result-card');
+            if (card && typeof card.scrollIntoView === 'function') {
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
     // seed 可选：一份已有输入（阶段18-2 从历史记录打开时带来）。表单按它渲染而不是按 default，
     // 否则「保存 → 查看」这条路上，用户看到的是一份全新的默认值 —— 保存等于白存。
     function renderQuickPage(tool, seed) {
-        quickSeed = seed || null;
+        // 优先级：调用方明确带进来的（历史「查看」/ 带参链接）> 上次输入 > spec 默认值。
+        // 带进来的那份必须赢：用户点的是"看那一条"，不是"看我上次填的"。
+        var m = memoryLib();
+        var mem = seed ? null : (m && typeof m.get === 'function' ? m.get(tool.id) : null);
+        quickSeed = seed || (mem && mem.values) || null;
         var titleEl = document.getElementById('quick-title');
         var subEl = document.getElementById('quick-subtitle');
         var badgeEl = document.getElementById('quick-policy-badge');
@@ -1331,9 +1463,13 @@
         renderPolicyBasis(tool);
 
         if (!formEl) return;
+        bindEnterToResult(formEl);
+
+        // 清空那一瞬间按 spec 默认值重画（而不是读 DOM —— DOM 里正是刚被带出来的那些值）
+        var forceDefaults = false;
 
         function build() {
-            var values = readValues(tool);
+            var values = forceDefaults ? specDefaults(tool) : readValues(tool);
             if (quickSeed) {
                 Object.keys(quickSeed).forEach(function (k) { values[k] = quickSeed[k]; });
             }
@@ -1354,10 +1490,24 @@
             renderResult(tool, readValues(tool));
         }
 
+        // 清空过就别再冒出来：切换视图会重画表单，提示要跟着这个开关走一次
+        var memOn = !!(mem && mem.values);
+        function drawMemoryHint() {
+            renderMemoryHint(tool, memOn ? mem : null, function () {
+                memOn = false;
+                quickSeed = null;   // 只清这一次的带出，不动 spec 默认值
+                forceDefaults = true;
+                memorySuppressed = true;    // 重画会触发一次重算，别让它把默认值又记回去
+                build();
+                forceDefaults = false;
+                memorySuppressed = false;
+            });
+        }
         renderModePill();
         build();
+        drawMemoryHint();
         // 偏好一变就地重画：记住本次的 build，换工具时它自然指向新工具那份
-        modeRebuild = build;
+        modeRebuild = function () { build(); drawMemoryHint(); };
     }
 
     // ====== 导航：底部 Tab 栏（手机）+ 顶部 Tab 行（桌面） ======
@@ -1490,6 +1640,13 @@
         bindResultBar();
 
         initTabBar();
+
+        // 阶段19-8：地址栏带了参数就直达（分享 / 书签 / 换设备）。放在 init 最后 ——
+        // 此时注册表与向导都已就位，open() 里才查得到工具；命中失败就照常停在首页。
+        var link = linkLib();
+        if (link && typeof link.open === 'function') {
+            try { link.open(); } catch (e) { console.warn('[toolbox] 带参链接打开失败:', e); }
+        }
     }
 
     // 阶段19-7：偏好一变就地重画两处 pill 与当前速算器表单。
@@ -1533,6 +1690,11 @@
         hideResultExtras: hideResultExtras,
         deepCounterpartOf: deepCounterpartOf,
         resultTextOf: resultTextOf,
+        // 阶段19-8：效率层 —— 复制（明文 / 表格）由速算器出，deep 向导复用同一份
+        // （两处各写一种表格形状，"粘进 Excel 列对齐"就没法只验一次）。
+        tableTextOf: tableTextOf,
+        copyText: copyText,
+        renderMemoryHint: renderMemoryHint,
         // 阶段19-5b：档案引导卡与「与上次对比」卡都挂到别处去（deep 向导结果步用前者）；
         // 同一份实现两处复用，引导口径只有一处。
         mountProfileNudge: mountProfileNudge,
