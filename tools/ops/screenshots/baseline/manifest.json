@@ -182,8 +182,8 @@
     "height": 900,
     "theme": "dark",
     "file": "quick-1280-dark.png",
-    "bytes": 151377,
-    "sha256": "5a3f4f9ccc5b1868beac7cb282aede48ba7cc1d175039036cabc29e4670850e9",
+    "bytes": 152045,
+    "sha256": "90bda46b64aad24108ad9361234001617eaf5f622fe4140f912ac9cc164b2090",
     "ready": true
   },
   {
@@ -193,8 +193,8 @@
     "height": 900,
     "theme": "light",
     "file": "quick-1280.png",
-    "bytes": 149578,
-    "sha256": "0304f554703d6c9f39e6a3697897f2c8554889656f9e78539e6887b747fc1824",
+    "bytes": 150196,
+    "sha256": "464612f59a17e7ede38695d224afc6a00b8d1815c46571dd001adabe16132f09",
     "ready": true
   },
   {

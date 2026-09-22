@@ -14,7 +14,7 @@
  *   早期首页是「深度测算」+「税务工具箱」两个并列卡片 —— 那是**实现形态**的分界
  *   （多步骤向导 vs 一屏算完），不是用户心智的分界。现在入口层只有一套按「人/场景」
  *   组织的分类，形态差异降为工具页最后那组「完整测算」的一行说明：
- *     · 首页：搜索入口 → 我是谁（5 张身份卡）→ 最近使用 → 最近计算
+ *     · 首页：Mission Hero → 我遇到了什么事 → 我的税务资产 → 我是谁（身份卡）→ 搜索入口 → 最近计算 → 税务提醒 → 今日税感
  *     · 工具页：搜索 → 5 个场景组 → 完整测算（原 4 张 mode card，按年填全 · 出完整预算表）
  *     · 速算器结果页：结果 + 易错口径 + **下一步**（相关工具 / 保存历史 / 导出 PDF）
  *   保存与导出不再是多步骤流程的专利（阶段16 下放）：差别只剩「填多填少」，不是「能不能存」。
@@ -271,6 +271,8 @@
             '</div>';
     }
 
+    // opts.actionHtml：组内操作条（如「最近使用」的清空）。挂在 tool-group-body 里而不是组头上 ——
+    // 组头本身是颗 <button>（可点、可键盘聚焦），往它里面塞按钮会变成嵌套 button，键盘与读屏都会错乱。
     function groupSectionHtml(title, desc, tools, isDeep, opts) {
         if (!tools.length) return '';
         opts = opts || {};
@@ -288,6 +290,7 @@
             (desc ? '<span class="tool-group-desc">' + esc(desc) + '</span>' : '') +
             '</button>' +
             '<div class="tool-group-body">' +
+            (opts.actionHtml || '') +
             '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, isDeep); }).join('') + '</div>' +
             '</div>' +
             '</div>';
@@ -318,22 +321,6 @@
                 openScenario(this.getAttribute('data-scenario'));
             });
         });
-    }
-
-    // ====== 首页：最近使用 ======
-    function renderRecentTools() {
-        var card = document.getElementById('home-recent-tools-card');
-        var box = document.getElementById('home-recent-tools');
-        if (!box) return;
-        refreshFlags();
-        var list = recentTools();
-        if (!list.length) {
-            if (card) card.classList.add('hidden');
-            return;
-        }
-        if (card) card.classList.remove('hidden');
-        box.innerHTML = list.map(function (t) { return cardHtml(t, t.status === 'deep'); }).join('');
-        bindEntries(box);
     }
 
     // ====== 工具页 ======
@@ -376,9 +363,14 @@
                 html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
             });
         } else {
+            // 「清空」跟着这组走（阶段19-10a）：原本它长在首页那张同名卡上，卡撤了以后
+            // 这里是唯一的清空入口 —— 不补回来的话，列表只能靠新的使用记录挤掉旧的。
             var recent = recentTools();
             if (recent.length) html += groupSectionHtml('最近使用', '', recent, false,
-                { id: 'recent', forceOpen: forceOpen, defaultOpen: true });
+                { id: 'recent', forceOpen: forceOpen, defaultOpen: true,
+                    actionHtml: '<div class="tool-group-actions">' +
+                        '<button type="button" id="toolbox-recent-clear" class="tool-group-action">清空最近使用</button>' +
+                        '</div>' });
             R().groups().forEach(function (g) {
                 var tools = R().byGroup(g.id);
                 html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
@@ -388,6 +380,15 @@
         container.innerHTML = html || '<div class="tool-empty">没有匹配的工具，试试「年终奖」「增值税」「社保」</div>';
         bindEntries(container);
         bindGroupToggles(container);
+
+        // 每次重渲染都是新 DOM，清空按钮也跟着重建 —— 在这里绑而不是 init 里绑一次。
+        var clearRecent = document.getElementById('toolbox-recent-clear');
+        if (clearRecent) {
+            clearRecent.addEventListener('click', function () {
+                try { localStorage.removeItem(RECENT_KEY); } catch (e) { /* 隐私模式忽略 */ }
+                renderToolbox(keyword || '');
+            });
+        }
 
         // 深度测算组是静态 HTML（4 张 mode card，带既有隐藏按钮与 info 按钮），
         // 这里只控制显隐：按身份筛选或搜索无命中时收起，避免与搜索结果互相干扰。
@@ -706,12 +707,20 @@
     function renderQuickActions(tool, values, out) {
         var box = document.getElementById('quick-actions');
         if (!box) return;
-        // 第四个按钮 = 下一步：有同名的完整测算就进完整版（速算器与完整测算本就是同一件事的
-        // 两种深度，§3.9.2），没有就回工具页 —— 恒为四按钮，不留空位也不临时变三按钮。
+        // 第四个按钮 = 下一步（19-4 定的位）。阶段19-10a 把它的资格收紧了一层：
+        // **行动条不接受纯导航**。原本「没有完整测算」时这一位是「换个工具」，点下去也是
+        // showPage(TOOLS_PAGE) —— 与页面左上角那颗返回箭头同一个目的地，同屏出现两次；
+        // 入口重复的症状就是两颗按钮谁都不像主角。现在这一位只给「再往前一步」的真实内容：
+        //   ① 有同名完整测算 → 「按年填全的完整版」（速算器是同一件事的浅版，§3.9.2）
+        //   ② 没有但有相关工具 → 「算完还能干什么」（跳到下文的推荐区，它确有内容才给）
+        //   ③ 两者都没有 → **这一位空着**，宁可三按钮是真的三个出口，也不要第四颗来复制导航。
         var deepId = deepCounterpartOf(tool);
+        var hasNext = (tool.nextTools || []).map(function (id) { return R().get(id); }).filter(Boolean).length > 0;
         var fourth = deepId
             ? '<button type="button" id="quick-open-deep" class="quick-action-btn" data-deep-id="' + esc(deepId) + '"><i class="fa fa-list-ol"></i>按年填全的完整版</button>'
-            : '<button type="button" id="quick-back-tools" class="quick-action-btn"><i class="fa fa-th"></i>换个工具</button>';
+            : (hasNext
+                ? '<button type="button" id="quick-next-tools" class="quick-action-btn"><i class="fa fa-forward"></i>算完还能干什么</button>'
+                : '');
 
         box.innerHTML = '' +
             '<button type="button" id="quick-save-history" class="quick-action-btn quick-action-btn-primary"><i class="fa fa-bookmark-o"></i>保存到历史</button>' +
@@ -797,9 +806,18 @@
             });
         }
 
-        var toolsBtn = document.getElementById('quick-back-tools');
-        if (toolsBtn) {
-            toolsBtn.addEventListener('click', function () { showPageFn(TOOLS_PAGE); });
+        var nextBtn = document.getElementById('quick-next-tools');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function () {
+                // 推荐区就在行动条下方，滚过去并把键盘落点交给它 —— 按钮本身不重复列一遍，
+                // 否则同一份推荐列表会在页面上出现两次。
+                var box = document.getElementById('quick-next');
+                if (!box) return;
+                box.classList.remove('hidden');
+                if (box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                var first = box.querySelector('.tool-next-item');
+                if (first && first.focus) first.focus({ preventScroll: true });
+            });
         }
     }
 
@@ -1664,10 +1682,9 @@
     // ====== 初始化 ======
     function init() {
         renderScenarios();
-        renderRecentTools();
         renderToolbox('');
 
-        // 首页搜索入口：进入工具页并聚焦搜索框（24 个工具时，搜索比浏览快）
+        // 首页搜索入口：进入工具页并聚焦搜索框（41 个工具时，搜索比浏览快）
         var entry = document.getElementById('toolbox-search-entry');
         if (entry) {
             entry.addEventListener('click', function () {
@@ -1676,16 +1693,6 @@
                 renderToolbox('');
                 showPageFn(TOOLS_PAGE);
                 focusSearchIfDesktop();
-            });
-        }
-
-        // 首页「最近使用」清空
-        var clearRecent = document.getElementById('home-recent-tools-clear');
-        if (clearRecent) {
-            clearRecent.addEventListener('click', function () {
-                try { localStorage.removeItem(RECENT_KEY); } catch (e) { /* ignore */ }
-                renderRecentTools();
-                renderToolbox('');
             });
         }
 

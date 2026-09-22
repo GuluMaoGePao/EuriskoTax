@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.91.0';
+        window.__APP_VERSION__ = '1.92.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -498,24 +498,19 @@
                     </div>
                 </div>
 
-                <!-- 卡片5：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
+                <!-- 卡片4：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
                 <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
                     <i class="fa fa-search tool-search-entry-icon"></i>
                     <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
                     <span class="tool-search-entry-count">41 个 ›</span>
                 </button>
 
-                <!-- 卡片4：最近使用（跨形态：速算器与深度流程混排） -->
-                <div id="home-recent-tools-card" class="home-card hidden">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-clock-o text-primary mr-2"></i>
-                            <span>最近使用</span>
-                        </div>
-                        <button id="home-recent-tools-clear" type="button" class="text-xs text-gray-500 hover:text-primary">清空</button>
-                    </div>
-                    <div id="home-recent-tools" class="tool-entry-list"></div>
-                </div>
+                <!-- 阶段19-10a（入口清理）：这里原本还有一张「最近使用」卡，撤掉了 ——
+                     它和工具页第一组「最近使用」读的是**同一份 localStorage**，等于同一份数据
+                     在两处入口各显示一遍；而首页紧接着就有「最近计算」卡，视觉上连着三张都在讲
+                     「你最近算过的」。
+                     回访入口保留在工具页那一组（含「清空」，见 toolbox-ui.js）——
+                     要找下一个工具本来就要进工具页，入口长在那儿比长在首页更顺手。 -->
 
                 <!-- 卡片5：最近计算 -->
                 <div class="home-card">
@@ -1545,7 +1540,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.91.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.92.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

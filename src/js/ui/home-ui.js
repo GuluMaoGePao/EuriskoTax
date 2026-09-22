@@ -775,13 +775,12 @@
         setupInteractions();
     }
 
-    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近使用与最近计算，还要刷新 Mission 与资产 ——
+    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近计算，还要刷新 Mission 与资产 ——
     // 「首访 → 有历史」的切换就发生在保存之后，只刷最近计算会留下一个还在问「你今年要交多少税」的过期首屏。
+    // 阶段19-10a：这里原本还顺手刷一下首页「最近使用」卡（调的是 refreshRecentTools）。
+    // 那个函数全仓**没有定义** —— typeof 判空让它永远安静地跳过，卡也因此从来不刷新。
+    // 卡已随入口清理撤掉（同一份数据在工具页第一组），这段一并删，不留假接线。
     function refreshHomeRecent() {
-        // 「最近使用」由别的模块负责刷新（本文件里没有 renderRecentTools），有就顺手带上
-        if (typeof refreshRecentTools === 'function') {
-            try { refreshRecentTools(); } catch (e) { /* 别的模块不可用不影响首页刷新 */ }
-        }
         renderRecentCalculations();
         renderMission();
         renderAssets();

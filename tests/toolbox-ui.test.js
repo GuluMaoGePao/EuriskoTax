@@ -60,7 +60,6 @@ beforeEach(() => {
     document.body.innerHTML = `
         <button id="toolbox-search-entry"></button>
         <div id="home-scenarios"></div>
-        <div id="home-recent-tools-card" class="hidden"><div id="home-recent-tools"></div></div>
         <div id="mode-selection-page" class="page active"></div>
         <div id="tools-page" class="page hidden">
             <input id="toolbox-search" />
@@ -788,12 +787,30 @@ describe('阶段19-4：行动条四按钮常驻', () => {
         expect(document.getElementById('quick-open-deep').getAttribute('data-deep-id')).toBe('vat-deep');
     });
 
-    test('没有完整测算时第四步回工具页，不留空位也不临时变三按钮', () => {
+    // 阶段19-10a 把这一位的规矩改了：原来「没有完整测算」时放「换个工具」，而它点下去
+    // showPage(TOOLS_PAGE) —— 与左上角返回箭头同一个目的地。行动条不接受纯导航：
+    // 现在这一位只给「再往前一步」的真实内容，两者都没有就留空（宁可三按钮是真的三个出口）。
+    test('没有完整测算但有相关工具时，第四步是「算完还能干什么」', () => {
         expect(window.EuriskoToolbox.deepCounterpartOf({ id: 'net-salary' })).toBe('');
         document.querySelector('[data-tool-id="net-salary"]').click();
         expect(document.getElementById('quick-open-deep')).toBeNull();
-        expect(document.getElementById('quick-back-tools')).toBeTruthy();
+        expect(document.getElementById('quick-next-tools')).toBeTruthy();
         expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);
+    });
+
+    test('既无完整测算也无相关工具时，这一位空着 —— 不放第二个「回工具页」', () => {
+        // 把推荐区的内容抽干，模拟「算完没有下一步」的工具
+        const originGet = window.EuriskoToolRegistry.get;
+        expect(window.EuriskoToolbox.deepCounterpartOf({ id: 'salary-tax' })).toBe('');
+        window.EuriskoToolRegistry.get = (id) => (id === 'salary-tax'
+            ? Object.assign({}, originGet.call(window.EuriskoToolRegistry, id), { nextTools: [] })
+            : originGet.call(window.EuriskoToolRegistry, id));
+        document.querySelector('[data-tool-id="salary-tax"]').click();
+        window.EuriskoToolRegistry.get = originGet;
+        expect(document.getElementById('quick-open-deep')).toBeNull();
+        expect(document.getElementById('quick-next-tools')).toBeNull();
+        expect(document.getElementById('quick-back-tools')).toBeNull();
+        expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(3);
     });
 });
 

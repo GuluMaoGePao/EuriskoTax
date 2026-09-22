@@ -125,9 +125,11 @@ async function captureOne(url, vp, prepareJs, outFile, expectSel, theme) {
     //
     // 为什么要 clear（踩过，且这次是**可复现**的偏差不是噪声）：
     //   agent-browser 的会话浏览器是长期存活的守护进程，localStorage 跨轮次留存。
-    //   上一轮拍 quick / deep-* 会在首页留下「最近使用」记录，于是下一轮拍 home 时
-    //   #home-recent-tools-card 从 hidden 变可见 —— 同一份代码，第一次拍出来的图和
-    //   之后每一次都不一样：连跑两次 --check 都稳定差 85B，而基线那张恰是「干净态」。
+    //   上一轮拍 quick / deep-* 会在工具页留下「最近使用」记录，于是下一轮拍 tools 时
+    //   那一组从无到有 —— 同一份代码，第一次拍出来的图和之后每一次都不一样：
+    //   连跑两次 --check 都稳定差 85B，而基线那张恰是「干净态」。
+    //   （原先这个不稳定源是首页那张 #home-recent-tools-card，19-10a 已撤同一份数据的第二处展示，
+    //    但工具页那一组仍吃同一份 localStorage，复位仍然是必需的。）
     //   不复位的话，基线永远只在第一次是对的，--check 从此永久误报。
     //   每个 target 都从干净状态起拍，才是「同一份代码 → 同一张图」。
     //

@@ -188,23 +188,24 @@ EuriskoTax
 
 ```
 ┌─ mode-selection-page ─────────────────────────────────────────────┐
-│ ① 欢迎 + 今日税感        #home-greeting 430 / #home-tax-feel 435  │
-│ ② 搜索入口卡片           #toolbox-search-entry 449 「41 个 ›」    │
-│ ③ 我是谁（5 张身份卡）    #home-scenarios 464                      │
-│ ④ 最近使用               #home-recent-tools-card 470（默认隐藏）   │
-│ ⑤ 最近计算               #home-recent-list 490 「全部 ›」488       │
-│ ⑥ 税务提醒               #home-calendar-list 504                   │
-│ ⑦ 税务小贴士             #home-tip-content 518 「换一条」516       │
-│ ⑧ 关于本站（20 速算 + 4 完整 = 24 入口说明）524                    │
-│ ＋ #content-home-banner 424（公告注入）／分享落地横幅（动态）      │
+│ ① Mission Hero            #home-mission 423（首屏唯一焦点）        │
+│ ② 我遇到了什么事（9 张事件卡）#home-event-rail 449                 │
+│ ③ 我的税务资产            #home-assets-card 457（回访用户才出现）   │
+│ ④ 我是谁（身份卡）        #home-scenarios 480                      │
+│ ⑤ 搜索入口卡片           #toolbox-search-entry 486 「41 个 ›」    │
+│ ⑥ 最近计算               #home-recent-list 508 「全部 ›」506       │
+│ ⑦ 税务提醒               #home-calendar-list 522                   │
+│ ⑧ 今日税感 · 小贴士      #home-tax-feel 544 「换一条」542          │
+│ ⑨ 关于本站（20 速算 + 21 完整 = 41 入口说明）561                   │
+│ ＋ #content-home-banner 417（公告注入）／分享落地横幅（动态）      │
+│ − 阶段19-10a 撤掉「最近使用」卡：与工具页第一组同源，不再两处显示  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 | 功能入口 | → 去向 | 实现 |
 |---|---|---|
-| `#toolbox-search-entry` | 工具页 + 聚焦搜索框 | `toolbox-ui.js:617-627` |
-| 身份卡 ×5 | 工具页（按身份筛选） | `openScenario()` `toolbox-ui.js:284` |
-| `#home-recent-tools-clear` | 清空 localStorage | `toolbox-ui.js:630` |
+| `#toolbox-search-entry` | 工具页 + 聚焦搜索框 | `toolbox-ui.js` `init()` 内 `toolbox-search-entry` 绑定 |
+| 身份卡 ×N | 工具页（按身份筛选） | `openScenario()` |
 | `#home-view-all-history` | 我的 → 自动进计算历史 | `home-ui.js:554-567` |
 | `#home-next-tip` | 换一条贴士 | `home-ui.js:545` |
 | 品牌 Logo `#brand-home-link` | 回首页 | `home-ui.js:570-577` |
@@ -218,7 +219,7 @@ EuriskoTax
 │ 搜索框 #toolbox-search 550（150ms 防抖）                          │
 │ 身份筛选 chip #toolbox-scenario-chip 552（清除 ›）                 │
 │ ─ #toolbox-groups 553 ← renderToolbox() 动态注入 ─────────────── │
-│   · 最近使用（有则显示）                                           │
+│   · 最近使用（有则显示，含「清空最近使用」#toolbox-recent-clear）   │
 │   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张工具卡    │
 │ ─ #toolbox-deep 558「完整测算」静态 4 张 mode-card ──────────────── │
 │   · forward 566 │ business 578 │ classification 590 │ reverse 602   │
