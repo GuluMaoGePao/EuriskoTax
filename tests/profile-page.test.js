@@ -216,11 +216,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 12 个模块卡片', () => {
+    test('renderProfileCards 应渲染 13 个模块卡片', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(12);
+        expect(cards.length).toBe(13);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-history');
@@ -240,6 +240,8 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-template');
         // 阶段19-10：效率层 E3 台账 —— 按月归档的那本账
         expect(ids).toContain('profile-card-ledger');
+        // 阶段19-11：效率层 E4 批量 —— 一份表一次算完
+        expect(ids).toContain('profile-card-batch');
     });
 
     // 阶段19-6b（§3.6 ③）：卡片从「常用功能 / 服务与支持」两组改成按场景三组
@@ -270,6 +272,7 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(groupOf('profile-card-entity')).toBe('工作台');
         expect(groupOf('profile-card-template')).toBe('工作台');
         expect(groupOf('profile-card-ledger')).toBe('工作台');
+        expect(groupOf('profile-card-batch')).toBe('工作台');
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {

@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.93.0';
+        window.__APP_VERSION__ = '1.94.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1540,7 +1540,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.93.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.94.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1923,6 +1923,9 @@
     <script src="src/js/ui/scenario-ui.js"></script>
     <!-- 阶段19-9：主体切换器 + 模板条 + 两个管理弹窗（UI 层，用到上面的存储层） -->
     <script src="src/js/ui/entity-ui.js"></script>
+    <!-- 阶段19-11 · E4 批量：一份表一次算完（粘贴 → 认列 → 计算 → 导出）。
+         它只跑在 #profile-batch-page 上，别的页面 DOM 里没有那个 textarea，整块不初始化。 -->
+    <script src="src/js/ui/batch-ui.js"></script>
     <script src="src/js/app.js"></script>
     <!-- 阶段13B：企业微信活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
          留空则留资弹窗自动降级为「仅留言通道」并打印一次控制台提示，不影响主流程。
@@ -2413,6 +2416,59 @@
                     <i class="fa fa-history text-4xl mb-2"></i>
                     <p>暂无计算记录</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量计算页面（个人中心内 · 阶段19-11 E4） -->
+    <div id="profile-batch-page" class="page hidden">
+        <div class="max-w-4xl mx-auto px-4 pb-6">
+            <div class="profile-sub-nav">
+                <div class="profile-sub-nav-inner">
+                    <button id="back-from-batch" class="profile-sub-nav-back">
+                        <i class="fa fa-arrow-left"></i><span>返回</span>
+                    </button>
+                    <span class="profile-sub-nav-title">批量计算</span>
+                </div>
+            </div>
+
+            <!-- 合规卖点必须写在**顶部**（§3.10.5）：整份工资表都不上传、数据不出本机。
+                 这句话放在脚注里等于没说 —— HR 交的是全员工资，她先要知道的是"安不安全"。 -->
+            <div class="batch-note">
+                <i class="fa fa-lock" style="margin-top:2px"></i>
+                <div>
+                    <b>整份表都不上传，数据不出本机。</b>
+                    粘贴、识别、计算、导出全部在你这台设备的浏览器里完成，没有请求发出去，也不会写进计算历史；
+                    关掉页面就什么都不剩。要留痕请导出那张表。
+                </div>
+            </div>
+
+            <div class="entity-form-grid" style="margin-top:12px">
+                <div class="entity-field">
+                    <span>用哪个工具算</span>
+                    <select id="batch-tool" class="tool-input" aria-label="用哪个工具算"></select>
+                </div>
+            </div>
+
+            <div class="entity-field" style="margin-top:12px">
+                <span>粘贴名单 / 工资表</span>
+                <textarea id="batch-paste" class="batch-paste" spellcheck="false"
+                    placeholder="从 Excel / WPS / 飞书复制整张表（带表头最好），直接粘贴到这里&#10;例：姓名&#9;税前月薪&#9;五险一金（个人/月）&#9;专项附加扣除（月）"></textarea>
+            </div>
+
+            <div class="entity-form-ops">
+                <button type="button" id="batch-run" class="entity-save">批量计算</button>
+            </div>
+
+            <div id="batch-preview" style="margin-top:12px"></div>
+            <div id="batch-status" style="margin-top:8px"></div>
+            <div id="batch-result" style="margin-top:12px"></div>
+
+            <!-- 默认藏起来：算完才出现（没有结果时的「导出」点了只会下载一个空文件） -->
+            <div id="batch-export-bar" class="entity-form-ops" style="display:none">
+                <!-- 导出的表会贴进工资条 / 发进群：免责声明跟着表走（写在 csv 末尾一行） -->
+                <button type="button" id="batch-export" class="entity-save">导出 CSV</button>
+                <button type="button" id="batch-copy" class="entity-op">复制为表格（贴进 Excel）</button>
             </div>
         </div>
     </div>

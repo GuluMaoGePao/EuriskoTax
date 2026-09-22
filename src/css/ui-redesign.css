@@ -886,6 +886,16 @@
     background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-micro);
 }
 
+/* --- 4.3b 批量：算不出来的那一行（§3.10.5）---
+     它必须**留在表里**并看得出来：删掉它就对不上人，而当 0 填进去就成了"这个人不用交税"。
+     所以只标红这一行的结果区，不动它原样带出的姓名与输入列。 */
+.ledger-table tr.is-bad td.num {
+    color: var(--c-danger-text);
+}
+.ledger-table tr.is-bad td.num::after {
+    content: ' —';
+}
+
 @media (prefers-reduced-motion: reduce) {
     .card-elevated,
     .event-card,

@@ -896,6 +896,21 @@ const PROFILE_CARDS_CONFIG = [
         desc: '按月归档的测算记录；重复的那件事可以从上个月带出来',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar-check-o text-xl text-blue-600'
+    },
+    {
+        // 阶段19-11 · 效率层 E4：批量 = 一份表一次算完。
+        // 与台账同组但不同形态：台账是「同一件事每月做一遍」（纵向），
+        // 批量是「同一件事一次做 N 遍」（横向，一行一个人）。
+        id: 'profile-card-batch',
+        group: 'workbench',
+        icon: 'fa-table',
+        title: '批量计算',
+        desc: '粘一份工资表进来，一次算完再导出；整份表不出本机',
+        // 配色沿用已有档（teal / cyan 不在 tailwind 产物里，写了没样式），
+        // 挑 rose 是因为它压在 rose-100 上仍过 3:1（图标不是纯装饰，旁边就是卡片标题）：
+        // amber-600 / amber-100 实测只有 2.86:1，图标会糊在底色里。
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-table text-xl text-rose-600'
     }
 ];
 
@@ -907,13 +922,12 @@ const PROFILE_CARDS_CONFIG = [
 //   这三项目前都没有对应的独立页面（方案对比是结果页里的一个区块，不是我的页子页），
 //   硬造三个入口只会点进去是空壳 —— 入口等页面先落地，不反过来拿入口凑数。
 // 阶段19-9：第四组「工作台」先放落地的两张卡（主体 / 模板）；
-// 阶段19-10：台账落地（ledger-store.js + entity-ui 的台账弹窗），第三张卡才补上 ——
-// 原先 plan 还列了批量一项：它属于阶段 19-11，在那之前**不预先占坑** ——
-// 空壳入口比没有入口更伤（老规矩：入口等页面先落地，不反过来拿入口凑数）。
+// 阶段19-10：台账落地，第三张卡才补上；阶段19-11：批量落地，第四张卡补上 ——
+// 每卡都是**页面先落地、入口后补**，从不预先占坑（空壳入口比没有入口更伤）。
 const PROFILE_CARD_GROUPS = [
     { key: 'data', title: '我的数据', desc: '测算记录 · 云同步 · 导出' },
     { key: 'tax', title: '我的税务', desc: '档案 · 日历' },
-    { key: 'workbench', title: '工作台', desc: '主体 · 模板' },
+    { key: 'workbench', title: '工作台', desc: '主体 · 模板 · 台账 · 批量' },
     { key: 'service', title: '服务与支持', desc: '客服 · 反馈 · 帮助' }
 ];
 
@@ -2292,6 +2306,8 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-template', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openTemplateManager(); } },
         // 阶段19-10 · E3 台账：按月归档的那本账
         { cardId: 'profile-card-ledger', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openLedger(); } },
+        // 阶段19-11 · E4 批量：一张表一次算完（它是子页不是弹窗 —— 粘贴区与结果表都装不进弹窗）
+        { cardId: 'profile-card-batch', pageId: 'profile-batch-page' },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
         { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },
