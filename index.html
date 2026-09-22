@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.94.0';
+        window.__APP_VERSION__ = '1.95.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -480,6 +480,25 @@
                     </div>
                     <div id="home-assets-list" class="flex flex-col gap-2">
                         <!-- 由 home-ui.js 按 home-mission.js 的 buildTodos / buildYearOverview 渲染 -->
+                    </div>
+                </div>
+
+                <!-- 卡片3b：漏填提醒（阶段19-2 遗留 · §3.3 ④）—— 默认 hidden，只有**档案填了一部分、还差几项**才出现。
+                     两条不出卡的规矩：① 一项都没填的新客不显示（"你漏了 5 项"是噪音，那是结果页引导卡的活）；
+                     ② 全填完不显示（没有"还能再省"还占位就是噪音，与省钱卡同一条规矩）。
+                     出口直接开对应的**速算器**（不是跳「我的 → 我的情况」）—— 免登录也能补，
+                     且算完的值会被档案吸收（tax-profile.absorb），补填这件事因此不用再写第二套表单。
+                     金额一律不写：几个子女、怎么分摊都不知道，硬算出来的「可能多缴 ¥1,200」是假的。 -->
+                <div id="home-missing-card" class="home-card hidden">
+                    <div class="home-card-header">
+                        <div class="home-card-title">
+                            <i class="fa fa-exclamation-circle text-primary mr-2"></i>
+                            <span>漏填提醒</span>
+                        </div>
+                        <span id="home-missing-progress" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div id="home-missing-body">
+                        <!-- 由 home-ui.js 按 tax-profile.js 的 completeness 渲染 -->
                     </div>
                 </div>
 
@@ -1540,7 +1559,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.94.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.95.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

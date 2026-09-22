@@ -460,6 +460,115 @@
         box.innerHTML = parts.join('');
     }
 
+    // ====== 渲染：漏填提醒（阶段19-2 遗留 · §3.3 ④）======
+    // 判定不自己写：completeness（漏了哪几项）与 shouldNudge（尊重「暂不」）都在 tax-profile.js 里，
+    // 首页只负责落 DOM —— 与结果页引导卡共用同一份判定，不会两边各长一套口径（19-5b 的教训）。
+    //
+    // 出口为什么开**速算器**而不是跳「我的 → 我的情况」：那张编辑卡在 profile 页（要登录），
+    // 而免登录可直接算是本站的主线；算一遍对应工具既能把值补上（tax-profile.absorb 会吸回档案），
+    // 也不必再写第二套补档案的表单。
+    var MISSING_TOOL_OF = {
+        identity: null,          // 身份没有"补填工具"：滚到首页身份卡组，挑一个当默认视角
+        city: 'social-base',     // 城市决定社保基数 → 社保公积金
+        social: 'social-base',
+        deductions: 'special-deduction',
+        bonus: 'bonus-tax'
+    };
+
+    function missingLib() {
+        var L = window.EuriskoTaxProfile;
+        return (L && L.pure && typeof L.pure.completeness === 'function') ? L : null;
+    }
+
+    /**
+     * 纯建模：档案 → 这张卡该不该出、漏了哪几项、出口开哪个工具。
+     * 只说**漏了什么**，**不含任何金额** —— 漏项能省多少钱取决于几个子女 / 怎么分摊，
+     * 不知道还硬算，算出来的「可能多缴 ¥1,200」就是假的（与省钱卡同一条规矩）。
+     */
+    function buildMissingModel(profile) {
+        var none = {
+            visible: false, percent: 0, filled: 0, total: 0,
+            missing: [], first: null, cta: null, deductionMissed: false
+        };
+        var L = missingLib();
+        if (!L || !profile) return none;
+        var c = L.pure.completeness(profile);
+        // 「暂不」是永久的（19-5）：用户在结果页说过别再提，首页换个地方再提就是骚扰
+        if (typeof L.shouldNudge === 'function' && !L.shouldNudge()) return none;
+        // 一项都没填的新客：提醒"你漏了 5 项"是噪音（那是结果页引导卡的活）；全填完也不占位
+        if (!(c.filled > 0) || !c.missing.length) return none;
+
+        var first = c.missing[0];
+        var toolId = MISSING_TOOL_OF[first.key] || null;
+        return {
+            visible: true,
+            percent: c.percent,
+            filled: c.filled,
+            total: c.total,
+            missing: c.missing.map(function (it) { return { key: it.key, label: it.label }; }),
+            first: { key: first.key, label: first.label },
+            cta: toolId
+                ? { action: 'tool', target: toolId, text: '去补填：' + first.label }
+                : { action: 'scroll', target: 'home-scenarios', text: '挑一个身份当默认视角' },
+            deductionMissed: c.missing.some(function (it) { return it.key === 'deductions'; })
+        };
+    }
+
+    function renderMissing() {
+        var card = document.getElementById('home-missing-card');
+        var box = document.getElementById('home-missing-body');
+        if (!card || !box) return;
+        var L = missingLib();
+        var model = buildMissingModel(L ? L.get() : null);
+        var progress = document.getElementById('home-missing-progress');
+
+        if (!model.visible) {
+            card.classList.add('hidden');
+            box.innerHTML = '';
+            if (progress) progress.textContent = '';
+            return;
+        }
+
+        card.classList.remove('hidden');
+        if (progress) progress.textContent = '我的情况 ' + model.filled + '/' + model.total;
+        box.innerHTML =
+            '<p class="whoami-hint">这几项还没填，测算会按「没享受」的口径算 —— 可能多缴。' +
+            '补全后下次测算自动带上，不用每次重填一遍。</p>' +
+            (model.deductionMissed
+                ? '<p class="whoami-hint">专项附加扣除最容易漏 —— 它直接减少应纳税所得额。</p>'
+                : '') +
+            '<div class="home-missing-chips">' + model.missing.map(function (m) {
+                return '<span class="profile-chip home-missing-chip">' + m.label + '</span>';
+            }).join('') + '</div>' +
+            '<div class="home-missing-actions">' +
+            '<button type="button" class="btn btn-primary home-missing-cta" data-action="' + model.cta.action +
+            '" data-target="' + model.cta.target + '">' + model.cta.text + '</button>' +
+            '</div>';
+    }
+
+    // 卡内内容每次重画，事件绑在卡片上（委托）——绑在按钮上会随重画丢掉
+    function setupMissingCta() {
+        var card = document.getElementById('home-missing-card');
+        if (!card || card.getAttribute('data-missing-bound') === '1') return;
+        card.setAttribute('data-missing-bound', '1');
+        card.addEventListener('click', function (e) {
+            var btn = e.target.closest('.home-missing-cta');
+            if (!btn) return;
+            var action = btn.getAttribute('data-action');
+            var target = btn.getAttribute('data-target');
+            if (action === 'tool') {
+                if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                    window.EuriskoToolbox.openTool(target);
+                }
+                return;
+            }
+            var anchor = document.getElementById(target || '');
+            if (anchor && typeof anchor.scrollIntoView === 'function') {
+                anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
     // ====== 渲染：最近计算（横向滑动） ======
     function renderRecentCalculations() {
         const container = document.getElementById('home-recent-list');
@@ -768,11 +877,19 @@
         HomePerf.measure('initHome → 渲染 Mission Hero', renderMission);
         HomePerf.measure('initHome → 渲染事件卡上轴', renderEventRail);
         HomePerf.measure('initHome → 渲染我的税务资产', renderAssets);
-        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 8 });
+        HomePerf.measure('initHome → 渲染漏填提醒', renderMissing);
+        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 9 });
 
         setupMissionCta();
+        setupMissingCta();
         setupModeCards();
         setupInteractions();
+
+        // 档案在别处被补了一项，首页这张卡要跟着少一项 —— 否则还挂着已经补上的项，等于骗人
+        var profileLib = missingLib();
+        if (profileLib && typeof profileLib.onChange === 'function') {
+            profileLib.onChange(renderMissing);
+        }
     }
 
     // 保存计算后刷新首页（阶段19-2 扩展）：除了最近计算，还要刷新 Mission 与资产 ——
@@ -784,6 +901,7 @@
         renderRecentCalculations();
         renderMission();
         renderAssets();
+        renderMissing();   // 算完可能刚补上一项，这张卡的漏项要跟着变
     }
 
     // 暴露到全局
@@ -792,6 +910,12 @@
     window.renderEventRail = renderEventRail;
     window.renderMission = renderMission;
     window.renderAssets = renderAssets;
+    window.renderMissing = renderMissing;
+    // 判定的纯函数单独导出：单测可以只问「该不该出卡、出口开哪个」，不必拼一整个首页
+    window.EuriskoHomeMissing = {
+        pure: { buildMissingModel: buildMissingModel, MISSING_TOOL_OF: MISSING_TOOL_OF },
+        render: renderMissing
+    };
 
     // DOM 就绪后自动初始化
     if (document.readyState === 'loading') {

@@ -525,6 +525,14 @@
 .whoami-chip.is-on { border-color: var(--c-brand); color: var(--c-brand); }
 .whoami-actions { margin-top: 14px; display: flex; gap: 8px; }
 
+/* --- 首页「漏填提醒」卡（阶段19-2 遗留 · §3.3 ④）---
+   漏项 chip 沿用 .profile-chip 的配色与圆角，只把它改成**只读标签**（那玩意儿带 cursor:pointer，
+   不可点却长成能点的样子是骗人）；配色本身一律走既有令牌，两档对比度与档案卡一致。 */
+.home-missing-chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.home-missing-chip { cursor: default; }
+.home-missing-actions { margin-top: 12px; }
+.home-missing-cta { font-size: var(--fs-xs); }
+
 /* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
 .identity-card {
     padding: var(--sp-4);
