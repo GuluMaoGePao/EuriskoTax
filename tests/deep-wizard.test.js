@@ -29,6 +29,8 @@ beforeAll(() => {
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
+    // 阶段19-4 顺延（v1.99.0）：结果步「各项数额」条（与速算器共用这一份）
+    loadSource('src/js/ui/result-bars.js');
 });
 
 const W = () => window.EuriskoDeepWizard;
@@ -199,6 +201,26 @@ describe('多步向导：第三个税种（企业所得税）', () => {
         expect(document.getElementById('qf-revenue')).toBeTruthy();
         expect(document.getElementById('qf-entertainment')).toBeTruthy();
         expect(document.getElementById('qf-donation')).toBeTruthy();
+    });
+
+    // 阶段19-4 顺延（v1.99.0）：结果可视化。21 个完整测算的结果步与速算器共用
+    // result-bars.js 那一份 —— 这里钉的是它挂对了地方、且取的是同一份 view。
+    test('结果步画「各项数额」条：主结果排第一，且排在逐行明细之前', () => {
+        W().open('corporate-income-tax-deep', { fresh: true });
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            document.getElementById('dw-next').click();
+        }
+        const card = document.getElementById('dw-result-card');
+        expect(card.querySelectorAll('.result-bar').length).toBeGreaterThan(1);
+
+        // 第一根是主结果 —— 与结果区那颗大数字同一项（条形取的就是 view，不会再算一遍）
+        expect(card.querySelector('.result-bar__label').textContent)
+            .toBe(document.getElementById('dw-result-primary-label').textContent);
+
+        const html = card.innerHTML;
+        expect(html.indexOf('result-bars-box')).toBeLessThan(html.indexOf('data-dw-row'));
+        // 只比大小，不表达加减关系（防误读成瀑布 / 构成图）
+        expect(html).toContain('不构成加减关系');
     });
 
     test('结果步算出的税与直接调 compute 一致', () => {

@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.98.0';
+        window.__APP_VERSION__ = '1.99.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1577,7 +1577,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.98.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.99.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1919,6 +1919,10 @@
     <!-- 阶段17 通用多步测算向导：复用 toolbox-ui 暴露的 fieldHtml / readValues / visibleFields / fmtValue，
          必须排在 toolbox-ui.js 之后 -->
     <script src="src/js/ui/deep-wizard-ui.js"></script>
+    <!-- 阶段19-4 顺延（v1.99.0）：结果页「各项数额」条 —— 速算器结果页与 21 个完整测算的
+         结果步共用这一份。排在 toolbox-ui.js / deep-wizard-ui.js 之后（两个渲染器在结果里调它），
+         缺了它两边都只是少一张图（并各打一条 warn），绝不影响测算本身。 -->
+    <script src="src/js/ui/result-bars.js"></script>
     <!-- 备案信息（ICP / 公安）：备案号为空时不渲染，下发后只改 site-filing-ui.js 的配置 -->
     <script src="src/js/ui/site-filing-ui.js"></script>
     <!-- 阶段10：账户分层(plan)判定 + 云同步引擎（登录 PRO 后自动上传/合并计算历史） -->

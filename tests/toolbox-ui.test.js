@@ -55,6 +55,8 @@ beforeAll(() => {
     // 阶段19-5b 遗留清偿（v1.98.0）：速算器结果页的「存为方案」要落到方案库
     loadSource('src/js/data/scenario-store.js');
     loadSource('src/js/ui/scenario-ui.js');
+    // 阶段19-4 顺延（v1.99.0）：结果页「各项数额」条（速算器与 deep 共用这一份）
+    loadSource('src/js/ui/result-bars.js');
     loadSource('src/js/ui/toolbox-ui.js');
 });
 
@@ -832,6 +834,25 @@ describe('阶段19-4：行动条四按钮常驻', () => {
         // 存的是它自己的口径，不再编一份综合所得的 summary（那六项它一项也没有）
         expect(list[0].summary).toEqual({});
         expect(btn.textContent).toContain('已存为方案');
+    });
+
+    // 阶段19-4 顺延（v1.99.0）：结果可视化。这里钉的是它**挂对了地方** ——
+    // 与 21 个完整测算共用 result-bars.js 那一份，速算器不另写一套条形。
+    test('结果页画「各项数额」条：主结果排第一，且排在逐行明细之前', () => {
+        document.querySelector('[data-tool-id="vat"]').click();
+        const box = document.getElementById('quick-result');
+        const bars = box.querySelectorAll('.result-bar');
+        expect(bars.length).toBeGreaterThan(1);      // 凑不出两根就不画（见 result-bars.test.js）
+
+        // 第一根是主结果 —— 与界面上那颗大数字同一项，不是另算一份
+        expect(box.querySelector('.result-bar__label').textContent)
+            .toBe(box.querySelector('.tool-result-primary-label').textContent);
+
+        // 条形在明细之前：先看各项的相对大小，再逐行核对
+        const html = box.innerHTML;
+        expect(html.indexOf('result-bars-box')).toBeLessThan(html.indexOf('tool-result-rows'));
+        // 只比大小，不表达加减关系（防误读成瀑布 / 构成图）
+        expect(html).toContain('不构成加减关系');
     });
 
     test('既无完整测算也无相关工具时，这一位空着 —— 不放第二个「回工具页」', () => {

@@ -739,6 +739,79 @@
 }
 
 /* ==========================================================================
+   4.5 结果页：各项数额条（阶段19-4 顺延 · v1.99.0）
+   —— 速算器结果与 21 个完整测算的结果步共用一份实现（src/js/ui/result-bars.js）。
+      颜色只有两档：主结果 --c-brand、其余 --c-text-disabled。不给"税额""扣除"
+      各配一个色 —— 那要按行名认语义，认错就是把错的那一根标成重点，
+      而这张条本来就不表达加减关系（见 result-bars.js 文件头）。
+   ========================================================================== */
+.result-bars__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    cursor: pointer;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+    list-style: none;
+}
+.result-bars__summary::-webkit-details-marker { display: none; }
+.result-bars__hint {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--c-text-3);
+}
+.result-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.result-bar__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+}
+.result-bar__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-text-2);
+}
+.result-bar__value {
+    flex: none;
+    font-weight: 600;
+    color: var(--c-text);
+}
+.result-bar__line {
+    margin-top: 4px;
+    height: 8px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+    overflow: hidden;
+}
+.result-bar__fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: var(--c-brand);
+    transition: width .25s ease;
+}
+/* 非主结果：中性灰。用 --c-text-disabled 而不是再取一个"次色令牌"——
+   深色档下它是 #6b7280，与 --c-surface-2(#374151) 仍能分出层次。 */
+.result-bar__fill--plain {
+    background: var(--c-text-disabled);
+}
+.result-bars__note {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+
+/* ==========================================================================
    4.6 阶段19-7：视图密度（简明 / 完整）
    —— pill 是就地切换的开关，不是模式弹窗：两个分段常驻，当前档高亮，
       用户看得见「下一次点击会发生什么」。实心底沿用 19-4 的 --c-btn-primary-*，
@@ -969,6 +1042,7 @@
     .card-elevated,
     .event-card,
     .progress-line__fill,
+    .result-bar__fill,
     .action-bar__btn {
         transition: none;
     }

@@ -453,6 +453,17 @@
                 '<span class="font-medium">' + esc(TB().fmtValue(r.value, r.kind)) + '</span></div>';
         }).join('');
 
+        // 阶段19-4 顺延（v1.99.0）：结果可视化 —— 各项数额条。与速算器共用 result-bars.js
+        // 那一份（两边的结果对象都是 primary + rows 同一形状），不在这里另写一套条形。
+        // 取的是 view（界面上正在显示的这份），与明细 / 保存同源，不会再算一遍。
+        var barsBlock = '';
+        if (window.EuriskoResultBars && typeof window.EuriskoResultBars.html === 'function') {
+            barsBlock = window.EuriskoResultBars.html(view);
+        } else {
+            // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
+            console.warn('[deep-wizard] EuriskoResultBars 未加载（result-bars.js），各项数额条被跳过');
+        }
+
         // 推导链（台账 C）：与速算器**同一套约定** —— compute 返回 steps，渲染走 utils.js 的
         // renderFormulaStepsHtml。不写第二套：20 个速算器与存量 4 页都在用那一份，写第二份必然漂移。
         // 它是 17B 迁移的硬前置：存量 4 页都有「查看计算过程」，spec 向导没有就等于迁移即降级。
@@ -479,6 +490,8 @@
                 '<div class="text-sm text-gray-600" id="dw-result-primary-label">' + esc(view.primary.label) + '</div>' +
                 '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(view.primary.value, view.primary.kind)) + '</div>' +
                 (view.compare ? compareHtml(view.compare) : '') +
+                // 条形排在明细之前：先看各项的相对大小，再逐行核对 —— 两张图同一份 view
+                barsBlock +
                 '<div class="mt-4">' + rows + '</div>' +
                 (view.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(view.note) + '</p>' : '') +
                 stepsHtml +

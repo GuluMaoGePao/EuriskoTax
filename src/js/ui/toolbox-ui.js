@@ -1376,6 +1376,17 @@
                 '</div>';
         }).join('');
 
+        // 阶段19-4 顺延（v1.99.0）：结果可视化 —— 各项数额条。
+        // 与 21 个完整测算共用 result-bars.js 那一份（速算器与 deep 的结果对象都是
+        // primary + rows 同一形状），不在这里另写一套条形。
+        var barsBlock = '';
+        if (window.EuriskoResultBars && typeof window.EuriskoResultBars.html === 'function') {
+            barsBlock = window.EuriskoResultBars.html(out, { fmt: fmtValue });
+        } else {
+            // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
+            console.warn('[toolbox] EuriskoResultBars 未加载（result-bars.js），各项数额条被跳过');
+        }
+
         // 台账 C：速算器推导链（compute 返回可选 steps；渲染复用 utils.js 的同一套实现，不写第二套）
         var stepsHtml = '';
         if (out.steps && out.steps.length) {
@@ -1399,6 +1410,7 @@
             '<div class="tool-result-primary-label">' + esc(out.primary.label) + '</div>' +
             '<div class="tool-result-primary-value">' + fmtValue(out.primary.value, out.primary.kind) + '</div>' +
             '</div>' +
+            barsBlock +
             '<div class="tool-result-rows">' + rowsHtml + '</div>' +
             stepsHtml +
             (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + esc(out.note) + '</div>' : '');
