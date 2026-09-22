@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.96.0';
+        window.__APP_VERSION__ = '1.97.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -536,15 +536,28 @@
                      回访入口保留在工具页那一组（含「清空」，见 toolbox-ui.js）——
                      要找下一个工具本来就要进工具页，入口长在那儿比长在首页更顺手。 -->
 
-                <!-- 卡片5：最近计算 -->
+                <!-- 卡片5：我的方案与台账（阶段19-2 遗留清偿④ · §3.3.5 ①）——
+                     原「最近计算」只是一条流水：算完往历史里一扔，看不出**存了几套方案、
+                     这个月办到哪一步**。这里补上那两层资产心智，流水降为下面那一小段（不撤 ——
+                     它是"接着上次算"的入口，撤了就是丢功能）。
+                     两条规矩：① 零感知 —— 没存方案 / 没有台账行，这两段**整段不出现**，
+                     新客看到的还是原来那张卡；② 出口必须真能打开 ——
+                     方案 → 方案库弹窗（scenario-ui.js 的 openLibrary，与结果页共用同一张对比表），
+                     台账 → 已有台账弹窗（entity-ui.js 的 openLedger）。
+                     上限照实说（已存 2/2 套），但**不挂升级按钮** —— 升级入口全局只有顶栏 pill
+                     与个人中心两处，这里再长一颗就是第三处。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
                             <i class="fa fa-history text-purple-500 mr-2"></i>
-                            <span>最近计算</span>
+                            <span>我的方案与台账</span>
                         </div>
                         <a href="#" id="home-view-all-history" class="text-xs text-primary hover:underline">全部 ›</a>
                     </div>
+                    <div id="home-plans-box" class="plans-box hidden">
+                        <!-- 由 home-ui.js 的 renderPlans 渲染（方案段 + 台账段） -->
+                    </div>
+                    <div id="home-plans-recent-label" class="plans-recent-label hidden">最近算过</div>
                     <div id="home-recent-list" class="recent-scroll">
                         <!-- 由 home-ui.js 动态填充 -->
                     </div>
@@ -1564,7 +1577,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.96.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.97.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

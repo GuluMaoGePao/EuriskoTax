@@ -569,6 +569,201 @@
         });
     }
 
+    // ====== 渲染：我的方案 / 台账（阶段19-2 遗留清偿④ · §3.3.5 ①）======
+    // 「最近计算」是一次性流水：算完往历史里一扔，下次打开首页它还是"上次算了个什么"，
+    // 看不出**存了几套方案、这个月办到哪一步**。这一段补的就是这两层资产心智。
+    //
+    // 两条规矩（与漏填提醒卡同一套）：
+    //   ① **零感知**：没存过方案 / 没有台账行 → 整段不出现，新客看到的还是原来那张流水卡；
+    //   ② **出口必须是真出口**：方案 → 方案库弹窗（scenario-ui 的 openLibrary），
+    //      台账 → 已有台账弹窗（entity-ui 的 openLedger）。段里不出现点了没反应的东西。
+
+    // 本文件原先没有转义函数：卡片文案都走的模板字符串。方案名与主体名是**用户自己起的**，
+    // 拼进 innerHTML 之前必须转义（名字里带个 < 就把卡片结构吃掉了）。
+    function esc(s) {
+        return String(s === undefined || s === null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // 千分位自己写：toLocaleString 的产出随运行环境 ICU 变，断言会跟着飘。
+    function money(n) {
+        var v = Math.round(Number(n) || 0);
+        return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function planLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoScenarios : null;
+    }
+    function ledgerLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoLedger : null;
+    }
+    function entityLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoEntities : null;
+    }
+
+    // 方案的「可比数额」：全年总税额（含年终奖），取不到就退回主税额 —— 不猜、不补 0。
+    function taxOf(s) {
+        var sum = (s && s.summary) || {};
+        var v = Number(sum.taxTotal);
+        if (!isFinite(v) || v === 0) v = Number(sum.totalTax);
+        return isFinite(v) ? v : null;
+    }
+
+    /**
+     * 纯建模：方案列表 → 这一行该说什么。
+     * 只报**存了几套**与**差额**，不评价哪套好（那是对比表里"最优"标签的活，
+     * 首页没有列出所有指标，标"最优"就是拿一半信息下结论）。
+     */
+    function buildPlanModel(list, isPro) {
+        var lib = planLib();
+        var limit = (lib && typeof lib.limitFor === 'function')
+            ? lib.limitFor(!!isPro)
+            : (isPro ? 10 : 2);
+        var items = Array.isArray(list) ? list : [];
+        if (!items.length) return { visible: false, count: 0, limit: limit, full: false, diff: null };
+
+        var diff = null;
+        if (items.length >= 2) {
+            var withTax = items.map(function (s) {
+                return { name: (s && s.name) || '未命名方案', tax: taxOf(s) };
+            }).filter(function (x) { return x.tax !== null; });
+            if (withTax.length >= 2) {
+                withTax.sort(function (a, b) { return b.tax - a.tax; });
+                var hi = withTax[0];
+                var lo = withTax[withTax.length - 1];
+                // 两套税额一样时不说"差 ¥0"（那句听着像坏了），说"税额相同"
+                diff = { hi: hi.name, lo: lo.name, amount: Math.abs(hi.tax - lo.tax), same: hi.tax === lo.tax };
+            }
+        }
+        return {
+            visible: true,
+            count: items.length,
+            limit: limit,
+            full: items.length >= limit,
+            isPro: !!isPro,
+            diff: diff
+        };
+    }
+
+    /**
+     * 纯建模：台账行 → 这一行该说什么。只说最近一个期间（台账的默认视图就是"这个月"）。
+     * 未申报 = 状态没走到「已申报」的行数（含"已算""已导出"）—— 它是**办到哪一步**，
+     * 不是"逾期"：系统不催任何人，也没有逾期这一天的数据。
+     */
+    function buildLedgerModel(groups, nameOfEntity) {
+        var list = Array.isArray(groups) ? groups : [];
+        var g = list.filter(function (x) { return x && x.rows && x.rows.length; })[0];
+        if (!g) return { visible: false, total: 0, undeclared: 0, entityName: '' };
+
+        var undeclared = g.rows.filter(function (r) { return r.status !== 'filed'; }).length;
+        // 主体名只在**这一格每一行都归到同一个主体**时才说：
+        // 混着"不按主体"的行时，报出的那个名字只覆盖了其中几条 —— 那就是拿一半信息冒充全部。
+        var ids = {};
+        g.rows.forEach(function (r) { if (r.entityId) ids[r.entityId] = true; });
+        var keys = Object.keys(ids);
+        var allSame = g.rows.length > 0 && keys.length === 1
+            && g.rows.every(function (r) { return !!r.entityId; });
+        var entityName = (allSame && typeof nameOfEntity === 'function')
+            ? (nameOfEntity(keys[0]) || '') : '';
+
+        return {
+            visible: true,
+            label: g.label || '',
+            total: g.rows.length,
+            undeclared: undeclared,
+            entityName: entityName
+        };
+    }
+
+    function renderPlans() {
+        var box = document.getElementById('home-plans-box');
+        if (!box) return;
+
+        var isPro = false;
+        var planUIMaybe = (typeof window !== 'undefined') ? window.EuriskoScenarioUI : null;
+        if (planUIMaybe && typeof planUIMaybe.getIsPro === 'function') {
+            try { isPro = !!planUIMaybe.getIsPro(); } catch (e) { isPro = false; }
+        }
+
+        var parts = [];
+
+        var SL = planLib();
+        var plan = buildPlanModel(SL && typeof SL.list === 'function' ? SL.list() : [], isPro);
+        if (plan.visible) {
+            // 上限照实说（免费 2/2 已用满）。**不挂升级按钮** —— 升级入口全局只有顶栏 pill
+            // 与个人中心两处（19-6b 定下的纪律），这里再长一颗就是第三处。
+            var quota = '已存 ' + plan.count + '/' + plan.limit + ' 套'
+                + (plan.isPro ? '' : (plan.full ? '（专业版 10 套）' : ''));
+            var diffText = '';
+            if (plan.diff) {
+                diffText = plan.diff.same
+                    ? ' · ' + esc(plan.diff.hi) + ' / ' + esc(plan.diff.lo) + ' 税额相同'
+                    : ' · ' + esc(plan.diff.hi) + ' / ' + esc(plan.diff.lo) + ' 差 ¥' + money(plan.diff.amount);
+            }
+            parts.push(
+                '<div class="plans-row">' +
+                '<span class="plans-row-main">' +
+                '<span class="plans-title"><i class="fa fa-columns mr-1.5"></i>方案对比</span>' +
+                '<span class="plans-meta">' + esc(quota) + diffText + '</span>' +
+                '</span>' +
+                '<button type="button" class="plans-go" data-plans-open="library">看对比 ›</button>' +
+                '</div>'
+            );
+        }
+
+        var LL = ledgerLib();
+        if (LL && typeof LL.visibleRows === 'function') {
+            var groups = (typeof LL.groupByPeriod === 'function') ? LL.groupByPeriod(LL.visibleRows()) : [];
+            var EL = entityLib();
+            var nameOf = function (id) {
+                if (!EL || typeof EL.byId !== 'function') return '';
+                var e = EL.byId(id);
+                return e ? (e.name || '') : '';
+            };
+            var led = buildLedgerModel(groups, nameOf);
+            if (led.visible) {
+                var meta = esc(led.label) + ' · 已算 ' + led.total + ' 条'
+                    + (led.undeclared ? ' · ' + led.undeclared + ' 条未申报' : ' · 都已申报')
+                    + (led.entityName ? ' · ' + esc(led.entityName) : '');
+                parts.push(
+                    '<div class="plans-row">' +
+                    '<span class="plans-row-main">' +
+                    '<span class="plans-title"><i class="fa fa-book mr-1.5"></i>台账</span>' +
+                    '<span class="plans-meta">' + meta + '</span>' +
+                    '</span>' +
+                    '<button type="button" class="plans-go" data-plans-open="ledger">我的台账 ›</button>' +
+                    '</div>'
+                );
+            }
+        }
+
+        var label = document.getElementById('home-plans-recent-label');
+        if (!parts.length) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            // 没有那两段时，下面就是整张卡唯一的列表 —— 再加一句「最近算过」是废话
+            if (label) label.classList.add('hidden');
+            return;
+        }
+        box.classList.remove('hidden');
+        box.innerHTML = parts.join('');
+        if (label) label.classList.remove('hidden');
+
+        box.querySelectorAll('[data-plans-open]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var what = this.getAttribute('data-plans-open');
+                if (what === 'library') {
+                    var SUI = window.EuriskoScenarioUI;
+                    if (SUI && typeof SUI.openLibrary === 'function') SUI.openLibrary();
+                } else if (what === 'ledger') {
+                    var EUI = window.EuriskoEntityUI;
+                    if (EUI && typeof EUI.openLedger === 'function') EUI.openLedger();
+                }
+            });
+        });
+    }
+
     // ====== 渲染：最近计算（横向滑动） ======
     function renderRecentCalculations() {
         const container = document.getElementById('home-recent-list');
@@ -870,6 +1065,7 @@
         const renderStart = performance.now();
         HomePerf.measure('initHome → 渲染问候语与日期', renderGreeting);
         HomePerf.measure('initHome → 渲染今日税感', renderTaxFeel);
+        HomePerf.measure('initHome → 渲染我的方案 / 台账', renderPlans);
         HomePerf.measure('initHome → 渲染最近计算', renderRecentCalculations);
         HomePerf.measure('initHome → 渲染税务日历', renderTaxCalendar);
         HomePerf.measure('initHome → 渲染税务小贴士', renderTaxTip);
@@ -898,6 +1094,7 @@
     // 那个函数全仓**没有定义** —— typeof 判空让它永远安静地跳过，卡也因此从来不刷新。
     // 卡已随入口清理撤掉（同一份数据在工具页第一组），这段一并删，不留假接线。
     function refreshHomeRecent() {
+        renderPlans();             // 存了方案 / 归档了台账，这两行要跟着变
         renderRecentCalculations();
         renderMission();
         renderAssets();
@@ -911,10 +1108,16 @@
     window.renderMission = renderMission;
     window.renderAssets = renderAssets;
     window.renderMissing = renderMissing;
+    window.renderPlans = renderPlans;
     // 判定的纯函数单独导出：单测可以只问「该不该出卡、出口开哪个」，不必拼一整个首页
     window.EuriskoHomeMissing = {
         pure: { buildMissingModel: buildMissingModel, MISSING_TOOL_OF: MISSING_TOOL_OF },
         render: renderMissing
+    };
+    // 同一套路：建模是纯函数（单测直接问「该说什么」），渲染只负责落 DOM
+    window.EuriskoHomePlans = {
+        pure: { buildPlanModel: buildPlanModel, buildLedgerModel: buildLedgerModel, taxOf: taxOf, money: money },
+        render: renderPlans
     };
 
     // DOM 就绪后自动初始化

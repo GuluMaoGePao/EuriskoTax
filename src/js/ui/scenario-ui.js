@@ -170,6 +170,52 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // 表头与表体抽成纯字符串函数：结果页那张对比卡与首页「方案库」弹窗共用同一份 ——
+    // 不写第二套对比表，否则两处迟早长出两套口径（19-6b 的教训）。
+    function headHtml(list) {
+        return '<tr><th>对比指标</th>'
+            + list.map(function (s) { return '<th>' + escapeHtml(s.name) + '</th>'; }).join('')
+            + '</tr>';
+    }
+
+    function tableBodyHtml(list, multi) {
+        const rowsHtml = METRICS.map(function (metric) {
+            const best = (multi && metric.best) ? bestIndex(list, metric.key, metric.best) : -1;
+            const cells = list.map(function (s, idx) {
+                const isBest = idx === best;
+                const cls = isBest ? 'positive font-bold' : '';
+                const tag = isBest ? ' <span class="text-xs">最优</span>' : '';
+                return '<td class="' + cls + '">'
+                    + escapeHtml(fmtValue(s.summary && s.summary[metric.key], metric.kind)) + tag + '</td>';
+            }).join('');
+            return '<tr><td class="font-medium">' + escapeHtml(metric.label) + '</td>' + cells + '</tr>';
+        }).join('');
+
+        const actionsHtml = '<tr><td class="font-medium">操作</td>'
+            + list.map(function (s) {
+                return '<td><button type="button" class="scenario-delete-btn text-xs text-red-500 hover:text-red-700" data-id="'
+                    + escapeHtml(s.id) + '"><i class="fa fa-trash mr-1"></i>删除</button></td>';
+            }).join('')
+            + '</tr>';
+
+        return rowsHtml + actionsHtml;
+    }
+
+    // after = 删完之后重画谁（由调用方给，见 render / drawLibrary 各自传自己的）
+    function bindDeletes(scope, after) {
+        scope.querySelectorAll('.scenario-delete-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const id = btn.getAttribute('data-id');
+                const res = window.EuriskoScenarios.remove(id);
+                if (res.ok) {
+                    if (typeof after === 'function') after();
+                } else if (typeof showHint === 'function') {
+                    showHint('删除失败：本地存储不可用', 'warn');
+                }
+            });
+        });
+    }
+
     function render() {
         const head = q('.dw-sc-head');
         const body = q('.dw-sc-body');
@@ -189,43 +235,11 @@
         wrap.classList.remove('hidden');
         if (empty) empty.classList.add('hidden');
 
-        head.innerHTML = '<tr><th>对比指标</th>'
-            + list.map(function (s) { return '<th>' + escapeHtml(s.name) + '</th>'; }).join('')
-            + '</tr>';
-
-        const rowsHtml = METRICS.map(function (metric) {
-            const best = (multi && metric.best) ? bestIndex(list, metric.key, metric.best) : -1;
-            const cells = list.map(function (s, idx) {
-                const isBest = idx === best;
-                const cls = isBest ? 'positive font-bold' : '';
-                const tag = isBest ? ' <span class="text-xs">最优</span>' : '';
-                return '<td class="' + cls + '">'
-                    + escapeHtml(fmtValue(s.summary && s.summary[metric.key], metric.kind)) + tag + '</td>';
-            }).join('');
-            return '<tr><td class="font-medium">' + escapeHtml(metric.label) + '</td>' + cells + '</tr>';
-        }).join('');
-
-        const actionsHtml = '<tr><td class="font-medium">操作</td>'
-            + list.map(function (s) {
-                return '<td><button class="scenario-delete-btn text-xs text-red-500 hover:text-red-700" data-id="'
-                    + escapeHtml(s.id) + '"><i class="fa fa-trash mr-1"></i>删除</button></td>';
-            }).join('')
-            + '</tr>';
-
-        body.innerHTML = rowsHtml + actionsHtml;
-
-        body.querySelectorAll('.scenario-delete-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const id = btn.getAttribute('data-id');
-                const res = window.EuriskoScenarios.remove(id);
-                if (res.ok) {
-                    showHint('已删除方案', 'ok');
-                    render();
-                } else {
-                    showHint('删除失败：本地存储不可用', 'warn');
-                }
-            });
-        });
+        head.innerHTML = headHtml(list);
+        body.innerHTML = tableBodyHtml(list, multi);
+        // 删完重画的是**当前这张表**（结果页就是结果页，方案库弹窗就是弹窗），
+        // 不能写死 render() —— 否则从首页弹窗里删一套，表格会画到结果页那个已经不在 DOM 里的容器上。
+        bindDeletes(body, function () { render(); showHint('已删除方案', 'ok'); });
 
         const isPro = getIsPro();
         if (!isPro) {
@@ -361,6 +375,78 @@
         return container;
     }
 
+    // ======================= 方案库弹窗（阶段19-2 遗留清偿④ 的落点）=======================
+    // 为什么要有它：方案对比这张表原先**只挂在结果页** —— 存了 2 套方案，下次想看
+    // 必须先重算一遍，否则那两套躺在 localStorage 里没有任何入口能打开。
+    // 首页「我的方案与台账」卡的出口就落在这里：一个只读 + 可删的库，与结果页共用同一张表。
+    //
+    // 弹窗皮沿用主体 / 台账管理弹窗那一套（同一组 class 与 tailwind 类已存在），
+    // 不发明第二套弹窗样式；DOM 按需建，不塞进 index.html。
+    var LIBRARY_MODAL_ID = 'scenario-library-modal';
+    var LIBRARY_BODY_ID = 'scenario-library-body';
+    var LIBRARY_CLOSE_ID = 'close-scenario-library';
+
+    // 与主体 / 台账管理弹窗同一套开关：全局 openModal/closeModal 存在就走它（带动画），
+    // 没有就退回 class（测试环境没有那两个全局函数时，弹窗照样能开能关）。
+    function openModalById(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        if (typeof window.openModal === 'function') window.openModal(modal);
+        else { modal.classList.remove('hidden'); modal.classList.remove('opacity-0'); }
+    }
+
+    function closeModalById(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        if (typeof window.closeModal === 'function') window.closeModal(modal);
+        else modal.classList.add('hidden');
+    }
+
+    function ensureLibraryModal() {
+        if (document.getElementById(LIBRARY_MODAL_ID)) return;
+        var div = document.createElement('div');
+        div.id = LIBRARY_MODAL_ID;
+        div.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+        div.setAttribute('onclick', 'if(event.target===this)closeModal(this)');
+        div.innerHTML = '<div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4 transform scale-95' +
+            ' transition-transform duration-300 max-h-[85vh] overflow-hidden flex flex-col">' +
+            '<div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
+            '<div class="flex justify-between items-center">' +
+            '<div><h3 class="text-lg font-bold">我的方案</h3>' +
+            '<p class="text-white/80 text-xs mt-0.5">存过的口径摆在一起比 · 基础版 2 套、专业版 10 套</p></div>' +
+            '<button type="button" id="' + LIBRARY_CLOSE_ID + '"' +
+            ' class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">' +
+            '<i class="fa fa-times"></i></button>' +
+            '</div></div>' +
+            '<div class="p-5 overflow-y-auto" id="' + LIBRARY_BODY_ID + '"></div>' +
+            '</div>';
+        document.body.appendChild(div);
+        document.getElementById(LIBRARY_CLOSE_ID).addEventListener('click', function () { closeModalById(LIBRARY_MODAL_ID); });
+    }
+
+    function drawLibrary() {
+        var body = document.getElementById(LIBRARY_BODY_ID);
+        if (!body) return;
+        var store = (typeof window !== 'undefined') ? window.EuriskoScenarios : null;
+        if (!store) return;
+        var list = store.list();
+        if (!list.length) {
+            body.innerHTML = '<p class="entity-modal-lead">还没有存过方案。任一工具算出结果后，' +
+                '结果区的「保存当前方案」会把它收进这里 —— 存了就能随时回来比，不用再算一遍。</p>';
+            return;
+        }
+        body.innerHTML = '<div class="overflow-x-auto"><table class="tax-budget-table">' +
+            '<thead>' + headHtml(list) + '</thead>' +
+            '<tbody>' + tableBodyHtml(list, list.length > 1) + '</tbody></table></div>';
+        bindDeletes(body, drawLibrary);
+    }
+
+    function openLibrary() {
+        ensureLibraryModal();
+        drawLibrary();
+        openModalById(LIBRARY_MODAL_ID);
+    }
+
     window.EuriskoScenarioUI = {
         METRICS: METRICS,
         cardHtml: cardHtml,
@@ -370,6 +456,10 @@
         saveCurrent: saveCurrent,
         generateBonus: generateBonus,
         getIsPro: getIsPro,
+        // 阶段19-2 遗留④：方案库弹窗（首页「我的方案与台账」的出口）
+        openLibrary: openLibrary,
+        drawLibrary: drawLibrary,
+        MODAL_IDS: { library: LIBRARY_MODAL_ID },
 
         // 纯逻辑出口（供 jest 单测）
         pure: {

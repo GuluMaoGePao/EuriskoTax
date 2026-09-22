@@ -561,6 +561,31 @@
     color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
 }
 
+/* --- 首页「我的方案与台账」（阶段19-2 遗留清偿④ · §3.3.5 ①）---
+   排版照台账弹窗里那一行（.ledger-row）：同样的"标题 + 说明 + 右侧出口"三件套，
+   用户在一个产品里认一次就够了；颜色一律走令牌，不再发明新色。 */
+.plans-box {
+    margin-bottom: 10px; display: flex; flex-direction: column;
+}
+.plans-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--c-border);
+}
+.plans-row:last-child { border-bottom: none; }
+.plans-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.plans-title { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.plans-meta {
+    font-size: var(--fs-micro); color: var(--c-text-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plans-go {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--c-brand); font-size: var(--fs-xs); white-space: nowrap;
+}
+.plans-recent-label {
+    margin-bottom: 6px; font-size: var(--fs-micro); color: var(--c-text-3);
+}
+
 /* --- 首页「漏填提醒」卡（阶段19-2 遗留 · §3.3 ④）---
    漏项 chip 沿用 .profile-chip 的配色与圆角，只把它改成**只读标签**（那玩意儿带 cursor:pointer，
    不可点却长成能点的样子是骗人）；配色本身一律走既有令牌，两档对比度与档案卡一致。 */
