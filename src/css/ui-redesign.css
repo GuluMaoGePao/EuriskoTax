@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 阶段19 UI 重构 · 新增样式层（src/css/ui-redesign.css）
  *
  * 为什么独立一个文件，而不是直接改 tokens.css / toolbox.css / tailwind.css：
@@ -727,6 +727,129 @@
     color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
     display: inline-flex; align-items: center;
 }
+
+/* ==========================================================================
+   6. 阶段19-9 · 效率层 E1 / E2：主体切换器 · 模板条 · 管理弹窗
+   ==========================================================================
+   一律取既有令牌，不新增色值 —— 深色档由令牌成对给出，不必在这里写第二份。
+   同一条 19-8 的规矩在这里继续成立：**凡靠 .hidden 控制显隐的容器都不写 display**，
+   本层排在 tailwind.css 之后会胜出，写了 display 等于把 hidden 废掉。
+   受影响的有：#entity-switcher（顶栏那一块）、.entity-panel（下拉）、#quick-template-bar。 */
+
+/* --- 顶栏主体切换器：没建主体时整块不出现，所以它不必为「空态」做任何事 --- */
+.entity-switcher-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    max-width: 168px; padding: 5px 10px; margin-left: 6px;
+    border: 1px solid var(--c-border); border-radius: var(--r-pill);
+    background: var(--c-surface-1); color: var(--c-text);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-switcher-btn:hover { background: var(--c-surface-2); }
+.entity-switcher-name {
+    max-width: 116px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entity-switcher-caret { font-size: 10px; color: var(--c-text-3); }
+
+.entity-panel {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 50;
+    width: 232px; padding: 6px;
+    background: var(--c-surface-0); border: 1px solid var(--c-border);
+    border-radius: 12px; box-shadow: var(--sh-3);
+}
+.entity-panel-item {
+    display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: 8px; background: none;
+    color: var(--c-text); font-size: var(--fs-sm); cursor: pointer;
+}
+.entity-panel-item:hover { background: var(--c-surface-2); }
+.entity-panel-item.is-on { color: var(--c-brand); }
+.entity-panel-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entity-panel-tags { flex: 0 0 auto; font-size: var(--fs-micro); color: var(--c-text-3); }
+.entity-panel-tick { flex: 0 0 auto; color: var(--c-brand); font-size: var(--fs-xs); }
+.entity-panel-sep { margin: 6px 4px; border-top: 1px solid var(--c-border); }
+.entity-panel-manage {
+    display: block; width: 100%; text-align: left; padding: 8px 10px;
+    border: 0; border-radius: 8px; background: none;
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-panel-manage:hover { background: var(--c-surface-2); color: var(--c-brand); }
+
+/* --- 工具页「从模板填充」条 --- */
+.tool-template-bar {
+    margin-bottom: 10px; padding: 6px 10px;
+    background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+}
+.tool-template-summary {
+    display: flex; align-items: center; cursor: pointer; list-style: none;
+    font-size: var(--fs-xs); color: var(--c-text-2);
+}
+.tool-template-summary::-webkit-details-marker { display: none; }
+.tool-template-body { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.tool-template-item {
+    padding: 4px 10px; border: 1px solid var(--c-border); border-radius: var(--r-pill);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-xs); cursor: pointer;
+}
+.tool-template-item:hover { border-color: var(--c-brand); color: var(--c-brand); }
+.tool-template-scope { margin-left: 6px; font-size: var(--fs-micro); color: var(--c-text-3); }
+.tool-template-more, .tool-template-manage {
+    padding: 0; border: 0; background: none; color: var(--c-brand);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* --- 两个管理弹窗内的行与表单（都是新增 DOM，样式只在这里定义一次） --- */
+.entity-modal-lead {
+    margin-bottom: 12px; padding: 10px 12px; font-size: var(--fs-xs); line-height: 1.7;
+    color: var(--c-text-2); background: var(--c-surface-3); border-radius: var(--r-ctrl);
+}
+.entity-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);
+}
+.entity-row.is-current { border-left: 3px solid var(--c-brand); padding-left: 8px; }
+.entity-row-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.entity-row-name { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.entity-row-badge {
+    padding: 1px 6px; border-radius: var(--r-pill);
+    background: var(--c-surface-3); color: var(--c-brand); font-size: var(--fs-micro);
+}
+.entity-row-tags { font-size: var(--fs-micro); color: var(--c-text-3); }
+.entity-row-ops { display: flex; align-items: center; gap: 12px; }
+.entity-op {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--c-brand); font-size: var(--fs-xs);
+}
+.entity-op-danger { color: var(--c-danger-text); }
+
+.entity-form { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--c-border); }
+.entity-form-title { margin-bottom: 10px; font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.entity-form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 480px) { .entity-form-grid { grid-template-columns: 1fr 1fr; } }
+.entity-field { display: flex; flex-direction: column; gap: 4px; }
+.entity-field > span { font-size: var(--fs-xs); color: var(--c-text-2); }
+.entity-field .tool-input { width: 100%; }
+.entity-form-ops { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.entity-save {
+    padding: 8px 16px; border: 0; border-radius: var(--r-ctrl);
+    background: var(--c-brand); color: #fff; font-size: var(--fs-sm); cursor: pointer;
+}
+.entity-save:hover { background: var(--c-brand-hover); }
+.entity-cancel {
+    padding: 0; border: 0; background: none; color: var(--c-text-2);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-form-note { margin-top: 10px; font-size: var(--fs-micro); line-height: 1.7; color: var(--c-text-3); }
+.entity-form-note.is-error { color: var(--c-danger-text); }
+
+.tpl-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);
+}
+.tpl-row-main { display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px; }
+.tpl-name-input {
+    width: 100%; padding: 4px 8px; border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-sm);
+}
+.tpl-row-meta { font-size: var(--fs-micro); color: var(--c-text-3); }
 
 @media (prefers-reduced-motion: reduce) {
     .card-elevated,

@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.90.0';
+        window.__APP_VERSION__ = '1.91.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -381,6 +381,10 @@
                             title="登录 / 注册">
                         <i class="fa fa-user-o"></i><span>登录</span>
                     </button>
+                    <!-- 阶段19-9：当前主体切换器。**没建主体时整块 DOM 都不留**（hidden 起步，
+                         由 entity-ui 决定显不显）——90% 的个人用户没有第二个纳税主体，
+                         给他们一颗常年显示的下拉，是用 10% 的场景给所有人加一个没用的控件。 -->
+                    <div id="entity-switcher" class="relative flex items-center hidden"></div>
                     <div id="user-menu" class="ml-2">
                         <div class="relative flex items-center gap-1.5">
                             <button id="topbar-plan-badge" type="button" title="查看版本与权益" class="hidden items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold leading-none"></button>
@@ -773,6 +777,8 @@
                     <!-- 阶段19-8：带出上次输入时必须说出来并给「清空」（静默替换默认值，
                          用户会以为是自己填的，最后把账算在算法头上）。内容由 toolbox-ui 渲染。 -->
                     <div id="quick-memory-hint" class="tool-memory-hint hidden"></div>
+                    <!-- 阶段19-9：该工具已存的模板入口（没有模板时整条不出现，由 entity-ui 渲染） -->
+                    <div id="quick-template-bar" class="hidden"></div>
                     <div id="quick-form" class="grid sm:grid-cols-2 gap-x-4"></div>
                 </div>
                 </div>
@@ -1539,7 +1545,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.90.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.91.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1910,10 +1916,15 @@
     <script src="src/js/ui/tax-profile-editor.js"></script>
     <!-- 方案对比中心（阶段12 A4）：方案库存储 + 对比界面 -->
     <script src="src/js/data/scenario-store.js"></script>
+    <!-- 阶段19-9 效率层：主体（给模板归类）与参数模板的存储层，纯数据、无 DOM 依赖 -->
+    <script src="src/js/data/entity-store.js"></script>
+    <script src="src/js/data/template-store.js"></script>
     <!-- 阶段19-6b：我的页权益进度条（§3.6 ①）—— 排在 plan.js / history-sync.js / scenario-store.js 之后
          （三个库都是运行时才读，加载顺序不致命，但按依赖顺序读起来不用回头猜） -->
     <script src="src/js/ui/profile-benefits.js"></script>
     <script src="src/js/ui/scenario-ui.js"></script>
+    <!-- 阶段19-9：主体切换器 + 模板条 + 两个管理弹窗（UI 层，用到上面的存储层） -->
+    <script src="src/js/ui/entity-ui.js"></script>
     <script src="src/js/app.js"></script>
     <!-- 阶段13B：企业微信活码配置 —— 在公司企微后台生成活码后把 URL 填入下方，
          留空则留资弹窗自动降级为「仅留言通道」并打印一次控制台提示，不影响主流程。

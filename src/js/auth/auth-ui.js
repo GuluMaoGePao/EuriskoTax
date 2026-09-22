@@ -862,6 +862,28 @@ const PROFILE_CARDS_CONFIG = [
         desc: '版本信息、免责声明与联系方式',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-info-circle text-xl text-indigo-600'
+    },
+    {
+        // 阶段19-9 · 效率层 E1：主体给模板归类（下一阶段的台账 / 批量也挂它下面）。
+        // 配色**复用已有档**（teal / cyan 之类不在 tailwind.css 构建产物里，写出来是白搭），
+        // 跟「税务档案」撞了同一档绿，靠图标区分；宁可少一种颜色，不要一处没有样式。
+        id: 'profile-card-entity',
+        group: 'workbench',
+        icon: 'fa-building-o',
+        title: '主体管理',
+        desc: '给模板归类用的纳税实体；不建也不影响任何测算',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-building-o text-xl text-green-600'
+    },
+    {
+        // 阶段19-9 · 效率层 E2：模板 = 某个工具的一套已填参数
+        id: 'profile-card-template',
+        group: 'workbench',
+        icon: 'fa-clone',
+        title: '参数模板',
+        desc: '某个工具的一套已填参数，进工具后一键带出',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-clone text-xl text-purple-600'
     }
 ];
 
@@ -872,9 +894,13 @@ const PROFILE_CARDS_CONFIG = [
 //   ⚠️ plan 原文还列了第四组「我的产出」（方案对比 · 报告 · 分享记录），本版**没有做**：
 //   这三项目前都没有对应的独立页面（方案对比是结果页里的一个区块，不是我的页子页），
 //   硬造三个入口只会点进去是空壳 —— 入口等页面先落地，不反过来拿入口凑数。
+// 阶段19-9：第四组「工作台」目前只放**已落地**的两张卡（主体 / 模板）。
+// plan 原文还列了台账与批量两项：它们属于阶段 19-10 / 19-11，那两批次前不预先占坑 ——
+// 空壳入口比没有入口更伤（照上面的老规矩：入口等页面先落地，不反过来拿入口凑数）。
 const PROFILE_CARD_GROUPS = [
     { key: 'data', title: '我的数据', desc: '测算记录 · 云同步 · 导出' },
     { key: 'tax', title: '我的税务', desc: '档案 · 日历' },
+    { key: 'workbench', title: '工作台', desc: '主体 · 模板' },
     { key: 'service', title: '服务与支持', desc: '客服 · 反馈 · 帮助' }
 ];
 
@@ -2247,6 +2273,10 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-tax', pageId: 'profile-tax-page', loadFn: loadProfileTax },
         { cardId: 'profile-card-data', pageId: 'profile-data-page', loadFn: renderCloudSyncPanel },
         { cardId: 'profile-card-calendar', pageId: 'profile-calendar-page', loadFn: loadProfileCalendar },
+        // 阶段19-9：两个管理入口都是**弹窗**而不是子页 —— 它们的内容一屏装得下，
+        // 单开一页会让「改个模板名」变成一次页面跳转。
+        { cardId: 'profile-card-entity', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openEntityManager(); } },
+        { cardId: 'profile-card-template', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openTemplateManager(); } },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
         { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },

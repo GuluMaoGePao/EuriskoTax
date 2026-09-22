@@ -723,6 +723,9 @@
             '<div class="quick-copy-row">' +
             '<button type="button" id="quick-copy-table" class="quick-copy-link"><i class="fa fa-table mr-1"></i>复制为表格（贴进 Excel）</button>' +
             '<button type="button" id="quick-copy-link" class="quick-copy-link"><i class="fa fa-link mr-1"></i>复制链接（带参数，数据不出本机）</button>' +
+            // 阶段19-9：存为模板属于「带走」这一族，也做成小字链接 —— 它不像复制那样每天点，
+            // 但天天摆在按钮位上会挤掉真正每天点的那四颗。
+            '<button type="button" id="quick-save-template" class="quick-copy-link"><i class="fa fa-clone mr-1"></i>存为模板</button>' +
             '</div>';
 
         var saveBtn = document.getElementById('quick-save-history');
@@ -768,6 +771,23 @@
             var l = linkLib();
             return l && typeof l.build === 'function' ? l.build(tool.id, values) : '';
         });
+
+        // 存了之后原样回来，但**失败要把原因说出来**：不说，用户会以为模板存好了，
+        // 下次进来找不到 —— 那比不给这个功能更糟。
+        var tplBtn = document.getElementById('quick-save-template');
+        if (tplBtn) {
+            var tplOrigin = tplBtn.innerHTML;
+            tplBtn.addEventListener('click', function () {
+                var UI = window.EuriskoEntityUI;
+                var res = (UI && typeof UI.saveAsTemplate === 'function')
+                    ? UI.saveAsTemplate(tool, readValues(tool))
+                    : { ok: false, reason: 'module' };
+                tplBtn.innerHTML = res.ok
+                    ? '<i class="fa fa-check"></i>已存为模板'
+                    : '<i class="fa fa-info-circle"></i>' + esc(UI && UI.hintFor ? UI.hintFor(res) : '存不了模板');
+                setTimeout(function () { tplBtn.innerHTML = tplOrigin; }, 2600);
+            });
+        }
 
         var deepBtn = document.getElementById('quick-open-deep');
         if (deepBtn) {
@@ -1468,14 +1488,43 @@
         // 清空那一瞬间按 spec 默认值重画（而不是读 DOM —— DOM 里正是刚被带出来的那些值）
         var forceDefaults = false;
 
+        // 上一次画到 DOM 上的值（阶段19-9 修正）。为什么必须有它：
+        //   种子（记忆 / 模板 / 历史查看）里有些字段此刻并不显示（条件字段没满足条件），
+        //   readValues 会把它们填成 spec 默认值 —— 若每次 build 都整体重跑一遍种子，
+        //   用户在别处敲进去的数字就跟着一起被盖回去了：改一下计税场景，刚填的金额就没了，
+        //   而且是**静默**的。反过来只信 DOM 也不行：隐藏字段一冒出来就变回默认值，
+        //   等于带了个寂寞。
+        // 结论：只有「DOM 与上次渲染不一致」的那些项才是用户真改过的，其余维持当前值。
+        var curValues = null;
+        var painted = null;
+        var paintedKeys = [];
+
         function build() {
-            var values = forceDefaults ? specDefaults(tool) : readValues(tool);
-            if (quickSeed) {
-                Object.keys(quickSeed).forEach(function (k) { values[k] = quickSeed[k]; });
+            var values;
+            if (!painted) {
+                // 首次：读 DOM（可能是上一颗工具留下的空表单）再用种子覆盖，含此刻没显示的字段
+                values = forceDefaults ? specDefaults(tool) : readValues(tool);
+                if (quickSeed) {
+                    Object.keys(quickSeed).forEach(function (k) { values[k] = quickSeed[k]; });
+                }
+            } else {
+                values = {};
+                Object.keys(curValues).forEach(function (k) { values[k] = curValues[k]; });
+                var dom = forceDefaults ? specDefaults(tool) : readValues(tool);
+                Object.keys(dom).forEach(function (k) {
+                    // 只比较**上一次真的画出来了**的字段：没画出来的 readValues 给的是默认值，
+                    // 拿它跟带出来的值比，等于把带出来的那部分误判成「用户改过」。
+                    if (paintedKeys.indexOf(k) === -1) return;
+                    if (String(dom[k]) !== String(painted[k])) values[k] = dom[k];
+                });
             }
+            curValues = values;
             var parts = partitionFields(visibleFields(tool, values));
             formEl.innerHTML = parts.basic.map(function (f) { return fieldHtml(f, values); }).join('') +
                 advancedBlockHtml(parts.advanced, values);
+            paintedKeys = parts.basic.concat(parts.advanced).map(function (f) { return f.key; });
+            painted = {};
+            paintedKeys.forEach(function (k) { painted[k] = values[k]; });
             formEl.querySelectorAll('input, select').forEach(function (el) {
                 el.addEventListener('input', function () {
                     // 条件字段变化时需要重建表单（如切换增值税计税场景）
@@ -1490,24 +1539,47 @@
             renderResult(tool, readValues(tool));
         }
 
+        // 用一整份新值重画表单（清空 / 套用模板都走这里）。必须先丢掉 painted：
+        // 否则 build 会走进"只认用户改过的项"那条分支，把这份新值判成没改动，点了没反应。
+        function adoptValues(vals, opts) {
+            painted = null;
+            paintedKeys = [];
+            quickSeed = vals || null;
+            forceDefaults = !!(opts && opts.forceDefaults);
+            build();
+            forceDefaults = false;
+        }
+
         // 清空过就别再冒出来：切换视图会重画表单，提示要跟着这个开关走一次
         var memOn = !!(mem && mem.values);
         function drawMemoryHint() {
             renderMemoryHint(tool, memOn ? mem : null, function () {
                 memOn = false;
-                quickSeed = null;   // 只清这一次的带出，不动 spec 默认值
-                forceDefaults = true;
                 memorySuppressed = true;    // 重画会触发一次重算，别让它把默认值又记回去
-                build();
-                forceDefaults = false;
+                adoptValues(specDefaults(tool), { forceDefaults: true });
                 memorySuppressed = false;
             });
         }
+
+        // 阶段19-9：从模板填充。它跟「带出上次输入」是两件事 —— 那是自动的一份，
+        // 这是用户点名要的那一份。注意**不说"已填充"的提示**：这一次是用户的动作，
+        // 不是页面自作主张，再弹一条提示是替用户复述他刚做的事。
+        mountQuickTemplateBar(tool, function (values) { adoptValues(values); });
+
         renderModePill();
         build();
         drawMemoryHint();
         // 偏好一变就地重画：记住本次的 build，换工具时它自然指向新工具那份
         modeRebuild = function () { build(); drawMemoryHint(); };
+    }
+
+    // 阶段19-9：速算器页那条「从模板填充」—— 没有模板就整条不出现（连折叠箭头都不留）。
+    // 由 entity-ui 统一画：完整测算页用的是同一份实现，两处的点法是同一种手感，
+    // 否则用户会以为「模板在另一个工具里丢了」。
+    function mountQuickTemplateBar(tool, onPick) {
+        var UI = window.EuriskoEntityUI;
+        if (!UI || typeof UI.mountTemplateBar !== 'function' || !tool) return;
+        UI.mountTemplateBar('quick-template-bar', tool.id, onPick);
     }
 
     // ====== 导航：底部 Tab 栏（手机）+ 顶部 Tab 行（桌面） ======

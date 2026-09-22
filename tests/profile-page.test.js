@@ -216,11 +216,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 9 个模块卡片', () => {
+    test('renderProfileCards 应渲染 11 个模块卡片', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(9);
+        expect(cards.length).toBe(11);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-history');
@@ -235,9 +235,13 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-notices');
         // 阶段13B：财税服务（留资转化）入口卡片
         expect(ids).toContain('profile-card-lead');
+        // 阶段19-9：效率层「工作台」——主体管理与参数模板
+        expect(ids).toContain('profile-card-entity');
+        expect(ids).toContain('profile-card-template');
     });
 
-    // 阶段19-6b（§3.6 ③）：9 张卡从「常用功能 / 服务与支持」两组改成按场景三组
+    // 阶段19-6b（§3.6 ③）：卡片从「常用功能 / 服务与支持」两组改成按场景三组
+    // 阶段19-9：新增「工作台」组（主体 · 模板），插在「我的税务」与「服务与支持」之间
     test('renderProfileCards 应按场景分成三组', () => {
         renderProfileCards();
         const text = document.getElementById('profile-cards-grid').textContent;
@@ -260,6 +264,9 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(groupOf('profile-card-tax')).toBe('我的税务');
         expect(groupOf('profile-card-calendar')).toBe('我的税务');
         expect(groupOf('profile-card-lead')).toBe('服务与支持');
+        // 阶段19-9：主体 / 模板归到「工作台」
+        expect(groupOf('profile-card-entity')).toBe('工作台');
+        expect(groupOf('profile-card-template')).toBe('工作台');
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {

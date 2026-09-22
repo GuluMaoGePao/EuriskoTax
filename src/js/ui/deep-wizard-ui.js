@@ -502,6 +502,9 @@
                     '<button type="button" id="dw-copy-result" class="dw-copy-link"><i class="fa fa-copy mr-1"></i>复制结果</button>' +
                     '<button type="button" id="dw-copy-table" class="dw-copy-link"><i class="fa fa-table mr-1"></i>复制为表格</button>' +
                     '<button type="button" id="dw-copy-link" class="dw-copy-link"><i class="fa fa-link mr-1"></i>复制链接</button>' +
+                    // 阶段19-9：存为模板。它排在这一行而不是上面三颗实心按钮里 ——
+                    // 每天用一次的东西才有资格占按钮位。
+                    '<button type="button" id="dw-save-template" class="dw-copy-link"><i class="fa fa-clone mr-1"></i>存为模板</button>' +
                 '</div>' +
                 // 方案对比卡的宿主位（v1.51.0）：只有声明了 toCalcInput 的工具才有。
                 // 页面式时代这张卡长在综合所得页面的结果区，删页后宿主与数据源一起没了 ——
@@ -660,11 +663,29 @@
         var adv = fs.filter(isAdvanced);
         var basic = fs.filter(function (f) { return !isAdvanced(f); });
         var inputs = basic.map(drawField).join('') + advancedBlock(adv);
+        // 阶段19-9：模板条只给第一步。走到第二步说明人已经开始填了，
+        // 那时候它唯一的作用是把注意力从当前步挪走。
+        var first = stepsOf(tool)[0];
+        var isFirst = !!first && first.key === step.key;
         return '<div class="card">' +
             '<h3 class="text-lg font-bold text-primary mb-4">' + esc(step.title) + '</h3>' +
             (step.why ? '<p class="text-sm text-gray-600 mb-4">' + esc(step.why) + '</p>' : '') +
+            (isFirst ? '<div id="dw-template-bar" class="hidden"></div>' : '') +
             inputs + navHtml(stepsOf(tool)) +
             '</div>';
+    }
+
+    // 阶段19-9：从模板填充 —— 20 个字段的完整测算才是模板的主战场，
+    // 但点法与速算器页完全一致（两边调到同一份实现），否则用户会以为模板换了地方。
+    function mountTemplateBar(tool) {
+        var UI = window.EuriskoEntityUI;
+        if (!UI || typeof UI.mountTemplateBar !== 'function') return;
+        UI.mountTemplateBar('dw-template-bar', tool.id, function (values) {
+            collect(tool);      // 先收回当前步已填的 —— 模板里没有的键不该被顺手抹掉
+            Object.keys(values).forEach(function (k) { state.values[k] = values[k]; });
+            saveDraft();
+            render();
+        });
     }
 
     function paneHtml(tool, steps) {
@@ -688,6 +709,7 @@
         bind(tool, steps);
         mountScenarioCard(tool);
         mountProfileNudge(tool);
+        mountTemplateBar(tool);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
         // 分步向导每次只渲染当前步，若不回填，用户「上一步 → 下一步」就会被打回默认值 ——
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
@@ -899,6 +921,23 @@
             var l = window.EuriskoParamLink;
             return l && typeof l.build === 'function' ? l.build(state.toolId, state.values) : '';
         });
+
+        // 阶段19-9：存为模板。失败必须把原因说出来 —— 不说，用户会以为存好了，
+        // 下次进来找不到，那比没这个功能更糟（速算器那份是同一句话两处写，这里也一样）。
+        var tplBtn = document.getElementById('dw-save-template');
+        if (tplBtn) {
+            var tplOrigin = tplBtn.innerHTML;
+            tplBtn.addEventListener('click', function () {
+                var UI = window.EuriskoEntityUI;
+                var res = (UI && typeof UI.saveAsTemplate === 'function')
+                    ? UI.saveAsTemplate(tool, state.values)
+                    : { ok: false, reason: 'module' };
+                tplBtn.innerHTML = res.ok
+                    ? '<i class="fa fa-check"></i>已存为模板'
+                    : '<i class="fa fa-info-circle"></i>' + esc(UI && UI.hintFor ? UI.hintFor(res) : '存不了模板');
+                setTimeout(function () { tplBtn.innerHTML = tplOrigin; }, 2600);
+            });
+        }
     }
 
     function bind(tool, steps) {
