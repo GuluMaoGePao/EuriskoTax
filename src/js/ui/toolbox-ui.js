@@ -304,23 +304,87 @@
         });
     }
 
-    // ====== 首页：我是谁（场景入口） ======
+    // ====== 首页：我是谁（身份视角，**不是筛选**）======
+    // 阶段19-2 遗留清偿③：plan §3.3.4 写死了「身份卡的作用是设置默认视图，不限制工具可达性」，
+    // 但落地成了 openScenario() —— 跳工具页后只渲染那一个推荐组，其余入口当场消失。
+    // 现在拆成两个动作：卡主体 = **设为默认视角**（就地，不跳走），卡内小出口 = 看这类工具（推荐置顶）。
+    function identityLib() { return window.EuriskoIdentityPref; }
+
     function renderScenarios() {
         var box = document.getElementById('home-scenarios');
         if (!box || !R()) return;
+        var lib = identityLib();
+        var current = lib ? lib.get() : '';
+
+        // 外层是 div 而不是 button：卡里有两颗按钮（设默认 / 看这类工具），
+        // 嵌套 button 会让键盘与读屏同时错乱（阶段19-10a 在组头上已踩过一次）。
         box.innerHTML = R().scenarios().map(function (s) {
+            var on = s.id === current;
             return '' +
-                '<button type="button" class="scenario-card" data-scenario="' + esc(s.id) + '">' +
+                '<div class="scenario-card' + (on ? ' is-on' : '') + '" data-scenario="' + esc(s.id) + '">' +
+                '<button type="button" class="scenario-pick" data-scenario="' + esc(s.id) + '"' +
+                ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
                 '<i class="fa ' + esc(s.icon || 'fa-user') + '"></i>' +
-                '<span class="scenario-name">' + esc(s.name) + '</span>' +
+                '<span class="scenario-name">' + esc(s.name) +
+                (on ? '<em class="scenario-badge">当前默认</em>' : '') + '</span>' +
                 '<span class="scenario-desc">' + esc(s.desc) + '</span>' +
-                '</button>';
+                '</button>' +
+                '<button type="button" class="scenario-tools" data-scenario="' + esc(s.id) + '">看这类工具 ›</button>' +
+                '</div>';
         }).join('');
-        box.querySelectorAll('.scenario-card').forEach(function (el) {
-            el.addEventListener('click', function () {
-                openScenario(this.getAttribute('data-scenario'));
-            });
+
+        box.querySelectorAll('.scenario-card').forEach(function (card) {
+            var id = card.getAttribute('data-scenario');
+            var pick = card.querySelector('.scenario-pick');
+            var tools = card.querySelector('.scenario-tools');
+            if (pick) {
+                pick.addEventListener('click', function () {
+                    var L = identityLib();
+                    if (L) L.set(id);       // 记住身份（密度由 identity-pref 带出，不在这里判断）
+                    renderScenarios();      // 就地重画：标记换到这张卡上、反馈行跟着更新
+                });
+            }
+            if (tools) {
+                tools.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    openScenario(id);       // 跳工具页 + 推荐组置顶（其余入口照常在）
+                });
+            }
         });
+
+        renderIdentityNote();
+    }
+
+    // 反馈行：选过才出现。为什么要有这一行 —— 点了卡片如果屏幕上什么都没变，
+    // 用户不知道到底生效了什么（身份不跳页、不筛选，视觉反馈只剩卡上那个小标）。
+    function renderIdentityNote() {
+        var note = document.getElementById('home-identity-note');
+        if (!note || !R()) return;
+        var lib = identityLib();
+        var id = lib ? lib.get() : '';
+        var scen = id ? R().scenarios().filter(function (s) { return s.id === id; })[0] : null;
+        if (!scen) { note.classList.add('hidden'); note.innerHTML = ''; return; }
+
+        // 入口总数从注册表算，不写死 41（加工具不用回来改这句话）
+        var total = (R().all() || []).length + (R().deep() || []).length;
+        var p = modeLib();
+        var modeText = p ? '当前视图：' + esc(p.label(p.get())) : '';
+
+        note.classList.remove('hidden');
+        note.innerHTML =
+            '<span class="identity-note-text">默认视角：<b>' + esc(scen.name) + '</b>' +
+            (modeText ? '（' + modeText + '）' : '') +
+            ' · 共 ' + total + ' 个入口仍然都能用</span>' +
+            '<button type="button" class="identity-note-clear">取消默认</button>';
+
+        var clear = note.querySelector('.identity-note-clear');
+        if (clear) {
+            clear.addEventListener('click', function () {
+                var L = identityLib();
+                if (L) L.clear();   // 只清身份，不动已经生效的视图密度
+                renderScenarios();
+            });
+        }
     }
 
     // ====== 工具页 ======
@@ -331,7 +395,9 @@
         var scen = R().scenarios().filter(function (s) { return s.id === currentScenario; })[0];
         if (!scen) { chip.classList.add('hidden'); return; }
         chip.classList.remove('hidden');
-        chip.innerHTML = '<span class="tool-chip-label">按身份筛选：' + esc(scen.name) + '</span>' +
+        // 措辞是「推荐」不是「筛选」：身份决定谁排在前面，不决定谁能出现 —— 名字说错了，
+        // 后面的人就会照着名字继续把它做成筛选。
+        chip.innerHTML = '<span class="tool-chip-label">按身份推荐：' + esc(scen.name) + '</span>' +
             '<button type="button" id="toolbox-scenario-clear" class="tool-chip-clear">清除 ›</button>';
         var clear = document.getElementById('toolbox-scenario-clear');
         if (clear) {
@@ -353,11 +419,15 @@
         refreshFlags();
         var forceOpen = !!currentScenario || !!result.matched;
 
+        // 按身份挑工具 = **推荐组置顶**，其余分组照常渲染（19-2 遗留清偿③）：
+        // 原实现走的是 else-if，等于只渲染推荐组 —— 其余 36 个入口当场消失，那是筛选，
+        // 违反 §3.9「身份绝不影响可用工具范围」。现在身份只决定谁排在前面。
         if (currentScenario) {
             var scen = R().scenarios().filter(function (s) { return s.id === currentScenario; })[0];
             if (scen) html += groupSectionHtml('为你推荐（' + scen.name + '）', scen.desc, R().byScenario(currentScenario), false,
                 { id: 'scenario', forceOpen: forceOpen, defaultOpen: true });
-        } else if (result.matched) {
+        }
+        if (result.matched) {
             R().groups().forEach(function (g) {
                 var tools = (result.tools || []).filter(function (t) { return t.group === g.id; });
                 html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
@@ -391,10 +461,11 @@
         }
 
         // 深度测算组是静态 HTML（4 张 mode card，带既有隐藏按钮与 info 按钮），
-        // 这里只控制显隐：按身份筛选或搜索无命中时收起，避免与搜索结果互相干扰。
+        // 这里只控制显隐：搜索无命中时收起，避免与搜索结果互相干扰。
+        // （原来还带「按身份筛选时收起」—— 身份不再是筛选，完整测算照样该在。）
         var deepBox = document.getElementById('toolbox-deep');
         if (deepBox) {
-            var hideDeep = !!currentScenario || (result.matched && (!result.deep || result.deep.length === 0));
+            var hideDeep = result.matched && (!result.deep || result.deep.length === 0);
             if (hideDeep) deepBox.classList.add('hidden');
             else deepBox.classList.remove('hidden');
             // 完整测算组是静态 HTML（4 张 mode card 的事件在别处绑定），这里只补折叠与计数，

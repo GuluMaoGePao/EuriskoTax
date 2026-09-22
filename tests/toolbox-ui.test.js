@@ -4,7 +4,7 @@
  * 这个文件不测算法（算法由各 *-quick.test.js 对拍），只钉住「页面到底能不能用」：
  *   ① 工具页渲染出 20 个入口、分组齐全；
  *   ② 搜索能过滤（用户找不到入口 = 白做）；
- *   ③ 首页「我是谁」场景入口能按身份筛选；
+ *   ③ 首页「我是谁」场景入口能按身份挑工具（推荐置顶，且不藏起其余入口）；
  *   ④ 点开一个 App 内速算器：表单渲染出来、主结果算出来、易错口径渲染出来、下一步有出口；
  *   ⑤ 点开深度流程：走的是原有隐藏按钮（与既有初始化逻辑同源，不会两条路走岔）；
  *   ⑥ 底部 Tab 栏只在顶层页出现（计算页有自己的预览条，两层底栏会打架）。
@@ -158,15 +158,26 @@ describe('首页「我是谁」场景入口', () => {
         expect(document.querySelectorAll('#home-scenarios .scenario-card')).toHaveLength(6);
     });
 
-    test('按身份筛选：只出该身份的工具，并显示可清除的筛选条', () => {
+    // 19-2 遗留清偿③：这条原来叫「按身份筛选：只出该身份的工具」，断言的是 **ids 恰好 5 个** ——
+    // 那正是 plan §3.3.4 明令禁止的形态：身份只该决定谁排在前面，不该把其余入口藏起来。
+    // 现在钉的是**可达性**：推荐组置顶且展开，其余入口一个不少。
+    test('按身份挑工具：推荐组置顶展开，其余入口照常可用（身份是导航，不是筛选）', () => {
         window.EuriskoToolbox.openScenario('employee');
+        const scenario = document.querySelector('#toolbox-groups [data-group="scenario"]');
+        expect(scenario).not.toBeNull();
+        expect(scenario.classList.contains('is-collapsed')).toBe(false);
+
         const ids = Array.from(document.querySelectorAll('#toolbox-groups .tool-entry')).map((el) => el.getAttribute('data-tool-id'));
-        expect(ids).toHaveLength(5);
-        expect(ids).toContain('salary-tax');
+        expect(ids).toContain('salary-tax');   // 推荐的（上班族组）
         expect(ids).toContain('bonus-tax');
-        expect(document.getElementById('toolbox-scenario-chip').classList.contains('hidden')).toBe(false);
-        // 筛选态下不混入多步骤流程（形态差异不该出现在按身份挑的工具里）
-        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(true);
+        expect(ids).toContain('vat');          // 不属于这个身份，但仍然要能进 —— 身份不限制可达性
+        expect(ids.length).toBeGreaterThan(5);
+
+        const chip = document.getElementById('toolbox-scenario-chip');
+        expect(chip.classList.contains('hidden')).toBe(false);
+        expect(chip.textContent).toContain('按身份推荐');   // 措辞跟着行为改：推荐，不是筛选
+        // 完整测算组也不再因为"挑了身份"被收起
+        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(false);
     });
 });
 

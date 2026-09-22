@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.95.0';
+        window.__APP_VERSION__ = '1.96.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -503,7 +503,9 @@
                 </div>
 
                 <!-- 卡片4：下轴「我是谁」（身份卡）—— 作用是**设置默认视角**，不是筛选工具：
-                     41 个入口永远都能进，身份只改默认密度与常用排序（偏好接线在阶段19-7）。 -->
+                     41 个入口永远都能进，身份只改默认的视图密度（plan §3.3.4）。
+                     点卡 = 设为默认视角（就地，不跳走、不筛选）；卡内那颗「看这类工具 ›」
+                     才跳工具页（推荐组置顶，其余入口照常在）。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
@@ -515,6 +517,9 @@
                     <div id="home-scenarios" class="scenario-grid">
                         <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
                     </div>
+                    <!-- 选完的反馈行（没选过就整行不出现）：设默认不跳页、不筛选，
+                         屏幕上没有变化的话，用户不知道自己刚才那一下生效了什么。 -->
+                    <div id="home-identity-note" class="identity-note hidden"></div>
                 </div>
 
                 <!-- 卡片4：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
@@ -1559,7 +1564,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.95.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.96.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1889,6 +1894,9 @@
     <!-- 阶段19-7：视图密度偏好（简明 / 完整）—— 必须排在 toolbox-ui.js 与 deep-wizard-ui.js 之前
          （两个渲染器在渲染时就读它，晚加载会出现「首屏按简明渲染、切一次才对」） -->
     <script src="src/js/ui/mode-pref.js"></script>
+    <!-- 阶段19-2 遗留清偿③：身份视角偏好（「我是谁」那 6 张卡选的是默认视角，不是筛选）——
+         必须在 toolbox-ui.js 之前（卡片渲染时读它），且在 mode-pref.js 之后（要调 applyDefault）。 -->
+    <script src="src/js/ui/identity-pref.js"></script>
     <!-- 阶段19-8：效率层 E5 —— 参数记忆与带参链接都是**可选模块**：
          取不到就整块功能不出现，绝不影响测算本身。两者都必须排在 toolbox-ui.js 之前
          （速算器在渲染时就读记忆；带参链接在 init 里调用 openTool）。 -->

@@ -525,6 +525,42 @@
 .whoami-chip.is-on { border-color: var(--c-brand); color: var(--c-brand); }
 .whoami-actions { margin-top: 14px; display: flex; gap: 8px; }
 
+/* --- 首页「我是谁」身份卡：设为默认视角（阶段19-2 遗留清偿③ · §3.3.4）---
+   卡上所有颜色都走既有令牌，两档各写一份：toolbox.css 里那张卡是硬编码色，
+   深色靠 `.dark .scenario-card` 覆盖 —— 这里的修饰类特异性更高且排在后面，两档都显式声明。 */
+.scenario-card { position: relative; }
+.scenario-card.is-on {
+    border-color: var(--c-brand);
+    background: var(--c-surface-2);
+}
+.dark .scenario-card.is-on {
+    border-color: var(--c-brand);
+    background: var(--c-surface-2);
+}
+/* 内部两颗按钮各自清掉按钮皮：卡本身已经是"看起来能点"的容器 */
+.scenario-pick {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    width: 100%; padding: 0; border: 0; background: none; color: inherit;
+    text-align: left; cursor: pointer;
+}
+.scenario-badge {
+    margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+    background: var(--c-brand); color: var(--c-btn-primary-ink);
+    font-size: var(--fs-xs); font-style: normal; font-weight: 400;
+}
+.scenario-tools {
+    margin-top: 8px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+.identity-note {
+    margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    font-size: var(--fs-xs); color: var(--c-text-2); line-height: 1.6;
+}
+.identity-note-clear {
+    padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+
 /* --- 首页「漏填提醒」卡（阶段19-2 遗留 · §3.3 ④）---
    漏项 chip 沿用 .profile-chip 的配色与圆角，只把它改成**只读标签**（那玩意儿带 cursor:pointer，
    不可点却长成能点的样子是骗人）；配色本身一律走既有令牌，两档对比度与档案卡一致。 */
