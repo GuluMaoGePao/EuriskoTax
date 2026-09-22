@@ -23,12 +23,14 @@
     var SWITCHER_ID = 'entity-switcher';
     var ENTITY_MODAL_ID = 'entity-manager-modal';
     var TEMPLATE_MODAL_ID = 'template-manager-modal';
+    var LEDGER_MODAL_ID = 'ledger-manager-modal';
     var MAX_ROWS = 3;            // 模板条一次铺开几份：超过的进「管理模板」
 
     var mountedBars = [];        // { hostId, toolId, onPick }：模板改一处，这里全部重画
 
     function E() { return (typeof window !== 'undefined') ? window.EuriskoEntities : null; }
     function T() { return (typeof window !== 'undefined') ? window.EuriskoTemplates : null; }
+    function L() { return (typeof window !== 'undefined') ? window.EuriskoLedger : null; }
     function R() { return (typeof window !== 'undefined') ? window.EuriskoToolRegistry : null; }
 
     function esc(s) {
@@ -472,12 +474,175 @@
         openModal(TEMPLATE_MODAL_ID);
     }
 
+    // ====== 阶段19-10 · E3 台账 ======
+    //
+    // 台账不是第二个历史：**历史是本体，台账是它的一层索引**（期间 / 主体 / 进度）。
+    // 因此这里每一行的数据源都是 `EuriskoLedger.rows()` —— 它把历史记录与索引拼成一行；
+    // 索引丢了行为还在（行照样列得出，只是没有主体与状态），历史删了行也跟着消失
+    // （见 ledger-store.js 的 rowsFor：指向空气的索引不会变成空行）。
+    //
+    // 为什么「保存即入账」而不加一颗「加入台账」按钮：上一版刚把结果行动条上那个只 step-over
+    // 回工具页的第四颗按钮撤掉 —— 这里再加回来就是自打脸。归档该跟着保存发生，
+    // 用户要改期间/状态/主体，来这个弹窗改。
+    function ledgerLead() {
+        return '<p class="entity-modal-lead">台账 = 你的测算按月归档。它<b>不是第二份历史</b>：' +
+            '记录本体还在「计算历史」里，台账只多记三样东西 —— 归到哪个月、归到哪个主体、办到哪一步。' +
+            '每月重复的那件事，开工具前点一下「复制上月」就不用从零填一遍。</p>';
+    }
+
+    function ledgerRetentionNote() {
+        var lib = L();
+        if (!lib) return '';
+        var hidden = typeof lib.hiddenCount === 'function' ? lib.hiddenCount() : 0;
+        if (typeof lib.isPro === 'function' && lib.isPro()) return '';
+        var months = lib.FREE_MONTHS;
+        if (!hidden) {
+            return '<p class="entity-form-note">免费版看最近 ' + months + ' 个月，专业版不限。' +
+                '更老的<b>一条都不会删</b>，只是暂时收起来 —— 视野之外，不是数据之外。</p>';
+        }
+        return '<p class="entity-form-note">另有 ' + hidden + ' 条更早的记录：免费版只列最近 ' + months +
+            ' 个月。它们一直在，专业版可见；升级入口仍在顶栏与个人中心。</p>';
+    }
+
+    function statusOptionsHtml(current) {
+        var lib = L();
+        var list = (lib && lib.STATUS) ? lib.STATUS : [];
+        return (list || []).map(function (s) {
+            return '<option value="' + esc(s.value) + '"' + (String(s.value) === String(current) ? ' selected' : '') +
+                '>' + esc(s.label) + '</option>';
+        }).join('');
+    }
+
+    function ledgerRowHtml(row, toolName, entityName, prevHit) {
+        return '<div class="ledger-row">' +
+            '<div class="ledger-row-main">' +
+            '<span class="ledger-title">' + esc(row.title) + '</span>' +
+            '<span class="ledger-meta">' + esc(toolName || '未登记的测算') +
+            ' · ' + esc(entityName || '不按主体') +
+            ' · ' + esc(String(row.date || '').slice(0, 10)) + '</span>' +
+            '</div>' +
+            '<div class="ledger-row-ops">' +
+            // 期间：原生 month 输入 —— 键盘可用、手机上有自己的选择器，
+            // 自己手写月份选择器十有八九忘了把「没有该月浏览器」这件事考虑进去。
+            '<input type="month" class="ledger-period-input" data-ledger-period="' + esc(row.historyId) +
+            '" value="' + esc(row.periodKey) + '" aria-label="归到哪个月">' +
+            '<select class="ledger-status-select" data-ledger-status="' + esc(row.historyId) +
+            '" aria-label="办到哪一步">' + statusOptionsHtml(row.status) + '</select>' +
+            (toolName ? '<button type="button" class="entity-op" data-ledger-view="' + esc(row.historyId) +
+                '">看这条</button>' : '') +
+            (prevHit ? '<button type="button" class="entity-op" data-ledger-copy="' + esc(row.historyId) +
+                '" title="' + esc(prevHit.periodKey) + ' 的记录">复制上月</button>' : '') +
+            '</div></div>';
+    }
+
+    function drawLedgerBody() {
+        var body = document.getElementById('ledger-manager-body');
+        if (!body) return;
+        var lib = L();
+        if (!lib) { body.innerHTML = '<p class="entity-form-note">台账模块没加载，历史与导出不受影响。</p>'; return; }
+        var rows = typeof lib.visibleRows === 'function' ? lib.visibleRows() : [];
+        if (!rows.length) {
+            body.innerHTML = ledgerLead() +
+                '<p class="entity-form-note">还没有归档的测算：任一工具算出结果后点「保存到历史」，' +
+                '它会自动进当月这一格。</p>';
+            return;
+        }
+        var reg = R();
+        var ent = E();
+        var groups = typeof lib.groupByPeriod === 'function' ? lib.groupByPeriod(rows) : [];
+        var html = groups.map(function (g) {
+            return '<div class="ledger-period">' +
+                '<div class="ledger-period-head"><span>' + esc(g.label) + '</span>' +
+                '<span class="ledger-period-count">' + g.rows.length + ' 条</span></div>' +
+                g.rows.map(function (row) {
+                    var tool = (reg && typeof reg.get === 'function') ? reg.get(row.toolId) : null;
+                    var owner = row.entityId && ent && typeof ent.byId === 'function' ? ent.byId(row.entityId) : null;
+                    // 「复制上月」只对**这一格真有上月账**的行出现：给没有的行摆一颗点了没反应的
+                    // 按钮，就是拿 UI 骗人。
+                    var prevHit = typeof lib.prevMonthValues === 'function'
+                        ? lib.prevMonthValues({ toolId: row.toolId, entityId: row.entityId, periodKey: row.periodKey })
+                        : null;
+                    return ledgerRowHtml(row, tool ? tool.name : '', owner ? owner.name : '', prevHit);
+                }).join('') +
+                '</div>';
+        }).join('');
+        body.innerHTML = ledgerLead() + html + ledgerRetentionNote();
+        bindLedgerBody();
+    }
+
+    function bindLedgerBody() {
+        var body = document.getElementById('ledger-manager-body');
+        if (!body) return;
+        var lib = L();
+        if (!lib) return;
+        body.querySelectorAll('[data-ledger-status]').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                lib.setStatus(sel.getAttribute('data-ledger-status'), sel.value);
+                drawLedgerBody();
+            });
+        });
+        body.querySelectorAll('[data-ledger-period]').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                var res = lib.setPeriod(inp.getAttribute('data-ledger-period'), inp.value);
+                drawLedgerBody();
+                if (!res.ok) return;      // 期间不合法：重画即回到原值，不再弹窗打扰
+            });
+        });
+        body.querySelectorAll('[data-ledger-view]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.getAttribute('data-ledger-view');
+                var rec = (lib.historyRecords() || []).filter(function (r) {
+                    return String(r.id) === String(id);
+                })[0];
+                if (!rec) return;
+                reopenRecord(rec);
+            });
+        });
+        body.querySelectorAll('[data-ledger-copy]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.getAttribute('data-ledger-copy');
+                var rowsNow = lib.visibleRows();
+                var row = rowsNow.filter(function (r) { return r.historyId === id; })[0];
+                if (!row) return;
+                var hit = lib.prevMonthValues({ toolId: row.toolId, entityId: row.entityId, periodKey: row.periodKey });
+                if (!hit || !hit.record) return;
+                closeModal(LEDGER_MODAL_ID);
+                reopenRecord(hit.record);
+            });
+        });
+    }
+
+    // 打开一条历史记录：走工具自己的入口而不是跳过表单直接显示结果 ——
+    // 「跳到工具页、参数已经填好」才是"带出来"的意思，用户要看也能看到自己改过哪一处。
+    function reopenRecord(rec) {
+        var toolbox = (typeof window !== 'undefined') ? window.EuriskoToolbox : null;
+        if (!toolbox || typeof toolbox.openTool !== 'function') return;
+        var lib = L();
+        var toolId = (lib && typeof lib.toolIdOf === 'function') ? lib.toolIdOf(rec) : '';
+        if (!toolId) return;
+        // 两种历史形态的值位置不同：速算器写在 values，完整测算写在 results.values。
+        var values = rec && rec.values ? rec.values
+            : (rec && rec.results && rec.results.values ? rec.results.values : null);
+        toolbox.openTool(toolId, { values: values || undefined });
+    }
+
+    function openLedger() {
+        ensureModal(LEDGER_MODAL_ID, '我的台账', '按月归档的测算 · 免费看最近 3 个月',
+            'ledger-manager-body', 'close-ledger-manager');
+        drawLedgerBody();
+        openModal(LEDGER_MODAL_ID);
+    }
+
     // ====== 初始化 ======
     function init() {
         renderSwitcher();
         // 两个 store 写了一处就重画全局：顶栏要跟着改名字，工具页的模板条也要跟着改可见范围
         ['eurisko:entity-changed', 'eurisko:template-changed'].forEach(function (name) {
             window.addEventListener(name, function () { renderSwitcher(); refreshBars(); });
+        });
+        // 台账索引改了：只在弹窗正开着时重画（弹窗是按需建的，关着的时候找 body 是空操作）
+        window.addEventListener('eurisko:ledger-changed', function () {
+            if (document.getElementById('ledger-manager-body')) drawLedgerBody();
         });
     }
 
@@ -495,6 +660,8 @@
         quotaOf: quotaOf,
         openEntityManager: openEntityManager,
         openTemplateManager: openTemplateManager,
-        MODAL_IDS: { entity: ENTITY_MODAL_ID, template: TEMPLATE_MODAL_ID }
+        openLedger: openLedger,
+        drawLedgerBody: drawLedgerBody,
+        MODAL_IDS: { entity: ENTITY_MODAL_ID, template: TEMPLATE_MODAL_ID, ledger: LEDGER_MODAL_ID }
     };
 })();

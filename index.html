@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.92.0';
+        window.__APP_VERSION__ = '1.93.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1540,7 +1540,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.92.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.93.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1914,6 +1914,9 @@
     <!-- 阶段19-9 效率层：主体（给模板归类）与参数模板的存储层，纯数据、无 DOM 依赖 -->
     <script src="src/js/data/entity-store.js"></script>
     <script src="src/js/data/template-store.js"></script>
+    <!-- 阶段19-10 · E3 台账：历史之上那层「期间 / 主体 / 状态」索引。
+         本体仍是 taxCalculationHistory —— 见 ledger-store.js 文件头那三条边界。 -->
+    <script src="src/js/data/ledger-store.js"></script>
     <!-- 阶段19-6b：我的页权益进度条（§3.6 ①）—— 排在 plan.js / history-sync.js / scenario-store.js 之后
          （三个库都是运行时才读，加载顺序不致命，但按依赖顺序读起来不用回头猜） -->
     <script src="src/js/ui/profile-benefits.js"></script>

@@ -1398,6 +1398,14 @@
 
     // 写入与首页「最近计算」同一份存储（taxCalculationHistory），
     // 让速算器结果也进历史 —— 这是深度流程原本独有的能力，现在两种形态收敛。
+    // 阶段19-10：速算器与完整测算各有一处「写历史」（这里 + tax-calculator.js 的 saveToHistory），
+    // 两边的台账归档都只有这一行 —— 索引写失败不影响历史（隐私模式 / 配额满照样能算）。
+    function archiveToLedger(historyId) {
+        var L = (typeof window !== 'undefined') ? window.EuriskoLedger : null;
+        if (!L || typeof L.attach !== 'function' || !historyId) return;
+        try { L.attach(historyId); } catch (e) { /* 台账挂了不能连累保存 */ }
+    }
+
     function saveToHistory(tool, values, out) {
         try {
             var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -1415,6 +1423,10 @@
                 result_data: { totalTax: Number(out.primary.value) || 0 }
             });
             localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+            // 阶段19-10：保存即入账 —— 不额外加一颗「加入台账」按钮（入口清理刚把行动条收干净，
+            // 再加回来就是自打脸）。期间默认从这条记录的 date 推、主体默认取当前主体，
+            // 真要归到别的月份去台账弹窗里改。
+            archiveToLedger(id);
             if (typeof window.refreshHomeRecent === 'function') window.refreshHomeRecent();
             return true;
         } catch (e) {

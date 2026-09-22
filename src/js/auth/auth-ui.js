@@ -884,6 +884,18 @@ const PROFILE_CARDS_CONFIG = [
         desc: '某个工具的一套已填参数，进工具后一键带出',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-clone text-xl text-purple-600'
+    },
+    {
+        // 阶段19-10 · 效率层 E3：台账 = 按月归档的测算。
+        // 它不建第二个历史：本体仍是计算历史，台账只多带了期间 / 主体 / 进度三层索引
+        // （这句话将来会被反复问到，所以写在这里，不写在只有代码里才看得见的地方）。
+        id: 'profile-card-ledger',
+        group: 'workbench',
+        icon: 'fa-calendar-check-o',
+        title: '我的台账',
+        desc: '按月归档的测算记录；重复的那件事可以从上个月带出来',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-calendar-check-o text-xl text-blue-600'
     }
 ];
 
@@ -894,9 +906,10 @@ const PROFILE_CARDS_CONFIG = [
 //   ⚠️ plan 原文还列了第四组「我的产出」（方案对比 · 报告 · 分享记录），本版**没有做**：
 //   这三项目前都没有对应的独立页面（方案对比是结果页里的一个区块，不是我的页子页），
 //   硬造三个入口只会点进去是空壳 —— 入口等页面先落地，不反过来拿入口凑数。
-// 阶段19-9：第四组「工作台」目前只放**已落地**的两张卡（主体 / 模板）。
-// plan 原文还列了台账与批量两项：它们属于阶段 19-10 / 19-11，那两批次前不预先占坑 ——
-// 空壳入口比没有入口更伤（照上面的老规矩：入口等页面先落地，不反过来拿入口凑数）。
+// 阶段19-9：第四组「工作台」先放落地的两张卡（主体 / 模板）；
+// 阶段19-10：台账落地（ledger-store.js + entity-ui 的台账弹窗），第三张卡才补上 ——
+// 原先 plan 还列了批量一项：它属于阶段 19-11，在那之前**不预先占坑** ——
+// 空壳入口比没有入口更伤（老规矩：入口等页面先落地，不反过来拿入口凑数）。
 const PROFILE_CARD_GROUPS = [
     { key: 'data', title: '我的数据', desc: '测算记录 · 云同步 · 导出' },
     { key: 'tax', title: '我的税务', desc: '档案 · 日历' },
@@ -2277,6 +2290,8 @@ function setupAuthEventListeners() {
         // 单开一页会让「改个模板名」变成一次页面跳转。
         { cardId: 'profile-card-entity', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openEntityManager(); } },
         { cardId: 'profile-card-template', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openTemplateManager(); } },
+        // 阶段19-10 · E3 台账：按月归档的那本账
+        { cardId: 'profile-card-ledger', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openLedger(); } },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
         { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },

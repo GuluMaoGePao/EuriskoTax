@@ -286,6 +286,13 @@ function deleteHistoryRecord(id) {
     showConfirm('确定要删除这条记录吗？', function() {
         calculationHistory = calculationHistory.filter(item => item.id !== id);
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        // 阶段19-10：历史删了，台账里指着它的那行必须一起走 ——
+        // 留下来就是一排「点进去什么都没有」的幽灵行，用户没法解释它为什么会在这本账里。
+        try {
+            if (window.EuriskoLedger && typeof window.EuriskoLedger.remove === 'function') {
+                window.EuriskoLedger.remove(id);
+            }
+        } catch (e) { /* 台账索引清理失败不影响删除 */ }
         // 阶段10：已同步过的记录删除 → 云端墓碑广播（未同步过则忽略）；再通知引擎上传
         try {
             if (window.EuriskoSync && typeof window.EuriskoSync.recordLocalDelete === 'function') {

@@ -851,6 +851,41 @@
 }
 .tpl-row-meta { font-size: var(--fs-micro); color: var(--c-text-3); }
 
+/* ====== 阶段19-10 · E3 台账弹窗 ======
+     台账的行是在**历史记录上多两层信息**（期间 / 状态），所以行样式刻意比 tpl-row 更矮:
+     它是要竖着扫的那张表（"这个月都算了啥"），不是要填的东西。 */
+.ledger-period {
+    margin-bottom: 14px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    padding: 0 12px 4px;
+}
+.ledger-period-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+    border-bottom: 1px dashed var(--c-border);
+}
+.ledger-period-count {
+    font-size: var(--fs-micro); font-weight: 400; color: var(--c-text-3);
+}
+.ledger-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--c-border);
+}
+.ledger-row:last-child { border-bottom: none; }
+.ledger-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.ledger-title {
+    font-size: var(--fs-sm); color: var(--c-text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ledger-meta { font-size: var(--fs-micro); color: var(--c-text-3); }
+.ledger-row-ops { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ledger-period-input,
+.ledger-status-select {
+    padding: 3px 6px; border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-micro);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .card-elevated,
     .event-card,

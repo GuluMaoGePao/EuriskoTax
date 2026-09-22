@@ -2180,6 +2180,14 @@ function saveToHistory(results, type, titlePrefix) {
             calculationHistory = calculationHistory.slice(0, 50);
         }
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        // 阶段19-10：写历史的同时给台账补一行索引（本体还是这条记录，索引只带历史
+        // 记录里查不到的那些东西：主体归属 / 进度状态 / 用户改过的期间。见 ledger-store.js 文件头）
+        try {
+            if (typeof window !== 'undefined' && window.EuriskoLedger
+                && typeof window.EuriskoLedger.attach === 'function') {
+                window.EuriskoLedger.attach(savedData.id);
+            }
+        } catch (e) { /* 台账不可用不影响历史本身 */ }
         // 阶段8：匿名埋点信号（仅计算类型，不含任何输入数据），由 index.html 监听器统一上报
         try {
             if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
