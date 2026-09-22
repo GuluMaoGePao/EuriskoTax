@@ -205,7 +205,11 @@ describe('端到端：综合所得向导结果区自动挂上方案对比卡', (
             document.getElementById('dw-result-primary').textContent.replace(/[^0-9.\-]/g, '')
         );
         expect(shown).toBeGreaterThan(0);
-        expect(list[0].summary.netIncome).toBeCloseTo(shown, 1);
+        // v1.98.0：方案按工具自己的口径存指标（metrics），不再只写综合所得那套 summary ——
+        // 守护的仍是同一件事（存进去的数 = 界面上显示的数），只是取数落点换了。
+        expect(list[0].toolId).toBe('forward');
+        expect(list[0].metrics[0].label).toBe(document.getElementById('dw-result-primary-label').textContent);
+        expect(list[0].metrics[0].value).toBeCloseTo(shown, 1);
     });
 
     test('卡片只在结果步出现：回退到第一步时宿主位不存在', () => {

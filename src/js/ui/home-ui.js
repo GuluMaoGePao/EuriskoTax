@@ -602,12 +602,26 @@
         return (typeof window !== 'undefined') ? window.EuriskoEntities : null;
     }
 
-    // 方案的「可比数额」：全年总税额（含年终奖），取不到就退回主税额 —— 不猜、不补 0。
-    function taxOf(s) {
-        var sum = (s && s.summary) || {};
-        var v = Number(sum.taxTotal);
-        if (!isFinite(v) || v === 0) v = Number(sum.totalTax);
-        return isFinite(v) ? v : null;
+    // 方案的「可比数额」：取两套方案**共有**的指标里那条像税额的
+    // （年度应纳税额 / 应纳增值税 / 应补税额 …），取不到就不说差额 —— 不猜、不补 0。
+    //
+    // v1.98.0 之前只看 summary.taxTotal，那是综合所得独有的字段：速算器存进来的方案
+    // 一句差额都说不出。现在任何工具都能存（方案按自己的口径存指标），所以这里改成
+    // 先看两套口径对不对得上（compareRows 取交集），再决定拿哪一行做差。
+    function diffRowOf(list) {
+        var SUI = (typeof window !== 'undefined') ? window.EuriskoScenarioUI : null;
+        if (!SUI || !SUI.pure || typeof SUI.pure.compareRows !== 'function') return null;
+        var cmp = SUI.pure.compareRows(list);
+        if (!cmp || !cmp.comparable || !cmp.rows || !cmp.rows.length) return null;
+
+        var money = cmp.rows.filter(function (r) {
+            return r.kind === 'money'
+                && r.cells.every(function (v) { return typeof v === 'number' && isFinite(v); });
+        });
+        if (!money.length) return null;
+        // 只认税额类：说「差 ¥X」却不说是差在哪一项上，等于让人自己猜比的是什么
+        var taxLike = money.filter(function (r) { return /应纳|税额|应缴|实缴|应补|应退|补缴/.test(r.label); });
+        return taxLike.length ? taxLike[0] : null;
     }
 
     /**
@@ -625,15 +639,20 @@
 
         var diff = null;
         if (items.length >= 2) {
-            var withTax = items.map(function (s) {
-                return { name: (s && s.name) || '未命名方案', tax: taxOf(s) };
-            }).filter(function (x) { return x.tax !== null; });
-            if (withTax.length >= 2) {
-                withTax.sort(function (a, b) { return b.tax - a.tax; });
-                var hi = withTax[0];
-                var lo = withTax[withTax.length - 1];
-                // 两套税额一样时不说"差 ¥0"（那句听着像坏了），说"税额相同"
-                diff = { hi: hi.name, lo: lo.name, amount: Math.abs(hi.tax - lo.tax), same: hi.tax === lo.tax };
+            // 两套方案的指标要对得上才比：跨工具（交集为空）时硬凑一个差额，
+            // 减出来的数字能算，但那个差没有意义 —— 那就是拿假结论冒充对比。
+            var row = diffRowOf(items);
+            if (row) {
+                var pairs = items.map(function (s, i) {
+                    return { name: (s && s.name) || '未命名方案', tax: Number(row.cells[i]) };
+                }).filter(function (x) { return isFinite(x.tax); });
+                if (pairs.length >= 2) {
+                    pairs.sort(function (a, b) { return b.tax - a.tax; });
+                    var hi = pairs[0];
+                    var lo = pairs[pairs.length - 1];
+                    // 两套税额一样时不说"差 ¥0"（那句听着像坏了），说"税额相同"
+                    diff = { hi: hi.name, lo: lo.name, amount: Math.abs(hi.tax - lo.tax), same: hi.tax === lo.tax };
+                }
             }
         }
         return {
@@ -1116,7 +1135,7 @@
     };
     // 同一套路：建模是纯函数（单测直接问「该说什么」），渲染只负责落 DOM
     window.EuriskoHomePlans = {
-        pure: { buildPlanModel: buildPlanModel, buildLedgerModel: buildLedgerModel, taxOf: taxOf, money: money },
+        pure: { buildPlanModel: buildPlanModel, buildLedgerModel: buildLedgerModel, diffRowOf: diffRowOf, money: money },
         render: renderPlans
     };
 

@@ -506,10 +506,11 @@
                     // 每天用一次的东西才有资格占按钮位。
                     '<button type="button" id="dw-save-template" class="dw-copy-link"><i class="fa fa-clone mr-1"></i>存为模板</button>' +
                 '</div>' +
-                // 方案对比卡的宿主位（v1.51.0）：只有声明了 toCalcInput 的工具才有。
-                // 页面式时代这张卡长在综合所得页面的结果区，删页后宿主与数据源一起没了 ——
-                // 现在由渲染器按 spec 有没有取数钩子决定挂不挂，index.html 不必再为它留一块静态 HTML。
-                (typeof tool.toCalcInput === 'function' ? '<div id="dw-scenario-host" class="mt-6"></div>' : '') +
+                // 方案对比卡的宿主位（v1.51.0）：页面式时代这张卡长在综合所得页面的结果区，
+                // 删页后宿主与数据源一起没了，现在由渲染器挂。
+                // v1.98.0：不再只给声明了 toCalcInput 的工具 —— 方案库改成按工具自己的口径存指标
+                // （不再只有综合所得那六项），任一完整测算的结果步都能存。
+                '<div id="dw-scenario-host" class="mt-6"></div>' +
                 // 阶段19-5b：税务档案引导卡的宿主位。与速算器共用同一份渲染（toolbox-ui），
                 // 不在这里抄第二份 —— 两处各长一套的话，「暂不」只在一处生效这种错迟早出现。
                 '<div id="dw-profile-nudge" class="mt-6 hidden"></div>' +
@@ -719,17 +720,34 @@
         state.atResult = !!(steps[state.stepIndex] && steps[state.stepIndex].result);
     }
 
-    // 方案对比卡（v1.51.0）：spec 声明了 toCalcInput 才挂，取数与 compute 同源。
+    // 方案对比卡（v1.51.0 起）：取数与 compute 同源。
     // 不在渲染器里另写一份「向导值 → 计税入参」的映射 —— 那份映射一旦有两份，
     // 「保存的方案」与「界面上算的数」迟早对不上。
+    //
+    // v1.98.0：保存改用**结果对象**（state.lastResult，就是界面上正在显示的那一份）出指标，
+    // 于是 21 个完整测算都能存方案；toCalcInput 那份只留给「生成年终奖方案」（它要按
+    // base / deductions 重算两种口径，只有综合所得给得起）。
     function mountScenarioCard(tool) {
         var host = document.getElementById('dw-scenario-host');
-        if (!host) return;                       // 非结果步，或该工具没有这张卡
+        if (!host) return;                       // 非结果步
         var ui = window.EuriskoScenarioUI;
         if (!ui || typeof ui.mount !== 'function' || !window.EuriskoScenarios) return;
-        var ctx = null;
-        try { ctx = tool.toCalcInput(state.values); } catch (e) { ctx = null; }
-        if (!ctx || !ctx.results) return;
+        var ctx = {
+            toolId: tool.id,
+            toolName: tool.name || '',
+            values: Object.assign({}, state.values),
+            out: state.lastResult || null
+        };
+        if (typeof tool.toCalcInput === 'function') {
+            try {
+                var legacy = tool.toCalcInput(state.values);
+                if (legacy && legacy.results) {
+                    ctx.base = legacy.base;
+                    ctx.deductions = legacy.deductions;
+                    ctx.results = legacy.results;
+                }
+            } catch (e) { /* 取不到就不给「生成年终奖方案」，保存照常可用 */ }
+        }
         ui.mount(host, ctx);
     }
 

@@ -52,6 +52,9 @@ beforeAll(() => {
     // 阶段19-8：参数记忆与带参链接（index.html 里也排在 toolbox-ui.js 之前）
     loadSource('src/js/ui/param-memory.js');
     loadSource('src/js/ui/param-link.js');
+    // 阶段19-5b 遗留清偿（v1.98.0）：速算器结果页的「存为方案」要落到方案库
+    loadSource('src/js/data/scenario-store.js');
+    loadSource('src/js/ui/scenario-ui.js');
     loadSource('src/js/ui/toolbox-ui.js');
 });
 
@@ -807,6 +810,28 @@ describe('阶段19-4：行动条四按钮常驻', () => {
         expect(document.getElementById('quick-open-deep')).toBeNull();
         expect(document.getElementById('quick-next-tools')).toBeTruthy();
         expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);
+    });
+
+    // 阶段19-5b 遗留清偿（v1.98.0）：速算器此前**进不了方案库** —— 那张对比表只认综合所得
+    // 口径，存进去缺的指标会被补成 ¥0.00。现在方案按工具自己的口径存，速算器也就有资格进库。
+    test('「存为方案」是小字链接：不占第五颗按钮位，点了真的进方案库', () => {
+        localStorage.removeItem('taxScenarios');
+        document.querySelector('[data-tool-id="vat"]').click();
+
+        const btn = document.getElementById('quick-save-scenario');
+        expect(btn).toBeTruthy();
+        // 行动条仍是四颗按钮（19-4 的规矩），它排在小字链接那一行（19-8/19-9 的同一条规矩）
+        expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);
+        expect(btn.classList.contains('quick-copy-link')).toBe(true);
+
+        btn.click();
+        const list = window.EuriskoScenarios.list();
+        expect(list).toHaveLength(1);
+        expect(list[0].toolId).toBe('vat');
+        expect(list[0].metrics.length).toBeGreaterThan(0);
+        // 存的是它自己的口径，不再编一份综合所得的 summary（那六项它一项也没有）
+        expect(list[0].summary).toEqual({});
+        expect(btn.textContent).toContain('已存为方案');
     });
 
     test('既无完整测算也无相关工具时，这一位空着 —— 不放第二个「回工具页」', () => {

@@ -806,6 +806,10 @@
             // 阶段19-9：存为模板属于「带走」这一族，也做成小字链接 —— 它不像复制那样每天点，
             // 但天天摆在按钮位上会挤掉真正每天点的那四颗。
             '<button type="button" id="quick-save-template" class="quick-copy-link"><i class="fa fa-clone mr-1"></i>存为模板</button>' +
+            // 阶段19-5b 遗留（v1.98.0）：速算器此前**不能**存方案 —— 方案库那张对比表只认
+            // 综合所得口径，存进去缺的指标会被补成 ¥0.00。现在方案按工具自己的口径存，
+            // 速算器也就有资格进库了。仍做成小字链接：它不是每天点，占按钮位会挤掉那四颗。
+            '<button type="button" id="quick-save-scenario" class="quick-copy-link"><i class="fa fa-columns mr-1"></i>存为方案（加入对比）</button>' +
             '</div>';
 
         var saveBtn = document.getElementById('quick-save-history');
@@ -866,6 +870,27 @@
                     ? '<i class="fa fa-check"></i>已存为模板'
                     : '<i class="fa fa-info-circle"></i>' + esc(UI && UI.hintFor ? UI.hintFor(res) : '存不了模板');
                 setTimeout(function () { tplBtn.innerHTML = tplOrigin; }, 2600);
+            });
+        }
+
+        // 存为方案：失败要把原因说在这颗按钮上 —— 速算器页没有方案卡那行提示，
+        // 不说的话用户会以为存好了，下次在「我的方案与台账」里找不到。
+        var scBtn = document.getElementById('quick-save-scenario');
+        if (scBtn) {
+            var scOrigin = scBtn.innerHTML;
+            scBtn.addEventListener('click', function () {
+                var UI = window.EuriskoScenarioUI;
+                var res = (UI && typeof UI.saveFrom === 'function')
+                    ? UI.saveFrom({ toolId: tool.id, toolName: tool.name || '', values: values, out: out })
+                    : { ok: false, reason: 'module' };
+                scBtn.innerHTML = res.ok
+                    ? '<i class="fa fa-check"></i>已存为方案'
+                    : '<i class="fa fa-info-circle"></i>' + esc(
+                        res.reason === 'limit' ? '方案已达上限（专业版 10 套）'
+                            : res.reason === 'no-result' ? '先算出结果再存'
+                                : '存不了方案'
+                    );
+                setTimeout(function () { scBtn.innerHTML = scOrigin; }, 2600);
             });
         }
 
