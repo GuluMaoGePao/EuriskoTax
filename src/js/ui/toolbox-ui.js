@@ -1183,28 +1183,59 @@
     // 本次输入里到底有没有带专项附加扣除：有值才算填了（填 0 等于没享受，不是"忘了"）
     var DEDUCTION_INPUT_RE = /(children|infant|elderly|housing|loan|rent|degreeMonths|certCount|medical|deduction|special)/i;
 
+    // v1.100.0：适用范围从「速算器 group === 'salary'」改成**按字段表判定**。
+    // 判的是「这次测算吃不吃专项附加扣除」这件事本身，不是「它挂在哪个组 / 叫什么 id」：
+    // 完整测算（deep）的 spec 也有这个字段（forward 就是），按 group 判它们永远进不来；
+    // 按 id 白名单判则每加一个 spec 就要回来改一次 —— 那是 19-5b 那条债的同一个形状。
+    // 顺带修正一处误导：bonus-tax 原先在 group 里，但**年终奖单独计税不吃专项附加扣除**，
+    // 用字段表判它自然被排除（它压根没有这个字段）。
+    // special-deduction（核定额度那个）同理：它的字段是「子女教育（个数）」这类逐项，
+    // 没有一个叫「专项附加扣除」的字段 —— 它自己就是在算这个，不该提醒自己。
+    var SPECIAL_DEDUCTION_RE = /专项附加扣除/;
+
+    function deductionFieldsOf(tool) {
+        return (tool && Array.isArray(tool.fields) ? tool.fields : []).filter(function (f) {
+            return SPECIAL_DEDUCTION_RE.test(f.label || '');
+        });
+    }
+
+    // 开关关掉 = 明确没享受；开关没关就看有没有填进金额（填 0 等于没享受，多半是忘了）
+    function deductionBrought(tool, values) {
+        var off = deductionFieldsOf(tool).some(function (f) {
+            return f.type === 'switch' && values[f.key] === false;
+        });
+        if (off) return false;
+        return Object.keys(values || {}).some(function (k) {
+            return DEDUCTION_INPUT_RE.test(k) && Number(values[k]) > 0;
+        });
+    }
+
     function deductionMissTip(tool, values) {
-        if (tool.id === 'special-deduction') return null;   // 它本身就是在核定额度的
-        if (tool.group !== 'salary') return null;
+        var fs = deductionFieldsOf(tool);
+        if (!fs.length) return null;                       // 这次测算根本不吃专项附加扣除
         var lib = profileLib();
         if (!lib) return null;
         var picked = (lib.get().deductions || []).slice();
         if (!picked.length) return null;
-        var filled = Object.keys(values || {}).some(function (k) {
-            return DEDUCTION_INPUT_RE.test(k) && Number(values[k]) > 0;
-        });
-        if (filled) return null;
+        if (deductionBrought(tool, values || {})) return null;
         var item = lib.pure.itemOf('deductions');
         var labels = picked.map(function (v) {
             var opt = (item ? item.options : []).filter(function (o) { return o.value === v; })[0];
             return opt ? opt.label : v;
         }).join('、');
+        var stepKey = null;
+        fs.forEach(function (f) { if (!stepKey && f.step) stepKey = f.step; });
         return {
             title: '档案里有扣除，这次没算进去',
             body: '你的档案里勾选了：' + labels + '。这次测算没带上 —— 补上能少缴，' +
                 '具体额度跟你的适用税率有关，这里不替你估。',
             ctaText: '核定能扣多少',
-            toolId: 'special-deduction'
+            toolId: 'special-deduction',
+            // 分步向导（deep）里的出口是「回到那一步补上」：那份测算是分步填完的，
+            // 让他跳去核定额度的工具等于把已经填好的一整份丢掉重来。
+            // 两个出口都在 tip 上，由渲染层按「这一步此刻找得到吗」挑一个真能用的。
+            stepKey: stepKey,
+            stepCta: '回去补上'
         };
     }
 
@@ -1212,8 +1243,22 @@
         return bonusSavingTip(tool, values) || deductionMissTip(tool, values);
     }
 
-    function renderSavingNudge(tool, values) {
-        var box = document.getElementById('quick-saving-nudge');
+    // 出口按「此刻真能用」挑一个，而不是把三个都摆上或照抄 tip 上的第一个：
+    //   ① 分步向导能定位到那一步 → 「回去补上」（这次的测算就在那一步上改）；
+    //   ② 定位不到（简明视图把那一步合并进「补充参数」了）→ 退回「核定能扣多少」；
+    //   ③ 速算器：聚焦到那个输入框（同页补）/ 打开核定工具（跨工具）。
+    // 一颗按钮只做一件事，且点了必须真的发生点什么 —— 摆一颗点了不跳的按钮是拿 UI 骗人。
+    function savingActionOf(tip, opts) {
+        if (tip.stepKey && opts && typeof opts.onStep === 'function' && typeof opts.stepIndexOf === 'function') {
+            var idx = opts.stepIndexOf(tip.stepKey);
+            if (idx >= 0) return { kind: 'step', index: idx, text: tip.stepCta || '回去补上' };
+        }
+        if (tip.focus) return { kind: 'focus', id: tip.focus, text: tip.ctaText };
+        if (tip.toolId) return { kind: 'tool', id: tip.toolId, text: tip.ctaText };
+        return null;
+    }
+
+    function renderSavingNudgeInto(box, tool, values, opts) {
         if (!box) return;
         var tip = savingTipOf(tool, values);
         if (!tip) {
@@ -1221,6 +1266,7 @@
             box.innerHTML = '';
             return;
         }
+        var act = savingActionOf(tip, opts);
         box.classList.remove('hidden');
         box.innerHTML = '' +
             '<div class="saving-nudge-head">' +
@@ -1231,26 +1277,42 @@
             '</div>' +
             '<div class="saving-nudge-lead">' + esc(tip.title) + '</div>' +
             '<div class="saving-nudge-body">' + esc(tip.body) + '</div>' +
-            '<button type="button" class="saving-nudge-cta"' +
-            (tip.toolId ? ' data-tool-id="' + esc(tip.toolId) + '"' : '') +
-            (tip.focus ? ' data-focus="' + esc(tip.focus) + '"' : '') + '>' +
-            '<i class="fa fa-arrow-right"></i>' + esc(tip.ctaText) + '</button>';
+            (act
+                ? '<button type="button" class="saving-nudge-cta" data-kind="' + esc(act.kind) + '"' +
+                    (act.id !== undefined ? ' data-id="' + esc(act.id) + '"' : '') +
+                    (act.index !== undefined ? ' data-index="' + esc(act.index) + '"' : '') + '>' +
+                    '<i class="fa fa-arrow-right"></i>' + esc(act.text) + '</button>'
+                : '');
 
         var cta = box.querySelector('.saving-nudge-cta');
         if (!cta) return;
         cta.addEventListener('click', function () {
-            var focusId = this.getAttribute('data-focus');
-            if (focusId) {
-                var el = document.getElementById(focusId);
+            var kind = this.getAttribute('data-kind');
+            if (kind === 'step' && opts && typeof opts.onStep === 'function') {
+                opts.onStep(Number(this.getAttribute('data-index')));
+                return;
+            }
+            if (kind === 'focus') {
+                var el = document.getElementById(this.getAttribute('data-id'));
                 if (el) {
                     el.focus();
                     if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
-                    return;
                 }
+                return;
             }
-            var toolId = this.getAttribute('data-tool-id');
-            if (toolId) openTool(toolId, { values: values });
+            if (kind === 'tool') openTool(this.getAttribute('data-id'), { values: values });
         });
+    }
+
+    function renderSavingNudge(tool, values) {
+        renderSavingNudgeInto(document.getElementById('quick-saving-nudge'), tool, values || {}, null);
+    }
+
+    // 挂到指定容器（完整测算结果步走这一条入口，与档案引导卡同一个套路）
+    function mountSavingNudge(containerId, tool, values, opts) {
+        var box = document.getElementById(containerId);
+        if (!box || !tool) return;
+        renderSavingNudgeInto(box, tool, values || {}, opts);
     }
 
     // ====== 与上次对比（阶段19-5b · 留存机制 §3.8 ③）======
@@ -1900,6 +1962,8 @@
         renderCompareNudge: renderCompareNudge,
         // 阶段19-6a：省钱卡（§3.8 ④）。导出 savingTipOf 是为了单测能直接问「这个场景该不该出卡」
         renderSavingNudge: renderSavingNudge,
+        // v1.100.0：完整测算结果步复用同一份（判定按字段表，出口可回跳到那一步）
+        mountSavingNudge: mountSavingNudge,
         savingTipOf: savingTipOf,
         // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
         policyBasisOf: policyBasisOf,

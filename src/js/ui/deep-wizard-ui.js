@@ -524,6 +524,10 @@
                 // v1.98.0：不再只给声明了 toCalcInput 的工具 —— 方案库改成按工具自己的口径存指标
                 // （不再只有综合所得那六项），任一完整测算的结果步都能存。
                 '<div id="dw-scenario-host" class="mt-6"></div>' +
+                // v1.100.0：省钱卡宿主位（阶段19-4 顺延 · 留存机制 §3.8 ④）。判定与文案都在
+                // toolbox-ui 那一份里，这里只给容器 —— 与档案引导卡同一个套路。
+                // 排在档案引导之前：先说这次测算还能省什么（与这一屏直接相关），再谈补全档案。
+                '<div id="dw-saving-nudge" class="mt-6 hidden"></div>' +
                 // 阶段19-5b：税务档案引导卡的宿主位。与速算器共用同一份渲染（toolbox-ui），
                 // 不在这里抄第二份 —— 两处各长一套的话，「暂不」只在一处生效这种错迟早出现。
                 '<div id="dw-profile-nudge" class="mt-6 hidden"></div>' +
@@ -722,6 +726,7 @@
         bindEnterNext(host);
         bind(tool, steps);
         mountScenarioCard(tool);
+        mountSavingNudge(tool);
         mountProfileNudge(tool);
         mountTemplateBar(tool);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
@@ -762,6 +767,34 @@
             } catch (e) { /* 取不到就不给「生成年终奖方案」，保存照常可用 */ }
         }
         ui.mount(host, ctx);
+    }
+
+    // v1.100.0：省钱卡（阶段19-4 顺延 · §3.8 ④）。判定与文案走 toolbox-ui 那一份 ——
+    // 「档案里勾了扣除、这次没算进去」这件事在速算器与完整测算是同一件事，
+    // 写两套就等于允许两边对"什么算没带上"给出不同答案。
+    //
+    // 这里只补两件只有向导知道的事：
+    //   ① stepIndexOf —— 那一步此刻在不在（简明视图会把 advanced 步合并，
+    //      合并后找不到就由渲染层退回「核定能扣多少」，绝不摆一颗点了不跳的按钮）；
+    //   ② onStep —— 回到那一步。走的是与「上一步」同一套 state.stepIndex + saveDraft + render，
+    //      不为这张卡新开一条导航路径。
+    function mountSavingNudge(tool) {
+        var host = document.getElementById('dw-saving-nudge');
+        var tb = window.EuriskoToolbox;
+        if (!host || !tb || typeof tb.mountSavingNudge !== 'function') return;
+        var steps = stepsOf(tool);
+        tb.mountSavingNudge('dw-saving-nudge', tool, state.values, {
+            stepIndexOf: function (key) {
+                for (var i = 0; i < steps.length; i++) { if (steps[i].key === key) return i; }
+                return -1;
+            },
+            onStep: function (index) {
+                state.stepIndex = Math.max(0, Math.min(steps.length - 1, index));
+                state.atResult = !!(steps[state.stepIndex] && steps[state.stepIndex].result);
+                saveDraft();
+                render();
+            }
+        });
     }
 
     // 阶段19-5b：档案引导卡宿主由渲染器建，内容交给 toolbox-ui 那份实现填（口径只有一处）。
