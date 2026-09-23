@@ -371,6 +371,8 @@
             id: 'forward', name: '综合所得', subtitle: '工资 / 劳务 / 稿酬，四步出年度个税预算表',
             icon: 'fa-calculator', status: 'deep', comparable: true,
             nextTools: ['salary-tax', 'annual-settlement', 'special-deduction'],
+            // 阶段19-12：挂上政策条目 —— 没挂的结果页出不了时效徽标，而它**不报错**（静默缺口）
+            policyKey: 'comprehensive',
             fields: [
                 { key: 'workMonths', step: 'param', label: '年工作总月数', type: 'select', default: 12,
                     options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
@@ -576,6 +578,7 @@
             id: 'business', name: '经营所得', subtitle: '一人多家怎么汇总，亏损能不能互抵',
             icon: 'fa-briefcase', status: 'deep',
             nextTools: ['business-income', 'social-base', 'vat'],
+            policyKey: 'business-income',
             // 结果步由渲染器自动追加（所有完整测算都有，「计算结果」不在此重复声明）。
             //
             // 17D-11（v1.67.0）做深：原来的 spec 只认「一家个体户、成本费用逐项扣」，
@@ -893,6 +896,10 @@
             id: 'classification', name: '分类所得', subtitle: '利息 / 租赁 / 转让 / 偶然所得，按次单独计税',
             icon: 'fa-list-alt', status: 'deep',
             nextTools: ['withholding', 'annual-settlement'],
+            // 阶段19-12：政策库里**没有**分类所得条目，所以刻意不挂 policyKey。
+            // 为凑齐徽标而编一条政策（文号与有效期会印进导出的「政策依据」）比不挂更糟：
+            // 不挂只是这一页没有时效徽标，挂错是给用户一个错的有效期 —— 那是在骗人。
+            // 补政策条目时（必须带真文号）再挂上，并把 classification 从测试白名单里删掉。
             fields: [
                 // repeater：值是一条数组 [ { type, income, …条件字段} ]
                 { key: 'items', step: 'income', label: '所得条目', type: 'repeater',
@@ -3366,6 +3373,8 @@
             id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推税前收入',
             icon: 'fa-refresh', status: 'deep', comparable: true,
             nextTools: ['net-salary', 'salary-tax', 'employer-cost'],
+            // 倒算的是工资薪金（综合所得），政策口径与正向那套同源
+            policyKey: 'comprehensive',
             fields: [
                 // ---- 第一步：倒算目标 ----
                 // 四种目标合成一个下拉：拆成「先选方式、再选金额类型」两层就多一处不一致，
@@ -5771,6 +5780,7 @@
             subtitle: '满五唯一免在哪、核定 1% 能不能选、换购能退多少',
             icon: 'fa-home', status: 'deep', comparable: true,
             nextTools: ['classification', 'surtax-stamp'],
+            policyKey: 'property-transfer',
             fields: [
                 { key: 'usage', step: 'property', label: '转让的是', type: 'select', default: 'residence',
                     options: [{ value: 'residence', label: '住房（住宅）' }, { value: 'nonresidence', label: '非住房（商铺 / 写字楼等）' }],
@@ -6034,6 +6044,7 @@
             subtitle: '90 天 · 183 天 · 满六年，这次问题不是扣多少',
             icon: 'fa-passport', status: 'deep', comparable: true,
             nextTools: ['expat', 'forward', 'withholding'],
+            policyKey: 'non-resident',
             fields: [
                 { key: 'role', step: 'residence', label: '在境内单位的职务', type: 'select', default: 'staff',
                     options: [{ value: 'staff', label: '普通 / 中层员工' },

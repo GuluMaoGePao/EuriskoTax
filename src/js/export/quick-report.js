@@ -62,6 +62,14 @@
         return name + '_测算结果_' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.pdf';
     }
 
+    // B4（阶段19-12）：政策版本 —— 报告是要**交给别人看**的（老板 / 客户 / 税局），
+    // 「按哪一年的政策算的」是它能不能被当证据用的前提。值与页面同源（tax-registry.VERSION），
+    // 这里不自带一个数字：自带就一定会在某次改口径时忘了同步。
+    function versionLine() {
+        var reg = window.EuriskoTaxRegistry;
+        return (reg && reg.VERSION) ? String(reg.VERSION) : '';
+    }
+
     // 政策时效：只问 tax-registry，不自己算日期（阶段15 原则 6）
     function policyLine(tool) {
         var key = tool && tool.policyKey;
@@ -145,6 +153,7 @@
 
         var policy = policyLine(tool);
         var basis = basisHtml(tool);
+        var version = versionLine();
 
         return styles() +
             '<div class="qr">' +
@@ -162,6 +171,7 @@
             pitfalls +
             basis +
             (policy ? '<div class="qr-note">政策时效：' + esc(policy) + '</div>' : '') +
+            (version ? '<div class="qr-note">政策版本：' + esc(version) + '</div>' : '') +
             '<div class="qr-foot">本报告由 EuriskoTax 在本地浏览器完成计算并生成，计算过程不上传任何数据；' +
             '结果为测算参考，实际纳税请以税务机关核算为准。</div>' +
             '</div>';

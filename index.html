@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.102.0';
+        window.__APP_VERSION__ = '1.103.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -781,18 +781,23 @@
         <div id="quick-calculator-page" class="page hidden">
             <div class="quick-page-inner mx-auto py-4 px-4">
                 <!-- 顶部：返回 + 标题 + 政策时效 -->
-                <div class="flex items-start gap-3 mb-3">
-                    <button id="quick-back-btn" class="mt-1 text-gray-500 hover:text-primary" title="返回首页">
-                        <i class="fa fa-arrow-left"></i>
-                    </button>
-                    <div class="flex-1 min-w-0">
-                        <h2 id="quick-title" class="text-lg font-bold"></h2>
-                        <p id="quick-subtitle" class="text-xs text-gray-500 mt-0.5"></p>
+                <div class="mb-3">
+                    <div class="flex items-start gap-3">
+                        <button id="quick-back-btn" class="mt-1 text-gray-500 hover:text-primary" title="返回首页">
+                            <i class="fa fa-arrow-left"></i>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <h2 id="quick-title" class="text-lg font-bold"></h2>
+                            <p id="quick-subtitle" class="text-xs text-gray-500 mt-0.5"></p>
+                        </div>
+                        <!-- 阶段19-7：视图密度开关（简明 / 完整），就地切换、即时生效、记住偏好。
+                             内容由 toolbox-ui.js 按 window.EuriskoModePref 渲染（游客也可用）。 -->
+                        <div id="quick-mode-pill" class="flex-shrink-0"></div>
                     </div>
-                    <div id="quick-policy-badge" class="flex-shrink-0"></div>
-                    <!-- 阶段19-7：视图密度开关（简明 / 完整），就地切换、即时生效、记住偏好。
-                         内容由 toolbox-ui.js 按 window.EuriskoModePref 渲染（游客也可用）。 -->
-                    <div id="quick-mode-pill" class="flex-shrink-0"></div>
+                    <!-- 阶段19-12：政策时效 + 版本独占一行。挤在标题行里，手机宽度下会把
+                         「月薪个税」压成一字一行（基线 quick-375 抓到的真回归）——
+                         可信标记值得占一行，标题不值得为它竖排。 -->
+                    <div id="quick-policy-badge" class="mt-1.5 ml-8 flex flex-wrap gap-1"></div>
                 </div>
 
                 <div class="quick-layout">
@@ -1577,7 +1582,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.102.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.103.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

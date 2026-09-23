@@ -29,6 +29,22 @@
     function R() { return window.EuriskoToolRegistry; }
     function TB() { return window.EuriskoToolbox; }
 
+    // 阶段19-12（B3 + B4）：政策时效徽标 + 政策版本。
+    // 21 个完整测算此前**一枚都没有**（速算器有）—— 而按年填全的这些恰恰是财务 / 代账的主力入口，
+    // 他们最怕的就是「政策过期没」。这份 HTML 由 toolbox 出、deep 只管用，与速算器页面上那枚
+    // 是同一个函数：两份措辞分家只是时间问题，不给自己这个机会。
+    // 它是**可信标记**不是参数，所以简明视图下照样显示 —— 藏起来等于让用户不知道
+    // 这次算里有没有已经过期的政策。
+    function policyStampHtml() {
+        var tb = TB();
+        if (!tb) return '';
+        var spec = R() ? R().get(state.toolId) : null;
+        var html = '';
+        if (typeof tb.policyBadgeOf === 'function') html += tb.policyBadgeOf(spec && spec.policyKey);
+        if (typeof tb.policyVersionHtml === 'function') html += tb.policyVersionHtml();
+        return html;
+    }
+
     function esc(s) {
         return String(s === undefined || s === null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -485,6 +501,8 @@
         }
 
         return '<div class="card" id="dw-result-card" data-tool-id="' + esc(state.toolId) + '">' +
+                // 阶段19-12：政策时效 + 版本钉在结果卡最上面 —— 先知道这次算站不站得住，再看金额。
+                '<div class="dw-policy-stamp mb-2" id="dw-policy-stamp">' + policyStampHtml() + '</div>' +
                 // 阶段18-3：主结果的**含义**（如「应纳个人所得税」）此前只能靠第一个 .text-sm 去猜，
                 // 分享图取数时没有锚点可用。给它一个 id，通用取数就能照抄真实口径，而不是写死文案。
                 '<div class="text-sm text-gray-600" id="dw-result-primary-label">' + esc(view.primary.label) + '</div>' +

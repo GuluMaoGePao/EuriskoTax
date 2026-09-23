@@ -95,6 +95,16 @@
         }
     }
 
+    // 阶段19-12（B4）：结果标政策版本 —— 回答「这次算用的是哪一年的政策」。
+    // 版本号只问 tax-registry（那边管口径描述的版本），渲染层**不自带一个数字**：
+    // 自带就一定会在某次改口径时忘了同步，报告上印着一个对不上的版本 —— 那比不标更糟，
+    // 因为它看起来像证据。
+    function policyVersionHtml() {
+        var reg = window.EuriskoTaxRegistry;
+        if (!reg || !reg.VERSION) return '';
+        return '<span class="tool-badge">政策版本 ' + esc(reg.VERSION) + '</span>';
+    }
+
     // ====== 政策依据（页内展开，不外跳）======
     // 为什么这里一条 <a> 都不给：微信 / PWA standalone 里外链要么被拦、要么把用户带出应用，
     // 结果页自证其说的最后一环就断了。改成就地展开 + 一键复制文号 —— 文号能直接粘进
@@ -1666,7 +1676,9 @@
 
         if (titleEl) titleEl.textContent = tool.name;
         if (subEl) subEl.textContent = tool.subtitle || '';
-        if (badgeEl) badgeEl.innerHTML = policyBadgeOf(tool.policyKey);
+        // 时效徽标 + 政策版本一起出：这两件事是同一个问题的两半（这次算准不准、按哪年政策算的），
+        // 分开摆就会有人只看到一半。
+        if (badgeEl) badgeEl.innerHTML = policyBadgeOf(tool.policyKey) + policyVersionHtml();
         if (linkEl) linkEl.href = (tool.seoPath || '/seo/index.html') + '?source=app_quick';
 
         // 换工具时先收掉上一份结果的吸底条与行动条：留着上一个工具的金额是最坏的一种"看起来成功"
@@ -1974,6 +1986,11 @@
         // （两处各写一种表格形状，"粘进 Excel 列对齐"就没法只验一次）。
         tableTextOf: tableTextOf,
         copyText: copyText,
+        // 阶段19-12：政策时效徽标与政策版本 —— deep 向导复用**同一份**（速算器出、deep 用）。
+        // 21 个完整测算此前一枚徽标都没有（速算器有），这不是"少一个功能"，
+        // 而是同一个产品在两个入口上给了两套可信度口径。
+        policyBadgeOf: policyBadgeOf,
+        policyVersionHtml: policyVersionHtml,
         renderMemoryHint: renderMemoryHint,
         // 阶段19-5b：档案引导卡与「与上次对比」卡都挂到别处去（deep 向导结果步用前者）；
         // 同一份实现两处复用，引导口径只有一处。
