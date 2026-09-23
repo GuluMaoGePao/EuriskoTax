@@ -2930,7 +2930,10 @@
                 { key: 'pensionSelf', step: 'pension', label: '个人养老金：今年缴费额（元）', type: 'money', default: 12000, min: 0,
                     hint: '上限 **12000 元/年**，超额部分当年不可扣、**也不能结转到以后年度**' },
                 { key: 'years', step: 'pension', label: '预计缴费年数', type: 'number', default: 10, min: 1 },
-                { key: 'growthMultiple', step: 'pension', label: '预期领取额是累计缴费的几倍', type: 'number', default: 1.5, min: 1, step: 0.1,
+                // 19-7b：这里原先末尾还写了 `step: 0.1`（想当输入框步长）—— 它把前面的 `step:'pension'`
+                // 覆盖掉了，字段因此不属于任何一步，界面上永远看不到、只能按 1.5 参与计算。
+                // 渲染器不读字段级步长（数字框统一 inputmode=decimal），所以那个 0.1 直接删。
+                { key: 'growthMultiple', step: 'pension', label: '预期领取额是累计缴费的几倍', type: 'number', default: 1.5, min: 1,
                     hint: '领取环节的 3% 是**按领取额全额**计的（本金 + 收益一起计） —— 填 1 表示只回本金，1.5 表示连本带收益领 1.5 倍' },
 
                 { key: 'healthPremium', step: 'other', label: '税优健康险：今年保费（元）', type: 'money', default: 2400, min: 0,
@@ -7670,6 +7673,118 @@
             //   ② 单笔输入下的逐点对拍（tests/withholding-deep.test.js）。
             if (t.fields || t.compute) return;
             SHARED.forEach(function (k) { t[k] = twin[k]; });
+        });
+    })();
+
+    // ====== 阶段19-7b：字段级分级（简明 / 完整视图的字段可见性）======
+    // 分级收在这一张清单里，而不是散到 300 个字段上逐个打 `level`：
+    //   一份清单能一眼看全「哪些参数算进阶」，散进字段定义里就再没人核对得过来 ——
+    //   这与「按名字认人的表，每加一种形态就漏一批」是同一个病，同一剂药（按 id 认，不按位置认）。
+    //
+    // 判定标准只有一条：**不填也能算出结果**（有 default 兜底）、填了更准的，才标 advanced。
+    // 据此三条硬边界：
+    //   ① 主输入不标（月工资 / 收入总额 / 成本 / 各类金额）—— 藏起来不叫简洁，叫算不出来；
+    //   ② 决定「这次算什么」的分支不标（身份 / 情形 / 征收方式 / 是否并入 / 是否享受）：
+    //      藏了等于悄悄换掉工具语义，用户会以为自己算的是另一件事；
+    //   ③ 整步都是可选的 → 标**步级**（简明下合并成一步「补充参数（可选）」）；
+    //      步内只剩一部分可选 → 标字段级（收进「⚙ 更多参数（可选）」折叠块）。
+    //      两者**不叠加**：同一个字段既在 advanced 步里又自带 level，会折出两层折叠。
+    //
+    // 速算器一个都不标（沿用 19-7a 的口径）：它们只有 2~5 个字段且全部必填。
+    // 19-7a 已在 6 个高频 spec 的 steps 上写了步级 level，那 6 处保持原样，这里不重复声明。
+    var ADVANCED_STEPS = {
+        // 津补贴免税之外的专项附加扣除：expat 的主线是八类津补贴，这一整步都是「另外还能扣多少」
+        'expat-deep': ['special'],
+        // 汇算的四项可选扣除（大病医疗 / 其他扣除 / 专项附加怎么取）与已预缴，全有兜底
+        'annual-settlement-deep': ['deduction', 'prepaid'],
+        // 学历继续教育 / 职业资格 / 大病医疗：绝大多数人这几项是 0
+        'special-deduction-deep': ['other'],
+        // 是否高新 / 科技型中小 / 限制行业（三个都有「否」兜底）与研发加计、亏损台账
+        'corporate-income-tax-deep': ['identity', 'deduction'],
+        // 六税两费减半：政策开关，默认享受
+        'surtax-stamp-deep': ['policy'],
+        // 数月奖金：非居民当月没有这笔就不填，默认 0 也不影响工资部分
+        'non-resident': ['bonus']
+    };
+
+    var ADVANCED_FIELDS = {
+        // 全年其他综合所得：填 0 表示全年只有这一笔（预扣口径不需要它）
+        'withholding-deep': ['otherTaxable'],
+        // 同上（只用于「并入会怎样」的对照）+ 行权时点能否自己安排（规划项，不影响已发生批次）
+        'equity-deep': ['otherTaxable', 'plannable'],
+        // 不足一年的月数 / 补偿款中代扣的社保 / 当年其他综合所得 —— 前两项是精细化，第三项是对照
+        'severance-deep': ['extraMonths', 'socialDeduction', 'otherTaxable'],
+        // 三项全是横向对照用：分摊年数按法定算不能自选，另两项只影响「如果…会差多少」
+        'early-retirement-deep': ['otherTaxable', 'claimedYears', 'avgWage'],
+        // 汇算四项里除工资外的三项：只有工资的人这三栏是 0
+        'annual-settlement-deep': ['labor', 'author', 'royalty'],
+        // 配偶侧的明细（填 0 = 按单身算）+ 各项「本年享受月数」与分摊方式（默认满年 / 自动分摊）
+        'special-deduction-deep': [
+            'selfOtherDeduction', 'spouseMonthlyInsurance', 'spouseOtherDeduction',
+            'childMonths', 'childShare', 'infantMonths', 'infantShare',
+            'loanMonths', 'loanShare', 'rentMonths', 'elderlyMonths', 'elderlyMonthly'
+        ],
+        // 缴费年数与领取倍数是**收益侧假设**（不影响当期能扣多少）；年金六项都有法定默认
+        'private-pension-deep': [
+            'selfSpecialDeduction', 'selfOtherDeduction',
+            'spouseMonthlyInsurance', 'spouseSpecialDeduction', 'spouseOtherDeduction',
+            'years', 'growthMultiple',
+            'annuityPrevMonthlyWage', 'annuitySocialAverage', 'personalRate', 'employerRate', 'monthlyWithdraw'
+        ],
+        // 两个「当前市值」是明确标注**仅对照**的；经营所得 / 分类所得侧与票据状态都是「有才填」
+        'donation': [
+            'equityMarketValue', 'houseMarketValue',
+            'businessTaxable', 'businessVerified', 'classificationTaxable', 'classificationType',
+            'employerCount', 'hasReceipt'
+        ],
+        // 谈薪倒算：扣除明细一整片都是「不填按 0」，主目标与口径选择保留在明面
+        'reverse': [
+            'workMonths', 'bonusIncome', 'bonusInclude',
+            'socialBase', 'pensionRate', 'medicalRate', 'unemploymentRate',
+            'housingFundBase', 'housingFundRate',
+            'pensionInsurance', 'medicalInsurance', 'unemploymentInsurance', 'housingFund',
+            'childrenInfantDeduction', 'elderlyDeduction', 'housingType', 'rentDeduction', 'housingLoanDeduction',
+            'educationDeduction', 'educationProfessionalCheckbox', 'medicalDeduction',
+            'otherDeductionCheckbox', 'pensionDeductionCheckbox', 'pensionDeduction',
+            'enterpriseAnnuityCheckbox', 'enterpriseAnnuity',
+            'insuranceOtherDeductionCheckbox', 'insuranceOtherDeduction',
+            'taxDeferredPensionCheckbox', 'taxDeferredPension',
+            'charitableDonationCheckbox', 'charitableDonation'
+        ],
+        // 简易计税的法定情形、小规模纳税期与专票销售额、免税与简易项目、共同进项分摊
+        'vat-deep': ['simplifiedCase', 'period', 'specialInvoice', 'exemptSales', 'simplifiedSales', 'unallocatedInput'],
+        // 三项限额扣除（招待费 / 广告费 / 捐赠）：不填按 0，填了才做限额调整
+        'corporate-income-tax-deep': ['entertainment', 'advertising', 'donation'],
+        // 津贴、加班与上年度计薪月数：都是「有就填，没有按 0 / 12 个月」
+        'social-base-deep': ['monthlyAllowance', 'monthlyOvertime', 'paidMonths'],
+        // 境外书立地、留抵退税 / 即征即退 / 进口环节 / 消费税、单独列明的增值税 —— 都有 0 兜底
+        'surtax-stamp-deep': ['signedWhere', 'creditRefund', 'instantRefund', 'importVat', 'consumption', 'stampVat'],
+        // 季节性用工折算、派遣用工归属（能把人数整段降下来）、工会的实际拨缴额
+        'disability-fund-deep': [
+            'seasonalCount', 'seasonalMonths', 'dispatchCount', 'dispatchHere',
+            'monthlyAllowance', 'annualBonus', 'paidMonths',
+            'hireAnnualWage', 'hasUnion', 'actual'
+        ],
+        // 核定征收率（只在原值凭证不全时才用）、转让过程的税金、装修费 / 贷款利息 / 其他合理费用
+        'property-transfer': ['assessRate', 'vatAndSurcharge', 'decoration', 'loanInterest', 'otherFees'],
+        // 六年规则的两项细节（此前住满年度数 / 单次最长离境）与月份折算：都有默认，主判定是居住天数
+        'non-resident': ['fullYearsBefore', 'maxSingleAbsence', 'calendarDays', 'months']
+    };
+
+    (function applyAdvancedLevels() {
+        Object.keys(ADVANCED_STEPS).forEach(function (id) {
+            var t = get(id);
+            if (!t || !t.steps) return;
+            t.steps.forEach(function (s) {
+                if (ADVANCED_STEPS[id].indexOf(s.key) >= 0) s.level = 'advanced';
+            });
+        });
+        Object.keys(ADVANCED_FIELDS).forEach(function (id) {
+            var t = get(id);
+            if (!t || !t.fields) return;
+            t.fields.forEach(function (f) {
+                if (ADVANCED_FIELDS[id].indexOf(f.key) >= 0) f.level = 'advanced';
+            });
         });
     })();
 

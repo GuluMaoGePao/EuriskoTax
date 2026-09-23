@@ -89,6 +89,17 @@ const TARGETS = [
         prepare: `if (window.EuriskoDeepWizard) window.EuriskoDeepWizard.open('bonus-tax-deep', { fresh: true });`
     },
     {
+        id: 'deep-step1-advanced',
+        name: '完整测算第1步（年度汇算 · 简明视图的更多参数）',
+        // 阶段19-7b：advanced **字段级**分级铺到了全部 spec，而上面 deep-step1 / deep-result
+        // 两张用的 bonus-tax-deep 是 19-7a 就有的**步**级分级 —— 新铺的折叠块一张基线都没进过，
+        // 等于这轮唯一肉眼可见的产物没有回归网（以后改坏了哪种跑法都发现不了）。
+        // 年度汇算第 1 步就有三项（劳务 / 稿酬 / 特许权）在简明视图下收进
+        // 「⚙ 更多参数（可选）」，一张图正好盖住「默认收起 + 折叠块在场」这两件事。
+        // 不额外拍展开态：那是完整视图的活，由 mode-pref 的对拍守护管。
+        prepare: `if (window.EuriskoDeepWizard) window.EuriskoDeepWizard.open('annual-settlement-deep', { fresh: true });`
+    },
+    {
         id: 'deep-result',
         name: '深度测算结果步（年终奖）',
         expect: '#dw-result-card',

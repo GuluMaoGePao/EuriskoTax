@@ -44,6 +44,50 @@
     "ready": true
   },
   {
+    "id": "deep-step1-advanced",
+    "name": "完整测算第1步（年度汇算 · 简明视图的更多参数）",
+    "width": 1280,
+    "height": 900,
+    "theme": "dark",
+    "file": "deep-step1-advanced-1280-dark.png",
+    "bytes": 96470,
+    "sha256": "b8f1a220658b3848a8188008a0094139639727e95172e7b571a7c57163b84bd2",
+    "ready": true
+  },
+  {
+    "id": "deep-step1-advanced",
+    "name": "完整测算第1步（年度汇算 · 简明视图的更多参数）",
+    "width": 1280,
+    "height": 900,
+    "theme": "light",
+    "file": "deep-step1-advanced-1280.png",
+    "bytes": 94057,
+    "sha256": "c9a8b0886217207bad38a79129b8d01d046d831577939082aca135c126614b16",
+    "ready": true
+  },
+  {
+    "id": "deep-step1-advanced",
+    "name": "完整测算第1步（年度汇算 · 简明视图的更多参数）",
+    "width": 375,
+    "height": 812,
+    "theme": "dark",
+    "file": "deep-step1-advanced-375-dark.png",
+    "bytes": 61588,
+    "sha256": "cf3ec78d71ef4f67b0f4ad443724ef40701a6d4718ca7b8c3ae88321d720940a",
+    "ready": true
+  },
+  {
+    "id": "deep-step1-advanced",
+    "name": "完整测算第1步（年度汇算 · 简明视图的更多参数）",
+    "width": 375,
+    "height": 812,
+    "theme": "light",
+    "file": "deep-step1-advanced-375.png",
+    "bytes": 60041,
+    "sha256": "e87738d9d89687a768b5f0dbf4e16715e45a308e1e097573aa29ead9ece58d6f",
+    "ready": true
+  },
+  {
     "id": "deep-step1",
     "name": "深度向导第1步（年终奖）",
     "width": 1280,
