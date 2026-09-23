@@ -586,11 +586,13 @@
     // ① 简明视图下用户也能临时展开用一次，不必为了一个参数去改全局偏好；
     // ② readValues 始终能读到它们，切换视图不会丢已填的值（三条守护测试之三）。
     // renderFn 可选：完整测算向导有 repeater 字段，得用自己的渲染器（默认就是速算器这份 fieldHtml）
-    function advancedBlockHtml(fields, values, renderFn) {
+    // toolId 可选：阶段19-7b② —— 折叠块带 data-tool-id，「调过哪个测算的进阶参数」才可归因
+    function advancedBlockHtml(fields, values, renderFn, toolId) {
         if (!fields.length) return '';
         var draw = typeof renderFn === 'function' ? renderFn : function (f) { return fieldHtml(f, values); };
         var open = isFullMode() ? ' open' : '';
-        return '<details class="tool-advanced-block mt-3"' + open + '>' +
+        return '<details class="tool-advanced-block mt-3"' + open +
+            ' data-tool-id="' + String(toolId || '').replace(/"/g, '') + '">' +
             '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
             '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span>' +
             '<span class="text-xs text-gray-500">' + fields.length + ' 项 · 不填按默认值</span>' +
@@ -1721,7 +1723,7 @@
             curValues = values;
             var parts = partitionFields(visibleFields(tool, values));
             formEl.innerHTML = parts.basic.map(function (f) { return fieldHtml(f, values); }).join('') +
-                advancedBlockHtml(parts.advanced, values);
+                advancedBlockHtml(parts.advanced, values, null, tool.id);
             paintedKeys = parts.basic.concat(parts.advanced).map(function (f) { return f.key; });
             painted = {};
             paintedKeys.forEach(function (k) { painted[k] = values[k]; });
@@ -1861,8 +1863,25 @@
         syncNav();
     }
 
+    // ====== 阶段19-7b②：记录「简明视图下主动展开进阶参数」======
+    // 用**捕获阶段**监听 document：toggle 事件不冒泡，而两处渲染器（速算器 / 完整测算向导）
+    // 都是整块 innerHTML 重画，逐个 details 去绑会被下次重渲染冲掉，绑在祖先上才一劳永逸。
+    // 只报「展开」、不报「合上」；到底计不计由 mode-pref 按当前视图判断（完整视图下展开是默认态）。
+    function bindAdvancedSignal() {
+        document.addEventListener('toggle', function (e) {
+            var node = e.target;
+            if (!node || String(node.tagName).toUpperCase() !== 'DETAILS') return;
+            if (!node.classList || !node.classList.contains('tool-advanced-block')) return;
+            if (!node.open) return;
+            var p = window.EuriskoModePref;
+            if (!p || typeof p.noteAdvancedOpen !== 'function') return;
+            p.noteAdvancedOpen(node.getAttribute('data-tool-id') || '');
+        }, true);
+    }
+
     // ====== 初始化 ======
     function init() {
+        bindAdvancedSignal();
         renderScenarios();
         renderToolbox('');
 

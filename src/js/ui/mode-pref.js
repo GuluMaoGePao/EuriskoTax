@@ -23,6 +23,8 @@
     // 但只能在用户**没表达过**的时候带 —— 用户亲手切过一次之后，身份卡再改就是推翻他的选择。
     // 没有这个标记，两个偏好会互相覆盖，且覆盖顺序取决于谁先加载（那就是玄学）。
     var KEY_EXPLICIT = 'euriskoPrefModeExplicit';
+    // 阶段19-7b②：「简明视图下主动展开过进阶参数」的累计记录（线索质量分层信号，见 lead-context）
+    var KEY_TOUCHED = 'euriskoPrefAdvancedTouched';
     var SIMPLE = 'simple';
     var FULL = 'full';
     var subs = [];
@@ -60,6 +62,33 @@
         } catch (e) { /* 存不下就只影响"是否记住"，不影响本次会话 */ }
     }
 
+    // —— 阶段19-7b②：「主动展开过进阶参数」的记录 ——
+    // 为什么记在本模块而不是渲染层：折叠块是**本模块定义的**（简明 = 收起、完整 = 展开），
+    // 两处渲染器（速算器 / 完整测算向导）各自发明一个存储键，就是阶段18 那个病：
+    // 加一种形态漏一批，最后谁也说不清「调过进阶参数」到底记没记。
+    // 它**不是偏好**（不决定界面长什么样），只是行为计数，因此不 emit 变更事件。
+    function emptyTouched() { return { count: 0, tools: [], at: '' }; }
+
+    function readTouched() {
+        try {
+            var raw = JSON.parse(window.localStorage.getItem(KEY_TOUCHED) || '{}');
+            if (!raw || typeof raw !== 'object') return emptyTouched();
+            return {
+                count: Number(raw.count) > 0 ? Math.floor(Number(raw.count)) : 0,
+                tools: Array.isArray(raw.tools) ? raw.tools.filter(function (t) { return typeof t === 'string'; }) : [],
+                at: typeof raw.at === 'string' ? raw.at : ''
+            };
+        } catch (e) {
+            return emptyTouched();
+        }
+    }
+
+    function writeTouched(v) {
+        try {
+            window.localStorage.setItem(KEY_TOUCHED, JSON.stringify(v));
+        } catch (e) { /* 存不下就只是这次没记上，绝不影响当前会话 */ }
+    }
+
     function emit(mode, prev) {
         subs.slice().forEach(function (cb) {
             try { cb(mode, prev); } catch (e) { console.warn('[mode-pref] 订阅回调抛错', e); }
@@ -91,6 +120,22 @@
         },
         /** 用户是否亲手切过视图（身份卡靠它决定能不能带出默认） */
         isExplicit: function () { return readExplicit(); },
+        /**
+         * 渲染层上报：用户展开了「更多参数（可选）」折叠块。
+         * 只在**简明视图**下计数 —— 完整视图下它本来就是展开的，点一下不代表「主动找参数」，
+         * 记进去会把「完整视图用户」和「简明视图下摸索过的人」混成同一个数，分层就废了。
+         */
+        noteAdvancedOpen: function (toolId) {
+            if (read() !== SIMPLE) return readTouched();
+            var v = readTouched();
+            v.count += 1;
+            v.at = new Date().toISOString();
+            if (toolId && v.tools.indexOf(toolId) === -1) v.tools.push(toolId);
+            writeTouched(v);
+            return readTouched();
+        },
+        /** 累计记录：{ count, tools:[toolId], at } —— 线索质量分层用（lead-context.viewSignals） */
+        advancedTouched: function () { return readTouched(); },
         toggle: function () { return api.set(read() === FULL ? SIMPLE : FULL); },
         /** 订阅变更，返回退订函数 */
         onChange: function (cb) {
@@ -107,6 +152,7 @@
             try {
                 window.localStorage.removeItem(KEY);
                 window.localStorage.removeItem(KEY_EXPLICIT);
+                window.localStorage.removeItem(KEY_TOUCHED);
             } catch (e) { /* ignore */ }
         },
         label: function (mode) { return (mode || read()) === FULL ? '完整' : '简明'; }

@@ -332,6 +332,10 @@
     }
 
     function collectPayload() {
+        var signals = (window.LeadContext && typeof window.LeadContext.viewSignals === 'function')
+            ? window.LeadContext.viewSignals()
+            : null;
+
         function val(id) {
             var node = el(id);
             return node && typeof node.value === 'string' ? node.value : '';
@@ -358,6 +362,11 @@
             need: val('lead-need') || 'other',
             source: state.source,
             scene: state.scene,
+            // 阶段19-7b②：视图密度与「简明视图下主动展开进阶参数」次数随线索一起上报，
+            // 顾问据此排跟进优先级（完整视图 / 调过进阶参数 = 更接近成交）。
+            // 取不到就留空：老会话没记录过就是没信号，不猜一个「简明」出来充数。
+            viewMode: signals ? signals.mode : '',
+            advancedTouched: signals ? signals.advancedTouched : 0,
             note: val('lead-note').trim(),
             consent: !!(el('lead-consent') && el('lead-consent').checked)
         };

@@ -246,6 +246,9 @@ model Lead {
   need        String   @default("") // 代理记账 / 汇算清缴 / 申报核对 / 咨询 / other
   source      String   @default("unknown") // 触点归因（见阶段13方案 §3.1）
   scene       String   @default("") // 情境快照
+  // 阶段19-7b②（v1.102.0）：线索质量分层 —— 只记「使用深度」，不记任何填报内容
+  view_mode        String   @default("") // 留资时的视图密度：simple / full，空 = 未上报（老客户端）
+  advanced_touched Int      @default(0) // 简明视图下主动展开「更多参数（可选）」的累计次数
   note        String   @default("")
   consent     Boolean  @default(false) // 个保法显式同意留痕
   status      String   @default("new") // new / contacted / qualified / converted / dropped

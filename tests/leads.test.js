@@ -123,6 +123,30 @@ describe('阶段13 转化线索 - buildLead 归一化契约', () => {
         expect(buildLead({ ...BASE, scene: 'x'.repeat(leadInternals.SCENE_MAX + 1) }).error).toContain('scene');
     });
 
+    // 阶段19-7b②：视图密度 + 进阶参数探索次数（线索质量分层）
+    test('viewMode 保留合法值，非法值回落空串：没上报就是没信号，不能充数成 simple', () => {
+        expect(buildLead({ ...BASE, viewMode: 'full' }).data.view_mode).toBe('full');
+        expect(buildLead({ ...BASE, viewMode: 'simple' }).data.view_mode).toBe('simple');
+        expect(buildLead({ ...BASE, viewMode: 'hacker' }).data.view_mode).toBe('');
+        expect(buildLead({ ...BASE, viewMode: 1 }).data.view_mode).toBe('');
+        // 缺省为空串：老客户端没这个字段，顾问侧看到的是「无信号」而不是「用户选了简明」
+        expect(buildLead(BASE).data.view_mode).toBe('');
+    });
+
+    test('advancedTouched 只认非负整数：小数 / 负数 / 字符串 / 越界一律回落 0 或截断', () => {
+        expect(buildLead({ ...BASE, advancedTouched: 3 }).data.advanced_touched).toBe(3);
+        expect(buildLead({ ...BASE, advancedTouched: 0 }).data.advanced_touched).toBe(0);
+        // 它是计数不是状态：脏数据回落 0 只会**低估**信号，不会凭空造出一个高优线索
+        expect(buildLead({ ...BASE, advancedTouched: -1 }).data.advanced_touched).toBe(0);
+        expect(buildLead({ ...BASE, advancedTouched: 1.5 }).data.advanced_touched).toBe(0);
+        expect(buildLead({ ...BASE, advancedTouched: '3' }).data.advanced_touched).toBe(0);
+        expect(buildLead(BASE).data.advanced_touched).toBe(0);
+        expect(buildLead({ ...BASE, advancedTouched: leadInternals.ADVANCED_MAX }).data.advanced_touched)
+            .toBe(leadInternals.ADVANCED_MAX);
+        expect(buildLead({ ...BASE, advancedTouched: leadInternals.ADVANCED_MAX + 1 }).data.advanced_touched)
+            .toBe(leadInternals.ADVANCED_MAX);
+    });
+
     test('source 白名单覆盖四条触点链路（结果页/内容中心/个人中心/分享）', () => {
         // 结果页只投三类（工资与谈薪刻意不出服务引导）
         ['result_business', 'result_settlement', 'result_budget'].forEach((s) => {

@@ -668,9 +668,10 @@
         if (!fields.length) return '';
         var tb = TB();
         if (tb && typeof tb.advancedBlockHtml === 'function') {
-            return tb.advancedBlockHtml(fields, state.values, drawField);
+            return tb.advancedBlockHtml(fields, state.values, drawField, state.toolId);
         }
-        return '<details class="tool-advanced-block mt-3"' + (isFullMode() ? ' open' : '') + '>' +
+        return '<details class="tool-advanced-block mt-3"' + (isFullMode() ? ' open' : '') +
+            ' data-tool-id="' + String(state.toolId || '').replace(/"/g, '') + '">' +
             '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
             '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span></summary>' +
             '<div class="mt-3">' + fields.map(drawField).join('') + '</div></details>';

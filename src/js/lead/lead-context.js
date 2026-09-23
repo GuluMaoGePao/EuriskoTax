@@ -187,6 +187,22 @@
         return parts.join(' · ');
     }
 
+    // 阶段19-7b②（v1.102.0）：视图密度 + 「简明视图下主动展开过进阶参数」的次数。
+    // 这两个数**不描述算了什么**（那是 current() 的职责），只描述**这个人想要多细** ——
+    // 选完整视图、或在简明视图下翻出进阶参数去调的人，多数是财务 / HR / 企业主（ICP ★★★）。
+    // 刻意不并进 current() 的文本：那段话是给用户看的「参考您的测算」，
+    // 混进行为标记，就成了当着用户的面给他打分。
+    // 拿不到（模块未加载）返回 null —— 没信号就说没信号，不猜一个「简明」出来充数。
+    function viewSignals() {
+        var p = window.EuriskoModePref;
+        if (!p || typeof p.get !== 'function') return null;
+        var touched = (typeof p.advancedTouched === 'function') ? p.advancedTouched() : null;
+        return {
+            mode: p.get() === p.FULL ? 'full' : 'simple',
+            advancedTouched: Number(touched && touched.count) || 0
+        };
+    }
+
     function formatDate(value) {
         var date = value ? new Date(value) : null;
         if (!date || isNaN(date.getTime())) return '';
@@ -263,6 +279,7 @@
         current: current,
         summarize: summarize,
         historyOptions: historyOptions,
-        conclusionWord: conclusionWord
+        conclusionWord: conclusionWord,
+        viewSignals: viewSignals
     };
 })();

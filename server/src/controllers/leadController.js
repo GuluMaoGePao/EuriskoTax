@@ -45,6 +45,12 @@ const PHONE_RE = /^1[3-9]\d{9}$/;
 // 幂等去重窗口：同手机号 24h 内重复提交不新建记录（也避免暴露"该号码已提交"）
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// 阶段19-7b②：视图密度白名单。空串（未上报）是**合法值** —— 老客户端 / 游客首次进入
+// 没有信号就是没有信号，不能回落成 simple 充数，否则顾问会把「没采集到」当成「用户选了简明」。
+const VIEW_MODES = ['simple', 'full', ''];
+// 进阶参数展开次数上限：纯防脏数据（端上是真实计数，正常远小于此）
+const ADVANCED_MAX = 999;
+
 const pickEnum = (list, raw, fallback) => (typeof raw === 'string' && list.includes(raw) ? raw : fallback);
 
 /**
@@ -95,6 +101,14 @@ const buildLead = (body) => {
     const noteRes = readText(src.note, NOTE_MAX, 'note');
     if (noteRes.error) return { error: noteRes.error };
 
+    // 视图密度 + 进阶参数探索次数（阶段19-7b②）：线索质量分层依据，选填、**不阻断留资**。
+    // 非法值一律回落（与 entity / need / source 同一个「不写脏数据」口径）：
+    // 非整数、负数、超上限都归 0 —— 它是计数不是状态，回落 0 只会低估不会误判。
+    const viewMode = pickEnum(VIEW_MODES, src.viewMode, '');
+    const advancedTouched = Number.isInteger(src.advancedTouched) && src.advancedTouched >= 0
+        ? Math.min(src.advancedTouched, ADVANCED_MAX)
+        : 0;
+
     return {
         data: {
             name,
@@ -107,6 +121,8 @@ const buildLead = (body) => {
             need: pickEnum(NEEDS, src.need, 'other'),
             source: pickEnum(SOURCES, src.source, 'unknown'),
             scene: sceneRes.value,
+            view_mode: viewMode,
+            advanced_touched: advancedTouched,
             note: noteRes.value,
             consent: true
         }
@@ -152,11 +168,16 @@ const submitLead = async (req, res, next) => {
                         // 两项各自判断 —— 用户可能只改了城市而省份没重选
                         province: data.province || existing.province,
                         city: data.city || existing.city,
+                        // 视图密度以最新一次为准（与情境同口径）；
+                        // 「调过进阶参数」取**最大**：它是事实不是状态，
+                        // 不能被后一次「这次没展开」抹掉 —— 抹掉就等于把已知的强信号降级。
+                        view_mode: data.view_mode || existing.view_mode,
+                        advanced_touched: Math.max(existing.advanced_touched || 0, data.advanced_touched || 0),
                         note: noteMerged,
                         user_id: existing.user_id || userId
                     }
                 });
-                console.log(`[LEAD] ${new Date().toISOString()} merged id=${merged.id} source=${merged.source} scene="${merged.scene}"`);
+                console.log(`[LEAD] ${new Date().toISOString()} merged id=${merged.id} source=${merged.source} scene="${merged.scene}" view="${merged.view_mode}" adv=${merged.advanced_touched}`);
                 return res.status(200).json({ success: true, data: { id: merged.id, merged: true } });
             }
         }
@@ -168,7 +189,7 @@ const submitLead = async (req, res, next) => {
         // 落日志：生产环境可经 ops-notify.ps1 邮件转发，实现"有新线索即知会"
         // 带上省·市：日志是「有新线索即知会」的转发源，顾问一眼就能看出该按哪套基数口径对接
         const region = [saved.province, saved.city].filter(Boolean).join('·');
-        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} region="${region}" scene="${saved.scene}"`);
+        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} region="${region}" scene="${saved.scene}" view="${saved.view_mode}" adv=${saved.advanced_touched}`);
 
         res.status(201).json({
             success: true,
@@ -186,6 +207,8 @@ module.exports = {
         ENTITY_TYPES,
         NEEDS,
         SOURCES,
+        VIEW_MODES,
+        ADVANCED_MAX,
         PHONE_RE,
         NAME_MAX,
         WECHAT_MAX,

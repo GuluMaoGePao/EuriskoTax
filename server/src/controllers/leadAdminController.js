@@ -320,7 +320,7 @@ const exportLeads = async (req, res, next) => {
 
         const header = [
             'ID', '提交时间(北京)', '姓名', '手机号', '微信号', '公司/个体户', '省份', '城市', '主体类型',
-            '需求', '来源', '情境', '状态', '跟进人', '备注', '同意隐私'
+            '需求', '来源', '情境', '视图', '调过进阶参数', '状态', '跟进人', '备注', '同意隐私'
         ];
         const lines = [header.map(csvCell).join(',')];
         items.forEach((it) => {
@@ -337,6 +337,9 @@ const exportLeads = async (req, res, next) => {
                 it.need,
                 it.source,
                 it.scene,
+                // 阶段19-7b②：顾问按「视图 / 调过进阶参数」排跟进优先级（完整视图或调过参数的更接近成交）
+                it.view_mode,
+                it.advanced_touched,
                 it.status,
                 it.owner,
                 it.note,
