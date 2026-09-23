@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15C-3）：企业用工成本，长尾词「企业用工成本 计算器 /
+         用工成本 倍数 / 单位五险一金 比例 / 人均预算 倒推工资 / 涨薪 企业成本 /
+         社保基数 保底 企业成本 / 公积金 单位 12%」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 规则与费率复用 App 同源实现（employer-cost-quick.js → social-insurance-quick.js →
+              tax-constants.js），页面上不出现第二份口径；
+           3) 政策依据文号来自注册表 tax-registry.js，页面不自己维护文号；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背一条主线任务：**成本倍数不是常数 —— 工资越低，倍数越高** ——
+         缴费基数按社平工资 60% 保底，低工资也要按下限缴，单位那部分一分不少；
+         反过来 300% 封顶后单位部分不再增加，高工资的倍数反而更低（保底与封顶咬的是两端）。
+         配套的第二条主线：涨薪 1000 元，企业每月多付 1395 元，员工全年只多拿 8370~9021 元
+         —— 中间的差额就是「涨薪传递率」。 -->
+    <title>企业用工成本计算器 2026：税前 1 万企业实际花 1.395 万（单位五险一金 + 社保基数保底封顶）</title>
+    <meta name="description" content="按 2026 年现行口径测算企业用工成本：税前月薪 10000 元，企业实际月支出 13950 元（1.395 倍），员工月均到手 7697.50 元、只占企业成本的 55.2%；税前 3000 元因社保按下限 4800 元保底，成本倍数反而高达 1.63 倍，而税前 50000 元只有 1.19 倍。含人均预算倒推工资、涨薪成本与传递率测算。政策依据：社会保险法（主席令第 35 号）、住房公积金管理条例（国务院令第 262 号）、国办发〔2019〕13 号、财税〔2006〕10 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/employer-cost.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="企业用工成本：税前 1 万，企业实际要花 1.395 万">
+    <meta property="og:description" content="成本倍数不是常数 —— 工资越低倍数越高（保底），工资越高倍数越低（封顶）。涨薪 1000 元，企业多付 1395，员工只多拿约 750。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/employer-cost.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 企业用工成本测算",
+                "url": "https://euriskotax.zeabur.app/seo/employer-cost.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "由税前工资测算企业实际用工成本（含单位缴纳的五险一金），并按人均预算倒推可开工资、测算涨薪成本与传递率。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "税前 10000 元，企业实际要花多少钱？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "用工成本 = 税前工资 + 单位缴纳的五险一金。按常见费率（养老 16%、医疗约 9.8%、失业 0.5%、工伤与生育由单位缴、公积金同比例 12%），税前 10000 元的单位五险一金为 3950 元，企业月成本 13950 元（1.395 倍），年成本 167400 元；员工月均到手 7697.50 元，只占企业成本的 55.2%。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "为什么工资越低，用工成本倍数反而越高？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为缴费基数按当地上年度社平工资的 60% 保底：社平 8000 元时下限为 4800 元，工资 3000 元也要按 4800 元缴，单位部分 1896 元一分不少，成本 4896 元、倍数 1.63 倍。工资涨到 10000 元时倍数回落到 1.40 倍，工资 50000 元因 300% 封顶只有 1.19 倍 —— 保底与封顶咬的是两端。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "人均预算 20000 元，能开多少工资？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "按同一套参数倒推：人均月预算 20000 元可开税前月薪 14336.91 元（取整到百元 14300 元），员工月均到手 10810.00 元。倒推要二分求解 —— 单位五险一金随工资分段变化（保底区间固定、封顶后不再增加），不能拿预算除以一个固定倍数。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "给员工涨薪 1000 元，企业要多花多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "看工资有没有超过社保封顶：未封顶时企业每月多付 1395 元（1000 元工资 + 395 元单位五险一金），全年多付 16740 元，而员工全年到手只多 8370~9021 元，传递率约 50%~54%；已封顶（社平 8000 元时为 24000 元以上）后单位部分不再增加，企业每月只多付 1000 元，传递率反而升到 70%~80%。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "公积金 12% 是单位和个人各 12% 吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "是。单位与职工的缴存比例一致（均不低于 5%、不高于 12%，住房公积金管理条例第十八条），谈「12% 公积金」意味着单位再出同比例的一份，两笔都进职工个人账户。在比例不超过 12%、基数不超过设区城市上年度职工月平均工资 3 倍的范围内，免征个人所得税（财税〔2006〕10 号）。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个用工成本包含招聘、福利和残保金吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不包含。本页只算税前工资与法定五险一金中单位缴纳的部分，不含招聘与培训费用、补充公积金、商业保险、职工福利、工会经费、职工教育经费、残疾人就业保障金等。实际用工成本通常高于本页结果。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_employercost">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>企业用工成本计算器：税前 1 万，企业实际要花 1.395 万</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>用工成本 = 税前工资 + <strong>单位缴纳的五险一金</strong>，
+            但这个「倍数」<strong>不是常数</strong>：缴费基数按当地社平工资 <strong>60% 保底</strong>，
+            工资低也要按下限缴，所以<strong>工资越低，倍数越高</strong> ——
+            社平 8000 元、公积金 12%、专项附加扣除 1000 元/月的口径下：
+            <strong>税前 3000 元 → 企业月成本 4896 元（1.63 倍）</strong>；
+            <strong>税前 10000 元 → 13950 元（1.40 倍）</strong>；
+            <strong>税前 50000 元 → 59480 元（1.19 倍，300% 封顶后单位部分不再增加）</strong>。
+            员工真正拿到手的只占企业成本的一半左右：税前 1 万，员工月均到手 7697.50 元，占 <strong>55.2%</strong>。
+            涨薪同理：<strong>每月多开 1000 元，企业实际多付 1395 元，员工全年只多拿 8370~9021 元</strong>。
+            下面三个速算器分别实算：正算成本、按预算倒推工资、涨薪成本。
+        </p>
+
+        <section class="card" aria-labelledby="cost-title">
+            <h2 id="cost-title" style="margin-top:0">速算一：税前工资 → 企业用工成本</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：单位部分与个人部分<strong>共用同一套缴费基数</strong>（本人上年度月平均工资，
+                按社平工资 60% 保底 / 300% 封顶）；员工到手按<strong>累计预扣法</strong>逐月爬档
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="e-wage">税前月薪（元）</label>
+                    <input class="calc-input" id="e-wage" type="number" inputmode="decimal" min="0" step="1000" value="10000" aria-describedby="cost-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="e-avg">当地上年度月社平工资（元）</label>
+                    <input class="calc-input" id="e-avg" type="number" inputmode="decimal" min="0" step="500" value="8000" aria-describedby="cost-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="e-rate">公积金缴存比例（%）</label>
+                    <input class="calc-input" id="e-rate" type="number" inputmode="decimal" min="5" max="12" step="1" value="12" aria-describedby="cost-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="e-special">专项附加扣除（元/月）</label>
+                    <input class="calc-input" id="e-special" type="number" inputmode="decimal" min="0" step="500" value="1000" aria-describedby="cost-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="e-headcount">人数</label>
+                    <input class="calc-input" id="e-headcount" type="number" inputmode="decimal" min="1" step="1" value="1" aria-describedby="cost-note">
+                </div>
+            </div>
+            <p class="small muted" id="cost-note" style="margin-top:10px">
+                单位费率取常见值：养老 16%、医疗 9.8%、失业 0.5%、工伤 0.4%、生育 0.8%，
+                公积金与职工同比例（单位、个人各一份）。工伤、生育<strong>个人不缴</strong>。
+            </p>
+            <div class="results" id="cost-results" hidden>
+                <div class="result highlight">
+                    <div class="k">企业人均月成本（元）</div>
+                    <div class="v" id="c-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">成本倍数（成本 / 工资）</div>
+                    <div class="v" id="c-multiple">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">单位五险一金/月（元）</div>
+                    <div class="v" id="c-employer">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">缴费基数（元）</div>
+                    <div class="v" id="c-base">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">个人五险一金/月（元）</div>
+                    <div class="v" id="c-personal">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">员工月均到手（元）</div>
+                    <div class="v" id="c-net">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">到手占企业成本</div>
+                    <div class="v" id="c-share">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">企业年成本·人均（元）</div>
+                    <div class="v" id="c-annual">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">团队月成本（元）</div>
+                    <div class="v" id="c-team-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">团队年成本（元）</div>
+                    <div class="v" id="c-team-annual">—</div>
+                </div>
+            </div>
+            <div class="hint" id="cost-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="budget-title">
+            <h2 id="budget-title" style="margin-top:0">速算二：人均预算 → 能开多少工资（倒推）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：单位五险一金随工资<strong>分段变化</strong>（保底区间固定、封顶后不再增加），
+                所以倒推要二分求解，不能拿预算除以一个固定倍数
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="b-budget">企业人均月预算（元/人）</label>
+                    <input class="calc-input" id="b-budget" type="number" inputmode="decimal" min="0" step="1000" value="13950" aria-describedby="budget-note">
+                </div>
+            </div>
+            <p class="small muted" id="budget-note" style="margin-top:10px">
+                社平工资、公积金比例与专项附加扣除沿用速算一的输入。
+            </p>
+            <div class="results" id="budget-results" hidden>
+                <div class="result highlight">
+                    <div class="k">可开税前月薪（元）</div>
+                    <div class="v" id="b-wage">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">取整到百元（元）</div>
+                    <div class="v" id="b-wage-hundred">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">其中单位五险一金（元）</div>
+                    <div class="v" id="b-employer">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">员工月均到手（元）</div>
+                    <div class="v" id="b-net">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">成本倍数</div>
+                    <div class="v" id="b-multiple">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">实际月成本（元）</div>
+                    <div class="v" id="b-cost">—</div>
+                </div>
+            </div>
+            <div class="hint" id="budget-hint" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="raise-title">
+            <h2 id="raise-title" style="margin-top:0">速算三：涨薪成本与传递率（企业多付 vs 员工多拿）</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：<strong>企业多付</strong> = 涨薪额 + 随之增加的单位五险一金；
+                <strong>传递率</strong> = 员工全年多拿的到手 ÷ 企业全年多付的成本
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="r-step">税前每月加（元）</label>
+                    <input class="calc-input" id="r-step" type="number" inputmode="decimal" min="0" step="500" value="1000" aria-describedby="raise-note">
+                </div>
+            </div>
+            <p class="small muted" id="raise-note" style="margin-top:10px">
+                以速算一的税前月薪为基准；社保参数沿用速算一的输入。
+            </p>
+            <div class="results" id="raise-results" hidden>
+                <div class="result">
+                    <div class="k">加薪后税前（元）</div>
+                    <div class="v" id="r-gross">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">企业月多付（元）</div>
+                    <div class="v" id="r-extra-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">企业年多付（元）</div>
+                    <div class="v" id="r-extra-annual">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">员工月均多拿（元）</div>
+                    <div class="v" id="r-extra-net-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">员工年多拿（元）</div>
+                    <div class="v" id="r-extra-net-annual">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">传递率</div>
+                    <div class="v" id="r-passthrough">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">成本放大（每涨 1 元实际多付）</div>
+                    <div class="v" id="r-cost-multiple">—</div>
+                </div>
+            </div>
+            <div class="hint" id="raise-hint" hidden></div>
+        </section>
+
+        <h2>示例：税前工资 → 企业用工成本（社平 8000、公积金 12%、专项附加 1000）</h2>
+        <div class="table-scroll">
+            <table id="employer-cost-table">
+                <thead>
+                    <tr><th>税前月薪（元）</th><th>缴费基数（元）</th><th>单位五险一金（元/月）</th><th>企业月成本（元）</th><th>企业年成本（元）</th><th>成本倍数</th><th>员工月均到手（元）</th><th>到手占成本</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">3000.00</td><td class="num">4800.00</td><td class="num">1896.00</td><td class="num">4896.00</td><td class="num">58752.00</td><td class="num">1.63</td><td class="num">1920.00</td><td class="num">39.2%</td></tr>
+                    <tr><td class="num">4000.00</td><td class="num">4800.00</td><td class="num">1896.00</td><td class="num">5896.00</td><td class="num">70752.00</td><td class="num">1.47</td><td class="num">2920.00</td><td class="num">49.5%</td></tr>
+                    <tr><td class="num">4800.00</td><td class="num">4800.00</td><td class="num">1896.00</td><td class="num">6696.00</td><td class="num">80352.00</td><td class="num">1.40</td><td class="num">3720.00</td><td class="num">55.6%</td></tr>
+                    <tr><td class="num">8000.00</td><td class="num">8000.00</td><td class="num">3160.00</td><td class="num">11160.00</td><td class="num">133920.00</td><td class="num">1.40</td><td class="num">6194.00</td><td class="num">55.5%</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">3950.00</td><td class="num">13950.00</td><td class="num">167400.00</td><td class="num">1.40</td><td class="num">7697.50</td><td class="num">55.2%</td></tr>
+                    <tr><td class="num">15000.00</td><td class="num">15000.00</td><td class="num">5925.00</td><td class="num">20925.00</td><td class="num">251100.00</td><td class="num">1.40</td><td class="num">11272.50</td><td class="num">53.9%</td></tr>
+                    <tr><td class="num">24000.00</td><td class="num">24000.00</td><td class="num">9480.00</td><td class="num">33480.00</td><td class="num">401760.00</td><td class="num">1.40</td><td class="num">17490.00</td><td class="num">52.2%</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">24000.00</td><td class="num">9480.00</td><td class="num">39480.00</td><td class="num">473760.00</td><td class="num">1.32</td><td class="num">22290.00</td><td class="num">56.5%</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">24000.00</td><td class="num">9480.00</td><td class="num">59480.00</td><td class="num">713760.00</td><td class="num">1.19</td><td class="num">37430.00</td><td class="num">62.9%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            看倍数那一列：从 <strong>1.63</strong> 一路降到 <strong>1.19</strong> ——
+            前两行基数是 <strong>4800.00</strong>（社平 60% 保底，工资 3000 元与 4000 元按同一个基数缴，
+            单位部分都是 1896.00 元）；最后两行基数是 <strong>24000.00</strong>（社平 300% 封顶，
+            工资 30000 元与 50000 元的单位部分都是 9480.00 元）。
+            <strong>保底让低工资更贵，封顶让高工资更便宜</strong>。
+        </p>
+
+        <h2>涨薪 1000 元：企业多付多少，员工多拿多少</h2>
+        <div class="table-scroll">
+            <table id="raise-example-table">
+                <thead>
+                    <tr><th>涨薪前税前（元）</th><th>涨薪后（元）</th><th>企业月多付（元）</th><th>企业年多付（元）</th><th>员工月均多拿（元）</th><th>员工年多拿（元）</th><th>成本放大</th><th>传递率</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">8000.00</td><td class="num">9000.00</td><td class="num">1395.00</td><td class="num">16740.00</td><td class="num">751.75</td><td class="num">9021.00</td><td class="num">1.40</td><td class="num">53.9%</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">11000.00</td><td class="num">1395.00</td><td class="num">16740.00</td><td class="num">751.75</td><td class="num">9021.00</td><td class="num">1.40</td><td class="num">53.9%</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">21000.00</td><td class="num">1395.00</td><td class="num">16740.00</td><td class="num">697.50</td><td class="num">8370.00</td><td class="num">1.40</td><td class="num">50%</td></tr>
+                    <tr><td class="num">27137.50</td><td class="num">28137.50</td><td class="num">1000.00</td><td class="num">12000.00</td><td class="num">800.00</td><td class="num">9600.00</td><td class="num">1.00</td><td class="num">80%</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">31000.00</td><td class="num">1000.00</td><td class="num">12000.00</td><td class="num">800.00</td><td class="num">9600.00</td><td class="num">1.00</td><td class="num">80%</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">51000.00</td><td class="num">1000.00</td><td class="num">12000.00</td><td class="num">700.00</td><td class="num">8400.00</td><td class="num">1.00</td><td class="num">70%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            这张表最反直觉的地方在最后一列：<strong>高工资涨薪的传递率反而更高</strong> ——
+            未封顶时企业每多付 1 元，员工只拿到约 <strong>0.50~0.54 元</strong>；
+            超过封顶线（社平 8000 元时 24000 元）后单位部分不再增加，企业每多付 1 元员工能拿到
+            <strong>0.70~0.80 元</strong>。给高薪员工涨薪，钱更"值"。
+        </p>
+
+        <h2>人均预算倒推：这笔预算能开多少工资</h2>
+        <div class="table-scroll">
+            <table id="budget-example-table">
+                <thead>
+                    <tr><th>企业人均月预算（元）</th><th>可开税前月薪（元）</th><th>取整到百元（元）</th><th>员工月均到手（元）</th><th>成本倍数</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">8000.00</td><td class="num">5734.77</td><td class="num">5700.00</td><td class="num">4444.45</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">7168.45</td><td class="num">7100.00</td><td class="num">5555.55</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">13950.00</td><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">7697.50</td><td class="num">1.40</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">14336.91</td><td class="num">14300.00</td><td class="num">10810.00</td><td class="num">1.40</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">21505.37</td><td class="num">21500.00</td><td class="num">15809.99</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">40520.00</td><td class="num">40500.00</td><td class="num">30500.00</td><td class="num">1.23</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            最后一行倍数掉到 <strong>1.23</strong>：预算 50000 元对应税前 40520 元，
+            已超过社平 3 倍（24000 元），单位五险一金封顶在 9480.00 元 ——
+            预算再往上加，工资能跟着涨的比例更大。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 成本倍数不是常数：工资越低，倍数越高</h3>
+        <p>
+            单位与个人<strong>共用同一套缴费基数</strong>，而基数按社平工资 60% 保底 / 300% 封顶。
+            社平 8000 元时下限 4800 元：工资 3000 元也要按 4800 元缴，单位部分 1896.00 元一分不少 ——
+            成本 4896.00 元、<strong>倍数 1.63</strong>。工资 10000 元时倍数回落到 <strong>1.40</strong>，
+            工资 50000 元因封顶只有 <strong>1.19</strong>。
+            所以「按 1.4 倍估用工成本」在两端都会算错，低工资那边错得更狠。
+        </p>
+        <h3>2. 涨薪 1000 元 ≠ 企业多花 1000 元，员工更拿不到 1000 元</h3>
+        <p>
+            未封顶时企业每月多付 <strong>1395.00 元</strong>（工资 1000 + 单位五险一金 395），
+            全年多付 16740.00 元，而员工全年到手只多 <strong>8370.00~9021.00 元</strong> ——
+            中间被单位五险一金、个人五险一金与累进个税吃掉一半，这就是<strong>传递率约 50%</strong> 的来源。
+            已封顶后单位部分不再增加，企业每月只多付 1000 元，传递率反而升到 <strong>70%~80%</strong>。
+        </p>
+        <h3>3. 公积金是双边的，且这一页只算法定五险一金</h3>
+        <p>
+            谈「12% 公积金」意味着单位再出同比例的一份（单位、个人各 12%，两笔都进职工个人账户），
+            所以它是<strong>成本项而不是可选项</strong>。
+            同时要说清楚边界：本页只算税前工资与法定五险一金中单位缴纳的部分，
+            <strong>不含</strong>招聘与培训费用、补充公积金、商业保险、职工福利、工会经费、职工教育经费、
+            残疾人就业保障金等 —— 真实用工成本通常更高。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>税前 10000 元，企业实际要花多少钱？</summary>
+            <p>用工成本 = 税前工资 + 单位缴纳的五险一金。按常见费率（养老 16%、医疗约 9.8%、失业 0.5%、工伤与生育由单位缴、公积金同比例 12%），税前 10000 元的单位五险一金为 3950 元，企业月成本 13950 元（1.395 倍），年成本 167400 元；员工月均到手 7697.50 元，只占企业成本的 55.2%。</p>
+        </details>
+        <details>
+            <summary>为什么工资越低，用工成本倍数反而越高？</summary>
+            <p>因为缴费基数按当地上年度社平工资的 60% 保底：社平 8000 元时下限为 4800 元，工资 3000 元也要按 4800 元缴，单位部分 1896 元一分不少，成本 4896 元、倍数 1.63 倍。工资涨到 10000 元时倍数回落到 1.40 倍，工资 50000 元因 300% 封顶只有 1.19 倍 —— 保底与封顶咬的是两端。</p>
+        </details>
+        <details>
+            <summary>人均预算 20000 元，能开多少工资？</summary>
+            <p>按同一套参数倒推：人均月预算 20000 元可开税前月薪 14336.91 元（取整到百元 14300 元），员工月均到手 10810.00 元。倒推要二分求解 —— 单位五险一金随工资分段变化（保底区间固定、封顶后不再增加），不能拿预算除以一个固定倍数。</p>
+        </details>
+        <details>
+            <summary>给员工涨薪 1000 元，企业要多花多少？</summary>
+            <p>看工资有没有超过社保封顶：未封顶时企业每月多付 1395 元（1000 元工资 + 395 元单位五险一金），全年多付 16740 元，而员工全年到手只多 8370~9021 元，传递率约 50%~54%；已封顶（社平 8000 元时为 24000 元以上）后单位部分不再增加，企业每月只多付 1000 元，传递率反而升到 70%~80%。</p>
+        </details>
+        <details>
+            <summary>公积金 12% 是单位和个人各 12% 吗？</summary>
+            <p>是。单位与职工的缴存比例一致（均不低于 5%、不高于 12%，住房公积金管理条例第十八条），谈「12% 公积金」意味着单位再出同比例的一份，两笔都进职工个人账户。在比例不超过 12%、基数不超过设区城市上年度职工月平均工资 3 倍的范围内，免征个人所得税（财税〔2006〕10 号）。</p>
+        </details>
+        <details>
+            <summary>这个用工成本包含招聘、福利和残保金吗？</summary>
+            <p>不包含。本页只算税前工资与法定五险一金中单位缴纳的部分，不含招聘与培训费用、补充公积金、商业保险、职工福利、工会经费、职工教育经费、残疾人就业保障金等。实际用工成本通常高于本页结果。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报价或投标依据吗？</summary>
+            <p>不能。本页按公开政策口径做测算，实际缴费基数上下限、单位费率（尤其工伤费率按行业浮动）与个税口径以当地社保、公积金与税务机关的认定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把用工成本与到手工资放在一处看</h2>
+            <p>本页算的是企业侧支出；员工到手工资、年度汇算、年终奖与各项个税测算可在 App 里一起看。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_employercost">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
+        <p id="policy-basis">政策依据：《中华人民共和国社会保险法》（主席令第 35 号）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《降低社会保险费率综合方案》（国办发〔2019〕13 号，养老单位费率 16%）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/social-base.html">社保公积金</a> · <a href="/seo/net-salary.html">税后工资倒算</a> · <a href="/seo/salary-tax.html">工资个税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js   —— 出厂费率与基数规则（socialInsuranceRules）
+       tax-registry.js    —— 税种注册表（15D-1）：政策依据文号
+       tax-rates-sync.js  —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       salary-tax-quick.js —— 工资薪金累计预扣（同一张综合所得税率表）
+       social-insurance-quick.js —— 五险一金（含 60% 保底 / 300% 封顶与公积金免税上限）
+       employer-cost-quick.js —— 企业用工成本（正算 / 按预算倒推 / 涨薪传递率） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/salary-tax-quick.js" defer></script>
+<script src="/src/js/calculation/social-insurance-quick.js" defer></script>
+<script src="/src/js/calculation/employer-cost-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var quick = window.EuriskoEmployerCostQuick;
+
+    function money(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function percent(n) {
+        if (n === null || n === undefined) return '—';
+        return (Math.round(Number(n) * 1000) / 10) + '%';
+    }
+    function ratio(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toFixed(2) + ' 倍';
+    }
+    function text(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+    function fail(hint, msg) {
+        if (hint) {
+            hint.innerHTML = msg;
+            hint.hidden = false;
+        }
+    }
+    function val(id) {
+        var el = document.getElementById(id);
+        return el ? el.value : '';
+    }
+
+    function inputs() {
+        return {
+            wage: val('e-wage'),
+            socialAverage: val('e-avg'),
+            housingRate: Number(val('e-rate')) / 100,
+            specialMonthly: val('e-special'),
+            headcount: val('e-headcount')
+        };
+    }
+
+    // 政策依据只读注册表：页面不自己维护文号（与社保、税后工资页同一套做法）
+    function renderBasis() {
+        var el = document.getElementById('policy-basis');
+        if (!el || !window.EuriskoTaxRegistry) return;
+        var parts = [];
+        ['social-insurance', 'housing-fund'].forEach(function (id) {
+            window.EuriskoTaxRegistry.basisOf(id).forEach(function (b) {
+                parts.push(b.title.replace(/（[^）]*$/, '') + '（' + b.doc + '）');
+            });
+        });
+        if (parts.length) el.textContent = '政策依据：' + parts.join('、') + '。';
+    }
+
+    function renderCost() {
+        var box = document.getElementById('cost-results');
+        var hint = document.getElementById('cost-hint');
+        if (!box) return null;
+        if (!quick || typeof quick.costOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方示例表仍可手工估算。');
+            return null;
+        }
+        var input = inputs();
+        var r = quick.costOf(input);
+        if (!r.wage) {
+            box.hidden = true;
+            fail(hint, '请填写税前月薪（大于 0）后再算。');
+            return null;
+        }
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('c-monthly', money(r.monthlyPerPerson));
+        text('c-multiple', ratio(r.multiple));
+        text('c-employer', money(r.employerTotal));
+        text('c-base', money(r.base));
+        text('c-personal', money(r.personalTotal));
+        text('c-net', money(r.netMonthly));
+        text('c-share', percent(r.netShare));
+        text('c-annual', money(r.annualPerPerson));
+        text('c-team-monthly', money(r.monthlyTotal));
+        text('c-team-annual', money(r.annualTotal));
+
+        if (hint) {
+            var msg = [];
+            if (r.clamped === 'below') {
+                msg.push('工资低于下限：缴费基数按社平工资 60%（' + money(r.baseMin) + ' 元）<strong>保底</strong>，'
+                    + '单位部分 ' + money(r.employerTotal) + ' 元一分不少 —— 这也是低工资成本倍数更高的原因（'
+                    + ratio(r.multiple) + '）。');
+            } else if (r.clamped === 'above') {
+                msg.push('工资已高于上限：缴费基数按社平工资 300%（' + money(r.baseMax) + ' 元）<strong>封顶</strong>，'
+                    + '单位部分停在 ' + money(r.employerTotal) + ' 元，成本倍数降到 ' + ratio(r.multiple) + '。');
+            }
+            msg.push('企业每花 100 元，员工实际到手约 ' + Math.round(r.netShare * 1000) / 10
+                + ' 元 —— 差额是单位五险一金、个人五险一金与个税。');
+            if (msg.length) {
+                hint.innerHTML = msg.join(' ');
+                hint.hidden = false;
+            }
+        }
+        return r;
+    }
+
+    function renderBudget() {
+        var box = document.getElementById('budget-results');
+        var hint = document.getElementById('budget-hint');
+        if (!box) return;
+        if (!quick || typeof quick.solveOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方示例表仍可手工估算。');
+            return;
+        }
+        var base = inputs();
+        var budget = Number(String(val('b-budget')).replace(/,/g, '').trim());
+        if (!isFinite(budget) || budget <= 0) {
+            box.hidden = true;
+            fail(hint, '请填写企业人均月预算（大于 0）后再算。');
+            return;
+        }
+        var r = quick.solveOf(Object.assign({}, base, { budgetMonthly: budget }));
+        if (!r.converged) {
+            box.hidden = true;
+            fail(hint, '预算太低（连社保下限都覆盖不了），请提高预算后再算。');
+            return;
+        }
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('b-wage', money(r.wage));
+        text('b-wage-hundred', money(r.wageHundred));
+        text('b-employer', money(r.social.employerTotal));
+        text('b-net', money(r.netMonthly));
+        text('b-multiple', ratio(r.multiple));
+        text('b-cost', money(r.monthlyPerPerson));
+
+        if (hint) {
+            var msg = ['预算 ' + money(r.budgetMonthly) + ' 元/人/月中，有 '
+                + money(r.social.employerTotal) + ' 元是单位五险一金，真正发给员工的税前工资只有 '
+                + money(r.wage) + ' 元。'];
+            if (r.social.clamped === 'below') {
+                msg.push('注意：倒推出的工资低于社保下限，缴费基数按 ' + money(r.social.baseMin) + ' 元保底。');
+            } else if (r.social.clamped === 'above') {
+                msg.push('注意：倒推出的工资已超过社保上限，单位部分封顶在 ' + money(r.social.baseMax) + ' 元 —— 预算再往上加，工资涨得更快。');
+            }
+            hint.innerHTML = msg.join(' ');
+            hint.hidden = false;
+        }
+    }
+
+    function renderRaise() {
+        var box = document.getElementById('raise-results');
+        var hint = document.getElementById('raise-hint');
+        if (!box) return;
+        if (!quick || typeof quick.raiseOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方示例表仍可手工估算。');
+            return;
+        }
+        var input = inputs();
+        var base = quick.costOf(input);
+        if (!base.wage) {
+            box.hidden = true;
+            fail(hint, '先在速算一填好税前月薪，这里才能算涨薪成本。');
+            return;
+        }
+        var r = quick.raiseOf(input, val('r-step'));
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('r-gross', money(r.gross));
+        text('r-extra-monthly', money(r.extraCostMonthly));
+        text('r-extra-annual', money(r.extraCostAnnual));
+        text('r-extra-net-monthly', money(r.extraNetMonthly));
+        text('r-extra-net-annual', money(r.extraNetAnnual));
+        text('r-passthrough', percent(r.passThrough));
+        text('r-cost-multiple', ratio(r.costMultiple));
+
+        if (hint) {
+            var msg = ['企业每月多付 <strong>' + money(r.extraCostMonthly) + ' 元</strong>（其中 '
+                + money(r.extraCostMonthly - r.step) + ' 元是随之增加的单位五险一金），'
+                + '员工全年到手只多 ' + money(r.extraNetAnnual) + ' 元 —— 传递率 '
+                + percent(r.passThrough) + '。'];
+            if (r.costMultiple > 1.05) {
+                msg.push('未超封顶：单位五险一金随工资同步增加，成本放大 ' + ratio(r.costMultiple) + '。');
+            } else {
+                msg.push('已超封顶：单位部分不再增加，企业每多付 1 元员工能拿到约 '
+                    + Math.round(r.passThrough * 100) / 100 + ' 元 —— 给高薪员工涨薪更"值"。');
+            }
+            hint.innerHTML = msg.join(' ');
+            hint.hidden = false;
+        }
+    }
+
+    function renderAll() {
+        renderCost();
+        renderBudget();
+        renderRaise();
+    }
+
+    ['e-wage', 'e-avg', 'e-rate', 'e-special', 'e-headcount', 'b-budget', 'r-step'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', renderAll);
+    });
+
+    renderBasis();
+    renderAll();
+});
+</script>
+</body>
+</html>

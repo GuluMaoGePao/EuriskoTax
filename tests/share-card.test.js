@@ -27,22 +27,55 @@ const SAMPLE_DATA = {
 
 describe('阶段13D 分享图 - 模板分流', () => {
     test('4 类结果各归其模板：谈薪 → negotiation，其余 → income', () => {
-        expect(ShareCard.SOURCES['reverse-step-result'].template).toBe('negotiation');
-        ['step-result', 'business-step-result', 'classification-step-result'].forEach((id) => {
+        // 17B-2（v1.48.0）：反向倒算的旧结果页删了，谈薪那一路改走 dw-result-card:reverse
+        expect(ShareCard.SOURCES['dw-result-card:reverse'].template).toBe('negotiation');
+        // 17B-3（v1.49.0）：综合所得的旧结果页 step-result 随页面删了，改从向导的结果卡取数；
+        // 17B-4（v1.50.0）：分类所得同样 —— 它原先那份 'classification-step-result' 随页面删了，
+        // 改按 `:toolId` 划出 dw-result-card:classification 这一路。
+        // 四个迁移工具（business / reverse / forward / classification）共用 dw-result-card，
+        // 全靠 `:toolId` 后缀分家 —— 少划一路就会退到兜底那份 business 的配置上，把某一路的
+        // 分享图截成「应纳个人所得税」这种张冠李戴的标题。
+        // 18-3（v1.73.0）：business 那份原先挂在裸键 'dw-result-card' 上兼作兜底，现已改为
+        // 'dw-result-card:business'，兜底交给按卡现场取数的通用配置（见下一条用例）。
+        ['dw-result-card:forward', 'dw-result-card:classification', 'dw-result-card:business'].forEach((id) => {
             expect(ShareCard.SOURCES[id].template).toBe('income');
         });
     });
 
     test('触发器覆盖全部结果容器（新增结果页漏配 = 那个页面没有分享出口）', () => {
-        expect(ShareCard.TRIGGERS.map((t) => t.containerId).sort())
-            .toEqual(Object.keys(ShareCard.SOURCES).sort());
+        // `容器:工具Id` 是**同一容器按工具再分的一路**（两个 spec 工具共用 dw-result-card），
+        // 它不是一个独立的触发目标 —— 触发按钮还是那一个 dw-next。
+        // 18-3：配置键统一成 `容器:工具Id`（business 那份原先是裸键），所以「容器」要按
+        // 冒号前那一段去重来看 —— 一个容器对应一颗触发按钮，与它下面挂了几路工具无关。
+        const own = Array.from(new Set(Object.keys(ShareCard.SOURCES).map((k) => k.split(':')[0])));
+        expect(ShareCard.TRIGGERS.map((t) => t.containerId).sort()).toEqual(own.sort());
     });
 
-    test('谈薪页被服务引导排除，分享图是它唯一的转化出口 —— 必须存在', () => {
+    test('谈薪结果被服务引导排除，分享图是它唯一的转化出口 —— 必须存在', () => {
         // lead-touchpoints 把谈薪排除在引导白名单外（受众是求职者，不该推企业服务），
-        // 因此这条断言守的是「谈薪页仍然有出口」这个产品决策，不只是代码
+        // 因此这条断言守的是「谈薪仍然有出口」这个产品决策，不只是代码
         expect(readSrc('src/js/lead/lead-touchpoints.js')).toMatch(/reverse/);
-        expect(ShareCard.TRIGGERS.some((t) => t.containerId === 'reverse-step-result')).toBe(true);
+        expect(ShareCard.TRIGGERS.some((t) => t.containerId === 'dw-result-card')).toBe(true);
+        expect(ShareCard.SOURCES['dw-result-card:reverse'].template).toBe('negotiation');
+    });
+
+    test('同一个向导结果卡能按当前工具分流（谈薪不能截成经营所得卡）', () => {
+        // 17B-2：dw-result-card 是通用节点，两个工具轮着用 —— 认不出工具就会糊成一张错卡
+        document.body.innerHTML = '<div id="dw-result-card" data-tool-id="reverse"></div>';
+        expect(ShareCard.generate.length).toBeGreaterThan(0);   // 入口在
+        expect(typeof ShareCard.sourceKey).toBe('function');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card:reverse');
+
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'business');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card:business');
+
+        // 18-3：别的工具（没手写配置的那 17 路）**不再退回 business 那一份** —— 表里确实没有
+        // 这一路，但取数要按卡上的 data-tool-id 现场生成，否则「算的是增值税、图上是经营所得」
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'vat-deep');
+        expect(ShareCard.sourceKey('dw-result-card')).toBe('dw-result-card');
+        expect(ShareCard.resolveConfig('dw-result-card').hero.selector).toContain('data-tool-id="vat-deep"');
+        // 页面式容器的 id 不被这条分流逻辑改口
+        expect(ShareCard.sourceKey('step-result')).toBe('step-result');
     });
 });
 
@@ -50,6 +83,9 @@ describe('阶段13D 分享图 - 与 index.html 的契约', () => {
     test('所有取数 selector 在页面中真实存在（id 改名会让分享图静默变空）', () => {
         const missing = [];
         Object.keys(ShareCard.SOURCES).forEach((key) => {
+            // 17B-1：spec 驱动的向导结果是**运行时渲染**的，静态 HTML 里查不到，
+            // 它们的存在改由 tests/business-income-core.test.js 的向导端到端用例守护。
+            if (key.indexOf('dw-') === 0) return;
             const cfg = ShareCard.SOURCES[key];
             [cfg.hero.selector].concat(cfg.rows.map((r) => r.selector)).forEach((sel) => {
                 if (INDEX_HTML.indexOf('id="' + sel.replace('#', '') + '"') === -1) missing.push(sel);
@@ -61,8 +97,10 @@ describe('阶段13D 分享图 - 与 index.html 的契约', () => {
     test('所有触发按钮与结果容器 id 在页面中真实存在', () => {
         const missing = [];
         ShareCard.TRIGGERS.forEach((t) => {
-            if (INDEX_HTML.indexOf('id="' + t.buttonId + '"') === -1) missing.push(t.buttonId);
-            if (INDEX_HTML.indexOf('id="' + t.containerId + '"') === -1) missing.push(t.containerId);
+            // 同上：dw-* 是向导的运行时节点，不在静态 HTML 里
+            const gone = (id) => id && id.indexOf('dw-') !== 0 && INDEX_HTML.indexOf('id="' + id + '"') === -1;
+            if (gone(t.buttonId)) missing.push(t.buttonId);
+            if (gone(t.containerId)) missing.push(t.containerId);
         });
         expect(missing).toEqual([]);
     });
@@ -258,8 +296,9 @@ describe('阶段13D+ 分享落地引导', () => {
     });
 
     test('CTA 锚点在页面中真实存在（锚点被改名 = 按钮点了没反应）', () => {
-        expect(INDEX_HTML).toContain('id="home-start-card"');
-        expect(readSrc('src/js/share/share-landing.js')).toContain('home-start-card');
+        // 锚点随信息架构调整而变（原「开始计算」卡片已移入工具页，首页第一屏是「我是谁」场景入口）
+        expect(INDEX_HTML).toContain('id="home-scenarios"');
+        expect(readSrc('src/js/share/share-landing.js')).toContain('home-scenarios');
     });
 
     test('落地引导不承担归因与埋点（职责单一，可整体下线而不影响闭环）', () => {

@@ -114,136 +114,10 @@ function updateStepIndicator(pageId, step) {
 }
 
 // === 预览条实时更新 ===
-function formatPreviewNum(n) {
-    const num = Math.max(0, Math.round(Number(n) || 0));
-    return num.toLocaleString('zh-CN');
-}
-
-function updateCalcPreview(pageId) {
-    try {
-        if (pageId === 'forward-calculation-page') {
-            const income = parseFloat(document.getElementById('total-income-amount')?.textContent.replace(/,/g, '')) || 0;
-            const deductionEl = document.getElementById('total-deduction-amount');
-            const deduction = deductionEl ? (parseFloat(deductionEl.textContent.replace(/,/g, '')) || 0) : 0;
-            const tax = (typeof calculationResults !== 'undefined' && calculationResults?.taxDetails?.totalTax) || 0;
-            const incEl = document.getElementById('forward-preview-income');
-            const dedEl = document.getElementById('forward-preview-deduction');
-            const taxEl = document.getElementById('forward-preview-tax');
-            if (incEl) incEl.textContent = formatPreviewNum(income);
-            if (dedEl) dedEl.textContent = formatPreviewNum(deduction);
-            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { income, deduction, tax });
-        } else if (pageId === 'reverse-calculation-page') {
-            // 根据 reverse-type 取对应输入
-            let target = 0;
-            const reverseType = document.getElementById('reverse-type')?.value;
-            if (reverseType === 'rate') {
-                target = parseFloat(document.getElementById('reverse-target-rate')?.value) || 0;
-            } else if (reverseType === 'monthly') {
-                target = parseFloat(document.getElementById('reverse-monthly-net')?.value) || 0;
-            } else if (reverseType === 'both') {
-                const targetType = document.getElementById('reverse-target-type')?.value;
-                target = parseFloat(document.getElementById(targetType === 'net' ? 'reverse-fixed-net' : 'reverse-fixed-tax')?.value) || 0;
-            }
-            const deduction = (typeof reverseDeductionAmount !== 'undefined' && reverseDeductionAmount) || 0;
-            const income = (typeof reverseCalculationResults !== 'undefined' &&
-                (reverseCalculationResults?.incomeDetails?.total || reverseCalculationResults?.totalIncome)) || 0;
-            const tEl = document.getElementById('reverse-preview-target');
-            const dEl = document.getElementById('reverse-preview-deduction');
-            const iEl = document.getElementById('reverse-preview-income');
-            if (tEl) tEl.textContent = formatPreviewNum(target);
-            if (dEl) dEl.textContent = formatPreviewNum(deduction);
-            if (iEl) iEl.textContent = formatPreviewNum(income);
-            InteractionLog.preview(pageId, { target, deduction, income });
-        } else if (pageId === 'business-calculation-page') {
-            const taxable = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxableIncome) || 0;
-            const deduction = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.deductionDetails?.totalDeduction) || 0;
-            const tax = (typeof businessCalculationResults !== 'undefined' && businessCalculationResults?.taxDetails?.totalTax) || 0;
-            const tEl = document.getElementById('business-preview-taxable');
-            const dEl = document.getElementById('business-preview-deduction');
-            const taxEl = document.getElementById('business-preview-tax');
-            if (tEl) tEl.textContent = formatPreviewNum(taxable);
-            if (dEl) dEl.textContent = formatPreviewNum(deduction);
-            if (taxEl) taxEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { taxable, deduction, tax });
-        } else if (pageId === 'classification-calculation-page') {
-            const income = parseFloat(document.getElementById('classification-income')?.value) || 0;
-            // 分类所得无显式税率字段，按类型估算
-            const type = document.getElementById('classification-type')?.value || 'interest';
-            const rateMap = { interest: 20, rent: 20, transfer: 20, accidental: 20 };
-            const rate = rateMap[type] || 20;
-            const tax = (typeof classificationCalculationResults !== 'undefined' && classificationCalculationResults?.taxDetails?.totalTax) || (income * rate / 100);
-            const iEl = document.getElementById('classification-preview-income');
-            const rEl = document.getElementById('classification-preview-rate');
-            const tEl = document.getElementById('classification-preview-tax');
-            if (iEl) iEl.textContent = formatPreviewNum(income);
-            if (rEl) rEl.textContent = rate;
-            if (tEl) tEl.textContent = formatPreviewNum(tax);
-            InteractionLog.preview(pageId, { income, rate, tax });
-        }
-    } catch (e) {
-        // 预览条更新失败不应影响主流程
-        InteractionLog.error('预览条更新', e);
-    }
-}
-
-// 延迟刷新，确保在其他计算函数更新显示值之后再读取
-function schedulePreviewUpdate(pageId) {
-    if (window.requestAnimationFrame) {
-        requestAnimationFrame(() => updateCalcPreview(pageId));
-    } else {
-        setTimeout(() => updateCalcPreview(pageId), 0);
-    }
-}
-
-// 绑定输入实时刷新预览条
-function bindPreviewLiveUpdate() {
-    const forwardInputs = ['salary-income', 'labor-income', 'author-income', 'royalty-income', 'bonus-income',
-        'social-security-base', 'pension-insurance', 'medical-insurance', 'unemployment-insurance', 'housing-fund'];
-    forwardInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('forward-calculation-page'));
-    });
-
-    const reverseInputs = ['reverse-target-rate', 'reverse-monthly-net', 'reverse-fixed-tax', 'reverse-fixed-net',
-        'reverse-social-security-base', 'reverse-pension-insurance', 'reverse-medical-insurance'];
-    reverseInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', () => schedulePreviewUpdate('reverse-calculation-page'));
-            el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
-        }
-    });
-    // reverse-type / reverse-target-type 改变时也刷新
-    ['reverse-type', 'reverse-target-type'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', () => schedulePreviewUpdate('reverse-calculation-page'));
-    });
-
-    const businessInputs = ['business-income', 'business-cost', 'business-expenses', 'business-taxes',
-        'business-losses', 'business-other-expenses', 'business-pension-insurance', 'business-medical-insurance'];
-    businessInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('business-calculation-page'));
-    });
-
-    const classificationInputs = ['classification-income'];
-    classificationInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => schedulePreviewUpdate('classification-calculation-page'));
-    });
-    // classification-type 改变时刷新税率显示
-    const classificationTypeEl = document.getElementById('classification-type');
-    if (classificationTypeEl) {
-        classificationTypeEl.addEventListener('change', () => schedulePreviewUpdate('classification-calculation-page'));
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindPreviewLiveUpdate);
-} else {
-    bindPreviewLiveUpdate();
-}
+// 17B-4（v1.50.0）：最后一条常驻预览条也随分类所得页面删掉了 —— 页面式 deep 自此归零，
+// 迁到 spec 的那六个税种都不需要这里代算预览：
+// 向导自己就在步骤里逐步把数算给用户看，另起一套预览等于两个入口算同一个数，早晚不一致。
+// （v1.47.0 经营所得 / v1.48.0 反向倒算 / v1.49.0 综合所得 / v1.50.0 分类所得，四次删完。)
 
 // === 参数提示系统：初始化 tooltip 交互 ===
 // 将 data-hint 属性对应的文本注入 tooltip-text，并绑定点击展开/收起
@@ -303,45 +177,9 @@ if (document.readyState === 'loading') {
     initTooltipHints();
 }
 
-// 步骤导航
-function goToStep(step) {
-    InteractionLog.log('NAV', `goToStep(${step}) → 综合所得计税`);
-
-    // 更新步骤指示器
-    updateStepIndicator('forward-calculation-page', step);
-    
-    // 显示对应步骤内容
-    document.querySelectorAll('#forward-calculation-page .step-pane').forEach(pane => {
-        pane.classList.add('hidden');
-    });
-    
-    if (step === 1) {
-        document.getElementById('step-parameters').classList.remove('hidden');
-    } else if (step === 2) {
-        document.getElementById('step-income').classList.remove('hidden');
-        // 触发一次计算
-        updateIncomeCalculation();
-    } else if (step === 3) {
-        document.getElementById('step-deductions').classList.remove('hidden');
-        // 检查并显示默认勾选的扣除项内容
-        if (document.getElementById('special-deduction-checkbox').checked) {
-            document.getElementById('special-deduction-content').classList.remove('hidden');
-        }
-        if (document.getElementById('special-additional-deduction-checkbox').checked) {
-            document.getElementById('special-additional-deduction-content').classList.remove('hidden');
-        }
-        if (document.getElementById('other-deduction-checkbox').checked) {
-            document.getElementById('other-deduction-content').classList.remove('hidden');
-        }
-        
-        // 触发一次计算
-        updateDeductionCalculation();
-    } else if (step === 4) {
-        document.getElementById('step-result').classList.remove('hidden');
-    }
-}
-
-// 通用步骤面板切换（用于反向/经营/分类所得）
+// 17B-3（v1.49.0）：goToStep 随综合所得页面一起删了。它原先是「综合所得专用」的四分支
+// 步骤导航（并且被 draft-store 按函数名字符串绑定），现在页面式只剩分类所得，统一走
+// showStepByPanes —— 这正是 ui-design-spec §7 想要的「step 切换只有一处实现」。
 function showStepByPanes(pageId, step, paneIds) {
     paneIds.forEach(id => {
         const el = document.getElementById(id);
@@ -352,62 +190,26 @@ function showStepByPanes(pageId, step, paneIds) {
     updateStepIndicator(pageId, step);
 }
 
-// 反向倒算步骤导航
-function showReverseStep(step) {
-    showStepByPanes('reverse-calculation-page', step, [
-        'reverse-step-parameters', 'reverse-step-deductions', 'reverse-step-result'
-    ]);
-}
 
-// 经营所得步骤导航
-function showBusinessStep(step) {
-    showStepByPanes('business-calculation-page', step, [
-        'business-step-income-cost', 'business-step-deductions', 'business-step-result'
-    ]);
-}
 
-// 分类所得步骤导航
-function showClassificationStep(step) {
-    showStepByPanes('classification-calculation-page', step, [
-        'classification-step-info', 'classification-step-result'
-    ]);
-}
-
-// 反向倒算扣除项显示/隐藏控制
-function setupReverseDeductionToggle(checkboxId, contentId) {
-    const checkbox = document.getElementById(checkboxId);
-    const content = document.getElementById(contentId);
-    
-    // 初始状态
-    if (checkbox.checked) {
-        content.classList.remove('hidden');
-    } else {
-        content.classList.add('hidden');
-    }
-    
-    // 绑定事件
-    checkbox.addEventListener('change', function() {
-        if (this.checked) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-        updateReverseDeductionCalculation();
-    });
-}
+// 17B-4（v1.50.0）：分类所得的步骤导航随旧页面删掉了 —— 它是 showStepByPanes 的最后一个调用者。
+// （另外三个页面式 deep 的调用者已先一步随各自的旧页面删掉：v1.47.0 经营所得 /
+// v1.48.0 反向倒算 / v1.49.0 综合所得。函数本身留着 —— 页面式页还在用它切换 step-pane。）
 
 // 导出PDF
 // opts（可选，阶段10B 专业版汇算清缴报告复用）：
-//   { contentBuilder, beforeCapture, filename }
+//   { contentBuilder, beforeCapture, filename, skipResultCheck }
 //     contentBuilder  () => HTML 字符串，覆盖默认的 generateWordDocumentContent(title) 内容
 //     beforeCapture   (container) => void，html2canvas 截图前回调（如绘制 Chart 图表后等待就绪）
 //     filename        自定义保存文件名（不含扩展名差异，直接作为 doc.save 参数）
+//     skipResultCheck 跳过「请先进行计算」守卫（阶段16：速算器结果不走深度流程的全局结果变量，
+//                     它自带 tool / values / out，由 quick-report 直接给出文档内容）
 function exportToPDF(elementId, title, opts) {
     opts = opts || {};
     // 获取计算结果数据
-    if (Object.keys(calculationResults).length === 0 &&
-        Object.keys(reverseCalculationResults).length === 0 &&
-        Object.keys(businessCalculationResults).length === 0) {
+    // 17B-2（v1.48.0）：原先还多一个 reverseCalculationResults 的分支 —— 那个全局变量随旧页面删了，
+    // 留着这半句是**必炸的**（未声明变量直接抛 ReferenceError），而删掉它不影响任何现役入口。
+    if (!opts.skipResultCheck && Object.keys(calculationResults).length === 0) {
         showAlert('请先进行计算，再导出文档');
         return;
     }
@@ -501,6 +303,27 @@ function exportToPDF(elementId, title, opts) {
             const fileName = (typeof opts.filename === 'string' && opts.filename.trim())
                 ? opts.filename
                 : `${title}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+            // Phase 1.5 交付兜底：微信 / App 内置浏览器里 doc.save() 会被拦或静默失败，
+            // 用户表现为「点了导出没反应」—— 而微信正是当前唯一真实可达渠道，等于链路不闭环。
+            // 降级链：下载 → 结果长图（长按保存）→ 复制结果文本，保证总有出路。
+            const envLib = window.EuriskoEnv;
+            const env = envLib && typeof envLib.currentEnv === 'function' ? envLib.currentEnv() : null;
+            const delivery = env && typeof envLib.pickDelivery === 'function'
+                ? envLib.pickDelivery(env, { image: true })
+                : { way: 'download', fallbacks: [] };
+
+            if (delivery.way !== 'download' && typeof envLib.openFallbackPanel === 'function') {
+                envLib.openFallbackPanel({
+                    imageDataUrl: canvas.toDataURL('image/png'),
+                    text: envLib.htmlToPlainText(docContent),
+                    hint: envLib.deliveryHint(env, delivery.way),
+                    // 仍留一条手动尝试下载的口子：某些容器实际能下载，不该替用户判死刑
+                    onRetryDownload: function () { doc.save(fileName); }
+                });
+                return;
+            }
+
             doc.save(fileName);
         })
         .catch(error => {

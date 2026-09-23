@@ -18,7 +18,7 @@
     var BANNER_ID = 'share-landing-banner';
     var ANCHOR_ID = 'content-home-banner';   // 首页公告条：横幅插在它之后，保持首页既有信息层次
     var HOST_SELECTOR = '#mode-selection-page .max-w-5xl';
-    var SCROLL_TARGET_ID = 'home-start-card'; // 「开始计算」卡片
+    var SCROLL_TARGET_ID = 'home-scenarios'; // 「我是谁」场景入口（原「开始计算」卡片已移入工具页）
     var SOURCE_RE = /[?&]source=share(\b|$)/i;
 
     function isShareLanding() {

@@ -39,8 +39,9 @@
 |------|----------------|------|
 | push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 165 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
-| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 167 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 28 套件 570 例（含版本号五处同步守护、文档口径守护） |
+| 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 259 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 112 套件 2092 例（含版本号五处同步守护、文档口径守护） |
+| 改了工具 / 渲染器，想确认 41 个入口都还出得来数 | **`npm run smoke:ui`** | 真机把 20 个速算器 + 21 个完整测算**各算一次**，只问三件事：出不出数 / 抛没抛异常 / deep 结果卡的政策时效徽标在不在。跑前拍 localStorage 快照、跑后整份还原（不留痕）；只报不修，有失败退出码 1。热会话约 15 秒，全新会话要拉外网 CDN 可能数分钟 |
 | 发版前口径自检 | `npm run verify:release` | 一条命令列出**版本号五处落点**（含 `文件:行号`）+ **文档口径 vs 实测**（套件/用例数 / 门禁项数 / 线上指纹数）；不一致退出码 1。加 `-- --write` 只改「当前声明值」并自动同步套件/用例数（CHANGELOG 里「上一版基线 → 当前值」的历史值不会被误改）。**版本前缀约束**（2026-09-13 加固）：项数声明改为逐条校验 —— 非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`；「新增/移除/少 N 项」这类增量描述不计入总项数。口径定义与 `npm test` 里的守护同源：`tools/ops/release-metrics.js` |
 
 ### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
@@ -119,7 +120,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   本地日常开发是 SQLite，线上是 PostgreSQL + 容器启动时 `prisma migrate deploy` 建表——
   「schema 改了忘写迁移」「迁移 SQL 在 PG 上跑不通」这两类问题**在 SQLite 上永远绿**，只会在上线后炸成 500。
   `verify:pg` 用 Docker 起一个临时 PostgreSQL，按线上同序（`generate` → `migrate deploy` → 内容种子 → 起服务）
-  再跑一遍同样的 167 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
+  再跑一遍同样的 259 项断言；`npm run verify:pg:fresh` 会先删数据卷，等价「全新库首次部署」。
   首次使用需装 Docker Desktop；**没装时该命令优雅退出（退出码 2）并给出提示，不影响 `verify:local`**。
 - **首次使用要准备的环境（Windows 11 家庭版实测路径）**：
   1. **启用 WSL2**：`VirtualMachinePlatform` 与 WSL 可选功能**两项都要开**（管理员 `dism.exe /online /Enable-Feature /FeatureName:<功能名> /All /NoRestart`），**重启一次**生效。家庭版没有 Hyper-V，Docker Desktop 只能走 WSL2 后端；
@@ -188,10 +189,13 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 | Docker Desktop 已启动，但 `docker info` 报 `Docker Desktop is unable to start` | WSL2 刚启用生效时，Docker Desktop 的启动前置检查（内部调 `C:\Windows\System32\wsl.exe --version`）抢在 WSL 就绪前跑，失败后它**不会自动重试** | 完全退出 Docker Desktop 再启动一次即可（在普通窗口里 `wsl --version` 能打印版本号，就说明 WSL 已就绪）；这不是配置问题 |
 | `docker pull` 报 `dial tcp registry-1.docker.io:443` 超时 / EOF | 本机直连 Docker Hub 不通（国内常见），且 Docker Desktop 没配代理 | 在 `Settings → Docker Engine`（即 `~/.docker/daemon.json`）加 `registry-mirrors` → 重启 Desktop → 重跑；**先用 `Test-NetConnection <来源域名> -Port 443` 实测源可用再写进去**，公开加速源失效很快 |
 | `npm run verify:pg` 报 `prisma migrate deploy` 失败 | 迁移本身有问题——**这正是上线会炸的点** | 修好迁移再发布（`cd server && npx prisma migrate dev` 修正 SQL）；演练库可 `docker compose -f docker-compose.postgres.yml down -v` 重置后重跑 |
+| `npm run verify:pg` 报 `Unique constraint failed on the fields: (username)` | 演练库是**保留卷**，但本机测试账号（`dev-account.local.json`）换过：库里上次那个账号已占用同一用户名，脚本按邮箱找不到人就会去新建，撞上唯一约束 | 跑 `npm run verify:pg:fresh`（先删卷＝全新库首次部署，也正是线上首装的等价路径）；想继续复用旧卷就别改本机账号的用户名 |
 | 跑完 `verify:pg` 后 `verify:local`/本地启动报 Client provider 不匹配 | 演练把 Prisma Client 生成成了 PostgreSQL 版本 | 脚本收尾会自动恢复 SQLite Client；若恢复失败（引擎被占用）手动执行 `cd server && npm run prisma:generate:dev` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |
+| 脚本 / GUI 里非交互调 `ops-publish.ps1`，报「无法处理对参数"PollMaxSeconds"的参数转换…转换为 System.Int32」 | 用 `Start-Process -ArgumentList` 裸传数组：PowerShell 只把数组元素按空格拼成一条命令行，**不会替带空格的元素补引号**，带空格的中文 `-CommitMsg` 因此被拆成多个参数，尾词按位置绑到后面的参数上 | 别裸传数组，二选一：① 整体给一条 `-Command`，引号自己写 —— `-ArgumentList "-NoProfile","-Command","& '<脚本绝对路径>' -CommitMsg 'feat: xxx'"`；② 当前会话直接 `& .\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"`（不必开新进程）。此错发生在**参数绑定阶段**，脚本随即退出，**不会 add / commit / push**，工作区保持原样，修好重跑即可 |
 | 发布 `[4/4]` 一直显示「仍在构建」直到超时 | Zeabur 构建慢，或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；真慢就 `-PollMaxSeconds 900` 再来一次 |
-| 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 先让用户刷新；仍旧则把 `https://<域名>/reset` 发给对方直接打开（302 → 独立清洗页，能穿透旧 SW 死锁，不必教开 F12）；也可让用户跑 `tools\clean-browser-cache.bat` |
+| 改过 `tools/ops/*.ps1` 后脚本突然报「字符串缺少终止符」（报的行号还常常对不上、指向 `} else {`） | 文件被存成了 **UTF-8 无 BOM**：PS 5.1 对无 BOM 文件按 ANSI(GBK) 解码，中文字节被误解码后会把后面的引号一起吞掉，于是字符串没闭合 | 重存为「UTF-8 with BOM」（编辑器选带 BOM，或 `Set-Content -Encoding UTF8`）。自检：文件前三字节应为 `EF BB BF`；也可 `Get-Content -Raw <脚本>` 后交给 `[Parser]::ParseInput` 看有无 `$errs`。**这条现已由 `tests/ps1-encoding-guard.test.js` 自动守门**（随 `npm test` 跑，红灯会直接点名文件），实测 `ops-verify-pg.ps1`、`dev-account.ps1`、`gui-dev-console.ps1` 都栽在这个坑上 |
+| 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 先让用户刷新；仍旧则把 `https://<域名>/reset` 发给对方直接打开（302 → 独立清洗页，能穿透旧 SW 死锁，不必教开 F12）；也可让用户跑 `tools\ops\clean-browser-cache.bat` |
 | 某用户**每次**进站都闪一下 / 被重载一次 | 线上 `/version.json` 与 `index.html` 的 `__APP_VERSION__` 不一致（版本落点漏改） | 补齐五处版本号后重新发布；`ops-check-prod.ps1` 已能红灯拦下。快速自查：直接访问 `<域名>/version.json` 对比页面底部版本号 |
 | 端口 3000 被占用启动失败 | 上次没正常退出 | GUI「强制释放 3000 端口」后重启 |
 | GUI 找不到某按钮 | 用的是旧文档名字（标准启动/完整测试/开发模式…） | 对照 §0 名词表找新名；按钮旁有说明，悬停看 Desc |

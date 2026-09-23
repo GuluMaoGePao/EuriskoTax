@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 
 const logger = require('./middleware/logger');
 const { errorHandler, notFound } = require('./middleware/error');
+// 后端源码 / 运维脚本 / 点文件 / 本地库与密钥一律不下发（.git、dev.db、server/src、tools 配置…）：
+// 静态托管的是仓库根，不设闸这些文件在公网分享 / 线上就是可下载资源
+const { sensitiveFileGuard } = require('./middleware/sensitiveFileGuard');
 const authRoutes = require('./routes/auth');
 const calculationRoutes = require('./routes/calculations');
 const feedbackRoutes = require('./routes/feedback');
@@ -39,7 +42,19 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// Zeabur 等平台的 PORT 变量必须是合法数字；若被误填为 ${WEB_PORT} 之类字面量，
+// Node 会把它当成命名管道路径，导致容器不监听 TCP 端口而 502。
+function resolvePort() {
+    const raw = process.env.PORT || '3000';
+    const num = parseInt(raw, 10);
+    if (Number.isNaN(num) || num <= 0 || num > 65535) {
+        console.error(`[FATAL] PORT 环境变量不是合法端口号（当前值="${raw}"），将回退到 3000`);
+        return 3000;
+    }
+    return num;
+}
+const PORT = resolvePort();
 
 // 信任 Zeabur 网关的一层反代，使 req.ip 为真实客户端IP
 // 否则限流会把所有用户算作同一个网关IP，10次/15分钟的配额被全站共享
@@ -267,6 +282,8 @@ app.get('/reset', (req, res) => {
 //   - 图片 / 字体 → public, max-age=604800（7 天）
 //   - 其他 → 不设，走浏览器默认
 const staticPath = path.join(__dirname, '../../');
+// 必须挂在静态托管之前：先拦掉敏感文件，再让 static 处理其余资源
+app.use(sensitiveFileGuard);
 app.use(express.static(staticPath, {
     setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-5）：高商业意图长尾词「个人养老金能抵多少税 / 个人养老金每年 12000 /
+         个人养老金领取税率 3%」（「是否参与」这类提问本页不承接，只给税额测算）。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 限额与税率复用 App 同源实现（private-pension-quick.js + window.comprehensiveTaxRates
+              / window.privatePensionRules），页面上不出现第二份口径；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背两条「纠偏」任务：
+           ① 缴费扣的是**应纳税所得额**，不是直接减税额（与专项附加扣除页同一条纠偏）；
+           ② 适用税率 3% 的人「省 3%、领取时再交 3%」，两个环节相抵后税收净优惠为零。
+              注意口径：本页只算**税额差额**（缴费少交 vs 领取交），不评价是否参与 ——
+              备案内容限定为在线测算工具，「是否参与」属投资理财判断，不在承诺范围内。 -->
+    <title>个人养老金能抵多少税 2026：每年 12000 税前扣除 + 领取按 3% 单独计税（缴费与领取两环节税额测算）</title>
+    <meta name="description" content="输入每年缴费额与全年应纳税所得额，按 2026 年现行政策算出个人养老金当年少交的个人所得税、领取时按 3% 缴纳的税额与净优惠。含三环节税务处理表、年度税率表与公开示例。政策依据：财政部 税务总局公告 2024 年第 21 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/private-pension.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="个人养老金能抵多少税：每年 12000 税前扣除 + 领取 3% 单独计税">
+    <meta property="og:description" content="缴费能少交多少税、领取时要交多少 3%、合起来是赚还是亏，一算便知。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/private-pension.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 个人养老金税优测算",
+                "url": "https://euriskotax.zeabur.app/seo/private-pension.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按现行政策计算个人养老金缴费环节的税前扣除与领取环节 3% 税款的净差额。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "个人养老金每年最多能扣多少税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "缴费环节按 12000 元/年的限额标准在综合所得或经营所得中据实扣除；超过限额的部分当年不可扣除，也不能结转到以后年度。缴费上限由人社部与财政部根据经济社会发展水平适时调整。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "缴 12000 元到底能少交多少税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "取决于你全年应纳税所得额落在哪一档税率：扣除的是应纳税所得额，少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额。10% 档每年约少交 1200 元，20% 档约少交 2400 元；直接用「12000 × 税率」在跨档时会高估。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "领取个人养老金时怎么交税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "领取时按领取额全额（本金加投资收益）乘 3% 单独计税，不并入综合所得、不参与年度汇算，也不扣除任何费用。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "什么情况下个人养老金的税收净优惠为零？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "如果全年应纳税所得额不超过 36000 元、适用 3% 的税率，那么缴费时省 3%、领取时再交 3%，两个环节相抵后税收净优惠为零。本页只给出这一税额差额，不评价是否参与，也不构成投资建议。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "个人养老金账户里的投资收益要交税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "投资环节计入个人养老金资金账户的投资收益暂不征收个人所得税，只在领取环节按领取额全额的 3% 计税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_pension">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>个人养老金能抵多少税：每年 12000 税前扣除、领取按 3% 单独计税，两环节的税额怎么算</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>个人养老金三个环节的税务处理完全不同 ——<strong>缴费</strong>时按
+            <strong>12000 元/年</strong>的限额标准在综合所得或经营所得中<strong>据实扣除</strong>；
+            <strong>投资</strong>环节的收益<strong>暂不征税</strong>；<strong>领取</strong>时按<strong>领取额全额 × 3%</strong>
+            单独计税、不并入综合所得。所以<strong>税收差额</strong>只看一件事：<strong>你缴费当年的适用税率是不是高于 3%</strong>。
+            10% 档每年少交约 1200 元、20% 档约 2400 元；而如果你全年应纳税所得额不超过 36000 元（适用 3%），
+            缴费省 3%、领取再交 3%，<strong>两个环节相抵后税收净优惠为零</strong>（本页只给税额差额，不构成投资建议）。
+            政策依据：《关于个人养老金有关个人所得税政策的公告》（<strong>财政部 税务总局公告 2024 年第 21 号</strong>，
+            自 2024-01-01 起全国实施）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">个人养老金税优速算（少交的税 − 领取时 3% = 净优惠）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="contribution-input">每年缴费额（元）</label>
+                    <input class="calc-input" id="contribution-input" type="number" inputmode="decimal" min="0" step="1000" value="12000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 240px">
+                    <label class="calc-label" for="taxable-input">缴费当年全年应纳税所得额（元）</label>
+                    <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="years-input">缴费年数</label>
+                    <input class="calc-input" id="years-input" type="number" inputmode="numeric" min="1" step="1" value="10" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="withdraw-input">预计领取总额（元）</label>
+                    <input class="calc-input" id="withdraw-input" type="number" inputmode="decimal" min="0" step="10000" value="120000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                「缴费当年全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除；
+                不确定就按「全年收入 − 6 万 − 社保公积金」估算。
+                <strong>每年最多扣 12000 元</strong>，超额部分当年不可扣、也不能结转到以后年度。
+                「预计领取总额」留空则按「只回本金」估算（累计可扣额度 × 年数），实际领取额通常更高。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result highlight">
+                    <div class="k">每年可税前扣除</div>
+                    <div class="v" id="r-deductible">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">适用税率</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">扣除前应纳税额 / 扣除后</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">缴费环节每年少交</div>
+                    <div class="v" id="r-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">缴费年数累计少交</div>
+                    <div class="v" id="r-total-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">领取时按 3% 缴纳</div>
+                    <div class="v" id="r-withdraw-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">净优惠（少交的税 − 领取时交的税）</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">回本线（领取额低于此值时税收净优惠仍为正）</div>
+                    <div class="v" id="r-breakeven">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">「扣除额 × 税率」的天真算法（对照）</div>
+                    <div class="v" id="r-naive">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三环节税务处理表」「年度税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>三个环节的税务处理（2026 年现行口径）</h2>
+        <div class="table-scroll">
+            <table id="pension-rule-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">同一笔钱，缴费、投资、领取三个阶段各交一次「判断」，处理方式完全不同</caption>
+                <thead>
+                <tr>
+                    <th scope="col">环节</th>
+                    <th scope="col">税务处理</th>
+                    <th scope="col">限制</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>缴费</td><td class="num">按 12000 元/年限额标准，在综合所得或经营所得中据实扣除</td><td>超额部分当年不可扣、不能结转</td></tr>
+                <tr><td>投资</td><td class="num">账户内投资收益暂不征收个人所得税</td><td>仅在个人养老金资金账户内</td></tr>
+                <tr><td>领取</td><td class="num">按领取额全额 × 3% 单独计税</td><td>不并入综合所得、不参与汇算、不扣费用</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            一句话记住：<strong>缴费按你的税率档少交税（扣的是应纳税所得额），投资不交税，
+            领取时统一按 3% 交一次</strong> —— 差额就是净优惠。
+        </p>
+
+        <h2>年度综合所得税率表（缴费能省多少税，看你落在哪一档）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；个人养老金缴费降低的是「应纳税所得额」这一列</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：四种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">每年可扣（元）</th>
+                    <th scope="col">扣除前应纳税额（元）</th>
+                    <th scope="col">扣除后应纳税额（元）</th>
+                    <th scope="col">每年少交（元）</th>
+                    <th scope="col">领取时 3%（元）</th>
+                    <th scope="col">净优惠（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>10% 档（扣除前 8 万）：缴 1 年，只回本金 12000</td><td class="num">12000.00</td><td class="num">5480.00</td><td class="num">4280.00</td><td class="num">1200.00</td><td class="num">360.00</td><td class="num">840.00</td></tr>
+                <tr><td>20% 档（扣除前 20 万）：缴 10 年，只回本金 120000</td><td class="num">12000.00</td><td class="num">23080.00</td><td class="num">20680.00</td><td class="num">2400.00</td><td class="num">3600.00</td><td class="num">20400.00</td></tr>
+                <tr><td>3% 档（扣除前 2 万）：缴 1 年，只回本金 12000 —— <strong>税收净优惠为 0</strong></td><td class="num">12000.00</td><td class="num">600.00</td><td class="num">240.00</td><td class="num">360.00</td><td class="num">360.00</td><td class="num">0.00</td></tr>
+                <tr><td>30% 档（扣除前 50 万）：年缴 20000，其中 8000 超额不可扣</td><td class="num">12000.00</td><td class="num">97080.00</td><td class="num">93480.00</td><td class="num">3600.00</td><td class="num">360.00</td><td class="num">3240.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（限额、3% 税率与税率表取自 App 常量，可被运营在后台热改后同步），
+            并由 <code>tests/private-pension-quick.test.js</code> 与 App 内核逐点对拍守护。
+            第二行的净优惠是<strong>十年累计</strong>（每年少交 2400 × 10 − 领取时 3600）。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 缴了不等于自动扣：限额内「据实」扣除，超额部分作废</h3>
+        <p>
+            缴费环节按 <strong>12000 元/年</strong>的限额标准<strong>据实扣除</strong>：
+            实际缴多少就在限额内扣多少，<strong>超过 12000 元的部分当年不可扣除，也不能结转到以后年度</strong>。
+            抵扣凭证通过个人养老金信息平台归集，在预扣预缴或年度汇算时申报。
+        </p>
+        <h3>2. 领取时按「全额」3%，本金和收益一起算</h3>
+        <p>
+            领取环节按<strong>领取额全额</strong>（本金 + 投资收益）乘 <strong>3%</strong> 单独计税，
+            <strong>不扣除任何费用、不并入综合所得、不参与年度汇算</strong>。
+            所以投资收益虽然暂不征税，但领取时仍会按 3% 一并计税 —— 这 3% 覆盖的是你领走的全部金额。
+        </p>
+        <h3>3. 适用 3% 税率的人：省 3%、交 3%，税收净优惠为零</h3>
+        <p>
+            如果全年应纳税所得额不超过 36000 元（适用 3% 税率），缴费时少交 3%、领取时再交 3%，
+            两个环节相抵后 <strong>税收净优惠为 0</strong>。
+            本页只测算缴费与领取两个环节的<strong>税额差额</strong>，不评价是否参与 ——
+            是否参加取决于你对资金流动性与退休安排的考量，本页不构成投资建议。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>个人养老金每年最多能扣多少税？</summary>
+            <p>缴费环节按 12000 元/年的限额标准在综合所得或经营所得中据实扣除；超过限额的部分当年不可扣除，也不能结转到以后年度。缴费上限由人社部与财政部根据经济社会发展水平适时调整。</p>
+        </details>
+        <details>
+            <summary>缴 12000 元到底能少交多少税？</summary>
+            <p>取决于你全年应纳税所得额落在哪一档税率：扣除的是应纳税所得额，少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额。10% 档每年约少交 1200 元，20% 档约少交 2400 元；直接用「12000 × 税率」在跨档时会高估。</p>
+        </details>
+        <details>
+            <summary>领取个人养老金时怎么交税？</summary>
+            <p>领取时按领取额全额（本金加投资收益）乘 3% 单独计税，不并入综合所得、不参与年度汇算，也不扣除任何费用。</p>
+        </details>
+        <details>
+            <summary>什么情况下个人养老金的税收净优惠为零？</summary>
+            <p>如果全年应纳税所得额不超过 36000 元、适用 3% 的税率，那么缴费时省 3%、领取时再交 3%，两个环节相抵后税收净优惠为零。本页只给出这一税额差额，不评价是否参与，也不构成投资建议。</p>
+        </details>
+        <details>
+            <summary>个人养老金账户里的投资收益要交税吗？</summary>
+            <p>投资环节计入个人养老金资金账户的投资收益暂不征收个人所得税，只在领取环节按领取额全额的 3% 计税。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把个人养老金算进全年账一起看</h2>
+            <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_pension">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议或投资建议；实际纳税请以税务部门与商业银行核算为准。</p>
+        <p>政策依据：《关于个人养老金有关个人所得税政策的公告》（财政部 税务总局公告 2024 年第 21 号，自 2024-01-01 起全国实施；先行城市地区见财政部 税务总局公告 2022 年第 34 号）。缴费上限由人社部与财政部适时调整。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/private-pension.html">个人养老金税优测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js              —— 出厂税率表与个人养老金规则（comprehensiveTaxRates / privatePensionRules）
+       tax-registry.js               —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js             —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       private-pension-quick.js      —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/private-pension-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var contributionInput = document.getElementById('contribution-input');
+    var taxableInput = document.getElementById('taxable-input');
+    var yearsInput = document.getElementById('years-input');
+    var withdrawInput = document.getElementById('withdraw-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoPrivatePensionQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「三环节税务处理表」「年度税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var r = quick.compareOf({
+            annualContribution: contributionInput ? contributionInput.value : 0,
+            taxableBefore: taxableInput ? taxableInput.value : 0,
+            years: yearsInput ? yearsInput.value : 1,
+            withdrawTotal: withdrawInput ? withdrawInput.value : ''
+        });
+
+        document.getElementById('r-deductible').textContent = money(r.deductible) + ' 元';
+        document.getElementById('r-rate').textContent = (r.rate * 100).toFixed(0) + '%';
+        document.getElementById('r-tax').textContent = money(r.taxBefore) + ' 元 → ' + money(r.taxAfter) + ' 元';
+        document.getElementById('r-saved').textContent = money(r.taxSaved) + ' 元';
+        document.getElementById('r-total-saved').textContent = money(r.totalTaxSaved) + ' 元';
+        document.getElementById('r-withdraw-tax').textContent = money(r.withdrawTax) + ' 元';
+        document.getElementById('r-net').textContent = (r.netBenefit >= 0 ? '' : '-') + money(Math.abs(r.netBenefit)) + ' 元';
+        document.getElementById('r-breakeven').textContent = money(r.breakEvenWithdraw) + ' 元';
+        document.getElementById('r-naive').textContent = money(r.naiveSaved) + ' 元（高估 ' + money(r.naiveGap) + ' 元）';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('每年可扣 <strong>' + money(r.deductible) + ' 元</strong>，适用税率 <strong>'
+            + (r.rate * 100).toFixed(0) + '%</strong>，缴费环节每年少交 <strong>' + money(r.taxSaved) + ' 元</strong>。');
+        if (r.overLimit > 0) {
+            parts.push('注意：你填的年缴费额超过年限额，<strong>超出的 ' + money(r.overLimit)
+                + ' 元当年不可扣除、也不能结转</strong>。');
+        }
+        if (r.taxableBefore <= 0) {
+            parts.push('请填写「缴费当年全年应纳税所得额」，否则无法估算少交的税。');
+        }
+        parts.push('领取时按 <strong>' + money(r.withdrawTotal) + ' 元 × 3% = ' + money(r.withdrawTax)
+            + ' 元</strong> 单独计税，' + r.years + ' 年下来净优惠 <strong>' + money(r.netBenefit) + ' 元</strong>。');
+        if (!r.worthIt) {
+            parts.push('<strong>测算结果：税收净优惠为零。</strong>你的适用税率不高于 3%，缴费省 3%、领取时再交 3%，'
+                + '两个环节相抵后没有税收差额（本页仅测算税额，不构成投资建议）。');
+        } else {
+            parts.push('测算结果：税收净优惠为<strong>正</strong> —— 领取额低于 <strong>' + money(r.breakEvenWithdraw)
+                + ' 元</strong>时净优惠仍为正（本页仅测算税额，不构成投资建议）。');
+        }
+        if (r.naiveGap >= 0.005) {
+            parts.push('注意：直接用「可扣额 × ' + (r.rate * 100).toFixed(0) + '%」会算出 '
+                + money(r.naiveSaved) + ' 元，<strong>高估 ' + money(r.naiveGap) + ' 元</strong> —— 因为这笔扣除跨过了档位分界点。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [contributionInput, taxableInput, yearsInput, withdrawInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', render);
+        el.addEventListener('change', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>

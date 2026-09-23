@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15B-5）：个体工商户经营所得「核定 vs 查账」，
+         长尾词「个体工商户 核定征收 税负 / 核定征收 税率 / 经营所得 计算器 /
+         个体户 个税 怎么算 / 核定 应税所得率 / 个体工商户 减半征收」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 规则与费率复用 App 同源实现（business-income-quick.js → tax-constants.js
+              → businessTaxRates / businessIncomeRules），页面上不出现第二份口径；
+           3) 政策依据文号来自注册表 tax-registry.js，页面不自己维护文号；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背一条主线任务：**把「核定不等于少交税」讲清楚** ——
+         核定征收按「收入 × 应税所得率」计税，成本费用、业主 6 万费用扣除与专项附加一律不扣，
+         核定期间的亏损也不得弥补；所以只有当**实际净利率高于临界点**时核定才划算。
+         临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营业收入 —— 这个式子是本页的全部价值。 -->
+    <title>个体工商户核定征收与查账征收哪个税负低？经营所得个税对比计算器（核定 vs 查账，2026 口径）</title>
+    <meta name="description" content="核定征收不等于少交税：核定按「收入 × 应税所得率」计税，不扣成本费用、不扣业主 6 万费用与专项附加、亏损也不得弥补。临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营收 —— 年营收 60 万、核定所得率 10% 时，净利率要高于 20% 核定才划算（另有工资时临界降回 10%）。含核定/查账并排速算、临界净利率速查表，以及「年应纳税所得额不超过 200 万元部分减半」（至 2027-12-31）的实算。政策依据：个人所得税法（主席令第九号）、实施条例（国务院令第 707 号）、个体工商户个人所得税计税办法（国家税务总局令第 35 号）、财政部 税务总局公告 2023 年第 12 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/business-income.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="核定还是查账税负低？先算临界净利率">
+    <meta property="og:description" content="核定按「收入×应税所得率」计税、成本与 6 万都不扣 —— 净利率低于临界点时核定反而多交税。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/business-income.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 个体工商户经营所得核定与查账对比测算",
+                "url": "https://euriskotax.zeabur.app/seo/business-income.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "并排测算个体工商户经营所得的核定征收与查账征收税负，并给出临界净利率（核定所得率 + 6 万元 ÷ 年营收）。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "核定征收一定比查账征收省税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不一定。核定征收按「收入总额 × 应税所得率」计税，不扣成本费用、不扣业主本人 6 万元费用扣除、不扣专项附加扣除，核定期间的亏损也不得弥补。只有当实际净利率高于临界净利率时，核定才划算。年营收 60 万元、核定应税所得率 10%、无综合所得时，临界净利率为 20%。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "临界净利率怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营业收入。因为查账征收还能扣掉业主本人每年 6 万元的费用扣除，这一截摊到营收上就是「6 万 ÷ 营收」。年营收 60 万、核定所得率 10% 时为 20%；年营收 120 万时为 15%。若本人另有工资薪金等综合所得，6 万元已在工资侧扣除，临界净利率就等于核定应税所得率本身（10%），与营收无关。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "核定征收可以扣除成本、费用和专项附加吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "都不能。核定征收的应纳税所得额 = 收入总额 × 应税所得率，成本费用与损失不再扣除，业主本人 6 万元费用扣除与子女教育、赡养老人等专项附加扣除也都不能扣；核定期间发生的亏损不得结转以后年度弥补。这是「核定反而多交税」的全部来源。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "核定征收能享受「不超过 200 万元部分减半」的优惠吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "能。个体工商户年应纳税所得额不超过 200 万元的部分减半征收个人所得税，不区分核定或查账征收方式（财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31）。但减的是「不超过 200 万元那部分对应税额」的一半，不是全部税额的一半：应纳税所得额 300 万元时实际只减 32.2%，500 万元时只减 18.8%。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "本人另有工资时，6 万元费用扣除扣在哪边？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "只能扣一次。基本减除费用 6 万元/年、个人缴纳的社保公积金与专项附加扣除，只能在综合所得（工资薪金）或经营所得中选择一处扣除，不能两边重复享受。通常建议在综合所得侧扣除，因为工资侧的边际税率往往更高。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "经营所得用的是工资那张税率表吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不是。经营所得适用 5%~35% 五级超额累进税率（速算扣除数 0 / 1500 / 10500 / 40500 / 65500），与综合所得的 3%~45% 七级表是两张不同的表，不能混用。这也是经营所得页面不能套用工资个税算器的原因。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为申报依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。应税所得率由各地税务局在国家税务总局规定的幅度内确定，实际以主管税务机关的核定为准；本页默认 10% 仅作演示。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_bizincome">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>核定征收与查账征收哪个税负低？先算「临界净利率」：核定所得率 + 6 万 ÷ 年营收</h1>
+        <p class="answer">
+            <strong>先给结论：</strong><strong>核定不等于少交税</strong>。核定征收按
+            <strong>「收入总额 × 应税所得率」</strong>计税 —— 成本费用再多也不看，
+            业主本人的 <strong>6 万元/年</strong>费用扣除、专项附加扣除同样不能扣，
+            核定期间的亏损也<strong>不得</strong>结转弥补。
+            所以只有当实际净利率高于这条线时核定才划算：
+            <br>
+            <strong>临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营业收入</strong>
+            <br>
+            年营收 60 万、核定所得率 10%（无综合所得）：临界净利率 <strong>20.00%</strong> ——
+            净利率 15% 时查账反而省 <strong>1500 元</strong>；净利率 30% 时核定才省 <strong>4500 元</strong>。
+            若本人另有工资（6 万已扣在工资侧），临界直接降回 <strong>10.00%</strong>。
+            两种征收方式<strong>都能</strong>享受「年应纳税所得额不超过 200 万元部分减半」（至 2027-12-31）。
+        </p>
+
+        <section class="card" aria-labelledby="compare-title">
+            <h2 id="compare-title" style="margin-top:0">速算：核定与查账并排算，并给出你的临界净利率</h2>
+            <p class="small muted" style="margin-top:0">
+                口径：核定应纳税所得额 = 收入 × 应税所得率；查账应纳税所得额 =
+                收入 − 成本费用损失 − 以前年度亏损 − 业主费用扣除 6 万 − 社保公积金 − 专项附加扣除。
+                两者都适用<strong>经营所得五级税率表</strong>（5%~35%），并叠加≤200 万减半
+            </p>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="b-revenue">年营业收入（元，不含增值税）</label>
+                    <input class="calc-input" id="b-revenue" type="number" inputmode="decimal" min="0" step="10000" value="600000" aria-describedby="compare-note">
+                </div>
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="b-cost">成本、费用、税金及损失（元）</label>
+                    <input class="calc-input" id="b-cost" type="number" inputmode="decimal" min="0" step="10000" value="510000" aria-describedby="compare-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-ratio">核定应税所得率（%）</label>
+                    <input class="calc-input" id="b-ratio" type="number" inputmode="decimal" min="1" max="30" step="1" value="10" aria-describedby="compare-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-loss">可弥补以前年度亏损（元）</label>
+                    <input class="calc-input" id="b-loss" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="compare-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="b-special">专项附加扣除（元/年）</label>
+                    <input class="calc-input" id="b-special" type="number" inputmode="decimal" min="0" step="12000" value="0" aria-describedby="compare-note">
+                </div>
+            </div>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="b-social">本人缴纳的社保公积金（元/年）</label>
+                    <input class="calc-input" id="b-social" type="number" inputmode="decimal" min="0" step="1000" value="0" aria-describedby="compare-note">
+                </div>
+                <div style="flex:1 1 260px">
+                    <label class="calc-label" for="b-hascomp">本人是否另有工资薪金等综合所得</label>
+                    <select class="calc-input" id="b-hascomp" aria-describedby="compare-note">
+                        <option value="no" selected>没有（6 万扣在经营所得）</option>
+                        <option value="yes">有（6 万已扣在工资侧）</option>
+                    </select>
+                </div>
+            </div>
+            <p class="small muted" id="compare-note" style="margin-top:10px">
+                应税所得率由各地税务局在国家税务总局规定的幅度内确定（农林业 3%~10%、制造业 5%~15%、
+                批发零售 4%~15%、建筑 8%~20%、饮食 8%~25%、娱乐 15%~30%），实际以主管税务机关核定为准；
+                本页默认 10% 仅作演示。有综合所得时，6 万基本减除费用、社保公积金与专项附加只能在工资侧扣一次。
+            </p>
+            <div class="results" id="compare-results" hidden>
+                <div class="result">
+                    <div class="k">核定：应纳税所得额（元）</div>
+                    <div class="v" id="r-a-taxable">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">核定：未减半税额（元）</div>
+                    <div class="v" id="r-a-before">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">核定：减半减免（元）</div>
+                    <div class="v" id="r-a-halve">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">核定：实缴个税（元）</div>
+                    <div class="v" id="r-a-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">查账：利润（元）</div>
+                    <div class="v" id="r-b-profit">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">查账：应纳税所得额（元）</div>
+                    <div class="v" id="r-b-taxable">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">查账：减半减免（元）</div>
+                    <div class="v" id="r-b-halve">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">查账：实缴个税（元）</div>
+                    <div class="v" id="r-b-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">谁更省（元）</div>
+                    <div class="v" id="r-cheaper">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">你的实际净利率</div>
+                    <div class="v" id="r-actual">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">临界净利率</div>
+                    <div class="v" id="r-breakeven">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">临界利润（元）</div>
+                    <div class="v" id="r-bkprofit">—</div>
+                </div>
+            </div>
+            <div class="hint" id="compare-hint" hidden></div>
+        </section>
+
+        <h2>示例一：年营收 60 万、核定所得率 10%、没有工资（6 万扣在经营所得侧）</h2>
+        <div class="table-scroll">
+            <table id="compare-example-table">
+                <thead>
+                    <tr><th>实际净利率</th><th>利润（元）</th><th>核定应纳税所得额（元）</th><th>核定实缴个税（元）</th><th>查账应纳税所得额（元）</th><th>查账实缴个税（元）</th><th>谁更省</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">3%</td><td class="num">18000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">0.00</td><td class="num">0.00</td><td>查账省 2250.00</td></tr>
+                    <tr><td class="num">5%</td><td class="num">30000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">0.00</td><td class="num">0.00</td><td>查账省 2250.00</td></tr>
+                    <tr><td class="num">10%</td><td class="num">60000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">0.00</td><td class="num">0.00</td><td>查账省 2250.00</td></tr>
+                    <tr><td class="num">15%</td><td class="num">90000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">30000.00</td><td class="num">750.00</td><td>查账省 1500.00</td></tr>
+                    <tr><td class="num">20%（临界）</td><td class="num">120000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td>两者相同</td></tr>
+                    <tr><td class="num">25%</td><td class="num">150000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">90000.00</td><td class="num">3750.00</td><td>核定省 1500.00</td></tr>
+                    <tr><td class="num">30%</td><td class="num">180000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">120000.00</td><td class="num">6750.00</td><td>核定省 4500.00</td></tr>
+                    <tr><td class="num">40%</td><td class="num">240000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">180000.00</td><td class="num">12750.00</td><td>核定省 10500.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            注意查账侧前三行是 <strong>0.00 元</strong>：利润 6 万以内被业主 6 万费用扣除抵完，
+            一分钱经营所得个税都不用交 —— 但核定侧仍按「60 万 × 10% = 6 万」照缴 <strong>2250 元</strong>。
+            这就是<strong>核定反而多交税</strong>的典型区间：核定税额是一条<strong>与利润无关的水平线</strong>，
+            而查账税额随利润从 0 爬升，交点就是临界净利率。
+        </p>
+
+        <h2>示例二：同样 60 万，但本人另有工资（6 万已扣在工资侧）</h2>
+        <div class="table-scroll">
+            <table id="comprehensive-example-table">
+                <thead>
+                    <tr><th>实际净利率</th><th>利润（元）</th><th>核定实缴个税（元）</th><th>查账实缴个税（元）</th><th>谁更省</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">3%</td><td class="num">18000.00</td><td class="num">2250.00</td><td class="num">450.00</td><td>查账省 1800.00</td></tr>
+                    <tr><td class="num">5%</td><td class="num">30000.00</td><td class="num">2250.00</td><td class="num">750.00</td><td>查账省 1500.00</td></tr>
+                    <tr><td class="num">10%（临界）</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">2250.00</td><td>两者相同</td></tr>
+                    <tr><td class="num">15%</td><td class="num">90000.00</td><td class="num">2250.00</td><td class="num">3750.00</td><td>核定省 1500.00</td></tr>
+                    <tr><td class="num">20%</td><td class="num">120000.00</td><td class="num">2250.00</td><td class="num">6750.00</td><td>核定省 4500.00</td></tr>
+                    <tr><td class="num">30%</td><td class="num">180000.00</td><td class="num">2250.00</td><td class="num">12750.00</td><td>核定省 10500.00</td></tr>
+                    <tr><td class="num">40%</td><td class="num">240000.00</td><td class="num">2250.00</td><td class="num">18750.00</td><td>核定省 16500.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            6 万不能扣两次：一旦它在工资侧被扣掉，经营所得侧的免税空间就没了，
+            临界净利率从 <strong>20% 掉到 10%</strong> —— 与核定应税所得率持平。
+            「我还有份工资」这件事，会让核定的优势区间<strong>整整扩大 10 个百分点</strong>。
+        </p>
+
+        <h2>临界净利率速查（无综合所得：临界 = 核定所得率 + 6 万 ÷ 年营收）</h2>
+        <div class="table-scroll">
+            <table id="breakeven-example-table">
+                <thead>
+                    <tr><th>年营业收入</th><th>核定所得率 5%</th><th>核定所得率 10%</th><th>核定所得率 15%</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">30 万</td><td class="num">25.00%</td><td class="num">30.00%</td><td class="num">35.00%</td></tr>
+                    <tr><td class="num">60 万</td><td class="num">15.00%</td><td class="num">20.00%</td><td class="num">25.00%</td></tr>
+                    <tr><td class="num">120 万</td><td class="num">10.00%</td><td class="num">15.00%</td><td class="num">20.00%</td></tr>
+                    <tr><td class="num">240 万</td><td class="num">7.50%</td><td class="num">12.50%</td><td class="num">17.50%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            营收越小，6 万那一截占比越大，临界越高 —— 年营收 30 万、核定所得率 15% 时，
+            净利率要做到 <strong>35%</strong> 核定才划算（多数小本生意做不到）。
+            若本人另有工资薪金，临界净利率<strong>就等于核定应税所得率本身</strong>（5% / 10% / 15%），与营收无关。
+        </p>
+
+        <h2>减半优惠：只减「不超过 200 万那部分」的税额</h2>
+        <div class="table-scroll">
+            <table id="halve-example-table">
+                <thead>
+                    <tr><th>年应纳税所得额（元）</th><th>未减半税额（元）</th><th>减半减免（元）</th><th>实缴个税（元）</th><th>实际省了</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">200000.00</td><td class="num">29500.00</td><td class="num">14750.00</td><td class="num">14750.00</td><td class="num">50.0%</td></tr>
+                    <tr><td class="num">500000.00</td><td class="num">109500.00</td><td class="num">54750.00</td><td class="num">54750.00</td><td class="num">50.0%</td></tr>
+                    <tr><td class="num">1000000.00</td><td class="num">284500.00</td><td class="num">142250.00</td><td class="num">142250.00</td><td class="num">50.0%</td></tr>
+                    <tr><td class="num">2000000.00</td><td class="num">634500.00</td><td class="num">317250.00</td><td class="num">317250.00</td><td class="num">50.0%</td></tr>
+                    <tr><td class="num">3000000.00</td><td class="num">984500.00</td><td class="num">317250.00</td><td class="num">667250.00</td><td class="num">32.2%</td></tr>
+                    <tr><td class="num">5000000.00</td><td class="num">1684500.00</td><td class="num">317250.00</td><td class="num">1367250.00</td><td class="num">18.8%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            减免额在 <strong>200 万处封顶为 317250 元</strong> —— 超过之后，
+            多赚的部分不再有减半，实际省下的比例被摊薄（300 万省 32.2%、500 万只省 18.8%）。
+            这条优惠<strong>核定与查账都能享受</strong>，执行至 2027-12-31。
+        </p>
+
+        <h2>四条最容易踩的口径</h2>
+        <h3>1. 核定不等于少交税：先比「实际净利率」和「临界净利率」</h3>
+        <p>
+            核定税额是 <strong>与利润无关的一条水平线</strong>（收入 × 应税所得率 → 固定税额），
+            查账税额则从 0 随利润爬升。两者相交处 =
+            <strong>核定应税所得率 + 6 万元 ÷ 年营业收入</strong>。
+            年营收 60 万、核定所得率 10%、没有工资时，临界是 <strong>20%</strong>：
+            净利率 15% 的餐馆、工作室、网店选核定，每年<strong>多交 1500 元</strong>；
+            净利率 30% 的选核定，才省 <strong>4500 元</strong>。
+            先算自己落在交点哪一侧，再谈选哪种。
+        </p>
+        <h3>2. 核定征收的「三不」：不扣成本、不扣 6 万、不弥补亏损</h3>
+        <p>
+            核定的应纳税所得额 = 收入总额 × 应税所得率，
+            <strong>成本费用与损失不再扣除</strong>、<strong>业主本人 6 万元费用扣除不能扣</strong>、
+            <strong>专项附加扣除不能扣</strong>，且<strong>核定期间发生的亏损不得结转以后年度弥补</strong>。
+            这三件事叠加，才是「账不健全的代价」—— 反过来，账证健全就该走查账，把真实成本扣干净。
+        </p>
+        <h3>3. 减半只减 200 万以内那部分，不是全额减半</h3>
+        <p>
+            个体工商户年应纳税所得额<strong>不超过 200 万元的部分</strong>减半征收
+            （财政部 税务总局公告 2023 年第 12 号，2023-01-01 至 2027-12-31），
+            核定与查账<strong>都能享受</strong>（很多人以为只有查账能享受）。
+            但减免额在 200 万处封顶：应纳税所得额 300 万时实际只减 <strong>32.2%</strong>，
+            500 万时只减 <strong>18.8%</strong> —— 规模越大，这项优惠越薄。
+        </p>
+        <h3>4. 经营所得用的是自己的五级税率表，不是工资那张七级表</h3>
+        <p>
+            经营所得适用 <strong>5% / 10% / 20% / 30% / 35%</strong> 五级超额累进
+            （速算扣除数 0 / 1500 / 10500 / 40500 / 65500），与综合所得的 3%~45% 七级表
+            <strong>不是同一张表</strong>。拿工资个税算器去估个体户的税，档位和速算扣除数全错。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>核定征收一定比查账征收省税吗？</summary>
+            <p>不一定。核定征收按「收入总额 × 应税所得率」计税，不扣成本费用、不扣业主本人 6 万元费用扣除、不扣专项附加扣除，核定期间的亏损也不得弥补。只有当实际净利率高于临界净利率时，核定才划算。年营收 60 万元、核定应税所得率 10%、无综合所得时，临界净利率为 20%。</p>
+        </details>
+        <details>
+            <summary>临界净利率怎么算？</summary>
+            <p>临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营业收入。因为查账征收还能扣掉业主本人每年 6 万元的费用扣除，这一截摊到营收上就是「6 万 ÷ 营收」。年营收 60 万、核定所得率 10% 时为 20%；年营收 120 万时为 15%。若本人另有工资薪金等综合所得，6 万元已在工资侧扣除，临界净利率就等于核定应税所得率本身（10%），与营收无关。</p>
+        </details>
+        <details>
+            <summary>核定征收可以扣除成本、费用和专项附加吗？</summary>
+            <p>都不能。核定征收的应纳税所得额 = 收入总额 × 应税所得率，成本费用与损失不再扣除，业主本人 6 万元费用扣除与子女教育、赡养老人等专项附加扣除也都不能扣；核定期间发生的亏损不得结转以后年度弥补。这是「核定反而多交税」的全部来源。</p>
+        </details>
+        <details>
+            <summary>核定征收能享受「不超过 200 万元部分减半」的优惠吗？</summary>
+            <p>能。个体工商户年应纳税所得额不超过 200 万元的部分减半征收个人所得税，不区分核定或查账征收方式（财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31）。但减的是「不超过 200 万元那部分对应税额」的一半，不是全部税额的一半：应纳税所得额 300 万元时实际只减 32.2%，500 万元时只减 18.8%。</p>
+        </details>
+        <details>
+            <summary>本人另有工资时，6 万元费用扣除扣在哪边？</summary>
+            <p>只能扣一次。基本减除费用 6 万元/年、个人缴纳的社保公积金与专项附加扣除，只能在综合所得（工资薪金）或经营所得中选择一处扣除，不能两边重复享受。通常建议在综合所得侧扣除，因为工资侧的边际税率往往更高。</p>
+        </details>
+        <details>
+            <summary>经营所得用的是工资那张税率表吗？</summary>
+            <p>不是。经营所得适用 5%~35% 五级超额累进税率（速算扣除数 0 / 1500 / 10500 / 40500 / 65500），与综合所得的 3%~45% 七级表是两张不同的表，不能混用。这也是经营所得页面不能套用工资个税算器的原因。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为申报依据吗？</summary>
+            <p>不能。应税所得率由各地税务局在国家税务总局规定的幅度内确定，实际以主管税务机关的核定为准；本页默认 10% 仅作演示。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把经营所得与个税放在一处看</h2>
+            <p>本页算的是核定与查账的选择；经营所得年度汇算、增值税与附加税费、工资个税测算可在 App 里一起看。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_bizincome">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；应税所得率与征收方式以主管税务机关核定为准。</p>
+        <p id="policy-basis">政策依据：《中华人民共和国个人所得税法》（主席令第九号，2018 年修正）、《中华人民共和国个人所得税法实施条例》（国务院令第 707 号）、《个体工商户个人所得税计税办法》（国家税务总局令第 35 号）、《关于进一步支持小微企业和个体工商户发展有关税费政策的公告》（财政部 税务总局公告 2023 年第 12 号）、《中华人民共和国税收征收管理法》（主席令第 23 号，2015 年修正）、《个体工商户税收定期定额征收管理办法》（国税发〔2006〕183 号）。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/vat.html">增值税</a> · <a href="/seo/surtax-stamp-duty.html">附加税与印花税</a> · <a href="/seo/corporate-income-tax.html">企业所得税</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js  —— 出厂税率与规则（businessTaxRates / businessIncomeRules）
+       tax-registry.js   —— 税种注册表（15D-1）：政策依据文号与到期状态
+       business-income-quick.js —— 核定 / 查账 / 临界净利率（不复制费率，只读常量与注册表） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/calculation/business-income-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var quick = window.EuriskoBusinessIncomeQuick;
+
+    function money(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function percent(n) {
+        if (n === null || n === undefined) return '—';
+        return (Math.round(Number(n) * 1000) / 10) + '%';
+    }
+    function text(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+    function fail(hint, msg) {
+        if (hint) {
+            hint.innerHTML = msg;
+            hint.hidden = false;
+        }
+    }
+    function val(id) {
+        var el = document.getElementById(id);
+        return el ? el.value : '';
+    }
+    function num(id) {
+        var n = Number(val(id));
+        return isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function inputs() {
+        return {
+            revenue: num('b-revenue'),
+            cost: num('b-cost'),
+            profitRatio: num('b-ratio') / 100,
+            previousLoss: num('b-loss'),
+            specialAdditional: num('b-special'),
+            specialDeduction: num('b-social'),
+            hasComprehensiveIncome: val('b-hascomp') === 'yes'
+        };
+    }
+
+    // 政策依据只读注册表：页面不自己维护文号（与增值税、附加税、社保页同一套做法）
+    function renderBasis() {
+        var el = document.getElementById('policy-basis');
+        if (!el || !window.EuriskoTaxRegistry) return;
+        var parts = [];
+        ['business-income', 'business-income-halve', 'business-income-assessed'].forEach(function (id) {
+            window.EuriskoTaxRegistry.basisOf(id).forEach(function (b) {
+                parts.push(b.title.replace(/（[^）]*$/, '') + '（' + b.doc + '）');
+            });
+        });
+        if (parts.length) el.textContent = '政策依据：' + parts.join('、') + '。';
+    }
+
+    function renderCompare() {
+        var box = document.getElementById('compare-results');
+        var hint = document.getElementById('compare-hint');
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            fail(hint, '速算器脚本未加载，请刷新页面；下方示例表仍可手工估算。');
+            return;
+        }
+        var input = inputs();
+        if (input.revenue <= 0 || input.profitRatio <= 0) {
+            box.hidden = true;
+            fail(hint, '请填写年营业收入（大于 0）与核定应税所得率后再算。');
+            return;
+        }
+        var r = quick.compareOf(input);
+        var bk = quick.breakevenProfitRatioOf(input);
+        box.hidden = false;
+        if (hint) hint.hidden = true;
+
+        text('r-a-taxable', money(r.assessed.taxable));
+        text('r-a-before', money(r.assessed.beforeHalve));
+        text('r-a-halve', money(r.assessed.halve));
+        text('r-a-tax', money(r.assessed.tax));
+        text('r-b-profit', money(r.audited.profit));
+        text('r-b-taxable', money(r.audited.taxable));
+        text('r-b-halve', money(r.audited.halve));
+        text('r-b-tax', money(r.audited.tax));
+        text('r-actual', percent(r.actualProfitRatio));
+
+        if (r.cheaper === 'same') {
+            text('r-cheaper', '两者相同');
+        } else if (r.cheaper === 'audited') {
+            text('r-cheaper', '查账省 ' + money(r.diff));
+        } else {
+            text('r-cheaper', '核定省 ' + money(-r.diff));
+        }
+
+        if (bk === null) {
+            text('r-breakeven', '查账恒优');
+            text('r-bkprofit', '—');
+        } else {
+            text('r-breakeven', percent(bk.ratio));
+            text('r-bkprofit', money(bk.profitAtRatio));
+        }
+
+        if (hint) {
+            var msg = [];
+            if (r.cheaper === 'audited') {
+                msg.push('按这组参数，<strong>查账更省 ' + money(r.diff) + ' 元</strong>：你的净利率 '
+                    + percent(r.actualProfitRatio) + ' 低于临界 ' + (bk ? percent(bk.ratio) : '—')
+                    + '，核定那条水平线还在上面。');
+            } else if (r.cheaper === 'assessed') {
+                msg.push('按这组参数，<strong>核定更省 ' + money(-r.diff) + ' 元</strong>：净利率 '
+                    + percent(r.actualProfitRatio) + ' 已高于临界 ' + (bk ? percent(bk.ratio) : '—') + '。');
+            } else {
+                msg.push('两者税额相同 —— 你正落在临界净利率上。');
+            }
+            if (input.hasComprehensiveIncome) {
+                msg.push('已按「另有工资」处理：6 万基本减除费用、社保公积金与专项附加都<strong>只能扣在工资侧</strong>，经营所得不再重复扣。');
+            }
+            if (r.audited.taxable <= 0) {
+                msg.push('查账侧应纳税所得额为 0：利润被 6 万业主费用扣除（及专项附加）抵完，一分钱经营所得个税都不用交。');
+            }
+            if (window.EuriskoTaxRegistry) {
+                var st = window.EuriskoTaxRegistry.statusOf('business-income-halve');
+                if (st && st.expired) {
+                    msg.push('<strong>减半优惠已过执行期</strong>（执行至 ' + st.expiresOn + '）：表中数字已不含减半，请按最新政策复核。');
+                } else if (st && st.daysLeft !== null && st.daysLeft <= 180) {
+                    msg.push('减半优惠执行至 ' + st.expiresOn + '，剩 ' + st.daysLeft + ' 天到期。');
+                }
+            }
+            if (msg.length) {
+                hint.innerHTML = msg.join(' ');
+                hint.hidden = false;
+            }
+        }
+    }
+
+    ['b-revenue', 'b-cost', 'b-ratio', 'b-loss', 'b-special', 'b-social', 'b-hascomp'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', renderCompare);
+    });
+
+    renderBasis();
+    renderCompare();
+});
+</script>
+</body>
+</html>

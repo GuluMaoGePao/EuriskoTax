@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-1）：高商业意图长尾词「劳务报酬个税」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（withholding-quick.js + window.withholdingTaxRates
+              / window.otherIncomeRules），页面上不出现第二份税率表；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
+    <title>劳务报酬个税计算器 2026：800 元扣除与 20%/30%/40% 预扣率怎么算</title>
+    <meta name="description" content="输入一笔劳务报酬 / 稿酬 / 特许权使用费，立即算出预扣预缴税额与税后到手，并对比「并入综合所得」后的实际税负（应退还是应补）。含预扣率表、费用扣除规则与示例表，政策依据：国家税务总局公告 2018 年第 61 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/labor-withholding.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="劳务报酬个税计算器 2026：800 元扣除与 20%/30%/40% 预扣率怎么算">
+    <meta property="og:description" content="输入金额立即算预扣预缴税额，并与并入综合所得后的实际税负对比。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/labor-withholding.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 劳务报酬个税计算器",
+                "url": "https://euriskotax.zeabur.app/seo/labor-withholding.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "计算劳务报酬、稿酬、特许权使用费的预扣预缴税额与税后到手，并对比并入综合所得后的实际税负。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "劳务报酬个税怎么算？为什么有人按 20%、有人按 40%？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "先减费用：单次收入不超过 4000 元减除 800 元，超过 4000 元减除 20%；再按「应纳税所得额」查预扣率表：不超过 20000 元 20%，20000 至 50000 元 30%（速算扣除数 2000），超过 50000 元 40%（速算扣除数 7000）。例如劳务报酬 10000 元，应纳税所得额 8000 元，预扣税额 1600 元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "稿酬和特许权使用费的预扣率是多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "预扣率固定 20%。稿酬在减除费用后再减按 70% 计算，即收入 10000 元的应纳税所得额为 5600 元、预扣税额 1120 元；特许权使用费不享受这层七折，收入 10000 元的应纳税所得额为 8000 元、预扣税额 1600 元。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "预扣的税就是最终要交的税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不是。劳务报酬、稿酬、特许权使用费属于综合所得，次年 3 月 1 日至 6 月 30 日办理年度汇算时按收入额并入综合所得（劳务与特许权按 80%、稿酬按 56%），与全年工资等合并后重新计税，预扣多了退、少了补。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "为什么兼职收入预扣了 20%，汇算后反而能退税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "因为预扣预缴按 20% 起算，而全年综合所得可能只落在 3% 或 10% 档，且基本减除费用 6 万元、专项附加扣除等在预扣阶段并未扣除。全年综合所得不高时，并入后按低档计税，原预扣的税额就会形成退税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_withholding">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>劳务报酬个税怎么算：800 元扣除、20%/30%/40% 三档预扣率</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>支付方（公司）给你付劳务报酬时会<strong>先扣一笔税</strong>，这叫<strong>预扣预缴</strong>：
+            收入不超过 4000 元减除 <strong>800 元</strong>费用，超过 4000 元减除 <strong>20%</strong>；
+            剩下的「应纳税所得额」按 <strong>20% / 30% / 40%</strong> 三档预扣率计税（后两档速算扣除数 2000 / 7000）。
+            但预扣的税<strong>不是最终结果</strong> —— 劳务报酬、稿酬、特许权使用费都属于综合所得，
+            次年汇算时按收入额并入综合所得重新算，<strong>多退少补</strong>。
+            政策依据：《个人所得税扣缴申报管理办法（试行）》（<strong>国家税务总局公告 2018 年第 61 号</strong>）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">劳务报酬 / 稿酬 / 特许权使用费预扣速算</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="type-input">所得类型</label>
+                    <select class="calc-input" id="type-input">
+                        <option value="labor" selected>劳务报酬所得</option>
+                        <option value="author">稿酬所得</option>
+                        <option value="royalty">特许权使用费所得</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="amount-input">收入金额（元，税前）</label>
+                    <input class="calc-input" id="amount-input" type="number" inputmode="decimal" min="0" step="100" value="10000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <label class="calc-label" for="rate-input">你全年综合所得适用的税率档（用于估算并入后的实际税负）</label>
+            <select class="calc-input" id="rate-input" aria-describedby="calc-note">
+                <option value="0.03">3%（全年应纳税所得额 ≤ 36000）</option>
+                <option value="0.10" selected>10%（36000 ～ 144000）</option>
+                <option value="0.20">20%（144000 ～ 300000）</option>
+                <option value="0.25">25%（300000 ～ 420000）</option>
+                <option value="0.30">30%（420000 ～ 660000）</option>
+                <option value="0.35">35%（660000 ～ 960000）</option>
+                <option value="0.45">45%（超过 960000）</option>
+            </select>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                本页算的是<strong>预扣预缴</strong>（支付方先扣的数）与<strong>并入综合所得后的估算税负</strong>；
+                并入后的实际税负取决于全年收入与扣除，精确值请<a href="/?source=seo_withholding">在 App 里把全年收支填一次</a>。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">应纳税所得额（减费用后）</div>
+                    <div class="v" id="r-taxable">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">预扣预缴税额</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">预扣后到手</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">并入综合所得后（估算）</div>
+                    <div class="v" id="r-settled">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方预扣率表、费用扣除规则与示例表手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>怎么算：两步就够</h2>
+        <ol>
+            <li><strong>减费用</strong>：单次收入 ≤ 4000 元 → 减 800 元；&gt; 4000 元 → 减 20%。稿酬在减完费用后<strong>再减按 70%</strong> 计算（这是稿酬税负更轻的原因）。</li>
+            <li><strong>查预扣率</strong>：劳务报酬按「应纳税所得额」查下表（20% / 30% / 40%）；稿酬与特许权使用费预扣率固定 <strong>20%</strong>。</li>
+        </ol>
+        <p class="muted small">例：劳务报酬 10000 元 → 减 20% 费用后为 8000 元 → 8000 × 20% = <strong>1600 元</strong>（稿酬同样 10000 元只需 1120 元）。</p>
+
+        <h2>预扣率表（劳务报酬）</h2>
+        <div class="table-scroll">
+            <table id="rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">按「应纳税所得额」（已减费用）定档，稿酬与特许权使用费不查此表，预扣率固定 20%</caption>
+                <thead>
+                <tr>
+                    <th scope="col">应纳税所得额（元）</th>
+                    <th scope="col">预扣率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 20000</td><td class="num">20%</td><td class="num">0</td></tr>
+                <tr><td>20000 ～ 50000</td><td class="num">30%</td><td class="num">2000</td></tr>
+                <tr><td>超过 50000</td><td class="num">40%</td><td class="num">7000</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>费用扣除与「并入综合所得」的折算</h2>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">所得类型</th>
+                    <th scope="col">减除费用</th>
+                    <th scope="col">预扣率</th>
+                    <th scope="col">并入综合所得的收入额</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>劳务报酬所得</td><td>≤4000 减 800，&gt;4000 减 20%</td><td class="num">20% / 30% / 40%</td><td>收入 × 80%</td></tr>
+                <tr><td>稿酬所得</td><td>同上，再减按 70% 计算</td><td class="num">20%</td><td>收入 × 56%</td></tr>
+                <tr><td>特许权使用费所得</td><td>≤4000 减 800，&gt;4000 减 20%</td><td class="num">20%</td><td>收入 × 80%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">「收入额」是年度汇算时并入综合所得的数：劳务与特许权按 80% 折算、稿酬按 56% 折算 —— 这也是同样一笔 10000 元，稿酬的税负明显更低的原因。</p>
+
+        <h2>示例：同样 10000 元，三种所得差多少</h2>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">所得类型</th>
+                    <th scope="col">收入（元）</th>
+                    <th scope="col">应纳税所得额（元）</th>
+                    <th scope="col">预扣税额（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>劳务报酬</td><td class="num">10000.00</td><td class="num">8000.00</td><td class="num">1600.00</td></tr>
+                <tr><td>稿酬</td><td class="num">10000.00</td><td class="num">5600.00</td><td class="num">1120.00</td></tr>
+                <tr><td>特许权使用费</td><td class="num">10000.00</td><td class="num">8000.00</td><td class="num">1600.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">表中数字由本页速算器同源计算得出（税率与费用扣除规则取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/withholding-quick.test.js</code> 逐点与 App 内核结果对拍守护。</p>
+
+        <h2>预扣 vs 并入综合所得：为什么有人能退税</h2>
+        <p>
+            预扣预缴是「支付方按固定规则先扣」，<strong>没有</strong>扣除每年 6 万元基本减除费用、五险一金与专项附加扣除；
+            而年度汇算把这些扣除全部算进去，再按全年综合所得适用同一张年度税率表。因此：
+        </p>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">综合所得年度税率表（全年应纳税所得额）—— 汇算时按此表对全部综合所得计税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <table>
+            <thead>
+            <tr><th scope="col">情况</th><th scope="col">汇算结果通常是</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>全年综合所得低（如学生兼职、只有几笔稿酬）</td><td>预扣 20% 高于实际档位 → <strong>退税</strong></td></tr>
+            <tr><td>全年综合所得已进入较高档位（25% 及以上）</td><td>预扣率低于实际档位 → <strong>补税</strong></td></tr>
+            <tr><td>劳务报酬单笔金额大（应纳税所得额超过 5 万）</td><td>预扣 40%，多数情况会退一部分</td></tr>
+            </tbody>
+        </table>
+        <p class="small muted">判断的关键是把「并入后的全年应纳税额」与「已预缴税额」放在一起比。手工算容易出错，<a href="/?source=seo_withholding">在 App 里填一次全年收支，应退/应补会直接给出</a>（数据只存在本机浏览器）。</p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>劳务报酬个税怎么算？为什么有人按 20%、有人按 40%？</summary>
+            <p>先减费用：单次收入不超过 4000 元减除 800 元，超过 4000 元减除 20%；再按「应纳税所得额」查预扣率表：不超过 20000 元 20%，20000 至 50000 元 30%（速算扣除数 2000），超过 50000 元 40%（速算扣除数 7000）。例如劳务报酬 10000 元，应纳税所得额 8000 元，预扣税额 1600 元。</p>
+        </details>
+        <details>
+            <summary>稿酬和特许权使用费的预扣率是多少？</summary>
+            <p>预扣率固定 20%。稿酬在减除费用后再减按 70% 计算，即收入 10000 元的应纳税所得额为 5600 元、预扣税额 1120 元；特许权使用费不享受这层七折，收入 10000 元的应纳税所得额为 8000 元、预扣税额 1600 元。</p>
+        </details>
+        <details>
+            <summary>预扣的税就是最终要交的税吗？</summary>
+            <p>不是。劳务报酬、稿酬、特许权使用费属于综合所得，次年 3 月 1 日至 6 月 30 日办理年度汇算时按收入额并入综合所得（劳务与特许权按 80%、稿酬按 56%），与全年工资等合并后重新计税，预扣多了退、少了补。</p>
+        </details>
+        <details>
+            <summary>为什么兼职收入预扣了 20%，汇算后反而能退税？</summary>
+            <p>因为预扣预缴按 20% 起算，而全年综合所得可能只落在 3% 或 10% 档，且基本减除费用 6 万元、专项附加扣除等在预扣阶段并未扣除。全年综合所得不高时，并入后按低档计税，原预扣的税额就会形成退税。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把全年收支一起算，看看到底退还是补</h2>
+            <p>输入工资、社保公积金、专项附加扣除与劳务 / 稿酬收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_withholding">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/labor-withholding.html">劳务报酬个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js      —— 出厂税率表与费用扣除规则（withholdingTaxRates / otherIncomeRules）
+       tax-registry.js       —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js     —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       withholding-quick.js  —— 与内核 calculateOtherIncome 等价的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/withholding-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var typeInput = document.getElementById('type-input');
+    var amountInput = document.getElementById('amount-input');
+    var rateInput = document.getElementById('rate-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var rTaxable = document.getElementById('r-taxable');
+    var rTax = document.getElementById('r-tax');
+    var rNet = document.getElementById('r-net');
+    var rSettled = document.getElementById('r-settled');
+    var quick = window.EuriskoWithholdingQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function typeName(type) {
+        if (type === 'author') return '稿酬';
+        if (type === 'royalty') return '特许权使用费';
+        return '劳务报酬';
+    }
+
+    function render() {
+        if (!amountInput || !box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            // 计算脚本未加载（网络异常/被拦截）时不装作有结果
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「预扣率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var amount = Number(amountInput.value);
+        var type = typeInput ? typeInput.value : 'labor';
+        var rate = rateInput ? Number(rateInput.value) : 0.1;
+        if (!Number.isFinite(amount) || amount <= 0) {
+            box.hidden = true;
+            if (hint) { hint.hidden = true; }
+            return;
+        }
+        var r = quick.compareOf(type, amount, rate);
+        box.hidden = false;
+        rTaxable.textContent = money(r.taxable) + ' 元';
+        rTax.textContent = money(r.prepaid) + ' 元';
+        rNet.textContent = money(amount - r.prepaid) + ' 元';
+        rSettled.textContent = money(r.settled) + ' 元';
+
+        if (!hint) return;
+        var gap = Math.abs(r.gap);
+        if (gap < 0.005) {
+            hint.innerHTML = '这笔' + typeName(type) + '预扣的税额与并入综合所得后的估算税负<strong>基本持平</strong>。';
+        } else if (r.gap < 0) {
+            hint.innerHTML = '并入综合所得后按你所选的 ' + (rate * 100) + '% 档估算，税负比已预扣的少 <strong>'
+                + money(gap) + ' 元</strong>，年度汇算时通常体现为<strong>退税</strong>。';
+        } else {
+            hint.innerHTML = '并入综合所得后按你所选的 ' + (rate * 100) + '% 档估算，税负比已预扣的多 <strong>'
+                + money(gap) + ' 元</strong>，年度汇算时通常需要<strong>补税</strong>。';
+        }
+        hint.hidden = false;
+    }
+
+    if (amountInput) {
+        amountInput.addEventListener('input', render);
+        if (typeInput) typeInput.addEventListener('change', render);
+        if (rateInput) rateInput.addEventListener('change', render);
+        render();
+        // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+        document.addEventListener('euriskotax:tax-rates-updated', render);
+    }
+});
+</script>
+</body>
+</html>

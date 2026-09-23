@@ -7,43 +7,11 @@ const FIELD_HINTS = {
     'common_work_months': '一年中实际工作的月数，不满12个月时需要调整计算',
     'common_prepaid_tax': '个人全年已预缴的个税总额，用于计算年度应退/应补税额；留空则由系统按工资累计预缴 + 劳务/稿酬/特许权使用费预缴自动估算',
 
-    // ===== 综合所得 - 基本参数 =====
-    'forward_salary': '税前月工资薪金，全额计入综合所得收入额',
-    'forward_labor': '劳务报酬所得，按80%折算计入综合所得收入额',
-    'forward_author': '稿酬所得，按80%×70%折算计入综合所得收入额',
-    'forward_royalty': '特许权使用费所得，按80%折算计入综合所得收入额',
-    'forward_bonus': '全年一次性奖金收入，可选择并入综合所得计税或单独计税',
-    'forward_basic_deduction': '每月固定5000元，不可修改',
-
-    // ===== 综合所得 - 社保公积金 =====
-    'forward_social_base': '社会保险缴费的基数，一般为本人上年度月平均工资',
-    'forward_pension': '个人承担的养老保险部分',
-    'forward_medical': '个人承担的医疗保险部分',
-    'forward_unemployment': '个人承担的失业保险部分',
-    'forward_housing': '个人承担的住房公积金部分',
-
-    // ===== 综合所得 - 专项附加扣除 =====
-    'forward_children': '每个子女/婴幼儿每月2000元的专项附加扣除',
-    'forward_elderly': '独生子女每月3000元，非独生子女分摊每月3000元，最高1500元/月',
-    'forward_house': '住房租金或住房贷款利息，二选一',
-    'forward_education': '学历教育400元/月，职业资格3600元/年，可叠加享受',
-    'forward_serious': '医保目录范围内自付部分超过15000元的部分，限额80000元',
-    'forward_pension_insurance': '个人养老金月度扣除限额1000元',
-    'forward_annuity': '请手动输入企业年金金额，一般为个人月工资的5%',
-    'forward_health': '商业健康保险月度扣除限额200元',
-    'forward_investment': '当月收入的6%与1000元中的较低者',
-    'forward_donation': '符合标准的一般捐赠30%，特殊捐赠100%',
-
-    // ===== 反向倒算 =====
-    'reverse_mode': '选择倒算方式',
-    'reverse_type': '选择需要反向倒算的所得类型',
-    'reverse_basis': '选择应纳税所得额的计算基准，适配不同预算规划需求',
-    'reverse_rate': '选择希望适用的税率级别',
-    'reverse_monthly_income': '每月实际到手的税后收入',
-    'reverse_target_type': '选择倒算的目标类型',
-    'reverse_target_tax': '希望全年缴纳的个人所得税总额',
-    'reverse_target_income': '希望全年实际到手的税后收入',
-    'reverse_bonus': '全年一次性奖金收入',
+    // 17B-2（v1.48.0）：反向倒算的这一组键随旧页面删除 —— 它们对应的 `<reverse-*>`
+    // 输入框不存在了，留着只是给「改字段提示的人」一份找不到主人的清单。
+    // 17B-3（v1.49.0）：综合所得 `forward_*` 同样删掉。迁移后字段提示写在 **spec 自己的
+    // `fields[].hint`** 里（tool-registry），跟着字段一起被渲染器画出来；
+    // 这份按页面分组的清单只服务于手写页面。
 
     // ===== 经营所得 - 成本费用 =====
     'business_revenue': '包括主营业务收入和其他业务收入',
@@ -69,12 +37,9 @@ const FIELD_HINTS = {
     'business_prepaid': '年度内已预缴的经营所得税额',
 
     // ===== 分类所得 =====
-    'classification_type': '选择分类所得的具体类型',
-    'classification_amount': '每次收入的金额',
-    'classification_tax': '包括相关税费等',
-    'classification_deduction': '每月最高扣除800元',
-    'classification_original': '取得财产时的实际支出',
-    'classification_fee': '转让过程中发生的相关费用'
+    // 17B-4（v1.50.0）：classification_* 六个键随分类所得页面删掉了 ——
+    // 承载它们的 tooltip 只写在那（现已不存在的）页面上。tooltip 机制本身还在：
+    // 页面式 page 与向导共用同一套 data-hint → 这里查字典的方式，删掉这 6 条只是因为宿主没了。
 };
 
 // 暴露到全局

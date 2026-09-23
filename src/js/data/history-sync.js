@@ -150,6 +150,9 @@
     let account = null;                 // 当前登录邮箱
     let plan = 'free';
     let planExpiresAt = null;
+    // 权益来源（trial / purchase / redeem …）：gate 提示要按它区分
+    // 「付费权益过期」与「免费体验过期」—— 没有它，前者会被当成后者。
+    let grantedBy = null;
     let attached = false;
     let busy = false;
     let dirtyWhileBusy = false;
@@ -253,7 +256,11 @@
                 const message = code === 'HISTORY_LIMIT_REACHED'
                     ? errMsg
                     : code === 'PRO_REQUIRED'
-                        ? (window.EuriskoPlan ? window.EuriskoPlan.PRO_FEATURE_HINT : errMsg)
+                        ? (window.EuriskoPlan
+                            ? (window.EuriskoPlan.featureHintFor
+                                ? window.EuriskoPlan.featureHintFor({ plan, plan_expires_at: planExpiresAt, pro_granted_by: grantedBy })
+                                : window.EuriskoPlan.PRO_FEATURE_HINT)
+                            : errMsg)
                         : errMsg;
                 publish({ status: 'error', message, syncedCount: 0, recordsPulled: 0 });
                 return getState();
@@ -320,6 +327,7 @@
         account = user && user.email ? user.email : null;
         plan = (user && user.plan) || 'free';
         planExpiresAt = (user && user.plan_expires_at) || null;
+        grantedBy = (user && user.pro_granted_by) || null;
     }
 
     const engine = {
@@ -349,6 +357,7 @@
             account = null;
             plan = 'free';
             planExpiresAt = null;
+            grantedBy = null;
             try {
                 localStorage.removeItem(META_KEY);
             } catch (e) { /* 忽略 */ }

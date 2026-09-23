@@ -14,21 +14,18 @@
 (function () {
     'use strict';
 
+    // 阶段17 17B-1（v1.47.0）：经营所得那份「专业版报告」随旧页面一并删除。
+    // 向导有自己的导出路径（deep-wizard-ui 的 exportResult → exportToPDF/Word），不需要这条 kind。
     const KIND_COMPREHENSIVE = 'comprehensive';
-    const KIND_BUSINESS = 'business';
 
     const META = {
         comprehensive: {
             legacyTitle: '个人年度个税预算表',
-            resultElId: 'step-result',
+            // 17B-3（v1.49.0）：'step-result' 随综合所得旧页面删除，改为向导的结果卡 ——
+            // 换过的旧 id 会让 exportToPDF 静默丢掉截图主体：报告只剩封面和免责页，且不报错。
+            resultElId: 'dw-result-card',
             reportTitle: () => `${new Date().getFullYear()}年度综合所得汇算清缴报告`,
             kindLabel: '综合所得年度汇算测算'
-        },
-        business: {
-            legacyTitle: '经营所得年度预算表',
-            resultElId: 'business-result',
-            reportTitle: () => `${new Date().getFullYear()}年度经营所得汇算清缴报告`,
-            kindLabel: '经营所得年度汇算测算'
         }
     };
 
@@ -80,19 +77,7 @@
 
     // === 纯数据：税负结构（柱状图数据源） ===
     function taxStructure(kind) {
-        if (kind === KIND_BUSINESS) {
-            const R = (typeof window !== 'undefined' && window.businessCalculationResults) || {};
-            const id = R.incomeDetails || {};
-            const td = R.taxDetails || {};
-            const loss = num(id.businessLosses) + num(id.businessOtherExpenses);
-            const profit = num(id.businessProfit);
-            return {
-                kind: KIND_BUSINESS,
-                labels: ['收入总额', '成本费用', '税金/损失等', '利润总额', '应纳税所得额', '应纳税额'],
-                values: [num(id.businessIncome), num(id.businessCost), loss, profit, num(td.taxableIncome), num(td.totalTax)],
-                note: '税额已按优惠政策（如减半征收）自动折算；若勾选“有综合所得”，6万元减除费用在综合所得侧扣除。'
-            };
-        }
+
         const R = (typeof window !== 'undefined' && window.calculationResults) || {};
         const id = R.incomeDetails || {};
         const dd = R.deductionDetails || {};
@@ -112,9 +97,7 @@
         const qa = (typeof window !== 'undefined' && window.TAX_ASSISTANT_QA) || [];
         if (!Array.isArray(qa)) return [];
         const max = limit || 6;
-        const preferred = kind === KIND_BUSINESS
-            ? ['经营所得', '政策法规']
-            : ['汇算清缴', '政策法规', '综合所得'];
+        const preferred = ['汇算清缴', '政策法规', '综合所得'];
         const result = [];
         const seen = {};
 
@@ -305,17 +288,106 @@
         exportToPDF(meta.resultElId, meta.legacyTitle);
     }
 
-    function exportFinalReport(kind) {
-        const meta = META[kind] || META.comprehensive;
-        if (!isProUser()) {
-            legacyPdf(kind); // 免费版保留既有导出能力
+    // === 合规护栏：与 lead-touchpoints.js 同款双保险 ===
+    // 谈薪（reverse）永不出现「留资换权益」钩子；白名单之外一律回落标准导出。
+    var REPORT_ALLOWED_TYPES = ['comprehensive'];
+    var REPORT_BLOCKED_TYPES = ['reverse'];
+
+    function hookAllowed(kind) {
+        return REPORT_BLOCKED_TYPES.indexOf(kind) === -1
+            && REPORT_ALLOWED_TYPES.indexOf(kind) !== -1;
+    }
+
+    // === 版本选择弹窗（Phase 3.5）：给「两个版本」，不给一道障碍 ===
+    // 合规：弹窗内**零购买语义**（不出现 购买 / 支付 / 价格 / ¥ / 订阅），
+    //      收款发生在站外，站内只有「留资 → 发权益码」（§1.5⑨）。
+    var DIALOG_ID = 'report-version-dialog';
+
+    function dialogEl() {
+        var dlg = document.getElementById(DIALOG_ID);
+        if (dlg) return dlg;
+        dlg = document.createElement('div');
+        dlg.id = DIALOG_ID;
+        dlg.className = 'fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+        dlg.innerHTML = [
+            '<div role="dialog" aria-modal="true" aria-labelledby="report-version-title"',
+            ' class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform scale-95 transition-transform duration-300">',
+            '  <div class="px-6 pt-6 pb-3">',
+            '    <h3 id="report-version-title" class="text-lg font-bold text-slate-900">选择导出版本</h3>',
+            '  </div>',
+            '  <div class="px-6 space-y-3">',
+            '    <button type="button" data-rv="standard" class="w-full text-left rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-300">',
+            '      <div class="font-semibold text-slate-900">标准版</div>',
+            '      <div class="mt-1 text-sm text-slate-600">你正在看的完整测算结果，PDF 格式，现在即可导出。</div>',
+            '    </button>',
+            '    <button type="button" data-rv="pro" class="w-full text-left rounded-xl border border-amber-200 bg-amber-50/60 p-4 transition-colors hover:border-amber-300">',
+            '      <div class="font-semibold text-slate-900">精装版</div>',
+            '      <div class="mt-1 text-sm text-slate-600">封面 + 政策要点 + 税负结构图表，可直接交付给他人。</div>',
+            '      <div class="mt-2 text-xs text-amber-700">属专业版权益</div>',
+            '    </button>',
+            '  </div>',
+            '  <div class="px-6 py-4">',
+            '    <button type="button" data-rv="cancel" class="w-full py-2 text-sm text-slate-500">取消</button>',
+            '  </div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(dlg);
+        return dlg;
+    }
+
+    function closeDialog(dlg) {
+        if (typeof window.closeModal === 'function') { window.closeModal(dlg); return; }
+        dlg.classList.add('opacity-0');
+        dlg.classList.add('hidden');
+    }
+
+    // 留资换权益（钩子）。LeadModal 不可用时兜底为标准导出 —— **免费必须能导**。
+    function openEntitlement(kind) {
+        if (!hookAllowed(kind)) { legacyPdf(kind); return; }
+        if (window.LeadModal && typeof window.LeadModal.open === 'function') {
+            window.LeadModal.open({ source: 'report_pro', type: kind });
             return;
         }
-        exportToPDF(meta.resultElId, meta.reportTitle(), {
-            filename: proFilename(),
-            contentBuilder: function () { return buildProDocHtml(kind, meta); },
-            beforeCapture: function (container) { renderProChart(kind, container); }
-        });
+        legacyPdf(kind);
+    }
+
+    function openVersionDialog(kind) {
+        var dlg = dialogEl();
+        dlg.dataset.kind = kind;
+        if (dlg.dataset.rvBound !== '1') {
+            dlg.dataset.rvBound = '1';
+            dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDialog(dlg); });
+            var btns = dlg.querySelectorAll('[data-rv]');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    var v = this.getAttribute('data-rv');
+                    var k = dlg.dataset.kind || 'comprehensive';
+                    closeDialog(dlg);
+                    if (v === 'standard') legacyPdf(k);
+                    else if (v === 'pro') openEntitlement(k);
+                });
+            }
+        }
+        if (typeof window.openModal === 'function') window.openModal(dlg);
+        else {
+            dlg.classList.remove('hidden');
+            setTimeout(function () { dlg.classList.remove('opacity-0'); }, 10);
+        }
+    }
+
+    function exportFinalReport(kind) {
+        const meta = META[kind] || META.comprehensive;
+        if (isProUser()) {
+            exportToPDF(meta.resultElId, meta.reportTitle(), {
+                filename: proFilename(),
+                contentBuilder: function () { return buildProDocHtml(kind, meta); },
+                beforeCapture: function (container) { renderProChart(kind, container); }
+            });
+            return;
+        }
+        // 非专业版：给「两个版本」的选择，而不是一道障碍（§1.5⑨）。
+        // 精装版的价值说明在点导出「之后、选版之前」就可见 —— 即 Phase 3.5 的「付费预期」。
+        openVersionDialog(kind);
     }
 
     window.EuriskoReport = {
@@ -325,6 +397,11 @@
         isProUser: isProUser,
         buildProDocHtml: buildProDocHtml,
         exportFinalReport: exportFinalReport,
+        // 合规护栏对外暴露：与 lead-touchpoints.js 的 ALLOWED/BLOCKED 同款，
+        // 供 verify:local 与 jest 断言「reverse 永不出现钩子」，防止后续迭代失守。
+        REPORT_ALLOWED_TYPES: REPORT_ALLOWED_TYPES,
+        REPORT_BLOCKED_TYPES: REPORT_BLOCKED_TYPES,
+        hookAllowed: hookAllowed,
         pure: {
             proFilename: proFilename,
             taxStructure: taxStructure,
@@ -332,7 +409,8 @@
             escapeHtml: escapeHtml,
             num: num,
             money: money,
-            isProUser: isProUser
+            isProUser: isProUser,
+            hookAllowed: hookAllowed
         }
     };
 })();

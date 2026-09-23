@@ -41,53 +41,136 @@
 
     // 结果容器 → 模板与取数规则（容器 id 取自 index.html 的 step-pane）
     var SOURCES = {
-        'step-result': {
+        // 17B-3（v1.49.0）：step-result 随综合所得旧页面删掉了。与 business / reverse 一样，
+        // 综合所得的分享图改从向导的结果卡取数，认人靠 sourceKey 读 data-tool-id ——
+        // 同一张卡会被三个工具轮着用，照裸 id 取会把别人的结果截进综合所得的图里。
+        'dw-result-card:forward': {
             template: 'income',
             title: '综合所得年度汇算',
-            hero: { selector: '#result-net-income', label: '税后年收入' },
+            hero: { selector: '#dw-result-card[data-tool-id="forward"] #dw-result-primary', label: '税后年收入' },
             rows: [
-                { label: '税前年收入', selector: '#result-total-income' },
-                { label: '全年应缴税额', selector: '#result-total-tax' },
-                { label: '适用税率', selector: '#result-tax-rate' }
+                { label: '税前年收入', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="税前年收入"]' },
+                { label: '全年应缴税额', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="综合所得应纳税额"]' },
+                { label: '适用税率', selector: '#dw-result-card[data-tool-id="forward"] [data-dw-row="适用税率"]' }
             ]
         },
-        'business-step-result': {
+        // 17B-1 / 17B-2：经营所得与反向倒算迁到 spec 驱动后，结果节点是**运行时渲染**的通用节点，
+        // 在 index.html 里查不到。selector 统一带上 data-tool-id 做归属校验 —— 向导是通用
+        // 渲染器，dw-result-card 会被所有 spec 工具轮着用，不加这一层就会把增值税的结果截成
+        // 一张「经营所得分享图」（数值来自别的口径，比空图更难被发现）。
+        //
+        // 麻烦的是**两个工具共用同一个容器 id**，而模板还不一样：经营所得 → income，
+        // 反向倒算（谈薪）→ negotiation。于是按工具再分一路，键写作 `容器:工具Id`，
+        // 由 sourceKey() 读活节点的 data-tool-id 落到对应那一份。
+        // 阶段18-3（v1.73.0）：这一份原先挂在裸键 'dw-result-card' 上，兼作「认不出时的兜底」——
+        // 于是其余 17 个完整测算的取数都会落到这里，而它的 selector 写死 business，读到的自然是
+        // 空，用户刚算完却看到「暂无可分享的结果」。兜底改由下面的 genericConfig 承担（按卡上
+        // 的 data-tool-id 现场取数），这一份回归它本来的身份：经营所得那一路。
+        'dw-result-card:business': {
             template: 'income',
             title: '经营所得年度汇算',
-            hero: { selector: '#business-result-net-income', label: '税后经营所得' },
+            hero: { selector: '#dw-result-card[data-tool-id="business"] #dw-result-primary', label: '应纳个人所得税' },
             rows: [
-                { label: '经营利润', selector: '#business-result-profit' },
-                { label: '年度扣除', selector: '#business-result-deductions' }
+                { label: '应纳税所得额', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="应纳税所得额"]' },
+                { label: '适用税率', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="适用税率"]' },
+                { label: '减半征收减免', selector: '#dw-result-card[data-tool-id="business"] [data-dw-row="减半征收减免"]' }
             ]
         },
-        'classification-step-result': {
-            template: 'income',
-            title: '分类所得计税',
-            hero: { selector: '#classification-result-net-income', label: '税后收入' },
-            rows: [
-                { label: '所得类型', selector: '#classification-result-type' },
-                { label: '应纳税额', selector: '#classification-result-total-tax' }
-            ]
-        },
-        'reverse-step-result': {
+        // 谈薪卡的取数口径是「税前该谈多少」，与经营所得那张 income 卡完全不同 —— 这也是它必须
+        // 单独一路的原因：共用一套 selector 时漏并不会报错，只会把税額截成参数不明的一张卡。
+        'dw-result-card:reverse': {
             template: 'negotiation',
             title: '谈薪测算',
-            hero: { selector: '#reverse-result-total-income', label: '年度税前收入（可谈目标）' },
+            hero: { selector: '#dw-result-card[data-tool-id="reverse"] #dw-result-primary', label: '税前年收入（可谈目标）' },
             rows: [
-                { label: '年度税后收入', selector: '#reverse-result-net-income' },
-                { label: '全年应缴税额', selector: '#reverse-result-total-tax' },
-                { label: '适用税率', selector: '#reverse-result-tax-rate' }
+                { label: '全年税后到手', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年税后到手"]' },
+                { label: '全年个人所得税', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年个人所得税"]' },
+                { label: '全年扣除合计', selector: '#dw-result-card[data-tool-id="reverse"] [data-dw-row="全年扣除合计"]' }
             ]
-        }
+        },
+        // 17B-4（v1.50.0）：分类所得同样迁到了向导，containerId 从 'classification-step-result'
+        // 改成 dw-result-card，并**按工具划一路**（dw-result-card:classification）。
+        // 不划的话它会退到下面那份兜底 'dw-result-card'（business 的配置），
+        // 分享图上就会出现「应纳个人所得税 ¥0」这种横刀夺爱的标题。
+        'dw-result-card:classification': {
+            template: 'income',
+            title: '分类所得计税',
+            hero: { selector: '#dw-result-card[data-tool-id="classification"] #dw-result-primary', label: '税后收入' },
+            rows: [
+                { label: '应纳税额', selector: '#dw-result-card[data-tool-id="classification"] [data-dw-row="应纳税额合计"]' },
+                { label: '税负率', selector: '#dw-result-card[data-tool-id="classification"] [data-dw-row="实际税负率"]' }
+            ]
+        },
     };
 
     // 计算按钮 → 结果容器（与 lead-touchpoints / funnel-tracking 同一套映射，保持一致）
+    // 17B-2（v1.48.0）：reverse-step-result 随反向倒算旧页面删除，谈薪这一路改走向导的 dw-next
+    // → dw-result-card（同一收容容器，靠下面的 sourceKey 认出是谈薪那一路）。
+    // 17B-3（v1.49.0）：综合所得同样改走 dw-next → dw-result-card，上面的取值范围跟着变 ——
+    // 17B-4（v1.50.0）：分类所得跟进 —— calculate-classification-btn 随旧页面删了，
+    // 现在四个迁移工具（business / reverse / forward / classification）共用同一颗 dw-next。
     var TRIGGERS = [
-        { buttonId: 'next-to-result-btn', containerId: 'step-result' },
-        { buttonId: 'calculate-business-btn', containerId: 'business-step-result' },
-        { buttonId: 'calculate-classification-btn', containerId: 'classification-step-result' },
-        { buttonId: 'calculate-reverse-btn', containerId: 'reverse-step-result' }
+        { buttonId: 'dw-next', containerId: 'dw-result-card' }   // 四个迁移工具的向导下一步
     ];
+
+    // 容器 id → 真正的取数配置。向导那两个工具（business / reverse）共用 dw-result-card，
+    // 要看**此刻结果卡上挂着的是哪个工具**才分得出来 —— 照 id 直接查会把谈薪卡截成经营所得卡。
+    function sourceKey(containerId) {
+        if (!containerId || String(containerId).indexOf('dw-result-card') !== 0) return containerId;
+        var el = document.getElementById('dw-result-card');
+        var toolId = el && el.getAttribute('data-tool-id');
+        var scoped = toolId ? containerId + ':' + toolId : containerId;
+        return SOURCES[scoped] ? scoped : containerId;
+    }
+
+    // 阶段18-3（v1.73.0）：21 个完整测算共用同一张结果卡，而手写的取数配置只有阶段17 逐个迁移
+    // 的那 4 份。其余 17 个算完点「生成分享图」时，sourceKey 认不出就退回裸键，裸键的 selector
+    // 指向另一个工具，读到的自然是空 —— 用户看到「暂无可分享的结果…请先完成一次测算」，
+    // 而保存与导出都是好的（与阶段18-2 的历史查看同一个病：按名字认人的表，每加一种形态就漏
+    // 一批）。与其每加一个测算就补一份配置（漏一个就静默失败），不如给 spec 驱动的向导一份
+    // **通用取数**：主结果是 #dw-result-primary，明细照卡上的 data-dw-row 抄前几行，
+    // 标题取注册表里的工具名。手写那 4 份仍在 —— 它们是挑过行的（分类所得取的是实际税负率
+    // 而不是适用税率），通用取数只会照卡上顺序抄。
+    var GENERIC_ROW_LIMIT = 3;
+
+    function rowsFromCard(card, scoped) {
+        var rows = [];
+        if (!card) return rows;
+        var nodes = card.querySelectorAll('[data-dw-row]');
+        for (var i = 0; i < nodes.length && rows.length < GENERIC_ROW_LIMIT; i++) {
+            var label = nodes[i].getAttribute('data-dw-row');
+            // 行标签要拼进属性选择器，带引号会把选择器撑坏 —— 宁可少一行，也不出半张图
+            if (!label || String(label).indexOf('"') !== -1) continue;
+            rows.push({ label: label, selector: scoped + ' [data-dw-row="' + label + '"]' });
+        }
+        return rows;
+    }
+
+    function genericConfig(containerId) {
+        var el = document.getElementById(containerId);
+        var toolId = el && el.getAttribute('data-tool-id');
+        if (!toolId) return null;
+        var reg = window.EuriskoToolRegistry;
+        var tool = reg && typeof reg.get === 'function' ? reg.get(toolId) : null;
+        var scoped = '#' + containerId + '[data-tool-id="' + toolId + '"]';
+        return {
+            // 谈薪卡的口径是「税前该谈多少」，与 income 那张完全不同 —— 这一路是手写的，
+            // 通用取数也必须尊重这个分流，否则谈薪会被写成一张正向结果卡。
+            template: toolId === 'reverse' ? 'negotiation' : 'income',
+            title: (tool && tool.name) ? tool.name : toolId,
+            hero: {
+                selector: scoped + ' #dw-result-primary',
+                label: readText(scoped + ' #dw-result-primary-label') || '测算结果'
+            },
+            rows: rowsFromCard(el, scoped)
+        };
+    }
+
+    // 解析顺序不能反：先认「容器 + 工具」的手写配置（挑过行），再回落到通用取数。
+    function resolveConfig(rawContainerId) {
+        var key = sourceKey(rawContainerId);
+        return SOURCES[key] || genericConfig(rawContainerId);
+    }
 
     // 模板文案：如实描述功能，不承诺收益（合规红线）。
     // 「微信扫码」这一步的指引放在二维码旁固定展示，文案本身只说价值，避免同一句话重复两遍。
@@ -120,6 +203,18 @@
         return node ? String(node.textContent || '').trim() : '';
     }
 
+    // 明细行的值：向导把「标签」和「值」渲染在**同一个节点**里
+    // （'<div data-dw-row="适用税率"><span>适用税率</span><span>20%</span></div>'），
+    // 照 textContent 整取会把标签一起带进图上（「适用税率20%」）—— 与 lead-context.js 同一处坑，
+    // 那里也是取最后一个 span。值 span 恒在最后，不依赖 class，也不要求每行都有标签。
+    function readCell(selector) {
+        var node = document.querySelector(selector);
+        if (!node) return '';
+        var spans = node.querySelectorAll('span');
+        var value = spans.length ? spans[spans.length - 1] : node;
+        return String(value.textContent || '').trim();
+    }
+
     // 取数：hero 必须有效，否则视为「尚未测算」而拒绝出图 ——
     // 生成一张写着 ¥0 的分享图比不出图更伤品牌
     function collect(cfg) {
@@ -128,7 +223,7 @@
 
         var rows = [];
         (cfg.rows || []).forEach(function (row) {
-            var value = readText(row.selector);
+            var value = readCell(row.selector);
             if (isMeaningful(value)) rows.push({ label: row.label, value: value });
         });
 
@@ -383,8 +478,9 @@
 
     // 任何一条失败路径都必须有「用户可见 + 控制台可查」的反馈。
     // 静默 return 是最坏的选择：用户只会说「点了没反应」，排查时无从下手。
-    function generate(containerId) {
-        var cfg = SOURCES[containerId];
+    function generate(rawContainerId) {
+        var containerId = sourceKey(rawContainerId);
+        var cfg = resolveConfig(rawContainerId);
         if (!cfg) {
             console.warn('[ShareCard] 未识别的结果容器，无法生成分享图:', containerId);
             showToast('生成失败：未识别的结果类型，请刷新页面后重试');
@@ -451,19 +547,29 @@
 
         var wrap = document.createElement('div');
         wrap.id = CTA_BLOCK_ID;
-        wrap.className = 'mt-6 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-4 sm:p-5';
+        // 深色档：这块 CTA 的底色是渐变，上表的 .dark .bg-* 兜底表管不到渐变（它改的是 background-color）。
+    // 原样保留就是一张浅蓝底配浅灰字（实测 1.01:1），故显式给 dark: 变体。
+    // 注意 dark: 变体由 tailwind.config.js 的 darkMode:'class' 生成，改后须重建 tailwind.css。
+    wrap.className = 'mt-6 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-xl p-4 sm:p-5' +
+        ' dark:from-slate-800 dark:to-blue-950 dark:border-slate-700';
         wrap.innerHTML = ctaHtml(containerId);
         container.appendChild(wrap);
     }
 
+    // 阶段18-5（v1.75.0）：向导的「下一步 / 计算结果」按钮是**每次渲染重新生成**的，而这里
+    // 原先在页面加载时按 getElementById('dw-next') 直接绑一次 —— 页面式时代那颗按钮是静态
+    // DOM，绑一次管一辈子；迁到 spec 驱动（阶段17）后换成动态渲染，绑的那一颗早被替换掉了，
+    // 于是 21 个完整测算的分享图入口**一次都没挂上过**（结果区只有保存 / 导出，没有分享）。
+    // 改成事件委托（与下面 CTA 的点击同一套做法）：认的是 id，不是那一颗具体的节点。
     function bindTriggers() {
-        TRIGGERS.forEach(function (trigger) {
-            var btn = document.getElementById(trigger.buttonId);
+        var buttons = TRIGGERS.map(function (t) { return '#' + t.buttonId; }).join(', ');
+        document.addEventListener('click', function (e) {
+            var btn = (e.target && e.target.closest) ? e.target.closest(buttons) : null;
             if (!btn) return;
-            btn.addEventListener('click', function () {
-                // 结果由按钮原有处理器渲染（分类所得为 setTimeout），这里延后一拍注入
-                setTimeout(function () { injectCta(trigger.containerId); }, 180);
-            });
+            var trigger = TRIGGERS.filter(function (t) { return t.buttonId === btn.id; })[0];
+            if (!trigger) return;
+            // 结果由按钮原有处理器渲染（分类所得为 setTimeout），这里延后一拍注入
+            setTimeout(function () { injectCta(trigger.containerId); }, 180);
         });
     }
 
@@ -492,6 +598,8 @@
         TEMPLATE_TEXT: TEMPLATE_TEXT,
         SHARE_IMAGE_WIDTH: SHARE_IMAGE_WIDTH,
         DISCLAIMER: DISCLAIMER,
+        sourceKey: sourceKey,
+        resolveConfig: resolveConfig,   // 测试与排查用：看「这一次到底按哪一份配置出图」
         buildHtml: buildHtml,
         collect: collect,
         generate: generate,

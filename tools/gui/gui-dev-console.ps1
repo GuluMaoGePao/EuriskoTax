@@ -848,8 +848,8 @@ html,body{margin:0;font-family:'Microsoft YaHei',PingFang SC,Segoe UI,sans-serif
 .topbar{background:#1e293b!important;padding:12px 28px;color:#fff;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .topbar h2{margin:0;font-size:18px;font-weight:600;letter-spacing:.3px}
 .topbar .tag{font-size:13px;padding:4px 12px;border-radius:999px;background:#0ea5e9}
-.hint{margin:18px 28px 8px;padding:14px 18px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:6px;color:#0f172a;font-size:14px}
-.hint .mono{background:#0f172a;color:#fbbf24;padding:2px 7px;border-radius:4px;font-family:Consolas,Monaco,monospace;font-size:12.5px;margin:0 3px;word-break:break-all}
+.hint{margin:18px 28px 8px;padding:14px 18px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:6px;color:#0f177a;font-size:14px}
+.hint .mono{background:#0f177a;color:#fbbf24;padding:2px 7px;border-radius:4px;font-family:Consolas,Monaco,monospace;font-size:12.5px;margin:0 3px;word-break:break-all}
 .hint .row{margin:3px 0}
 .swagger-ui .scheme-container{box-shadow:none!important;margin:8px 0 4px!important;padding:10px 28px!important}
 .swagger-ui .info{margin:6px 28px 10px!important}
@@ -1814,7 +1814,7 @@ function Invoke-AsyncCommand {
                     Write-Log "[跳过] 未检测到可用的 Docker（docker compose 不可用）—— 演练门禁未执行，这不是代码问题。" "WARN"
                     Write-Log "       日常发布前继续用「✅ 本地登录链路验证」；要启用演练请装 Docker Desktop 后重跑。" "GRAY"
                     if (Test-AllowPopup -Key "PG_NO_DOCKER") {
-                        $pgMsg = "本机没有可用的 Docker，PostgreSQL 演练门禁已跳过（返回码 2）。`r`n`r`n这不是代码问题：`r`n  ① 日常发布前继续跑「✅ 本地登录链路验证（verify:local）」，SQLite 下同一套 167 项照样全跑；`r`n  ② 只有改了 server/prisma/schema.prisma 或 migrations/ 时才必须跑 PG 演练；`r`n  ③ 演练前请先停掉本地 :3000 后端（运行中会锁 Prisma 引擎 DLL，generate 会报 EPERM）。`r`n`r`n是否现在打开 Docker Desktop 下载页？"
+                        $pgMsg = "本机没有可用的 Docker，PostgreSQL 演练门禁已跳过（返回码 2）。`r`n`r`n这不是代码问题：`r`n  ① 日常发布前继续跑「✅ 本地登录链路验证（verify:local）」，SQLite 下同一套 259 项照样全跑；`r`n  ② 只有改了 server/prisma/schema.prisma 或 migrations/ 时才必须跑 PG 演练；`r`n  ③ 演练前请先停掉本地 :3000 后端（运行中会锁 Prisma 引擎 DLL，generate 会报 EPERM）。`r`n`r`n是否现在打开 Docker Desktop 下载页？"
                         $pgR = [System.Windows.Forms.MessageBox]::Show($pgMsg, "PostgreSQL 演练已跳过（缺少 Docker）", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Information)
                         if ($pgR -eq "Yes") { Start-Process "https://www.docker.com/products/docker-desktop/" }
                     }
@@ -3066,7 +3066,7 @@ Add-SectionCard -TabCtx $tab3Ctx `
         } },
     @{ Text = "打开 tests 目录`n测试代码所在目录"; Desc = "在资源管理器中打开 tests/ 目录，查看/编辑测试代码文件。"; Color = "120, 120, 140";
        OnClick = { Start-Process "explorer.exe" (Join-Path $ProjectRoot "tests") } },
-    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/test-report.md，查看已编写的测试说明和结果记录。"; Color = "120, 120, 140";
+    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/test-report.md（历史快照：文中 203 用例 / 6 套件是 2026-09-07 的数字，现状 1750 例 / 94 套件见 CHANGELOG）。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\test-report.md") } }
 )
 
@@ -3077,7 +3077,7 @@ Add-SectionCard -TabCtx $tab3Ctx `
     -AccentColor $C_WARN -Buttons @(
     @{ Text = "运行性能基准测试`nnpm run test:performance"; Desc = "运行 scripts 中的性能基准脚本，结果输出到下方日志区。"; Color = "225, 165, 80";
        OnClick = { Invoke-AsyncCommand -Name "perf" -Command "npm run test:performance" -WorkingDir $ProjectRoot } },
-    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 performance-optimization-report.md，阅读项目性能优化历史和建议。"; Color = "120, 120, 140";
+    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 performance-optimization-report.md（历史快照：测量点来自 2026-08 的代码，计税层之后已重写，只作参考）。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\performance-optimization-report.md") } },
     @{ Text = "运行 Jest 性能单测`ntax-assistant-perf"; Desc = "单独运行 tests/tax-assistant-perf.test.js，针对税务助手模块的性能测试。"; Color = "165, 105, 210";
        OnClick = { Invoke-AsyncCommand -Name "perftest" -Command "npx jest tests/tax-assistant-perf.test.js" -WorkingDir $ProjectRoot } }
@@ -3085,14 +3085,14 @@ Add-SectionCard -TabCtx $tab3Ctx `
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "3. 发布门禁（上线前必跑）" `
-    -Subtitle "脚本：server/scripts/verify-local-auth.js（同一套 167 项断言，两种数据库模式）" `
+    -Subtitle "脚本：server/scripts/verify-local-auth.js（同一套 259 项断言，两种数据库模式）" `
     -Description "详细说明：部署前的端到端门禁 —— 真实启动本地后端，验证 登录本地测试账号 → 用邀请码+邮箱验证码注册新号 → 新号登录 全链路，并核对前端/SW 版本指纹。失败显示红字，禁止 push。日常跑 SQLite 版（verify:local）；改动 server/prisma/schema.prisma 或 migrations/ 后必须加跑 PostgreSQL 版（verify:pg）—— 它用 Docker 起临时库、按线上容器同序执行 migrate deploy，专拦「本地 SQLite 全绿、线上迁移才炸」的问题。" `
     -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
     @{ Text = "✅ 本地登录链路验证`n（发布门禁 verify:local）"; Desc = "一键跑本地登录/注册全链路门禁（约 1-2 分钟，SQLite dev.db）。全绿=可以安全发布；失败=红字输出并提示勿 push。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "verify" -Command "npm run verify:local" -WorkingDir $ProjectRoot } },
-    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 167 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+    @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 259 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } } },
-    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 167 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+    @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 259 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } } }
 )
 

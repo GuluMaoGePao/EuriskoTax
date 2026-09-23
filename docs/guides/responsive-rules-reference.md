@@ -211,7 +211,7 @@
 
 ---
 
-## 4. 税务助手响应式规则（13 项）
+## 4. 税务助手响应式规则（14 项）
 
 > 涉及文件：`index.html`
 > 组件类名前缀：`.assistant-*`
@@ -221,11 +221,11 @@
 | 项目 | 值 |
 |------|---|
 | 选择器 | `.assistant-drawer` |
-| 位置 | [index.html#L1479-L1482](../../index.html#L1479-L1482) |
-| 桌面端 | `width: 480px`（固定宽度侧边栏） |
+| 位置 | [index.html#L1086-L1093](../../index.html#L1086-L1093) |
+| 桌面端 | `width: var(--assistant-w)`（令牌值 480px，固定宽度侧边栏） |
 | 移动端 | `width: 100%`（全屏覆盖） |
 | 断点 | `@media (max-width: 640px)` |
-| 备注 | 始终带 `max-width: 100%` 防止超出视口 |
+| 备注 | 始终带 `max-width: 100%` 防止超出视口；宽度取 `src/css/tokens.css` 的布局令牌而非字面值 —— 桌面推开要让出同一段宽度，两处必须同源 |
 
 ### 规则 4.2 — 头部内边距
 
@@ -364,12 +364,28 @@
 | 说明 | 答案底部"去XX测算"关联跳转按钮，增大触摸区 |
 | 状态 | ✅ 已修复（v1.1.0） |
 
+### 规则 4.14 — 桌面推开形态（≥1280px）
+
+| 项目 | 值 |
+|------|---|
+| 选择器 | `body.assistant-open #app-container` |
+| 位置 | [index.html#L1113-L1135](../../index.html#L1113-L1135) |
+| 桌面端（≥1280px） | `padding-right: var(--assistant-w)` —— 侧栏**推开**内容，不再浮于其上 |
+| 其余宽度（<1280px） | 无 padding —— 维持「覆盖 + 遮罩」的原有形态 |
+| 断点 | `@media (min-width: 1280px)` |
+| 触发方式 | JS 开/关抽屉时只切 `body.assistant-open`，形态由媒体查询决定（不监听 resize） |
+| 阈值由来 | 侧栏 480 + 内容至少留 `--c-narrow`(720) = 1200，向上取标准断点 1280；低于此宽推开会把表单挤到 720 以下 |
+| 说明 | 推开态同步关掉遮罩的压暗与点击拦截（`opacity: 0; pointer-events: none`），侧栏与内容须同时可用。工具网格也因此改按可用宽度算列数（`auto-fill minmax(260px, 1fr)`，见 toolbox.css），否则推开后 20 张卡会被压到约 170px |
+
 ---
 
 ## 5. 计算器模块响应式规则（1 项）
 
 > 涉及文件：`index.html`
-> 页面 ID：`#forward-calculation-page`、`#reverse-calculation-page`、`#business-calculation-page`、`#classification-calculation-page`
+> 页面 ID：**（已无）** —— 四个页面式 deep 全部删除（`#reverse-calculation-page` v1.48.0、
+> `#business-calculation-page` v1.47.0、`#forward-calculation-page` v1.49.0、
+> `#classification-calculation-page` **v1.50.0**），分步 UI 一律改由 `#deep-wizard-page`
+> 通用向导渲染 —— 按钮组规则随之移至向导（`deep-wizard-ui.css`）
 
 ### 规则 5.1 — 步骤操作按钮组
 
@@ -383,6 +399,9 @@
 | 说明 | 原 `flex justify-between` 在窄屏将「上一步 / 重置 / 下一步」挤压变形、文字折行；现小屏逐行堆叠全宽、宽屏水平排列，按钮统一 `whitespace-nowrap` 防止折行 |
 
 涉及 8 处：综合所得 3 处、反向倒算 2 处、经营所得 2 处、分类所得 1 处。
+其中反向倒算 2 处（v1.48.0）、经营所得 2 处（v1.47.0）、综合所得 3 处（v1.49.0）、
+分类所得 1 处（v1.50.0，增删所得条目的按钮容器）已随各自旧页面删除 ——
+**页面式现役 0 处**；向导侧的同一套规则由 `deep-wizard-ui.css` 保持（含 repeater 的「添加一条」按钮）。
 
 ---
 
@@ -513,3 +532,4 @@ document.body.style.overflowX = 'hidden';
 | 2026-08-11 | 1.2.0 | 修复税务助手 3 个快捷功能 Bug（非响应式规则变更，但影响移动端交互可用性）：<br>**Bug1 — showHelpModal 未定义**：在 `tax-assistant-ui.js#L456-L461` 新增 `showHelpModal()` 函数，调用 `window.openModal(document.getElementById('help-modal'))`，并暴露到 `window.showHelpModal`。修复前"税率表速查"和"使用帮助"点击后静默失败。<br>**Bug2 — goToStep 参数类型错误**：`handleShortcutAction` 的 `goBonusCalc` 分支从 `goToStep('forward')` 改为 `showPage('forward-calculation-page') + goToStep(1)`。`goToStep` 期望数字参数（1/2/3/4），原字符串 `'forward'` 导致所有步骤被隐藏但无一步显示。<br>**Bug3 — 税率表速查无 UI**：在 `tax-assistant-ui.js#L464-L571` 新增 `buildRateTableModalHTML()` 和 `showRateTable()` 函数，动态生成含综合所得(7级)、年终奖(7级)、经营所得(5级)三张税率表 + 分类所得 20% 比例税率说明的模态框。模态框动态创建到 body，含关闭按钮和遮罩点击关闭。税率表数据与 `tax-calculator.js#L7-L43` 保持同步。 |
 | 2026-09-07 | 1.3.0 | 个人中心模块卡片 6 → 7 张：新增 `profile-card-feedback`「意见反馈」（点击开反馈弹窗）。卡片复用 `#profile-cards-grid` 网格（规则 3.5，1/2/3 列），无需新增响应式规则；§6.3 卡片 ID 匹配核查同步为 7 个。弹窗复用通用 `openModal` 组件（桌面居中、移动端全宽安全区），随通用弹窗样式自适应 |
 | 2026-09-11 | 1.4.0 | 新增第 5 节「计算器模块响应式规则」（规则 5.1）：统一综合所得/反向倒算/经营所得/分类所得共 8 处步骤操作按钮组的移动端排版——窄屏 `flex-col` 垂直堆叠全宽、`md:` 起水平排列，按钮统一 `whitespace-nowrap` 防止折行；原第 5-7 节顺延为第 6-8 节 |
+| 2026-09-16 | 1.5.0 | 新增规则 4.14「桌面推开形态」：≥1280px 时助手侧栏由覆盖式改为推开式（`#app-container` 让出 `var(--assistant-w)`），同时把侧栏宽度收进 `tokens.css` 令牌（规则 4.1）；工具网格改按可用宽度算列数以适配推开后的窄容器；第 4 节规则数 13 → 14 项 |

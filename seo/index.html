@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- 20 个 SEO 落地页的总目录（阶段15 入口补齐）。
+         为什么需要这一页：此前每页只在页脚手挑 2~3 个互链，17 个页面彼此是孤岛，
+         站内路径断了 —— 从「月薪个税」进站的人看不到「年终奖 / 离职补偿 / 增值税」，
+         App 里也一个入口都没有。这一页把全部工具摆在一屏内，
+         既给读者做目录，也给爬虫做一张 HTML 版 sitemap（正文 + ItemList 结构化数据）。 -->
+    <title>税务测算工具箱 2026：个税 / 企业税 / 用工成本 20 个免费计算器（免注册，附政策依据）</title>
+    <meta name="description" content="20 个税务测算工具一次列全：月薪个税、税后工资倒算（谈薪）、个税汇算清缴、年终奖、专项附加扣除、个人养老金、税优健康险、企业年金、离职补偿、提前退休、劳务报酬、股权激励、外籍津补贴、增值税、企业所得税、附加税与印花税、个体工商户经营所得（核定 vs 查账）、社保公积金、企业用工成本、残保金与工会经费。每个都能在线算，口径与 App 同源（累计预扣法、60%~300% 社保上下限、小微企业所得税优惠、社平 2 倍工资封顶），并标注政策依据文号。免注册、不采集收入金额。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/index.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="税务测算工具箱：20 个免费计算器">
+    <meta property="og:description" content="个税、企业税、五险一金，一页列全，点开即算。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/index.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：ItemList 把 20 个工具的 URL 显式交给爬虫（与正文卡片一一对应） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "CollectionPage",
+                "name": "EuriskoTax 税务测算工具箱",
+                "url": "https://euriskotax.zeabur.app/seo/index.html",
+                "inLanguage": "zh-CN",
+                "description": "个人所得税、企业税与社保公积金共 20 个在线测算工具的目录。"
+            },
+            {
+                "@type": "ItemList",
+                "name": "税务测算工具",
+                "itemListOrder": "https://schema.org/ItemListUnordered",
+                "numberOfItems": 20,
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "url": "https://euriskotax.zeabur.app/seo/salary-tax.html", "name": "月薪个税计算器（累计预扣法）" },
+                    { "@type": "ListItem", "position": 2, "url": "https://euriskotax.zeabur.app/seo/net-salary.html", "name": "税后工资倒算与谈薪测算" },
+                    { "@type": "ListItem", "position": 3, "url": "https://euriskotax.zeabur.app/seo/annual-settlement.html", "name": "个税汇算清缴（退税还是补税）" },
+                    { "@type": "ListItem", "position": 4, "url": "https://euriskotax.zeabur.app/seo/bonus-tax.html", "name": "年终奖个税（单独计税还是并入综合所得）" },
+                    { "@type": "ListItem", "position": 5, "url": "https://euriskotax.zeabur.app/seo/special-deduction.html", "name": "专项附加扣除计算器" },
+                    { "@type": "ListItem", "position": 6, "url": "https://euriskotax.zeabur.app/seo/private-pension.html", "name": "个人养老金税优测算" },
+                    { "@type": "ListItem", "position": 7, "url": "https://euriskotax.zeabur.app/seo/severance.html", "name": "离职补偿金个税计算器" },
+                    { "@type": "ListItem", "position": 8, "url": "https://euriskotax.zeabur.app/seo/early-retirement.html", "name": "提前退休与内部退养一次性收入个税" },
+                    { "@type": "ListItem", "position": 9, "url": "https://euriskotax.zeabur.app/seo/labor-withholding.html", "name": "劳务报酬个税计算器" },
+                    { "@type": "ListItem", "position": 10, "url": "https://euriskotax.zeabur.app/seo/equity-incentive.html", "name": "股权激励个税计算器" },
+                    { "@type": "ListItem", "position": 11, "url": "https://euriskotax.zeabur.app/seo/expat-allowance.html", "name": "外籍个人津补贴免税测算" },
+                    { "@type": "ListItem", "position": 12, "url": "https://euriskotax.zeabur.app/seo/vat.html", "name": "增值税计算器（小规模与一般纳税人）" },
+                    { "@type": "ListItem", "position": 13, "url": "https://euriskotax.zeabur.app/seo/corporate-income-tax.html", "name": "企业所得税计算器" },
+                    { "@type": "ListItem", "position": 14, "url": "https://euriskotax.zeabur.app/seo/surtax-stamp-duty.html", "name": "城建税、教育费附加与印花税计算器" },
+                    { "@type": "ListItem", "position": 15, "url": "https://euriskotax.zeabur.app/seo/social-base.html", "name": "社保公积金计算器（缴费基数上下限）" },
+                    { "@type": "ListItem", "position": 16, "url": "https://euriskotax.zeabur.app/seo/employer-cost.html", "name": "企业用工成本测算（单位五险一金 + 涨薪传递率）" },
+                    { "@type": "ListItem", "position": 17, "url": "https://euriskotax.zeabur.app/seo/business-income.html", "name": "个体工商户经营所得（核定征收 vs 查账征收）" },
+                    { "@type": "ListItem", "position": 18, "url": "https://euriskotax.zeabur.app/seo/disability-fund.html", "name": "残保金与工会经费测算（30 人以下免征）" },
+                    { "@type": "ListItem", "position": 19, "url": "https://euriskotax.zeabur.app/seo/health-insurance.html", "name": "税优健康险节税测算（2400 元/年限额）" },
+                    { "@type": "ListItem", "position": 20, "url": "https://euriskotax.zeabur.app/seo/enterprise-annuity.html", "name": "企业年金个税测算（个人 4% 当期扣除）" }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_index">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>税务测算工具箱：20 个计算器，点开即算</h1>
+        <p class="answer">
+            按<strong>人</strong>和<strong>场景</strong>分组：上班族看工资个税与到手，离职/退休看一次性收入，
+            个体户和企业看经营所得、增值税、企业所得税与附加税，<strong>HR 与老板看用工成本、残保金与工会经费</strong>，
+            所有人都要看社保公积金。
+            20 个工具<strong>免注册、不采集收入金额</strong>，口径与 App 同源 ——
+            累计预扣法、社保 60%~300% 上下限、小微企业所得税优惠都是同一套实现，
+            每个页面底部标注政策依据文号（个税法主席令第九号、2018 年第 61 号、社会保险法主席令第 35 号等）。
+        </p>
+
+        <h2>工资、个税与到手</h2>
+        <div class="tool-grid">
+            <a class="tool-card" href="/seo/salary-tax.html">
+                <div class="t">月薪个税计算器</div>
+                <div class="d">按累计预扣法逐月算，看每月到手多少 —— 为什么年初到手多、年末到手少</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/net-salary.html">
+                <div class="t">税后工资倒算（谈薪）</div>
+                <div class="d">月到手 1 万，税前要谈多少？倒推税前 + 加薪试算（边际到手率）</div>
+            </a>
+            <a class="tool-card" href="/seo/annual-settlement.html">
+                <div class="t">个税汇算清缴</div>
+                <div class="d">一年下来你是退税还是补税，补多少、退多少一次算清</div>
+            </a>
+            <a class="tool-card" href="/seo/bonus-tax.html">
+                <div class="t">年终奖个税</div>
+                <div class="d">单独计税还是并入综合所得更省税，两种口径直接对比</div>
+            </a>
+            <a class="tool-card" href="/seo/special-deduction.html">
+                <div class="t">专项附加扣除</div>
+                <div class="d">七项各能扣多少、能少交多少个税，附年度确认与分摊规则</div>
+            </a>
+            <a class="tool-card" href="/seo/private-pension.html">
+                <div class="t">个人养老金税优</div>
+                <div class="d">每年 12000 元税前扣除能省多少，领取按 3% 怎么计税</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/health-insurance.html">
+                <div class="t">税优健康险节税</div>
+                <div class="d">保费每年最多扣 2400 元、理赔免税；但节税上限 1080 元，别只为省税买保险</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/enterprise-annuity.html">
+                <div class="t">企业年金个税</div>
+                <div class="d">个人缴费 4% 当期免税、单位 8% 递延，领取按全额怎么计税</div>
+            </a>
+        </div>
+
+        <h2>离职、劳务与特殊收入</h2>
+        <div class="tool-grid">
+            <a class="tool-card" href="/seo/severance.html">
+                <div class="t">离职补偿金个税</div>
+                <div class="d">经济补偿金 3 倍社平工资以内免税，超过部分怎么算</div>
+            </a>
+            <a class="tool-card" href="/seo/early-retirement.html">
+                <div class="t">提前退休 / 内部退养</div>
+                <div class="d">一次性收入怎么算，和离职补偿有什么区别</div>
+            </a>
+            <a class="tool-card" href="/seo/labor-withholding.html">
+                <div class="t">劳务报酬个税</div>
+                <div class="d">800 元扣除与 20% / 30% / 40% 三档预扣率，年度汇算时怎么并入</div>
+            </a>
+            <a class="tool-card" href="/seo/equity-incentive.html">
+                <div class="t">股权激励个税</div>
+                <div class="d">股票期权、限制性股票、股票增值权，单独计税执行至 2027 年底</div>
+            </a>
+            <a class="tool-card" href="/seo/expat-allowance.html">
+                <div class="t">外籍个人津补贴免税</div>
+                <div class="d">与专项附加扣除二选一，哪个更划算（执行至 2027-12-31）</div>
+            </a>
+        </div>
+
+        <h2>企业与经营</h2>
+        <div class="tool-grid">
+            <a class="tool-card" href="/seo/vat.html">
+                <div class="t">增值税</div>
+                <div class="d">小规模季度 30 万免征、3% 减按 1%；一般纳税人销项减进项</div>
+            </a>
+            <a class="tool-card" href="/seo/corporate-income-tax.html">
+                <div class="t">企业所得税</div>
+                <div class="d">一般 25% / 高新 15% / 小型微利实际税负 5%（300 万·300 人·5000 万门槛）</div>
+            </a>
+            <a class="tool-card" href="/seo/surtax-stamp-duty.html">
+                <div class="t">附加税与印花税</div>
+                <div class="d">城建税市区 7% / 县城 5% / 其他 1%，教育费附加与六税两费减半</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/business-income.html">
+                <div class="t">个体工商户经营所得</div>
+                <div class="d">核定与查账哪个税负低？临界净利率 = 核定所得率 + 6 万 ÷ 年营收（60 万营收、10% 所得率时为 20%）</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/disability-fund.html">
+                <div class="t">残保金与工会经费</div>
+                <div class="d">30 人以下免征，31 人按全部人数算；平均工资按社平 2 倍封顶（不是社保的 300%）</div>
+            </a>
+        </div>
+
+        <h2>社保、公积金与用工成本</h2>
+        <div class="tool-grid">
+            <a class="tool-card" href="/seo/social-base.html">
+                <div class="t">社保公积金计算器</div>
+                <div class="d">缴费基数不是工资：60% 保底 / 300% 封顶，个人与单位各交多少、到手与企业用工成本一次算清</div>
+            </a>
+            <a class="tool-card is-new" href="/seo/employer-cost.html">
+                <div class="t">企业用工成本</div>
+                <div class="d">税前 1 万企业实际花 1.395 万：单位五险一金、按预算倒推工资、涨薪传递率</div>
+            </a>
+        </div>
+
+        <section class="cta">
+            <h2>要算年度汇算、年终奖和专项附加扣除？</h2>
+            <p>上面的单页工具各管一段；把所有收入放一起算、保存历史、生成结果分享图，用完整版计算器。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_index">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/net-salary.html">税后工资倒算</a> · <a href="/seo/salary-tax.html">月薪个税</a> · <a href="/seo/social-base.html">社保公积金</a></p>
+    </div>
+</footer>
+</body>
+</html>

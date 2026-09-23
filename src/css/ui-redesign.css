@@ -1,0 +1,1050 @@
+﻿/**
+ * 阶段19 UI 重构 · 新增样式层（src/css/ui-redesign.css）
+ *
+ * 为什么独立一个文件，而不是直接改 tokens.css / toolbox.css / tailwind.css：
+ *   tokens.css 是**唯一真源**，被 toolbox.css（App）与 seo/landing.css（21 个落地页）
+ *   同时消费；tailwind.css 是构建产物（npm run build:css 生成，改了要重新入仓）。
+ *   重构期需要一个"可以放心加、随时能整体摘掉"的沙箱层 —— 本文件就是这个沙箱，
+ *   只放**组件类**（新令牌一律进 tokens.css），一旦出问题，
+ *   删掉 index.html 里这一行 link 即可回滚。
+ *
+ * 三条硬约束（19-x 全程遵守）：
+ *   1. **本层自身只增不改**：本文件只新增类，不覆盖任何现有变量与现有类。
+ *      「接线」另当别论 —— 让既有样式改取本层令牌（如 toolbox.css 的 hover 用 --sh-2）
+ *      确实会动到既有文件，那类改动逐个记在 CHANGELOG 的对应阶段小节。
+ *   2. **先定义后接线**：本文件里的类在未被 index.html / JS 引用前，对页面**零影响**。
+ *      因此本文件可以安全先行入仓，接线放到 19-1 之后逐阶段做。
+ *   3. **取值只来自 tokens.css**：本文件不引入任何新的字面色值与魔法数字，
+ *      需要新取值时先往 tokens.css 的对应分组里加，再在这里引用。
+ *
+ * 加载位置：index.html 中排在 tailwind.css **之后**（工具类之后），
+ * 这样新组件类在与工具类同名冲突时由本层胜出，不需要 !important。
+ */
+
+/* ==========================================================================
+   1. 令牌：本层**不定义**任何变量 —— 一律取自 src/css/tokens.css
+   ==========================================================================
+
+   这里原本自带一份 :root / .dark 副本（19-0 的临时做法），19-1 已迁回 tokens.css。
+   
+   为什么必须迁走：tokens.css 是**唯一真源**，被 toolbox.css（App）与
+   seo/landing.css（21 个落地页）同时消费。令牌若留在本层，落地页就取不到，
+   而本层的组件类迟早也要被两处共用 —— 那时必然出现两份值各自漂移。
+   
+   本层从这一版起只放**消费令牌的组件类**（第 2 节起），不持有任何字面色值；
+   取值来源仍遵守第 3 条硬约束：需要新的值，先往 tokens.css 对应分组里加，再在这里引用。
+   （§3.7 那一组 —— 表面分层 / 语义 bg-line / 阴影三档 / 画布色板 —— 已在 tokens.css 就位。）*/
+
+
+/* ==========================================================================
+   2. 组件类（§3.3 / §3.5 / §3.6 / §3.10 逐阶段接线）
+   —— 所有类目前**均未被引用**，入仓即零视觉变化。
+   ========================================================================== */
+
+/* --- 2.1 卡片：抬升一档（替代全站平铺的白卡）--- */
+.card-elevated {
+    background: var(--c-surface-0);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    box-shadow: var(--sh-1);
+    transition: box-shadow var(--dur-micro) var(--ease);
+}
+.card-elevated:hover {
+    box-shadow: var(--sh-2);
+}
+
+/* --- 2.2 Mission Hero：首页首屏唯一焦点（§3.3.2）---
+   全站唯一使用品牌渐变 + 大留白的区域，高度 ≤ 一屏 45%。 */
+.hero-card {
+    position: relative;
+    overflow: hidden;
+    padding: var(--sp-6);
+    border-radius: var(--r-hero);
+    /* 底用 --c-hero-from/to，不直接用 --c-brand：深色档的 --c-brand 是**文字色**（浅蓝），
+       拿去当底时 Hero 的白字只有 2.34:1（19-2 首轮审计实测）。见 tokens.css 的 --c-hero-* 注释。 */
+    background: linear-gradient(135deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
+    color: #fff;
+    box-shadow: var(--sh-3);
+}
+.hero-card__title {
+    font-size: var(--fs-2xl);
+    font-weight: 600;
+    line-height: 1.3;
+}
+.hero-card__sub {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-sm);
+    opacity: .92;
+}
+/* Hero 内的主按钮：白底品牌字（渐变底上唯一的实心按钮） */
+.hero-card__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-4);
+    padding: var(--sp-3) var(--sp-6);
+    min-height: 44px;              /* 触控目标下限（可访问性） */
+    border-radius: var(--r-ctrl);
+    background: #fff;
+    /* 白底按钮上的字：深色档若跟着 --c-brand 变浅蓝，就成了「白底浅蓝字」（实测 2.54:1） */
+    color: var(--c-hero-cta-ink);
+    font-weight: 600;
+    box-shadow: var(--sh-1);
+}
+.hero-card__cta:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.3 行动条（Action Bar）：结果页四按钮常驻行（§3.5）---
+   手机上横向可滑，桌面均分；每个按钮 ≥ 44px 触控高度。 */
+.action-bar {
+    display: flex;
+    gap: var(--sp-2);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--c-border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.action-bar__btn {
+    flex: 1 0 auto;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    min-width: 72px;
+    min-height: 44px;
+    padding: var(--sp-2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-micro);
+}
+.action-bar__btn:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.4 省钱卡：结果旁的高优先级卡（§3.5）---
+   只报**确定的、能给政策依据**的优化空间，绝不猜测。 */
+.save-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border: 1px solid var(--c-success-line);
+    border-radius: var(--r-card);
+    background: var(--c-success-bg);
+    color: var(--c-success-text);
+}
+.save-card__amount {
+    font-family: var(--font-numeric);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+}
+
+/* --- 2.5 Chip：身份 chip / 筛选 chip / 状态微标签 --- */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-1) var(--sp-3);
+    min-height: 32px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-pill);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+}
+.chip[aria-pressed="true"],
+.chip--active {
+    border-color: var(--c-brand-line);
+    background: var(--c-brand-subtle);
+    color: var(--c-brand);
+    font-weight: 600;
+}
+.chip:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 2.6 进度条：权益进度 / 档案完成度（§3.6 / §3.8 ②）--- */
+.progress-line {
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+    overflow: hidden;
+}
+.progress-line__fill {
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: var(--c-brand);
+    transition: width var(--dur-page) var(--ease);
+}
+
+/* ==========================================================================
+   3. 双轴导航（§3.3）—— 19-2 接线
+   ========================================================================== */
+
+/* --- 3.1 事件轴：横向滑动卡片组 ---
+   手机 scroll-snap 横滑（首屏露 1.5 张暗示可滑），桌面转网格。
+   事件卡是首页转化主力，**任何断点都不折叠**。 */
+.event-rail {
+    display: grid;
+    gap: var(--sp-3);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+@media (max-width: 767px) {
+    .event-rail {
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        /* 负边距 + 内边距：让卡片能贴边滚动到容器外沿 */
+        margin-inline: calc(-1 * var(--sp-4));
+        padding-inline: var(--sp-4);
+        scrollbar-width: none;
+    }
+    .event-rail::-webkit-scrollbar { display: none; }
+}
+
+.event-card {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    width: min(78vw, 260px);
+    padding: var(--sp-4);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+    box-shadow: var(--sh-1);
+    text-align: left;
+    transition: box-shadow var(--dur-micro) var(--ease),
+                transform var(--dur-micro) var(--ease);
+}
+@media (min-width: 768px) {
+    .event-card { width: auto; }
+}
+.event-card:hover {
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+}
+.event-card:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+.event-card__title {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.event-card__hint {
+    margin-top: var(--sp-1);
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+}
+/* 事件卡一律用生活语言，**不得出现税种名与术语**（§3.3.3） */
+
+/* --- 3.1b 工具页：场景组折叠 + 卡片状态微标签（§3.4 / 19-3）——
+   41 个入口一次全铺开等于没有目录，故场景组默认折叠；
+   折叠只加 class、**不重建 DOM**（重建会冲掉「最近使用」等动态区已绑定的事件）。 */
+.tool-group-head {
+    /* 组头由 div 改成 button（可点、可键盘聚焦），故先抹掉浏览器默认外观 */
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.tool-group-head:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+    border-radius: var(--r-ctrl);
+}
+.tool-group-caret {
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+    transition: transform var(--dur-micro) var(--ease);
+}
+.tool-group.is-collapsed .tool-group-caret { transform: rotate(-90deg); }
+/* 折叠时看不到内容，组头必须说清里面有几个 —— 否则用户不知道该不该展开 */
+.tool-group-count {
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+.tool-group.is-collapsed .tool-group-body { display: none; }
+
+/* 微标签：算过 / 热门 / 可对比 —— 让 41 个入口带上「我的痕迹」 */
+.tool-entry-flags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: var(--sp-1);
+}
+.tool-entry-flag {
+    font-size: var(--fs-micro);
+    line-height: 1.4;
+    padding: 1px 6px;
+    border-radius: 999px;
+    white-space: nowrap;
+    background: var(--c-surface-2);
+    color: var(--c-text-2);
+}
+.tool-entry-flag-done {
+    background: rgba(var(--c-brand-rgb), .1);
+    color: var(--c-brand);
+}
+.tool-entry-flag-hot {
+    background: rgba(245, 158, 11, .14);
+    color: var(--c-warning-text);
+}
+
+/* --- 3.1c 速算器结果页：桌面双栏 + 手机吸底条（§3.5 / 19-4）---
+   改的是「算完那一刻看得见什么」：桌面把输入与结果并排（结果实时联动，不用上下翻），
+   手机仍单列但把主金额钉在底部 —— 否则「算完还要往回找数字」。 */
+.quick-page-inner { max-width: 720px; }        /* 表单宜窄（§3.7）：手机与平板不变 */
+.quick-layout { display: grid; gap: var(--sp-3, 12px); grid-template-columns: minmax(0, 1fr); }
+
+@media (min-width: 1024px) {
+    .quick-page-inner { max-width: 1100px; }    /* 双栏要装得下 420 + 结果 */
+    .quick-layout {
+        /* 输入栏 ≤420px（§3.7 硬约束），结果栏吃掉剩下的 —— 用 minmax(0,1fr) 而不是
+           auto：结果里的长数字（如「应纳税所得额 1,234,567.89」）否则会把栅格撑破。 */
+        grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+        align-items: start;
+        gap: var(--sp-4, 16px);
+    }
+    /* sticky 而非 fixed：随页面滚动、停在自己的列里，不与顶栏/底栏抢层级。
+       top 取顶栏高度 + 一点呼吸，别顶在导航条下面。 */
+    .quick-col-input {
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 96px);
+        overflow: auto;
+    }
+}
+
+/* 结果吸底条：只在手机/平板（<1024px）出现，桌面双栏下结果就在旁边 */
+.quick-result-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--tabbar-h-mobile) + var(--inset-bottom) + 8px);
+    z-index: 45;                       /* 低于底栏 50+、高于内容 */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--h-result-bar);
+    padding: 0 14px;
+    border-radius: var(--r-card);
+    background: var(--c-surface-1);
+    border: 1px solid var(--c-border);
+    /* 向上投影（--sh-up）：吸底条是"浮在内容之上"的一层，影子要投在上边缘，
+       深色档由 tokens.css 换成更黑的版本，这里不写字面值。 */
+    box-shadow: var(--sh-up);
+    color: var(--c-text);
+    cursor: pointer;
+}
+/* 平板形态（≥768px）没有底栏，占位要跟着退掉 */
+@media (min-width: 768px) {
+    .quick-result-bar { bottom: calc(var(--inset-bottom) + 8px); }
+}
+@media (min-width: 1024px) {
+    .quick-result-bar { display: none; }
+}
+.quick-result-bar-label {
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+    white-space: nowrap;
+}
+.quick-result-bar-value {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-base);
+    font-weight: 700;
+    /* 金额等宽 + 千分位（§3.7 排版原则 3） */
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.quick-result-bar-cta {
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+    white-space: nowrap;
+}
+/* 吸底条会压住最后一屏内容：给它留出高度（仅 <1024px 生效） */
+@media (max-width: 1023px) {
+    .quick-layout { padding-bottom: calc(var(--h-result-bar) + 12px); }
+}
+
+/* 行动条：四按钮常驻（保存 / 导出 / 复制 / 完整版） */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-action-btn {
+    flex: 1 1 auto;
+    min-width: 96px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: var(--r-ctrl);
+    border: 1px solid var(--c-border);
+    background: var(--c-surface-1);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+    cursor: pointer;
+}
+.quick-action-btn:hover { background: var(--c-surface-2); color: var(--c-text); }
+.quick-action-btn:disabled { opacity: .6; cursor: default; }
+/* 一屏一主行动（§3.7 排版原则 1）：只有「保存」是实心，其余是次级 */
+/* 底**不能取 --c-brand**：深色档它是文字色浅蓝，白字只剩 2.54:1（对比度审计实测）。
+   与 Hero 同一个坑、同一种解法 —— 底与字都取专用令牌，两档同值。 */
+.quick-action-btn-primary {
+    background: var(--c-btn-primary-bg);
+    border-color: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+.quick-action-btn-primary:hover { filter: brightness(1.06); }
+
+/* --- 税务档案完成度引导（阶段19-5 · 留存机制 §3.8 ②）---
+   全部取既有令牌，不新增色值：深色档由令牌成对给出，不必在这里写第二份。
+   进度条与选中态复用 --c-btn-primary-*（实心底 + 白字），与行动条同一套解法。 */
+.profile-nudge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-nudge-title {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+}
+.profile-nudge-pct { font-size: var(--fs-xs); color: var(--c-text-2); }
+.profile-nudge-bar {
+    margin-top: 8px; height: 6px; border-radius: 999px;
+    background: var(--c-surface-2); overflow: hidden;
+}
+.profile-nudge-bar-fill {
+    display: block; height: 100%; border-radius: 999px;
+    background: var(--c-btn-primary-bg); transition: width .25s ease;
+}
+.profile-nudge-ask { margin-top: 10px; font-size: var(--fs-sm); color: var(--c-text); }
+.profile-nudge-done { margin-top: 10px; font-size: var(--fs-sm); color: var(--c-text-2); }
+.profile-nudge-ctrl { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-chip {
+    padding: 6px 10px; border-radius: var(--r-ctrl);
+    border: 1px solid var(--c-border); background: var(--c-surface-1);
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+}
+.profile-chip:hover { background: var(--c-surface-2); color: var(--c-text); }
+.profile-chip.is-on,
+.profile-chip-primary {
+    background: var(--c-btn-primary-bg);
+    border-color: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+.profile-chip-primary:hover { filter: brightness(1.06); }
+.profile-nudge-input {
+    flex: 1 1 140px; min-width: 0; padding: 6px 10px;
+    border-radius: var(--r-ctrl); border: 1px solid var(--c-border);
+    background: var(--c-surface-1); color: var(--c-text); font-size: var(--fs-xs);
+}
+.profile-nudge-skip {
+    margin-top: 10px; padding: 0; border: 0; background: none;
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+    text-decoration: underline;
+}
+
+/* --- 与上次对比（阶段19-5b · 留存机制 §3.8 ③）---
+   差额用语义色但**必须带文字**（「少缴 / 多缴」）—— 只给颜色等于没说哪边好。
+   语义色一律取 *-text 那一档（它是为白底/深色底上的文字配的，不是实心底）。 */
+.compare-nudge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.compare-nudge-title {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+}
+.compare-nudge-diff { font-size: var(--fs-xs); color: var(--c-text-2); }
+.compare-nudge-diff.is-lower { color: var(--c-success-text); }
+.compare-nudge-diff.is-higher { color: var(--c-danger-text); }
+.compare-nudge-body {
+    margin-top: 8px; display: flex; flex-wrap: wrap; gap: 12px;
+    font-size: var(--fs-xs); color: var(--c-text-2);
+}
+.compare-nudge-body b { color: var(--c-text); font-weight: 600; }
+.compare-nudge-cta {
+    margin-top: 10px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.compare-nudge-tip { margin-top: 10px; font-size: var(--fs-xs); color: var(--c-text-2); }
+
+/* --- 省钱卡（阶段19-6a · 留存机制 §3.8 ④）---
+   金额用 success 语义色，但**永远配文字**（「还能少缴 / 并入更省」）——
+   只给一个绿色数字，用户不知道那是省了还是多缴了。 */
+.saving-nudge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.saving-nudge-title {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+}
+.saving-nudge-amount { font-size: var(--fs-lg); font-weight: 700; color: var(--c-success-text); }
+.saving-nudge-lead { margin-top: 6px; font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.saving-nudge-body { margin-top: 4px; font-size: var(--fs-xs); color: var(--c-text-2); line-height: 1.6; }
+.saving-nudge-cta {
+    margin-top: 10px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+
+.profile-nudge-manage { margin-top: 8px; }
+.profile-manage {
+    padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* --- 我的 → 税务档案「我的情况」编辑卡（阶段19-6a）--- */
+.whoami-hint { margin-top: 8px; font-size: var(--fs-xs); color: var(--c-text-2); line-height: 1.6; }
+.whoami-form { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.whoami-label {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: var(--fs-xs); font-weight: 600; color: var(--c-text);
+}
+.whoami-now { font-weight: 400; color: var(--c-text-2); }
+.whoami-now.is-empty { color: var(--c-text-3); }
+.whoami-deductions { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; }
+.whoami-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+    border: 1px solid var(--c-border); border-radius: 999px;
+    font-size: var(--fs-xs); color: var(--c-text-2); cursor: pointer;
+}
+.whoami-chip.is-on { border-color: var(--c-brand); color: var(--c-brand); }
+.whoami-actions { margin-top: 14px; display: flex; gap: 8px; }
+
+/* --- 首页「我是谁」身份卡：设为默认视角（阶段19-2 遗留清偿③ · §3.3.4）---
+   卡上所有颜色都走既有令牌，两档各写一份：toolbox.css 里那张卡是硬编码色，
+   深色靠 `.dark .scenario-card` 覆盖 —— 这里的修饰类特异性更高且排在后面，两档都显式声明。 */
+.scenario-card { position: relative; }
+.scenario-card.is-on {
+    border-color: var(--c-brand);
+    background: var(--c-surface-2);
+}
+.dark .scenario-card.is-on {
+    border-color: var(--c-brand);
+    background: var(--c-surface-2);
+}
+/* 内部两颗按钮各自清掉按钮皮：卡本身已经是"看起来能点"的容器 */
+.scenario-pick {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    width: 100%; padding: 0; border: 0; background: none; color: inherit;
+    text-align: left; cursor: pointer;
+}
+.scenario-badge {
+    margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+    background: var(--c-brand); color: var(--c-btn-primary-ink);
+    font-size: var(--fs-xs); font-style: normal; font-weight: 400;
+}
+.scenario-tools {
+    margin-top: 8px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+.identity-note {
+    margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    font-size: var(--fs-xs); color: var(--c-text-2); line-height: 1.6;
+}
+.identity-note-clear {
+    padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* --- 首页「我的方案与台账」（阶段19-2 遗留清偿④ · §3.3.5 ①）---
+   排版照台账弹窗里那一行（.ledger-row）：同样的"标题 + 说明 + 右侧出口"三件套，
+   用户在一个产品里认一次就够了；颜色一律走令牌，不再发明新色。 */
+.plans-box {
+    margin-bottom: 10px; display: flex; flex-direction: column;
+}
+.plans-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--c-border);
+}
+.plans-row:last-child { border-bottom: none; }
+.plans-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.plans-title { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.plans-meta {
+    font-size: var(--fs-micro); color: var(--c-text-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plans-go {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--c-brand); font-size: var(--fs-xs); white-space: nowrap;
+}
+.plans-recent-label {
+    margin-bottom: 6px; font-size: var(--fs-micro); color: var(--c-text-3);
+}
+
+/* --- 首页「漏填提醒」卡（阶段19-2 遗留 · §3.3 ④）---
+   漏项 chip 沿用 .profile-chip 的配色与圆角，只把它改成**只读标签**（那玩意儿带 cursor:pointer，
+   不可点却长成能点的样子是骗人）；配色本身一律走既有令牌，两档对比度与档案卡一致。 */
+.home-missing-chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.home-missing-chip { cursor: default; }
+.home-missing-actions { margin-top: 12px; }
+.home-missing-cta { font-size: var(--fs-xs); }
+
+/* --- 3.2 身份轴：身份卡（设置默认视图，不限制工具可达性）--- */
+.identity-card {
+    padding: var(--sp-4);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+    text-align: left;
+}
+.identity-card[aria-pressed="true"] {
+    border-color: var(--c-brand);
+    background: var(--c-brand-subtle);
+}
+.identity-card:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+.identity-card__title {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.identity-card__desc {
+    margin-top: var(--sp-1);
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+
+/* ==========================================================================
+   4. 效率层（§3.10）—— 19-9 之后接线
+   ========================================================================== */
+
+/* --- 4.1 主体切换器（顶栏右侧，仅在已建主体时显示）--- */
+.entity-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    max-width: 200px;
+    padding: var(--sp-1) var(--sp-3);
+    min-height: 36px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-pill);
+    background: var(--c-surface-0);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+}
+.entity-switcher__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.entity-switcher:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+
+/* --- 4.2 台账表格（§3.10.4）--- */
+.ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+}
+.ledger-table th,
+.ledger-table td {
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--c-border);
+    text-align: left;
+}
+.ledger-table th {
+    background: var(--c-surface-2);
+    font-weight: 600;
+    color: var(--c-text-2);
+}
+/* 金额列一律等宽 + 右对齐 + 千分位（§3.7 排版原则 3） */
+.ledger-table td.num,
+.ledger-table th.num {
+    font-family: var(--font-numeric);
+    text-align: right;
+}
+
+/* --- 4.3 批量计算：粘贴区与预览表（§3.10.5）--- */
+.batch-paste {
+    width: 100%;
+    min-height: 160px;
+    padding: var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    background: var(--c-surface-1);
+    font-family: var(--font-numeric);
+    font-size: var(--fs-sm);
+    resize: vertical;
+}
+.batch-paste:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+/* 批量页顶部必须明示"数据不出本机"（§3.10.5 合规卖点） */
+.batch-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+    border: 1px solid var(--c-info-line);
+    border-radius: var(--r-card);
+    background: var(--c-info-bg);
+    color: var(--c-text-2);
+    font-size: var(--fs-xs);
+}
+
+/* --- 4.4 我的页：权益进度条（§3.6 ①）---
+   三格各一档，当前档位及之前点亮 —— 它表达的是**档位在阶梯上的位置**，
+   不是"距离专业版还差百分之几"：基础版到专业版之间没有分母，任何百分比都是编出来的。
+   （真有分母的是方案用量：那个是 count/limit，以文字形式写在下面一行。） */
+.benefit-steps {
+    display: flex;
+    gap: var(--sp-2);
+}
+.benefit-step {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.benefit-step__bar {
+    display: block;
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+}
+.benefit-step.is-done .benefit-step__bar,
+.benefit-step.is-current .benefit-step__bar {
+    background: var(--c-brand);
+}
+.benefit-step__label {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+}
+.benefit-step.is-current .benefit-step__label {
+    color: var(--c-text);
+    font-weight: 600;
+}
+.benefit-line {
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+}
+
+/* ==========================================================================
+   4.5 结果页：各项数额条（阶段19-4 顺延 · v1.99.0）
+   —— 速算器结果与 21 个完整测算的结果步共用一份实现（src/js/ui/result-bars.js）。
+      颜色只有两档：主结果 --c-brand、其余 --c-text-disabled。不给"税额""扣除"
+      各配一个色 —— 那要按行名认语义，认错就是把错的那一根标成重点，
+      而这张条本来就不表达加减关系（见 result-bars.js 文件头）。
+   ========================================================================== */
+.result-bars__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    cursor: pointer;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+    list-style: none;
+}
+.result-bars__summary::-webkit-details-marker { display: none; }
+.result-bars__hint {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--c-text-3);
+}
+.result-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.result-bar__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    font-size: var(--fs-xs);
+}
+.result-bar__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-text-2);
+}
+.result-bar__value {
+    flex: none;
+    font-weight: 600;
+    color: var(--c-text);
+}
+.result-bar__line {
+    margin-top: 4px;
+    height: 8px;
+    border-radius: var(--r-pill);
+    background: var(--c-surface-2);
+    overflow: hidden;
+}
+.result-bar__fill {
+    display: block;
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: var(--c-brand);
+    transition: width .25s ease;
+}
+/* 非主结果：中性灰。用 --c-text-disabled 而不是再取一个"次色令牌"——
+   深色档下它是 #6b7280，与 --c-surface-2(#374151) 仍能分出层次。 */
+.result-bar__fill--plain {
+    background: var(--c-text-disabled);
+}
+.result-bars__note {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-micro);
+    color: var(--c-text-3);
+}
+
+/* ==========================================================================
+   4.6 阶段19-7：视图密度（简明 / 完整）
+   —— pill 是就地切换的开关，不是模式弹窗：两个分段常驻，当前档高亮，
+      用户看得见「下一次点击会发生什么」。实心底沿用 19-4 的 --c-btn-primary-*，
+      不取 --c-brand（深色档白字只有 2.54:1）。
+   ========================================================================== */
+.mode-pill {
+    display: inline-flex;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--c-surface-1);
+}
+.mode-pill-seg {
+    padding: 4px 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--c-text-2);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.mode-pill-seg.is-on {
+    background: var(--c-btn-primary-bg);
+    color: var(--c-btn-primary-ink);
+}
+/* 「更多参数（可选）」折叠块：简明视图收起、完整视图默认展开，
+   但**两视图都常驻在 DOM 里** —— 不填也能算，想改随时能改。 */
+.tool-advanced-block {
+    border-top: 1px dashed var(--c-border);
+    padding-top: 10px;
+}
+
+/* ==========================================================================
+   5. 可访问性：尊重"减少动态效果"
+   ========================================================================== */
+/* --- 阶段19-8 · 效率层 E5：参数记忆提示 + 结果「带走」一行（速算器 / 完整测算共用）---
+   全部取既有令牌，不新增色值：深色档由令牌成对给出，不必在这里写第二份。
+   刻意在提示容器上**不写 display**：它由 .hidden 控制显隐，而本层排在 tailwind.css
+   之后会胜出 —— 写了 display:flex 就等于把 hidden 废掉（提示永远显示）。 */
+.tool-memory-hint { margin-bottom: 10px; font-size: var(--fs-xs); color: var(--c-text-2); }
+.tool-memory-clear {
+    margin-left: 8px; padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* 行动条下面那一行「复制为表格 / 复制链接」：它们不是主行动，做成小字链接，
+   不与四颗按钮抢重量（四按钮常驻是 19-4 的规矩）。 */
+.quick-copy-row { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 14px; }
+/* 完整测算结果页同一行：贴在「保存 / 导出 PDF / 导出 Word」三颗实心按钮之后 */
+.dw-copy-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+.quick-copy-link,
+.dw-copy-link {
+    padding: 0; border: 0; background: none;
+    color: var(--c-brand); font-size: var(--fs-xs); cursor: pointer;
+    display: inline-flex; align-items: center;
+}
+
+/* ==========================================================================
+   6. 阶段19-9 · 效率层 E1 / E2：主体切换器 · 模板条 · 管理弹窗
+   ==========================================================================
+   一律取既有令牌，不新增色值 —— 深色档由令牌成对给出，不必在这里写第二份。
+   同一条 19-8 的规矩在这里继续成立：**凡靠 .hidden 控制显隐的容器都不写 display**，
+   本层排在 tailwind.css 之后会胜出，写了 display 等于把 hidden 废掉。
+   受影响的有：#entity-switcher（顶栏那一块）、.entity-panel（下拉）、#quick-template-bar。 */
+
+/* --- 顶栏主体切换器：没建主体时整块不出现，所以它不必为「空态」做任何事 --- */
+.entity-switcher-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    max-width: 168px; padding: 5px 10px; margin-left: 6px;
+    border: 1px solid var(--c-border); border-radius: var(--r-pill);
+    background: var(--c-surface-1); color: var(--c-text);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-switcher-btn:hover { background: var(--c-surface-2); }
+.entity-switcher-name {
+    max-width: 116px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entity-switcher-caret { font-size: 10px; color: var(--c-text-3); }
+
+.entity-panel {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 50;
+    width: 232px; padding: 6px;
+    background: var(--c-surface-0); border: 1px solid var(--c-border);
+    border-radius: 12px; box-shadow: var(--sh-3);
+}
+.entity-panel-item {
+    display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: 8px; background: none;
+    color: var(--c-text); font-size: var(--fs-sm); cursor: pointer;
+}
+.entity-panel-item:hover { background: var(--c-surface-2); }
+.entity-panel-item.is-on { color: var(--c-brand); }
+.entity-panel-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entity-panel-tags { flex: 0 0 auto; font-size: var(--fs-micro); color: var(--c-text-3); }
+.entity-panel-tick { flex: 0 0 auto; color: var(--c-brand); font-size: var(--fs-xs); }
+.entity-panel-sep { margin: 6px 4px; border-top: 1px solid var(--c-border); }
+.entity-panel-manage {
+    display: block; width: 100%; text-align: left; padding: 8px 10px;
+    border: 0; border-radius: 8px; background: none;
+    color: var(--c-text-2); font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-panel-manage:hover { background: var(--c-surface-2); color: var(--c-brand); }
+
+/* --- 工具页「从模板填充」条 --- */
+.tool-template-bar {
+    margin-bottom: 10px; padding: 6px 10px;
+    background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+}
+.tool-template-summary {
+    display: flex; align-items: center; cursor: pointer; list-style: none;
+    font-size: var(--fs-xs); color: var(--c-text-2);
+}
+.tool-template-summary::-webkit-details-marker { display: none; }
+.tool-template-body { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.tool-template-item {
+    padding: 4px 10px; border: 1px solid var(--c-border); border-radius: var(--r-pill);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-xs); cursor: pointer;
+}
+.tool-template-item:hover { border-color: var(--c-brand); color: var(--c-brand); }
+.tool-template-scope { margin-left: 6px; font-size: var(--fs-micro); color: var(--c-text-3); }
+.tool-template-more, .tool-template-manage {
+    padding: 0; border: 0; background: none; color: var(--c-brand);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+
+/* --- 两个管理弹窗内的行与表单（都是新增 DOM，样式只在这里定义一次） --- */
+.entity-modal-lead {
+    margin-bottom: 12px; padding: 10px 12px; font-size: var(--fs-xs); line-height: 1.7;
+    color: var(--c-text-2); background: var(--c-surface-3); border-radius: var(--r-ctrl);
+}
+.entity-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);
+}
+.entity-row.is-current { border-left: 3px solid var(--c-brand); padding-left: 8px; }
+.entity-row-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.entity-row-name { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.entity-row-badge {
+    padding: 1px 6px; border-radius: var(--r-pill);
+    background: var(--c-surface-3); color: var(--c-brand); font-size: var(--fs-micro);
+}
+.entity-row-tags { font-size: var(--fs-micro); color: var(--c-text-3); }
+.entity-row-ops { display: flex; align-items: center; gap: 12px; }
+.entity-op {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--c-brand); font-size: var(--fs-xs);
+}
+.entity-op-danger { color: var(--c-danger-text); }
+
+.entity-form { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--c-border); }
+.entity-form-title { margin-bottom: 10px; font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
+.entity-form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 480px) { .entity-form-grid { grid-template-columns: 1fr 1fr; } }
+.entity-field { display: flex; flex-direction: column; gap: 4px; }
+.entity-field > span { font-size: var(--fs-xs); color: var(--c-text-2); }
+.entity-field .tool-input { width: 100%; }
+.entity-form-ops { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.entity-save {
+    padding: 8px 16px; border: 0; border-radius: var(--r-ctrl);
+    background: var(--c-brand); color: #fff; font-size: var(--fs-sm); cursor: pointer;
+}
+.entity-save:hover { background: var(--c-brand-hover); }
+.entity-cancel {
+    padding: 0; border: 0; background: none; color: var(--c-text-2);
+    font-size: var(--fs-xs); cursor: pointer;
+}
+.entity-form-note { margin-top: 10px; font-size: var(--fs-micro); line-height: 1.7; color: var(--c-text-3); }
+.entity-form-note.is-error { color: var(--c-danger-text); }
+
+.tpl-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);
+}
+.tpl-row-main { display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px; }
+.tpl-name-input {
+    width: 100%; padding: 4px 8px; border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-sm);
+}
+.tpl-row-meta { font-size: var(--fs-micro); color: var(--c-text-3); }
+
+/* ====== 阶段19-10 · E3 台账弹窗 ======
+     台账的行是在**历史记录上多两层信息**（期间 / 状态），所以行样式刻意比 tpl-row 更矮:
+     它是要竖着扫的那张表（"这个月都算了啥"），不是要填的东西。 */
+.ledger-period {
+    margin-bottom: 14px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-ctrl);
+    padding: 0 12px 4px;
+}
+.ledger-period-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; font-size: var(--fs-sm); font-weight: 600; color: var(--c-text);
+    border-bottom: 1px dashed var(--c-border);
+}
+.ledger-period-count {
+    font-size: var(--fs-micro); font-weight: 400; color: var(--c-text-3);
+}
+.ledger-row {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--c-border);
+}
+.ledger-row:last-child { border-bottom: none; }
+.ledger-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.ledger-title {
+    font-size: var(--fs-sm); color: var(--c-text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ledger-meta { font-size: var(--fs-micro); color: var(--c-text-3); }
+.ledger-row-ops { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ledger-period-input,
+.ledger-status-select {
+    padding: 3px 6px; border: 1px solid var(--c-border); border-radius: var(--r-ctrl);
+    background: var(--c-surface-0); color: var(--c-text); font-size: var(--fs-micro);
+}
+
+/* --- 4.3b 批量：算不出来的那一行（§3.10.5）---
+     它必须**留在表里**并看得出来：删掉它就对不上人，而当 0 填进去就成了"这个人不用交税"。
+     所以只标红这一行的结果区，不动它原样带出的姓名与输入列。 */
+.ledger-table tr.is-bad td.num {
+    color: var(--c-danger-text);
+}
+.ledger-table tr.is-bad td.num::after {
+    content: ' —';
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-elevated,
+    .event-card,
+    .progress-line__fill,
+    .result-bar__fill,
+    .action-bar__btn {
+        transition: none;
+    }
+    .event-card:hover { transform: none; }
+}

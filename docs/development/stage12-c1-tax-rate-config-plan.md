@@ -1,5 +1,7 @@
 # 阶段12 C1：税制参数配置化（管理台热改税率 + 可选公告联动）
 
+> 🟡 **已关闭阶段 · 只作回查**：本阶段已全部交付收口，文中的进度与基线数字是当时快照。当前进度看 [development-plan.md](./development-plan.md) 的阶段状态表，现状口径看 [文档中心「当前状态」](../README.md)。
+
 > 状态：**已完成**（测试基线 17 套件 / 361 例全绿）
 > 关联：`docs/development/stage12-core-enhancement-plan.md`（A 阶段）、`src/js/calculation/tax-constants.js`（注释中预留的 C1 契约）
 

@@ -18,4 +18,9 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && r
 WORKDIR /app
 COPY --from=build /app /app
 EXPOSE 3000
+ENV PORT=3000
+# 若平台（如 Zeabur）注入的 PORT 变量不是合法数字，本镜像默认值 3000 仍可兜底，
+# 但平台级环境变量优先级高于 Dockerfile ENV，故控制台里也请保持 PORT=3000 或留空。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "require('http').get('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 CMD ["sh", "-c", "cd server && npx prisma migrate deploy && node src/app.js"]

@@ -14,7 +14,7 @@
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
 | `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
-| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 167 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
+| `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 259 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
@@ -67,6 +67,11 @@ GUI 内置 8 大功能面板（共 110+ 按钮），调用本目录下的 `ops-s
 .\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
+> ⚠️ **公网分享时的安全边界（v1.19.0 起）**
+> `-Share` 会把本机 `:3000` 暴露到公网，而后端是「静态托管仓库根」的，所以后端源码、本地数据库、`.git`、运维配置天生都在可访问路径上。
+> 现已加闸 `server/src/middleware/sensitiveFileGuard.js`：点文件段（`.git/**`、`.env`）、`server/` `tools/` `docs/` 顶层目录、`.db`/`.sqlite`/`.pem`/`.key` 等后缀 **一律 404**；`*.local.json`（本机测试账号的真实密码）**仅环回地址可读**，公网来源 404。
+> 也就是说：分享出去的是前端站点本身，不再包含源码与本地库 —— 但分享链接仍等于把本机应用开放给拿到链接的人，用完记得关掉。
+
 ### 单独启动守护脚本
 
 ```powershell
@@ -100,7 +105,7 @@ Send-TestNotification
 ### PostgreSQL 生产等价演练（动过 schema/迁移后必跑）
 
 ```powershell
-# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 167 项 e2e
+# 起临时 PostgreSQL → prisma generate → migrate deploy → 内容种子 → 259 项 e2e
 npm run verify:pg
 
 # 等价「全新库首次部署」：先删数据卷再跑
@@ -281,6 +286,123 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
   "healthCheckTimeout": 30
 }
 ```
+
+---
+
+## 视觉回归截图基线（阶段19-0 新增，19-1 补深色档）
+
+Tokens 改版（阶段19 要动首页结构 / 结果页布局 / 令牌层）没有视觉回归就是赌博 —— `src/css/tokens.css`
+文件头写的那句「本项目没有视觉回归」正是本次要补上的一环。
+
+`ui-screenshot-baseline.js` 把 **6 个关键页面 × 2 个断点（375 / 1280）× 2 套主题（浅 / 深）** 的截图固化成基线，
+每个阶段结束后重拍比对，**变了才需要人眼确认**（方案里的验收方式就是人眼确认，hash 只回答"变没变"）。
+
+```bash
+node tools/ops/ui-screenshot-baseline.js                          # 生成 / 覆盖浅色基线
+node tools/ops/ui-screenshot-baseline.js --theme dark             # 生成 / 覆盖深色基线
+node tools/ops/ui-screenshot-baseline.js --check --theme light    # 与基线比对（不覆盖，产物落在 .tmp/）
+node tools/ops/ui-screenshot-baseline.js --only home,tools
+```
+
+产物：`screenshots/baseline/*.png`（**24 张**，入仓，深色文件名带 `-dark` 后缀）+ `manifest.json`
+（sha256 / 字节数 / 资源就绪标记 / 主题）。
+
+> **为什么必须有深色基线（19-1 补）**：`tokens.css` 的 `.dark` 段是**另一套**阴影值（深色靠"更黑"不靠
+> "更灰"，透明度 .30/.40/.50）。浅色 12 张全绿**证明不了深色没问题** —— 19-1 的验收要求
+> 「深色模式逐页过一遍」在只有浅色基线时根本没有产物可看。
+>
+> **`--theme` 一次只拍一套，清单按 (页面@断点@主题) 合并写入**：直接覆盖会把上一次的主题冲掉，
+> 24 张永远凑不齐（表现为另一主题 `--check` 全部 missing）。两个主题各跑一次即可并存。
+
+基线之所以能靠 sha256 比对（而不是引 pixelmatch 这类像素库），是因为脚本在截图前掐掉了五类时序噪声，
+每一条都是实测踩出来的，改动前请先读脚本里对应的注释：**冻结动画 / 光标 / 滚动位置**、
+**每张开拍前清空 storage**（否则上一轮留下的「最近使用」会让首页 baseline 只在第一次是对的）、
+**隐藏滚动条**（375px 首页超高，滑块位置漂移会让每一轮都产生假 diff）、**等 CDN 资源就绪**
+（`index.html` 引了 6 个外网 CDN，图标是字体，字体没到就是空白方块）、
+**冻结时间相关内容**（问候语按小时分段、日期行按天、今日税感的「剩 N 天」按天倒计时 ——
+基线拍于上午、复查跑到中午，「上午好」变「中午好」，两张 home 当场双红；
+冻结的是**确定性**不是真实性，占位结构照抄真实渲染）。
+
+> ⚠️ 已知限制一：浏览器**冷启动会挂**（把 agent-browser 守护进程和无头 Chrome 一起杀掉后重跑，
+> 实测卡在第一张 7 分钟不出图，open 卡在等外网 CDN）。遇到就先起服务并用
+> `node <cli> open http://127.0.0.1:3000/` 把浏览器热起来再跑 ——
+> `<cli>` 取 `npm root -g` 下 `agent-browser/package.json` 的 `bin` 字段；
+> 注意别用 `npx`（Windows 下 spawn EINVAL），本项目里一律用 node 直接跑 CLI。
+
+### 对比度审计（阶段19-1 验收项「对比度仍达 AA」）
+
+阶段19-1 的验收口径是「对比度仍达 AA」，但此前**没有任何手段能回答这个问题**：全站几十处
+`/50` `/90` 透明度修饰符 + 深浅两套主题，读 CSS 推不出实际渲染色。`ui-contrast-audit.js`
+走真机：把页面切到与截图基线**完全相同的状态**（复用 `ui-lib/screenshot-kit.js`），用
+`getComputedStyle` 取实际渲染的前景色与**沿祖先链合成**的有效背景色，按 WCAG 2.1 算对比度。
+
+```bash
+node tools/ops/ui-contrast-audit.js                     # 浅色 + 深色，6 页 × 2 断点（24 组）
+node tools/ops/ui-contrast-audit.js --theme dark
+node tools/ops/ui-contrast-audit.js --only home,tools
+node tools/ops/ui-contrast-audit.js --scope admin        # 管理台 11 视图 × 2 断点（22 组，仅浅色）
+node tools/ops/ui-contrast-audit.js --scope all          # 主站 + 管理台
+node tools/ops/ui-contrast-audit.js --json report.json  # 导出明细（不入仓）
+node tools/ops/ui-contrast-audit.js --strict            # 有确定失败项则退出码 1（供门禁用）
+```
+
+**管理台是独立 scope**（v1.81.1 起，此前 admin.html 从未被审计过）：
+
+- **没有深色主题** —— admin.html 无主题切换，`.dark` 挂上去也没有对应 CSS 生效，跑深色只会
+  产出与浅色全同的结果，白费 22 次运行。
+- **视图 = 登录页 + 10 个 section**，prepare 只做 DOM 显隐切换，**不走 `switchTab()`**：
+  静态服务器没有 `/api`，走真实切换会触发数据加载失败的错误 toast（红底白字 4.2 秒）——
+  那是"无后端"的噪声，不是 admin.html 本身的对比度问题。
+- 因此管理台的审计**只覆盖静态结构与空态**，不含真实数据行（数据在 /api 可用时才渲染）。
+- **入仓的 admin.css 产物里组件类排在工具类之后**（与标准 Tailwind 输出顺序相反），同
+  specificity 时后者胜 —— 想用 `text-gray-600` 工具类去覆盖 `.page-desc` 这类组件类的颜色
+  **压不过**（实测审计仍是旧值）。要改组件类文字色只能：改 admin.src.css 并重建产物
+  （受 19-2 遗留限制暂不可行），或在 admin.html 里用内联 style。
+
+判定口径只守两条线：**正文 4.5:1、大字 3:1**（大字 = ≥24px，或 ≥18.66px 且 font-weight ≥700）。
+
+> **渐变是能判定的，只有背景图（url()）取不到色**。
+> 第一版只要祖先链上有 `background-image` 就整体标「待人工确认」，结果 22 处白字压渐变全进了人工桶 ——
+> 而这批里**真的有不达标的**（助手头 `from-blue-500` 那端白字只有 3.68:1）。现改为解析
+> `linear-gradient` 的**全部色停点**、逐点算并取**最差**值：线性渐变只在色停之间插值，
+> 最差色停即保守下界，**宁可多报，不可放过**。仍取不到色的只剩 `url()` 背景图，那才单列「待人工」。
+>
+> 判定背景时还有一条容易写反的规则：**由内向外走，遇到不透明的一层就停**（CSS 是"近的盖住远的"）。
+> 只找"第一个 background-image"就开算会把自带 `bg-white` / `bg-blue-600` 的按钮误判成
+> 压在父级渐变上（白字对白底 1.05:1 的假警报），本项目里已因此误报过三处。
+
+### ✅ Tailwind 构建链路：tailwind.css 已修好，admin.css 待办（阶段19-2）
+
+**症状与根因**：每阶段都要跑 `build:css` 并提交产物，前提是**本地产物可复现**，而此前实测**不可复现**
+（入仓 98677 B / 本地重建 93664 B）。Tailwind 版本不是原因（声明 / 实际安装 / lock 三者都是 3.4.17）。
+结论：入仓的 `tailwind.css` 是**过期产物** —— 它生成于那些旧类仍被使用的时候，此后一直没被重建过。
+
+**纯重建已于 v1.79.0 执行**，class 级差分审计结论：
+
+| 方向 | 数量 | 判定 |
+|---|---|---|
+| 将被删除（仅入仓有）| **36** | **全部零裸用** → 纯删历史残余：`result-hero*` / `calc-preview-*` / `result-metric*` / `result-pitfall*` / `mt-[2px]` / `h-64` / `bg-accent` … |
+| 将被新增（仅重建有）| **6** | 2 个真实 + 4 个扫描假阳性 |
+
+新增的 4 个 `!xxx`（`!active` `!label` `!step` `!table`）是 **Tailwind 文本扫描的假阳性** ——
+它们的真身是 JS 里的**取反表达式**（`if (!step) return;` / `if (!label || …)`），被当成 `!` important 修饰的类名，
+生成了也没人用，无害。另外 2 个 `list-disc` / `pl-5` 来自 `deep-wizard-ui.js:287` 的 extras 列表渲染，
+但**目前没有任何 spec 提供 `extras.list`**（契约见该文件 241 行），这条分支从未渲染 ——
+所以重建后**零视觉变化**，截图基线 **12/12 一致**三重佐证。
+
+> **审查方法（下次动 `tailwind.src.css` 前照做，别指望 diff）**：minified 产物是单行文件，
+> diff 永远只有一行，**看不出任何门道**。可靠做法是类级差分：抽出两份 CSS 的类名集合 → 取差集 →
+> 逐个回查 content 范围是否被裸用。两个坑：
+> ① 回查的**左边界必须排除 `:` 与 `!`**，否则 `sm:gap-6` 会被当成用了裸 `gap-6`、`!pl-3` 当成用了裸 `pl-3`
+> （第一版脚本就是这样误报了 6 个，差点把一次安全重建判成危险）；
+> ② 被删的 36 个类里有些辗转只剩 `id` 在用（`result-tax-bar-fill` 是 `getElementById` 的参数，不是 class）——
+> Tailwind 照样扫到并保留，别慌着删 `.result-tax-bar`。
+> content 范围见 `tailwind.config.js`；**只有 `index.html` 真的加载了 `tailwind.css`**，
+> `admin.html` / `clean-cache.html` 虽在 content 里却不加载（它们各自内联样式），审查时不必为它们纠结。
+
+**仍未修的另一半**：`src/css/admin.css`（52539 B）同样不可复现（本地重建 51614 B，差 925 B）——
+同一类问题、**同一套方法**可处理，尚未执行。管理后台页面的视觉验证成本更高，暂不与前台合并做。
+在它修好前，`build:css` 依旧不要整条跑 —— 那会把两条链路的变更混在同一次提交里。
 
 ---
 

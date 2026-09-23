@@ -6,7 +6,8 @@
 //
 // 这里把可静态推导的部分变成断言（口径定义集中在 tools/ops/release-metrics.js）：
 //   - 套件数 = tests/**/*.test.js 文件数（jest testMatch 同口径）
-//   - 用例数 = 测试文件里「行首 test(」个数（与 jest 实测核对一致）
+//   - 用例数 = 测试文件里「行首 test( / it(」个数 + test.each([...]) 的数据条目数
+//     （each 在源码里是一行声明，jest 按数据条目展开，只数行首会少算；口径见 release-metrics.js）
 //   - 门禁/指纹项数无法离线推导（脚本含 catch 分支回退断言），只夹逼「文档彼此一致 + 不超过脚本文本断言数」
 //   - 项数声明的身份靠**版本前缀**判定（2026-09-13 加固）：非当前口径必须带 vX.Y.Z / [X.Y.Z]
 //     （同一行或所在 `## ` 小节标题）才算历史基线，否则就是漏改的旧口径
@@ -68,6 +69,43 @@ describe('文档口径与实测一致', () => {
         const r = checkMetrics();
         expect(r.issues).toEqual([]);
         expect(r.ok).toBe(true);
+    });
+});
+
+// 文档登记守护（2026-09-17）
+//
+// 背景：2026-09-16 / 09-17 新增的两份 UI 方案（`ui-ux-master-plan.md` / `dual-end-ui-plan.md`）
+// **从未被登记进 `docs/README.md`** —— 该索引最后更新停在 09-14，早于它们的创建日。
+// 后果不是报错，而是「想要的东西存在，但必须一层层点链接才找得到」：
+// 唯一入口变成被别的文档引用，文档之间越套越深，没人敢删也没人找得到。
+//
+// 这里把「新增文档必须登记」从口头纪律变成会红的断言 —— 否则下一次还是会漏。
+describe('docs 索引登记不能有遗漏', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const DOCS_ROOT = path.resolve(__dirname, '../docs');
+    const readme = () => fs.readFileSync(path.join(DOCS_ROOT, 'README.md'), 'utf8');
+
+    function docsMarkdowns() {
+        const files = [];
+        (function walk(dir) {
+            fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (e.name.endsWith('.md')) files.push(path.relative(DOCS_ROOT, full).replace(/\\/g, '/'));
+            });
+        })(DOCS_ROOT);
+        return files.filter((f) => f !== 'README.md');
+    }
+
+    test('docs 下每个 .md 都能在 docs/README.md 里找到（新增文档必须登记）', () => {
+        const content = readme();
+        const unlisted = docsMarkdowns().filter((rel) => !content.includes(rel));
+        expect(unlisted).toEqual([]);
+    });
+
+    test('至少扫到了足够多的文档（防目录改名后断言空转）', () => {
+        expect(docsMarkdowns().length).toBeGreaterThan(20);
     });
 });
 

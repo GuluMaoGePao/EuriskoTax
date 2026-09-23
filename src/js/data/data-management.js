@@ -94,74 +94,22 @@ function notifyHistoryMutated() {
     } catch (e) { /* 同步信号失败静默 */ }
 }
 
-// 保存计算结果
-function saveCalculationResult() {
-    console.log('%c[EuriskoTax] SAVE → 开始保存计算结果', 'color: #1e40af; font-weight: bold;');
-    if (Object.keys(calculationResults).length === 0) {
-        console.warn('[EuriskoTax] SAVE → 计算结果为空，无法保存');
-        showAlert('请先进行计算，再保存结果');
-        return;
-    }
-
-    try {
-        // 生成唯一ID
-        const id = Date.now().toString();
-
-        // 构建保存的数据对象
-        const savedData = {
-            id: id,
-            type: 'forward',
-            title: `综合所得计税 - ${new Date().toLocaleDateString()}`,
-            results: calculationResults,
-            date: new Date().toISOString(),
-            updatedAt: new Date().toISOString()  // 阶段10：云同步冲突判定时间戳（旧数据缺省时回退 date）
-        };
-
-        console.log('[EuriskoTax] SAVE → 保存数据:', {
-            id: id,
-            type: savedData.type,
-            title: savedData.title,
-            income: calculationResults?.incomeDetails?.total,
-            tax: calculationResults?.taxDetails?.totalTax
-        });
-
-        // 添加到历史记录
-        calculationHistory.unshift(savedData);
-
-        // 限制历史记录数量
-        if (calculationHistory.length > 50) {
-            calculationHistory = calculationHistory.slice(0, 50);
-        }
-
-        // 保存到本地存储
-        localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
-
-        // 阶段8：匿名埋点信号（综合所得），由 index.html 监听器统一上报
-        try {
-            if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
-                document.dispatchEvent(new CustomEvent('euriskotax:calc-saved', { detail: { type: 'forward' } }));
-            }
-        } catch (e) { /* 埋点失败静默 */ }
-
-        // 阶段10：通知云同步引擎（登录+PRO 时自动上传本端增量）
-        notifyHistoryMutated();
-
-        console.log('%c[EuriskoTax] SAVE → 保存成功，历史记录共 ' + calculationHistory.length + ' 条', 'color: #16a34a; font-weight: bold;');
-
-        // 显示保存成功提示
-        showSaveSuccessMessage();
-
-    } catch (error) {
-        console.error('[EuriskoTax] SAVE → 保存失败:', error);
-        showSaveErrorMessage();
-    }
-}
+// 17B-3（v1.49.0）：`saveCalculationResult`（综合所得页面的「保存计算结果」）随旧页面删掉了 ——
+// 它的调用点只有 app.js 那颗现已删除的按钮。此后正向历史的写入由向导自己的保存承担
+// （deep-wizard-ui 的 execSave），走的还是同一份 localStorage + notifyHistoryMutated 通道，
+// 所以「已保存的 forward 记录怎么读」这件事没变 —— loadHistoryRecords / loadRecordToForm
+// 里那条 forward 分支必须留着，否则云同步拉回来的老记录就成了读不回来的死数据。
 
 // 辅助函数：安全获取收入值
 function getIncomeValue(item) {
     try {
         if (item.type === 'business') {
-            return item.results?.incomeDetails?.businessIncome || 0;
+            // 17B-1 起经营所得有两种历史结构：旧页面版散在 incomeDetails/taxDetails 里，
+            // spec 驱动的向导存的是 { values, primary, rows } —— 两种都要读得出来。
+            if (item.results && item.results.incomeDetails) {
+                return item.results.incomeDetails.businessIncome || 0;
+            }
+            return Number(item.results?.values?.income) || 0;
         } else if (item.type === 'classification') {
             return item.results?.totalIncome || 0;
         } else if (item.type === 'reverse') {
@@ -188,7 +136,12 @@ function getTaxValue(item) {
 function getNetIncomeValue(item) {
     try {
         if (item.type === 'business') {
-            return item.results?.taxDetails?.netIncome || 0;
+            if (item.results && item.results.taxDetails) {
+                return item.results.taxDetails.netIncome || 0;
+            }
+            // 向导版：税后经营所得在结果行里（rows 是 [{label, value}]）
+            const row = (item.results?.rows || []).find(function (r) { return r.label === '税后经营所得'; });
+            return Number(row?.value) || 0;
         } else if (item.type === 'classification') {
             const totalIncome = item.results?.totalIncome || 0;
             const totalTax = item.results?.taxDetails?.totalTax || item.results?.totalTax || 0;
@@ -286,209 +239,46 @@ function loadHistoryRecords() {
 }
 
 // 查看历史记录
+//
+// 阶段18-2（v1.72.0）：这里原本是一串按 record.type 写的 else-if —— 每迁移一个页面式 deep
+// 就地加一条（business / classification / reverse / forward）。后果是**只认这 4 个**：
+// 20 个速算器保存时 type 写的是 'quick'（toolbox-ui.js 的 saveToHistory），其余 17 个完整测算
+// 保存时 type 是各自的 tool.id（tax-calculator.js 的 saveToHistory 第二参），两者都落到最后
+// 那个 else，弹「这条记录没有对应的测算入口，可能来自更新的版本」—— 用户刚在本版保存的，
+// 却被告知可能来自更新的版本。而保存本身一直是好的，所以没人发现看不了。
+//
+// 改为**按注册表统一分发**：存的时候记下 toolId，看的时候按 toolId 决定开速算器还是开向导，
+// 并把这条记录的输入一起带过去（此前打开的是向导草稿，点老记录会看到最近一次算的东西）。
 function viewHistoryRecord(id) {
-    const record = calculationHistory.find(item => item.id === id);
+    const record = calculationHistory.find(item => String(item.id) === String(id));
     if (!record) return;
-    
-    // 根据记录类型切换到相应页面
-    if (record.type === 'business') {
-        // 切换到经营所得页面
-        showPage('business-calculation-page');
-        
-        // 填充经营所得数据
-        const results = record.results;
-        
-        // 基本信息
-        document.getElementById('business-income').value = results?.incomeDetails?.businessIncome || 0;
-        document.getElementById('business-cost').value = results?.incomeDetails?.businessCost || 0;
-        document.getElementById('business-expenses').value = results?.incomeDetails?.businessExpenses || 0;
-        document.getElementById('business-taxes').value = results?.incomeDetails?.businessTaxes || 0;
-        document.getElementById('business-losses').value = results?.incomeDetails?.businessLosses || 0;
-        document.getElementById('business-other-expenses').value = results?.incomeDetails?.businessOtherExpenses || 0;
-        document.getElementById('business-previous-losses').value = results?.incomeDetails?.businessPreviousLosses || 0;
-        
-        // 扣除项
-        const deductionDetails = results?.deductionDetails || {};
-        document.getElementById('business-has-comprehensive-income').checked = deductionDetails.hasComprehensiveIncome ?? true;
-        
-        // 专项扣除 - 兼容新旧格式
-        const specialDeduction = deductionDetails.specialDeduction || {};
-        const hasSpecialDeduction = typeof specialDeduction === 'object' && specialDeduction.total > 0;
-        document.getElementById('business-special-deduction-checkbox').checked = hasSpecialDeduction;
-        if (hasSpecialDeduction) {
-            document.getElementById('business-special-deduction-content').classList.remove('hidden');
-            document.getElementById('business-pension-insurance').value = specialDeduction.pensionInsurance || 0;
-            document.getElementById('business-medical-insurance').value = specialDeduction.medicalInsurance || 0;
-            document.getElementById('business-unemployment-insurance').value = specialDeduction.unemploymentInsurance || 0;
-            document.getElementById('business-housing-fund').value = specialDeduction.housingFund || 0;
-        }
-        
-        // 专项附加扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
-        const rawSpecialAdditional = deductionDetails.specialAdditionalDeduction || {};
-        const specialAdditional = typeof rawSpecialAdditional === 'number' 
-            ? { total: rawSpecialAdditional, childrenInfant: 0, elderly: 0, housing: 0, education: 0, medical: 0 }
-            : rawSpecialAdditional;
-        const hasSpecialAdditional = specialAdditional.total > 0;
-        document.getElementById('business-special-additional-checkbox').checked = hasSpecialAdditional;
-        if (hasSpecialAdditional) {
-            document.getElementById('business-special-additional-content').classList.remove('hidden');
-            document.getElementById('business-children-infant-deduction').value = specialAdditional.childrenInfant || 0;
-            document.getElementById('business-elderly-deduction').value = specialAdditional.elderly || 0;
-            document.getElementById('business-housing-deduction').value = specialAdditional.housing || 0;
-            document.getElementById('business-education-deduction').value = specialAdditional.education || 0;
-            document.getElementById('business-medical-deduction').value = specialAdditional.medical || 0;
-        }
-        
-        // 其他扣除 - 兼容新旧格式（旧格式是数字，新格式是对象）
-        const rawOtherDeduction = deductionDetails.otherDeduction || {};
-        const otherDeduction = typeof rawOtherDeduction === 'number'
-            ? { total: rawOtherDeduction, pension: 0, enterpriseAnnuity: 0, insurance: 0, charitableDonation: 0 }
-            : rawOtherDeduction;
-        const hasOtherDeduction = otherDeduction.total > 0;
-        document.getElementById('business-other-deduction-checkbox').checked = hasOtherDeduction;
-        if (hasOtherDeduction) {
-            document.getElementById('business-other-deduction-content').classList.remove('hidden');
-            
-            if (otherDeduction.pension > 0) {
-                document.getElementById('business-pension-checkbox').checked = true;
-                document.getElementById('business-pension-fields').classList.remove('hidden');
-                document.getElementById('business-pension-deduction').value = otherDeduction.pension || 0;
-            }
-            if (otherDeduction.enterpriseAnnuity > 0) {
-                document.getElementById('business-enterprise-annuity-checkbox').checked = true;
-                document.getElementById('business-enterprise-annuity-fields').classList.remove('hidden');
-                document.getElementById('business-enterprise-annuity').value = otherDeduction.enterpriseAnnuity || 0;
-            }
-            if (otherDeduction.insurance > 0) {
-                document.getElementById('business-insurance-checkbox').checked = true;
-                document.getElementById('business-insurance-fields').classList.remove('hidden');
-                document.getElementById('business-insurance-deduction').value = otherDeduction.insurance || 0;
-            }
-            if (otherDeduction.charitableDonation > 0) {
-                document.getElementById('business-charitable-checkbox').checked = true;
-                document.getElementById('business-charitable-fields').classList.remove('hidden');
-                document.getElementById('business-charitable-donation').value = otherDeduction.charitableDonation || 0;
-            }
-        }
-        
-        document.getElementById('business-prepaid-tax').value = results?.taxDetails?.prepaidTax || 0;
-        
-        // 重新计算
-        calculateBusinessTax();
-        showBusinessStep(3);
-        updateBusinessBudgetTable();
-        updateBusinessCharts();
-    } else if (record.type === 'classification') {
-        // 切换到分类所得页面
-        showPage('classification-calculation-page');
-        
-        // 填充分类所得数据
-        const results = record.results;
-        
-        // 恢复数据
-        classificationCalculationResults = results;
-        if (results.items) {
-            classificationItems = [...results.items];
-        }
-        
-        // 重新计算和显示
-        updateClassificationItemsList();
-        updateClassificationResultDisplay();
-        updateClassificationBudgetTable();
-        updateClassificationCharts();
-        
-        // 更新日期
-        const dateElement = document.getElementById('classification-budget-table-date');
-        if (dateElement && results.calculationDate) {
-            dateElement.textContent = new Date(results.calculationDate).toLocaleDateString();
-        }
-        
-        showClassificationStep(2);
-    } else if (record.type === 'reverse') {
-        // 切换到反向倒算页面
-        showPage('reverse-calculation-page');
-        
-        // 填充反向倒算数据
-        const results = record.results;
-        
-        // 基本参数
-        document.getElementById('reverse-type').value = results?.reverseType || 'rate';
-        document.getElementById('reverse-work-months').value = results?.workMonths || 12;
-        
-        // 扣除项
-        document.getElementById('reverse-basic-deduction').value = results?.deductionDetails?.basic || 0;
-        document.getElementById('reverse-social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
-        document.getElementById('reverse-pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
-        document.getElementById('reverse-medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
-        document.getElementById('reverse-unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
-        document.getElementById('reverse-housing-fund').value = results?.deductionDetails?.housingFund || 0;
-        document.getElementById('reverse-elderly-deduction').value = results?.deductionDetails?.elderly || 0;
-        document.getElementById('reverse-children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
-        document.getElementById('reverse-housing-deduction').value = results?.deductionDetails?.housing || 0;
-        document.getElementById('reverse-education-deduction').value = results?.deductionDetails?.education || 0;
-        document.getElementById('reverse-medical-deduction').value = results?.deductionDetails?.medical || 0;
-        document.getElementById('reverse-other-deduction').value = results?.deductionDetails?.other || 0;
-        
-        // 重新计算
-        calculateReverseTax();
-        showReverseStep(3);
-        updateReverseBudgetTable();
-        updateReverseCharts();
-    } else {
-        // 切换到正向计税页面
-        showPage('forward-calculation-page');
-        
-        // 填充数据到表单
-        const results = record.results;
-        
-        // 基本参数
-        document.getElementById('work-months').value = results?.workMonths || 12;
-        document.getElementById('prepaid-tax').value = '';
-        
-        // 收入明细
-        document.getElementById('salary-income').value = results?.incomeDetails?.salary || 0;
-        document.getElementById('labor-income').value = results?.incomeDetails?.labor || 0;
-        document.getElementById('author-income').value = results?.incomeDetails?.author || 0;
-        document.getElementById('royalty-income').value = results?.incomeDetails?.royalty || 0;
-        document.getElementById('bonus-income').value = results?.incomeDetails?.bonus || 0;
-        document.getElementById('bonus-include').checked = results?.incomeDetails?.bonusInclude ?? false;
-        
-        // 扣除项明细
-        document.getElementById('basic-deduction').value = results?.deductionDetails?.basic || 5000;
-        
-        // 专项扣除
-        document.getElementById('social-security-base').value = results?.deductionDetails?.socialSecurityBase || 0;
-        document.getElementById('pension-insurance').value = results?.deductionDetails?.pensionInsurance || 0;
-        document.getElementById('medical-insurance').value = results?.deductionDetails?.medicalInsurance || 0;
-        document.getElementById('unemployment-insurance').value = results?.deductionDetails?.unemploymentInsurance || 0;
-        document.getElementById('housing-fund').value = results?.deductionDetails?.housingFund || 0;
-        
-        // 专项附加扣除
-        document.getElementById('elderly-deduction').value = results?.deductionDetails?.elderly || 0;
-        document.getElementById('children-infant-deduction').value = results?.deductionDetails?.childrenInfant || 0;
-        
-        // 住房类型
-        const housingType = (results?.deductionDetails?.housing || 0) > 1200 ? 'rent' : 'loan';
-        document.getElementById('housing-type').value = housingType;
-        
-        // 住房贷款/租金扣除
-        document.getElementById('housing-deduction').value = results?.deductionDetails?.housing || 0;
-        
-        // 继续教育扣除
-        document.getElementById('education-deduction').value = results?.deductionDetails?.education || 0;
-        
-        // 大病医疗扣除
-        document.getElementById('medical-deduction').value = results?.deductionDetails?.medical || 0;
-        
-        // 其他扣除
-        document.getElementById('other-deduction').value = results?.deductionDetails?.other || 0;
-        
-        // 重新计算
-        calculateTax();
-        goToStep(3);
-        updateBudgetTable();
-        updateCharts();
+
+    // 两种保存实现记的位置不同：速算器记在记录顶层，完整测算记在 results 里
+    var toolId = record.toolId || (record.results && record.results.toolId) || record.type;
+    var values = record.values || (record.results && record.results.values) || null;
+
+    // 老数据兼容：页面式时代存下的 type 是流程英文名。comprehensive 是云同步协议里 forward
+    // 的别名（history-sync 上行时映射），拉回来的云端记录必须能走同一条路。
+    if (toolId === 'comprehensive') toolId = 'forward';
+
+    var reg = window.EuriskoToolRegistry;
+    var tool = reg && typeof reg.get === 'function' ? reg.get(toolId) : null;
+
+    if (tool && tool.status === 'deep' && window.EuriskoDeepWizard && window.EuriskoDeepWizard.has(tool)) {
+        window.EuriskoDeepWizard.open(toolId, { values: values });
+        // 老记录没有 values（那时存的是页面自己的字段），此时仍是「打开向导接着算」
+        showAlert(values ? '已打开「' + tool.name + '」，并载入这条记录的输入。'
+                         : '已打开「' + tool.name + '」；向导会接着上次的输入继续。');
+        return;
     }
+
+    if (tool && window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+        window.EuriskoToolbox.openTool(toolId, { values: values });
+        return;
+    }
+
+    // 认不出：宁可说清楚也不猜 —— 猜错会把人扔到一个不相关的页面里。
+    showAlert('这条记录没有对应的测算入口，可能来自更新的版本。');
 }
 
 // 删除历史记录
@@ -496,6 +286,13 @@ function deleteHistoryRecord(id) {
     showConfirm('确定要删除这条记录吗？', function() {
         calculationHistory = calculationHistory.filter(item => item.id !== id);
         localStorage.setItem('taxCalculationHistory', JSON.stringify(calculationHistory));
+        // 阶段19-10：历史删了，台账里指着它的那行必须一起走 ——
+        // 留下来就是一排「点进去什么都没有」的幽灵行，用户没法解释它为什么会在这本账里。
+        try {
+            if (window.EuriskoLedger && typeof window.EuriskoLedger.remove === 'function') {
+                window.EuriskoLedger.remove(id);
+            }
+        } catch (e) { /* 台账索引清理失败不影响删除 */ }
         // 阶段10：已同步过的记录删除 → 云端墓碑广播（未同步过则忽略）；再通知引擎上传
         try {
             if (window.EuriskoSync && typeof window.EuriskoSync.recordLocalDelete === 'function') {

@@ -28,10 +28,15 @@ docs/admin/account-credentials.md
 # 读取方：server/scripts/dev-account.js、tools/ops/dev-account.ps1、登录页预填、GUI 复制按钮
 dev-account.local.json
 
-# Logs
-logs/
+# Logs：忽略目录里的内容，但目录级说明（README.md）要入库
+# 坑：这里必须写 `logs/*` 而不是 `logs/` —— 目录整体被忽略后，git 不会进入它，
+#     下面的 `!logs/README.md` 例外永远不会生效（2026-09-20 实测踩到）
+logs/*
+!logs/README.md
 *.log
 npm-debug.log*
+# 本地起后端时重定向出来的输出（*.log 已覆盖 .log，这里是 .err）
+server-dev.err
 
 # Build outputs
 dist/
@@ -56,3 +61,7 @@ Thumbs.db
 
 # Playwright CLI 本地快照 / UI 走查产物
 .playwright-cli/
+
+# 视觉回归基线的比对临时产物（tools/ops/ui-screenshot-baseline.js --check 的输出）
+# baseline/ 那 12 张要入仓；.tmp/ 每次比对都会被覆写，不进版本库
+tools/ops/screenshots/.tmp/

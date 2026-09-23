@@ -2,13 +2,25 @@
  * 阶段13 B：留资弹窗（工具 → 服务转化的核心动作）
  *
  * 双通道设计（见阶段13 方案 §4）：
- *   ① 立即通道 —— 扫描企业微信「联系我」活码，当场加顾问好友（意向最强的用户走这条）；
+ *   ① 立即通道 —— 扫描企微活码，当场咨询顾问（意向最强的用户走这条）；
  *   ② 留言通道 —— 留下手机号/微信号，顾问在工作时间回访（覆盖面最广）。
  *
  * 活码不硬编码：由公司在企业微信后台生成「联系我」活码后，
  * 在 index.html 里用 window.LEAD_CONFIG 注入（也可直接改下面的 DEFAULTS）：
  *   <script>window.LEAD_CONFIG = { wecomQrUrl: 'images/lead-wecom-qr.png' };</script>
  * 未配置时优雅降级为「仅留言通道」，并在控制台提示一次，不影响主流程。
+ *
+ * wecomQrUrl 两种形态都收（见 isImageLikeUrl / renderQr）：
+ *   ① 图片 —— 后台下载的活码 PNG / 企微图床地址，直接当 <img src>；
+ *   ② 链接 —— work.weixin.qq.com/kfid/... 「联系我」页面地址，**不是图片**，
+ *      直接塞进 src 只会得到一张裂图，所以这里用分享图同款的 qrcode-generator 现场生码。
+ *      换客服不换码、也不必维护一张会过期的 png，是更稳的形态。
+ * 二维码一律可点：手机上点一下直接进企微会话，桌面端扫码。
+ *
+ * 渠道分流（见 wecomQrByChannel / channelOfSource）：一个入口可以配一个专属码，
+ * 企微侧据此区分「留资弹窗 / 分享图 / 落地页」来源，并分派接待人员与欢迎语。
+ * **不要**手工在客服链接后拼 `?from=xxx`：企微规定客服链接不可改写、参数不可复制到别的链接，
+ * 拼了页面照开，但「进入会话事件」的参数校验会失败 —— 回调里拿不到来源，等于白做。
  *
  * 顾问背书同样走配置（advisorName / advisorTitle）：填真实信息才显示，留空则整行隐藏。
  * 写进弹窗的资质是要能被追问的，宁可少一行，也不编一个「从业 10 年」。
@@ -37,11 +49,25 @@
     // 触点归因白名单需与后端 leadController.SOURCES 保持一致（非法值后端会回落 unknown）
     var DEFAULTS = {
         wecomQrUrl: '',
+        wecomQrByChannel: {},
         advisorName: '',
         advisorTitle: ''
     };
 
-    var state = { source: 'modal', scene: '', type: '', submitting: false, warnedNoQr: false, successTimer: 0 };
+    // 入口 → 专属活码的渠道白名单（见 wecomQrUrl）：
+    //   modal   —— 站内留资弹窗（结果页 / 个人中心）
+    //   share   —— 分享图带来的访客（分享图上的码是回流站点的，他们最终仍从弹窗进企微，
+    //              所以「分享图来源」靠的是给这批访客换一个码，而不是改掉分享图的码）
+    //   landing —— 站外落地页 / SEO 页（source 含 seo_ / landing）
+    // 白名单是刻意的：渠道名会流进埋点与 DOM，未知值不能透传。
+    var QR_CHANNELS = ['modal', 'share', 'landing'];
+
+    // 链接型活码现场生码：弹窗里二维码显示 112px（w-28），这里按 5 倍生图，
+    // 高分屏放大也不糊；4 模块留白是扫码成功率的保底（同分享图口径）
+    var QR_LINK_TARGET_PX = 560;
+    var QR_QUIET_MODULES = 4;
+
+    var state = { source: 'modal', scene: '', type: '', wecomChannel: '', submitting: false, warnedNoQr: false, successTimer: 0 };
 
     function el(id) {
         return document.getElementById(id);
@@ -60,9 +86,85 @@
         return (window.LEAD_CONFIG && typeof window.LEAD_CONFIG === 'object') ? window.LEAD_CONFIG : DEFAULTS;
     }
 
-    function wecomQrUrl() {
-        var url = config().wecomQrUrl;
+    // 按入口取活码。
+    // 为什么要分码：企微客服链接**不允许自行改写或复制参数**（官方文档「获取客服账号链接」），
+    // 手工拼 `?from=share` 能打开页面，但「进入会话事件」的参数校验过不了 —— 回调里拿不到来源。
+    // 看起来能用、实际没数据，比不做更糟。所以来源只能靠「一个入口一个码」来区分。
+    // 未配或配空的入口一律回落到兜底码 wecomQrUrl：少配一个入口不会让通道消失。
+    function wecomQrUrl(channel) {
+        var cfg = config();
+        if (channel && QR_CHANNELS.indexOf(channel) !== -1) {
+            var byChannel = cfg.wecomQrByChannel;
+            if (byChannel && typeof byChannel === 'object') {
+                var own = byChannel[channel];
+                if (typeof own === 'string' && own.trim()) return own.trim();
+            }
+        }
+        var url = cfg.wecomQrUrl;
         return typeof url === 'string' ? url.trim() : '';
+    }
+
+    // source（已有触点归因）→ 渠道归类：不新增归因字段，复用后端已认可的 source 字符串
+    function channelOfSource(source) {
+        var s = String(source || '');
+        if (/share/i.test(s)) return 'share';
+        if (/seo_|landing/i.test(s)) return 'landing';
+        return 'modal';
+    }
+
+    // 是「图片」还是「链接」：企微活码两种产物都可能被填进来，判错就会得到一张裂图。
+    // 企微图床（wework.qpic.cn）没有扩展名，需单独认下来。
+    function isImageLikeUrl(url) {
+        var u = String(url || '').trim();
+        return /^data:image\//i.test(u)
+            || /\.(png|jpe?g|gif|webp|svg|bmp)(\?|#|$)/i.test(u)
+            || /wework\.qpic\.cn/i.test(u);
+    }
+
+    // 把「联系我」链接现场生码（与分享图共用 qrcode-generator）
+    function qrDataUrl(text) {
+        try {
+            if (typeof window.qrcode !== 'function') return '';
+            var qr = window.qrcode(0, 'M'); // 0 = 按内容长度自动选版本
+            qr.addData(text);
+            qr.make();
+            var total = qr.getModuleCount() + QR_QUIET_MODULES * 2;
+            var cell = Math.max(2, Math.round(QR_LINK_TARGET_PX / total));
+            // qrcode-generator 1.4.x 的 margin 单位是像素而非模块，故传 4 个模块的像素宽
+            return qr.createDataURL(cell, QR_QUIET_MODULES * cell);
+        } catch (err) {
+            console.warn('[LeadModal] 活码二维码生成失败，降级为点链接进入:', err);
+            return '';
+        }
+    }
+
+    // 立即通道的渲染：图片型直接用 src，链接型现场生码；
+    // 生成不出来也不让通道废掉（CDN 挂了 / 老浏览器）—— 退化成可点的「点此联系顾问」。
+    function renderQr(channel) {
+        var url = wecomQrUrl(channel);
+        var qr = el('lead-wecom-qr');
+        var link = el('lead-wecom-link');
+        var fallback = el('lead-wecom-fallback');
+        if (!url || !qr) return false;
+
+        if (link) {
+            link.setAttribute('href', url);
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener');
+        }
+
+        var src = isImageLikeUrl(url) ? url : qrDataUrl(url);
+        if (src) {
+            qr.src = src;
+            qr.classList.remove('hidden');
+            if (fallback) fallback.classList.add('hidden');
+        } else {
+            // 拿不到图就留白，不要裂图：点击入口仍在，通道不残废
+            qr.removeAttribute('src');
+            qr.classList.add('hidden');
+            if (fallback) fallback.classList.remove('hidden');
+        }
+        return true;
     }
 
     // openModal / closeModal 由 auth-ui.js（动态 import）注入，脚本加载顺序不保证，
@@ -138,7 +240,7 @@
             return;
         }
         var title = typeof cfg.advisorTitle === 'string' ? cfg.advisorTitle.trim() : '';
-        node.textContent = '顾问：' + name + (title ? ' · ' + title : '');
+        node.textContent = '客服：' + name + (title ? ' · ' + title : '');
         node.classList.remove('hidden');
     }
 
@@ -230,6 +332,10 @@
     }
 
     function collectPayload() {
+        var signals = (window.LeadContext && typeof window.LeadContext.viewSignals === 'function')
+            ? window.LeadContext.viewSignals()
+            : null;
+
         function val(id) {
             var node = el(id);
             return node && typeof node.value === 'string' ? node.value : '';
@@ -256,6 +362,11 @@
             need: val('lead-need') || 'other',
             source: state.source,
             scene: state.scene,
+            // 阶段19-7b②：视图密度与「简明视图下主动展开进阶参数」次数随线索一起上报，
+            // 顾问据此排跟进优先级（完整视图 / 调过进阶参数 = 更接近成交）。
+            // 取不到就留空：老会话没记录过就是没信号，不猜一个「简明」出来充数。
+            viewMode: signals ? signals.mode : '',
+            advancedTouched: signals ? signals.advancedTouched : 0,
             note: val('lead-note').trim(),
             consent: !!(el('lead-consent') && el('lead-consent').checked)
         };
@@ -263,9 +374,12 @@
 
     function validate(p) {
         if (!p.name) return '请填写您的称呼';
-        // 所在城市是顾问核对当地缴费基数口径的唯一依据：计算页已不再让用户选参保城市，
-        // 这里漏校验等于留资里「必填」的星号是假的，顾问拿到线索也不知道按哪套口径核。
-        if (!p.city) return '请填写所在城市（各地缴费基数口径不同，顾问要按当地核对）';
+        // 所在城市不参与校验：2026-09 与后端口径对齐为「选填，不阻断留资」。
+        // 城市对顾问核对当地社保 / 公积金缴费基数口径有用，但**不能因此阻断提交** ——
+        // 后端 buildLead 对 province / city 只做长度约束（见 leadController.js 注释），
+        // 前端若拦在这里，等于在北极星 lead_submit 上凭空丢弃线索；
+        // 且行政区划不可能穷尽（县级市 / 境外），「其他」兜底之外仍有用户无解。
+        // 因此这里只收不验：城市照常随 payload 提交（填了更好，顾问能按当地口径核），没填也放行。
         if (!p.phone && !p.wechat) return '请至少填写手机号或微信号';
         if (p.phone && !PHONE_RE.test(p.phone)) return '手机号格式不正确，请检查后重试';
         if (!p.consent) return '请先勾选同意，我们才能与您联系';
@@ -299,8 +413,8 @@
             var sub = el('lead-success-sub');
             if (sub) {
                 sub.textContent = (data && data.merged)
-                    ? '已收到您的补充信息，顾问会尽快联系您。'
-                    : '顾问会在 1 个工作日内联系您，请留意来电或微信。';
+                    ? '已收到您的补充信息，客服会尽快联系您。'
+                    : '客服会在 1 个工作日内联系您，请留意来电或微信。';
             }
             setView('success');
             document.dispatchEvent(new CustomEvent('euriskotax:lead-submit', {
@@ -374,7 +488,7 @@
         if (scene) {
             state.scene = scene;
             if (textEl) textEl.textContent = '参考您的测算：' + scene;
-            if (hintEl) hintEl.textContent = '顾问会提前看到，沟通时无需重复说明。';
+            if (hintEl) hintEl.textContent = '客服会提前看到，沟通时无需重复说明。';
             if (pickerEl) pickerEl.classList.add('hidden');
             sceneEl.classList.remove('hidden');
             return;
@@ -420,10 +534,9 @@
         renderScene(opts);
         renderAdvisor();
 
-        // 立即通道：配置了活码才渲染二维码
-        var qr = el('lead-wecom-qr');
-        var hasQr = !!wecomQrUrl();
-        if (qr && hasQr) qr.src = wecomQrUrl();
+        // 立即通道：按入口取码 —— 未配专属码则回落兜底码（图片型直接用，链接型现场生码）
+        state.wecomChannel = channelOfSource(state.source);
+        var hasQr = renderQr(state.wecomChannel);
         if (!hasQr && !state.warnedNoQr) {
             state.warnedNoQr = true;
             console.warn('[LeadModal] 未配置企业微信活码（window.LEAD_CONFIG.wecomQrUrl），本次仅展示留言通道。');
@@ -446,7 +559,7 @@
         }
 
         document.dispatchEvent(new CustomEvent('euriskotax:lead-click', {
-            detail: { source: state.source, scene: state.scene }
+            detail: { source: state.source, scene: state.scene, wecomChannel: state.wecomChannel }
         }));
     }
 
@@ -508,5 +621,6 @@
         init();
     }
 
-    window.LeadModal = { open: open, close: close };
+    // _wecom 只给测试用：活码形态判定与生码是「配错就裂图、但没有报错」的地方，必须有断言盯着
+    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr, wecomQrUrl: wecomQrUrl, channelOfSource: channelOfSource } };
 })();

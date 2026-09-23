@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-2）：高商业意图长尾词「股权激励个税 / 股票期权个税怎么算」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 税额口径复用 App 同源实现（equity-incentive-quick.js + window.comprehensiveTaxRates
+              / window.equityIncentiveRules），页面上不出现第二份税率表；
+           3) 政策依据文号与到期日来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
+    <title>股权激励个税计算器 2026：股票期权、限制性股票、股票增值权怎么算（单独计税执行至 2027 年底）</title>
+    <meta name="description" content="输入股票期权 / 限制性股票 / 股票增值权 / 股权奖励的股数与价格，算出股权激励收入（应纳税所得额）与单独计税应纳税额，并对照「若并入综合所得」的差异。含四种激励的收入公式、年度税率表与示例。政策依据：财税〔2018〕164 号、财政部 税务总局公告 2023 年第 25 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/equity-incentive.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="股权激励个税计算器 2026：股票期权、限制性股票、股票增值权怎么算">
+    <meta property="og:description" content="输入股数与价格，立即算出股权激励收入与单独计税应纳税额，并对照并入综合所得的差异。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/equity-incentive.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 股权激励个税计算器",
+                "url": "https://euriskotax.zeabur.app/seo/equity-incentive.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "计算股票期权、限制性股票、股票增值权、股权奖励的股权激励收入与单独计税应纳税额，并对照并入综合所得的差异。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "股权激励个税怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "居民个人取得股票期权、股票增值权、限制性股票、股权奖励等股权激励，符合条件的，在 2027 年 12 月 31 日前不并入当年综合所得，全额单独适用综合所得税率表计算纳税：应纳税额 = 股权激励收入 × 适用税率 − 速算扣除数，且不减除任何费用。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "股票期权、限制性股票、股票增值权的「股权激励收入」分别怎么算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "股票期权：（行权日每股市场价 − 每股施权价）× 行权股票数量；股票增值权：（行权日每股价格 − 授权日每股价格）× 行权份数；限制性股票：（登记日市价 + 解禁日市价）÷ 2 × 解禁份数 − 该批次出资额；股权奖励：（取得股票时的公平市场价格 − 每股实际出资额）× 取得股票数量。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "一年里有两次股权激励，要分开算还是合并算？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "合并计算。居民个人一个纳税年度内取得两次以上股权激励的，应合并后按「合并收入 × 适用税率 − 速算扣除数」计税，合并后往往适用更高档位，因此分期行权不能起到分次享受低档税率的作用。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "股权激励可以像年终奖那样选择并入综合所得吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不可以。现行政策下符合条件的股权激励是不并入当年综合所得、全额单独计税；本页给出的「并入综合所得」只是假设政策到期后的对照值，用于判断 2028 年起若不再延续会多交多少。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "非上市公司的股权激励税负一样吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不一定。非上市公司符合条件的股票期权、限制性股票、股权奖励可实行递延纳税：行权时暂不缴税，待股权转让时按「财产转让所得」适用 20% 税率；不符合递延条件的，按工资薪金所得并入综合所得计税。依据财税〔2016〕101 号。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_equity">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>股权激励个税怎么算：股票期权、限制性股票、股票增值权的单独计税</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>居民个人取得股票期权、股票增值权、限制性股票、股权奖励等股权激励，符合条件的，
+            在 <strong>2027 年 12 月 31 日</strong>前<strong>不并入当年综合所得，全额单独适用综合所得税率表</strong>计税：
+            <strong>应纳税额 = 股权激励收入 × 适用税率 − 速算扣除数</strong>，且<strong>不减除任何费用</strong>（不扣 6 万元基本减除费用，也不扣专项附加扣除）。
+            一个纳税年度内取得两次以上股权激励的，应<strong>合并计算</strong>。
+            政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第二条（<strong>财税〔2018〕164 号</strong>）
+            与《关于延续实施上市公司股权激励个人所得税政策的公告》（<strong>财政部 税务总局公告 2023 年第 25 号</strong>）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">股权激励个税速算（单独计税）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="type-input">激励类型</label>
+                    <select class="calc-input" id="type-input">
+                        <option value="option" selected>股票期权</option>
+                        <option value="restricted">限制性股票</option>
+                        <option value="appreciation">股票增值权</option>
+                        <option value="award">股权奖励</option>
+                    </select>
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="qty-input">数量（股 / 份）</label>
+                    <input class="calc-input" id="qty-input" type="number" inputmode="numeric" min="0" step="1000" value="10000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="price-input">行权 / 解禁日每股价格（元）</label>
+                    <input class="calc-input" id="price-input" type="number" inputmode="decimal" min="0" step="1" value="15" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="cost-input">每股成本（施权价 / 出资额，元）</label>
+                    <input class="calc-input" id="cost-input" type="number" inputmode="decimal" min="0" step="1" value="5" aria-describedby="calc-note">
+                </div>
+            </div>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px" id="grant-wrap" hidden>
+                    <label class="calc-label" for="grant-input">股票登记日每股价格（元，仅限制性股票需要）</label>
+                    <input class="calc-input" id="grant-input" type="number" inputmode="decimal" min="0" step="1" value="10" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="ytd-input">本年度已计入的股权激励收入（元，多次需合并）</label>
+                    <input class="calc-input" id="ytd-input" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 240px">
+                    <label class="calc-label" for="other-input">全年其他综合所得应纳税所得额（元，对照用）</label>
+                    <input class="calc-input" id="other-input" type="number" inputmode="decimal" min="0" step="10000" value="100000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                本页算的是<strong>现行单独计税</strong>的应纳税额；「并入综合所得」一栏是<strong>假设政策到期后并入</strong>的对照值
+                —— 现行政策下股权激励是「不并入」，不是「可选并入」。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">本次股权激励收入（应纳税所得额）</div>
+                    <div class="v" id="r-income">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">合并后的计税基数</div>
+                    <div class="v" id="r-base">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">单独计税应纳税额</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">实际税负率（税额 ÷ 基数）</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">若并入综合所得（对照）</div>
+                    <div class="v" id="r-merged">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">两者差额</div>
+                    <div class="v" id="r-gap">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「四种激励的收入公式」「年度税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>四种激励的「股权激励收入」怎么算</h2>
+        <div class="table-scroll">
+            <table id="income-formula">
+                <thead>
+                <tr>
+                    <th scope="col">激励类型</th>
+                    <th scope="col">股权激励收入（= 应纳税所得额）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>股票期权</td><td>（行权日每股市场价 − 每股施权价）× 行权股票数量</td></tr>
+                <tr><td>限制性股票</td><td>（登记日市价 + 解禁日市价）÷ 2 × 解禁份数 − 该批次出资额</td></tr>
+                <tr><td>股票增值权</td><td>（行权日每股价格 − 授权日每股价格）× 行权份数</td></tr>
+                <tr><td>股权奖励</td><td>（取得股票时的公平市场价格 − 每股实际出资额）× 取得股票数量</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">算出来的收入<strong>不减除费用</strong>直接查年度税率表定档，这也是股权激励税负常常高于预期的原因 —— 6 万元基本减除费用与专项附加扣除都用不上。</p>
+
+        <h2>年度综合所得税率表（单独计税就查这张表）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">股权激励收入（合并后）全额适用本表，按「收入 × 税率 − 速算扣除数」计税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：三种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">股权激励收入（元）</th>
+                    <th scope="col">单独计税应纳税额（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>股票期权 10000 股，行权日 15 元 / 施权价 5 元</td><td class="num">100000.00</td><td class="num">7480.00</td></tr>
+                <tr><td>限制性股票 20000 股，登记日 10 元、解禁日 20 元，每股出资 5 元</td><td class="num">200000.00</td><td class="num">23080.00</td></tr>
+                <tr><td>股票增值权 50000 份，授权日 8 元、行权日 20 元</td><td class="num">600000.00</td><td class="num">127080.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/equity-incentive-quick.test.js</code> 与 App 内核逐点对拍守护。</p>
+
+        <h2>单独计税 vs 并入综合所得：差额有多大</h2>
+        <p>
+            现行政策下股权激励<strong>不并入</strong>当年综合所得，所以下面这张表是<strong>对照</strong>：
+            如果 <strong>2028 年起政策不再延续</strong>、股权激励并入综合所得，同一笔收入会交多少。
+            其他综合所得应纳税所得额按 100000 元、本次股权激励收入按 100000 元测算：
+        </p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr><th scope="col">口径</th><th scope="col">计算方式</th><th scope="col">应纳税额（元）</th></tr>
+                </thead>
+                <tbody>
+                <tr><td>单独计税（现行）</td><td>其他综合所得 100000 元按年度表计税 + 激励收入 100000 元单独按年度表计税</td><td class="num">14960.00</td></tr>
+                <tr><td>并入综合所得（对照）</td><td>合计 200000 元按年度表一次计税</td><td class="num">23080.00</td></tr>
+                <tr><td>差额</td><td>并入后更高 —— 因为合并把全年应纳税所得额推到了 20% 档</td><td class="num">8120.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            方向提示：其他综合所得本身<strong>已经处在较高档位</strong>时，并入的边际影响更大；
+            反过来，若全年综合所得很低（例如刚工作、应纳税所得额不到 36000 元），并入反而可能更省 ——
+            此时单独计税至少按 3% 起算。判断的关键是把两种口径都算一遍，
+            <a href="/?source=seo_equity">在 App 里填一次全年收支</a>可以看到完整结果。
+        </p>
+
+        <h2>两条容易踩的口径</h2>
+        <h3>1. 一年两次激励要合并，分次行权不等于分次享受低档</h3>
+        <p>
+            一个纳税年度内取得两次以上股权激励的，应<strong>合并计算</strong>：
+            合并后的收入一次性定档，而不是每次各自从 3% 起算。
+            这也是「把行权拆到不同年份」比「拆到同一年的不同月份」更能影响税负的原因（跨年合法、同月无效）。
+        </p>
+        <h3>2. 非上市公司可能适用递延纳税，税率和时点都不同</h3>
+        <p>
+            非上市公司符合条件的股票期权、限制性股票、股权奖励，可实行<strong>递延纳税</strong>：
+            行权时<strong>暂不缴税</strong>，待实际转让该股权时按「<strong>财产转让所得</strong>」适用 <strong>20%</strong> 税率；
+            不符合递延条件的，仍按工资薪金所得并入综合所得计税。
+            依据：《关于完善股权激励和技术入股有关所得税政策的通知》（<strong>财税〔2016〕101 号</strong>）。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>股权激励个税怎么算？</summary>
+            <p>居民个人取得股票期权、股票增值权、限制性股票、股权奖励等股权激励，符合条件的，在 2027 年 12 月 31 日前不并入当年综合所得，全额单独适用综合所得税率表计算纳税：应纳税额 = 股权激励收入 × 适用税率 − 速算扣除数，且不减除任何费用。</p>
+        </details>
+        <details>
+            <summary>股票期权、限制性股票、股票增值权的「股权激励收入」分别怎么算？</summary>
+            <p>股票期权：（行权日每股市场价 − 每股施权价）× 行权股票数量；股票增值权：（行权日每股价格 − 授权日每股价格）× 行权份数；限制性股票：（登记日市价 + 解禁日市价）÷ 2 × 解禁份数 − 该批次出资额；股权奖励：（取得股票时的公平市场价格 − 每股实际出资额）× 取得股票数量。</p>
+        </details>
+        <details>
+            <summary>一年里有两次股权激励，要分开算还是合并算？</summary>
+            <p>合并计算。居民个人一个纳税年度内取得两次以上股权激励的，应合并后按「合并收入 × 适用税率 − 速算扣除数」计税，合并后往往适用更高档位，因此分期行权不能起到分次享受低档税率的作用。</p>
+        </details>
+        <details>
+            <summary>股权激励可以像年终奖那样选择并入综合所得吗？</summary>
+            <p>不可以。现行政策下符合条件的股权激励是不并入当年综合所得、全额单独计税；本页给出的「并入综合所得」只是假设政策到期后的对照值，用于判断 2028 年起若不再延续会多交多少。</p>
+        </details>
+        <details>
+            <summary>非上市公司的股权激励税负一样吗？</summary>
+            <p>不一定。非上市公司符合条件的股票期权、限制性股票、股权奖励可实行递延纳税：行权时暂不缴税，待股权转让时按「财产转让所得」适用 20% 税率；不符合递延条件的，按工资薪金所得并入综合所得计税。依据财税〔2016〕101 号。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把工资、年终奖与股权激励一起算</h2>
+            <p>输入全年工资、社保公积金、专项附加扣除与股权激励收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_equity">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>单独计税政策执行至 2027 年 12 月 31 日（财政部 税务总局公告 2023 年第 25 号），政策延续情况请以官方公告为准。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/equity-incentive.html">股权激励个税计算器</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js          —— 出厂税率表与股权激励规则（comprehensiveTaxRates / equityIncentiveRules）
+       tax-registry.js           —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js         —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       equity-incentive-quick.js —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/equity-incentive-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var typeInput = document.getElementById('type-input');
+    var qtyInput = document.getElementById('qty-input');
+    var priceInput = document.getElementById('price-input');
+    var costInput = document.getElementById('cost-input');
+    var grantInput = document.getElementById('grant-input');
+    var grantWrap = document.getElementById('grant-wrap');
+    var ytdInput = document.getElementById('ytd-input');
+    var otherInput = document.getElementById('other-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var rIncome = document.getElementById('r-income');
+    var rBase = document.getElementById('r-base');
+    var rTax = document.getElementById('r-tax');
+    var rRate = document.getElementById('r-rate');
+    var rMerged = document.getElementById('r-merged');
+    var rGap = document.getElementById('r-gap');
+    var quick = window.EuriskoEquityQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function syncVisibility() {
+        if (!grantWrap || !typeInput) return;
+        grantWrap.hidden = typeInput.value !== 'restricted';
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「四种激励的收入公式」「年度税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var type = typeInput ? typeInput.value : 'option';
+        var input = {
+            type: type,
+            qty: qtyInput ? qtyInput.value : 0,
+            price: priceInput ? priceInput.value : 0,
+            cost: costInput ? costInput.value : 0,
+            grantPrice: grantInput ? grantInput.value : 0,
+            ytdIncome: ytdInput ? ytdInput.value : 0,
+            otherTaxable: otherInput ? otherInput.value : 0
+        };
+        syncVisibility();
+
+        var r = quick.compareOf(input);
+        if (!(r.base > 0)) {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '请填写数量与价格（行权价需高于成本价），或本次激励收入为 0。';
+            }
+            return;
+        }
+        box.hidden = false;
+        rIncome.textContent = money(r.income) + ' 元';
+        rBase.textContent = money(r.base) + ' 元';
+        rTax.textContent = money(r.separate) + ' 元';
+        rRate.textContent = (r.effectiveRate * 100).toFixed(2) + '%';
+        rMerged.textContent = money(r.mergedTotal) + ' 元';
+        rGap.textContent = (r.gap >= 0 ? '+' : '−') + money(Math.abs(r.gap)) + ' 元';
+
+        if (!hint) return;
+        var gap = Math.abs(r.gap);
+        if (gap < 0.005) {
+            hint.innerHTML = '这笔激励按单独计税与「假设并入综合所得」的税负<strong>基本持平</strong>。';
+        } else if (r.gap > 0) {
+            hint.innerHTML = '现行单独计税比「假设并入」少交 <strong>' + money(gap)
+                + ' 元</strong> —— 若 2028 年起政策不再延续、改为并入综合所得，税负会上升这个数。';
+        } else {
+            hint.innerHTML = '这笔激励按「假设并入综合所得」反而少交 <strong>' + money(gap)
+                + ' 元</strong> —— 说明你全年综合所得所处档位较低；现行政策下仍须单独计税。';
+        }
+        hint.hidden = false;
+    }
+
+    [typeInput, qtyInput, priceInput, costInput, grantInput, ytdInput, otherInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>

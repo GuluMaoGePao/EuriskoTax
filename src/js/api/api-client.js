@@ -50,6 +50,13 @@ function removeCurrentUser() {
     sessionStorage.removeItem('current_user');
 }
 
+// 连不上后端的可操作提示（本地预览由后端 Express 同时托管前端静态资源，
+// 所以「打得开页面但登不上」基本都是后端没起 / 页面不是从 :3000 打开的）
+const CONNECT_ERROR_MESSAGE = '无法连接服务器：请确认后端已启动，并打开 http://localhost:3000 访问'
+    + '（GUI「日常启动：快速启动」或 server 目录 npm start）';
+const RESPONSE_ERROR_MESSAGE = '服务器返回了非预期内容：请打开 http://localhost:3000 访问，'
+    + '不要直接用其它静态服务或文件系统打开 index.html';
+
 // 后端英文错误消息 → 用户友好的中文提示（未匹配到的原样透出）
 const ERROR_MESSAGE_MAP = {
     'Username, email and password are required': '请填写用户名、邮箱和密码',
@@ -86,7 +93,15 @@ const ERROR_MESSAGE_MAP = {
     'Invalid admin token': '管理员令牌无效',
     'Stats endpoint is not configured. Set ADMIN_TOKEN environment variable first.': '统计接口未配置，请联系开发者',
     '请求过于频繁，请 15 分钟后再试': '请求过于频繁，请 15 分钟后再试',
-    '验证码发送过于频繁，请 15 分钟后再试': '验证码发送过于频繁，请 15 分钟后再试'
+    '验证码发送过于频繁，请 15 分钟后再试': '验证码发送过于频繁，请 15 分钟后再试',
+    // 网络层失败：浏览器抛的是英文 TypeError（Chrome "Failed to fetch" / Firefox "NetworkError when
+    // attempting to fetch resource." / Node "fetch failed"）。本地预览最常见的成因是「只起了前端静态
+    // 服务、没起后端」，或页面不是从 http://localhost:3000 打开的 —— 直接透出英文等于没告诉用户怎么办。
+    'Failed to fetch': CONNECT_ERROR_MESSAGE,
+    'NetworkError when attempting to fetch resource.': CONNECT_ERROR_MESSAGE,
+    'fetch failed': CONNECT_ERROR_MESSAGE,
+    'Unexpected end of JSON input': RESPONSE_ERROR_MESSAGE,
+    'Unexpected token < in JSON at position 0': RESPONSE_ERROR_MESSAGE
 };
 
 async function apiRequest(url, method = 'GET', data = null, requiresAuth = false, sendTokenIfPresent = false) {
@@ -115,8 +130,28 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
         options.body = JSON.stringify(data);
     }
 
-    const response = await fetch(`${API_BASE_URL}${url}`, options);
-    const result = await response.json();
+    // 网络层失败（后端没起 / 端口不对 / 断网）：fetch 直接 reject，浏览器给的是英文 TypeError，
+    // 不拦下来就会把「Failed to fetch」原样弹给用户 —— 本地预览最常见的就是这个。
+    let response;
+    try {
+        response = await fetch(`${API_BASE_URL}${url}`, options);
+    } catch (e) {
+        const error = new Error(CONNECT_ERROR_MESSAGE);
+        error.cause = e;
+        throw error;
+    }
+
+    // 拿到了响应但不是 JSON（例如请求打到了返回 HTML 的其它静态服务）：
+    // response.json() 会抛 "Unexpected token '<'..."，同样换成能照做的中文提示。
+    let result;
+    try {
+        result = await response.json();
+    } catch (e) {
+        const error = new Error(RESPONSE_ERROR_MESSAGE);
+        error.statusCode = response.status;
+        error.cause = e;
+        throw error;
+    }
 
     if (!result.success) {
         const errorMessage = result.error?.message || '';

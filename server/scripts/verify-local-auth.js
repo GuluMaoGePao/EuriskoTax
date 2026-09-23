@@ -356,8 +356,24 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('auth-ui.js 集成云同步引擎', authJs.status === 200 && authJs.raw.includes('EuriskoSync') && authJs.raw.includes('afterLogin'), `HTTP ${authJs.status}`);
         const dmJs = await request(PORT, 'GET', '/src/js/data/data-management.js');
         const calcJs = await request(PORT, 'GET', '/src/js/calculation/tax-calculator.js');
-        record('保存入口写入 updatedAt + 变更信号(data-management)', dmJs.status === 200 && dmJs.raw.includes('updatedAt') && dmJs.raw.includes('euriskotax:history-mutated'), `HTTP ${dmJs.status}`);
-        record('保存入口写入 updatedAt + 变更信号(tax-calculator)', calcJs.status === 200 && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated'), `HTTP ${calcJs.status}`);
+        // 17B-3（v1.49.0）：data-management 里那份自己写的 saveCalculationResult 随综合所得页删掉了 ——
+        // 它与 tax-calculator.saveToHistory 是同一件事的两份实现，只是各自维护一份 updatedAt / 变更信号。
+        // 此后「写历史」只有一个出口（saveToHistory，spec 向导的保存按钮也走它），
+        // 删除与清空时的变更信号仍由 data-management.notifyHistoryMutated 发出。
+        record('写历史的入口收敛为一处（tax-calculator.saveToHistory），仍带 updatedAt + 变更信号',
+            calcJs.status === 200 && calcJs.raw.includes('function saveToHistory')
+            && calcJs.raw.includes('updatedAt') && calcJs.raw.includes('euriskotax:history-mutated')
+            && dmJs.status === 200 && dmJs.raw.includes('function notifyHistoryMutated')
+            && dmJs.raw.includes('euriskotax:history-mutated')
+            // 重复实现必须消失：留着等于「两处各写一份」，改一处就够了 —— 改漏一处就是错
+            && !dmJs.raw.includes('function saveCalculationResult'),
+            `HTTP ${dmJs.status}/${calcJs.status}`);
+        // 向导（17B 起所有迁移工具的保存按钮都在它手上）写的是**同一份** taxCalculationHistory
+        const wizardSaveJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
+        record('向导与存量页面写同一份历史(spec 驱动的保存不再另开出口)',
+            wizardSaveJs.status === 200 && wizardSaveJs.raw.includes('saveToHistory')
+            && dmJs.status === 200 && dmJs.raw.includes("localStorage.getItem('taxCalculationHistory')"),
+            `HTTP ${wizardSaveJs.status}/${dmJs.status}`);
 
         // ---- 阶段11 内容中心前端资源静态断言（政策要点 + 公告/运营内容） ----
         const taxPolicyJs = await request(PORT, 'GET', '/src/js/data/tax-policy.js');
@@ -444,12 +460,14 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-card.js')
             && leadPage.raw.includes('src/js/export/capture.js') && leadPage.raw.includes('qrcode'), `HTTP ${leadPage.status}`);
         const shareLandingJs = await request(PORT, 'GET', '/src/js/share/share-landing.js');
+        // 落地首屏锚点跟着信息架构走：原「开始计算」卡片已移入工具页，
+        // 首页第一屏是「我是谁」场景入口，分享落地 CTA 也改指这里（#home-scenarios）
         record('share-landing.js 提供分享落地首屏引导(?source=share)',
             shareLandingJs.status === 200 && shareLandingJs.raw.includes('source=share')
-            && shareLandingJs.raw.includes('home-start-card'), `HTTP ${shareLandingJs.status}`);
-        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-start-card)',
+            && shareLandingJs.raw.includes('home-scenarios'), `HTTP ${shareLandingJs.status}`);
+        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-scenarios)',
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-landing.js')
-            && leadPage.raw.includes('id="home-start-card"'), `HTTP ${leadPage.status}`);
+            && leadPage.raw.includes('id="home-scenarios"'), `HTTP ${leadPage.status}`);
         const captureJs = await request(PORT, 'GET', '/src/js/export/capture.js');
         record('capture.js 暴露 window.Capture.captureHtml（PDF 与分享图共用截图层）',
             captureJs.status === 200 && captureJs.raw.includes('window.Capture') && captureJs.raw.includes('captureHtml'), `HTTP ${captureJs.status}`);
@@ -499,21 +517,25 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             `HTTP ${leadPage.status}`);
         // 控件从「自由文本框」收紧为「省 + 市级联下拉」：手输城市名五花八门（上海 / 上海市 / 魔都），
         // 顾问拿到线索还得猜是哪个统筹区；「其他 / 海外」+「其他（手动输入）」是兜底 ——
-        // 行政区划不可能穷尽（县级市 / 境外），不能把用户卡在本就必填的这一项上
-        record('index.html「所在城市」为省 + 市级联下拉(#lead-province/#lead-city)+手输兜底，且保留必填星号并引入省市数据',
+        // 行政区划不可能穷尽（县级市 / 境外）。
+        // 2026-09 口径变更：城市由「必填」改为「选填（只收不验）」，与后端 buildLead
+        // 「选填、不阻断留资」对齐 —— 前端过去多拦一道，等于在 lead_submit 上凭空丢弃线索。
+        // 断言因此同时扣住「必填标记不得复活」，防止半吊子回滚（改了 UI 忘了改这里，或反之）。
+        record('index.html「所在城市」为省 + 市级联下拉(#lead-province/#lead-city)+手输兜底，引入省市数据且**无**必填星号',
             leadPage.status === 200 && leadPage.raw.includes('id="lead-province"')
             && leadPage.raw.includes('id="lead-city"') && leadPage.raw.includes('id="lead-city-other"')
-            && leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>')
+            && !leadPage.raw.includes('所在城市 <span class="text-red-500">*</span>')
             && leadPage.raw.includes('src/js/data/china-regions.js'),
             `HTTP ${leadPage.status}`);
         const chinaRegionsJs = await request(PORT, 'GET', '/src/js/data/china-regions.js');
-        record('china-regions.js 提供省级行政区数据（直辖市/自治区/港澳台）供联动，lead-modal.js 做联动与必填校验',
+        record('china-regions.js 提供省级行政区数据（直辖市/自治区/港澳台）供联动，lead-modal.js 做联动采集且**不**因城市阻断提交',
             chinaRegionsJs.status === 200 && chinaRegionsJs.raw.includes('citiesOf')
             && chinaRegionsJs.raw.includes('北京') && chinaRegionsJs.raw.includes('新疆')
             && chinaRegionsJs.raw.includes('香港')
             && leadModalJs.status === 200 && leadModalJs.raw.includes('renderProvinces')
             && leadModalJs.raw.includes('setCities') && leadModalJs.raw.includes('lead-city-other')
-            && leadModalJs.raw.includes("val('lead-city')") && leadModalJs.raw.includes('请填写所在城市'),
+            && leadModalJs.raw.includes("val('lead-city')") && leadModalJs.raw.includes('city: city')
+            && !leadModalJs.raw.includes('请填写所在城市'),
             `HTTP ${chinaRegionsJs.status}/${leadModalJs.status}`);
         // 省份不能只是「筛选城市的中间态」：顾问要按省收敛分派（江浙沪私域），后端也要拿到。
         // 哨兵值必须剔除 —— 选「其他 / 海外」时下拉值是 '__other'，透传下去顾问会看到一行无意义的占位符
@@ -534,31 +556,65 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 控件形态与「空值兜底」都要守住：清空输入若按 0 计算，公积金会静默变 0，用户会当成算错
         const homeAppJs = await request(PORT, 'GET', '/src/js/app.js');
         const helperFnJs = await request(PORT, 'GET', '/src/js/calculation/helper-functions.js');
-        const rateInputIds = ['housing-fund-rate', 'reverse-housing-fund-rate', 'business-housing-fund-rate'];
-        record('index.html 三页「缴费比例」为可输入数字框且默认 5%（不再是固定两档下拉）',
-            leadPage.status === 200
-            && rateInputIds.every((id) => !leadPage.raw.includes(`<select id="${id}"`)
-                && new RegExp(`<input type="number" id="${id}"[^>]*value="5"`).test(leadPage.raw)),
-            `HTTP ${leadPage.status}`);
+        const toolRegJs = await request(PORT, 'GET', '/src/js/data/tool-registry.js');
+        const wizardJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
+        // v1.47.0 / v1.48.0 删掉经营所得页与反向倒算页之后，这里从「两页面版 + 经营所得向导 spec」
+        // 缩到「只剩正向一个页面版 + 两个向导 spec（business / reverse）」；
+        // v1.49.0（17B-3）把正向页也删了 —— 从此**三个已迁移的工具**（business / reverse /
+        // forward）的「缴费比例」控件都不在静态 HTML 里了，全部改到 tool-registry.js 断言。
+        // **数量变少不代表这项能力变弱了** —— 恰恰相反，反向与综合所得那份都是各自迁移前才补登记进 spec 的。
+        record('「缴费比例」不再是固定两档下拉（三个 spec：经营所得 / 反向倒算 / 综合所得，各占一份）',
+            toolRegJs.status === 200 && toolRegJs.raw.includes("key: 'housingFundRate'")
+            && toolRegJs.raw.includes("type: 'percent', default: 5")
+            // 三个 spec 各有一份才是完整：漏一个，那个工具的向导里就没有「自填比例」这个框
+            && (toolRegJs.raw.match(/key: 'housingFundRate'/g) || []).length >= 3
+            // 页面版那一批控件随页面删干净了；留一个「看似还在接线」的旧 <select> 是假-positive 的源头
+            && leadPage.status === 200 && !leadPage.raw.includes('<select id="housing-fund-rate"'),
+            `HTTP ${leadPage.status}/${toolRegJs.status}`);
         record('缴费比例输入即时重算 + 留空/越界回落默认值（清空后公积金不会静默变 0）',
-            helperFnJs.status === 200 && helperFnJs.raw.includes('function normalizeRateInput')
+            // 页面版的 normalizeRateInput 随综合所得页删掉了，等价能力现在两处承担：
+            // ① tool-registry.insuranceDerive 的 FALLBACK（清空 / 越界时按**险种自己的**默认比例算）；
+            // ② deep-wizard-ui 失焦时把非法值落回 field.default + isRateOk。
+            toolRegJs.status === 200
+            && toolRegJs.raw.includes('FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 }')
+            && wizardJs.status === 200 && wizardJs.raw.includes('function bindDerivedSources')
+            && wizardJs.raw.includes('function isRateOk')
+            && wizardJs.raw.includes("el.value = meta.default")
+            // 删页后的半吊子残留要抓：这些函数在 helper-functions.js 里**不该还活着**
+            // —— 它们操作的 DOM 已经不存在了，留着只会让人以为改这里还影响界面。
+            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function normalizeRateInput')
+            && !helperFnJs.raw.includes('function calculateSocialSecurity')
             && homeAppJs.status === 200
-            && homeAppJs.raw.includes("document.getElementById('housing-fund-rate').addEventListener('input'")
-            && homeAppJs.raw.includes("document.getElementById('reverse-housing-fund-rate').addEventListener('input'")
-            && homeAppJs.raw.includes('normalizeRateInput(this)'),
-            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
-        // 经营页的基数/比例原本一个事件都没接（改什么都不发生），且养老清空后若统一回落 5% 是错的
-        record('经营页「缴费基数 × 缴费比例」联动 + 低于下限提示接线（各险种回落自己的默认比例）',
-            helperFnJs.status === 200
-            && helperFnJs.raw.includes('function calculateBusinessInsurance')
-            && helperFnJs.raw.includes('function calculateBusinessSocialInsurance')
-            && helperFnJs.raw.includes('fallback: 8')
-            && homeAppJs.status === 200
-            && homeAppJs.raw.includes("['business-social-security-base', 'business-housing-fund-base']")
-            && homeAppJs.raw.includes("['business-pension-rate', 'business-medical-rate', 'business-unemployment-rate', 'business-housing-fund-rate']")
-            && homeAppJs.raw.includes("validateSocialSecurityBase('business')")
-            && homeAppJs.raw.includes("validateHousingFundBase('business')"),
-            `HTTP ${homeAppJs.status}/${helperFnJs.status}`);
+            && !homeAppJs.raw.includes("document.getElementById('housing-fund-rate')"),
+            `HTTP ${wizardJs.status}/${helperFnJs.status}`);
+        // 经营所得的「缴费基数 × 缴费比例 → 月缴额」原本是 app.js / helper-functions.js 的私有接线，
+        // v1.47.0 删页后改由向导的 derive / warnings 两个 spec 钩子承担 —— **能力不能随删页一起丢**。
+        // v1.48.0（17B-2）：反向倒算的旧页面也删了，同一份钩子抽到注册表顶部共用 ——
+        // `INSURANCE_DERIVE_FROM` / `insuranceDerive()` / `socialBaseWarnings()` 由 business 与 reverse
+        // 两个 spec 共用。**这份共用不是重构洁癖**：两边逻辑本来就是同一份，抄两遍迟早只改其中一遍。
+        // 各险种回落**自己的**默认值（养老 8% / 医疗 2% / 失业 0.5% / 公积金 5%），统一回落 5% 是错的；
+        // 末尾两组反向断言盯的是「半吊子残留」：删了页但私有函数 / 控件引用还挂在别处 ——
+        // 这种残留不会报错，只会在某天把值算到一个没人更新过的方向上。
+        record('经营所得 / 反向倒算「缴费基数 × 缴费比例 → 月缴额」联动 + 低于下限提示（spec 钩子承担，共用一份，各险种回落自己的默认比例）',
+            toolRegJs.status === 200
+            && toolRegJs.raw.includes('INSURANCE_DERIVE_FROM')
+            && toolRegJs.raw.includes('function insuranceDerive')
+            && toolRegJs.raw.includes('function socialBaseWarnings')
+            // 两个 spec 都得挂上：`deriveFrom: INSURANCE_DERIVE_FROM` 出现两次才算挂全
+            && (toolRegJs.raw.match(/deriveFrom: INSURANCE_DERIVE_FROM/g) || []).length >= 2
+            && (toolRegJs.raw.match(/derive: insuranceDerive/g) || []).length >= 2
+            && (toolRegJs.raw.match(/warnings: socialBaseWarnings/g) || []).length >= 2
+            && toolRegJs.raw.includes('FALLBACK = { pensionRate: 8, medicalRate: 2, unemploymentRate: 0.5, housingFundRate: 5 }')
+            && toolRegJs.raw.includes('MIN_SOCIAL_SECURITY_BASE')
+            && wizardJs.status === 200
+            && wizardJs.raw.includes('function applyDerived')
+            && wizardJs.raw.includes('function bindDerivedSources')
+            && wizardJs.raw.includes('function renderWarnings')
+            && homeAppJs.status === 200 && !homeAppJs.raw.includes('business-social-security-base')
+            && homeAppJs.raw.includes('EuriskoDeepWizard')
+            && helperFnJs.status === 200 && !helperFnJs.raw.includes('function calculateBusinessInsurance')
+            && !helperFnJs.raw.includes('function calculateReverseSocialSecurity'),
+            `HTTP ${toolRegJs.status}/${wizardJs.status}`);
         record('admin.html 含社保基数 Tab(data-nav="citysocial")与视图(#view-citysocial)',
             adminPage.status === 200 && adminPage.raw.includes('data-nav="citysocial"') && adminPage.raw.includes('id="view-citysocial"'),
             `HTTP ${adminPage.status}`);
@@ -599,7 +655,19 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
             && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
-            && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html')),
+            && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/labor-withholding.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/equity-incentive.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/severance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/special-deduction.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/private-pension.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/expat-allowance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/early-retirement.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/vat.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/corporate-income-tax.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/surtax-stamp-duty.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/health-insurance.html'))
+            && sitemapLocs.some((u) => u.endsWith('/seo/enterprise-annuity.html')),
             `HTTP ${sitemap.status}, ${sitemapLocs.length} 条`);
         const bonusPage = await request(PORT, 'GET', '/seo/bonus-tax.html');
         record('年终奖落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
@@ -677,16 +745,745 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && settlementPage.raw.includes('>9600.00<'), '');
         record('汇算清缴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
             settlementPage.status === 200 && settlementPage.raw.includes('?source=seo_settlement'), '');
+        // 阶段15 15A-8：汇算页增强「多处任职 / 年中跳槽」深度版 ——
+        // 这一段的价值在于把「跳槽补税」与「重复扣 6 万」两个机制分开讲清楚，
+        // 所以守护要能读到：多段速算器、四种典型场景的示例表数字、两条关键口径、三条新增 FAQ。
+        record('汇算页多处任职/跳槽段落：多段速算器与四种示例表可读（补 2520 / 补 7512 / 补 1020 / 退 810）',
+            settlementPage.status === 200 && settlementPage.raw.includes('id="multi-title"')
+            && settlementPage.raw.includes('id="multi-example-table"')
+            && settlementPage.raw.includes('>6960.00<') && settlementPage.raw.includes('>1968.00<')
+            && settlementPage.raw.includes('补 7512.00') && settlementPage.raw.includes('退 810.00'), '');
+        record('汇算页写明档位重置、减除费用全年定额 60000 元、专项附加同一项目只能扣一份',
+            settlementPage.status === 200 && settlementPage.raw.includes('档位重置')
+            && settlementPage.raw.includes('全年定额 60000 元')
+            && settlementPage.raw.includes('专项附加扣除同一项目只能扣一份'), '');
+        record('汇算页新增三条多处任职/跳槽常见问题（跳槽补税、重复扣 6 万、年中入职 6 万定额）',
+            settlementPage.status === 200
+            && settlementPage.raw.includes('一年内在两家公司上过班（年中跳槽），为什么汇算要补税？')
+            && settlementPage.raw.includes('同时在两家公司领工资，会重复扣 6 万元吗？')
+            && settlementPage.raw.includes('年中入职只上了半年，6 万元减除费用怎么算？'), '');
+        // 第四张落地页「劳务报酬 / 稿酬 / 特许权使用费预扣预缴」（阶段15 15A-1）：
+        // 前三张的守护照旧，另加两项本页独有的口径守护 ——
+        //   ① 预扣率表（20/30/40，速算扣除 0/2000/7000）与常量逐档对账（不再硬编码在内核里）；
+        //   ② 政策依据文号来自税种注册表 tax-registry.js，页面不得自己写一份口径。
+        const withholdingPage = await request(PORT, 'GET', '/seo/labor-withholding.html');
+        record('劳务报酬落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('rel="canonical"')
+            && withholdingPage.raw.includes('FAQPage')
+            && withholdingPage.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${withholdingPage.status}`);
+        const laborBlock = (constantsJs.raw.match(/labor:\s*\[([\s\S]*?)\]/) || [])[1] || '';
+        const laborRows = Array.from(laborBlock.matchAll(/rate:\s*([\d.]+)\s*,\s*deduction:\s*(\d+)/g))
+            .map((m) => ({ rate: Number(m[1]), deduction: Number(m[2]) }));
+        const staleLaborRows = laborRows.filter((r) => {
+            const pct = `${Math.round(r.rate * 1000) / 10}%`;
+            return !withholdingPage.raw.includes(pct) || !withholdingPage.raw.includes(`>${r.deduction}<`);
+        });
+        record('劳务报酬落地页静态预扣率表与常量文件逐档一致（页面不维护第二份口径）',
+            withholdingPage.status === 200 && laborRows.length === 3 && staleLaborRows.length === 0
+            && withholdingPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && withholdingPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && withholdingPage.raw.includes('/src/js/data/tax-rates-sync.js')
+            && withholdingPage.raw.includes('/src/js/calculation/withholding-quick.js'),
+            `常量 ${laborRows.length} 档, 与页面不一致 ${staleLaborRows.length} 档`);
+        record('劳务报酬落地页静态示例表与年度税率表可读（1600 / 1120 / 8000 / 5600 + 七档税率）',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('>1600.00<')
+            && withholdingPage.raw.includes('>1120.00<') && withholdingPage.raw.includes('>8000.00<')
+            && withholdingPage.raw.includes('>5600.00<')
+            && ['3%', '10%', '20%', '25%', '30%', '35%', '45%'].every((p) => withholdingPage.raw.includes(`>${p}<`)), '');
+        record('劳务报酬落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            withholdingPage.status === 200 && withholdingPage.raw.includes('?source=seo_withholding'), '');
+        const registryJs = await request(PORT, 'GET', '/src/js/calculation/tax-registry.js');
+        record('税种注册表登记了劳务报酬页与政策文号（页面只呈现、不自己写口径）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'withholding'")
+            && registryJs.raw.includes("page: '/seo/labor-withholding.html'")
+            && registryJs.raw.includes('国家税务总局公告 2018 年第 61 号'),
+            `HTTP ${registryJs.status}`);
+        // 第五张落地页「股权激励个税」（阶段15 15A-2）：
+        // 与劳务报酬页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 单独计税是「不并入」而非「可选并入」，
+        // 若哪天页面把「并入」写成可选，政策口径就错了，这里拦的是这句声明。
+        const equityPage = await request(PORT, 'GET', '/seo/equity-incentive.html');
+        record('股权激励落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            equityPage.status === 200 && equityPage.raw.includes('rel="canonical"')
+            && equityPage.raw.includes('FAQPage')
+            && equityPage.raw.includes('财政部 税务总局公告 2023 年第 25 号')
+            && equityPage.raw.includes('财税〔2018〕164 号'),
+            `HTTP ${equityPage.status}`);
+        const annualBlock = (equityPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const annualRows = Array.from(annualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnualRows = annualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('股权激励落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            equityPage.status === 200 && annualRows.length === 7 && staleAnnualRows.length === 0
+            && equityPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && equityPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && equityPage.raw.includes('/src/js/calculation/equity-incentive-quick.js'),
+            `页面 ${annualRows.length} 档, 与常量不一致 ${staleAnnualRows.length} 档`);
+        record('股权激励落地页静态示例表与对照表可读（100000/7480、200000/23080、600000/127080、14960、8120）',
+            equityPage.status === 200 && equityPage.raw.includes('>100000.00<')
+            && equityPage.raw.includes('>7480.00<') && equityPage.raw.includes('>200000.00<')
+            && equityPage.raw.includes('>127080.00<') && equityPage.raw.includes('>14960.00<')
+            && equityPage.raw.includes('>8120.00<'), '');
+        record('股权激励落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            equityPage.status === 200 && equityPage.raw.includes('?source=seo_equity'), '');
+        record('税种注册表登记了股权激励页：单独计税「不并入」而非可选并入 + 到期日 2027-12-31',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'equity-incentive'")
+            && registryJs.raw.includes("page: '/seo/equity-incentive.html'")
+            && registryJs.raw.includes('expiresOn: \'2027-12-31\'')
+            && equityPage.raw.includes('不并入当年综合所得')
+            && equityPage.raw.includes('2027 年 12 月 31 日'),
+            `HTTP ${registryJs.status}`);
+        // 第六张落地页「离职补偿金个税」（阶段15 15A-3）：
+        // 与股权激励页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 超额部分「单独适用年度税率表、不按工作年限平均」，
+        // 国税发〔1999〕178 号的平均法已不再执行，页面若照抄旧算法，这句断言就红。
+        const severancePage = await request(PORT, 'GET', '/seo/severance.html');
+        record('离职补偿金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            severancePage.status === 200 && severancePage.raw.includes('rel="canonical"')
+            && severancePage.raw.includes('FAQPage')
+            && severancePage.raw.includes('财税〔2018〕164 号')
+            && severancePage.raw.includes('劳动合同法》第四十七条'),
+            `HTTP ${severancePage.status}`);
+        const severanceAnnualBlock = (severancePage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const severanceAnnualRows = Array.from(severanceAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleSeveranceRows = severanceAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('离职补偿金落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            severancePage.status === 200 && severanceAnnualRows.length === 7 && staleSeveranceRows.length === 0
+            && severancePage.raw.includes('/src/js/calculation/tax-constants.js')
+            && severancePage.raw.includes('/src/js/calculation/tax-registry.js')
+            && severancePage.raw.includes('/src/js/calculation/severance-quick.js'),
+            `页面 ${severanceAnnualRows.length} 档, 与常量不一致 ${staleSeveranceRows.length} 档`);
+        record('离职补偿金落地页静态示例表与对照表可读（70000/4480、130000/10480、17960、29080、11120）',
+            severancePage.status === 200 && severancePage.raw.includes('>70000.00<')
+            && severancePage.raw.includes('>4480.00<') && severancePage.raw.includes('>130000.00<')
+            && severancePage.raw.includes('>10480.00<') && severancePage.raw.includes('>17960.00<')
+            && severancePage.raw.includes('>29080.00<') && severancePage.raw.includes('>11120.00<'), '');
+        record('离职补偿金落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            severancePage.status === 200 && severancePage.raw.includes('?source=seo_severance'), '');
+        record('税种注册表登记了离职补偿金页：长期政策（无到期日）+ 旧的平均法已不再执行 + 不并入',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'severance'")
+            && registryJs.raw.includes("page: '/seo/severance.html'")
+            && registryJs.raw.includes('expiresOn: null')
+            && severancePage.raw.includes('不并入当年综合所得')
+            && severancePage.raw.includes('国税发〔1999〕178 号')
+            && severancePage.raw.includes('不再执行'),
+            `HTTP ${registryJs.status}`);
+        // 第七张落地页「专项附加扣除」（阶段15 15A-4）：
+        // 与离职补偿金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 「扣的是应纳税所得额，不是直接减税额」：
+        // 页面若照抄「扣除额 × 税率」的天真算法，这句断言就红。
+        const specialPage = await request(PORT, 'GET', '/seo/special-deduction.html');
+        record('专项附加扣除落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            specialPage.status === 200 && specialPage.raw.includes('rel="canonical"')
+            && specialPage.raw.includes('FAQPage')
+            && specialPage.raw.includes('国发〔2018〕41 号')
+            && specialPage.raw.includes('国发〔2023〕13 号'),
+            `HTTP ${specialPage.status}`);
+        const specialAnnualBlock = (specialPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const specialAnnualRows = Array.from(specialAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleSpecialRows = specialAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('专项附加扣除落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            specialPage.status === 200 && specialAnnualRows.length === 7 && staleSpecialRows.length === 0
+            && specialPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && specialPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && specialPage.raw.includes('/src/js/calculation/special-deduction-quick.js'),
+            `页面 ${specialAnnualRows.length} 档, 与常量不一致 ${staleSpecialRows.length} 档`);
+        record('专项附加扣除落地页静态示例表与对照表可读（36000/5480/1880/3600、72200/43080/28640/14440、12000/400）',
+            specialPage.status === 200 && specialPage.raw.includes('>36000.00<')
+            && specialPage.raw.includes('>5480.00<') && specialPage.raw.includes('>1880.00<')
+            && specialPage.raw.includes('>3600.00<') && specialPage.raw.includes('>72200.00<')
+            && specialPage.raw.includes('>43080.00<') && specialPage.raw.includes('>14440.00<')
+            && specialPage.raw.includes('>12000.00<') && specialPage.raw.includes('>400.00<'), '');
+        record('专项附加扣除落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            specialPage.status === 200 && specialPage.raw.includes('?source=seo_special'), '');
+        record('税种注册表登记了专项附加扣除页：扣的是应纳税所得额而非直接减税 + 长期制度（无到期日）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'special-deduction'")
+            && registryJs.raw.includes("page: '/seo/special-deduction.html'")
+            && registryJs.raw.includes('specialDeductionRules')
+            && specialPage.raw.includes('扣的是「应纳税所得额」')
+            && specialPage.raw.includes('两段计税相减'),
+            `HTTP ${registryJs.status}`);
+        // 第八张落地页「个人养老金」（阶段15 15A-5）：
+        // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 3% 档「税收净优惠为零」：
+        // 适用税率 3% 的人省 3%、领取时再交 3%，页面必须算出净优惠为 0；
+        // 同时按备案承诺书（不涉及投资理财）要求，页面必须自己写明「不构成投资建议」。
+        const pensionPage = await request(PORT, 'GET', '/seo/private-pension.html');
+        record('个人养老金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            pensionPage.status === 200 && pensionPage.raw.includes('rel="canonical"')
+            && pensionPage.raw.includes('FAQPage')
+            && pensionPage.raw.includes('2024 年第 21 号')
+            && pensionPage.raw.includes('2022 年第 34 号'),
+            `HTTP ${pensionPage.status}`);
+        const pensionAnnualBlock = (pensionPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const pensionAnnualRows = Array.from(pensionAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const stalePensionRows = pensionAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('个人养老金落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            pensionPage.status === 200 && pensionAnnualRows.length === 7 && stalePensionRows.length === 0
+            && pensionPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && pensionPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && pensionPage.raw.includes('/src/js/calculation/private-pension-quick.js'),
+            `页面 ${pensionAnnualRows.length} 档, 与常量不一致 ${stalePensionRows.length} 档`);
+        record('个人养老金落地页三环节处理表与静态示例表可读（12000 元/年 / 3% / 暂不征税、840 / 20400 / 3240）',
+            pensionPage.status === 200 && pensionPage.raw.includes('12000 元/年')
+            && pensionPage.raw.includes('暂不征收个人所得税')
+            && pensionPage.raw.includes('>840.00<') && pensionPage.raw.includes('>20400.00<')
+            && pensionPage.raw.includes('>3240.00<') && pensionPage.raw.includes('>97080.00<'), '');
+        record('个人养老金落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            pensionPage.status === 200 && pensionPage.raw.includes('?source=seo_pension'), '');
+        record('税种注册表登记了个人养老金页：领取按 3% 单独计税 + 必须写明 3% 档净优惠为零且不构成投资建议',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'private-pension'")
+            && registryJs.raw.includes("page: '/seo/private-pension.html'")
+            && registryJs.raw.includes('privatePensionRules')
+            && pensionPage.raw.includes('税收净优惠为 0')
+            && pensionPage.raw.includes('不构成投资建议'),
+            `HTTP ${registryJs.status}`);
+        // 第九张落地页「外籍个人津补贴免税」（阶段15 15A-6）：
+        // 与专项附加扣除页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加两条本页独有的口径断言 ——
+        //   ① 津补贴免税与专项附加扣除是**二选一**（不得同时享受、年度内不得变更）；
+        //   ② 本政策**有到期日 2027-12-31**：到期提醒必须接入注册表 statusOf，页面必须写明 2028 年起如何衔接。
+        const expatPage = await request(PORT, 'GET', '/seo/expat-allowance.html');
+        record('外籍个人津补贴落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            expatPage.status === 200 && expatPage.raw.includes('rel="canonical"')
+            && expatPage.raw.includes('FAQPage')
+            && expatPage.raw.includes('2023 年第 29 号')
+            && expatPage.raw.includes('财税字〔1994〕020 号'),
+            `HTTP ${expatPage.status}`);
+        const expatAnnualBlock = (expatPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const expatAnnualRows = Array.from(expatAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleExpatRows = expatAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('外籍个人津补贴落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            expatPage.status === 200 && expatAnnualRows.length === 7 && staleExpatRows.length === 0
+            && expatPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && expatPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && expatPage.raw.includes('/src/js/calculation/expat-allowance-quick.js'),
+            `页面 ${expatAnnualRows.length} 档, 与常量不一致 ${staleExpatRows.length} 档`);
+        record('外籍个人津补贴落地页八项免税项目表与静态示例表可读（11600/7200/4400、1200/4880/3680、29000）',
+            expatPage.status === 200 && expatPage.raw.includes('探亲费')
+            && expatPage.raw.includes('以非现金形式或实报实销形式取得')
+            && expatPage.raw.includes('>11600.00<') && expatPage.raw.includes('>7200.00<')
+            && expatPage.raw.includes('>4880.00<') && expatPage.raw.includes('>29000.00<'), '');
+        record('外籍个人津补贴落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            expatPage.status === 200 && expatPage.raw.includes('?source=seo_expat'), '');
+        record('税种注册表登记了外籍个人津补贴页：二选一不得叠加 + 到期日 2027-12-31 且页面写明 2028 年起衔接',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'expat-allowance'")
+            && registryJs.raw.includes("page: '/seo/expat-allowance.html'")
+            && registryJs.raw.includes("expiresOn: '2027-12-31'")
+            && registryJs.raw.includes('expatAllowanceRules')
+            && expatPage.raw.includes('不得同时享受')
+            && expatPage.raw.includes('一个纳税年度内不得变更')
+            && expatPage.raw.includes('2028 年起'),
+            `HTTP ${registryJs.status}`);
+        // 第十张落地页「提前退休 / 内部退养一次性收入」（阶段15 15A-7）：
+        // 与外籍个人页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / CTA 归因），
+        // 另加一条本页独有的口径断言 —— 三套「一次性收入」口径必须分开：
+        //   提前退休**真分摊**、内部退养**平均只为定档**（税基是全额）、
+        //   而「3 倍社平工资免税」**只属于**离职补偿金，不能套到前两者上。
+        const earlyPage = await request(PORT, 'GET', '/seo/early-retirement.html');
+        record('提前退休/内部退养落地页可访问且含 canonical/FAQPage 结构化数据与政策依据',
+            earlyPage.status === 200 && earlyPage.raw.includes('rel="canonical"')
+            && earlyPage.raw.includes('FAQPage')
+            && earlyPage.raw.includes('财税〔2018〕164 号')
+            && earlyPage.raw.includes('国税发〔1999〕58 号'),
+            `HTTP ${earlyPage.status}`);
+        const earlyAnnualBlock = (earlyPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const earlyAnnualRows = Array.from(earlyAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const earlyMonthlyBlock = (earlyPage.raw.split('id="monthly-rate-table"')[1] || '').split('</table>')[0];
+        const earlyMonthlyRows = Array.from(earlyMonthlyBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleEarlyRows = earlyAnnualRows.concat(earlyMonthlyRows).filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('提前退休/内部退养落地页静态税率表（年度 + 月度）与常量文件逐档一致（页面不维护第二份口径）',
+            earlyPage.status === 200 && earlyAnnualRows.length === 7 && earlyMonthlyRows.length === 7
+            && staleEarlyRows.length === 0
+            && earlyPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && earlyPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && earlyPage.raw.includes('/src/js/calculation/early-retirement-quick.js'),
+            `年度 ${earlyAnnualRows.length} 档 / 月度 ${earlyMonthlyRows.length} 档, 与常量不一致 ${staleEarlyRows.length} 档`);
+        record('提前退休/内部退养落地页静态示例表可读（1800/4440/17400、3630/11890/20090）',
+            earlyPage.status === 200 && earlyPage.raw.includes('>1800.00<')
+            && earlyPage.raw.includes('>4440.00<') && earlyPage.raw.includes('>17400.00<')
+            && earlyPage.raw.includes('>3630.00<') && earlyPage.raw.includes('>11890.00<')
+            && earlyPage.raw.includes('>20090.00<'), '');
+        record('提前退休/内部退养落地页 CTA 带 SEO 归因参数（线索来源可回流）',
+            earlyPage.status === 200 && earlyPage.raw.includes('?source=seo_earlyretire'), '');
+        record('税种注册表登记了提前退休/内部退养页：三套一次性收入口径必须分开（真分摊 / 只定档 / 3 倍社平免税只归离职补偿）',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'early-retirement'")
+            && registryJs.raw.includes("page: '/seo/early-retirement.html'")
+            && registryJs.raw.includes('earlyRetirementRules')
+            && earlyPage.raw.includes('真分摊')
+            && earlyPage.raw.includes('只定档')
+            && earlyPage.raw.includes('只适用于与用人单位解除劳动关系取得的一次性补偿收入'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-1：企业税种第一页「增值税」——
+        // 与个税页最大的不同是：增值税是**价外税**，页面必须把「含税价先分离」和
+        // 「30 万是临界点（含本数、超过即全额计税）」讲清楚，否则算出来的数就是错的。
+        const vatPage = await request(PORT, 'GET', '/seo/vat.html');
+        record('增值税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（增值税法 + 2023 年第 19 号）',
+            vatPage.status === 200 && vatPage.raw.includes('rel="canonical"')
+            && vatPage.raw.includes('FAQPage')
+            && vatPage.raw.includes('主席令第四十一号')
+            && vatPage.raw.includes('国务院令第 826 号')
+            && vatPage.raw.includes('财政部 税务总局公告 2023 年第 19 号'),
+            `HTTP ${vatPage.status}`);
+        const vatRateBlock = (vatPage.raw.split('id="vat-rate-table"')[1] || '').split('</table>')[0];
+        const vatRateRows = Array.from(vatRateBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        // 常量里写作 rate: 0.13 / 0.09 / 0.06 / 0（9% 与 6% 要补前导零，否则查不到）
+        const staleVatRows = vatRateRows.filter((p) => !constantsJs.raw.includes(
+            p === 0 ? 'rate: 0,' : `rate: ${(p / 100).toFixed(2)},`
+        ));
+        record('增值税落地页静态税率表与常量文件逐档一致（13/9/6/0，页面不维护第二份口径）',
+            vatPage.status === 200 && vatRateRows.length === 4 && staleVatRows.length === 0
+            && vatPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && vatPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && vatPage.raw.includes('/src/js/calculation/vat-quick.js'),
+            `${vatRateRows.length} 档, 与常量不一致 ${staleVatRows.length} 档`);
+        record('增值税落地页静态示例表可读（小规模 3000.00/5000.00/15000.00/10000.00，一般纳税人 13000.00/6000.00）',
+            vatPage.status === 200 && vatPage.raw.includes('>3000.00<') && vatPage.raw.includes('>5000.00<')
+            && vatPage.raw.includes('>15000.00<') && vatPage.raw.includes('>10000.00<')
+            && vatPage.raw.includes('>13000.00<') && vatPage.raw.includes('>6000.00<'), '');
+        record('增值税落地页写明三条易错口径：价外税先分离、30 万含本数且超过全额计税、进项留抵不倒欠',
+            vatPage.status === 200 && vatPage.raw.includes('价外税')
+            && vatPage.raw.includes('含本数') && vatPage.raw.includes('全额')
+            && vatPage.raw.includes('留抵') && vatPage.raw.includes('不得抵扣进项')
+            && vatPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了增值税页（本体长期有效 + 小规模减免到 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'vat'")
+            && registryJs.raw.includes("id: 'vat-small-scale'")
+            && registryJs.raw.includes("page: '/seo/vat.html'")
+            && registryJs.raw.includes('vatRules')
+            && vatPage.raw.includes('?source=seo_vat'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-2：企业税种第二页「企业所得税」——
+        // 这一页要钉住的是**乘出来的 5%** 与 **300 万的悬崖**：
+        // 小微优惠是「减按 25% 计入 × 20% 税率」，三个门槛是「且」的关系且超过即全额 25%。
+        const citPage = await request(PORT, 'GET', '/seo/corporate-income-tax.html');
+        record('企业所得税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（税法 + 2023 年第 12 号）',
+            citPage.status === 200 && citPage.raw.includes('rel="canonical"')
+            && citPage.raw.includes('FAQPage')
+            && citPage.raw.includes('主席令第 63 号')
+            && citPage.raw.includes('国务院令第 512 号')
+            && citPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${citPage.status}`);
+        const citRateBlock = (citPage.raw.split('id="cit-rate-table"')[1] || '').split('</table>')[0];
+        const citRateRows = Array.from(citRateBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        const staleCitRows = citRateRows.filter((p) => !constantsJs.raw.includes(`rate: ${(p / 100).toFixed(2)},`));
+        record('企业所得税落地页静态税率表与常量文件逐档一致（25/20/15/20，页面不维护第二份口径）',
+            citPage.status === 200 && citRateRows.length === 4 && staleCitRows.length === 0
+            && citPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && citPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && citPage.raw.includes('/src/js/calculation/corporate-income-tax-quick.js'),
+            `${citRateRows.length} 档, 与常量不一致 ${staleCitRows.length} 档`);
+        record('企业所得税落地页静态示例表可读（三档 50000/150000/250000，临界点 150000 → 752500）',
+            citPage.status === 200 && citPage.raw.includes('>50000.00<') && citPage.raw.includes('>150000.00<')
+            && citPage.raw.includes('>250000.00<') && citPage.raw.includes('>752500.00<')
+            && citPage.raw.includes('>760000.00<') && citPage.raw.includes('>600000.00<'), '');
+        record('企业所得税落地页写明三条易错口径：5% 是乘出来的、300 万是悬崖不累进、分红再交 20%',
+            citPage.status === 200 && citPage.raw.includes('5% 是乘出来的，不是税率')
+            && citPage.raw.includes('300 万是悬崖，不是累进')
+            && citPage.raw.includes('企业交完税，分红还要再交一次')
+            && citPage.raw.includes('0.25 × 0.20 = 0.05')
+            && citPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了企业所得税页（税法长期有效 + 小微优惠到 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'corporate-income-tax'")
+            && registryJs.raw.includes("id: 'corporate-small-low-profit'")
+            && registryJs.raw.includes("page: '/seo/corporate-income-tax.html'")
+            && registryJs.raw.includes('corporateIncomeTaxRules')
+            && citPage.raw.includes('?source=seo_cit'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15B-3：企业税种第三页「附加税与印花税」——
+        // 这一页要钉住的是**计税依据**：附加税跟的是实际缴纳的增值税（为 0 则附加为 0），
+        // 印花税跟的是每张应税凭证（且不含列明的增值税）；六税两费减半到 2027-12-31。
+        const surtaxPage = await request(PORT, 'GET', '/seo/surtax-stamp-duty.html');
+        record('附加税与印花税落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（城建税法 + 印花税法 + 2023 年第 12 号）',
+            surtaxPage.status === 200 && surtaxPage.raw.includes('rel="canonical"')
+            && surtaxPage.raw.includes('FAQPage')
+            && surtaxPage.raw.includes('主席令第 51 号')
+            && surtaxPage.raw.includes('主席令第 89 号')
+            && surtaxPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${surtaxPage.status}`);
+        const surtaxBlock = (surtaxPage.raw.split('id="surtax-rate-table"')[1] || '').split('</table>')[0];
+        const surtaxRows = Array.from(surtaxBlock.matchAll(/<td class="num">([\d.]+)%<\/td>/g)).map((m) => Number(m[1]));
+        // 城建税三档写在对象内行尾（`rate: 0.07 }`），两项附加是独立字段（`rate: 0.03,`），两种写法都要认
+        const staleSurtaxRows = surtaxRows.filter((p) => {
+            const v = (p / 100).toFixed(2);
+            return !(constantsJs.raw.includes(`rate: ${v},`) || constantsJs.raw.includes(`rate: ${v} }`));
+        });
+        record('附加税落地页静态税率表与常量文件逐档一致（7/5/1/3/2，页面不维护第二份口径）',
+            surtaxPage.status === 200 && surtaxRows.length === 5 && staleSurtaxRows.length === 0
+            && surtaxPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && surtaxPage.raw.includes('/src/js/calculation/surtax-stamp-quick.js'),
+            `${surtaxRows.length} 档, 与常量不一致 ${staleSurtaxRows.length} 档`);
+        const stampBlock = (surtaxPage.raw.split('id="stamp-rate-table"')[1] || '').split('</table>')[0];
+        const stampRows = Array.from(stampBlock.matchAll(/<td class="num">([\d.]+)‰<\/td>/g))
+            .map((m) => Math.round((Number(m[1]) / 1000) * 1e9) / 1e9);
+        const staleStampRows = stampRows.filter((r) => !constantsJs.raw.includes(`rate: ${r},`));
+        record('印花税落地页静态税目税率表与常量文件逐行一致（17 个税目，页面不维护第二份口径）',
+            surtaxPage.status === 200 && stampRows.length === 17 && staleStampRows.length === 0,
+            `${stampRows.length} 个税目, 与常量不一致 ${staleStampRows.length} 个`);
+        record('附加税与印花税落地页写明三条易错口径：附加跟增值税走、看凭证与列明金额、账簿只对增加部分',
+            surtaxPage.status === 200 && surtaxPage.raw.includes('附加税跟着增值税走，不是跟着收入走')
+            && surtaxPage.raw.includes('印花税看的是「凭证」和「列明的金额」')
+            && surtaxPage.raw.includes('营业账簿只对「增加部分」计税')
+            && surtaxPage.raw.includes('不包括列明的增值税税款')
+            && surtaxPage.raw.includes('2027 年 12 月 31 日'), '');
+        record('税种注册表登记了附加税、印花税与六税两费减半三条（减半至 2027-12-31），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'surtax'")
+            && registryJs.raw.includes("id: 'stamp-duty'")
+            && registryJs.raw.includes("id: 'surtax-stamp-halve'")
+            && registryJs.raw.includes('stampDutyRules')
+            && surtaxPage.raw.includes('?source=seo_surtax'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15C-1：第十四个落地页「社保公积金」——
+        // 这一页要钉住的是**缴费基数**：不是当月工资，60% 保底 / 300% 封顶；
+        // 工伤、生育个人不缴；公积金只有「12% 且基数 ≤ 社平 3 倍」的部分免征个税。
+        const socialPage = await request(PORT, 'GET', '/seo/social-base.html');
+        record('社保公积金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（社会保险法 + 公积金管理条例 + 国办发〔2019〕13 号 + 财税〔2006〕10 号）',
+            socialPage.status === 200 && socialPage.raw.includes('rel="canonical"')
+            && socialPage.raw.includes('FAQPage')
+            && socialPage.raw.includes('主席令第 35 号')
+            && socialPage.raw.includes('国务院令第 262 号')
+            && socialPage.raw.includes('国办发〔2019〕13 号')
+            && socialPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${socialPage.status}`);
+        const socialTable = (socialPage.raw.split('id="social-rate-table"')[1] || '').split('</table>')[0];
+        // 费率表：五个险种的个人/单位比例 + 公积金区间（页面不维护第二份费率）
+        const pctText = (rate) => `${String(Math.round(rate * 1000) / 10)}%`;
+        const staleSocialRows = [
+            { name: '养老保险', personal: pctText(0.08), employer: pctText(0.16) },
+            { name: '医疗保险', personal: pctText(0.02), employer: pctText(0.098) },
+            { name: '失业保险', personal: pctText(0.005), employer: pctText(0.005) },
+            { name: '工伤保险', personal: '不缴', employer: pctText(0.004) },
+            { name: '生育保险', personal: '不缴', employer: pctText(0.008) }
+        ].filter((row) => !(socialTable.includes(row.name)
+            && socialTable.includes(`>${row.personal}<`) && socialTable.includes(`>${row.employer}<`)));
+        record('社保落地页静态费率表与常量逐项一致（养老 8/16、医疗 2/9.8、失业 0.5/0.5、工伤生育个人不缴）',
+            socialPage.status === 200 && staleSocialRows.length === 0
+            && socialTable.includes('住房公积金') && socialTable.includes('5%~12%')
+            && socialPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && socialPage.raw.includes('/src/js/calculation/social-insurance-quick.js'),
+            `与常量不一致 ${staleSocialRows.length} 项`);
+        record('社保落地页静态示例表可读：保底 4800/1080/2920、封顶 24000/5400/33020、用工成本 13950',
+            socialPage.status === 200 && ['>4000.00<', '>4800.00<', '>1080.00<', '>2920.00<',
+                '>2250.00<', '>7697.50<', '>630.00<', '>13950.00<',
+                '>4500.00<', '>15215.00<', '>14550.00<', '>8880.00<',
+                '>24000.00<', '>5400.00<', '>43260.00<', '>33020.00<', '>86040.00<']
+                .every((n) => socialPage.raw.includes(n)),
+            `HTTP ${socialPage.status}`);
+        record('社保落地页写明三条易错口径：60% 保底 300% 封顶、工伤生育个人不缴与公积金免税上限、累计预扣逐月变少',
+            socialPage.status === 200 && socialPage.raw.includes('缴费基数不是工资：60% 保底、300% 封顶')
+            && socialPage.raw.includes('工伤、生育个人不缴；公积金不是缴多少都免税')
+            && socialPage.raw.includes('到手工资逐月变少是累计预扣，企业成本是工资的 1.3~1.4 倍')
+            && socialPage.raw.includes('45024')
+            && socialPage.raw.includes('累计预扣法'), '');
+        record('税种注册表登记了社会保险与住房公积金两条（均长期有效），CTA 带归因参数',
+            registryJs.status === 200 && registryJs.raw.includes("id: 'social-insurance'")
+            && registryJs.raw.includes("id: 'housing-fund'")
+            && registryJs.raw.includes('socialInsuranceRules')
+            && socialPage.raw.includes('?source=seo_social'),
+            `HTTP ${registryJs.status}`);
+        // 阶段15 15C-2：第十五个落地页「税后工资 / 谈薪倒算」——
+        // 这一页要钉住的是**倒算不能除以到手率**：到手率不是常数（累计预扣分档 + 社保公积金 300% 封顶），
+        // 且「每月到手 X」本身有两种口径（全年平均 / 首月），谈薪前不先定口径就会谈错。
+        const netPage = await request(PORT, 'GET', '/seo/net-salary.html');
+        record('税后工资落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（个税法 + 2018 年第 61 号累计预扣 + 社保与公积金口径）',
+            netPage.status === 200 && netPage.raw.includes('rel="canonical"')
+            && netPage.raw.includes('FAQPage')
+            && netPage.raw.includes('主席令第九号')
+            && netPage.raw.includes('2018 年第 61 号')
+            && netPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页静态示例表可读：税前 6451.61/13175.62/27137.50/39853.33/68076.92、封顶 5400.00、边际 8370.00、企业成本 18379.98',
+            netPage.status === 200 && ['>6451.61<', '>13175.62<', '>27137.50<', '>39853.33<', '>68076.92<',
+                '>5400.00<', '>8370.00<', '>9600.00<', '>7800.00<', '>18379.98<']
+                .every((n) => netPage.raw.includes(n)),
+            `HTTP ${netPage.status}`);
+        const modeTable = (netPage.raw.split('id="mode-example-table"')[1] || '').split('</table>')[0];
+        record('税后工资落地页两口径对照表可读：首月口径 13062.86/25833.00/36142.27 与全年少拿 12523.19/33554.16',
+            netPage.status === 200 && ['>13062.86<', '>25833.00<', '>36142.27<', '>12523.19<', '>33554.16<']
+                .every((n) => modeTable.includes(n)),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页写明三条易错口径：到手率不是常数、边际到手率、年终奖另算与社保保底',
+            netPage.status === 200 && netPage.raw.includes('倒算不能「除以到手率」—— 到手率不是常数')
+            && netPage.raw.includes('涨薪 1000 元不等于到手多 1000 元：看边际到手率')
+            && netPage.raw.includes('倒算只对月薪负责：年终奖另算，保底也会咬人')
+            && netPage.raw.includes('边际到手率'),
+            `HTTP ${netPage.status}`);
+        record('税后工资落地页复用同源脚本（常量 + 五险一金 + 反向求解），CTA 带归因参数',
+            netPage.status === 200 && registryJs.raw.includes("id: 'comprehensive'")
+            && netPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && netPage.raw.includes('/src/js/calculation/social-insurance-quick.js')
+            && netPage.raw.includes('/src/js/calculation/net-salary-quick.js')
+            && netPage.raw.includes('?source=seo_netsalary'),
+            `HTTP ${netPage.status}`);
+        // 阶段15 15C-3：第十六个落地页「企业用工成本」——
+        // 这一页要钉住的是**成本倍数不是常数**：工资越低倍数越高（缴费基数按社平 60% 保底），
+        // 工资越高倍数越低（300% 封顶后单位部分不再增加）；配套钉住涨薪传递率
+        // （企业多付 1395 元、员工全年只多拿约 9000 元，封顶后传递率反而升高）。
+        const costPage = await request(PORT, 'GET', '/seo/employer-cost.html');
+        record('企业用工成本落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（社会保险法 + 公积金管理条例 + 国办发〔2019〕13 号 + 财税〔2006〕10 号）',
+            costPage.status === 200 && costPage.raw.includes('rel="canonical"')
+            && costPage.raw.includes('FAQPage')
+            && costPage.raw.includes('主席令第 35 号')
+            && costPage.raw.includes('国务院令第 262 号')
+            && costPage.raw.includes('国办发〔2019〕13 号')
+            && costPage.raw.includes('财税〔2006〕10 号'),
+            `HTTP ${costPage.status}`);
+        record('企业用工成本落地页静态成本表可读：13950.00/4896.00/59480.00、保底 4800.00 与封顶 24000.00、到手 7697.50',
+            costPage.status === 200 && ['>13950.00<', '>4896.00<', '>59480.00<', '>4800.00<', '>24000.00<',
+                '>1896.00<', '>9480.00<', '>167400.00<', '>7697.50<']
+                .every((n) => costPage.raw.includes(n)),
+            `HTTP ${costPage.status}`);
+        const raiseTable = (costPage.raw.split('id="raise-example-table"')[1] || '').split('</table>')[0];
+        record('企业用工成本落地页涨薪表可读：未封顶 1395.00/16740.00/9021.00、封顶后 1000.00/9600.00/8370.00',
+            costPage.status === 200 && ['>1395.00<', '>16740.00<', '>9021.00<', '>1000.00<', '>9600.00<', '>8370.00<']
+                .every((n) => raiseTable.includes(n)),
+            `HTTP ${costPage.status}`);
+        const budgetTable = (costPage.raw.split('id="budget-example-table"')[1] || '').split('</table>')[0];
+        record('企业用工成本落地页倒推表可读：预算 13950→10000.00、20000→14336.91、50000→40520.00',
+            costPage.status === 200 && ['>10000.00<', '>14336.91<', '>40520.00<', '>5734.77<']
+                .every((n) => budgetTable.includes(n)),
+            `HTTP ${costPage.status}`);
+        record('企业用工成本落地页写明三条易错口径：倍数不是常数、涨薪传递率、只算法定五险一金',
+            costPage.status === 200 && costPage.raw.includes('成本倍数不是常数：工资越低，倍数越高')
+            && costPage.raw.includes('涨薪 1000 元 ≠ 企业多花 1000 元，员工更拿不到 1000 元')
+            && costPage.raw.includes('公积金是双边的，且这一页只算法定五险一金')
+            && costPage.raw.includes('传递率'),
+            `HTTP ${costPage.status}`);
+        // 线索来源必须进白名单：没进白名单的 source 会被 Lead 接口静默回落成 unknown，
+        // 页面上看着有归因参数，后台却分不清线索来自哪一页 —— 这种错只在看数据时才会被发现。
+        const leadSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'controllers', 'leadController.js'), 'utf8');
+        record('企业用工成本落地页复用同源脚本（常量 + 五险一金 + 用工成本），线索来源已入白名单，CTA 带归因参数',
+            costPage.status === 200
+            && costPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && costPage.raw.includes('/src/js/calculation/social-insurance-quick.js')
+            && costPage.raw.includes('/src/js/calculation/employer-cost-quick.js')
+            && leadSrc.includes("'seo_employercost'")
+            && costPage.raw.includes('?source=seo_employercost'),
+            `HTTP ${costPage.status}`);
+        // 阶段15 15B-5：第十七个落地页「个体工商户经营所得：核定 vs 查账」。
+        // 这一页要钉住的是**核定不等于少交税**：核定税额是一条与利润无关的水平线
+        // （收入 × 应税所得率），只有实际净利率高于「核定所得率 + 6 万 ÷ 年营收」时才划算；
+        // 以及减半只减「不超过 200 万那部分」的税额，减免额在 200 万处封顶为 317250 元。
+        const bizPage = await request(PORT, 'GET', '/seo/business-income.html');
+        record('个体工商户经营所得落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（个税法 + 实施条例 + 个体工商户计税办法 + 2023 年第 12 号公告）',
+            bizPage.status === 200 && bizPage.raw.includes('rel="canonical"')
+            && bizPage.raw.includes('FAQPage')
+            && bizPage.raw.includes('主席令第九号')
+            && bizPage.raw.includes('国务院令第 707 号')
+            && bizPage.raw.includes('国家税务总局令第 35 号')
+            && bizPage.raw.includes('财政部 税务总局公告 2023 年第 12 号'),
+            `HTTP ${bizPage.status}`);
+        const bizCompareTable = (bizPage.raw.split('id="compare-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页静态对比表可读：核定 2250.00 与查账 0.00/750.00/3750.00/6750.00/12750.00（含临界行 20%）',
+            bizPage.status === 200 && ['>2250.00<', '>0.00<', '>750.00<', '>3750.00<', '>6750.00<', '>12750.00<', '20%（临界）']
+                .every((n) => bizCompareTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizCompTable = (bizPage.raw.split('id="comprehensive-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页「另有工资」对比表可读：查账 450.00/750.00/3750.00/18750.00（临界降到 10%）',
+            bizPage.status === 200 && ['>450.00<', '>750.00<', '>3750.00<', '>6750.00<', '>18750.00<', '10%（临界）']
+                .every((n) => bizCompTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizBreakTable = (bizPage.raw.split('id="breakeven-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页临界净利率速查表可读：25.00%/20.00%/15.00%/12.50%/35.00%（= 核定所得率 + 6 万 ÷ 年营收）',
+            bizPage.status === 200 && ['>25.00%<', '>20.00%<', '>15.00%<', '>12.50%<', '>35.00%<']
+                .every((n) => bizBreakTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        const bizHalveTable = (bizPage.raw.split('id="halve-example-table"')[1] || '').split('</table>')[0];
+        record('经营所得落地页减半表可读：14750.00/317250.00/667250.00/1367250.00（减免额在 200 万处封顶）',
+            bizPage.status === 200 && ['>14750.00<', '>317250.00<', '>667250.00<', '>1367250.00<', '>32.2%<', '>18.8%<']
+                .every((n) => bizHalveTable.includes(n)),
+            `HTTP ${bizPage.status}`);
+        record('经营所得落地页写明四条易错口径（核定不等于少交税、三不、减半不是全额、五级表不是七级表），复用同源脚本且线索来源已入白名单',
+            bizPage.status === 200
+            && bizPage.raw.includes('核定不等于少交税')
+            && bizPage.raw.includes('不扣成本、不扣 6 万、不弥补亏损')
+            && bizPage.raw.includes('只减「不超过 200 万那部分」的税额')
+            && bizPage.raw.includes('不是工资那张七级表')
+            && bizPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && bizPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && bizPage.raw.includes('/src/js/calculation/business-income-quick.js')
+            && leadSrc.includes("'seo_bizincome'")
+            && bizPage.raw.includes('?source=seo_bizincome'),
+            `HTTP ${bizPage.status}`);
+        // 阶段15 15B-6：第十八个落地页「残保金与工会经费」。
+        // 这一页要钉住的是**两个「不是」**：残保金不是「工资总额 × 1.5%」，而是差额人数 × 年平均工资
+        // （招 1 个残疾人省的是一个人的年平均工资）；封顶是社平 **2 倍**而不是社保那个 300%。
+        // 以及 **30 人是临界点**：30 人免征、31 人按全部 31 人算，不是只对超出的 1 人算。
+        const dfundPage = await request(PORT, 'GET', '/seo/disability-fund.html');
+        record('残保金与工会经费落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税 72 号 + 2019 年 2015 号方案 + 98 号公告 + 工会法 + 512 号令）',
+            dfundPage.status === 200 && dfundPage.raw.includes('rel="canonical"')
+            && dfundPage.raw.includes('FAQPage')
+            && dfundPage.raw.includes('财税〔2015〕72 号')
+            && dfundPage.raw.includes('发改价格规〔2019〕2015 号')
+            && dfundPage.raw.includes('财政部公告 2019 年第 98 号')
+            && dfundPage.raw.includes('国务院令第 512 号'),
+            `HTTP ${dfundPage.status}`);
+        const dfundHeadTable = (dfundPage.raw.split('id="headcount-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页人数临界表可读：30 人 0.00（免征）vs 31 人 41850.00（按全部人数算），应缴费额 46500.00/135000.00',
+            dfundPage.status === 200 && ['>0.00<', '>46500.00<', '>41850.00<', '>45000.00<', '>135000.00<', '>270000.00<']
+                .every((n) => dfundHeadTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundDisabledTable = (dfundPage.raw.split('id="disabled-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页「招残疾人」表可读：162000.00 → 30000.00 → 0.00（第一个省 132000.00，边际递减）',
+            dfundPage.status === 200 && ['>180000.00<', '>60000.00<', '>162000.00<', '>30000.00<', '>0.00<', '×90%', '×50%']
+                .every((n) => dfundDisabledTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundWageTable = (dfundPage.raw.split('id="wage-example-table"')[1] || '').split('</table>')[0];
+        record('残保金落地页工资封顶表可读：192000.00 封顶后实缴恒为 259200.00（社平 2 倍，不是社保 300%）',
+            dfundPage.status === 200 && ['>192000.00<', '>288000.00<', '>259200.00<', '>81000.00<', '>202500.00<', '已封顶']
+                .every((n) => dfundWageTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        const dfundUnionTable = (dfundPage.raw.split('id="union-example-table"')[1] || '').split('</table>')[0];
+        record('工会经费表可读：100 万 → 20000.00（上缴 8000.00 / 留存 12000.00）、3000 万 → 600000.00，按工资总额不是社保基数',
+            dfundPage.status === 200 && ['>20000.00<', '>8000.00<', '>12000.00<', '>60000.00<', '>600000.00<']
+                .every((n) => dfundUnionTable.includes(n)),
+            `HTTP ${dfundPage.status}`);
+        record('残保金落地页写明四条易错口径（不是工资总额乘比例、30 人临界、2 倍不是 300%、按工资总额不是社保基数），复用同源脚本且线索来源已入白名单',
+            dfundPage.status === 200
+            && dfundPage.raw.includes('不是「工资总额 × 1.5%」')
+            && dfundPage.raw.includes('30 人是临界点')
+            && dfundPage.raw.includes('不是只对超出的 1 人算')
+            && dfundPage.raw.includes('社保缴费基数的上限是社平 300%')
+            && dfundPage.raw.includes('不是社保缴费基数')
+            && dfundPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && dfundPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && dfundPage.raw.includes('/src/js/calculation/disability-fund-quick.js')
+            && leadSrc.includes("'seo_disabilityfund'")
+            && dfundPage.raw.includes('?source=seo_disabilityfund'),
+            `HTTP ${dfundPage.status}`);
+        // 第十九、二十个落地页「税优健康险 + 企业年金」（阶段15 15A-5 尾巴收尾）：
+        // 与个人养老金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / 易错口径 / CTA 归因），
+        // 各加两条本页独有的口径断言 ——
+        //   健康险：① 保险赔款免征个税（没有领取税，与个人养老金的 3% 对照）；
+        //           ② 节税上限 2400 × 45% = 1080 元/年，页面只给这个上限并写明「不构成购买建议」
+        //              （「值不值得买」属消费与理财判断，备案承诺书不承接）；
+        //   年金：  ① 个人免税上限 = 计税基数 × 4%（社平 300% 封顶），超 4% 部分税后扣缴；
+        //           ② 领取按全额（含单位缴费）单独计税，能算出「净优惠为负」的另一面。
+        const hiPage = await request(PORT, 'GET', '/seo/health-insurance.html');
+        record('税优健康险落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税〔2017〕39 号 + 个税法第四条）',
+            hiPage.status === 200 && hiPage.raw.includes('rel="canonical"')
+            && hiPage.raw.includes('FAQPage')
+            && hiPage.raw.includes('财税〔2017〕39 号')
+            && hiPage.raw.includes('免征个人所得税'),
+            `HTTP ${hiPage.status}`);
+        const hiAnnualBlock = (hiPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const hiAnnualRows = Array.from(hiAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleHiRows = hiAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('税优健康险落地页静态年度税率表与常量文件逐档一致（页面不维护第二份口径）',
+            hiPage.status === 200 && hiAnnualRows.length === 7 && staleHiRows.length === 0
+            && hiPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && hiPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && hiPage.raw.includes('/src/js/calculation/health-insurance-quick.js'),
+            `页面 ${hiAnnualRows.length} 档, 与常量不一致 ${staleHiRows.length} 档`);
+        const hiRuleBlock = (hiPage.raw.split('id="hi-rule-table"')[1] || '').split('</table>')[0];
+        record('税优健康险落地页限额处理表与静态示例表可读（2400 元/年、200 元/月、赔款免税；240 / 480 / 1080 / 79）',
+            hiPage.status === 200 && hiRuleBlock.includes('2400 元/年')
+            && hiRuleBlock.includes('200 元/月')
+            && hiRuleBlock.includes('免征个人所得税')
+            && hiPage.raw.includes('>240.00<') && hiPage.raw.includes('>480.00<')
+            && hiPage.raw.includes('>1080.00<') && hiPage.raw.includes('>79.00<'), '');
+        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、只给节税上限且不构成购买建议），线索来源已入白名单',
+            hiPage.status === 200
+            && hiPage.raw.includes('少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额')
+            && hiPage.raw.includes('本页不构成购买建议')
+            && hiPage.raw.includes('税优识别码')
+            && leadSrc.includes("'seo_health_insurance'")
+            && hiPage.raw.includes('?source=seo_health_insurance'),
+            `HTTP ${hiPage.status}`);
+        const annuityPage = await request(PORT, 'GET', '/seo/enterprise-annuity.html');
+        record('企业年金落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（财税〔2013〕103 号 + 人社部令第 36 号）',
+            annuityPage.status === 200 && annuityPage.raw.includes('rel="canonical"')
+            && annuityPage.raw.includes('FAQPage')
+            && annuityPage.raw.includes('财税〔2013〕103 号')
+            && annuityPage.raw.includes('第 36 号'),
+            `HTTP ${annuityPage.status}`);
+        const annAnnualBlock = (annuityPage.raw.split('id="annual-rate-table"')[1] || '').split('</table>')[0];
+        const annAnnualRows = Array.from(annAnnualBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnRows = annAnnualRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        const annMonthlyBlock = (annuityPage.raw.split('id="monthly-rate-table"')[1] || '').split('</table>')[0];
+        const annMonthlyRows = Array.from(annMonthlyBlock.matchAll(/<td>([^<]+)<\/td><td class="num">([\d.]+)%<\/td><td class="num">([\d,]+)<\/td>/g))
+            .map((m) => ({ pct: Number(m[2]), deduction: Number(m[3].replace(/,/g, '')) }));
+        const staleAnnMonthly = annMonthlyRows.filter((r) => !constantsJs.raw.match(
+            new RegExp(`rate:\\s*${(r.pct / 100).toFixed(2)}\\s*,\\s*deduction:\\s*${r.deduction}`)
+        ));
+        record('企业年金落地页静态年度税率表与月度税率表均与常量文件逐档一致（页面不维护第二份口径）',
+            annuityPage.status === 200 && annAnnualRows.length === 7 && staleAnnRows.length === 0
+            && annMonthlyRows.length === 7 && staleAnnMonthly.length === 0
+            && annuityPage.raw.includes('/src/js/calculation/tax-constants.js')
+            && annuityPage.raw.includes('/src/js/calculation/tax-registry.js')
+            && annuityPage.raw.includes('/src/js/calculation/annuity-quick.js'),
+            `年度 ${annAnnualRows.length} 档(不一致 ${staleAnnRows.length}), 月度 ${annMonthlyRows.length} 档(不一致 ${staleAnnMonthly.length})`);
+        const annRuleBlock = (annuityPage.raw.split('id="annuity-rule-table"')[1] || '').split('</table>')[0];
+        record('企业年金落地页三环节表与静态示例表可读（4% / 8% / 12% / 300% 封顶 / 全额单独计税；10560 / 750 / 930 / −276）',
+            annuityPage.status === 200 && annRuleBlock.includes('4%')
+            && annRuleBlock.includes('8%') && annRuleBlock.includes('12%')
+            && annRuleBlock.includes('300%') && annRuleBlock.includes('全额')
+            && annuityPage.raw.includes('>10560.00<') && annuityPage.raw.includes('>750.00<')
+            && annuityPage.raw.includes('>930.00<') && annuityPage.raw.includes('>-276.00<'), '');
+        record('企业年金落地页写明三条易错口径（4% 封顶且基数 300% 封顶、领取全额含单位缴费、3% 档净优惠为负但单位缴费白得），线索来源已入白名单',
+            annuityPage.status === 200
+            && annuityPage.raw.includes('300%')
+            && annuityPage.raw.includes('税后工资扣')
+            && annuityPage.raw.includes('不并入综合所得')
+            && annuityPage.raw.includes('为负')
+            && annuityPage.raw.includes('单位缴费')
+            && leadSrc.includes("'seo_annuity'")
+            && annuityPage.raw.includes('?source=seo_annuity'),
+            `HTTP ${annuityPage.status}`);
         const deadLocs = [];
+        // 阶段15 入口补齐：已收录的落地页必须都能走回工具总目录。
+        // 此前 15 个页面各自只链 2~3 个「手挑」的邻居、App 里一个入口都没有，
+        // 页面数还在涨，这条断言用来防止新页面继续变成孤岛。
+        const orphanPages = [];
         for (const loc of sitemapLocs) {
             let pathname = loc;
             try { pathname = new URL(loc).pathname; } catch { /* 非绝对 URL：直接按路径探测 */ }
             // eslint-disable-next-line no-await-in-loop
             const probe = await request(PORT, 'GET', pathname);
             if (probe.status !== 200) deadLocs.push(`${pathname}=${probe.status}`);
+            if (/^\/seo\/[a-z-]+\.html$/.test(pathname) && pathname !== '/seo/index.html'
+                && !probe.raw.includes('href="/seo/index.html"')) {
+                orphanPages.push(pathname);
+            }
         }
         record('sitemap 内每条 URL 均可访问（防收录 404）',
             sitemapLocs.length > 0 && deadLocs.length === 0, deadLocs.join(', '));
+        record('已收录的每个落地页都能回到工具总目录 /seo/index.html（防新页面变孤岛）',
+            orphanPages.length === 0, orphanPages.join(', '));
+        const indexPage = await request(PORT, 'GET', '/seo/index.html');
+        const toolCards = (indexPage.raw.match(/class="tool-card/g) || []).length;
+        record('工具总目录列出全部 20 个落地页（卡片 + ItemList 结构化数据）',
+            indexPage.status === 200 && toolCards === 20 && indexPage.raw.includes('"numberOfItems": 20'),
+            `HTTP ${indexPage.status}, cards=${toolCards}`);
+        const appHome = await request(PORT, 'GET', '/');
+        record('App 首页底部有落地页总目录入口（防 App 内无通路）',
+            appHome.status === 200 && appHome.raw.includes('/seo/index.html?source=app_footer'),
+            `HTTP ${appHome.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
     }

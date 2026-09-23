@@ -1,0 +1,799 @@
+/* 工具箱与通用速算器页样式（纯 CSS，不依赖 Tailwind JIT，便于独立维护）
+   深色模式沿用项目约定：html.dark 下覆盖。 */
+
+/* ====== 搜索框 ====== */
+.tool-search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.tool-search-wrap .tool-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--c-text-3);
+    font-size: 13px;
+}
+
+.tool-search {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f9fafb;
+    outline: none;
+    transition: border-color .2s, background .2s;
+}
+
+.tool-search:focus {
+    border-color: #1e40af;
+    background: #fff;
+}
+
+/* ====== 分组 ====== */
+.tool-group {
+    margin-bottom: 14px;
+}
+
+.tool-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.tool-group-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.tool-group-desc {
+    font-size: 11px;
+    color: var(--c-text-3);
+}
+
+.tool-grid-1 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+/* 列数由「实际还剩多少宽度」决定，而不是由视口宽度决定 —— 现在有两个变量在改可用宽度：
+   视口变宽（S5 把工具页容器放到 1024）与助手侧栏推开（S6 再拿走 480）。
+   按视口写死列数，推开后 20 张卡会被压到约 170px；auto-fill 会自己算：
+   网格容器 ≥796px（3×260 + 2×8）才出第三列，否则退回两列。
+   260px 是「图标 + 标题 + 描述」不挤的最小卡宽；这里用 auto-fill 而非 auto-fit，
+   是为了让搜索结果里只有 1–2 条命中的分组也保持同一卡宽（auto-fit 会把孤零零的卡拉满整行）。 */
+@media (min-width: 768px) {
+    .tool-grid-1 {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+}
+
+/* ====== 工具条目 ====== */
+.tool-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: box-shadow .2s, border-color .2s, transform .15s;
+}
+
+.tool-entry:hover {
+    border-color: #c7d7fb;
+    /* 可点卡片 hover：统一取阴影第二档。
+       原为字面的品牌蓝辉光 0 6px 14px -6px rgba(30,64,175,.25) —— 与其他三类可点卡
+       各写一份同值副本，且深色模式没有对应档位，改为令牌后自动跟随 --sh-2。 */
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+}
+
+.tool-entry-icon {
+    flex: 0 0 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(30, 64, 175, .08);
+    color: #1e40af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.tool-entry-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tool-entry-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.tool-entry-desc {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-entry-arrow {
+    color: #d1d5db;
+    font-size: 15px;
+}
+
+/* ====== 徽标 ====== */
+.tool-badge {
+    font-size: 10px;
+    line-height: 1.4;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tool-badge-deep {
+    background: rgba(var(--c-brand-rgb), .1);
+    color: var(--c-brand);
+}
+
+.tool-badge-native {
+    background: rgba(16, 185, 129, .12);
+    color: var(--c-success-text);
+}
+
+.tool-badge-seo {
+    background: var(--c-surface-2);
+    color: var(--c-text-3);
+}
+
+.tool-badge-ok {
+    background: rgba(16, 185, 129, .12);
+    color: var(--c-success-text);
+}
+
+.tool-badge-warn {
+    background: rgba(245, 158, 11, .14);
+    color: var(--c-warning-text);
+}
+
+.tool-badge-danger {
+    background: rgba(239, 68, 68, .12);
+    color: var(--c-danger-text, #b91c1c);
+}
+
+.tool-empty {
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--c-text-3);
+}
+
+/* ====== 速算器表单 ====== */
+.tool-field {
+    margin-bottom: 12px;
+}
+
+.tool-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.tool-input-wrap {
+    position: relative;
+}
+
+.tool-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+    color: #1f2937;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-input:focus {
+    border-color: #1e40af;
+    /* 焦点环：取全站唯一的 --sh-focus。
+       原为同色但透明度仅 .12 —— 浅到几乎看不见，键盘用户很难确认焦点落在哪。
+       提到 .35 后与 --sh-focus 走同一条线（深色下由 --c-brand-rgb 自动换成浅蓝）。 */
+    box-shadow: var(--sh-focus);
+}
+
+.tool-input-unit {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--c-text-3);
+    pointer-events: none;
+}
+
+.tool-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #374151;
+}
+
+.tool-field-hint {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--c-text-3);
+    line-height: 1.5;
+}
+
+/* ====== 结果区 ====== */
+.tool-result-primary {
+    padding: 14px 16px;
+    border-radius: 10px;
+    /* 终点原为 blue-500(#3b82f6)：12px 标签白字压在它那端只有 3.1:1（再叠 .85 透明度更差）。
+       终点收到 blue-600(#2563eb) 后白字 5.15:1，起点 primary 那端本来就有 8.8:1。 */
+    background: linear-gradient(135deg, #1e40af, #2563eb);
+    color: #fff;
+}
+
+.tool-result-primary-label {
+    font-size: 12px;
+    /* 不再用 opacity 弱化：白字 × .85 在蓝色端只剩 4.17:1，12px 说明文字不达 AA。
+       层级靠字号（12px vs 24px/800）表达，不靠压低对比度。 */
+}
+
+.tool-result-primary-value {
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 2px;
+    letter-spacing: .5px;
+}
+
+.tool-result-rows {
+    margin-top: 10px;
+}
+
+.tool-result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px dashed #eef0f3;
+    font-size: 13px;
+}
+
+.tool-result-row:last-child {
+    border-bottom: none;
+}
+
+.tool-result-label {
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tool-result-hint {
+    color: #d1d5db;
+    cursor: help;
+}
+
+.tool-result-value {
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.tool-result-note {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 11.5px;
+    line-height: 1.7;
+    color: #6b7280;
+}
+
+/* ====== 易错口径 ====== */
+.tool-pitfall-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--c-warning-text);
+    margin-bottom: 6px;
+}
+
+.tool-pitfall ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.tool-pitfall li {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #6b7280;
+}
+
+/* ====== 分组图标（工具页「完整测算」组复用 tool-group-head） ====== */
+.tool-group-icon {
+    color: #1e40af;
+    font-size: 12px;
+    position: relative;
+    top: -1px;
+}
+
+/* ====== 工具页组内的操作条（阶段19-10a：「最近使用」的清空搬到这里） ======
+     黑色幽默都藏在细节里：原来首页那张卡上有颗「清空」，卡撤了不能把能力也带走 ——
+     列表只能靠新记录挤掉旧的，那不是收敛入口，那是丢功能。 */
+.tool-group-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 2px 6px;
+}
+
+.tool-group-action {
+    font-size: 12px;
+    /* --c-text-3 是「弱化正文」（浅色 #6b7280 ≈ 4.8:1），不可用灰到 #9ca3af 那一档 ——
+       那是禁用态专用色，做正文会不达 AA（见 tokens.css 里那条改色记录）。 */
+    color: var(--c-text-3);
+    padding: 2px 4px;
+    border-radius: 6px;
+    transition: color 0.15s ease;
+}
+
+.tool-group-action:hover {
+    color: var(--c-brand, #2563eb);
+    text-decoration: underline;
+}
+
+/* ====== 首页搜索入口（看起来是搜索框，点开进工具页并聚焦） ====== */
+.tool-search-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-search-entry:hover {
+    border-color: #c7d7fb;
+    box-shadow: var(--sh-2);
+}
+
+.tool-search-entry-icon {
+    color: var(--c-text-3);
+    font-size: 13px;
+}
+
+.tool-search-entry-text {
+    flex: 1 1 auto;
+    font-size: 13px;
+    color: var(--c-text-3);
+}
+
+.tool-search-entry-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+    white-space: nowrap;
+}
+
+/* ====== 首页「我是谁」场景卡 ====== */
+.scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+@media (min-width: 768px) {
+    .scenario-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .scenario-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+.scenario-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .2s, box-shadow .2s, transform .15s;
+}
+
+.scenario-card:hover {
+    border-color: #c7d7fb;
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+}
+
+.scenario-card .fa {
+    font-size: 15px;
+    color: #1e40af;
+    margin-bottom: 2px;
+}
+
+.scenario-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.scenario-desc {
+    font-size: 11px;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+/* ====== 工具页：按身份筛选的提示条 ====== */
+.tool-scenario-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(30, 64, 175, .07);
+    font-size: 12px;
+    color: #1e40af;
+}
+
+.tool-chip-clear {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e40af;
+    white-space: nowrap;
+}
+
+/* ====== 结果页「下一步」====== */
+.tool-next-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.tool-next-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+@media (min-width: 640px) {
+    .tool-next-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.tool-next-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: #374151;
+    text-align: left;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.tool-next-item:hover {
+    border-color: #c7d7fb;
+    box-shadow: var(--sh-2);
+}
+
+.tool-next-item .fa:first-child {
+    color: #1e40af;
+}
+
+.tool-next-item .fa:last-child {
+    margin-left: auto;
+    color: #d1d5db;
+}
+
+.tool-next-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tool-next-btn {
+    padding: 7px 14px;
+    border: 1px solid #c7d7fb;
+    border-radius: 8px;
+    background: #fff;
+    color: #1e40af;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+}
+
+.tool-next-btn:hover {
+    background: rgba(30, 64, 175, .06);
+}
+
+.tool-next-btn:disabled {
+    color: #047857;
+    border-color: #a7f3d0;
+    cursor: default;
+}
+
+/* ====== 手机底部 Tab 栏（只在顶层页显示，≥768px 让位给顶部 Tab 行） ======
+   色值 / 层级统一取 src/css/tokens.css，不要再写字面值。 */
+.bottom-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-tabbar);
+    display: flex;
+    border-top: 1px solid var(--c-border);
+    /* 必须半透明，backdrop-filter 才有意义（原实现就是 .96alpha） */
+    background: var(--c-surface-blur);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    /* 6+22+2+13+8 ≈ 52px 内容高，且整块满足 44px 最小触摸区 */
+    padding: 6px 0 8px;
+    min-height: 44px;
+    border: none;
+    background: transparent;
+    /* 原为 #9ca3af：白底对比度仅约 2.6:1，不达 WCAG AA。改用 --c-text-3(#6b7280) ≈ 4.8:1 */
+    color: var(--c-text-3);
+    font-size: var(--fs-micro);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--dur-micro) var(--ease);
+}
+
+.bottom-tab .fa {
+    font-size: 22px;
+    line-height: 22px;
+}
+
+.bottom-tab.active {
+    color: var(--c-brand);
+    font-weight: 600;
+}
+
+/* Tab 栏显示时为页面留出底部空间（避免遮住最后一张卡片）。
+   只在手机形态生效 —— 桌面没有底栏，不该白留一截。
+
+   为什么选 [data-page-container] 而不是选 .max-w-5xl 之类的宽度工具类：
+   本轮 S5 把工具页容器从 max-w-3xl(768) 加宽到 max-w-5xl(1024)，
+   而这里原本写的是 `#tools-page .max-w-3xl` —— 加宽一落地，选择器立刻匹配不到任何元素，
+   工具页最后一张卡片被底栏压住，且 jsdom 里看不出来（没有布局，测试照常全绿）。
+   宽度是**会被反复调的排版决策**，不该拿它当结构锚点；[data-page-container] 只表达
+   「这是这一页的内容容器」，与宽度解耦。两个顶层页各自在本容器的第一个 div 上标了它。 */
+@media (max-width: 767px) {
+    body.has-tabbar [data-page-container] {
+        padding-bottom: calc(var(--tabbar-h-mobile) + var(--sp-3));
+    }
+}
+
+/* 桌面形态下彻底收起底栏：即使 JS 判定「应显示」也不出现，
+   避免同一时刻出现两套导航。 */
+@media (min-width: 768px) {
+    .bottom-tabbar {
+        display: none !important;
+    }
+}
+
+/* ====== 桌面顶部 Tab 行（≥768px，样式与 .bottom-tab 同源于 tokens） ======
+   为什么必须坚持两套 DOM：手机导航在底部才落在拇指热区；桌面把 3 个 Tab
+   横贯 1440px 通栏，既浪费横向空间，也违背桌面「导航在上」的通用惯例。 */
+.top-tabbar {
+    /* sticky/top-14/z-40 等定位工具类由 Tailwind 提供，这里只补 brand 语义 */
+    height: var(--nav-h-tabrow);
+}
+
+.top-tab {
+    position: relative;
+    height: var(--nav-h-tabrow);
+    padding: 0 var(--sp-4);
+    border: none;
+    background: transparent;
+    color: var(--c-text-3);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--dur-micro) var(--ease),
+                background-color var(--dur-micro) var(--ease);
+}
+
+.top-tab:hover {
+    color: var(--c-brand);
+    background: var(--c-brand-subtle);
+}
+
+.top-tab.active {
+    color: var(--c-brand);
+    font-weight: 600;
+}
+
+/* 激活指示条：与 .tab-active 的 border-b-2 语汇一致 */
+.top-tab.active::after {
+    content: '';
+    position: absolute;
+    left: var(--sp-4);
+    right: var(--sp-4);
+    bottom: 0;
+    height: 2px;
+    background: var(--c-brand);
+}
+
+/* 键盘可见焦点（鼠标点击不触发，避免 Focus ring 干扰阅读） */
+.top-tab:focus-visible,
+.bottom-tab:focus-visible {
+    outline: 2px solid var(--c-brand);
+    outline-offset: -2px;
+}
+
+/* ====== 深色模式 ====== */
+.dark .tool-search {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark .tool-group-title,
+.dark .tool-entry-title,
+.dark .tool-result-value,
+.dark .tool-label {
+    color: #e5e7eb;
+}
+
+.dark .tool-entry {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .tool-entry:hover {
+    border-color: #3b82f6;
+}
+
+.dark .tool-entry-desc,
+.dark .tool-result-label,
+.dark .tool-field-hint,
+.dark .tool-pitfall li {
+    color: #9ca3af;
+}
+
+.dark .tool-entry-icon {
+    background: rgba(59, 130, 246, .15);
+    color: #60a5fa;
+}
+
+.dark .tool-result-row {
+    border-bottom-color: #374151;
+}
+
+.dark .tool-result-note {
+    background: #111827;
+    color: #9ca3af;
+}
+
+.dark .tool-input {
+    background: #111827;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark .tool-badge-seo {
+    background: #374151;
+    color: #d1d5db;
+}
+
+.dark .tool-group-icon {
+    color: #60a5fa;
+}
+
+.dark .tool-search-entry,
+.dark .scenario-card,
+.dark .tool-next-item {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .tool-search-entry:hover,
+.dark .scenario-card:hover,
+.dark .tool-next-item:hover {
+    border-color: #3b82f6;
+}
+
+.dark .scenario-name,
+.dark .tool-next-head {
+    color: #e5e7eb;
+}
+
+.dark .scenario-desc,
+.dark .tool-search-entry-text {
+    color: #9ca3af;
+}
+
+.dark .scenario-card .fa,
+.dark .tool-next-item .fa:first-child,
+.dark .tool-search-entry-count {
+    color: #60a5fa;
+}
+
+.dark .tool-next-item {
+    color: #d1d5db;
+}
+
+.dark .tool-next-btn {
+    background: #1f2937;
+    border-color: #3b82f6;
+    color: #60a5fa;
+}
+
+.dark .tool-scenario-chip {
+    background: rgba(59, 130, 246, .14);
+    color: #93c5fd;
+}
+
+.dark .tool-chip-clear {
+    color: #93c5fd;
+}
+
+.dark .bottom-tabbar {
+    background: rgba(17, 24, 39, .96);
+    border-top-color: #374151;
+}
+
+/* ====== 政策依据（页内展开，不外跳） ======
+   多条文号纵向排开时光靠字号分层不好扫读，左侧一道竖线把条目分开 */
+.tool-basis-item {
+    border-left: 2px solid var(--c-border);
+    padding-left: 8px;
+}
+
+.dark .bottom-tab.active {
+    color: #60a5fa;
+}

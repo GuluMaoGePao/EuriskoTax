@@ -239,16 +239,16 @@
         const container = document.getElementById('assistant-categories');
         if (!container) return;
 
-        const categories = ['all', '综合所得', '经营所得', '分类所得', '反向倒算', '汇算清缴', '政策法规'];
-        const labels = {
-            'all': '全部',
-            '综合所得': '综合所得',
-            '经营所得': '经营所得',
-            '分类所得': '分类所得',
-            '反向倒算': '反向倒算',
-            '汇算清缴': '汇算清缴',
-            '政策法规': '政策法规'
-        };
+        // 分类不再纯写死：以 QA 数据里实际出现的 category 为准，写死的 BASE 只负责「顺序」与空数据兜底。
+        // 以前这里是一份写死数组，运营在 tax-assistant.js 里加了新分类，筛选栏不会跟着长出来 —— 改成并集。
+        const BASE_CATEGORIES = ['all', '综合所得', '经营所得', '分类所得', '反向倒算', '汇算清缴', '政策法规'];
+        const categories = BASE_CATEGORIES.slice();
+        (window.TAX_ASSISTANT_QA || []).forEach(function (item) {
+            var c = item && item.category;
+            if (c && categories.indexOf(c) === -1) categories.push(c);
+        });
+        const labels = {};
+        categories.forEach(function (c) { labels[c] = (c === 'all' ? '全部' : c); });
 
         let html = categories.map(function (cat) {
             const active = (!favMode && cat === currentCategory) ? 'assistant-cat-active' : '';
@@ -319,8 +319,13 @@
 
             // 关联跳转按钮
             var relatedBtn = '';
-            if (item.related && item.related.page) {
-                relatedBtn = '<button class="assistant-related-btn" data-related-page="' + item.related.page + '">' +
+            // 17B-1：关联跳转支持两种写法 —— 存量页面用 page，spec 驱动的向导用 tool。
+            // 经营所得的旧页面整页删掉了，它的 5 条快捷入口改为 tool:'business'。
+            if (item.related && (item.related.tool || item.related.page)) {
+                var relatedAttr = item.related.tool
+                    ? 'data-related-tool="' + item.related.tool + '"'
+                    : 'data-related-page="' + item.related.page + '"';
+                relatedBtn = '<button class="assistant-related-btn" ' + relatedAttr + '>' +
                              '<i class="fa fa-calculator"></i> ' + escapeHtml(item.related.label || '去测算') +
                              ' <i class="fa fa-arrow-right"></i></button>';
             }
@@ -433,8 +438,18 @@
         container.querySelectorAll('.assistant-related-btn').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                var pageId = this.getAttribute('data-related-page');
-                goToRelatedPage(pageId);
+                // 17B-1：tool 型关联的去处是 spec 驱动的向导，而向导**不在** showPage 的页面列表里
+                // （它是渲染进 deep-wizard-page 的一段 DOM），所以这里单独走 EuriskoDeepWizard.open。
+                var toolId = this.getAttribute('data-related-tool');
+                if (toolId) {
+                    closeAssistant();
+                    var W = window.EuriskoDeepWizard;
+                    if (!W || !W.open(toolId)) {
+                        logger.warn('NAV', '向导不可用，无法跳转到关联测算', { tool: toolId });
+                    }
+                    return;
+                }
+                goToRelatedPage(this.getAttribute('data-related-page'));
             });
         });
     }
@@ -553,7 +568,9 @@
         }
 
         return '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">' +
-            '<div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-t-xl">' +
+            // 渐变起点原为 blue-500(#3b82f6)：白字压在它上面只有 3.68:1，不达 AA（16/18px 非大字）。
+            // 起点降到 blue-600(#2563eb) 后为 5.15:1；终点 indigo-600 本来就有 6.4:1，不动。
+            '<div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">' +
                 '<div class="flex justify-between items-center">' +
                     '<div class="flex items-center">' +
                         '<div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">' +
@@ -623,12 +640,24 @@
                     showRateTable();
                     break;
                 case 'goBonusCalc':
-                    // 跳转到综合所得计算页面，再切换到步骤1（参数入口）
-                    if (typeof showPage === 'function') {
-                        showPage('forward-calculation-page');
+                    // 年终奖已经有了「一屏算完」的速算器（工具页 → 一次性收入 → 年终奖）：
+                    // 能一屏算完就不要把人推进多步骤向导，这里优先开速算器，旧向导只作兜底。
+                    if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                        window.EuriskoToolbox.openTool('bonus-tax');
+                        break;
                     }
-                    if (typeof goToStep === 'function') {
-                        goToStep(1);
+                    // 17B-3（v1.49.0）：综合所得页随迁移删了，兜底改走它迁过去的向导；
+                    // 工具箱没初始化时这是唯一还能把人送到测算里的路。
+                    var BW = window.EuriskoDeepWizard;
+                    if (BW && BW.open('forward')) break;
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('综合所得测算暂不可用，请刷新页面后重试。');
+                    }
+                    break;
+                case 'goTools':
+                    // 看了答案要去算：交给工具页（24 个入口，按身份/场景分类 + 搜索）
+                    if (typeof showPage === 'function') {
+                        showPage('tools-page');
                     }
                     break;
                 case 'goHistory':
@@ -815,6 +844,9 @@
         isOpen = true;
         drawer.classList.add('assistant-drawer-open');
         drawer.classList.remove('assistant-drawer-closed');
+        // 桌面推开形态的唯一开关：是否推开、让出多少宽度，全部由 CSS 按视口宽度决定。
+        // JS 不判断宽度 —— 判断就要监听 resize，两端形态还得各维护一遍。
+        document.body.classList.add('assistant-open');
         clearFabCollapseTimer();
         if (fab) fab.style.display = 'none';
         if (overlay) overlay.classList.add('assistant-overlay-visible');
@@ -875,6 +907,8 @@
         isOpen = false;
         drawer.classList.remove('assistant-drawer-open');
         drawer.classList.add('assistant-drawer-closed');
+        // 必须摘掉标记：残留会让内容区永久留白一整个侧栏的宽度
+        document.body.classList.remove('assistant-open');
         if (fab) fab.style.display = 'flex';
         if (overlay) overlay.classList.remove('assistant-overlay-visible');
         // 关闭抽屉后恢复悬浮球：先完整露出一下再自动回缩为半隐（隐藏态则保持隐藏）
@@ -1097,7 +1131,8 @@
 
     // ====== FAB 位置：恢复 / 保存 / 应用 ======
     function applyFabPosition(fab, side, offsetTop) {
-        var maxTop = window.innerHeight - FAB_SIZE - FAB_MARGIN;
+        // 底部预留量按当前是否有底栏实时计算，避免把球塞进 Tab 栏占位里
+        var maxTop = window.innerHeight - FAB_SIZE - FAB_MARGIN - fabBottomReserved();
         var minTop = FAB_MARGIN;
         var rawTop = offsetTop;
         var top = Math.max(minTop, Math.min(maxTop, offsetTop));
@@ -1134,7 +1169,7 @@
 
     function restoreFabPosition(fab) {
         var side = 'right';
-        var offsetTop = window.innerHeight - FAB_SIZE - 24; // 默认右下角
+        var offsetTop = window.innerHeight - FAB_SIZE - 24 - fabBottomReserved(); // 默认右下角（避开底栏）
         var source = 'default';
         try {
             var saved = localStorage.getItem(STORAGE_KEY);
@@ -1198,6 +1233,18 @@
             if (flag) localStorage.setItem(FAB_HIDDEN_KEY, '1');
             else localStorage.removeItem(FAB_HIDDEN_KEY);
         } catch (err) {}
+    }
+
+    // ====== 悬浮球底部避让 ======
+    // 手机形态下底部 Tab 栏常驻占位：悬浮球默认停在距底 24px，正好落在 Tab 栏上，
+    // 而层级表里球(60) 高于 Tab 栏(45)，结果就是「税助手」压住导航按钮。
+    // 这里读 DOM 实测高度而不是写死 52px：底栏高度将来可能调，读实测量不会漂移；
+    // 桌面形态底栏 display:none，offsetHeight 自然为 0，无需再判断点。
+    function fabBottomReserved() {
+        var bar = document.getElementById('bottom-tabbar');
+        // 显式判一次 hidden：底栏被切走时不应再留白（计算页没有底栏）
+        if (!bar || bar.classList.contains('hidden')) return 0;
+        return bar.offsetHeight || 0;
     }
 
     // 半隐时需向外移出的距离：margin + 球宽 - 想露出的宽度
@@ -1374,7 +1421,8 @@
         var newLeft = dragState.origLeft + dx;
         var newTop = dragState.origTop + dy;
         var clampedLeft = Math.max(FAB_MARGIN, Math.min(window.innerWidth - FAB_SIZE - FAB_MARGIN, newLeft));
-        var clampedTop = Math.max(FAB_MARGIN, Math.min(window.innerHeight - FAB_SIZE - FAB_MARGIN, newTop));
+        var clampedTop = Math.max(FAB_MARGIN,
+            Math.min(window.innerHeight - FAB_SIZE - FAB_MARGIN - fabBottomReserved(), newTop));
 
         fab.style.left = clampedLeft + 'px';
         fab.style.top = clampedTop + 'px';

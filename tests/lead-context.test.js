@@ -67,19 +67,27 @@ describe('阶段13B+ 咨询情境 - 结果页真实摘要（读已渲染 DOM）'
         document.body.innerHTML = '';
     });
 
-    test('结果页尚未渲染（仍是占位符）时返回空 —— 不编造情境', () => {
+    // 17B-3（v1.49.0）：综合所得迁到 spec 驱动的向导后，情境不再是三个静态 id，而是
+    // 向导结果卡上的 dw-result-primary + data-dw-row 行（**运行时渲染**）。下面照 business
+    // 那一套拼：卡片必须带 data-tool-id，否则 readWizardText 会拒答（见「换工具不归因」那条）。
+    function renderForwardCard(primaryText, rows) {
+        const rowHtml = rows.map((r) => '<div data-dw-row="' + r.label + '">' +
+            '<span>' + r.label + '</span><span>' + r.value + '</span></div>').join('');
         document.body.innerHTML =
-            '<div id="result-net-income">¥0</div>' +
-            '<div id="result-refund-tax">¥0</div>' +
-            '<div id="result-tax-rate">0%</div>';
+            '<div id="dw-result-card" data-tool-id="forward">' +
+            '<div id="dw-result-primary">' + primaryText + '</div>' + rowHtml + '</div>';
+    }
+
+    test('结果页尚未渲染（仍是占位符）时返回空 —— 不编造情境', () => {
+        renderForwardCard('¥0', [{ label: '适用税率', value: '0%' }]);
         expect(LeadContext.current('forward')).toBe('');
     });
 
     test('已渲染时给出「类型 + 结论 + 税率」，且金额一律不进入返回值', () => {
-        document.body.innerHTML =
-            '<div id="result-net-income">¥253,080.00</div>' +
-            '<div id="result-refund-tax">应退 ¥3,120.00</div>' +
-            '<div id="result-tax-rate">20%</div>';
+        renderForwardCard('¥253,080.00', [
+            { label: '应退税额', value: '¥3,120.00' },
+            { label: '适用税率', value: '20%' }
+        ]);
 
         const scene = LeadContext.current('forward');
         expect(scene).toBe('综合所得年度汇算 · 预计退税 · 适用税率 20%');
@@ -88,13 +96,21 @@ describe('阶段13B+ 咨询情境 - 结果页真实摘要（读已渲染 DOM）'
         expect(scene).not.toContain('3,120');
     });
 
-    test('经营所得走自己的结果容器节点', () => {
+    test('经营所得走 spec 驱动的向导结果节点（按 data-tool-id 认人）', () => {
+        // 17B-1：经营所得的旧结果容器随页面整页删除，节点改在向导里渲染 ——
+        // 但向导是**通用渲染器**，dw-result-card 会被所有 spec 工具轮着用，必须认 data-tool-id。
         document.body.innerHTML =
-            '<div id="business-result-net-income">¥180,000.00</div>' +
-            '<div id="business-result-refund-tax">应补 ¥6,800.00</div>' +
-            '<div id="business-result-tax-rate">35%</div>';
+            '<div id="dw-result-card" data-tool-id="business">' +
+            '<div id="dw-result-primary">¥180,000.00</div>' +
+            '<div data-dw-row="应补税额">¥6,800.00</div>' +
+            '<div data-dw-row="适用税率">35%</div>' +
+            '</div>';
 
         expect(LeadContext.current('business')).toBe('经营所得年度汇算 · 预计补税 · 适用税率 35%');
+
+        // 换一个工具用同一个容器：不能把增值税算完当成经营所得的情境报给顾问
+        document.getElementById('dw-result-card').setAttribute('data-tool-id', 'vat-deep');
+        expect(LeadContext.current('business')).toBe('');
     });
 
     test('未知类型返回空（谈薪等不投服务引导的类型不会被凑出情境）', () => {
@@ -149,11 +165,15 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
             .forEach((id) => expect(INDEX_HTML).toContain('id="' + id + '"'));
     });
 
-    test('情境提取依赖的结果节点 id 在 index.html 中真实存在（改名会静默失效）', () => {
-        ['result-net-income', 'result-refund-tax', 'result-tax-rate',
-            'business-result-net-income', 'business-result-refund-tax', 'business-result-tax-rate',
-            'classification-result-net-income']
-            .forEach((id) => expect(INDEX_HTML).toContain('id="' + id + '"'));
+    test('情境提取依赖的结果节点：四个页面式 deep 都已迁走，全改成向导运行时节点', () => {
+        // 17B-4（v1.50.0）：分类所得（最后一个页面式 deep）也走了 spec 驱动的向导 ——
+        // 它那颗静态结果节点 classification-result-net-income 随页面删掉了，改走 wizard:primary 锚点
+        // （端到端守护在 tests/classification-migration.test.js）。
+        // 于是静态 HTML 里**一个**旧结果节点都不该剩下：结果节点现在是运行时渲染的
+        // （dw-result-card + data-tool-id），由各个 migration 测试的向导端到端用例守护，
+        // 含「换工具后不再归因」这条（认不出当前工具，情境就会串味）。
+        ['classification-result-net-income', 'result-net-income', 'result-refund-tax', 'result-tax-rate']
+            .forEach((id) => expect(INDEX_HTML).not.toContain('id="' + id + '"'));
     });
 
     test('本模块必须在 lead-modal.js 之前加载（弹窗打开时同步取用）', () => {
@@ -204,7 +224,7 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
     });
 
     test('「提交后会有人联系」只留一句话，成功态只确认「收到了」', () => {
-        expect(INDEX_HTML).toContain('提交后由后台顾问与您联系反馈');
+        expect(INDEX_HTML).toContain('提交后客服会与您联系');
         const start = INDEX_HTML.indexOf('id="lead-success"');
         const end = INDEX_HTML.indexOf('id="lead-modal-footer"', start);
         expect(start).toBeGreaterThan(-1);
@@ -253,7 +273,36 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
             expect(src).not.toContain('首次免费');
             expect(src).not.toContain('把漏填项找出来');
         });
-        // 触点承诺的是一次免费咨询，不是「顾问替你完成申报」
-        expect(readSrc('src/js/lead/lead-touchpoints.js')).toContain('免费咨询');
+        // 触点承诺的是一次免费协助（协助核对参数），不是「替你完成申报」
+        expect(readSrc('src/js/lead/lead-touchpoints.js')).toContain('免费协助');
+    });
+
+    // v1.37.8 ICP 备案内容合规：下面这些是**涉税专业服务**话术 —— 与页脚「仅供参考，不构成税务建议」
+    // 自相矛盾，且可能超出备案时填报的服务内容。谁把它们改回来，这条会红。
+    test('留资与触点文案不含涉税专业服务话术（备案后红线）', () => {
+        const touchpoints = readSrc('src/js/lead/lead-touchpoints.js');
+        [
+            '财税顾问 · 一对一',
+            '确认没问题再申报',
+            '>记账报税<',
+            '>申报核对<',
+            '>其他财税咨询<',
+            '提交后由后台顾问'
+        ].forEach((phrase) => {
+            expect(INDEX_HTML).not.toContain(phrase);
+        });
+        ['免费咨询', '申报前先核对', '避免多缴或漏扣'].forEach((phrase) => {
+            expect(touchpoints).not.toContain(phrase);
+        });
+    });
+
+    test('留资同意行带《隐私政策》入口（收集个人信息却无政策入口 = PIPL 告知-同意缺失）', () => {
+        const start = INDEX_HTML.indexOf('id="lead-modal-footer"');
+        const end = INDEX_HTML.indexOf('id="lead-submit-btn"', start);
+        expect(start).toBeGreaterThan(-1);
+        expect(end).toBeGreaterThan(start);
+        const block = INDEX_HTML.slice(start, end);
+        expect(block).toContain('隐私政策');
+        expect(block).toContain('openPolicyModal');
     });
 });

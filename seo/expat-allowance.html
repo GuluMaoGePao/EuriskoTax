@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-6）：高商业意图长尾词「外籍个人 津补贴 免税 / 住房补贴 免税 个税 /
+         外籍个人 专项附加扣除 二选一 / 外籍个人免税政策 2027」。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 免税项目与税率复用 App 同源实现（expat-allowance-quick.js + window.comprehensiveTaxRates
+              / window.expatAllowanceRules），页面上不出现第二份口径；
+           3) 政策依据文号与**到期日**来自税种注册表 tax-registry.js（15D-1），
+              到期提醒读 statusOf，页面不自己算日期；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背两条「纠偏」任务：
+           ① 津补贴免税与专项附加扣除是**二选一**，不能叠加；
+           ② 本政策**执行至 2027-12-31** —— 到期提醒必须写进正文，而不是写完就忘的装饰。 -->
+    <title>外籍个人津补贴免税 2026：与专项附加扣除怎么二选一（执行至 2027-12-31）</title>
+    <meta name="description" content="输入全年应纳税所得额、可免税津补贴与专项附加扣除，按 2026 年现行政策比较「津补贴免税」与「专项附加扣除」两条路径各少交多少个税，并给出更优方案与差额。含八项免税津补贴表、年度税率表与公开示例。政策依据：财政部 税务总局公告 2023 年第 29 号（执行至 2027-12-31）。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/expat-allowance.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="外籍个人津补贴免税 vs 专项附加扣除：怎么二选一">
+    <meta property="og:description" content="两条路各少交多少税、差多少、2028 年起怎么衔接，一算便知。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/expat-allowance.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 外籍个人津补贴免税测算",
+                "url": "https://euriskotax.zeabur.app/seo/expat-allowance.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "比较外籍个人津补贴免税与专项附加扣除两条路径的节税结果，并提示政策到期日。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "外籍个人可以同时享受津补贴免税和专项附加扣除吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不可以。符合居民个人条件的外籍个人可以选择享受个人所得税专项附加扣除，也可以选择按财税字〔1994〕020 号等规定享受住房补贴、语言训练费、子女教育费等津补贴免税优惠，但不得同时享受；一经选择，在一个纳税年度内不得变更。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "哪些津补贴可以免征个人所得税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "主要包括：以非现金形式或实报实销形式取得的住房补贴、伙食补贴、搬迁费、洗衣费；按合理标准取得的境内外出差补贴；经当地税务机关审核批准为合理部分的探亲费（每年不超过 2 次）、语言训练费、子女教育费等。依据财税字〔1994〕020 号与国税发〔1997〕54 号。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "外籍个人津补贴免税政策执行到什么时候？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "执行至 2027-12-31（财政部 税务总局公告 2023 年第 29 号）。本页测算按现行政策口径；2028 年起若政策未延续，外籍个人应按规定享受专项附加扣除，不再以津补贴免税替代。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "免税额就是少交的税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不是。免税与扣除降的都是应纳税所得额：少交的税 = 优惠前的应纳税额 − 优惠后的应纳税额。直接用「免税额 × 税率」在跨过档位分界点时会高估。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "港澳台居民也适用吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "适用。外籍个人取得港澳地区住房等补贴的征免问题另有专门规定（财税〔2004〕29 号），本页测算按同一套「二选一」口径处理，具体以主管税务机关审核为准。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，免税资格（是否非现金形式或实报实销、是否经税务机关审核批准）以主管税务机关认定为准。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_expat">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>外籍个人津补贴免税 vs 专项附加扣除：怎么二选一、能少交多少个税</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>符合居民个人条件的外籍个人（含港澳台）可以
+            <strong>二选一</strong> —— 要么享受个人所得税<strong>专项附加扣除</strong>，
+            要么按原规定享受<strong>住房补贴、语言训练费、子女教育费等津补贴免税</strong>，
+            <strong>不得同时享受，且一经选择在一个纳税年度内不得变更</strong>。
+            两条路降的都是<strong>应纳税所得额</strong>，所以「哪条更划算」要按
+            <strong>T(优惠前) − T(优惠后)</strong> 实算，不能简单比金额大小 ——
+            金额相同时两者相等，金额不同时还要看有没有跨过档位分界点。
+            <strong>本政策执行至 2027-12-31</strong>（财政部 税务总局公告 2023 年第 29 号）；
+            <strong>2028 年起若未延续，应按规定改为享受专项附加扣除</strong>。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">两条路径对比速算（免税津补贴 vs 专项附加扣除）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 240px">
+                    <label class="calc-label" for="taxable-input">优惠前全年应纳税所得额（元）</label>
+                    <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="allowance-input">全年可免税津补贴合计（元）</label>
+                    <input class="calc-input" id="allowance-input" type="number" inputmode="decimal" min="0" step="5000" value="60000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="special-input">全年专项附加扣除合计（元）</label>
+                    <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="5000" value="36000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                「优惠前全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除。
+                <strong>两条路径只能选一条</strong>：本页把两条各算一遍是为了比较，实际申报时选其一，
+                <strong>且一个纳税年度内不得变更</strong>。
+                免税津补贴须以<strong>非现金形式或实报实销形式</strong>取得，或按合理标准经税务机关审核批准。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result">
+                    <div class="k">方案 A：津补贴免税少交</div>
+                    <div class="v" id="r-a-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">方案 B：专项附加扣除少交</div>
+                    <div class="v" id="r-b-saved">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">更划算的一条</div>
+                    <div class="v" id="r-better">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">两条相差（元 / 年）</div>
+                    <div class="v" id="r-diff">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">优惠后应纳税所得额 A / B</div>
+                    <div class="v" id="r-after">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">政策到期提醒</div>
+                    <div class="v" id="r-expiry">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「八项免税津补贴表」「年度税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>八项免税津补贴与适用条件</h2>
+        <div class="table-scroll">
+            <table id="expat-item-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">项目与条件取自 App 常量 expatAllowanceRules（依据财税字〔1994〕020 号、国税发〔1997〕54 号）</caption>
+                <thead>
+                <tr>
+                    <th scope="col">项目</th>
+                    <th scope="col">免税条件</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>住房补贴</td><td>以非现金形式或实报实销形式取得</td></tr>
+                <tr><td>伙食补贴</td><td>以非现金形式或实报实销形式取得</td></tr>
+                <tr><td>搬迁费</td><td>以非现金形式或实报实销形式取得</td></tr>
+                <tr><td>洗衣费</td><td>以非现金形式或实报实销形式取得</td></tr>
+                <tr><td>境内、外出差补贴</td><td>按合理标准取得</td></tr>
+                <tr><td>探亲费</td><td>经当地税务机关审核批准为合理的部分（每年不超过 2 次）</td></tr>
+                <tr><td>语言训练费</td><td>经当地税务机关审核批准为合理的部分</td></tr>
+                <tr><td>子女教育费</td><td>经当地税务机关审核批准为合理的部分</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            前四项共同的前提是<strong>非现金形式或实报实销</strong>：直接发现金并入工资的，不属于免税范围。
+            探亲费、语言训练费、子女教育费则需要<strong>经税务机关审核批准为合理的部分</strong>才能免税。
+        </p>
+
+        <h2>年度综合所得税率表（两条路径共用同一张表）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；免税与扣除降低的都是「应纳税所得额」这一列</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：三种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">免税津补贴（元）</th>
+                    <th scope="col">专项附加扣除（元）</th>
+                    <th scope="col">方案 A 少交（元）</th>
+                    <th scope="col">方案 B 少交（元）</th>
+                    <th scope="col">更优</th>
+                    <th scope="col">相差（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>优惠前 20 万：津补贴多、扣除少</td><td class="num">60000.00</td><td class="num">36000.00</td><td class="num">11600.00</td><td class="num">7200.00</td><td>津补贴免税</td><td class="num">4400.00</td></tr>
+                <tr><td>优惠前 8 万：津补贴少、扣除多</td><td class="num">12000.00</td><td class="num">60000.00</td><td class="num">1200.00</td><td class="num">4880.00</td><td>专项附加扣除</td><td class="num">3680.00</td></tr>
+                <tr><td>优惠前 50 万：两者金额相同</td><td class="num">100000.00</td><td class="num">100000.00</td><td class="num">29000.00</td><td class="num">29000.00</td><td>两者相同</td><td class="num">0.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（免税项目、到期日与税率表取自 App 常量，可被运营在后台热改后同步），
+            并由 <code>tests/expat-allowance-quick.test.js</code> 与 App 内核逐点对拍守护。
+            第三种情形说明：<strong>两条路径金额相同时节税额必然相等</strong>，此时选哪条只看手续与凭证。
+        </p>
+
+        <h2>2028 年起怎么衔接（本政策执行至 2027-12-31）</h2>
+        <p>
+            现行口径来自《关于延续实施外籍个人有关津补贴个人所得税政策的公告》
+            （<strong>财政部 税务总局公告 2023 年第 29 号</strong>），<strong>执行至 2027-12-31</strong>。
+            本页的到期提醒由税种注册表统一给出（<code>tax-registry.js#statusOf</code>），
+            页面不自己算日期 —— 政策一改，改注册表一处即可。
+            <strong>2028 年起若政策未延续，外籍个人应按规定改为享受专项附加扣除</strong>，
+            不再以津补贴免税替代；届时本页「方案 A」将不再可用，只剩「方案 B」。
+        </p>
+        <p class="small muted">
+            到期提醒不是装饰：前一版过渡口径（财税〔2018〕164 号第七条）就曾到 2021-12-31 结束、
+            随后由 2023 年第 29 号公告延续到 2027-12-31。<strong>跨年度适用前请先核对当年是否仍在执行期内</strong>。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 二选一，不是叠加；且一年内不得变更</h3>
+        <p>
+            享受津补贴免税就<strong>不能同时</strong>扣专项附加扣除，反过来也一样。
+            并且<strong>一经选择，在一个纳税年度内不得变更</strong> ——
+            所以比较必须在年初做，不能年中反悔。
+        </p>
+        <h3>2. 免税与扣除降的都是「应纳税所得额」，不是直接减税额</h3>
+        <p>
+            少交的税 = <strong>T(优惠前) − T(优惠后)</strong>，跨过档位分界点时
+            「金额 × 税率」会高估。这也是为什么「津补贴更多」不一定总更省：
+            两条路的金额不同、跨档情况不同，必须实算。
+        </p>
+        <h3>3. 免税有形式和审批要求</h3>
+        <p>
+            住房补贴、伙食补贴、搬迁费、洗衣费须<strong>以非现金形式或实报实销形式</strong>取得；
+            探亲费（每年不超过 2 次）、语言训练费、子女教育费须<strong>经当地税务机关审核批准为合理的部分</strong>。
+            形式不符合或未经审核的，不能免税。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>外籍个人可以同时享受津补贴免税和专项附加扣除吗？</summary>
+            <p>不可以。符合居民个人条件的外籍个人可以选择享受个人所得税专项附加扣除，也可以选择按财税字〔1994〕020 号等规定享受住房补贴、语言训练费、子女教育费等津补贴免税优惠，但不得同时享受；一经选择，在一个纳税年度内不得变更。</p>
+        </details>
+        <details>
+            <summary>哪些津补贴可以免征个人所得税？</summary>
+            <p>主要包括：以非现金形式或实报实销形式取得的住房补贴、伙食补贴、搬迁费、洗衣费；按合理标准取得的境内外出差补贴；经当地税务机关审核批准为合理部分的探亲费（每年不超过 2 次）、语言训练费、子女教育费等。依据财税字〔1994〕020 号与国税发〔1997〕54 号。</p>
+        </details>
+        <details>
+            <summary>外籍个人津补贴免税政策执行到什么时候？</summary>
+            <p>执行至 2027-12-31（财政部 税务总局公告 2023 年第 29 号）。本页测算按现行政策口径；2028 年起若政策未延续，外籍个人应按规定享受专项附加扣除，不再以津补贴免税替代。</p>
+        </details>
+        <details>
+            <summary>免税额就是少交的税吗？</summary>
+            <p>不是。免税与扣除降的都是应纳税所得额：少交的税 = 优惠前的应纳税额 − 优惠后的应纳税额。直接用「免税额 × 税率」在跨过档位分界点时会高估。</p>
+        </details>
+        <details>
+            <summary>港澳台居民也适用吗？</summary>
+            <p>适用。外籍个人取得港澳地区住房等补贴的征免问题另有专门规定（财税〔2004〕29 号），本页测算按同一套「二选一」口径处理，具体以主管税务机关审核为准。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，免税资格（是否非现金形式或实报实销、是否经税务机关审核批准）以主管税务机关认定为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把两条路径放进全年账一起算</h2>
+            <p>输入全年工资、社保公积金与扣除/免税项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_expat">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
+        <p>政策依据：《关于延续实施外籍个人有关津补贴个人所得税政策的公告》（财政部 税务总局公告 2023 年第 29 号，执行至 2027-12-31）、《关于个人所得税若干政策问题的通知》（财税字〔1994〕020 号）、《关于外籍个人取得有关补贴征免个人所得税执行问题的通知》（国税发〔1997〕54 号）、《关于外籍个人取得港澳地区住房等补贴征免个人所得税的通知》（财税〔2004〕29 号）。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/expat-allowance.html">外籍个人津补贴免税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js              —— 出厂税率表与免税项目（comprehensiveTaxRates / expatAllowanceRules）
+       tax-registry.js               —— 税种注册表（15D-1）：政策依据文号、生效/到期日与到期提醒
+       tax-rates-sync.js             —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       expat-allowance-quick.js      —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/expat-allowance-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var taxableInput = document.getElementById('taxable-input');
+    var allowanceInput = document.getElementById('allowance-input');
+    var specialInput = document.getElementById('special-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoExpatAllowanceQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // 到期提醒一律问注册表（statusOf），页面不自己算日期：政策一改，改注册表一处即可
+    function expiryText(status) {
+        var expiresOn = quick && quick.rules() ? quick.rules().expiresOn : null;
+        if (!status || !status.expiresOn) return '无到期日';
+        if (status.expired) return '已于 ' + status.expiresOn + ' 到期（请核对当年口径）';
+        if (status.daysLeft === null) return '执行至 ' + status.expiresOn;
+        return '执行至 ' + status.expiresOn + '（还剩 ' + status.daysLeft + ' 天）';
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「八项免税津补贴表」「年度税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var r = quick.compareOf({
+            taxableBefore: taxableInput ? taxableInput.value : 0,
+            allowanceAnnual: allowanceInput ? allowanceInput.value : 0,
+            specialAnnual: specialInput ? specialInput.value : 0
+        });
+
+        var betterText = r.better === 'allowance' ? '方案 A：津补贴免税'
+            : (r.better === 'special' ? '方案 B：专项附加扣除' : '两者相同');
+
+        document.getElementById('r-a-saved').textContent = money(r.allowance.saved) + ' 元';
+        document.getElementById('r-b-saved').textContent = money(r.special.saved) + ' 元';
+        document.getElementById('r-better').textContent = betterText;
+        document.getElementById('r-diff').textContent = money(Math.abs(r.diff)) + ' 元';
+        document.getElementById('r-after').textContent = money(r.allowance.taxableAfter) + ' / ' + money(r.special.taxableAfter) + ' 元';
+        document.getElementById('r-expiry').textContent = expiryText(r.status);
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('方案 A 少交 <strong>' + money(r.allowance.saved) + ' 元</strong>，方案 B 少交 <strong>'
+            + money(r.special.saved) + ' 元</strong>，' + (r.better === 'same'
+                ? '两者<strong>相同</strong>，选哪条只看手续与凭证。'
+                : '<strong>' + betterText + '</strong> 更划算，全年相差 ' + money(Math.abs(r.diff)) + ' 元。'));
+        parts.push('注意：两条路径<strong>只能选一条，且一个纳税年度内不得变更</strong>，本页同时算出两条只是为了比较。');
+        if (r.taxableBefore <= 0) {
+            parts.push('请填写「优惠前全年应纳税所得额」，否则无法估算少交的税。');
+        }
+        if (r.status && !r.status.expired) {
+            parts.push('本政策' + expiryText(r.status) + '；<strong>2028 年起若未延续，应改为享受专项附加扣除</strong>。');
+        } else if (r.status && r.status.expired) {
+            parts.push('<strong>本政策已到期</strong>，请按当年口径改用专项附加扣除。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [taxableInput, allowanceInput, specialInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', render);
+        el.addEventListener('change', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>

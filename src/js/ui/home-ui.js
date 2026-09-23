@@ -31,9 +31,12 @@
         }
     };
 
-    // ====== 数据：税务节点表（配置化，便于后续扩展） ======
-    // type: ongoing(进行中) | upcoming(即将到来) | expired(已结束但仍提示)
-    const TAX_NODES = [
+    // ====== 数据：税务节点表 ======
+    // 真源在 home-mission.js（阶段19-2）—— 那里要用节点表做 Mission 判定与待办推导。
+    // 这里**只是兜底**：tests/home-page.test.js 只 eval 本文件（不加载 home-mission.js），
+    // 若改成硬依赖会立刻红。两份必须逐字一致 —— 改节点口径时先改 home-mission.js 再同步这里。
+    // type: settlement(汇算区间) | policy(政策有效期) | prepaid(按期申报)
+    const TAX_NODES = (window.EuriskoHomeMission && window.EuriskoHomeMission.nodes) || [
         {
             id: 'comprehensive-settlement',
             name: '综合所得汇算清缴',
@@ -281,6 +284,505 @@
         `).join('');
     }
 
+    // ====== 渲染：Mission Hero（阶段19-2）======
+    // 首屏那句话与那颗按钮由 home-mission.js 判定（首访 / 有历史 / 临近节点），这里只负责落 DOM。
+    // 依赖缺失（home-mission.js 没加载、或 DOM 里没有 Hero 容器）时**静默跳过**，不弹错、不改其余卡片。
+    function renderMission() {
+        const titleEl = document.getElementById('home-mission-title');
+        const subEl = document.getElementById('home-mission-subtitle');
+        if (!titleEl && !subEl) return;
+        const M = window.EuriskoHomeMission;
+        if (!M || typeof M.detectMission !== 'function') return;
+
+        const mission = M.detectMission({ history: readHistoryForMission() });
+        if (titleEl) titleEl.textContent = mission.title;
+        if (subEl) subEl.textContent = mission.subtitle;
+
+        const cta = document.getElementById('home-mission-cta');
+        const ctaText = document.getElementById('home-mission-cta-text');
+        if (ctaText) ctaText.textContent = mission.cta.text;
+        if (cta) {
+            cta.setAttribute('data-mission-action', mission.cta.action);
+            cta.setAttribute('data-mission-target', String(mission.cta.target || ''));
+        }
+
+        // 次要动作只在「有历史」态出现（换个方案对比 = 回到事件轴重新挑）
+        const alt = document.getElementById('home-mission-alt');
+        if (alt) {
+            if (mission.altCta) {
+                alt.textContent = mission.altCta.text + ' ›';
+                alt.setAttribute('data-mission-action', mission.altCta.action);
+                alt.setAttribute('data-mission-target', String(mission.altCta.target || ''));
+                alt.classList.remove('hidden');
+            } else {
+                alt.classList.add('hidden');
+            }
+        }
+    }
+
+    // Mission 要读历史：优先内存镜像，兜底 localStorage（与 renderRecentCalculations 同一口径）
+    function readHistoryForMission() {
+        if (typeof syncCalculationHistoryFromStorage === 'function') {
+            try { syncCalculationHistoryFromStorage(); } catch (e) { /* 测试环境可能没有，忽略 */ }
+        }
+        if (typeof calculationHistory !== 'undefined' && Array.isArray(calculationHistory)) {
+            return calculationHistory;
+        }
+        try {
+            const list = JSON.parse(localStorage.getItem('taxCalculationHistory') || '[]');
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Hero 的 CTA：只有两种动作 —— 滚到事件轴 / 打开上次那条记录
+    function setupMissionCta() {
+        const bind = function (el) {
+            if (!el) return;
+            el.addEventListener('click', function () {
+                const action = this.getAttribute('data-mission-action');
+                const target = this.getAttribute('data-mission-target');
+                if (action === 'scroll') {
+                    const anchor = document.getElementById(target || 'home-event-rail');
+                    if (anchor && typeof anchor.scrollIntoView === 'function') {
+                        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    return;
+                }
+                if (action === 'open-last' && target && typeof viewHistoryRecord === 'function') {
+                    viewHistoryRecord(target);
+                }
+            });
+        };
+        bind(document.getElementById('home-mission-cta'));
+        bind(document.getElementById('home-mission-alt'));
+    }
+
+    // ====== 渲染：上轴 · 事件卡「我遇到了什么事」（阶段19-2）======
+    // 数据是生活语言（不发年终奖→bonus-tax），渲染成横向滑动卡片组；**任何断点都不折叠**。
+    function renderEventRail() {
+        const rail = document.getElementById('home-event-rail');
+        if (!rail) return;
+        const M = window.EuriskoHomeMission;
+        const cards = M && Array.isArray(M.eventCards) ? M.eventCards : [];
+        if (!cards.length) return;
+
+        rail.innerHTML = cards.map(c => `
+            <button type="button" class="event-card" data-event="${c.id}" data-tool="${c.target}"
+                    data-alt-tool="${c.altTarget || ''}" data-decide="${c.decide ? '1' : ''}">
+                <div class="event-card__title"><i class="fa ${c.icon} text-primary mr-2"></i>${c.title}</div>
+                <div class="event-card__hint">${c.desc}</div>
+                <div class="mt-2 text-xs text-primary">${c.decide ? '先判定，再算 ›' : '去算 ›'}</div>
+            </button>
+        `).join('');
+
+        rail.querySelectorAll('.event-card').forEach(btn => {
+            btn.addEventListener('click', function () {
+                openEventTarget(this.getAttribute('data-tool'),
+                    this.getAttribute('data-alt-tool'),
+                    this.getAttribute('data-decide') === '1');
+            });
+        });
+    }
+
+    // 打开事件卡落到哪个工具：第 8 张（开店 / 私活）先问一句再进 —— 劳务报酬与经营所得的
+    // 口径完全不同，猜错就是算错，这是自由职业者最大的断点（plan §3.3.3）
+    function openEventTarget(toolId, altToolId, needDecide) {
+        const open = function (id) {
+            if (!id) return;
+            if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                window.EuriskoToolbox.openTool(id);
+            }
+        };
+        if (needDecide && typeof showConfirm === 'function') {
+            showConfirm(
+                '这笔收入更接近哪一种？算错口径，结果会差很多。\n\n· 按次结算、对方代扣（劳务报酬）\n· 持续经营、自负盈亏（经营所得）',
+                function () { open(toolId); },      // 确定 → 劳务报酬
+                function () { open(altToolId); }    // 取消 → 经营所得
+            );
+            return;
+        }
+        open(toolId);
+    }
+
+    // ====== 渲染：我的税务资产（阶段19-2）======
+    // 只给回访用户看：待办与截止（税务日历 × 已保存测算）+ 今年税负概览（≥2 次测算才出现）。
+    function renderAssets() {
+        const card = document.getElementById('home-assets-card');
+        const box = document.getElementById('home-assets-list');
+        if (!card || !box) return;
+        const M = window.EuriskoHomeMission;
+        if (!M) return;
+
+        const history = readHistoryForMission();
+        const todos = M.buildTodos({ history });
+        const overview = M.buildYearOverview(history);
+        const yearEl = document.getElementById('home-assets-year');
+        if (yearEl) yearEl.textContent = `${overview.year} 年`;
+
+        const parts = [];
+
+        todos.forEach(t => {
+            const days = t.daysLeft > 0 ? `剩 ${t.daysLeft} 天` : '今天截止';
+            parts.push(`
+                <div class="flex items-center gap-2">
+                    <i class="fa fa-clock-o ${t.daysLeft <= 7 ? 'text-danger' : 'text-primary'}"></i>
+                    <span class="flex-1 truncate">${t.name}</span>
+                    <span class="text-xs text-gray-500">${t.deadline}</span>
+                    <span class="text-xs ${t.daysLeft <= 7 ? 'text-danger' : 'text-gray-500'}">${days}</span>
+                </div>
+            `);
+        });
+
+        if (overview.visible) {
+            const bars = overview.items.slice(0, 4).map(x => `
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 w-20 truncate">${x.name}</span>
+                    <span class="progress-line flex-1"><span class="progress-line__fill" style="width:${x.pct}%"></span></span>
+                    <span class="text-xs text-gray-500">¥${x.tax.toFixed(0)}</span>
+                </div>
+            `).join('');
+            parts.push(`
+                <div class="mt-1">
+                    <div class="text-xs text-gray-500 mb-1">今年已测算的税额构成（共 ¥${overview.total.toFixed(0)}）</div>
+                    ${bars}
+                </div>
+            `);
+        }
+
+        if (!parts.length) {
+            card.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+        card.classList.remove('hidden');
+        box.innerHTML = parts.join('');
+    }
+
+    // ====== 渲染：漏填提醒（阶段19-2 遗留 · §3.3 ④）======
+    // 判定不自己写：completeness（漏了哪几项）与 shouldNudge（尊重「暂不」）都在 tax-profile.js 里，
+    // 首页只负责落 DOM —— 与结果页引导卡共用同一份判定，不会两边各长一套口径（19-5b 的教训）。
+    //
+    // 出口为什么开**速算器**而不是跳「我的 → 我的情况」：那张编辑卡在 profile 页（要登录），
+    // 而免登录可直接算是本站的主线；算一遍对应工具既能把值补上（tax-profile.absorb 会吸回档案），
+    // 也不必再写第二套补档案的表单。
+    var MISSING_TOOL_OF = {
+        identity: null,          // 身份没有"补填工具"：滚到首页身份卡组，挑一个当默认视角
+        city: 'social-base',     // 城市决定社保基数 → 社保公积金
+        social: 'social-base',
+        deductions: 'special-deduction',
+        bonus: 'bonus-tax'
+    };
+
+    function missingLib() {
+        var L = window.EuriskoTaxProfile;
+        return (L && L.pure && typeof L.pure.completeness === 'function') ? L : null;
+    }
+
+    /**
+     * 纯建模：档案 → 这张卡该不该出、漏了哪几项、出口开哪个工具。
+     * 只说**漏了什么**，**不含任何金额** —— 漏项能省多少钱取决于几个子女 / 怎么分摊，
+     * 不知道还硬算，算出来的「可能多缴 ¥1,200」就是假的（与省钱卡同一条规矩）。
+     */
+    function buildMissingModel(profile) {
+        var none = {
+            visible: false, percent: 0, filled: 0, total: 0,
+            missing: [], first: null, cta: null, deductionMissed: false
+        };
+        var L = missingLib();
+        if (!L || !profile) return none;
+        var c = L.pure.completeness(profile);
+        // 「暂不」是永久的（19-5）：用户在结果页说过别再提，首页换个地方再提就是骚扰
+        if (typeof L.shouldNudge === 'function' && !L.shouldNudge()) return none;
+        // 一项都没填的新客：提醒"你漏了 5 项"是噪音（那是结果页引导卡的活）；全填完也不占位
+        if (!(c.filled > 0) || !c.missing.length) return none;
+
+        var first = c.missing[0];
+        var toolId = MISSING_TOOL_OF[first.key] || null;
+        return {
+            visible: true,
+            percent: c.percent,
+            filled: c.filled,
+            total: c.total,
+            missing: c.missing.map(function (it) { return { key: it.key, label: it.label }; }),
+            first: { key: first.key, label: first.label },
+            cta: toolId
+                ? { action: 'tool', target: toolId, text: '去补填：' + first.label }
+                : { action: 'scroll', target: 'home-scenarios', text: '挑一个身份当默认视角' },
+            deductionMissed: c.missing.some(function (it) { return it.key === 'deductions'; })
+        };
+    }
+
+    function renderMissing() {
+        var card = document.getElementById('home-missing-card');
+        var box = document.getElementById('home-missing-body');
+        if (!card || !box) return;
+        var L = missingLib();
+        var model = buildMissingModel(L ? L.get() : null);
+        var progress = document.getElementById('home-missing-progress');
+
+        if (!model.visible) {
+            card.classList.add('hidden');
+            box.innerHTML = '';
+            if (progress) progress.textContent = '';
+            return;
+        }
+
+        card.classList.remove('hidden');
+        if (progress) progress.textContent = '我的情况 ' + model.filled + '/' + model.total;
+        box.innerHTML =
+            '<p class="whoami-hint">这几项还没填，测算会按「没享受」的口径算 —— 可能多缴。' +
+            '补全后下次测算自动带上，不用每次重填一遍。</p>' +
+            (model.deductionMissed
+                ? '<p class="whoami-hint">专项附加扣除最容易漏 —— 它直接减少应纳税所得额。</p>'
+                : '') +
+            '<div class="home-missing-chips">' + model.missing.map(function (m) {
+                return '<span class="profile-chip home-missing-chip">' + m.label + '</span>';
+            }).join('') + '</div>' +
+            '<div class="home-missing-actions">' +
+            '<button type="button" class="btn btn-primary home-missing-cta" data-action="' + model.cta.action +
+            '" data-target="' + model.cta.target + '">' + model.cta.text + '</button>' +
+            '</div>';
+    }
+
+    // 卡内内容每次重画，事件绑在卡片上（委托）——绑在按钮上会随重画丢掉
+    function setupMissingCta() {
+        var card = document.getElementById('home-missing-card');
+        if (!card || card.getAttribute('data-missing-bound') === '1') return;
+        card.setAttribute('data-missing-bound', '1');
+        card.addEventListener('click', function (e) {
+            var btn = e.target.closest('.home-missing-cta');
+            if (!btn) return;
+            var action = btn.getAttribute('data-action');
+            var target = btn.getAttribute('data-target');
+            if (action === 'tool') {
+                if (window.EuriskoToolbox && typeof window.EuriskoToolbox.openTool === 'function') {
+                    window.EuriskoToolbox.openTool(target);
+                }
+                return;
+            }
+            var anchor = document.getElementById(target || '');
+            if (anchor && typeof anchor.scrollIntoView === 'function') {
+                anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
+    // ====== 渲染：我的方案 / 台账（阶段19-2 遗留清偿④ · §3.3.5 ①）======
+    // 「最近计算」是一次性流水：算完往历史里一扔，下次打开首页它还是"上次算了个什么"，
+    // 看不出**存了几套方案、这个月办到哪一步**。这一段补的就是这两层资产心智。
+    //
+    // 两条规矩（与漏填提醒卡同一套）：
+    //   ① **零感知**：没存过方案 / 没有台账行 → 整段不出现，新客看到的还是原来那张流水卡；
+    //   ② **出口必须是真出口**：方案 → 方案库弹窗（scenario-ui 的 openLibrary），
+    //      台账 → 已有台账弹窗（entity-ui 的 openLedger）。段里不出现点了没反应的东西。
+
+    // 本文件原先没有转义函数：卡片文案都走的模板字符串。方案名与主体名是**用户自己起的**，
+    // 拼进 innerHTML 之前必须转义（名字里带个 < 就把卡片结构吃掉了）。
+    function esc(s) {
+        return String(s === undefined || s === null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // 千分位自己写：toLocaleString 的产出随运行环境 ICU 变，断言会跟着飘。
+    function money(n) {
+        var v = Math.round(Number(n) || 0);
+        return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function planLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoScenarios : null;
+    }
+    function ledgerLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoLedger : null;
+    }
+    function entityLib() {
+        return (typeof window !== 'undefined') ? window.EuriskoEntities : null;
+    }
+
+    // 方案的「可比数额」：取两套方案**共有**的指标里那条像税额的
+    // （年度应纳税额 / 应纳增值税 / 应补税额 …），取不到就不说差额 —— 不猜、不补 0。
+    //
+    // v1.98.0 之前只看 summary.taxTotal，那是综合所得独有的字段：速算器存进来的方案
+    // 一句差额都说不出。现在任何工具都能存（方案按自己的口径存指标），所以这里改成
+    // 先看两套口径对不对得上（compareRows 取交集），再决定拿哪一行做差。
+    function diffRowOf(list) {
+        var SUI = (typeof window !== 'undefined') ? window.EuriskoScenarioUI : null;
+        if (!SUI || !SUI.pure || typeof SUI.pure.compareRows !== 'function') return null;
+        var cmp = SUI.pure.compareRows(list);
+        if (!cmp || !cmp.comparable || !cmp.rows || !cmp.rows.length) return null;
+
+        var money = cmp.rows.filter(function (r) {
+            return r.kind === 'money'
+                && r.cells.every(function (v) { return typeof v === 'number' && isFinite(v); });
+        });
+        if (!money.length) return null;
+        // 只认税额类：说「差 ¥X」却不说是差在哪一项上，等于让人自己猜比的是什么
+        var taxLike = money.filter(function (r) { return /应纳|税额|应缴|实缴|应补|应退|补缴/.test(r.label); });
+        return taxLike.length ? taxLike[0] : null;
+    }
+
+    /**
+     * 纯建模：方案列表 → 这一行该说什么。
+     * 只报**存了几套**与**差额**，不评价哪套好（那是对比表里"最优"标签的活，
+     * 首页没有列出所有指标，标"最优"就是拿一半信息下结论）。
+     */
+    function buildPlanModel(list, isPro) {
+        var lib = planLib();
+        var limit = (lib && typeof lib.limitFor === 'function')
+            ? lib.limitFor(!!isPro)
+            : (isPro ? 10 : 2);
+        var items = Array.isArray(list) ? list : [];
+        if (!items.length) return { visible: false, count: 0, limit: limit, full: false, diff: null };
+
+        var diff = null;
+        if (items.length >= 2) {
+            // 两套方案的指标要对得上才比：跨工具（交集为空）时硬凑一个差额，
+            // 减出来的数字能算，但那个差没有意义 —— 那就是拿假结论冒充对比。
+            var row = diffRowOf(items);
+            if (row) {
+                var pairs = items.map(function (s, i) {
+                    return { name: (s && s.name) || '未命名方案', tax: Number(row.cells[i]) };
+                }).filter(function (x) { return isFinite(x.tax); });
+                if (pairs.length >= 2) {
+                    pairs.sort(function (a, b) { return b.tax - a.tax; });
+                    var hi = pairs[0];
+                    var lo = pairs[pairs.length - 1];
+                    // 两套税额一样时不说"差 ¥0"（那句听着像坏了），说"税额相同"
+                    diff = { hi: hi.name, lo: lo.name, amount: Math.abs(hi.tax - lo.tax), same: hi.tax === lo.tax };
+                }
+            }
+        }
+        return {
+            visible: true,
+            count: items.length,
+            limit: limit,
+            full: items.length >= limit,
+            isPro: !!isPro,
+            diff: diff
+        };
+    }
+
+    /**
+     * 纯建模：台账行 → 这一行该说什么。只说最近一个期间（台账的默认视图就是"这个月"）。
+     * 未申报 = 状态没走到「已申报」的行数（含"已算""已导出"）—— 它是**办到哪一步**，
+     * 不是"逾期"：系统不催任何人，也没有逾期这一天的数据。
+     */
+    function buildLedgerModel(groups, nameOfEntity) {
+        var list = Array.isArray(groups) ? groups : [];
+        var g = list.filter(function (x) { return x && x.rows && x.rows.length; })[0];
+        if (!g) return { visible: false, total: 0, undeclared: 0, entityName: '' };
+
+        var undeclared = g.rows.filter(function (r) { return r.status !== 'filed'; }).length;
+        // 主体名只在**这一格每一行都归到同一个主体**时才说：
+        // 混着"不按主体"的行时，报出的那个名字只覆盖了其中几条 —— 那就是拿一半信息冒充全部。
+        var ids = {};
+        g.rows.forEach(function (r) { if (r.entityId) ids[r.entityId] = true; });
+        var keys = Object.keys(ids);
+        var allSame = g.rows.length > 0 && keys.length === 1
+            && g.rows.every(function (r) { return !!r.entityId; });
+        var entityName = (allSame && typeof nameOfEntity === 'function')
+            ? (nameOfEntity(keys[0]) || '') : '';
+
+        return {
+            visible: true,
+            label: g.label || '',
+            total: g.rows.length,
+            undeclared: undeclared,
+            entityName: entityName
+        };
+    }
+
+    function renderPlans() {
+        var box = document.getElementById('home-plans-box');
+        if (!box) return;
+
+        var isPro = false;
+        var planUIMaybe = (typeof window !== 'undefined') ? window.EuriskoScenarioUI : null;
+        if (planUIMaybe && typeof planUIMaybe.getIsPro === 'function') {
+            try { isPro = !!planUIMaybe.getIsPro(); } catch (e) { isPro = false; }
+        }
+
+        var parts = [];
+
+        var SL = planLib();
+        var plan = buildPlanModel(SL && typeof SL.list === 'function' ? SL.list() : [], isPro);
+        if (plan.visible) {
+            // 上限照实说（免费 2/2 已用满）。**不挂升级按钮** —— 升级入口全局只有顶栏 pill
+            // 与个人中心两处（19-6b 定下的纪律），这里再长一颗就是第三处。
+            var quota = '已存 ' + plan.count + '/' + plan.limit + ' 套'
+                + (plan.isPro ? '' : (plan.full ? '（专业版 10 套）' : ''));
+            var diffText = '';
+            if (plan.diff) {
+                diffText = plan.diff.same
+                    ? ' · ' + esc(plan.diff.hi) + ' / ' + esc(plan.diff.lo) + ' 税额相同'
+                    : ' · ' + esc(plan.diff.hi) + ' / ' + esc(plan.diff.lo) + ' 差 ¥' + money(plan.diff.amount);
+            }
+            parts.push(
+                '<div class="plans-row">' +
+                '<span class="plans-row-main">' +
+                '<span class="plans-title"><i class="fa fa-columns mr-1.5"></i>方案对比</span>' +
+                '<span class="plans-meta">' + esc(quota) + diffText + '</span>' +
+                '</span>' +
+                '<button type="button" class="plans-go" data-plans-open="library">看对比 ›</button>' +
+                '</div>'
+            );
+        }
+
+        var LL = ledgerLib();
+        if (LL && typeof LL.visibleRows === 'function') {
+            var groups = (typeof LL.groupByPeriod === 'function') ? LL.groupByPeriod(LL.visibleRows()) : [];
+            var EL = entityLib();
+            var nameOf = function (id) {
+                if (!EL || typeof EL.byId !== 'function') return '';
+                var e = EL.byId(id);
+                return e ? (e.name || '') : '';
+            };
+            var led = buildLedgerModel(groups, nameOf);
+            if (led.visible) {
+                var meta = esc(led.label) + ' · 已算 ' + led.total + ' 条'
+                    + (led.undeclared ? ' · ' + led.undeclared + ' 条未申报' : ' · 都已申报')
+                    + (led.entityName ? ' · ' + esc(led.entityName) : '');
+                parts.push(
+                    '<div class="plans-row">' +
+                    '<span class="plans-row-main">' +
+                    '<span class="plans-title"><i class="fa fa-book mr-1.5"></i>台账</span>' +
+                    '<span class="plans-meta">' + meta + '</span>' +
+                    '</span>' +
+                    '<button type="button" class="plans-go" data-plans-open="ledger">我的台账 ›</button>' +
+                    '</div>'
+                );
+            }
+        }
+
+        var label = document.getElementById('home-plans-recent-label');
+        if (!parts.length) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            // 没有那两段时，下面就是整张卡唯一的列表 —— 再加一句「最近算过」是废话
+            if (label) label.classList.add('hidden');
+            return;
+        }
+        box.classList.remove('hidden');
+        box.innerHTML = parts.join('');
+        if (label) label.classList.remove('hidden');
+
+        box.querySelectorAll('[data-plans-open]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var what = this.getAttribute('data-plans-open');
+                if (what === 'library') {
+                    var SUI = window.EuriskoScenarioUI;
+                    if (SUI && typeof SUI.openLibrary === 'function') SUI.openLibrary();
+                } else if (what === 'ledger') {
+                    var EUI = window.EuriskoEntityUI;
+                    if (EUI && typeof EUI.openLedger === 'function') EUI.openLedger();
+                }
+            });
+        });
+    }
+
     // ====== 渲染：最近计算（横向滑动） ======
     function renderRecentCalculations() {
         const container = document.getElementById('home-recent-list');
@@ -329,7 +831,9 @@
             comprehensive: { name: '综合所得', icon: 'fa-calculator', color: 'text-primary' },
             business: { name: '经营所得', icon: 'fa-briefcase', color: 'text-accent' },
             classification: { name: '分类所得', icon: 'fa-list-alt', color: 'text-success' },
-            reverse: { name: '反向倒算', icon: 'fa-refresh', color: 'text-secondary' }
+            reverse: { name: '反向倒算', icon: 'fa-refresh', color: 'text-secondary' },
+            // 20 个单页速算器保存的结果（toolbox-ui 写入 type: 'quick'）
+            quick: { name: '速算器', icon: 'fa-bolt', color: 'text-primary' }
         };
 
         container.innerHTML = sorted.map(item => {
@@ -346,7 +850,7 @@
                     <div class="flex items-center mb-2">
                         <i class="fa ${type.icon} ${type.color} mr-2"></i>
                         <span class="text-xs font-medium text-gray-700">${type.name}</span>
-                        <span class="ml-auto text-xs text-gray-400">${dateStr}</span>
+                        <span class="ml-auto text-xs text-gray-500">${dateStr}</span>
                     </div>
                     <div class="text-xs text-gray-500 mb-1 truncate">${title}</div>
                     <div class="text-sm font-bold text-primary">应纳税 ${taxStr}</div>
@@ -440,7 +944,7 @@
                     <span class="tax-reminder-dot ${item.color}"></span>
                     <div class="flex-1 min-w-0">
                         <div class="text-sm text-gray-700 truncate">${item.name}</div>
-                        <div class="text-xs text-gray-400">${item.date}</div>
+                        <div class="text-xs text-gray-500">${item.date}</div>
                     </div>
                     <span class="text-xs ${urgencyColor} font-medium ml-2 flex-shrink-0">${daysText}</span>
                 </div>
@@ -580,18 +1084,60 @@
         const renderStart = performance.now();
         HomePerf.measure('initHome → 渲染问候语与日期', renderGreeting);
         HomePerf.measure('initHome → 渲染今日税感', renderTaxFeel);
+        HomePerf.measure('initHome → 渲染我的方案 / 台账', renderPlans);
         HomePerf.measure('initHome → 渲染最近计算', renderRecentCalculations);
         HomePerf.measure('initHome → 渲染税务日历', renderTaxCalendar);
         HomePerf.measure('initHome → 渲染税务小贴士', renderTaxTip);
-        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 5 });
+        // 阶段19-2：首屏 Mission（三态判定）+ 上轴事件卡 + 我的税务资产
+        HomePerf.measure('initHome → 渲染 Mission Hero', renderMission);
+        HomePerf.measure('initHome → 渲染事件卡上轴', renderEventRail);
+        HomePerf.measure('initHome → 渲染我的税务资产', renderAssets);
+        HomePerf.measure('initHome → 渲染漏填提醒', renderMissing);
+        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 9 });
 
+        setupMissionCta();
+        setupMissingCta();
         setupModeCards();
         setupInteractions();
+
+        // 档案在别处被补了一项，首页这张卡要跟着少一项 —— 否则还挂着已经补上的项，等于骗人
+        var profileLib = missingLib();
+        if (profileLib && typeof profileLib.onChange === 'function') {
+            profileLib.onChange(renderMissing);
+        }
+    }
+
+    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近计算，还要刷新 Mission 与资产 ——
+    // 「首访 → 有历史」的切换就发生在保存之后，只刷最近计算会留下一个还在问「你今年要交多少税」的过期首屏。
+    // 阶段19-10a：这里原本还顺手刷一下首页「最近使用」卡（调的是 refreshRecentTools）。
+    // 那个函数全仓**没有定义** —— typeof 判空让它永远安静地跳过，卡也因此从来不刷新。
+    // 卡已随入口清理撤掉（同一份数据在工具页第一组），这段一并删，不留假接线。
+    function refreshHomeRecent() {
+        renderPlans();             // 存了方案 / 归档了台账，这两行要跟着变
+        renderRecentCalculations();
+        renderMission();
+        renderAssets();
+        renderMissing();   // 算完可能刚补上一项，这张卡的漏项要跟着变
     }
 
     // 暴露到全局
     window.initHome = initHome;
-    window.refreshHomeRecent = renderRecentCalculations; // 保存计算后可调用刷新
+    window.refreshHomeRecent = refreshHomeRecent; // 保存计算后可调用刷新
+    window.renderEventRail = renderEventRail;
+    window.renderMission = renderMission;
+    window.renderAssets = renderAssets;
+    window.renderMissing = renderMissing;
+    window.renderPlans = renderPlans;
+    // 判定的纯函数单独导出：单测可以只问「该不该出卡、出口开哪个」，不必拼一整个首页
+    window.EuriskoHomeMissing = {
+        pure: { buildMissingModel: buildMissingModel, MISSING_TOOL_OF: MISSING_TOOL_OF },
+        render: renderMissing
+    };
+    // 同一套路：建模是纯函数（单测直接问「该说什么」），渲染只负责落 DOM
+    window.EuriskoHomePlans = {
+        pure: { buildPlanModel: buildPlanModel, buildLedgerModel: buildLedgerModel, diffRowOf: diffRowOf, money: money },
+        render: renderPlans
+    };
 
     // DOM 就绪后自动初始化
     if (document.readyState === 'loading') {

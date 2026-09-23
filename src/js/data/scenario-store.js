@@ -97,6 +97,45 @@
         };
     }
 
+    // 由工具结果对象生成对比指标（v1.98.0 · 纯函数）
+    //
+    // 在此之前方案库只认综合所得：对比指标写死在 scenario-ui 的 METRICS 里（税前 / 税后 /
+    // 税额 / 税负率 / 月均 / 年终奖口径），别的工具存进去，缺的那几项会被 fmtValue 补成
+    // ¥0.00 —— 假数据比没有更糟。现在每个方案存**自己的**指标行（主结果 + 明细行），
+    // 对比时取交集：同一工具的两套天然可比；跨工具时交集常常是空的，那就各看各的。
+    //
+    // 两条纪律：
+    //   ① 指标**不带**「越小越优 / 越大越优」的判断 —— 通用化之后猜不出来（「应退税额」
+    //      越大越好，「应纳增值税」越小越好），猜错就是把错的那个标成最优。老口径那六项的
+    //      best 留在 scenario-ui 的 METRICS 里，只对那六项生效。
+    //   ② 取不到就是 null（界面显示 —），不补 0。
+    function buildMetrics(out) {
+        var o = out || {};
+        var list = [];
+        var seen = {};
+        function push(item) {
+            if (!item || !item.label) return;
+            var label = String(item.label);
+            if (seen[label]) return;                    // 主结果与明细行同名时只留一行
+            seen[label] = true;
+            var kind = item.kind || 'text';
+            var raw = item.value;
+            var n = Number(raw);
+            var numeric = (kind === 'money' || kind === 'percent' || kind === 'number');
+            // 空值先判：Number(null) 是 0，先算数字会把「没算出来」记成「算出来是零」
+            // —— 那正是方案库从前的老毛病（缺的指标被补成 ¥0.00）。
+            list.push({
+                label: label,
+                kind: kind,
+                value: (raw === undefined || raw === null || raw === '') ? null
+                    : (numeric && Number.isFinite(n)) ? n : String(raw)
+            });
+        }
+        push(o.primary);
+        (Array.isArray(o.rows) ? o.rows : []).forEach(push);
+        return list;
+    }
+
     // 生成方案 id（时间戳 + 随机后缀，避免同毫秒内连续保存冲突）
     function makeId() {
         return 'sc_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -207,6 +246,7 @@
         pure: {
             normalize: normalize,
             buildSummary: buildSummary,
+            buildMetrics: buildMetrics,
             upsert: upsert,
             removeById: removeById,
             filterByOwner: filterByOwner,

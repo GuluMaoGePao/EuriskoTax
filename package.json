@@ -1,8 +1,11 @@
 {
   "name": "EuriskoTax",
-  "version": "1.17.0",
+  "version": "1.104.0",
   "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
+    "build:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --minify && tailwindcss -i src/css/admin.src.css -o src/css/admin.css --minify",
+    "watch:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --watch",
+    "prebuild": "npm run build:css",
     "build": "echo 'Build complete - all files ready to deploy'",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
@@ -10,11 +13,13 @@
     "verify:local": "node server/scripts/verify-local-auth.js",
     "verify:pg": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1",
     "verify:pg:fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1 -Fresh",
-    "verify:release": "node tools/ops/preflight-release.js"
+    "verify:release": "node tools/ops/preflight-release.js",
+    "smoke:ui": "node tools/ops/ui-smoke-all-tools.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
+    "jest-environment-jsdom": "^29.7.0",
+    "tailwindcss": "^3.4.17"
   },
   "jest": {
     "testEnvironment": "jsdom",
@@ -30,6 +35,8 @@
       "src/js/calculation/bonus-tax-quick.js",
       "src/js/calculation/salary-tax-quick.js",
       "src/js/calculation/annual-settlement-quick.js",
+      "src/js/calculation/withholding-quick.js",
+      "src/js/calculation/tax-registry.js",
       "src/js/data/scenario-store.js",
       "src/js/data/tax-rates-sync.js",
       "src/js/ui/scenario-ui.js",

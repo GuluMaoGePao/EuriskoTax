@@ -16,6 +16,19 @@
 #   .\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"  # push 走代理（仅本次生效，不改 git 全局配置）
 #   .\tools\ops\ops-publish.ps1 -NoAutoTag              # 跳过发布后自动打版本标签（默认按 package.json version 打 vX.Y.Z）
 #   .\tools\ops\ops-publish.ps1 -NoSeedProd             # 跳过发布后生产内容种子（默认自动、幂等）
+#
+# 从别的脚本里非交互调用（无人在终端敲参数）时，注意别踩这个坑：
+#   Start-Process -ArgumentList "-File", $脚本, "-CommitMsg", "feat: 中文说明 带空格"
+#   —— 数组元素只是被空格拼成一条命令行，**PowerShell 不会替带空格的元素补引号**，
+#      于是提交说明被拆成多个参数：第一个词进 -CommitMsg，剩下的按位置绑到后续参数上，
+#      典型报错「无法处理对参数"PollMaxSeconds"的参数转换…转换为 System.Int32」（实测踩过，
+#      绑定阶段就退出，不会 add / commit / push，工作区保持原样）。
+#   两种正确写法（任选）：
+#     1) 整体给一条 -Command，引号自己负责：
+#        Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-Command",
+#          "& '<脚本绝对路径>' -CommitMsg 'feat: 中文说明 带空格'"
+#     2) 不开新进程，直接 & 调用（当前会话里已是 PowerShell）：
+#        & .\tools\ops\ops-publish.ps1 -CommitMsg "feat: 中文说明 带空格"
 # =============================================================================
 param(
     [string]$CommitMsg = "",

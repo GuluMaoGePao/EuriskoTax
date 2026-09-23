@@ -1,5 +1,7 @@
 # 阶段10：免费 / 专业版体系 实施方案（v1.0 · 10A+10B 已随 v1.7.0 发布）
 
+> 🟡 **已关闭阶段 · 只作回查**：本阶段已全部交付收口，文中的进度与基线数字是当时快照。当前进度看 [development-plan.md](./development-plan.md) 的阶段状态表，现状口径看 [文档中心「当前状态」](../README.md)。
+
 > 对应 [development-plan.md](./development-plan.md)「阶段10：免费/专业版体系」。
 > 规划日期：2026-09-07 · 项目版本基线：v1.6.0（含 SW 网络优先瘦缓存、反馈落库闭环、匿名计算埋点）
 > 状态：**10A + 10B 已落地并随 v1.7.0 发布（2026-09-10）**（10A 后端地基 a29bd12 + 前端同步链路 8f3195a；10B 政策要点更新 + 专业版汇算清缴报告，同批上线运维管理后台与反馈附图）。发布后门禁补至 `verify:local` 52/52（附图链路 + 运维后台用户端点），见文末决策记录。
@@ -186,13 +188,14 @@ Day5  联调 + 扩展单测/冒烟断言 + 双端手工验收矩阵
 ```
 
 ### Definition of Done（10A）
-- [ ] 注册/登录按 `SEED_GRANT_PRO` 自动 pro，profile 返回 plan
-- [ ] A 设备离线算 3 条 → 登录自动上传成功；B 设备登录拉取到 3 条（含结果可打开回看）
-- [ ] 双端同一条冲突：updatedAt 新者胜；一端删除，另一端同步后消失（墓碑生效）
-- [ ] 离线计算 → 联网后自动补齐同步；连续失败不丢本地数据
-- [ ] 免费 gate：模拟 `free` 账号点云同步/PDF 入口 → 出现登录/升级引导，计算功能完全不受影响
-- [ ] 历史 >500 条拒绝并中文提示；同步端点在 `GET /api/docs` 有 Swagger
-- [ ] 新冒烟断言入 `verify:local` 与 `ops-check-prod.ps1`
+> 2026-09-17 补记：此前头部称「已落地」而以下七项全未勾选，属收口遗漏（台账 H 项）。现按**今日可查证的验证载体**逐项勾销 —— 不盲勾，每项注明依据；若日后载体下线，此表即为回溯入口。
+- [x] 注册/登录按 `SEED_GRANT_PRO` 自动 pro，profile 返回 plan —— `authService.js`（`seedGrantEnabled`）；`verify:local` e2e「登录 → GET /profile 校验 plan=pro」
+- [x] A 设备离线算 3 条 → 登录自动上传成功；B 设备登录拉取到 3 条（含结果可打开回看） —— 引擎语义由 `tests/history-sync.test.js`（toPayload 快照携带 title/date/results = 拉回可回看）+ `verify:local` e2e「上传/全量拉取、幂等」覆盖；双真机矩阵未单独留痕，以引擎断言为准
+- [x] 双端同一条冲突：updatedAt 新者胜；一端删除，另一端同步后消失（墓碑生效） —— `verify:local` e2e「冲突新者胜、墓碑广播」；单测「云端不旧于本地 → 云端覆盖」「deletedClientIds 删除本地记录并清除对应墓碑」
+- [x] 离线计算 → 联网后自动补齐同步；连续失败不丢本地数据 —— 单测「云端空回包（空账号）不清空本端尚未同步记录」；本地历史始终是唯一数据源（本地优先架构，云端为覆盖层）
+- [x] 免费 gate：模拟 `free` 账号点云同步/PDF 入口 → 出现登录/升级引导，计算功能完全不受影响 —— `verify:local` e2e「free 账号 403 PRO_REQUIRED」
+- [x] 历史 >500 条拒绝并中文提示；同步端点在 `GET /api/docs` 有 Swagger —— `calculations.js` 路由注记（409 HISTORY_LIMIT_REACHED，上限 500）；`verify:local` e2e「SYNC_MAX_RECORDS 上限拒绝」
+- [x] 新冒烟断言入 `verify:local` 与 `ops-check-prod.ps1` —— `verify:local` 现含「阶段10A 云端同步链路」整段（见 `verify-local-auth.js` 头注）；`tools/ops/ops-check-prod.ps1` 含「index.html 加载 plan/history-sync 脚本」「云同步入口 DOM」「auth-ui 集成云同步引擎」等线上指纹
 
 ### 测试与回归
 - 新增：sync upsert 幂等/冲突、墓碑、上限、free 账号拒绝同步（`tests/` 沿用既有框架）

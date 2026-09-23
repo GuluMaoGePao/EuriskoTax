@@ -40,11 +40,13 @@ describe('工资个税累计预扣：落地页实现 ≡ App 内核', () => {
         expect(window.EuriskoTaxConstants.comprehensiveTaxRates.length).toBe(7);
     });
 
-    test('起征点与主站表单 #basic-deduction 的固定值一致（防止两处各写一份）', () => {
+    test('起征点与内核同源（主站表单那份已随综合所得页删除）', () => {
         const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-        const m = indexHtml.match(/id="basic-deduction"[^>]*value="(\d+)"/);
-        expect(m).not.toBeNull();
-        expect(window.EuriskoSalaryQuick.BASIC_DEDUCTION).toBe(Number(m[1]));
+        // 17B-3（v1.49.0）：主站表单那个只读的 #basic-deduction 输入框随综合所得页删了 ——
+        // 它原先是「两处各写一份 5000」的另一半（删它之前，这一条就是在给两份常量对账）。
+        // 现在 5000 只在 tax-constants.basicDeduction 与速算器里各出现一次，
+        // 口径同源改由「速算器与内核共读同一份 comprehensiveTaxRates」这类对拍守住。
+        expect(indexHtml).not.toContain('id="basic-deduction"');
         expect(window.EuriskoSalaryQuick.BASIC_DEDUCTION).toBe(5000);
     });
 

@@ -3,20 +3,41 @@
  * 刻意不引 Tailwind / Font Awesome / 任何 CDN：
  *   落地页的首要指标是首屏速度与可抓取性，主站那套「Tailwind + 图标字体」是为交互型应用服务的。
  *   这里手写约 4KB 的共享 CSS，所有落地页复用，页面本身不含内联样式表。
- *   视觉仍与主站同一品牌色（#1e40af），避免用户从落地页跳到 App 时感觉换了产品。
+ *   视觉仍与主站同一品牌色，避免用户从落地页跳到 App 时感觉换了产品 ——
+ *   而「同一品牌色」不再靠两处各写一份 hex 来保证：共享语义色取自 src/css/tokens.css
+ *   （设计令牌唯一真源），本文件只做一层别名映射。每个落地页须先加载 tokens.css，有测试钉住。
  */
 
 :root {
-    --brand: #1e40af;
-    --brand-dark: #1e3a8a;
-    --ink: #111827;
-    --muted: #4b5563;
-    --line: #e5e7eb;
-    --bg: #f8fafc;
-    --card: #ffffff;
-    --ok: #047857;
-    --warn: #b45309;
-    --warn-bg: #fffbeb;
+    /* ====== 共享语义色：一律取自设计令牌 ======
+       此前 --brand / --ink 等是逐字写死的 hex，与 App 端同一品牌色存在两份，
+       改版必漂移。现在本文件不持有任何品牌 / 文字 / 成功 / 告警的字面值。 */
+    --brand:      var(--c-brand);
+    --brand-dark: var(--c-brand-hover);
+    --brand-tint: var(--c-brand-subtle); /* 答案框 / 高亮结果 / CTA 悬停底 */
+    --brand-line: var(--c-brand-line);   /* 幽灵按钮描边 / 展开块描边 */
+    --ink:        var(--c-text);
+    --muted:      var(--c-text-2);
+    --line:       var(--c-border);
+    --bg:         var(--c-bg-2);         /* 页面底（令牌 gray-50；原值 slate-50，肉眼无差） */
+    --card:       var(--c-bg);
+    --ok:         var(--c-success-text);
+    --warn:       var(--c-warning-text);
+    --warn-bg:    var(--c-warning-bg);
+    --warn-line:  var(--c-warning-line);
+
+    /* ====== 落地页局部色 ======
+       输入描边、焦点环、下凹面、提示正文、CTA 渐变终点、新角标 —— 这些没有 App 对应语义，
+       硬塞进全局令牌只会稀释那份表的含义，所以集中在这一段：改版时一眼看全，不会漏。
+       判定标准很简单：凡是换个产品也该跟着变的（品牌 / 文字 / 边框 / 成功 / 告警）取令牌；
+       只属于落地页版式的留在这里。 */
+    --input-line:     #cbd5e1;
+    --focus-ring:     #bfdbfe;
+    --surface-sunken: #f1f5f9;
+    --hint-ink:       #78350f;
+    --brand-grad-end: #4338ca;
+    --badge-new-bg:   #fee2e2;
+    --badge-new-ink:  #b91c1c;
 }
 
 * { box-sizing: border-box; }
@@ -27,8 +48,10 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    font-size: 16px;
+    /* 字体栈与正文字号同样取令牌：此前这里另写了一份 system-ui 栈（漏了 Arial），
+       与 App 端同源但不同值 —— 正是「两套体系各自维护」的典型漂移。 */
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
     line-height: 1.75;
 }
 
@@ -75,7 +98,7 @@ a { color: var(--brand); }
 
 .btn-primary { background: var(--brand); color: #fff; }
 .btn-primary:hover { background: var(--brand-dark); }
-.btn-ghost { background: #fff; color: var(--brand); border-color: #c7d2fe; }
+.btn-ghost { background: #fff; color: var(--brand); border-color: var(--brand-line); }
 .btn-ghost:hover { border-color: var(--brand); }
 .btn-sm { padding: 7px 14px; font-size: 14px; }
 
@@ -90,7 +113,7 @@ p { margin: 0 0 14px; }
 .muted { color: var(--muted); }
 .small { font-size: 13.5px; }
 .answer {
-    background: #eef2ff;
+    background: var(--brand-tint);
     border-left: 3px solid var(--brand);
     border-radius: 0 10px 10px 0;
     padding: 14px 18px;
@@ -115,12 +138,15 @@ p { margin: 0 0 14px; }
     min-width: 0;
     padding: 12px 14px;
     font-size: 17px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--input-line);
     border-radius: 10px;
     font-variant-numeric: tabular-nums;
 }
 
-.calc-input:focus { outline: 2px solid #bfdbfe; border-color: var(--brand); }
+.calc-input:focus { outline: 2px solid var(--focus-ring); border-color: var(--brand); }
+
+/* 下拉（劳务报酬页的「所得类型 / 全年适用税率档」）：与输入框同一视觉，去掉系统描边 */
+select.calc-input { appearance: none; -webkit-appearance: none; background: var(--card); cursor: pointer; }
 
 .results {
     display: grid;
@@ -130,7 +156,7 @@ p { margin: 0 0 14px; }
 }
 
 .result {
-    background: #f1f5f9;
+    background: var(--surface-sunken);
     border-radius: 12px;
     padding: 14px 16px;
 }
@@ -144,17 +170,17 @@ p { margin: 0 0 14px; }
     letter-spacing: -0.01em;
 }
 
-.result.highlight { background: #eef2ff; }
+.result.highlight { background: var(--brand-tint); }
 .result.highlight .v { color: var(--brand); }
 
 .hint {
     margin-top: 16px;
     background: var(--warn-bg);
-    border: 1px solid #fde68a;
+    border: 1px solid var(--warn-line);
     border-radius: 10px;
     padding: 12px 14px;
     font-size: 14.5px;
-    color: #78350f;
+    color: var(--hint-ink);
 }
 
 .hint strong { color: var(--warn); }
@@ -165,7 +191,7 @@ p { margin: 0 0 14px; }
 table { border-collapse: collapse; width: 100%; font-size: 15px; }
 th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: right; white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
-thead th { background: #f1f5f9; font-weight: 600; }
+thead th { background: var(--surface-sunken); font-weight: 600; }
 td.num { font-variant-numeric: tabular-nums; }
 tbody tr:last-child td { border-bottom: 0; }
 
@@ -178,14 +204,14 @@ details {
     margin-bottom: 10px;
 }
 
-details[open] { border-color: #c7d2fe; }
+details[open] { border-color: var(--brand-line); }
 summary { cursor: pointer; font-weight: 600; }
 summary::marker { color: var(--brand); }
 details p { margin: 10px 0 2px; color: var(--muted); }
 
 /* ---------- 行动号召 ---------- */
 .cta {
-    background: linear-gradient(120deg, #1e40af, #4338ca);
+    background: linear-gradient(120deg, var(--brand), var(--brand-grad-end));
     color: #fff;
     border-radius: 16px;
     padding: 26px;
@@ -193,9 +219,45 @@ details p { margin: 10px 0 2px; color: var(--muted); }
 }
 
 .cta h2 { color: #fff; margin: 0 0 8px; }
-.cta p { color: #dbeafe; margin-bottom: 16px; }
+.cta p { color: var(--brand-tint); margin-bottom: 16px; }
 .cta .btn-primary { background: #fff; color: var(--brand); }
-.cta .btn-primary:hover { background: #eef2ff; }
+.cta .btn-primary:hover { background: var(--brand-tint); }
+
+/* ---------- 工具聚合（/seo/index.html：20 个落地页的总目录 · 2026-09-17 更正，原写 15 个） ---------- */
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    margin: 0 0 6px;
+}
+
+.tool-card {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+/* 投影用品牌色的 rgba 三元组（--c-brand-rgb 与 --c-brand 同色，改色在令牌层一处完成） */
+.tool-card:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(var(--c-brand-rgb), .08); }
+.tool-card .t { font-weight: 700; color: var(--brand); font-size: 16px; }
+.tool-card .d { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin-top: 4px; }
+.tool-card.is-new .t::after {
+    content: "新";
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--badge-new-bg);
+    color: var(--badge-new-ink);
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: 1px;
+}
 
 /* ---------- 页脚 ---------- */
 .site-footer {

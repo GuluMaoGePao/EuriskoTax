@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-5 尾巴收尾）：高商业意图长尾词「税优健康险能抵多少税 /
+         税优健康险 2400 / 商业健康保险 个税扣除 / 税优健康险能抵多少税」（「是否购买」属消费与理财判断，本页不承接）。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收录了也留不住；
+           2) 限额与税率复用 App 同源实现（health-insurance-quick.js + window.comprehensiveTaxRates
+              / window.healthInsuranceRules），页面上不出现第二份口径；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背两条「纠偏」任务：
+           ① 保费扣的是**应纳税所得额**，不是直接减税额（与个人养老金页同一条纠偏）；
+           ② **节税上限就是 2400 × 45% = 1080 元/年** —— 节税本身不足以成为购买一款保险的理由，
+              必须结合保障与产品本身评估。只讲优点的税优页面不可信。 -->
+    <title>税优健康险能抵多少税 2026：每年 2400 元税前扣除（200 元/月），保险赔款免征个税</title>
+    <meta name="description" content="输入年保费与全年应纳税所得额，按 2026 年现行政策算出税优健康险每年能少交的个人所得税。2400 元/年限额据实扣除，保险赔款免征个税、没有领取税。10% 档每年省 240 元、45% 档封顶 1080 元。政策依据：财税〔2017〕39 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/health-insurance.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="税优健康险能抵多少税：每年 2400 元税前扣除，赔款免征个税">
+    <meta property="og:description" content="一年最多扣 2400、能少交多少税一算便知；节税上限 1080 元/年，是否购买看保障责任本身。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/health-insurance.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 税优健康险节税测算",
+                "url": "https://euriskotax.zeabur.app/seo/health-insurance.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按现行政策计算税优健康险保费税前扣除每年能少交的个人所得税。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "税优健康险每年最多能扣多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "对个人购买符合规定的商业健康保险产品的支出，允许在计算应纳税所得额时税前扣除，扣除限额为 2400 元/年（200 元/月）。单位统一为员工购买的，视同个人购买，同样适用该限额；超过限额的部分当年不可扣除。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "买税优健康险到底能少交多少税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "取决于你全年应纳税所得额落在哪一档税率：扣除的是应纳税所得额，少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额。10% 档每年少交约 240 元，20% 档约 480 元，45% 档封顶 1080 元。直接用「2400 × 税率」在跨档时会高估。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "税优健康险理赔时要交税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不交。保险赔款依据个人所得税法第四条免征个人所得税，所以税优健康险没有个人养老金那样的领取环节税 —— 节税是确定的。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "什么样的产品才算税优健康险？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "必须是符合规定的商业健康保险产品，保单上带有税优识别码；不是所有商业健康险都能扣。单位统一购买的，由单位代为扣除申报；个人购买的，凭税优识别码在预扣预缴或年度汇算时申报。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "税优健康险的节税上限是多少？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "2400 元限额 × 45% 最高税率 = 1080 元/年就是制度上限，多数人在 240～480 元之间。本页只测算这一税额差额，是否购买要看保障责任、保证续保、费率与自身需求 —— 本页不构成购买建议。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际扣除以保单税优识别码与税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成保险产品推荐。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_health_insurance">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>税优健康险能抵多少税：每年 2400 元税前扣除，保险赔款免征个税</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>税优健康险的税优只有一条 —— 购买带<strong>税优识别码</strong>的
+            符合规定商业健康保险，保费按 <strong>2400 元/年（200 元/月）</strong>的限额在计算应纳税所得额时
+            <strong>据实扣除</strong>；理赔时保险赔款<strong>免征个人所得税</strong>，<strong>没有领取环节的税</strong>
+            （这一点与个人养老金「领取按 3%」完全不同）。但要把丑话说在前面：
+            <strong>节税上限就是 2400 × 45% = 1080 元/年</strong>，10% 档每年只省 240 元 ——
+            <strong>本页只测算节税上限</strong>，是否购买要看保障责任与产品本身，本页不构成购买建议。
+            政策依据：《关于将商业健康保险个人所得税试点政策推广到全国范围实施的通知》
+            （<strong>财税〔2017〕39 号</strong>，自 2017-07-01 起全国实施）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">税优健康险节税速算（保费 2400 内据实扣除，赔款免税）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="premium-input">每年保费支出（元）</label>
+                    <input class="calc-input" id="premium-input" type="number" inputmode="decimal" min="0" step="200" value="2400" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 260px">
+                    <label class="calc-label" for="taxable-input">全年应纳税所得额（元）</label>
+                    <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                「全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除；
+                不确定就按「全年收入 − 6 万 − 社保公积金」估算。
+                <strong>每年最多扣 2400 元（200 元/月）</strong>，超过部分当年不可扣；保费低于 2400 按实际保费扣。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result highlight">
+                    <div class="k">每年可税前扣除</div>
+                    <div class="v" id="r-deductible">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">适用税率</div>
+                    <div class="v" id="r-rate">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">扣除前应纳税额 / 扣除后</div>
+                    <div class="v" id="r-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">缴费环节每年少交</div>
+                    <div class="v" id="r-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">理赔时需缴税（保险赔款免税）</div>
+                    <div class="v" id="r-payout-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">净优惠（无领取税，即少交的税）</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">制度上限（2400 × 45%，对照）</div>
+                    <div class="v" id="r-max">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">「保费 × 税率」的天真算法（对照）</div>
+                    <div class="v" id="r-naive">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「限额处理表」「年度税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>环节处理一览（2026 年现行口径）</h2>
+        <div class="table-scroll">
+            <table id="hi-rule-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">缴费、理赔两个阶段各一次「判断」；与个人养老金最大的差别：没有领取税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">环节</th>
+                    <th scope="col">税务处理</th>
+                    <th scope="col">限制</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>缴费（买保险）</td><td class="num">保费按 2400 元/年（200 元/月）限额在应纳税所得额中据实扣除</td><td>须带税优识别码；超限部分当年不可扣</td></tr>
+                <tr><td>理赔（领取赔款）</td><td class="num">保险赔款免征个人所得税</td><td>无 —— 个税法第四条法定免税</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            一句话记住：<strong>保费在限额内降你的应纳税所得额，赔款全额免税</strong> ——
+            少交的税是确定的，但上限就是 1080 元/年。
+        </p>
+
+        <h2>年度综合所得税率表（保费能省多少税，看你落在哪一档）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；税优健康险保费降低的是「应纳税所得额」这一列</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：四种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">每年可扣（元）</th>
+                    <th scope="col">扣除前应纳税额（元）</th>
+                    <th scope="col">扣除后应纳税额（元）</th>
+                    <th scope="col">每年少交（元）</th>
+                    <th scope="col">理赔时需缴税（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>10% 档（扣除前 8 万）：保费 2400</td><td class="num">2400.00</td><td class="num">5480.00</td><td class="num">5240.00</td><td class="num">240.00</td><td class="num">0.00</td></tr>
+                <tr><td>20% 档（扣除前 20 万）：保费 2400</td><td class="num">2400.00</td><td class="num">23080.00</td><td class="num">22600.00</td><td class="num">480.00</td><td class="num">0.00</td></tr>
+                <tr><td>45% 档（扣除前 100 万）：保费 2400 —— 节税封顶</td><td class="num">2400.00</td><td class="num">268080.00</td><td class="num">267000.00</td><td class="num">1080.00</td><td class="num">0.00</td></tr>
+                <tr><td>跨档（扣除前 3.61 万）：天真算法 240，实省 79</td><td class="num">2400.00</td><td class="num">1090.00</td><td class="num">1011.00</td><td class="num">79.00</td><td class="num">0.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（限额与税率表取自 App 常量，可被运营在后台热改后同步），
+            并由 <code>tests/health-insurance-quick.test.js</code> 与 App 内核逐点对拍守护。
+            第四行扣除了 2400 元后从 10% 档落到 3% 档，「2400 × 10% = 240」高估了 161 元。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 扣的是应纳税所得额，不是「保费直接抵税」</h3>
+        <p>
+            保费按 2400 元/年的限额<strong>据实扣除</strong>，降低的是应纳税所得额；
+            少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额。
+            跨档时「2400 × 税率」会高估 —— 扣除前 3.61 万的人实省 79 元而不是 240 元。
+        </p>
+        <h3>2. 不是所有健康险都能扣：认准税优识别码</h3>
+        <p>
+            只有<strong>符合规定的商业健康保险产品</strong>（保单带税优识别码）才能税前扣除，
+            普通百万医疗险、重疾险不在内。单位统一购买的视同个人购买，
+            由单位在代扣代缴时办理；个人购买的在预扣预缴或年度汇算时凭税优识别码申报。
+        </p>
+        <h3>3. 节税上限 1080 元/年：先看上限，再看保障</h3>
+        <p>
+            2400 元限额 × 45% 最高税率 = <strong>1080 元/年</strong>，多数人实际省 240～480 元。
+            本页只测算节税额；是否购买取决于<strong>保障责任、保证续保与费率</strong>与自身需求 ——
+            本页不构成购买建议。对把节税当卖点说服你投保的说辞，请多留个心眼。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>税优健康险每年最多能扣多少？</summary>
+            <p>对个人购买符合规定的商业健康保险产品的支出，允许在计算应纳税所得额时税前扣除，扣除限额为 2400 元/年（200 元/月）。单位统一为员工购买的，视同个人购买，同样适用该限额；超过限额的部分当年不可扣除。</p>
+        </details>
+        <details>
+            <summary>买税优健康险到底能少交多少税？</summary>
+            <p>取决于你全年应纳税所得额落在哪一档税率：扣除的是应纳税所得额，少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额。10% 档每年少交约 240 元，20% 档约 480 元，45% 档封顶 1080 元。直接用「2400 × 税率」在跨档时会高估。</p>
+        </details>
+        <details>
+            <summary>税优健康险理赔时要交税吗？</summary>
+            <p>不交。保险赔款依据个人所得税法第四条免征个人所得税，所以税优健康险没有个人养老金那样的领取环节税 —— 节税是确定的。</p>
+        </details>
+        <details>
+            <summary>什么样的产品才算税优健康险？</summary>
+            <p>必须是符合规定的商业健康保险产品，保单上带有税优识别码；不是所有商业健康险都能扣。单位统一购买的，由单位代为扣除申报；个人购买的，凭税优识别码在预扣预缴或年度汇算时申报。</p>
+        </details>
+        <details>
+            <summary>税优健康险的节税上限是多少？</summary>
+            <p>2400 元限额 × 45% 最高税率 = 1080 元/年就是制度上限，多数人在 240～480 元之间。本页只测算这一税额差额，是否购买要看保障责任、保证续保、费率与自身需求 —— 本页不构成购买建议。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际扣除以保单税优识别码与税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成保险产品推荐。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把税优健康险扣进全年账一起看</h2>
+            <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_health_insurance">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议或保险产品推荐；实际纳税与扣除请以税务部门核算为准。</p>
+        <p>政策依据：《关于将商业健康保险个人所得税试点政策推广到全国范围实施的通知》（财税〔2017〕39 号，自 2017-07-01 起全国实施）；《中华人民共和国个人所得税法》第四条（保险赔款免征个人所得税）。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/health-insurance.html">税优健康险节税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js              —— 出厂税率表与税优健康险规则（comprehensiveTaxRates / healthInsuranceRules）
+       tax-registry.js               —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js             —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       health-insurance-quick.js     —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/health-insurance-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var premiumInput = document.getElementById('premium-input');
+    var taxableInput = document.getElementById('taxable-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoHealthInsuranceQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「环节处理表」「年度税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var r = quick.compareOf({
+            annualPremium: premiumInput ? premiumInput.value : 0,
+            taxableBefore: taxableInput ? taxableInput.value : 0
+        });
+
+        document.getElementById('r-deductible').textContent = money(r.deductible) + ' 元';
+        document.getElementById('r-rate').textContent = (r.rate * 100).toFixed(0) + '%';
+        document.getElementById('r-tax').textContent = money(r.taxBefore) + ' 元 → ' + money(r.taxAfter) + ' 元';
+        document.getElementById('r-saved').textContent = money(r.taxSaved) + ' 元';
+        document.getElementById('r-payout-tax').textContent = '0 元（保险赔款免征个税）';
+        document.getElementById('r-net').textContent = money(r.netBenefit) + ' 元';
+        document.getElementById('r-max').textContent = money(r.maxYearlySaving) + ' 元/年';
+        document.getElementById('r-naive').textContent = money(r.naiveSaved) + ' 元（高估 ' + money(r.naiveGap) + ' 元）';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('每年可扣 <strong>' + money(r.deductible) + ' 元</strong>，适用税率 <strong>'
+            + (r.rate * 100).toFixed(0) + '%</strong>，缴费环节每年少交 <strong>' + money(r.taxSaved) + ' 元</strong>。');
+        if (r.overLimit > 0) {
+            parts.push('注意：你填的年保费超过限额，<strong>超出的 ' + money(r.overLimit)
+                + ' 元当年不可扣除</strong>（这部分保费照常税后支出）。');
+        }
+        if (r.taxableBefore <= 0) {
+            parts.push('请填写「全年应纳税所得额」，否则无法估算少交的税。');
+        }
+        parts.push('理赔时保险赔款<strong>免征个人所得税</strong>，没有领取税 —— 净优惠就是上面少交的 <strong>'
+            + money(r.netBenefit) + ' 元</strong>。');
+        if (r.naiveGap >= 0.005) {
+            parts.push('注意：直接用「可扣额 × ' + (r.rate * 100).toFixed(0) + '%」会算出 '
+                + money(r.naiveSaved) + ' 元，<strong>高估 ' + money(r.naiveGap) + ' 元</strong> —— 因为这笔扣除跨过了档位分界点。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [premiumInput, taxableInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', render);
+        el.addEventListener('change', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+// 台账 C：推导链扩全流程 一致性测试
+//
+// 核心目标（延续 formula-steps.test.js 的验收门禁）：
+//   经营所得 / 分类所得 / 反向倒算 / 月薪个税速算器的推导链，
+//   每一步数值必须与计算结果逐位一致 —— 防止「面板说明」与「结果」互相漂移。
+//
+// 另有防回滚断言：三个完整测算页的面板 DOM 必须存在于 index.html
+//（前车之鉴：auth-ui.js 曾用死选择器 + ?. 抹错，两行代码从未生效多年未发现）。
+
+const fs = require('fs');
+const path = require('path');
+const { loadSource } = require('./helpers/load-source');
+
+const ROOT = path.join(__dirname, '..');
+
+beforeAll(() => {
+    loadSource('src/js/calculation/tax-constants.js');
+    loadSource('src/js/calculation/tax-calculator.js');
+    // 17B-4（v1.50.0）：helper-functions.js 随分类所得页面删除（它是最后一个页面式 deep）。
+    loadSource('src/js/calculation/utils.js');
+    loadSource('src/js/calculation/salary-tax-quick.js');
+    loadSource('src/js/data/tool-registry.js');
+});
+
+function setInput(id, value) {
+    let el = document.getElementById(id);
+    if (!el) {
+        el = document.createElement('input');
+        el.id = id;
+        document.body.appendChild(el);
+    }
+    el.value = String(value);
+    return el;
+}
+
+// ==================================================================
+// 经营所得：DOM 全链路（真实跑 calculateBusinessTax，断言面板渲染结果）
+// 说明：businessCalculationResults 是 tax-calculator.js 的 let 变量，
+//       跨 eval 不可直接读取 —— 故用「计算 → 接线 → 面板 HTML」端到端断言，
+//       数值先手工核算（利润 220000 − 亏损 30000 = 190000；投资者减除 60000；
+//       专项扣除 21000；专附 6900；其他扣前 1000；捐赠按 101100×30% 限额内扣 10000；
+//       应纳税所得额 91100 → 20% − 10500 = 7720；减半 3860；税后 186140）。
+// ==================================================================
+describe('经营所得推导链（全链路）', () => {
+    // 17B-1（v1.47.0）：旧页面的 calculateBusinessTax 随 business-calculation-page 整页删除了，
+    // 推导链的接线方换成 tool-registry 里的 business spec（compute 返回 buildBusinessFormulaSteps(...)）。
+    // 所以这里把「值 → 内核 → 推导链」自己串起来 —— 键名也随之从 DOM id 改成内核的 values key。
+    function businessValues(overrides = {}) {
+        return Object.assign({
+            income: 500000,
+            cost: 200000,
+            expenses: 50000,
+            taxes: 10000,
+            losses: 0,
+            otherExpenses: 20000,
+            previousLosses: 30000,
+            hasComprehensiveIncome: false,
+            workMonths: 12,
+            pensionInsurance: 1000,
+            medicalInsurance: 200,
+            unemploymentInsurance: 50,
+            housingFund: 500,
+            childrenInfantDeduction: 2000,
+            elderlyDeduction: 3000,
+            housingDeduction: 1500,
+            educationDeduction: 400,
+            medicalDeduction: 0,
+            pensionDeduction: 1000,
+            enterpriseAnnuity: 0,
+            insuranceDeduction: 0,
+            charitableDonation: 10000,
+            prepaidTax: 5000
+        }, overrides);
+    }
+
+    function injectBusinessPanel() {
+        // 不用 innerHTML +=（会重建 DOM、丢掉已注入 input 的 value property）
+        const panel = document.createElement('details');
+        panel.id = 'formula-steps-panel-business';
+        panel.className = 'hidden';
+        const body = document.createElement('div');
+        body.id = 'formula-steps-body-business';
+        panel.appendChild(body);
+        document.body.appendChild(panel);
+        return body;
+    }
+
+    // 三步走：值 → 内核（calculateBusinessTaxCore）→ 推导链（buildBusinessFormulaSteps）→ 渲染
+    function runBusinessChain(overrides = {}) {
+        const body = injectBusinessPanel();
+        const steps = buildBusinessFormulaSteps(calculateBusinessTaxCore(businessValues(overrides)));
+        body.innerHTML = renderFormulaStepsHtml(steps);
+        return { body, steps };
+    }
+
+    test('关键数值逐位可核对', () => {
+        const { body } = runBusinessChain();
+
+        expect(body.innerHTML).toContain('220000.00');   // 第一步：经营利润
+        expect(body.innerHTML).toContain('190000.00');   // 第二步：弥补亏损后所得
+        expect(body.innerHTML).toContain('98900.00');    // 第三步：扣除额合计（60000+21000+6900+11000）
+        expect(body.innerHTML).toContain('91100.00');    // 第四步：应纳税所得额
+        expect(body.innerHTML).toContain('7720.00');     // 第五步：减半征收前应纳税额
+        expect(body.innerHTML).toContain('186140.00');   // 最后一步：税后经营所得
+        // 政策依据脚注
+        expect(body.innerHTML).toContain('200 万元');
+    });
+
+    test('无综合所得时投资者减除费用出现在扣除步', () => {
+        const { body } = runBusinessChain();
+        expect(body.innerHTML).toContain('投资者减除费用');
+        expect(body.innerHTML).toContain('60000.00'); // 5000 × 12
+    });
+
+    test('有综合所得时不扣投资者减除费用与专项扣除', () => {
+        const { body } = runBusinessChain({ hasComprehensiveIncome: true });
+        expect(body.innerHTML).not.toContain('投资者减除费用');
+        expect(body.innerHTML).not.toContain('专项扣除（三险一金）');
+    });
+});
+
+// ==================================================================
+// 分类所得：真实跑 calculateClassificationTaxTotal
+// ==================================================================
+describe('分类所得推导链', () => {
+    test('每个条目一步，汇总步与 results 逐位一致', () => {
+        const rentItem = calculateSingleClassificationTax('rent', 60000, 5000);
+        expect(rentItem.taxableIncome).toBe(60000 * 0.8 - 5000); // 43000
+
+        const interestItem = calculateSingleClassificationTax('interest', 10000, 0);
+        const results = calculateClassificationTaxTotal([rentItem, interestItem]);
+
+        const steps = buildClassificationFormulaSteps(results);
+        // 2 个条目 + 1 个汇总
+        expect(steps).toHaveLength(3);
+
+        expect(steps[0].totalValue).toBe(rentItem.totalTax);
+        expect(steps[1].totalValue).toBe(interestItem.totalTax);
+
+        const summary = steps[2];
+        expect(summary.totalLabel).toBe('应纳税额合计');
+        expect(summary.totalValue).toBe(results.totalTax);
+        expect(summary.rows[0].value).toBe(results.totalIncome);
+        expect(summary.rows[1].value).toBe(results.totalTaxableIncome);
+    });
+
+    // 17B-4（v1.50.0）：分类所得页面整页删除了 —— addClassificationItem / calculateClassificationTax /
+    // updateClassificationResultDisplay 那一套「读 DOM → 算 → 点亮静态面板」的接线随之消失。
+    // 口径本身没丢：spec 的 compute 调的还是上面这条用例里那两个 tax-calculator 函数，
+    // 推导链也还是 buildClassificationFormulaSteps —— 与经营所得（17B-1）改法一致：
+    // 断言对象从「页面 DOM 被点亮」换成「spec 算出来的推导链里有那几个数」。
+    test('spec 的 compute 给出同样那几个数（推导链接线防回滚）', () => {
+        const panel = document.createElement('details');
+        panel.id = 'formula-steps-panel-classification';
+        panel.className = 'hidden';
+        const body = document.createElement('div');
+        body.id = 'formula-steps-body-classification';
+        panel.appendChild(body);
+        document.body.appendChild(panel);
+
+        const out = window.EuriskoToolRegistry.get('classification').compute({
+            items: [{ type: 'rent', income: 60000, rentDeductions: 5000, rentRepair: 0 }]
+        });
+        body.innerHTML = renderFormulaStepsHtml(out.steps);
+
+        expect(out.steps.length).toBeGreaterThan(0);
+        expect(body.innerHTML).toContain('财产租赁所得');
+        expect(body.innerHTML).toContain('43000.00');
+        expect(body.innerHTML).toContain('8600.00');    // 43000 × 20%
+    });
+});
+
+// ==================================================================
+// 反向倒算：构造 results 对象，断言映射一致（结构同 saveReverseCalculationResult 产出）
+// ==================================================================
+describe('反向倒算推导链', () => {
+    const reverseResults = {
+        incomeType: 'comprehensive',
+        reverseType: 'monthly',
+        workMonths: 12,
+        calcMode: 'all',
+        totalIncome: 263736,
+        totalDeduction: 108000,
+        totalTax: 32736,
+        incomeDetails: { total: 263736, monthly: 21978 },
+        deductionDetails: {
+            basic: 5000, specialDeductionTotal: 24000, specialAdditionalTotal: 18000,
+            otherTotal: 6000, total: 108000
+        },
+        taxDetails: {
+            totalTax: 32736, netIncome: 231000, monthlyNet: 19250,
+            taxableIncome: 155736, applicableRate: 0.2, applicableDeduction: 16920
+        },
+        bonusIncome: 0,
+        bonusTax: 0
+    };
+
+    test('反推收入与验算步与 results 逐位一致', () => {
+        const steps = buildReverseFormulaSteps(reverseResults);
+        expect(steps.length).toBe(6);
+
+        // 第一步：月度税后目标
+        expect(steps[0].rows[1].value).toBe(reverseResults.taxDetails.monthlyNet);
+
+        // 扣除合计步
+        const deductionStep = steps.find((s) => s.totalLabel === '年度扣除额合计');
+        expect(deductionStep.totalValue).toBe(reverseResults.totalDeduction);
+
+        // 应纳税所得额步
+        const taxableStep = steps.find((s) => s.totalLabel === '应纳税所得额');
+        expect(taxableStep.totalValue).toBe(reverseResults.taxDetails.taxableIncome);
+
+        // 反推所需税前收入（核心结果）
+        const incomeStep = steps.find((s) => s.totalLabel === '所需税前收入');
+        expect(incomeStep.totalValue).toBe(reverseResults.incomeDetails.total);
+
+        // 最后一步：正向验算
+        const lastStep = steps[steps.length - 1];
+        expect(lastStep.totalValue).toBe(reverseResults.taxDetails.netIncome);
+
+        steps.forEach((s) => expect(Number.isFinite(s.totalValue)).toBe(true));
+    });
+
+    test('按目标税率倒算时第一步展示税率档且有区间脚注', () => {
+        const rateResults = Object.assign({}, reverseResults, {
+            reverseType: 'rate',
+            taxDetails: Object.assign({}, reverseResults.taxDetails, { applicableRate: 0.1 })
+        });
+        const steps = buildReverseFormulaSteps(rateResults);
+        expect(steps[0].rows[1].label).toBe('目标税率档');
+        expect(steps[0].rows[1].value).toBe(0.1);
+        expect(steps[0].rows[1].format).toBe('percent');
+        expect(steps.find((s) => s.totalLabel === '所需税前收入').footnote).toContain('区间');
+    });
+});
+
+// ==================================================================
+// 月薪个税速算器（台账 C 打样）：compute 返回 steps，与 primary 逐位一致
+// ==================================================================
+describe('月薪个税速算器推导链（打样）', () => {
+    const R = () => window.EuriskoToolRegistry;
+
+    test('默认输入：三步推导，累计税额与 primary 一致', () => {
+        const out = R().get('salary-tax').compute({
+            monthlyIncome: 15000, months: 12, monthlyInsurance: 1500, monthlySpecialAdditional: 1000
+        });
+        expect(out.steps).toHaveLength(3);
+
+        expect(out.steps[0].totalValue).toBe(7500);                       // 15000 − 5000 − 1500 − 1000
+        expect(out.steps[1].totalValue).toBe(90000);                      // 7500 × 12
+        expect(out.steps[2].totalValue).toBe(90000 * 0.1 - 2520);         // 90000 × 10% − 2520 = 6480
+        expect(out.steps[2].totalValue).toBe(out.primary.value);          // 面板与主结果逐位一致
+        expect(out.steps[2].footnote).toContain('90000.00');
+    });
+
+    test('月薪低于起征点时不出推导链（避免零除与误导）', () => {
+        const out = R().get('salary-tax').compute({
+            monthlyIncome: 4000, months: 12, monthlyInsurance: 0, monthlySpecialAdditional: 0
+        });
+        expect(out.primary.value).toBe(0);
+        expect(out.steps).toBeUndefined();
+    });
+});
+
+// ==================================================================
+// 防回滚：三个面板 DOM 必须在 index.html（接线不因重构漂移）
+// ==================================================================
+describe('面板 DOM 防回滚（index.html）', () => {
+    test('分类所得的推导链也改由向导运行时渲染（页面式面板不复存在）', () => {
+        const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+        // 17B-1（v1.47.0）/ 17B-2（v1.48.0）/ 17B-3（v1.49.0）：经营所得、反向倒算、综合所得三处
+        // 静态面板先后随旧页面删除；17B-4（v1.50.0）分类所得是最后一个 —— 它的推导链同样改由向导
+        // 运行时渲染（dw-formula-panel），存在性由 tests/classification-migration.test.js 的端到端用例守护。
+        // 反过来钉：静态 HTML 里**不该再有**任一份推导链面板 —— 留一半就会出现
+        // 「静态 HTML 一份 + 运行时面板一份」的两份真相。
+        ['business', 'reverse', 'classification'].forEach((flow) => {
+            expect(html).not.toContain('id="formula-steps-panel-' + flow + '"');
+            expect(html).not.toContain('id="formula-steps-body-' + flow + '"');
+        });
+    });
+
+    test('utils.js 导出的渲染被 spec 接线引用（不是死代码）', () => {
+        const registry = fs.readFileSync(path.join(ROOT, 'src/js/data/tool-registry.js'), 'utf8');
+        // 17B-1 / 17B-2 / 17B-4：reverse、classification 迁到 spec 驱动后，buildXxxFormulaSteps
+        // 的接线方从 tax-calculator.js（页面时代）变成了 tool-registry 里的 spec（向导渲染时用）。
+        expect(registry).toContain('buildReverseFormulaSteps(');
+        expect(registry).toContain('buildClassificationFormulaSteps(');
+
+        // 17D-11（v1.67.0）：business 是这条链上**第一个退回去自带推导链**的 ——
+        // utils 那一份六步是按「一家个体户、成本费用逐项扣」写的，讲不出新的三层
+        // （投资者工资调增 / 合伙企业分配比例 / 多家企业汇总定档 + 亏损不能互抵），
+        // 硬套就会出现「推导链一个数、主结果另一个数」的两份真相。
+        expect(registry).toContain('② 汇总定档（第十二 ~ 十四条）');
+        expect(registry).not.toContain('buildBusinessFormulaSteps(');
+    });
+});

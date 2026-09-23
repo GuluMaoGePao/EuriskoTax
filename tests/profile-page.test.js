@@ -84,6 +84,14 @@ function buildProfileDOM() {
                     <button class="btn">编辑资料</button>
                 </div>
             </div>
+            <!-- 阶段19-6b：权益进度条（内容由 ui/profile-benefits.js 填充；未登录/无档位时整卡隐藏） -->
+            <div id="profile-benefits-card" class="hidden">
+                <span id="profile-benefits-tier"></span>
+                <div id="profile-benefits-steps"></div>
+                <p id="profile-benefits-usage" class="hidden"></p>
+                <p id="profile-benefits-sync" class="hidden"></p>
+                <button id="profile-nav-upgrade"><span>了解专业版</span></button>
+            </div>
             <div id="profile-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
             <div id="profile-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
@@ -192,10 +200,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(cards.length).toBe(4);
         // 验证包含预期的统计项 ID
         const ids = Array.from(cards).map(c => c.querySelector('[id]')?.id).filter(Boolean);
+        // 阶段19-6b：四格换成真算得出的四个量（原「历史记录/档案数量/本月提醒」见函数上的注释）
         expect(ids).toContain('profile-stats-calculations');
-        expect(ids).toContain('profile-stats-profiles');
-        expect(ids).toContain('profile-stats-history');
-        expect(ids).toContain('profile-stats-reminders');
+        expect(ids).toContain('profile-stats-scenarios');
+        expect(ids).toContain('profile-stats-kinds');
+        expect(ids).toContain('profile-stats-last');
     });
 
     test('renderProfileStats 幂等：重复调用不重复渲染', () => {
@@ -207,11 +216,11 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 9 个模块卡片', () => {
+    test('renderProfileCards 应渲染 13 个模块卡片', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(9);
+        expect(cards.length).toBe(13);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-history');
@@ -226,6 +235,44 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-notices');
         // 阶段13B：财税服务（留资转化）入口卡片
         expect(ids).toContain('profile-card-lead');
+        // 阶段19-9：效率层「工作台」——主体管理与参数模板
+        expect(ids).toContain('profile-card-entity');
+        expect(ids).toContain('profile-card-template');
+        // 阶段19-10：效率层 E3 台账 —— 按月归档的那本账
+        expect(ids).toContain('profile-card-ledger');
+        // 阶段19-11：效率层 E4 批量 —— 一份表一次算完
+        expect(ids).toContain('profile-card-batch');
+    });
+
+    // 阶段19-6b（§3.6 ③）：卡片从「常用功能 / 服务与支持」两组改成按场景三组
+    // 阶段19-9：新增「工作台」组（主体 · 模板），插在「我的税务」与「服务与支持」之间
+    test('renderProfileCards 应按场景分成三组', () => {
+        renderProfileCards();
+        const text = document.getElementById('profile-cards-grid').textContent;
+        expect(text).toContain('我的数据');
+        expect(text).toContain('我的税务');
+        expect(text).toContain('服务与支持');
+        // 分组内成员：历史/数据管理在「我的数据」，档案/日历在「我的税务」
+        const groupOf = (cardId) => {
+            const card = document.getElementById(cardId);
+            let prev = card.previousElementSibling;
+            while (prev) {
+                const h = prev.querySelector('h4');
+                if (h) return h.textContent;
+                prev = prev.previousElementSibling;
+            }
+            return '';
+        };
+        expect(groupOf('profile-card-history')).toBe('我的数据');
+        expect(groupOf('profile-card-data')).toBe('我的数据');
+        expect(groupOf('profile-card-tax')).toBe('我的税务');
+        expect(groupOf('profile-card-calendar')).toBe('我的税务');
+        expect(groupOf('profile-card-lead')).toBe('服务与支持');
+        // 阶段19-9：主体 / 模板归到「工作台」；阶段19-10：台账同一组
+        expect(groupOf('profile-card-entity')).toBe('工作台');
+        expect(groupOf('profile-card-template')).toBe('工作台');
+        expect(groupOf('profile-card-ledger')).toBe('工作台');
+        expect(groupOf('profile-card-batch')).toBe('工作台');
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {
@@ -237,22 +284,35 @@ describe('个人中心 - 渲染逻辑', () => {
 
     test('updateProfileStats 应更新统计数字', () => {
         // 准备数据（历史 key 与主页一致：taxCalculationHistory，本地唯一数据源）
-        localStorage.setItem('taxCalculationHistory', JSON.stringify([1, 2, 3]));
-        localStorage.setItem('tax_profile', JSON.stringify({ socialBase: 4250 }));
+        const now = Date.now();
+        const daysAgo = (d) => new Date(now - d * 86400000).toISOString();
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([
+            { id: '3', type: 'business', title: '经营所得 - 老', date: daysAgo(40), results: {} },
+            { id: '2', type: 'quick', toolId: 'bonus', title: '年终奖 - 3天前', date: daysAgo(3), results: {} },
+            { id: '1', type: 'forward', title: '综合所得 - 今天', date: daysAgo(0), results: { taxDetails: { totalTax: 1234.5 } } }
+        ]));
 
         renderProfileStats(); // 先渲染 DOM
         updateProfileStats();
 
         expect(document.getElementById('profile-stats-calculations').textContent).toBe('3');
-        expect(document.getElementById('profile-stats-history').textContent).toBe('3');
-        expect(document.getElementById('profile-stats-profiles').textContent).toBe('1');
+        // 覆盖税种按 type / toolId 去重：forward / quick+bonus / business
+        expect(document.getElementById('profile-stats-kinds').textContent).toBe('3');
+        // 最近一次按**时间**取最大，不是取数组第一个（云同步合并后顺序不保证）
+        expect(document.getElementById('profile-stats-last').textContent).toBe('今天');
+        expect(document.getElementById('profile-stats-last-sub').textContent).toMatch(/¥1,?235/);
+        // 方案库（window.EuriskoScenarios）在本测试环境里不存在 → 显示「—」而不是 0
+        expect(document.getElementById('profile-stats-scenarios').textContent).toBe('—');
     });
 
-    test('updateProfileStats 无税务档案时档案数为 0', () => {
-        localStorage.setItem('taxCalculationHistory', JSON.stringify([1]));
+    test('updateProfileStats 无历史时四格都不编数', () => {
+        localStorage.setItem('taxCalculationHistory', JSON.stringify([]));
         renderProfileStats();
         updateProfileStats();
-        expect(document.getElementById('profile-stats-profiles').textContent).toBe('0');
+        expect(document.getElementById('profile-stats-calculations').textContent).toBe('0');
+        // 没测算过就谈不上有几种税、上次是什么时候 —— 这两格是空的，不是 0
+        expect(document.getElementById('profile-stats-kinds').textContent).toBe('—');
+        expect(document.getElementById('profile-stats-last').textContent).toBe('—');
     });
 
     test('renderTaxCalendar 应渲染税务日历事件', () => {

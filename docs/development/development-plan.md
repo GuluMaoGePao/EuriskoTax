@@ -184,6 +184,9 @@ EuriskoTax/
 
 ## 🔄 数据库表设计（当前生产 schema · Prisma / PostgreSQL）
 
+> 📌 **真源在代码**：`server/prisma/schema.prisma`（生产 PostgreSQL）/ `schema.dev.prisma`（本地 SQLite 开发用）。
+> 本节是**立项时的设计快照**，改表结构请改 schema 并走迁移（`server/prisma/migrations/`），不要在本文改。
+
 > 完整模型与迁移见 [server/prisma/schema.prisma](../../server/prisma/schema.prisma)；本地开发使用同构的 `schema.dev.prisma`（SQLite）。当前共 **8 张表**（阶段8 新增 feedbacks / calc_events，迁移 `20260907_add_feedback_and_calcevent`；阶段10A 为 users 增 plan 分层与 calculations 增同步字段，迁移 `20260908_add_plan_tier_and_calc_sync`；阶段10A-补 为 feedbacks 增 attachments，迁移 `20260909_add_feedback_attachments`；阶段11 新增 content_items / content_releases，迁移 `20260911_add_content_center`）：
 
 ### users（用户）
@@ -313,6 +316,9 @@ EuriskoTax/
 
 ## 🔌 API接口设计
 
+> 📌 **真源在 [api-reference.md](../api/api-reference.md)**（接口契约唯一真源）。本节是**早期设计快照**，
+> 改接口契约改那份；两边冲突时以 `api-reference.md` 为准。
+
 完整的API接口文档请参考：[docs/api/api-reference.md](../api/api-reference.md)
 
 ---
@@ -335,9 +341,12 @@ EuriskoTax/
 | 阶段12：支付体系与 B 端 API | 🟡 部分完成 / 已拆分（**A ✅** 四项核心功能补强：公式透明化 / 方案对比中心 / 计算核心纯函数化 / 常量版本化；**C1 ✅** 税制参数配置化（v1.11.0 · 2026-09-12）—— `TaxRateConfig` 版本化快照 + 运维后台「税率」Tab 热改（保存即生效、可回滚、可选联动公告）+ 公开只读端点 `GET /api/config/tax-rates` + 端上 `tax-rates-sync.js` 离线兜底；**范围调整**：支付体系与 B 端 API 被 ICP 备案阻塞，移出本阶段顺延至阶段16；C2 城市社保参数库已移入阶段14 并随 v1.13.0 上线） | 3周+ | 已拆分 |
 | 阶段13：获客与转化（引流 → 线索） | ✅ 已完成（**随 v1.12.0 上线**；**13A ✅ 后端地基 2026-09-12**：`Lead` 模型（`user_id` 可空 / `scene` 情境快照 / `consent` 同意留痕 / `status` 状态机）+ 迁移 `20260912_add_leads` + 公开端点 `POST /api/leads`（游客可提交、10 次/小时/IP 限流、同手机号 24h 幂等合并）+ 管理端 `GET/PATCH /api/admin/leads`、`/stats`、`/export`（CSV 含 BOM + 公式注入防护）；`verify:local` 82/82 全绿（新增 14 项线索断言）+ `tests/leads.test.js` 20 项。**13B ✅ 前端触点 2026-09-12**：结果页情境引导（分流白名单 `business`/`forward`/`comprehensive`/`classification`，显式排除谈薪 `reverse`）+ 留资弹窗 `lead-modal`（企业微信活码 + 留言表单双通道；活码经 `window.LEAD_CONFIG.wecomQrUrl` 注入，未配置自动降级为仅留言通道）+ 个人中心「财税服务」卡片 + `api-client.submitLead`（游客可用 / 登录则关联账号）；`verify:local` 89/89 全绿（13A 14 项 + 13B 新增 7 项前端触点断言）。**13C ✅ 管理台「线索」Tab 2026-09-12**：运维后台新增「线索」Tab —— 漏斗条（总数/今日新增/待分配/已成交·转化率）+ 列表（联系人·来源·情境·备注）+ 行内状态机即时保存 + 分配跟进人 + 按筛选导出 CSV；`verify:local` 92/92 全绿（13A 14 项 + 13B 7 项 + 13C 2 项 + Swagger 文档完整性 1 项）。**13E ✅ 漏斗埋点 2026-09-13**：`FunnelEvent`（日粒度聚合）+ 公开端点 `POST /api/stats/funnel`（无需登录、白名单、限流）+ `GET /api/admin/leads/funnel`（各步转化率 + 北极星）+ 前端 `funnel-tracking.js`（visit / calc_done / save / share / lead_click，其中 lead_click 包装 `LeadModal.open` 唯一入口）+ 管理台「转化漏斗」区块；**口径修正**：原 calc_done 只统计登录用户保存动作，游客与算完未保存者全不计入，北极星分母失真 → 改公开端点全量口径；`verify:local` 95/95 全绿（+13E 3 项）、单测 **20 套件 412 例**（+`tests/funnel.test.js` 9 例）。**13D ✅ 一键结果分享图 2026-09-13**：新增公共截图层 `Capture.captureHtml`（统一 html2canvas 配置 + 临时容器清理），PDF 导出与分享图共用同一层、消除配置漂移；`share-card.js` 结果页→模板路由（`income` 正向结果卡 / `negotiation` 谈薪卡，谈薪页唯一转化出口）+ 二维码（`qrcode-generator` CDN，离线可用）+ 预生成预览确认（保存/关闭）+ 固定免责声明「本测算结果仅供参考，不构成税务建议」；分享链接带 `?source=share` 回填 `Lead.source`，构成 T4 归因闭环；`verify:local` 100/100 全绿（阶段13 累计 +32 项：13A 14 / 13B 7 / 13C 2 / Swagger 1 / 13E 3 / 13D 5）、单测 **20 套件 412 例**（+`tests/share-card.test.js` 22 例）—— 阶段13 子项已全部完成）详见 [stage13-acquisition-and-leads-plan.md](./stage13-acquisition-and-leads-plan.md) | 1-2周 | 2026-09-13 |
 | 阶段14：变现与可信度 | ✅ 已完成并上线（v1.13.0 · 2026-09-13）（**14A/14B/14C ✅ ProCode 兑换码**：`ProCode` 模型（`code` 唯一 / `duration_days` 空=永久 / `batch` 批次 / `used_by` 兑换留痕 / `disabled` 作废）+ 迁移 `20260913_add_pro_codes`；用户端 `POST /api/pro-codes/redeem`（登录 + 事务原子占用，一码一用；限时码对未过期 pro 叠加续期；永久码 `plan_expires_at=null`；已是永久 pro 拒绝且不消耗码）+ `GET /api/pro-codes/mine`；管理端 `GET/POST /api/admin/pro-codes`、`PATCH /:id`（已兑换码禁止作废）、`GET /export`（CSV 含 BOM + 公式注入防护）；前端「版本与权益」弹窗自助兑换入口 + 管理台「兑换码」Tab（生成 / 计数 / 筛选 / 作废 / 导出，原 Tab 更名「邀请码」）；`verify:local` 117/117 全绿（新增 17 项）+ `tests/pro-code.test.js` 28 例。**14D/C2 ✅ 城市社保参数库 2026-09-13**：`CitySocialConfig` 模型（`version` 唯一 / `status` published·archived / `payload` JSON 快照）+ 迁移 `20260913_add_city_social_config`；公开只读 `GET /api/config/city-social`（`since` 增量指纹）+ 管理端 `GET/POST /api/admin/city-social`、`POST /rollback`（版本化快照 / 回滚另存 / 可选公告联动，公告版本号加 `city-` 前缀避免与税率公告互相覆盖）；**服务端校验即安全边界**（城市编码契约 / 上限 ≥ 下限（留空 = 不设上限）/ 公积金比例 `(0,100]` / `national` 兜底城市不可删除 / 默认城市须在列表中 / 版本号唯一）；端上 `city-social-sync.js` / `city-social-ui.js`（**v1.17.0 已回退**：两个前端模块删除、三页不再注入「参保城市」下拉，回到「默认基数 + 用户自改」，城市改由留资表单收集并由顾问人工核对；参数库与公开端点保留供 SEO 落地页复用）；管理台新增「社保基数」Tab（一城一行可增删表格 / 出厂基线载入 / 版本历史回滚 / 前端与后端同口径预校验）；`verify:local` **146/146** 全绿（**口径修正**：此前记的 142/142 是「基线 100 + 本阶段新增 35 + 阶段13 补强 7」的推算值，发布前实跑为 **146/146**，缺口 4 项此前未登记归属 —— 已按实跑回填，分段明细见 CHANGELOG）+ `tests/city-social.test.js` 24 例 + `tests/city-social-sync.test.js` 27 例。**阶段14 剩余项已陆续交付**：高商业意图 SEO 落地页 —— 首个页面 `/seo/bonus-tax.html`（年终奖个税）随 v1.14.0 上线（门禁 152/152），第二个页面 `/seo/salary-tax.html`（月薪个税）随 v1.15.0 上线（门禁 156/156），第三个页面 `/seo/annual-settlement.html`（汇算清缴：应退/应补 = 全年应纳税额 − 已预缴税额）随 v1.16.0 上线（门禁 **162/162**）；**待办**：其余关键词落地页（社保基数 / 税后工资），方案见 `docs/development/seo-landing-plan.md`） | 2周 | 2026-09-13 |
-| 阶段15：税务计算能力扩展（多税种） | ⏳ 待开始（**先 15A 个税纵深 → 后 15B 企业税种**；纯前端能力，不依赖 ICP 备案，与备案并行推进）**15A 个税纵深**：劳务报酬/稿酬预扣 · 股权激励 · 离职补偿金 · 专项附加扣除确认 · 个人养老金 · 外籍优惠 · 汇算深度；**15B 企业税种**：增值税 · 企业所得税 · 附加税费 · 印花税；**15C 社保薪酬**（收编阶段14 待办落地页「社保基数」「税后工资」）；**15D 架构守护**：税种注册表 + 多税种版本化 + SEO 落地页矩阵。方案见 [stage15-multi-tax-plan.md](./stage15-multi-tax-plan.md) | 3周+ | 预计 —
+| 阶段15：税务计算能力扩展（多税种） | ✅ 已完成并全部关闭（**v1.18.0 → v1.35.0 陆续交付，最后一批随 v1.35.0 收口 · 2026-09-15**；计划收口见 stage15-multi-tax-plan.md §9）：15A/15B/15C 共交付 **20 个 SEO 落地页**（个税纵深 8 + 企业税种 4 + 社保薪酬 3 + 用工/残保金 3 + 养老年金健康险税优 2），15D 按事实标注（20 个 quick 模块 + 内核对拍测试、独立工具页入口 /seo/index.html、视觉统一实测验证 21 页共用 landing.css 零内联样式、门禁 259/259）；15A-5 尾巴「税优健康险（2400 元/年限额 + 赔款免税）」与「企业年金（个人 4% 当期扣除 + 领取全额单独计税）」随 v1.35.0 补齐。方案见 [stage15-multi-tax-plan.md](./stage15-multi-tax-plan.md) | 3周+ | 2026-09-15 |
 | 阶段16：迁移与合规升级 | ⏳ 待开始（**前置：ICP 备案通过**；16D B 端 API 另依赖阶段15 的 15B 企业税种）迁腾讯云国内节点（Zeabur 转预发）+ 官方支付（微信/支付宝）+ 微信小程序 + B 端 API。方案见 [stage16-migration-and-compliance-plan.md](./stage16-migration-and-compliance-plan.md) | 3周+ | 预计 —
-| ⏳ 并行线：ICP 备案 | ⏳ 待启动（定域名 → 腾讯云轻量 → 域名实名 → 提交备案 → 排队 3-5 周；期间产品正常迭代，不阻塞阶段13/14） | 3-5周 | 预计 —
+| 阶段17：全税种完整测算（**核心卖点**） | ✅ 已完成并收官（**v1.42.0 → v1.70.0 · 2026-09-19**）：17A 测算描述符 spec（`tool-registry` 加 `step` 分组 + `steps` 分步声明 + 通用渲染器 `src/js/ui/deep-wizard-ui.js`）→ 17B 反向迁移（原有 4 个**页面式** deep 全部迁到 spec 驱动，页面式归零）→ 17C-1~5 铺齐 **6/6 类**税种 → 17D-1~13 个税纵深（场景完整度 6/16 → **16/16**）→ 17E 遗留清偿。现况：`EuriskoToolRegistry.deep()` **21 个 spec 驱动完整测算**、`.all()` 20 个速算器（约定：`X-deep` 复用同名速算器的 fields/steps/compute/pitfalls/policyKey）。方案见 [stage17-full-tax-coverage-plan.md](./stage17-full-tax-coverage-plan.md) | 3周+ | 2026-09-19 |
+| 阶段18：spec 驱动的配套链路收口 | 🟡 **大部分完成**（**v1.71.0 → v1.76.0 · 2026-09-19**）：修的是阶段17「每迁移一个页面式 deep 就地补一份按工具认人的配置」留下的**静默失败** —— 21 个 spec 驱动 deep 里只有 4 个被照顾到，其余 17 个全漏且表现为静默/半静默失败。18-1 加载顺序装配守护 / 18-2 历史查看按注册表统一分发 / 18-3 + 18-5 分享图取数与入口（改事件委托）/ 18-4 留资情境注册表兜底 / 18-6a 真机验收补跑。**剩余两项待定**：① 18-6 按用户反馈补具体税种场景（待用户输入）；② 留资引导投放白名单（`lead-touchpoints.ALLOWED_TYPES`）是否从 4 类扩到更多 deep（产品投放口径，待用户定）。方案见 [stage18-spec-driven-followup.md](./stage18-spec-driven-followup.md) | 1周 | 进行中 |
+| 阶段19：UI 重构与留存设计 | 🚧 **进行中**（**v1.77.0 起 · 2026-09-20**）：19-0 样式沙箱层 `src/css/ui-redesign.css` + **视觉回归截图基线**（`tools/ops/ui-screenshot-baseline.js`，6 页 × 375/1280 × 浅色/深色 = 24 张，入仓）✅ v1.77.0；19-1a 设计令牌迁回 `tokens.css` 真源（零像素变化）✅ v1.78.0；19-1b Tailwind 产物**纯重建**（修好构建链路，零视觉变化）✅ v1.79.0；19-1c **全站阴影收口**到 `--sh-*` 5 个角色（26 处字面值收口、焦点环统一）✅ v1.80.0；19-1 验收：全站文字对比度达 WCAG AA ✅ v1.81.0 / v1.81.1（补 admin.html）；**19-2 首页双轴重构**（Mission 三态 Hero + 事件卡上轴 9 张 + 我的税务资产 + 身份卡 5→6）✅ v1.82.0；**19-3 工具页降载**（6 组默认折叠 + 逐组记忆 + 卡片状态微标签 + 进页聚焦搜索；改动如有两边：折叠只加 class 不重建 DOM、「最近使用」组默认展开）✅ v1.83.0；**19-4 速算器结果页双栏**（桌面 ≥1024px 左输入 sticky / 右结果，手机单列 + 结果吸底条 + 行动条四按钮常驻；**只做一份 DOM**，单列与双栏由 CSS 断点切换）✅ v1.84.0。**编号口径**：v1.79.0 / v1.80.0 的标题里写作 19-2 / 19-3，实为方案 §4 中 19-1 的两个子步骤（施工顺序编号，与方案撞号），已提交标题不回改，后续以 [stage19-ui-redesign-plan.md](./stage19-ui-redesign-plan.md) §4 为准。**遗留**：`src/css/admin.css` 仍不可复现（`build:css` 不要整条跑）；深色档**变化**截图覆盖不到（只有像素比对），深色模式需逐页人工过一遍 | 进行中 | 进行中 |
+| 🟡 并行线：ICP 备案 | 🟡 进行中（2026-09-15：**域名已购、腾讯云服务器已购、ICP 备案已提交排队中、企业微信已注册**；阶段15 已关闭，备案通过后即可启动阶段16 迁移） | 3-5周 | 进行中 |
 
 ### 当前状态
 
@@ -358,7 +367,9 @@ EuriskoTax/
 
 **商业与冷启动状态（2026-09-14 补记）**：
 - 产品已具备获客条件：转化链路（结果页引导 → 留资落库 → 顾问状态机 → 转化漏斗）+ 兑换码收款 + 三个 SEO 落地页均已上线，**尚未开始推广（0 用户 / 0 收入）**
-- 三个点火动作待执行：注册 `.com` 域名（**须公司名下**，买完需满 3 个自然日才能提交备案）→ 提交 ICP 备案（企业主体 · 有限责任公司，排队 3–5 周）→ 配置企业微信「联系我」活码（当前 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl` 为空，留资弹窗降级为仅留言通道）
+- 三个点火动作进展（2026-09-16 更新）：① `.com` 域名 ✅ 已注册（`euriskotax.com`，公司名下）；② ICP 备案 ✅ 已提交（2026-09-15，腾讯云接入，审核中，一般 1–3 周）；③ 企业微信「联系我」活码 ✅ 已配置（见 gtm-execution-plan 1.2）
+- **备案审核期间纪律**：`euriskotax.com` 在备案通过前**不加任何解析**（无解析是正确状态）；接入商为腾讯云，备案通过后解析指向腾讯云境内服务器
+- 迁移目标已购：腾讯云轻量服务器 euriskotax-sh（上海 · Docker CE 镜像 · 65 元/月 · SSH 密钥 `euriskoTax_ssh`）；Zeabur（东京）保留为过渡/预览环境
 - 战略与财务测算见 [../marketing/business-plan-for-partners.md](../marketing/business-plan-for-partners.md)；90 天执行清单 / Go-NoGo / 线索 SOP 见 [../marketing/gtm-execution-plan.md](../marketing/gtm-execution-plan.md)
 
 **本地开发环境**：
@@ -379,6 +390,9 @@ EuriskoTax/
 ---
 
 ## 🚀 部署方案
+
+> 📌 **真源在代码与部署手册**：`Dockerfile`（Zeabur 生产镜像）+ [lighthouse-deployment-guide.md](../tech-reports/lighthouse-deployment-guide.md)
+> （ICP 备案通过后迁腾讯云轻量上海）。本节是**立项时的方案快照**。
 
 ### 本地开发
 ```bash
@@ -501,18 +515,48 @@ cpolar http 3000 -region=cn
    - ✅ PDF 报告导出（专业版汇算清缴报告）、政策要点增量推送（10B）
    - ✅ 运维管理后台（用户权益调整 / 反馈跟进 / 兑换码）与意见反馈附图
 
-3. **税务计算能力扩展（多税种，阶段15）** ⏳ 待开始（先 15A 个税纵深 → 后 15B 企业税种）
+3. **税务计算能力扩展（多税种，阶段15）** ✅ 已完成并全部关闭（v1.18.0 → v1.35.0，20 个落地页）
    - 个税纵深：劳务报酬/稿酬预扣、股权激励、离职补偿金、专项附加扣除确认、个人养老金、外籍优惠、汇算深度
    - 企业税种：增值税、企业所得税、附加税费、印花税
    - 架构守护：税种注册表单点定义 + 多税种版本化热更新 + SEO 落地页矩阵
    - 详见 [stage15-multi-tax-plan.md](stage15-multi-tax-plan.md)
 
 4. **迁移与合规升级（阶段16）** ⏳ 待开始（前置：ICP 备案通过）
-   - 迁腾讯云国内节点（Zeabur 转预发）+ 官方支付（微信/支付宝）
+   - **已拍板（2026-09-16）**：备案域名 = `euriskotax.com`（canonical / sitemap / robots 届时从 `euriskotax.zeabur.app` 一次切换，切换脚本已备好：`tools/ops/set-canonical-domain.ps1 -Apply`，85 处）；**暂不开线上收费**，官方支付（微信/支付宝）继续顺延，兑换码线下发放模式不变（`tests/filing-compliance.test.js` 有「无在线支付入口」守卫）
+   - **迁移执行包已就绪（2026-09-16）**，位于 `deploy/lighthouse/` + `tools/ops/deploy-lighthouse.ps1`，操作手册见 [../tech-reports/lighthouse-deployment-guide.md](../tech-reports/lighthouse-deployment-guide.md)：
+     - `deploy/lighthouse/docker-compose.yml`：生产三件套（PostgreSQL 仅内网 / 应用容器启动自动 `prisma migrate deploy` / nginx 反代 80，443 块预写注释）
+     - `deploy/lighthouse/nginx/default.conf`：反代 + gzip + 安全头；签发证书后取消 443 注释
+     - `deploy/lighthouse/.env.example`：`POSTGRES_PASSWORD` / `JWT_SECRET`（`openssl rand -hex 32` 生成）/ `ADMIN_TOKEN`（**与 Zeabur 现值一致**）/ `CORS_ORIGIN`（IP 测试期 `*`，切域名日收紧为 `https://euriskotax.com`）
+     - 部署命令：`powershell -File tools/ops/deploy-lighthouse.ps1 -ServerIp <公网IP>`（打包 → scp → 构建 → `/health` 健康检查；服务器需先备好 `.env`）
+     - ⚠️ 脚本为中文内容，已按仓库规范带 UTF-8 BOM（Windows PowerShell 5.1 无 BOM 读中文脚本会乱码炸）
+   - **待执行时间线**（备案通过为切换日）：
+     1. 备案通过当天：备案号填入 `src/js/ui/site-filing-ui.js` 的 `icpNumber`（页脚全站生效）→ 发版
+     2. 轻量服务器首次部署（IP 直连测试）+ 数据迁移：Zeabur PostgreSQL `pg_dump -Fc` → `pg_restore --clean --if-exists`，核对兑换码/留资数量（手册第 3 节）
+     3. 腾讯云 DNS 加 A 记录 `@ → 轻量公网IP` → certbot webroot 签发证书 → 启用 443 → 收紧 CORS
+     4. 本机 `set-canonical-domain.ps1 -Apply` 全站切域名 → 全量测试 → 发布 → 旧域名 301（Zeabur 设 primary domain）
+     5. 上线 30 日内：公安备案（主动办理）；稳定 1–2 周后再决定 Zeabur 去留
    - 微信小程序（Taro 复用前端计税 JS）→ 桌面端（Tauri，可选）
    - B端 API 开放：将服务端计税能力封装为独立版本化端点（如 `/api/v1/calc/*`）+ API Key 授权 + 按次计费 + 限流配额（复用 express-rate-limit 经验），面向代账公司/财务 SaaS 输出，Swagger 文档即销售材料（**依赖阶段15 的 15B 企业税种**）
    - 数据管理与多端支持：多设备登录与云端同步、数据导入导出、备份机制
    - 详见 [stage16-migration-and-compliance-plan.md](stage16-migration-and-compliance-plan.md)
+
+5. **全税种完整测算（阶段17 · 核心卖点）** ✅ 已完成并收官（v1.42.0 → v1.70.0 · 2026-09-19）
+   - 17A 描述符 spec + 通用多步向导渲染器（`deep-wizard-ui.js`）；17B 把原有 4 个页面式 deep 反向迁到 spec 驱动，**页面式 deep 归零**
+   - 17C-1~5：增值税 / 企业所得税 / 社保公积金 / 附加税印花税 / 残保金工会经费 —— **6/6 类税种齐**
+   - 17D-1~13 个税纵深：个税场景完整度 **6/16 → 16/16**
+   - 现况：21 个 spec 驱动完整测算 + 20 个速算器；详见 [stage17-full-tax-coverage-plan.md](stage17-full-tax-coverage-plan.md)
+
+6. **spec 驱动的配套链路收口（阶段18）** 🟡 大部分完成（v1.71.0 → v1.76.0 · 2026-09-19）
+   - 已交付：18-1 加载顺序装配守护 / 18-2 历史查看按注册表统一分发 / 18-3 + 18-5 分享图取数与入口 / 18-4 留资情境兜底 / 18-6a 真机验收补跑
+   - ⏳ 待定两项：① 18-6 按用户反馈补具体税种场景（**待用户输入**）；② 留资引导投放白名单是否从 4 类扩到更多 deep（**待用户拍板**）
+   - 详见 [stage18-spec-driven-followup.md](stage18-spec-driven-followup.md)（根因 / 六批次 / 待定两项 / 教训）
+
+7. **UI 重构与留存设计（阶段19）** 🚧 进行中（v1.77.0 起 · 2026-09-20）
+   - 已交付：19-0 样式沙箱层 + 视觉回归截图基线（24 张）/ 19-1a 令牌迁回真源 / 19-1b Tailwind 产物纯重建 / 19-1c 全站阴影收口到 `--sh-*` 五角色 / 19-1 验收（对比度达 AA，含 admin.html）/ 19-2 首页双轴重构（v1.82.0）/ 19-3 工具页降载（v1.83.0）/ **19-4 速算器结果页双栏（v1.84.0）** / **19-9 效率层 E1 主体 + E2 参数模板（v1.91.0）** / **19-10 效率层 E3 台账（v1.93.0）** / **19-11 效率层 E4 批量（v1.94.0）** / **19-5b 遗留清偿：方案库口径补齐（v1.98.0，任一工具都能存方案）** / **19-4 顺延清偿：结果页「各项数额」条（v1.99.0，速算器与 21 个完整测算共用一份）** / **19-4 顺延清偿：省钱卡接进 21 个完整测算结果步（v1.100.0，判定由字段表说了算）**
+   - 19-2 遗留：四条已全部清偿 —— 漏填提醒（v1.95.0）/ 身份卡设默认视图（v1.96.0）/ 我的方案与台账（v1.97.0）；
+     19-5b 遗留（方案库只认综合所得口径，速算器存进去会被补成 ¥0.00）亦已清偿（v1.98.0）
+   - ⚠️ 施工约束：`src/css/admin.css` 仍不可复现 → **不要整条跑 `build:css`**（只跑 `tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --minify`）；改样式后先用截图 `--check` 定位变化区域，确认后再固化基线
+   - 详见 [stage19-ui-redesign-plan.md](stage19-ui-redesign-plan.md)
 
 ### 技术文档
 
@@ -524,8 +568,7 @@ cpolar http 3000 -region=cn
 ---
 
 *文档创建时间：2026-05-25*
-*最后更新：2026-09-13（**下一阶段已定档**：新增 **阶段15 税务计算能力扩展（多税种）**（先 15A 个税纵深 → 后 15B 企业税种；纯前端能力，不依赖 ICP 备案、可与备案并行；收编阶段14 待办落地页「社保基数」「税后工资」），原「阶段15 迁移与合规升级」顺延为 **阶段16**（前置 ICP 备案；16D B 端 API 另依赖 15B 企业税种），方案见 `docs/development/stage15-multi-tax-plan.md` / `docs/development/stage16-migration-and-compliance-plan.md`；**阶段14 已全部完成：主体随 v1.13.0、剩余项「高商业意图 SEO 落地页」随 v1.14.0 / v1.15.0 / v1.16.0 陆续上线**：14A/14B/14C `ProCode` 专业版兑换码（后端事务化一码一用 + 用户端自助兑换 + 管理台「兑换码」Tab）与 **14D/C2 城市社保参数库**（`CitySocialConfig` + 公开只读端点 + 版本化回滚；顺带消除 C1 遗留的 `TODO(C2 社保地区政策库)`）已完成并随 v1.13.0 上线 —— 其中「参保城市」下拉已于 **v1.17.0 回退**（计算页回到「默认基数 + 用户自改」，城市改由留资/咨询时收集、顾问人工核对），参数库与端点保留待「社保基数」SEO 落地页复用；**阶段13 补强**：留资弹窗的「当前测算」由编造的入口标签改为可核实的非金额摘要（新增 `lead-context.js`），去掉无法兑现的「免费核对一次」次数承诺，并补上分享落地首屏引导（新增 `share-landing.js`）与分享图视觉收口；门禁 **167/167**、单测 **28 套件 570 例**、线上指纹 **37 项**；**阶段14 剩余项已交付三页**：高商业意图 SEO 落地页 —— `/seo/bonus-tax.html`（年终奖个税）随 v1.14.0、`/seo/salary-tax.html`（月薪个税，累计预扣口径）随 v1.15.0、`/seo/annual-settlement.html`（汇算清缴：应退/应补 = 全年应纳税额 − 已预缴税额）随 v1.16.0 上线，均为静态正文 + 同源口径速算器（与内核逐点对拍）+ `robots.txt`/`sitemap.xml` 收录 + 门禁逐档对账断言，方案见 `docs/development/seo-landing-plan.md`；**待办**：其余关键词落地页（社保基数 / 税后工资）。上一版：阶段13 获客与转化 13A–13E 随 v1.12.0 上线（门禁 100/100、单测 20 套件 412 例）；阶段12 A+C1 已完成，支付体系与 B 端 API 因 ICP 备案阻塞移至阶段16。详见 CHANGELOG.md）*
-*对应项目版本：v1.17.0*
+*最后更新：2026-09-23（**v1.104.0 当前基线**：门禁 **259/259**、单测 **112 套件 2092 例**、线上指纹 **37 项**）——本版「41 个工具真机冒烟（阶段19 收官验证）」：阶段19 一路踩的都是同一类坑 —— jsdom 全绿、真机点开一看不对（18-6a 行名带括号后缀匹配不到、19-12 政策徽标把标题压成一字一行、18-2 点老记录看到最近一次算的东西）。单测钉的是「函数在给定输入下返回什么」，钉不住「41 个入口在真机上出不出数」—— deep 侧 21 个结果卡按 spec 现拼，spec 缺字段 / compute 抛错 / 渲染少判空，在单测里都是绿的那一格（测试只挑两三个代表跑）。改法：新增 `tools/ops/ui-smoke-all-tools.js`（`npm run smoke:ui`），真机上把 20 个速算器 + 21 个完整测算各算一次，只问三件事：出不出数 / 抛没抛异常（页面级 error 一并收） / deep 那枚时效徽标在不在。三条边界：不写留痕（跑前拍 localStorage 快照、跑后整份还原 —— 41 次测算灌进历史，历史就不再是「我算过什么」，后面拍基线也会被污染）、只报不修（失败退出码 1）、复用基线底座与浏览器会话（全新会话要拉 6 个外网 CDN，冷启动实测卡 7 分钟以上）。验收：41/41 出数、零页面级异常；唯一「有政策版本但无时效徽标」的是 classification（19-12 已知缺口，政策库无分类所得条目），缺口每次冒烟都列出 —— 悄悄多出几个就说明有人新增 spec 忘了挂 policyKey。**盘点结论（防再误判）**：效率层早已全部交付 —— 模板 / 台账 / 批量 / 参数记忆与草稿 / 「与上次差 ¥X」/ 税务日历与首页待办 / 首页台账卡；批量也不是「只算工资表」（工具下拉已放开到全部 20 个速算器，每行都走同一个 tool.compute）。plan 里剩下的要么**刻意不做**（常用置顶；待办 × 台账 —— 拿用户自己标的 status 去催人会变成瞎催），要么**要后端**（主体跨设备同步、登录后随档案同步）：都不该由前端单方面拍板。本版只加脚本、文档与 npm script，不动产品代码，视觉基线无需重拍。
 
 ---
 

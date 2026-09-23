@@ -24,10 +24,18 @@
     // 刻意不再携带固定 scene 字符串：情境由 lead-context.js 从已渲染结果反推，
     // 传递不可信的死标签只会把「测算类型名」当成「用户的当前测算」写进线索表。
     var TOUCHPOINTS = {
-        forward:        { containerId: 'step-result',                source: 'result_settlement' },
-        comprehensive:  { containerId: 'step-result',                source: 'result_settlement' },
-        business:       { containerId: 'business-step-result',       source: 'result_business' },
-        classification: { containerId: 'classification-step-result', source: 'result_budget' }
+        // 17B-3（v1.49.0）：综合所得也迁到了 spec 向导，'step-result'（旧页面结果容器）随之删除。
+        // 与 business 一样改指向导的结果卡；认人靠 data-tool-id，不是靠 id —— 通用渲染器的节点
+        // 被所有 spec 工具复用，写裸 id 等于把别人的结果当成综合所得去归因。
+        forward:        { containerId: 'dw-result-card',             source: 'result_settlement' },
+        comprehensive:  { containerId: 'dw-result-card',             source: 'result_settlement' },
+        // 17B-2：business-step-result 是随旧页面删掉、却一直没跟着改的一行 —— 结果是 business
+        // 走完向导，引导因为找不到容器而从不出现（静默失败，没人觉得不对）。改成向导的结果卡。
+        business:       { containerId: 'dw-result-card',             source: 'result_business' },
+        // 17B-4（v1.50.0）：分类所得也与 business / forward 一样指向导的结果卡。
+        // 'classification-step-result' 是随旧页面删掉的 —— 引导会因为找不到容器而从不出现
+        // （静默失败，没人觉得不对：明明算完了却没人推荐）。
+        classification: { containerId: 'dw-result-card', source: 'result_budget' }
     };
 
     var GUIDE_ID = 'lead-result-guide';
@@ -40,18 +48,18 @@
                 '</div>' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex items-center gap-2 flex-wrap">' +
-                        '<h3 class="font-bold text-gray-800 text-sm">申报前先核对，避免多缴或漏扣</h3>' +
+                        '<h3 class="font-bold text-gray-800 text-sm">算完先看这三项，参数别填错</h3>' +
                         '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">免费</span>' +
                     '</div>' +
-                    '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">下面这三项最容易被忽略，申报前建议先过一遍：</p>' +
+                    '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">下面这三项最容易被填错，建议对照自查：</p>' +
                     '<ul class="mt-2 space-y-1 text-xs text-gray-600 leading-relaxed">' +
                         '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>专项附加扣除有没有漏填、还能不能补扣</li>' +
                         '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>社保公积金、年终奖选哪种算法更划算</li>' +
-                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>退税 / 补税的结论对不对、依据全不全</li>' +
+                        '<li><i class="fa fa-check-circle text-blue-500 mr-1.5"></i>退税 / 补税的测算依据是否填全</li>' +
                     '</ul>' +
                     '<div class="flex flex-wrap items-center gap-2 mt-3">' +
                         '<button type="button" class="lead-result-cta btn btn-primary text-xs px-4 py-2 rounded-lg"' +
-                            ' data-source="' + source + '" data-type="' + type + '">免费咨询</button>' +
+                            ' data-source="' + source + '" data-type="' + type + '">免费协助</button>' +
                         '<span class="text-[11px] text-gray-400">不采集收入金额 · 测算结果仅供参考</span>' +
                     '</div>' +
                 '</div>' +
@@ -76,12 +84,23 @@
         container.appendChild(wrap);
     }
 
-    function bindButton(btnId, type) {
-        var btn = document.getElementById(btnId);
+    // 17B-4（v1.50.0）：原先这里还有一个 bindButton(btnId, type) —— 它给「页面专属计算按钮」
+    // 挂延时注入，是四个页面式 deep 各用一颗按钮时代的产物。页面上没了，最后一个调用者
+    // （分类所得的 calculate-classification-btn）也随页面删了，函数一并删除：
+    // 留着它，下一个人会以为「新测算的入口是自己的按钮」，而实际上都走 dw-next。
+
+    // 17B-1：spec 驱动的向导是**通用渲染器** —— dw-next 与 dw-result-card 会被所有 spec 工具
+    // 轮着用。若照搬「按钮 → 类型」的固定绑定，用户算了增值税也会被当成经营所得线索
+    // 归因进去（线索表里看不出错，联系时也答非所问）。所以注入前先按 data-tool-id 认人。
+    function bindWizardNext(type) {
+        var btn = document.getElementById('dw-next');
         if (!btn) return;
         btn.addEventListener('click', function () {
-            // 结果由按钮原处理器同步（分类所得为 setTimeout）渲染，这里延后一拍注入
-            setTimeout(function () { inject(type); }, 150);
+            setTimeout(function () {
+                var card = document.getElementById('dw-result-card');
+                if (!card || card.getAttribute('data-tool-id') !== type) return;
+                inject(type);
+            }, 150);
         });
     }
 
@@ -102,11 +121,16 @@
     }
 
     function init() {
-        bindButton('next-to-result-btn', 'forward');            // 综合所得（年度汇算）
-        bindButton('calculate-business-btn', 'business');       // 经营所得
-        bindButton('calculate-classification-btn', 'classification'); // 分类所得
-        // 反向倒算（谈薪）显式挂钩但会被 BLOCKED_TYPES 拦截 —— 证明守卫生效，可被门禁断言覆盖
-        bindButton('calculate-reverse-btn', 'reverse');
+        // 17B-3（v1.49.0）：综合所得也走了向导，它的按钮 'next-to-result-btn' 随旧页面删掉了，
+        // 与 business / reverse 一样改钩 dw-next，并按 data-tool-id 认人（通用渲染器复用同一颗按钮）。
+        bindWizardNext('forward');
+        bindWizardNext('business');                             // 经营所得：17B-1 起走 spec 驱动的向导
+        // 17B-4（v1.50.0）：分类所得同上 —— 'calculate-classification-btn' 随旧页面删掉了。
+        // bindButton 这个路基于是彻底没了调用者（四个页面式 deep 全走了），注入统一走 bindWizardNext。
+        bindWizardNext('classification');
+        // 反向倒算（谈薪）显式挂钩但会被 BLOCKED_TYPES 拦截 —— 证明守卫生效，可被门禁断言覆盖。
+        // 17B-2：它的按钮随旧页面删了，钩到向导的下一步上（同样先按 data-tool-id 认人）。
+        bindWizardNext('reverse');
         bindCta();
     }
 

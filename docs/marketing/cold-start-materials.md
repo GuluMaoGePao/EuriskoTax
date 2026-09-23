@@ -3,7 +3,7 @@
 > 更新日期：2026-09-14 ｜ 注册机制：邮箱验证码 + **一机一码邀请码**（`EURISKO-XXXX-XXXX`）
 > 产物地址：https://euriskotax.zeabur.app
 
-> 🚩 **发帖前必读**：本文件只提供文案。**发布前必须先过 [gtm-execution-plan.md](gtm-execution-plan.md) 的 Go/No-Go 检查表** —— 尤其 P0 项「企业微信活码已配置」（当前 `index.html` 的 `window.LEAD_CONFIG.wecomQrUrl` 为空，留资弹窗降级为仅留言通道）与「域名 / 备案」两项。未配活码就投放，线索承接会明显打折。
+> 🚩 **发帖前必读**：本文件只提供文案。**发布前必须先过 [gtm-execution-plan.md](gtm-execution-plan.md) 的 Go/No-Go 检查表** —— P0 项「企业微信活码已配置」已于 2026-09-16 完成（`window.LEAD_CONFIG.wecomQrUrl` = `https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0`）；**发帖前仍必须确认 P0 #4「顾问值班人与响应时限」已定** —— 活码通了但没人接，比不投放更伤口碑。
 > 渠道调度（哪天发哪一篇、发完看什么数）见 [gtm-execution-plan.md](gtm-execution-plan.md) 的 90 天周节奏。
 
 > ⚠️ 2026-09-06 起固定邀请码 `EURISKO2026BETA` 已废弃，每码仅可注册一个账号。发帖前请先用本地 GUI「邀请码管理」或管理员接口生成一批码，再按本文各渠道的"领取话术"投放。

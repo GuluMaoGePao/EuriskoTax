@@ -10,6 +10,24 @@ const SOURCES = [
     'home_banner', 'modal', 'notice_list', 'profile', 'share', 'unknown',
     // 阶段14 剩余项：SEO 落地页（页面按页给独立来源，便于判断哪个关键词页真的带来线索）
     'seo_bonus', 'seo_salary', 'seo_settlement',
+    // 阶段15 15A：个税纵深落地页（劳务报酬 / 稿酬 / 特许权使用费预扣预缴、股权激励、离职补偿金、专项附加扣除、个人养老金、外籍个人津补贴、提前退休与内部退养）
+    'seo_withholding', 'seo_equity', 'seo_severance', 'seo_special', 'seo_pension', 'seo_expat', 'seo_earlyretire',
+    // 阶段15 15B：企业税种落地页（增值税、企业所得税、附加税与印花税）
+    'seo_vat', 'seo_cit', 'seo_surtax', 'seo_social', 'seo_netsalary',
+    // 阶段15 15C-3：企业用工成本（15C 收尾项，为 15B / 16D 铺垫）
+    'seo_employercost',
+    // 阶段16：精装版报告权益钩子（Phase 3.5）—— 衡量「留资 → 发权益码」这条链路的效果，
+    // 与 seo_* 同级别独立归因，便于判断报告钩子是否真的带来线索而非只是噪音。
+    'report_pro',
+    // 阶段16：专业版权益续期入口（Phase 3.5 缺口 3）—— 同上，独立归因于报告索取，
+    // 便于区分「首次索取权益」与「到期续期」两类意图完全不同的线索。
+    'renew_pro',
+    // 阶段15 15B-5：个体工商户经营所得「核定 vs 查账」
+    'seo_bizincome',
+    // 阶段15 15B-6：残保金与工会经费
+    'seo_disabilityfund',
+    // 阶段15 15A-5 尾巴收尾：税优健康险、企业年金
+    'seo_health_insurance', 'seo_annuity',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
@@ -26,6 +44,12 @@ const PHONE_RE = /^1[3-9]\d{9}$/;
 
 // 幂等去重窗口：同手机号 24h 内重复提交不新建记录（也避免暴露"该号码已提交"）
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// 阶段19-7b②：视图密度白名单。空串（未上报）是**合法值** —— 老客户端 / 游客首次进入
+// 没有信号就是没有信号，不能回落成 simple 充数，否则顾问会把「没采集到」当成「用户选了简明」。
+const VIEW_MODES = ['simple', 'full', ''];
+// 进阶参数展开次数上限：纯防脏数据（端上是真实计数，正常远小于此）
+const ADVANCED_MAX = 999;
 
 const pickEnum = (list, raw, fallback) => (typeof raw === 'string' && list.includes(raw) ? raw : fallback);
 
@@ -77,6 +101,14 @@ const buildLead = (body) => {
     const noteRes = readText(src.note, NOTE_MAX, 'note');
     if (noteRes.error) return { error: noteRes.error };
 
+    // 视图密度 + 进阶参数探索次数（阶段19-7b②）：线索质量分层依据，选填、**不阻断留资**。
+    // 非法值一律回落（与 entity / need / source 同一个「不写脏数据」口径）：
+    // 非整数、负数、超上限都归 0 —— 它是计数不是状态，回落 0 只会低估不会误判。
+    const viewMode = pickEnum(VIEW_MODES, src.viewMode, '');
+    const advancedTouched = Number.isInteger(src.advancedTouched) && src.advancedTouched >= 0
+        ? Math.min(src.advancedTouched, ADVANCED_MAX)
+        : 0;
+
     return {
         data: {
             name,
@@ -89,6 +121,8 @@ const buildLead = (body) => {
             need: pickEnum(NEEDS, src.need, 'other'),
             source: pickEnum(SOURCES, src.source, 'unknown'),
             scene: sceneRes.value,
+            view_mode: viewMode,
+            advanced_touched: advancedTouched,
             note: noteRes.value,
             consent: true
         }
@@ -134,11 +168,16 @@ const submitLead = async (req, res, next) => {
                         // 两项各自判断 —— 用户可能只改了城市而省份没重选
                         province: data.province || existing.province,
                         city: data.city || existing.city,
+                        // 视图密度以最新一次为准（与情境同口径）；
+                        // 「调过进阶参数」取**最大**：它是事实不是状态，
+                        // 不能被后一次「这次没展开」抹掉 —— 抹掉就等于把已知的强信号降级。
+                        view_mode: data.view_mode || existing.view_mode,
+                        advanced_touched: Math.max(existing.advanced_touched || 0, data.advanced_touched || 0),
                         note: noteMerged,
                         user_id: existing.user_id || userId
                     }
                 });
-                console.log(`[LEAD] ${new Date().toISOString()} merged id=${merged.id} source=${merged.source} scene="${merged.scene}"`);
+                console.log(`[LEAD] ${new Date().toISOString()} merged id=${merged.id} source=${merged.source} scene="${merged.scene}" view="${merged.view_mode}" adv=${merged.advanced_touched}`);
                 return res.status(200).json({ success: true, data: { id: merged.id, merged: true } });
             }
         }
@@ -150,7 +189,7 @@ const submitLead = async (req, res, next) => {
         // 落日志：生产环境可经 ops-notify.ps1 邮件转发，实现"有新线索即知会"
         // 带上省·市：日志是「有新线索即知会」的转发源，顾问一眼就能看出该按哪套基数口径对接
         const region = [saved.province, saved.city].filter(Boolean).join('·');
-        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} region="${region}" scene="${saved.scene}"`);
+        console.log(`[LEAD] ${new Date().toISOString()} id=${saved.id} user=${userId || 'guest'} entity=${saved.entity_type} need=${saved.need} source=${saved.source} region="${region}" scene="${saved.scene}" view="${saved.view_mode}" adv=${saved.advanced_touched}`);
 
         res.status(201).json({
             success: true,
@@ -168,6 +207,8 @@ module.exports = {
         ENTITY_TYPES,
         NEEDS,
         SOURCES,
+        VIEW_MODES,
+        ADVANCED_MAX,
         PHONE_RE,
         NAME_MAX,
         WECHAT_MAX,

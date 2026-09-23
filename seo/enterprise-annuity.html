@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- SEO 落地页（阶段15 15A-5 尾巴收尾）：高商业意图长尾词「企业年金要交个税吗 / 企业年金
+         个人缴费 4% 免税 / 年金领取怎么交税 / 企业年金怎么计税」（「是否参与」属投资理财判断，本页不承接）。
+         设计约束（见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+           1) 页面必须自己有用（能算），否则点进来的人立刻返回 —— 收收了也留不住；
+           2) 比例与税率复用 App 同源实现（annuity-quick.js + window.comprehensiveTaxRates
+              / window.bonusMonthlyTaxRates / window.annuityRules），页面上不出现第二份口径；
+           3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
+           4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
+         这一页背三条「纠偏」任务：
+           ① 个人缴费免税上限是**计税基数 × 4%**（基数按当地社平 300% 封顶），
+              不是「个人缴多少都免税」；
+           ② 领取环节按**全额**（本金 + 单位缴费 + 收益）单独计税 —— 按月领取用月度税率表；
+           ③ 能算出「净优惠为负」：3% 档缴费者省 3%、领取交 3%，且领取税覆盖全额 ——
+              但单位缴费扣税后仍归你，参加依然划算。两面都要讲。 -->
+    <title>企业年金要交个税吗 2026：个人缴费 4% 当期扣除 + 领取全额单独计税（能省多少一算便知）</title>
+    <meta name="description" content="输入月缴费基数、个人与单位缴费比例，按 2026 年现行政策算出企业年金每年当期少交的个人所得税、退休按月领取要交的税与净优惠。个人缴费 ≤ 计税基数 4% 当期扣除、单位缴费 8% 递延、领取按全额单独计税。政策依据：财税〔2013〕103 号。">
+    <link rel="canonical" href="https://euriskotax.zeabur.app/seo/enterprise-annuity.html">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EuriskoTax 税费计算器">
+    <meta property="og:title" content="企业年金要交个税吗：个人 4% 当期扣除 + 领取全额单独计税">
+    <meta property="og:description" content="缴费能少交多少、退休领取要交多少、单位缴费是不是白得，一算便知。">
+    <meta property="og:url" content="https://euriskotax.zeabur.app/seo/enterprise-annuity.html">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="stylesheet" href="/src/css/tokens.css">
+    <link rel="stylesheet" href="/seo/landing.css">
+
+    <!-- 结构化数据：与页面正文的 FAQ 一一对应（口径以正文为准，改正文必须同步这里） -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "EuriskoTax 企业年金个税测算",
+                "url": "https://euriskotax.zeabur.app/seo/enterprise-annuity.html",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "zh-CN",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+                "description": "按现行政策计算企业年金缴费环节的当期扣除、单位缴费递延与按月领取的单独计税。"
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "企业年金个人缴费要交个税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "个人缴费在不超过本人缴费工资计税基数 4% 标准内的部分，暂从个人当期应纳税所得额中扣除（当期不交税）；超过 4% 的部分照常从税后工资扣缴。计税基数为本人上年度月平均工资，超过当地上年度职工月平均工资 300% 以上的部分不计入。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "单位给我缴的企业年金要交税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "单位缴费不超过本企业职工工资总额 8%（单位与个人合计不超过 12%）的部分计入个人账户时，个人暂不缴纳个人所得税 —— 这是递延而非免税，领取时按领取额全额单独计税。本页只测算这两个环节的税额，不构成是否参加企业年金的建议。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "退休后领取企业年金怎么交税？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "领取时不并入综合所得、不参与年度汇算，按领取额全额单独计算应纳税款：按月领取的按月度税率表（与年终奖月度换算表同一张）计算；按季领取的平均分摊到各月；按年领取的按综合所得税率表计算。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "企业年金投资收益要交税吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "年金基金投资运营收益分配计入个人账户时，暂不缴纳个人所得税；领取时与本金、单位缴费一起按领取额全额单独计税。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "什么情况下企业年金的净优惠为负？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "如果你全年应纳税所得额不超过 36000 元（适用 3%），个人缴费当期省 3%、领取时再按全额交 3%，且领取税覆盖的是账户全额（含单位缴费）—— 单看个人缴费部分的税收净优惠可能为负（单位缴费部分在领取时才计税）。本页只测算税额，不构成是否参加的建议。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以年金计划受托人申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议。"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+</head>
+<body>
+<header class="site-header">
+    <div class="wrap">
+        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_annuity">打开完整计算器</a>
+    </div>
+</header>
+
+<main>
+    <div class="wrap">
+        <h1>企业年金要交个税吗：个人缴费 4% 当期扣除、单位缴费 8% 递延、领取全额单独计税</h1>
+        <p class="answer">
+            <strong>先给结论：</strong>企业年金的税务处理是「<strong>ETE 递延</strong>」——
+            <strong>缴费</strong>环节个人缴费在<strong>计税基数 × 4%</strong>标准内当期从应纳税所得额中扣除
+            （单位缴费 ≤ 工资总额 8% 计入账户时个人暂不纳税，单位 + 个人合计 ≤ 12%）；
+            <strong>投资</strong>环节收益<strong>暂不征税</strong>；<strong>领取</strong>时按领取额
+            <strong>全额单独计税</strong>（按月领取用月度税率表），不并入综合所得。
+            20% 档的人每月免 800、每年少交约 1920 元；3% 档的人省 3% 交 3%，单看税收净优惠甚至可能为负 ——
+            <strong>但单位缴费部分在领取时才计税</strong>（本页只测算税额，不构成是否参加的建议）。
+            政策依据：《关于企业年金 职业年金个人所得税有关问题的通知》（<strong>财税〔2013〕103 号</strong>，
+            自 2014-01-01 起施行）。
+        </p>
+
+        <section class="card" aria-labelledby="calc-title">
+            <h2 id="calc-title" style="margin-top:0">企业年金税负速算（缴费少交 − 领取交 = 净优惠）</h2>
+            <div class="calc-input-row" style="margin-bottom:12px">
+                <div style="flex:1 1 200px">
+                    <label class="calc-label" for="base-input">月缴费工资计税基数（元）</label>
+                    <input class="calc-input" id="base-input" type="number" inputmode="decimal" min="0" step="1000" value="20000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="personal-input">个人缴费比例（%）</label>
+                    <input class="calc-input" id="personal-input" type="number" inputmode="decimal" min="0" max="100" step="1" value="4" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 160px">
+                    <label class="calc-label" for="employer-input">单位缴费比例（%）</label>
+                    <input class="calc-input" id="employer-input" type="number" inputmode="decimal" min="0" max="100" step="1" value="8" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 220px">
+                    <label class="calc-label" for="taxable-input">全年应纳税所得额（元）</label>
+                    <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="300000" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 140px">
+                    <label class="calc-label" for="years-input">缴费年数</label>
+                    <input class="calc-input" id="years-input" type="number" inputmode="numeric" min="1" step="1" value="10" aria-describedby="calc-note">
+                </div>
+                <div style="flex:1 1 180px">
+                    <label class="calc-label" for="withdraw-input">退休后每月领取（元）</label>
+                    <input class="calc-input" id="withdraw-input" type="number" inputmode="decimal" min="0" step="500" value="3000" aria-describedby="calc-note">
+                </div>
+            </div>
+            <p class="small muted" id="calc-note" style="margin-top:10px">
+                「月缴费工资计税基数」= 本人上年度月平均工资，<strong>超过当地上年度职工月平均工资 300% 的部分不计入</strong>
+                （请直接填封顶后的基数）。「全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金 − 其他扣除。
+                个人缴费超过基数 4% 的部分照常税后扣缴；单位缴费按 8% 封顶计算（单位 + 个人合计 ≤ 12%）。
+                「退休后每月领取」留空则按「每年进账户本金 ÷ 12」估算。
+            </p>
+
+            <div class="results" id="calc-results" hidden>
+                <div class="result highlight">
+                    <div class="k">每月免税的个人缴费</div>
+                    <div class="v" id="r-exempt-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">单位每月递延进账户</div>
+                    <div class="v" id="r-employer-monthly">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">缴费环节每年少交</div>
+                    <div class="v" id="r-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">累计少交（× 年数）</div>
+                    <div class="v" id="r-total-saved">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">账户累计本金</div>
+                    <div class="v" id="r-account">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">每月领取 × 月度税率表</div>
+                    <div class="v" id="r-monthly-tax">—</div>
+                </div>
+                <div class="result">
+                    <div class="k">领取税合计</div>
+                    <div class="v" id="r-withdraw-tax">—</div>
+                </div>
+                <div class="result highlight">
+                    <div class="k">净优惠（少交的税 − 领取交的税）</div>
+                    <div class="v" id="r-net">—</div>
+                </div>
+            </div>
+            <div class="hint" id="calc-hint" hidden></div>
+            <noscript>
+                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三环节处理表」「税率表」与「示例表」手工估算。</p>
+            </noscript>
+        </section>
+
+        <h2>三个环节的税务处理（ETE 递延，2026 年现行口径）</h2>
+        <div class="table-scroll">
+            <table id="annuity-rule-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">缴费、投资、领取三个阶段；个人缴费当期扣除、单位缴费递延、领取全额单独计税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">环节</th>
+                    <th scope="col">税务处理</th>
+                    <th scope="col">限制</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>缴费（个人部分）</td><td class="num">个人缴费 ≤ 计税基数 × 4% 的部分，暂从当期应纳税所得额中扣除</td><td>计税基数 = 本人上年月均工资，当地社平工资 300% 封顶；超 4% 部分税后扣缴</td></tr>
+                <tr><td>缴费（单位部分）</td><td class="num">单位缴费 ≤ 工资总额 8% 计入个人账户时，个人暂不纳税（单位 + 个人合计 ≤ 12%）</td><td>递延而非免税，领取时全额计税</td></tr>
+                <tr><td>投资</td><td class="num">年金基金投资运营收益计入个人账户时暂不征税</td><td>仅限年金基金账户内</td></tr>
+                <tr><td>领取</td><td class="num">按领取额全额单独计税，不并入综合所得、不参与汇算；按月领取用月度税率表</td><td>按季领取平均分摊到各月；按年领取用综合所得税率表</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            一句话记住：<strong>个人 4% 当期少交税、单位 8% 递延进账户、领取全额单独交一次</strong> ——
+            领取税覆盖本金、单位缴费与收益的全部。
+        </p>
+
+        <h2>年度综合所得税率表（缴费环节能省多少税，看你落在哪一档）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；个人缴费免税额降低的是「应纳税所得额」这一列</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>月度税率表（按月领取年金时用，与年终奖月度换算表同一张）</h2>
+        <div class="table-scroll">
+            <table id="monthly-rate-table">
+                <caption class="small muted" style="text-align:left;padding:8px 0">每月应纳税额 = 每月领取额 × 税率 − 速算扣除数；按月领取的年金逐月单独按此表计税</caption>
+                <thead>
+                <tr>
+                    <th scope="col">每月领取额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 3000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>3000 ～ 12000</td><td class="num">10%</td><td class="num">210</td></tr>
+                <tr><td>12000 ～ 25000</td><td class="num">20%</td><td class="num">1410</td></tr>
+                <tr><td>25000 ～ 35000</td><td class="num">25%</td><td class="num">2660</td></tr>
+                <tr><td>35000 ～ 55000</td><td class="num">30%</td><td class="num">4410</td></tr>
+                <tr><td>55000 ～ 80000</td><td class="num">35%</td><td class="num">7160</td></tr>
+                <tr><td>超过 80000</td><td class="num">45%</td><td class="num">15160</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>示例：四种典型情形</h2>
+        <div class="table-scroll">
+            <table id="example-table">
+                <thead>
+                <tr>
+                    <th scope="col">情形</th>
+                    <th scope="col">每年免税扣除（元）</th>
+                    <th scope="col">每年少交（元）</th>
+                    <th scope="col">账户累计本金（元）</th>
+                    <th scope="col">领取税合计（元）</th>
+                    <th scope="col">净优惠（元）</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>20% 档：基数 2 万、个人 4% / 单位 8%，缴 10 年，月领 3000</td><td class="num">9600.00</td><td class="num">1920.00</td><td class="num">288000.00</td><td class="num">8640.00</td><td class="num">10560.00</td></tr>
+                <tr><td>10% 档：基数 1.5 万、个人 4% / 单位 8%，缴 10 年，月领 2500</td><td class="num">7200.00</td><td class="num">720.00</td><td class="num">216000.00</td><td class="num">6450.00</td><td class="num">750.00</td></tr>
+                <tr><td>个人缴 6%：基数 2 万，月缴 1200 只免 800，超出的 400 税后进账户</td><td class="num">9600.00</td><td class="num">1920.00</td><td class="num">33600.00</td><td class="num">990.00</td><td class="num">930.00</td></tr>
+                <tr><td>3% 档：基数 1 万、缴 1 年，月领 1000 —— 税收净优惠为负，但单位缴费仍白得</td><td class="num">4800.00</td><td class="num">144.00</td><td class="num">14400.00</td><td class="num">420.00</td><td class="num">-276.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            表中数字由本页速算器同源计算得出（比例、税率表与月度表取自 App 常量，可被运营在后台热改后同步），
+            并由 <code>tests/annuity-quick.test.js</code> 与 App 内核逐点对拍守护。
+            第一行的领取税 = 月税 90 元（3000 × 3%）× 96 个月；第四行领取税覆盖的是账户全额（含单位缴费部分）。
+        </p>
+
+        <h2>三条最容易踩的口径</h2>
+        <h3>1. 个人免税上限是「计税基数 × 4%」，基数还要 300% 封顶</h3>
+        <p>
+            免税的不是「个人缴多少」，而是<strong>计税基数 × 4%</strong>以内的部分；
+            计税基数按本人上年度月平均工资，<strong>超过当地上年度职工月平均工资 300% 的部分不计入</strong>。
+            个人缴 6% 时超出 4% 的部分照常从税后工资扣（钱照常进账户，只是没免税）。
+        </p>
+        <h3>2. 领取时按「全额」单独计税 —— 本金、单位缴费、收益一起算</h3>
+        <p>
+            领取环节按领取额<strong>全额</strong>单独计税，<strong>不并入综合所得、不参与汇算</strong>：
+            按月领取用月度税率表（每月 3000 元以内只交 3%），按年领取用综合所得税率表。
+            单位缴费当年没扣过税，领取时同样全额计税 —— 这是「递延」的代价。
+        </p>
+        <h3>3. 3% 档净优惠为负，但单位缴费白得 —— 参加依然划算</h3>
+        <p>
+            全年应纳税所得额不超过 36000 元（3% 档）的人，缴费时省 3%、领取时全额再交 3%，
+            税收净优惠可能为负（示例第四行 −276 元）。<strong>但单位缴费扣掉领取税后大部分仍归你</strong> ——
+            这部分是从天上掉下来的，所以只要单位真金白银缴费，参加企业年金几乎总是划算的；
+            单看税收差额为负的，只是没有单位缴费的那部分个人缴费。
+        </p>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>企业年金个人缴费要交个税吗？</summary>
+            <p>个人缴费在不超过本人缴费工资计税基数 4% 标准内的部分，暂从个人当期应纳税所得额中扣除（当期不交税）；超过 4% 的部分照常从税后工资扣缴。计税基数为本人上年度月平均工资，超过当地上年度职工月平均工资 300% 以上的部分不计入。</p>
+        </details>
+        <details>
+            <summary>单位给我缴的企业年金要交税吗？</summary>
+            <p>单位缴费不超过本企业职工工资总额 8%（单位与个人合计不超过 12%）的部分计入个人账户时，个人暂不缴纳个人所得税 —— 这是递延而非免税，领取时按领取额全额单独计税。本页只测算这两个环节的税额，不构成是否参加企业年金的建议。</p>
+        </details>
+        <details>
+            <summary>退休后领取企业年金怎么交税？</summary>
+            <p>领取时不并入综合所得、不参与年度汇算，按领取额全额单独计算应纳税款：按月领取的按月度税率表（与年终奖月度换算表同一张）计算；按季领取的平均分摊到各月；按年领取的按综合所得税率表计算。</p>
+        </details>
+        <details>
+            <summary>企业年金投资收益要交税吗？</summary>
+            <p>年金基金投资运营收益分配计入个人账户时，暂不缴纳个人所得税；领取时与本金、单位缴费一起按领取额全额单独计税。</p>
+        </details>
+        <details>
+            <summary>什么情况下企业年金的税收净优惠为负？</summary>
+            <p>如果你全年应纳税所得额不超过 36000 元（适用 3%），个人缴费当期省 3%、领取时再按全额交 3%，且领取税覆盖的是账户全额（含单位缴费）—— 单看个人缴费部分的税收净优惠可能为负（单位缴费部分在领取时才计税）。本页只测算税额，不构成是否参加的建议。</p>
+        </details>
+        <details>
+            <summary>这个测算结果能直接作为报税依据吗？</summary>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以年金计划受托人申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议。</p>
+        </details>
+
+        <section class="cta">
+            <h2>把企业年金扣进全年账一起看</h2>
+            <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_annuity">打开 EuriskoTax 完整计算器</a>
+        </section>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门与年金计划受托人核算为准。</p>
+        <p>政策依据：《关于企业年金 职业年金个人所得税有关问题的通知》（财税〔2013〕103 号，自 2014-01-01 起施行）；《企业年金办法》（人力资源和社会保障部令第 36 号）。</p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/enterprise-annuity.html">企业年金个税测算</a></p>
+    </div>
+</footer>
+
+<!-- 口径复用 App 同源脚本：
+       tax-constants.js      —— 出厂税率表与年金规则（comprehensiveTaxRates / bonusMonthlyTaxRates / annuityRules）
+       tax-registry.js       —— 税种注册表（15D-1）：政策依据文号与生效/到期日单点定义
+       tax-rates-sync.js     —— 运营在后台热改税率后，拉取并以同一份口径覆盖上表
+       annuity-quick.js      —— 与内核 calculateTaxByTaxableIncome 同表同逻辑的轻量实现（有对拍测试） -->
+<script src="/src/js/calculation/tax-constants.js" defer></script>
+<script src="/src/js/calculation/tax-registry.js" defer></script>
+<script src="/src/js/data/tax-rates-sync.js" defer></script>
+<script src="/src/js/calculation/annuity-quick.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var baseInput = document.getElementById('base-input');
+    var personalInput = document.getElementById('personal-input');
+    var employerInput = document.getElementById('employer-input');
+    var taxableInput = document.getElementById('taxable-input');
+    var yearsInput = document.getElementById('years-input');
+    var withdrawInput = document.getElementById('withdraw-input');
+    var box = document.getElementById('calc-results');
+    var hint = document.getElementById('calc-hint');
+    var quick = window.EuriskoAnnuityQuick;
+
+    function money(n) {
+        return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+        if (!box) return;
+        if (!quick || typeof quick.compareOf !== 'function') {
+            box.hidden = true;
+            if (hint) {
+                hint.hidden = false;
+                hint.innerHTML = '速算器脚本未加载，请刷新页面；下方「三环节处理表」「税率表」与「示例表」仍可手工估算。';
+            }
+            return;
+        }
+        var r = quick.compareOf({
+            contributionBase: baseInput ? baseInput.value : 0,
+            personalRate: personalInput ? (Number(personalInput.value) / 100 || 0) : 0,
+            employerRate: employerInput ? (Number(employerInput.value) / 100 || 0) : 0,
+            taxableBefore: taxableInput ? taxableInput.value : 0,
+            years: yearsInput ? yearsInput.value : 1,
+            monthlyWithdraw: withdrawInput ? withdrawInput.value : ''
+        });
+
+        document.getElementById('r-exempt-monthly').textContent = money(r.exemptMonthly) + ' 元/月';
+        document.getElementById('r-employer-monthly').textContent = money(r.employerMonthly) + ' 元/月';
+        document.getElementById('r-saved').textContent = money(r.taxSaved) + ' 元';
+        document.getElementById('r-total-saved').textContent = money(r.totalTaxSaved) + ' 元';
+        document.getElementById('r-account').textContent = money(r.accountTotal) + ' 元';
+        document.getElementById('r-monthly-tax').textContent = money(r.monthlyWithdraw) + ' × '
+            + (r.monthlyWithdrawRate * 100).toFixed(0) + '% = ' + money(r.monthlyWithdraw * r.monthlyWithdrawRate) + ' 元/月';
+        document.getElementById('r-withdraw-tax').textContent = money(r.withdrawTaxTotal) + ' 元（' + r.months + ' 个月）';
+        document.getElementById('r-net').textContent = (r.netBenefit >= 0 ? '' : '-') + money(Math.abs(r.netBenefit)) + ' 元';
+        box.hidden = false;
+
+        if (!hint) return;
+        var parts = [];
+        parts.push('个人缴费每月免税 <strong>' + money(r.exemptMonthly) + ' 元</strong>（计税基数 × 4% 封顶），'
+            + '单位每月递延进账户 <strong>' + money(r.employerMonthly) + ' 元</strong>，'
+            + '缴费环节每年少交 <strong>' + money(r.taxSaved) + ' 元</strong>。');
+        if (r.taxablePersonalMonthly > 0) {
+            parts.push('注意：你的个人缴费超过基数的 4%，<strong>超出的 ' + money(r.taxablePersonalMonthly)
+                + ' 元/月没有免税</strong>（照常从税后工资扣，但照常进账户）。');
+        }
+        if (r.taxableBefore <= 0) {
+            parts.push('请填写「全年应纳税所得额」，否则无法估算少交的税。');
+        }
+        parts.push('账户累计本金约 <strong>' + money(r.accountTotal) + ' 元</strong>，'
+            + '按每月 <strong>' + money(r.monthlyWithdraw) + ' 元</strong>领取（月度税率表 '
+            + (r.monthlyWithdrawRate * 100).toFixed(0) + '%），领取税合计 <strong>'
+            + money(r.withdrawTaxTotal) + ' 元</strong>。');
+        if (r.netBenefit >= 0) {
+            parts.push('净优惠 <strong>' + money(r.netBenefit) + ' 元</strong>（累计少交 − 领取交）。');
+        } else {
+            parts.push('<strong>注意：税收净优惠为负</strong>（' + money(r.netBenefit)
+                + ' 元）—— 你缴费档位的税率不高，省的税覆盖不了领取税。但单位缴费扣税后仍归你，参加依然划算。');
+        }
+        hint.innerHTML = parts.join(' ');
+        hint.hidden = false;
+    }
+
+    [baseInput, personalInput, employerInput, taxableInput, yearsInput, withdrawInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', render);
+        el.addEventListener('change', render);
+    });
+    render();
+    // 运营在后台热改税率后（tax-rates-sync 拉取完成、事件派发在 document 上）按新口径重算一次
+    document.addEventListener('euriskotax:tax-rates-updated', render);
+});
+</script>
+</body>
+</html>
