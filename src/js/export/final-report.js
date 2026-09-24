@@ -169,17 +169,33 @@
         return '<div class="pro-section">' +
             '<div class="pro-section-title">政策要点与注意事项</div>' +
             list +
-            '<p class="pro-policy-src">以上要点来源于内置税务知识库及政策更新推送（专业版）。政策以官方最新发布为准。</p>' +
+            // S-05：去掉「（专业版）」与「官方」—— 政策要点对所有用户开放，写专业版等于卖免费能力；
+            // 「官方」属暗示背书。文案取自单一真源（copy-standard.js）。
+            '<p class="pro-policy-src">' + escapeHtml(policySourceText()) + '</p>' +
             '</div>';
     }
 
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    var DISCLAIMER_COPY = COPY.DISCLAIMER || {};
+    function copyText(v, fallback) { return v || fallback; }
+
+    function policySourceText() {
+        return copyText(DISCLAIMER_COPY.policySource,
+            '以上要点来源于内置政策知识库，以国家税务总局及主管税务机关最新发布为准。');
+    }
+
+    // E 型 · 报告四条：现状即标准，逐字不得改（守护断言 6）
     function disclaimerHtml() {
+        var lines = DISCLAIMER_COPY.report || [
+            '1. 本报告由 EuriskoTax 根据您填写的测算参数自动生成，结果仅供参考，不构成任何税务、法律或投资建议。',
+            '2. 测算基于当前已收录的税收政策与税率表，政策如有调整以国家税务总局及主管税务机关发布为准。',
+            '3. 如用于年度汇算清缴申报，请以「个人所得税」APP 或税务机关申报系统核定结果为准；如有疑问请咨询专业税务人员或 12366。',
+            '4. 本工具不替代法定申报义务，测算误差导致的任何损失，工具提供方不承担责任。'
+        ];
         return '<div class="pro-disclaimer">' +
             '<div class="pro-section-title">免责声明</div>' +
-            '<p>1. 本报告由 EuriskoTax 根据您填写的测算参数自动生成，结果仅供参考，不构成任何税务、法律或投资建议。</p>' +
-            '<p>2. 测算基于当前已收录的税收政策与税率表，政策如有调整以国家税务总局及主管税务机关发布为准。</p>' +
-            '<p>3. 如用于年度汇算清缴申报，请以「个人所得税」APP 或税务机关申报系统核定结果为准；如有疑问请咨询专业税务人员或 12366。</p>' +
-            '<p>4. 本工具不替代法定申报义务，测算误差导致的任何损失，工具提供方不承担责任。</p>' +
+            lines.map(function (t) { return '<p>' + t + '</p>'; }).join('') +
             '</div>';
     }
 
@@ -323,7 +339,8 @@
             '    <button type="button" data-rv="pro" class="w-full text-left rounded-xl border border-amber-200 bg-amber-50/60 p-4 transition-colors hover:border-amber-300">',
             '      <div class="font-semibold text-slate-900">精装版</div>',
             '      <div class="mt-1 text-sm text-slate-600">封面 + 政策要点 + 税负结构图表，可直接交付给他人。</div>',
-            '      <div class="mt-2 text-xs text-amber-700">属专业版权益</div>',
+            // PAY-13：不再说「属专业版权益」—— 那是档位营销；交付版的获取方式只有留资一条
+            '      <div class="mt-2 text-xs text-amber-700">需要交付版？留资，由顾问协助 ›</div>',
             '    </button>',
             '  </div>',
             '  <div class="px-6 py-4">',

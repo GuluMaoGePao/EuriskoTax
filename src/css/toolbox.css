@@ -32,9 +32,104 @@
     background: #fff;
 }
 
+/* ====== T1（阶段20 P2）：类型筛选 chip ======
+   三个视图互斥（全部 / 速算 / 完整测算），选中态走品牌色，未选中是弱化边框 ——
+   与工具页已有的身份 chip（.tool-scenario-chip）同一套视觉语言，不发明第三种。
+   计数写在 chip 里，由 JS 从注册表填，不在这里写死数字。 */
+.tool-type-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.tool-type-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border: 1px solid #eef0f3;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--c-text-2);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s, color .2s, background .2s;
+}
+.tool-type-chip:hover {
+    border-color: #c7d7fb;
+}
+.tool-type-chip.is-on {
+    border-color: #1e40af;
+    background: rgba(30, 64, 175, .06);
+    color: #1e40af;
+    font-weight: 600;
+}
+.dark .tool-type-chip {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+.dark .tool-type-chip.is-on {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, .15);
+    color: #60a5fa;
+}
+
+/* ====== T3（阶段20 P2）：场景锚点条 ======
+   桌面 sticky 的**一行**跳读条。手机隐藏：手机上是单列折叠，滚两下的事，
+   再挂一条吸顶条只会吃掉一屏里最贵的那 40px。 */
+.tool-anchor-bar {
+    display: none;
+}
+@media (min-width: 768px) {
+    .tool-anchor-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        margin-bottom: 10px;
+        padding: 8px 0;
+        background: var(--c-bg, #fff);
+    }
+    .tool-anchor-chip {
+        padding: 4px 12px;
+        border: 1px solid #eef0f3;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--c-text-2);
+        font-size: 12px;
+        cursor: pointer;
+        transition: border-color .2s, color .2s;
+    }
+    .tool-anchor-chip:hover {
+        border-color: #c7d7fb;
+        color: #1e40af;
+    }
+    .dark .tool-anchor-chip {
+        background: #1f2937;
+        border-color: #374151;
+        color: #e5e7eb;
+    }
+}
+
 /* ====== 分组 ====== */
 .tool-group {
     margin-bottom: 14px;
+}
+
+/* T2（阶段20 P2）：桌面分组头 sticky —— 组里卡片铺成多列后往下滚，
+   看不到"这一屏属于哪一组"是网格化的副作用，组头吸顶是最便宜的解法。
+   只做桌面：手机是单列折叠，组头吸顶会和内容抢位置。 */
+@media (min-width: 768px) {
+    .tool-group-head {
+        position: sticky;
+        top: 44px;          /* 让位给 T3 的锚点条 */
+        z-index: 4;
+        padding: 6px 0;
+        background: var(--c-bg, #fff);   /* .dark 档由 tokens.css 的 --c-bg 负责 */
+    }
 }
 
 .tool-group-head {

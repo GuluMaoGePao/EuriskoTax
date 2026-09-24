@@ -210,7 +210,7 @@ function exportToPDF(elementId, title, opts) {
     // 17B-2（v1.48.0）：原先还多一个 reverseCalculationResults 的分支 —— 那个全局变量随旧页面删了，
     // 留着这半句是**必炸的**（未声明变量直接抛 ReferenceError），而删掉它不影响任何现役入口。
     if (!opts.skipResultCheck && Object.keys(calculationResults).length === 0) {
-        showAlert('请先进行计算，再导出文档');
+        showAlert('请先完成测算，再导出文档');
         return;
     }
 

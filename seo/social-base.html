@@ -101,8 +101,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_social">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_social">打开完整测算</a>
     </div>
 </header>
 
@@ -331,7 +331,7 @@
             工资 20000 元与 50000 元这两行的到手工资逐月下降，是累计预扣档位爬升的结果，不是算错。
         </p>
 
-        <h2>三条最容易踩的口径</h2>
+        <h2>三条常见易错口径</h2>
         <h3>1. 缴费基数不是工资：60% 保底、300% 封顶</h3>
         <p>
             缴费基数按本人上年度月平均工资确定，但要夹在当地上年度社平工资的 <strong>60% ~ 300%</strong> 之间。
@@ -380,13 +380,13 @@
         </details>
         <details>
             <summary>这个测算结果能直接作为缴费或报税依据吗？</summary>
-            <p>不能。本页按公开政策口径做测算，实际缴费基数上下限、单位费率与公积金免税口径以当地社保、公积金与税务机关的认定为准。本测算结果仅供参考，不构成税务建议。</p>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际缴费基数上下限、单位费率与公积金免税口径以当地社保、公积金与税务机关的认定为准。本测算结果仅供参考，不构成税务建议。</p>
         </details>
 
         <section class="cta">
             <h2>把五险一金与个税放在一处看</h2>
-            <p>本页算的是社保公积金与到手工资；年度汇算、年终奖、专项附加扣除与各项个税测算可在 App 里一起看。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_social">打开 EuriskoTax 完整计算器</a>
+            <p>本页算的是社保公积金与到手工资；年度汇算、年终奖、专项附加扣除与各项个税测算可在 App 里一起看。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_social">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
@@ -397,6 +397,7 @@
         <p id="policy-basis">政策依据：《中华人民共和国社会保险法》（主席令第 35 号，2011-07-01 施行）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《降低社会保险费率综合方案》（国办发〔2019〕13 号，养老保险单位缴费比例降至 16%，2019-05-01 起执行）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/salary-tax.html">工资个税测算</a> · <a href="/seo/annual-settlement.html">年度汇算</a> · <a href="/seo/special-deduction.html">专项附加扣除</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -579,5 +580,6 @@ document.addEventListener('DOMContentLoaded', function () {
     renderAll();
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

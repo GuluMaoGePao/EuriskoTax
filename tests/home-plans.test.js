@@ -217,7 +217,9 @@ describe('我的方案与台账 · 渲染', () => {
         savePlan('方案 1', 100);
         savePlan('方案 2', 200);
         render();
-        expect(box().textContent).toContain('（专业版 10 套）');
+        // PAY-09：额度照实说，不再括注「（专业版 10 套）」这种档位营销
+        expect(box().textContent).toContain('已存 2/2 套');
+        expect(box().textContent).not.toContain('专业版');
         expect(box().querySelector('a[href*="upgrade"], [data-plans-open="upgrade"]')).toBeNull();
     });
 

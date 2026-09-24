@@ -663,6 +663,7 @@ async function loadProfile() {
             const renderStart = performance.now();
             ProfilePerf.measure('loadProfile → 渲染统计卡片', renderProfileStats);
             ProfilePerf.measure('loadProfile → 更新统计数据', updateProfileStats);
+            ProfilePerf.measure('loadProfile → 渲染高频四宫格', renderProfileQuick);
             ProfilePerf.measure('loadProfile → 渲染模块卡片', renderProfileCards);
             ProfilePerf.measure('loadProfile → 加载税务档案', loadTaxProfile);
             ProfilePerf.measure('loadProfile → 渲染税务日历', renderTaxCalendar);
@@ -773,10 +774,16 @@ function renderProfileStats() {
 // group 决定卡片归属的分组（见 PROFILE_CARD_GROUPS）；数组顺序即组内展示顺序。
 // 排序原则：先「常用功能」（与测算直接相关、高频），再「服务与支持」（咨询与帮助），
 // 并把商业价值最高的「财税服务」放在服务组首位，让有需求的用户第一眼看到。
+//
+// 阶段20 P3：这里同时是**入口的唯一定义处** —— 高频四宫格（PROFILE_QUICK_ORDER 指定的 4 张）
+// 与下方分组列表**都从这一份配置取**，只靠 quick 标记区分落在哪一段。
+// 分开写两份的后果是「同一入口两个落点」（去重铁律：一个目的地只有一条稳定路径），
+// 且改一处必漏另一处；所以宁可在同一份配置里多一个字段。
 const PROFILE_CARDS_CONFIG = [
     {
         id: 'profile-card-history',
         group: 'data',
+        quick: true,        // 高频 → 进四宫格，不再出现在下方列表里
         icon: 'fa-history',
         title: '计算历史',
         desc: '查看、复算与清理已保存的测算记录',
@@ -786,6 +793,7 @@ const PROFILE_CARDS_CONFIG = [
     {
         id: 'profile-card-tax',
         group: 'tax',
+        quick: true,
         icon: 'fa-file-text-o',
         title: '税务档案',
         desc: '保存常用扣除配置，测算时一键套用',
@@ -793,8 +801,10 @@ const PROFILE_CARDS_CONFIG = [
         iconClass: 'fa fa-file-text-o text-xl text-green-600'
     },
     {
+        // 阶段20 P3：「我的数据」组随高频四张进宫格后只剩这一张，单张不值得立一个组 ——
+        // 归入「工作台」（计划 §6.1 的九卡分组就是这么排的：工作台 = 模板 · 主体 · 批量 · 数据）。
         id: 'profile-card-data',
-        group: 'data',
+        group: 'workbench',
         icon: 'fa-database',
         title: '数据管理',
         desc: '云端同步、数据导出与本地备份',
@@ -804,6 +814,7 @@ const PROFILE_CARDS_CONFIG = [
     {
         id: 'profile-card-calendar',
         group: 'tax',
+        quick: true,
         icon: 'fa-calendar',
         title: '税务日历',
         desc: '汇算清缴、申报截止等关键时间提醒',
@@ -817,13 +828,14 @@ const PROFILE_CARDS_CONFIG = [
         iconClass: 'fa fa-calendar text-xl text-orange-600'
     },
     {
-        // 阶段13B：个人中心常驻付费服务入口（商业价值最高，置于服务组首位）
+        // 阶段13B：个人中心常驻留资入口（商业价值最高，置于服务组首位）
+        // L-14：这一条是留资文案的标准范例 —— 说清「什么问题 + 留下什么 + 谁联系你」，不做任何时效承诺。
         id: 'profile-card-lead',
         group: 'service',
         icon: 'fa-handshake-o',
         title: '财税服务',
-        desc: '个税汇算测算与工具使用问题，留下联系方式由客服协助',
-        tag: '在线客服',
+        desc: '个税汇算测算与工具使用问题，留下联系方式由顾问协助',
+        tag: '顾问协助',
         iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-handshake-o text-xl text-blue-600'
     },
@@ -891,6 +903,7 @@ const PROFILE_CARDS_CONFIG = [
         // （这句话将来会被反复问到，所以写在这里，不写在只有代码里才看得见的地方）。
         id: 'profile-card-ledger',
         group: 'workbench',
+        quick: true,        // 台账也是高频（每月都要翻），进宫格
         icon: 'fa-calendar-check-o',
         title: '我的台账',
         desc: '按月归档的测算记录；重复的那件事可以从上个月带出来',
@@ -924,12 +937,50 @@ const PROFILE_CARDS_CONFIG = [
 // 阶段19-9：第四组「工作台」先放落地的两张卡（主体 / 模板）；
 // 阶段19-10：台账落地，第三张卡才补上；阶段19-11：批量落地，第四张卡补上 ——
 // 每卡都是**页面先落地、入口后补**，从不预先占坑（空壳入口比没有入口更伤）。
+// 阶段20 P3（§6.1）：高频四张（历史 / 台账 / 档案 / 日历）上提成四宫格后，
+//   「我的数据」「我的税务」两组各被掏空，剩下的都归「工作台」——
+//   于是从四组降到两组、13 卡降到 9 卡。低频项不再与高频项同权，这是本次的立意：
+//   13 卡一维罗列时，找「我的档案」要在一屏里翻，而现在它在首屏第二个宫格。
 const PROFILE_CARD_GROUPS = [
-    { key: 'data', title: '我的数据', desc: '测算记录 · 云同步 · 导出' },
-    { key: 'tax', title: '我的税务', desc: '档案 · 日历' },
-    { key: 'workbench', title: '工作台', desc: '主体 · 模板 · 台账 · 批量' },
-    { key: 'service', title: '服务与支持', desc: '客服 · 反馈 · 帮助' }
+    { key: 'workbench', title: '工作台', desc: '模板 · 主体 · 批量 · 数据' },
+    { key: 'service', title: '服务与支持', desc: '顾问 · 公告 · 反馈 · 帮助' }
 ];
+
+// 高频四宫格的顺序（阶段20 P3 §6.1）：这四项占「我的」真实点击的绝大部分，
+// 宫格比列表扫得快 —— 找入口是**扫视**动作，列表要逐行读标题，宫格看图标就定位。
+// 写 id 而不是重写一份配置：入口定义只有 PROFILE_CARDS_CONFIG 一处。
+const PROFILE_QUICK_ORDER = [
+    'profile-card-history',
+    'profile-card-ledger',
+    'profile-card-tax',
+    'profile-card-calendar'
+];
+
+function profileQuickCards() {
+    return PROFILE_QUICK_ORDER
+        .map((id) => PROFILE_CARDS_CONFIG.find((c) => c.id === id))
+        .filter(Boolean);
+}
+
+// 宫格格子的 HTML：图标 + 标题 + 角标（角标只给真有数字的那一项，没有就是没有）
+function profileQuickTileHtml({ id, title, badge, iconClass }) {
+    return `
+        <div class="profile-quick-tile" id="${id}">
+            <div class="profile-quick-icon"><i class="${iconClass}"></i></div>
+            <div class="profile-quick-title">${title}</div>
+            ${badge ? `<span class="profile-quick-badge">${badge}</span>` : ''}
+        </div>
+    `;
+}
+
+// 渲染高频四宫格（幂等：只在首次进我的页时跑，与卡片列表同一套规矩）
+function renderProfileQuick() {
+    const grid = document.getElementById('profile-quick-grid');
+    if (!grid || grid.children.length > 0) return;
+    grid.innerHTML = profileQuickCards().map((c) => profileQuickTileHtml(Object.assign({}, c, {
+        badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
+    }))).join('');
+}
 
 // 单张功能卡片（横向紧凑式：图标 + 标题/说明 + 箭头）
 // 所有类名均为完整静态字符串，避免动态拼接触发 Tailwind CDN 重扫导致卡顿。
@@ -961,7 +1012,9 @@ function renderProfileCards() {
     if (!grid || grid.children.length > 0) return; // 已渲染则跳过
 
     grid.innerHTML = PROFILE_CARD_GROUPS.map((group, index) => {
-        const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key);
+        // 高频四张已在四宫格（renderProfileQuick），这里不再重复渲染 ——
+        // 同一入口出现两处，等于又造出第二条稳定路径。
+        const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key && !c.quick);
         if (!cards.length) return '';
         const head = `
             <div class="md:col-span-2 flex items-center gap-2 px-1 ${index === 0 ? '' : 'pt-3'}">
@@ -1637,27 +1690,33 @@ function planTierOf(user) {
     return planLib.describe(user);
 }
 
-// 徽标短文案（体验版附剩余天数）
+// 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+const UPGRADE_COPY = COPY.UPGRADE || {};
+const LEAD_COPY = COPY.LEAD || {};
+const upText = (v, fallback) => v || fallback;
+
+// 徽标短文案：未开通一律说「顾问协助」（不写体验、不写天数 —— 体验已下线，见 PAY-15）
 function tierShortLabel(tier) {
     if (!tier) return '';
-    if (tier.key === 'trial') return tier.daysLeft > 0 ? `体验版 · 剩${tier.daysLeft}天` : '体验版';
-    return tier.label; // 基础版 / 专业版
+    if (tier.key === 'free') return upText(LEAD_COPY.badge, '顾问协助');
+    if (tier.key === 'trial') return '体验版';
+    return '已开通';
 }
 
-// 个人中心「我的版本」一行说明
+// 个人中心「我的版本」一行说明（§2.5：不写任何时效承诺；未开通不提「专业版」，见 §8-6）
 function planNoteText(user) {
     const tier = planTierOf(user);
     if (!tier) return '';
     if (tier.key === 'free') {
-        // 已过期的付费用户与到期的免费体验是两类人：前者付过钱，不能只说「可再次免费领取」
-        if (tier.expiredPro) return `专业版权益已于 ${fmtDate(tier.expireAt)} 到期`;
+        // 已过期的付费用户与到期的体验是两类人：前者已交付过，不能只说「需要更多」
+        if (tier.expiredPro) return `权益已于 ${fmtDate(tier.expireAt)} 到期`;
         return tier.expiredTrial
-            ? `专业版体验已于 ${fmtDate(tier.expireAt)} 到期，可再次免费领取`
-            : '基础版 · 可免费领取 14 天专业版体验';
+            ? `体验权益已于 ${fmtDate(tier.expireAt)} 到期`
+            : upText(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›');
     }
-    if (tier.key === 'trial') return `专业版体验进行中 · ${fmtDate(tier.expireAt)} 到期`;
-    // 老渠道/种子授权（permanent）：正式上线后再单独告知测试用户可获得永久专业版，界面先不透露
-    return tier.permanent ? '专业版已生效 · 全部专业功能可用' : `专业版有效期至 ${fmtDate(tier.expireAt)}`;
+    if (tier.key === 'trial') return `权益有效期至 ${fmtDate(tier.expireAt)}`;
+    return tier.permanent ? '已开通 · 权益长期有效' : `已开通 · 权益有效期至 ${fmtDate(tier.expireAt)}`;
 }
 
 // 顶栏 pill + 个人中心徽标按档位渲染（登录后显示；未登录整体隐藏）
@@ -1683,7 +1742,10 @@ function renderPlanBadges(userArg) {
         topbarBadge.classList.remove('hidden');
         topbarBadge.textContent = label;
         topbarBadge.className = TOPBAR_BADGE_CLASSES[key];
-        topbarBadge.title = key === 'free' ? '点击查看 · 免费领取专业版体验' : `${label} · 点击查看版本与权益`;
+        // PAY-02：未开通的 pill 不出现任何营销语；已开通的人必须看得见自己有什么（§4.1 K 类）
+        topbarBadge.title = key === 'free'
+            ? `${upText(LEAD_COPY.badge, '顾问协助 ›')} · 点击查看${upText(UPGRADE_COPY.title, '升级码')}`
+            : `${label} · 点击查看权益`;
     }
     if (profileBadge) {
         profileBadge.classList.remove('hidden');
@@ -1737,35 +1799,39 @@ function renderCloudSyncPanel() {
     const disableSyncBtn = (disabled) => { if (btn) btn.disabled = !!disabled; };
     const syncStatusTexts = { idle: '待同步', syncing: '同步中…', synced: '已同步', error: '同步异常' };
 
-    // 未登录：引导登录领取体验
+    // 留资 CTA（PAY-01：体验领取链路整体下线，未开通的下一句一律是「留资，由顾问协助」）
+    const leadCtaHtml = (desc) =>
+        '<p class="text-violet-800"><i class="fa fa-user-o mr-1 text-violet-500"></i>' + desc + '</p>' +
+        '<button id="cloud-sync-lead-btn" type="button" class="mt-2 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-4 py-2 text-sm"><i class="fa fa-envelope mr-2"></i>'
+        + upText(LEAD_COPY.cta, '找顾问协助 ›') + '</button>';
+
+    // 未登录：只给留资，不给「领取体验」（体验已下线）
     if (!user) {
         if (tierEl) { tierEl.classList.add('hidden'); tierEl.textContent = ''; }
         if (statusEl) { statusEl.textContent = '未登录'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
-        if (noteEl) noteEl.textContent = '云同步为专业版功能。登录后即可免费领取 14 天专业版体验（公测期不限次数），体验期内自动把本机计算历史安全同步到云端。';
+        if (noteEl) noteEl.textContent = '云同步' + upText(UPGRADE_COPY.needCode, '需升级码开通') + '。登录后即可在「' + upText(UPGRADE_COPY.title, '升级码') + '」中输入升级码开通。';
         disableSyncBtn(true);
         if (accountEl) accountEl.textContent = '';
-        setCta('<p class="text-violet-800"><i class="fa fa-gift mr-1 text-violet-500"></i>登录后即可免费领取 14 天专业版体验，多设备自动找回计算历史。</p>' +
-            '<button id="cloud-sync-claim-btn" type="button" class="mt-2 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-4 py-2 text-sm"><i class="fa fa-unlock-alt mr-2"></i>登录领取体验</button>');
+        setCta(leadCtaHtml('需要云端同步或更大的方案库？留资，由顾问协助。'));
         return;
     }
 
-    // 基础版（含体验到期回落）：展示 PRO gate + 免费体验 CTA
+    // 未开通（含体验到期回落）：展示 gate 提示 + 留资 CTA
     if (!tier || tier.key === 'free') {
-        setTierChip('free', '基础版');
-        if (statusEl) { statusEl.textContent = '免费版'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
+        setTierChip('free', '未开通');
+        if (statusEl) { statusEl.textContent = '未开通'; statusEl.classList.remove('text-green-600', 'text-red-600'); }
         // 文案交给 plan.js 按档位统一取词：这里再手写一份分支，就是同一句话两个出处，必然漂移
         if (noteEl) noteEl.textContent = planLib.featureHintFor
             ? planLib.featureHintFor(user)
             : planLib.PRO_FEATURE_HINT;
         disableSyncBtn(true);
-        if (accountEl) accountEl.textContent = `当前账号：${user.email}（基础版）`;
-        setCta('<p class="text-violet-800"><i class="fa fa-gift mr-1 text-violet-500"></i>免费领取 14 天专业版体验，解锁云同步与汇算 PDF 报告。</p>' +
-            '<button id="cloud-sync-claim-btn" type="button" class="mt-2 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-4 py-2 text-sm"><i class="fa fa-gift mr-2"></i>免费领取 14 天专业版体验</button>');
+        if (accountEl) accountEl.textContent = `当前账号：${user.email}`;
+        setCta(leadCtaHtml(upText(LEAD_COPY.needMoreSync, '需要更多或需要云端同步？留资，由顾问协助 ›')));
         return;
     }
 
-    // 体验版 / 专业版：正常同步面板
-    setTierChip(tier.key, tier.key === 'trial' ? `体验版 · 剩${tier.daysLeft || 0}天` : '专业版');
+    // 已开通（体验期未结束的老用户 / 正式权益）：正常同步面板
+    setTierChip(tier.key, tier.key === 'trial' ? '体验版' : '已开通');
     setCta('');
     if (statusEl) {
         statusEl.textContent = syncStatusTexts[state.status] || '待同步';
@@ -1777,24 +1843,34 @@ function renderCloudSyncPanel() {
     if (accountEl) accountEl.textContent = `当前账号：${user.email}`;
 }
 
-// Phase 3.5 缺口 3：专业版权益续期入口。
-// ⚠️ 合规（零购买语义）：站内不出现「购买 / 续费 / 支付 / 价格」，
-//    一律走「留资 → 运营线下发码」，与 final-report.js 的精装版报告钩子共用同一条站外收款路径。
-function openRenewLead() {
+// 站内唯一的留资出口：未开通的人不该看到催买的话，但必须看得见这条出路（§4.1 判断口诀）。
+// 所有「需要更多 / 需要协助 / 需要恢复」的下一句统一走这里，source 与后端 leadController.SOURCES 对齐。
+function openLeadFrom(source) {
     if (window.LeadModal && typeof window.LeadModal.open === 'function') {
-        window.LeadModal.open({ source: 'renew_pro' });
-        return;
+        window.LeadModal.open({ source: source || 'upgrade_code' });
+        return true;
     }
-    showAlert('请联系我们，我们会为您延续专业版权益。');
+    return false;
 }
 
-// === 版本权益弹窗：按档位渲染 hero + 领取 CTA ===
+// Phase 3.5 缺口 3：权益续期入口。
+// ⚠️ 合规（零购买语义）：站内不出现「购买 / 续费 / 支付 / 价格」，
+//    一律走「留资 → 顾问线下发码」，与 final-report.js 的交付版报告钩子共用同一条站外收款路径。
+function openRenewLead() {
+    if (openLeadFrom('renew_pro')) return;
+    showAlert('请联系我们，我们会为您恢复权益。');
+}
+
+// === 升级码弹窗：按档位渲染 hero（PAY-04：弹窗只承接「已经拿到码的人」）===
+// 未开通的人看到的不是权益对比，而是「你现在有什么 / 需要更多就留资」——
+// 对比表与购买 FAQ 已随本次定位切换整体下线（属付费营销，见 §4.1 D 类）。
 function upgradeHeroHtml(user) {
     const planLib = (typeof window !== 'undefined' && window.EuriskoPlan) ? window.EuriskoPlan : null;
     const tier = planLib && planLib.describe ? planLib.describe(user) : null;
     const trialDays = (planLib && planLib.TRIAL_DAYS) || 14;
-    const claimBtn = (label) =>
-        '<button id="upgrade-claim-btn" type="button" class="mt-3 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-5 py-2 text-sm shadow"><i class="fa fa-gift mr-2"></i>' + label + '</button>';
+    // 留资按钮（id 与弹窗尾部那颗区分开：hero 是动态填充的，同 id 会撞车）
+    const leadBtn = (label) =>
+        '<button id="upgrade-hero-lead-btn" type="button" class="mt-3 inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-5 py-2 text-sm shadow"><i class="fa fa-envelope mr-2"></i>' + label + '</button>';
     // 续期入口复用于「即将到期」与「已到期」两处：抽成 helper，避免同一份按钮 HTML 写两遍后各自漂移。
     // ⚠️ 合规：走「留资 → 运营线下发码」，与 final-report.js 的精装版报告钩子共用同一条站外收款路径。
     const renewBtn = (label) =>
@@ -1802,30 +1878,29 @@ function upgradeHeroHtml(user) {
 
     if (!user) {
         return '<div class="text-center">' +
-            '<p class="text-violet-700 font-bold text-base">登录后免费领取 14 天专业版体验</p>' +
-            '<p class="text-gray-500 text-xs mt-1">体验期内完整解锁云同步与汇算 PDF 报告；公测期不限次数。</p>' +
-            claimBtn('登录领取体验') + '</div>';
+            '<p class="text-violet-700 font-bold text-base">' + upText(UPGRADE_COPY.title, '升级码') + '开通</p>' +
+            '<p class="text-gray-500 text-xs mt-1">已有升级码？在下方输入即可即时开通；还没有升级码的，可以先留资，由顾问协助。</p>' +
+            leadBtn(upText(LEAD_COPY.cta, '找顾问协助 ›')) + '</div>';
     }
     if (!tier || tier.key === 'free') {
-        // 已过期的付费用户（expiredPro）：这是复购意向最强的一类人，
-        // 不能落进下面「免费领取体验」的通用文案——那等于把已付费的人当用户重新养一遍。
-        // 语气上不写「欢迎回来」这类空话：他刚失去的是掏钱才有的东西，只说事实 + 给恢复路径。
+        // 权益已到期的老用户（expiredPro）：这是意向最强的一类人，
+        // 语气上不写「欢迎回来」这类空话：他刚失去的是已经交付过的东西，只说事实 + 给恢复路径。
         if (tier && tier.expiredPro) {
             return '<div class="flex items-start">' +
                 '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0">' +
                 '<i class="fa fa-clock-o text-amber-600 text-xl"></i></div>' +
-                '<div class="flex-1"><p class="text-amber-700 font-bold text-base">专业版权益已于 ' + fmtDate(tier.expireAt) + ' 到期</p>' +
-                '<p class="text-gray-500 text-xs mt-1">云端同步、汇算清缴 PDF 报告等功能暂不可用，您的本地计税数据不受影响。留下联系方式，我们会为您恢复权益。</p>' +
+                '<div class="flex-1"><p class="text-amber-700 font-bold text-base">权益已于 ' + fmtDate(tier.expireAt) + ' 到期</p>' +
+                '<p class="text-gray-500 text-xs mt-1">云端同步、汇算清缴 PDF 报告等功能暂不可用，您的本地测算数据不受影响。留下联系方式，我们会为您恢复权益。</p>' +
                 renewBtn('联系我们恢复权益') + '</div></div>';
         }
         const expired = !!(tier && tier.expiredTrial);
         return '<div class="flex">' +
             '<div class="flex-1">' +
-            '<p class="text-violet-700 font-bold text-base">' + (expired ? '体验已到期，可再次免费领取' : '免费领取 14 天专业版体验') + '</p>' +
+            '<p class="text-violet-700 font-bold text-base">' + (expired ? '体验权益已到期' : '尚未开通') + '</p>' +
             '<p class="text-gray-500 text-xs mt-1">' + (expired
-                ? '上一轮体验已于 ' + fmtDate(tier.expireAt) + ' 到期，重新领取后立即恢复全部专业版功能，本地数据不受影响。'
-                : '基础版用户可免费试用全部专业版功能 14 天。体验期间计税与历史数据不受任何影响，到期自动回落基础版。') + '</p>' +
-            claimBtn('立即免费领取体验') + '</div></div>';
+                ? '上一轮体验已于 ' + fmtDate(tier.expireAt) + ' 到期，本地测算数据不受影响。'
+                : '测算、社保口径、政策要点与更新公告对所有用户开放；云端同步与更大的方案库' + upText(UPGRADE_COPY.needCode, '需升级码开通') + '。') + '</p>' +
+            leadBtn(upText(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›')) + '</div></div>';
     }
     if (tier.key === 'trial') {
         const pct = Math.min(100, Math.max(6, Math.round(((tier.daysLeft || 0) / trialDays) * 100)));
@@ -1837,9 +1912,9 @@ function upgradeHeroHtml(user) {
             '<span class="text-xs text-gray-400">' + fmtDate(tier.expireAt) + ' 到期</span></div>' +
             '<div class="h-2 rounded-full bg-violet-200 overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600" style="width:' + pct + '%"></div></div>' +
             '<p class="text-xs mt-2 ' + (warn ? 'text-amber-600 font-medium' : 'text-gray-500') + '">' +
-            (warn ? '体验即将到期：请确认云端数据已同步。到期后自动回到基础版，仍可再次免费领取。' : '专业版全功能体验中：云同步与汇算 PDF 报告均已解锁。到期后自动回到基础版，可再次免费领取。') + '</p></div>';
+            (warn ? '体验即将到期：请确认云端数据已同步。' : '体验权益生效中：云同步与汇算 PDF 报告均已解锁。') + '</p></div>';
     }
-    // 专业版：seed/正式授权均落此态；正式上线前不向用户明示"永久专业版授权"，用通用权益文案呈现
+    // 已开通：seed/正式授权均落此态；不向用户明示"永久授权"，统一说「权益长期有效」
     // Phase 3.5 缺口 3：到期前提醒 + 续期入口（此前只有一句「有效期至 X」，既无倒计时也无去处）。
     // ⚠️ 合规：零购买语义 —— 不出现「购买 / 续费 / 支付 / 价格」，只说「留下联系方式，我们为您延续权益」。
     const RENEW_REMIND_DAYS = 7;
@@ -1847,16 +1922,16 @@ function upgradeHeroHtml(user) {
         return '<div class="flex items-start">' +
             '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0">' +
             '<i class="fa fa-clock-o text-amber-600 text-xl"></i></div>' +
-            '<div class="flex-1"><p class="text-amber-700 font-bold text-base">专业版权益 ' + tier.daysLeft + ' 天后到期</p>' +
-            '<p class="text-gray-500 text-xs mt-1">到期后将回到基础版，需要保留的云端历史请提前同步。留下联系方式，我们会为您延续权益。</p>' +
+            '<div class="flex-1"><p class="text-amber-700 font-bold text-base">权益 ' + tier.daysLeft + ' 天后到期</p>' +
+            '<p class="text-gray-500 text-xs mt-1">到期后云端能力暂不可用，需要保留的云端历史请提前同步。留下联系方式，我们会为您延续权益。</p>' +
             renewBtn('联系我们延续权益') + '</div></div>';
     }
     const trailing = tier.permanent
-        ? '您已开通专业版，云同步、汇算清缴 PDF 报告等全部专业功能均可用。'
-        : '专业版有效期至 ' + fmtDate(tier.expireAt) + '，云同步、汇算清缴 PDF 报告等全部专业功能随时可用。';
+        ? '您已开通，云同步、汇算清缴 PDF 报告等均可使用。'
+        : '权益有效期至 ' + fmtDate(tier.expireAt) + '，云同步、汇算清缴 PDF 报告等均可使用。';
     return '<div class="flex items-start">' +
         '<div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0"><i class="fa fa-check text-amber-600 text-xl"></i></div>' +
-        '<div><p class="text-amber-700 font-bold text-base">专业版已启用</p>' +
+        '<div><p class="text-amber-700 font-bold text-base">已开通</p>' +
         '<p class="text-gray-500 text-xs mt-1">' + trailing + '</p></div></div>';
 }
 
@@ -1884,42 +1959,15 @@ function openUpgradeModal() {
     openModal(modal);
 }
 
-// 领取专业版体验（顶栏弹窗 / 数据管理页云同步 CTA 共用）
-async function handleClaimTrial(btn) {
-    if (!apiClient || typeof apiClient.isLoggedIn !== 'function' || !apiClient.isLoggedIn()) {
-        showAlert('请先登录，即可免费领取 14 天专业版体验');
-        return;
-    }
-    if (!apiClient.claimTrial) {
-        showAlert('服务暂不可用，请刷新页面后重试');
-        return;
-    }
-    const origHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading-spinner inline-block w-4 h-4 mr-2"></span>开通中…';
-    }
-    try {
-        const updated = await apiClient.claimTrial();
-        if (window.EuriskoSync && typeof window.EuriskoSync.updateUser === 'function') {
-            window.EuriskoSync.updateUser(updated);
-        }
-        renderPlanBadges(updated);
-        renderCloudSyncPanel();
-        const hero = document.getElementById('upgrade-hero');
-        if (hero) hero.innerHTML = upgradeHeroHtml(updated);
-        showAlert('已开通 14 天专业版体验，云同步与全部专业功能已生效', 'success');
-    } catch (err) {
-        if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = origHtml; }
-        showAlert((err && err.message) || '领取失败，请稍后重试');
-    }
-}
+// PAY-01（v1.105.0）：体验领取链路已整体下线 —— 属付费引导，与「不做付费、全留资」定位冲突。
+// 原先的 handleClaimTrial 与其三处入口（弹窗 hero / 云同步 CTA / 顶栏引导）一并删除；
+// 已领取体验的用户权益到期前照常生效（服务端 granted_by=trial 不受影响），到期后走留资。
 
-// 兑换专业版兑换码（「版本与权益」弹窗内的自助开通入口）
-// 适用场景：线下收款后运营发放兑换码，客户自行开通，无需人工改库
+// 开通升级码（「升级码」弹窗内的自助开通入口）
+// 适用场景：顾问在站外完成交付后发放升级码，用户回站自助开通，无需人工改库
 async function handleRedeemProCode(btn) {
     if (!apiClient || typeof apiClient.isLoggedIn !== 'function' || !apiClient.isLoggedIn()) {
-        showAlert('请先登录后再兑换专业版兑换码');
+        showAlert('请先登录后再开通' + upText(UPGRADE_COPY.title, '升级码'));
         return;
     }
     if (!apiClient.redeemProCode) {
@@ -1929,14 +1977,14 @@ async function handleRedeemProCode(btn) {
     const input = document.getElementById('upgrade-redeem-input');
     const code = input ? String(input.value || '').trim() : '';
     if (!code) {
-        showAlert('请输入兑换码');
+        showAlert('请输入' + upText(UPGRADE_COPY.title, '升级码'));
         if (input) input.focus();
         return;
     }
     const origHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span class="loading-spinner inline-block w-4 h-4 mr-2"></span>兑换中…';
+        btn.innerHTML = '<span class="loading-spinner inline-block w-4 h-4 mr-2"></span>开通中…';
     }
     try {
         const updated = await apiClient.redeemProCode(code);
@@ -1953,14 +2001,14 @@ async function handleRedeemProCode(btn) {
             : null;
         showAlert(
             until
-                ? '兑换成功，专业版已开通至 ' + until
-                : '兑换成功，专业版永久授权已生效',
+                ? upText(UPGRADE_COPY.successPrefix, '开通成功，权益有效期至 ') + until
+                : upText(UPGRADE_COPY.successLong, '开通成功，权益长期有效。'),
             'success'
         );
     } catch (err) {
         // 失败时恢复按钮，并把服务端的具体原因透出（已使用 / 已作废 / 太频繁）
         if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = origHtml; }
-        showAlert((err && err.message) || '兑换失败，请稍后重试');
+        showAlert((err && err.message) || '开通失败，请稍后重试');
     }
 }
 
@@ -2164,19 +2212,10 @@ function setupAuthEventListeners() {
         });
     });
 
+    // R1（阶段20 P0）：顶栏菜单里的 #profile-link 已删（个人中心是目的地不是账号动作，走 Tab「我的」），
+    // 绑定同步删除 —— 元素没了还 getElementById().addEventListener 会在初始化时抛错中断后续绑定。
     // 用户协议和隐私政策弹窗：显示/隐藏逻辑已由 index.html 中的 inline onclick 直接处理，
     // 此处不再重复绑定 addEventListener，避免与 inline onclick 冲突或元素缺失时抛错中断后续绑定
-    document.getElementById('profile-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        const eventTime = Date.now();
-        // 先切换页面（让动画立即开始），再异步加载数据，避免同步渲染阻塞页面切换
-        const showPageStart = performance.now();
-        showPage('profile-page');
-        const showPageDuration = performance.now() - showPageStart;
-        ProfilePerf.log('进入个人中心 → showPage', showPageDuration, { eventTime });
-        // 在下一帧加载数据，让浏览器先完成页面切换渲染
-        requestAnimationFrame(() => loadProfile());
-    });
     document.getElementById('logout-link').addEventListener('click', (e) => {
         e.preventDefault();
         handleLogout();
@@ -2251,12 +2290,12 @@ function setupAuthEventListeners() {
             if (closeBtn) closeBtn.addEventListener('click', closeUpgrade);
             const cancelBtn = document.getElementById('upgrade-cancel-btn');
             if (cancelBtn) cancelBtn.addEventListener('click', closeUpgrade);
-            // 领取 / 兑换按钮委托：内容随档位动态填充
+            // 留资 / 开通 / 续期按钮委托：hero 内容随档位动态填充（两颗留资按钮：hero 内 + 弹窗尾部）
             upgradeModalEl.addEventListener('click', (e) => {
-                const claimBtn = e.target.closest('#upgrade-claim-btn');
-                if (claimBtn) {
+                const leadBtn = e.target.closest('#upgrade-hero-lead-btn, #upgrade-lead-btn');
+                if (leadBtn) {
                     e.preventDefault();
-                    handleClaimTrial(claimBtn);
+                    openLeadFrom('upgrade_code');
                     return;
                 }
                 const redeemBtn = e.target.closest('#upgrade-redeem-btn');
@@ -2281,14 +2320,14 @@ function setupAuthEventListeners() {
                 });
             }
         }
-        // 数据管理页云同步 CTA 的领取按钮委托（CTA 由 renderCloudSyncPanel 动态注入）
+        // 数据管理页云同步 CTA 的留资按钮委托（CTA 由 renderCloudSyncPanel 动态注入）
         const dataPageEl = document.getElementById('profile-data-page');
         if (dataPageEl) {
             dataPageEl.addEventListener('click', (e) => {
-                const claimBtn = e.target.closest('#cloud-sync-claim-btn');
-                if (!claimBtn) return;
+                const leadBtn = e.target.closest('#cloud-sync-lead-btn');
+                if (!leadBtn) return;
                 e.preventDefault();
-                handleClaimTrial(claimBtn);
+                openLeadFrom('upgrade_code');
             });
         }
     }
@@ -2332,9 +2371,11 @@ function setupAuthEventListeners() {
         }
     ];
 
-    const profileCardsGrid = document.getElementById('profile-cards-grid');
-    if (profileCardsGrid) {
-        profileCardsGrid.addEventListener('click', (e) => {
+    // 阶段20 P3：高频四宫格与下方卡片列表**共用同一套点击映射** ——
+    // 宫格只是换了个呈现方式，行为不该重写一份（否则改一处必漏另一处）。
+    // 两个容器都挂上委托，匹配规则不变（[id^="profile-card-"]）。
+    const bindProfileCardClicks = (container) => {
+        container.addEventListener('click', (e) => {
             const card = e.target.closest('[id^="profile-card-"]');
             if (!card) return;
             const config = profileCardConfigs.find(c => c.cardId === card.id);
@@ -2356,7 +2397,11 @@ function setupAuthEventListeners() {
                 });
             }
         });
-    }
+    };
+    ['profile-quick-grid', 'profile-cards-grid'].forEach((cid) => {
+        const el = document.getElementById(cid);
+        if (el) bindProfileCardClicks(el);
+    });
 
     document.getElementById('profile-nav-settings').addEventListener('click', (e) => {
         e.preventDefault();
@@ -2367,7 +2412,8 @@ function setupAuthEventListeners() {
         ], { eventTime });
     });
 
-    // 个人中心横幅的「版本与权益」入口（阶段14：兑换码自助开通的主要发现路径之一）
+    // 个人中心的「升级码」入口（阶段14 收敛的 2 处入口之一）。
+    // 未开通的人进来看到的是「尚未开通 + 留资」，已开通的人看到自己的权益 —— 同一个弹窗，两种内容。
     const profileNavUpgrade = document.getElementById('profile-nav-upgrade');
     if (profileNavUpgrade) {
         profileNavUpgrade.addEventListener('click', (e) => {

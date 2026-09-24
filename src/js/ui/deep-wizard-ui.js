@@ -22,7 +22,10 @@
     var PAGE_ID = 'deep-wizard-page';
     var DRAFT_PREFIX = 'euriskoDeepDraft:';
     // 与存量 4 页同一句话、同样就地展示（不藏在页脚）—— 测算 ≠ 申报，这句话必须跟着结果走。
-    var DISCLAIMER = '测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。';
+    // C-02 / A 型：取自文案单一真源（copy-standard.js），与 index.html 结果区逐字一致（守护断言 2）。
+    var DISCLAIMER = ((typeof window !== 'undefined' && window.CopyStandard && window.CopyStandard.DISCLAIMER)
+        ? window.CopyStandard.DISCLAIMER.result
+        : '') || '测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以主管税务机关核定为准。';
 
     var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null, compareKey: null };
 

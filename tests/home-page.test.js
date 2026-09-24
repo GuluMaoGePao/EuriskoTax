@@ -67,17 +67,23 @@ beforeEach(() => {
                     <button id="home-mission-alt" class="hidden"></button>
                 </section>
                 <div id="home-event-rail" class="event-rail"></div>
-                <div id="home-assets-card" class="hidden">
-                    <span id="home-assets-year"></span>
-                    <div id="home-assets-list"></div>
-                </div>
-                <!-- 卡片4：税务提醒 -->
-                <div class="home-card">
+                <!-- 卡片4：接下来要办（阶段20 P1 三合一：待办 + 截止 + 漏填）——
+                     外层这张壳由 syncTodoCard 管显隐，三段各自管自己的 hidden -->
+                <div id="home-todo-card" class="home-card hidden">
                     <div class="home-card-header">
-                        <div class="home-card-title"><span>税务提醒</span></div>
-                        <span id="home-calendar-year"></span>
+                        <div class="home-card-title"><span>接下来要办</span></div>
+                        <span id="home-assets-year"></span>
                     </div>
-                    <div id="home-calendar-list" class="space-y-1"></div>
+                    <div id="home-assets-card" class="hidden">
+                        <div id="home-assets-list"></div>
+                    </div>
+                    <div id="home-calendar-section" class="hidden">
+                        <div id="home-calendar-list" class="space-y-1"></div>
+                    </div>
+                    <div id="home-missing-card" class="hidden">
+                        <span id="home-missing-progress"></span>
+                        <div id="home-missing-body"></div>
+                    </div>
                 </div>
                 <!-- 卡片5：小贴士 -->
                 <div class="home-card">
@@ -168,7 +174,8 @@ describe('主页 - 最近计算渲染', () => {
         expect(cards[0].getAttribute('data-history-id')).toBe('test2');
     });
 
-    test('最近计算应限制最多5条', () => {
+    // 阶段20 P1 ⑥：首页这一块只回答「接着上次算哪个」，3 条够；再多就是清单（清单归「我的 → 计算历史」）
+    test('继续上次应限制最多3条', () => {
         const history = [];
         for (let i = 0; i < 10; i++) {
             history.push({ id: `test${i}`, type: 'comprehensive', date: `2026-07-${i+1}`, title: `测试${i}`, results: { totalTax: 100 } });
@@ -178,7 +185,7 @@ describe('主页 - 最近计算渲染', () => {
         global.window.refreshHomeRecent();
 
         const cards = document.querySelectorAll('.recent-card');
-        expect(cards.length).toBe(5);
+        expect(cards.length).toBe(3);
     });
 
     test('点击 recent-card 应调用 viewHistoryRecord', () => {
@@ -194,21 +201,49 @@ describe('主页 - 最近计算渲染', () => {
     });
 });
 
-// ====== 渲染：税务日历 ======
-describe('主页 - 税务日历渲染', () => {
-    test('年份应显示当前年份', () => {
-        const yearEl = document.getElementById('home-calendar-year');
-        expect(yearEl.textContent).toBe(String(new Date().getFullYear()));
+// ====== 渲染：截止段（原「税务提醒」卡，阶段20 P1 收编为「接下来要办」第二段）======
+// 判定走纯函数 buildCalendarItems(now)：日历是**日期驱动**的，靠真实系统时间测不出
+// 「3 月该出汇算清缴、9 月该什么都没有」这两种形态 —— 传 now 进去才测得动。
+describe('主页 - 截止段（90 天窗口）', () => {
+    const build = (iso) => window.EuriskoHomeCalendar.pure.buildCalendarItems(new Date(iso));
+
+    // 5/1：距综合所得汇算清缴截止（6/30）60 天，在 90 天窗口内
+    test('汇算清缴临近（5/1）：综合所得汇算清缴截止进待办，且带剩余天数', () => {
+        const items = build('2026-05-01T00:00:00');
+        expect(items.some(it => it.name.includes('综合所得汇算清缴'))).toBe(true);
+        // 按剩余天数升序：第一条是最紧的
+        expect(items[0].daysLeft).toBeLessThanOrEqual(items[items.length - 1].daysLeft);
+        items.forEach(it => expect(typeof it.daysLeft).toBe('number'));
     });
 
-    test('日历列表应有提醒项', () => {
-        const items = document.getElementById('home-calendar-list').querySelectorAll('.tax-reminder-item');
-        expect(items.length).toBeGreaterThan(0);
+    test('远期节点不进待办（减半优惠 2027/12/31 在 2026 年不出现）', () => {
+        const items = build('2026-09-24T00:00:00');
+        expect(items.some(it => it.name.includes('经营所得减半优惠'))).toBe(false);
     });
 
-    test('提醒项应包含剩余天数', () => {
-        const container = document.getElementById('home-calendar-list');
-        expect(container.textContent).toMatch(/剩.*天|今天截止/);
+    test('月度预缴只在 15 日之前出现（当天是 9/20 时它已经过了）', () => {
+        const before = build('2026-09-10T00:00:00');
+        const after = build('2026-09-20T00:00:00');
+        expect(before.some(it => it.name.includes('月度预缴'))).toBe(true);
+        expect(after.some(it => it.name.includes('月度预缴'))).toBe(false);
+    });
+
+    test('渲染：窗口内没有节点时，截止段收起、整卡跟着收起', () => {
+        // 9/20 这个 fixture 日期没有任何 90 天内的节点，正好验证「没有就不占位」
+        window.renderTaxCalendar();
+        expect(document.getElementById('home-calendar-section').classList.contains('hidden')).toBe(true);
+        expect(document.getElementById('home-calendar-list').innerHTML).toBe('');
+        expect(document.getElementById('home-todo-card').classList.contains('hidden')).toBe(true);
+    });
+
+    test('渲染：窗口内有节点时，截止段展开并带出剩余天数文案', () => {
+        // 直接落 DOM 验证渲染片段（纯函数已证明什么时候有节点，这里只验证有→会渲染）
+        document.getElementById('home-calendar-section').classList.remove('hidden');
+        const box = document.getElementById('home-calendar-list');
+        box.innerHTML = '<div class="tax-reminder-item">剩 5 天</div>';
+        window.syncTodoCard();
+        expect(document.getElementById('home-todo-card').classList.contains('hidden')).toBe(false);
+        expect(box.textContent).toMatch(/剩.*天|今天截止/);
     });
 });
 

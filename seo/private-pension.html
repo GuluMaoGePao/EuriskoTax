@@ -98,7 +98,7 @@
                         "name": "这个测算结果能直接作为报税依据吗？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。"
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和主管税务机关认定为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。"
                         }
                     }
                 ]
@@ -110,8 +110,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_pension">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_pension">打开完整测算</a>
     </div>
 </header>
 
@@ -274,7 +274,7 @@
             第二行的净优惠是<strong>十年累计</strong>（每年少交 2400 × 10 − 领取时 3600）。
         </p>
 
-        <h2>三条最容易踩的口径</h2>
+        <h2>三条常见易错口径</h2>
         <h3>1. 缴了不等于自动扣：限额内「据实」扣除，超额部分作废</h3>
         <p>
             缴费环节按 <strong>12000 元/年</strong>的限额标准<strong>据实扣除</strong>：
@@ -318,23 +318,24 @@
         </details>
         <details>
             <summary>这个测算结果能直接作为报税依据吗？</summary>
-            <p>不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和税务部门核算为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。</p>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际扣除与代扣以个人养老金信息平台申报记录和主管税务机关认定为准。本测算结果仅供参考，不构成税务建议，也不构成投资建议。</p>
         </details>
 
         <section class="cta">
             <h2>把个人养老金算进全年账一起看</h2>
-            <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_pension">打开 EuriskoTax 完整计算器</a>
+            <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_pension">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
-        <p>本测算结果仅供参考，不构成税务建议或投资建议；实际纳税请以税务部门与商业银行核算为准。</p>
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关与商业银行认定为准。本页不构成投资建议。</p>
         <p>政策依据：《关于个人养老金有关个人所得税政策的公告》（财政部 税务总局公告 2024 年第 21 号，自 2024-01-01 起全国实施；先行城市地区见财政部 税务总局公告 2022 年第 34 号）。缴费上限由人社部与财政部适时调整。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/private-pension.html">个人养老金税优测算</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -426,5 +427,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('euriskotax:tax-rates-updated', render);
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

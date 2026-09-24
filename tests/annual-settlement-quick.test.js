@@ -249,6 +249,8 @@ describe('落地页静态表格 ≡ 税率常量与内核（页面不维护第�
             '/src/js/calculation/tax-constants.js',
             '/src/js/data/tax-rates-sync.js',
             '/src/js/calculation/annual-settlement-quick.js',
+            // 阶段20 CP-5：备案位（两号皆空时不渲染，未备案同样违规）
+            '/src/js/ui/site-filing-ui.js',
         ]);
         scripts.forEach((src) => expect(() => loadSource(src.replace(/^\//, ''))).not.toThrow());
         expect(window.TaxRates).toBeDefined();

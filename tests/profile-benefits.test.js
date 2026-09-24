@@ -18,14 +18,16 @@ beforeAll(() => {
 
 const CARD_HTML = `
     <div id="profile-benefits-card" class="hidden">
+        <h4 id="profile-benefits-title"></h4>
         <span id="profile-benefits-tier"></span>
         <div id="profile-benefits-steps"></div>
         <p id="profile-benefits-usage" class="hidden"></p>
         <p id="profile-benefits-sync" class="hidden"></p>
-        <button type="button" id="profile-nav-upgrade"><i class="fa fa-crown"></i><span>了解专业版</span></button>
+        <button type="button" id="profile-nav-upgrade"><i class="fa fa-crown"></i><span>需要更多协助？留资，顾问联系您</span></button>
     </div>`;
 
-const TIER_LABELS = { free: '基础版', trial: '体验版', pro: '专业版' };
+// §8-6：前端对未开通用户停用「专业版」（后端档位仍叫 pro），已开通的人必须看得见自己有什么
+const TIER_LABELS = { free: '未开通', trial: '体验版', pro: '已开通' };
 
 function fakePlan(key) {
     window.EuriskoPlan = {
@@ -56,7 +58,7 @@ beforeEach(() => {
 });
 
 describe('权益进度条 · 档位刻度', () => {
-    test('基础版：刻度停在基础版，前无「已完成」格', () => {
+    test('未开通：刻度停在第一格，前无「已完成」格', () => {
         fakePlan('free');
         window.EuriskoProfileBenefits.render({ username: 'u' });
         expect(card().classList.contains('hidden')).toBe(false);
@@ -65,10 +67,12 @@ describe('权益进度条 · 档位刻度', () => {
         expect(steps[0].className).toContain('is-current');
         expect(steps[1].className).toContain('is-todo');
         expect(steps[2].className).toContain('is-todo');
-        expect(card().textContent).toContain('基础版（当前）');
+        expect(card().textContent).toContain('未开通（当前）');
+        // M-02：未开通的人整卡讲的是额度，不是权益
+        expect(line('profile-benefits-title').textContent).toBe('我的额度');
     });
 
-    test('体验版：基础版格已完成，体验版是当前档', () => {
+    test('体验版：第一格已完成，体验版是当前档', () => {
         fakePlan('trial');
         window.EuriskoProfileBenefits.render({ username: 'u' });
         const steps = card().querySelectorAll('.benefit-step');
@@ -77,13 +81,14 @@ describe('权益进度条 · 档位刻度', () => {
         expect(steps[2].className).toContain('is-todo');
     });
 
-    test('专业版：三格全点亮，当前档是最右那格', () => {
+    test('已开通：三格全点亮，当前档是最右那格', () => {
         fakePlan('pro');
         window.EuriskoProfileBenefits.render({ username: 'u' });
         const steps = card().querySelectorAll('.benefit-step');
         expect(steps[0].className).toContain('is-done');
         expect(steps[1].className).toContain('is-done');
         expect(steps[2].className).toContain('is-current');
+        expect(line('profile-benefits-title').textContent).toBe('我的权益');
     });
 
     test('未登录（拿不到档位）：整卡隐藏，不摆一个空壳进度条', () => {
@@ -117,11 +122,12 @@ describe('权益进度条 · 只说算得出来的', () => {
         expect(card().textContent).not.toContain('0 套');
     });
 
-    test('云同步未开启（非专业版权益）：说清为什么没开', () => {
+    test('云同步未开启（PAY-05）：说清开通方式，不提档位营销', () => {
         fakePlan('free');
         fakeSync({ proActive: false, lastSyncAt: null });
         window.EuriskoProfileBenefits.render({ username: 'u' });
-        expect(line('profile-benefits-sync').textContent).toBe('云同步未开启（专业版可用）');
+        expect(line('profile-benefits-sync').textContent).toBe('云同步未开启（需升级码开通）');
+        expect(line('profile-benefits-sync').textContent).not.toContain('专业版');
     });
 
     test('云同步已开启：报上次同步时间', () => {
@@ -140,14 +146,15 @@ describe('权益进度条 · 只说算得出来的', () => {
 });
 
 describe('升级入口（阶段14 约束）', () => {
-    test('基础版是「了解专业版」，专业版改成「查看版本与权益」', () => {
+    test('PAY-03：未开通给留资出口，已开通给「查看我的权益」', () => {
         fakePlan('free');
         window.EuriskoProfileBenefits.render({ username: 'u' });
-        expect(cta()).toBe('了解专业版');
+        expect(cta()).toBe('需要更多协助？留资，顾问联系您');
+        expect(cta()).not.toContain('专业版');
 
         fakePlan('pro');
         window.EuriskoProfileBenefits.render({ username: 'u' });
-        expect(cta()).toBe('查看版本与权益');
+        expect(cta()).toBe('查看我的权益');
     });
 
     test('按钮还是原来那一颗（id 不变、全局仍只有一处）', () => {

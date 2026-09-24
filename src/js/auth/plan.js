@@ -71,19 +71,23 @@
         return getTier(user.plan, user.plan_expires_at, user.pro_granted_by);
     }
 
-    // 阶段10/11 UI 文案：Pro 专属功能 gate 提示（三档体系：基础版可免费领取 14 天体验）
-    // 「正式专业版购买即将开放」已过期：阶段14 的兑换码自助开通就是当前的正式开通路径。
-    // 同时只列真实生效的档位差异（云同步 / 完整 PDF 报告 / 方案对比库上限），
-    // 并显式说明「政策要点与更新公告对所有用户开放」—— 这句以前写在专业版权益里，属于卖免费能力。
-    // 前半段（哪些付费 / 哪些全员开放）必须对所有档位一致，故抽成单一来源复用 ——
-    // 「同一份能力清单散落在多条文案里」正是本仓库反复踩过的漂移坑，改一处漏三处就自我矛盾。
-    const GATE_CAPABILITIES = '云端同步、汇算清缴 PDF 完整报告与更大的方案对比库为专业版（PRO）功能；计税、社保口径、政策要点与更新公告对所有用户开放。';
+    // UI 文案的唯一出处是 src/js/copy/copy-standard.js（docs/guides/user-facing-copy-standard.md §4 PAY-10）；
+    // 这里只做兜底：常量缺失时（单独 eval 本文件的单测环境）仍能给出同一口径的文案。
+    const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    const GATE_COPY = COPY.GATE || {};
+    const LEAD_COPY = COPY.LEAD || {};
 
-    // 四条 gate 提示共用 GATE_CAPABILITIES，只在「下一句该干什么」上分叉：
-    const PRO_FEATURE_HINT = GATE_CAPABILITIES + '基础版可免费领取 14 天专业版体验（公测期不限次数，到期后随时可再次领取），正式专业版可用兑换码在「版本与权益」中自助开通。';
-    const TRIAL_ACTIVE_HINT = GATE_CAPABILITIES + '您当前仍处于专业版体验期内，上述专业功能均可使用；到期后可用兑换码在「版本与权益」中自助开通正式专业版。';
-    const EXPIRED_TRIAL_HINT = GATE_CAPABILITIES + '您的专业版体验已到期，可再次免费领取 14 天体验（公测期不限次数），也可用兑换码在「版本与权益」中自助开通正式专业版。';
-    const EXPIRED_PRO_HINT = GATE_CAPABILITIES + '您的专业版权益已到期，可在「版本与权益」中留下联系方式恢复权益。';
+    // 前半段（哪些需升级码 / 哪些全员开放）必须对所有档位一致，故抽成单一来源复用 ——
+    // 「同一份能力清单散落在多条文案里」正是本仓库反复踩过的漂移坑，改一处漏三处就自我矛盾。
+    const GATE_CAPABILITIES = GATE_COPY.capabilities
+        || '云端同步、汇算清缴 PDF 完整报告与更大的方案对比库需升级码开通；测算、社保口径、政策要点与更新公告对所有用户开放。';
+
+    // 四条 gate 提示共用 GATE_CAPABILITIES，只在「下一句该干什么」上分叉。
+    // PAY-01：体验领取已下线，未开通的下一句一律是留资（站内零购买语义）。
+    const PRO_FEATURE_HINT = GATE_CAPABILITIES + (GATE_COPY.leadCta || '需要更多或需要云端同步？留资，由顾问协助 ›');
+    const TRIAL_ACTIVE_HINT = GATE_CAPABILITIES + (GATE_COPY.activeTrial || '您当前仍在权益有效期内，上述能力均可使用。');
+    const EXPIRED_TRIAL_HINT = GATE_CAPABILITIES + (LEAD_COPY.needMore || '需要更多？留资，由顾问协助 ›');
+    const EXPIRED_PRO_HINT = GATE_CAPABILITIES + (GATE_COPY.expiredPro || '您的权益已到期，可在「升级码」中留下联系方式恢复权益。');
 
     // 同一个 gate 提示，对不同身份的人要说不同的下一句。
     // 此前所有人共用 PRO_FEATURE_HINT 里的「基础版可免费领取 14 天体验」，对三类人是错的：

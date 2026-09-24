@@ -111,7 +111,7 @@ describe('文档编排', () => {
         expect(html).toContain('应纳税所得额');
         expect(html).toContain('年终奖金额');
         expect(html).toContain('临界点附近多发 1 元');
-        expect(html).toContain('以税务机关核算为准');
+        expect(html).toContain('以主管税务机关认定为准');
         expect(html).toContain('2026-09-15');
     });
 
@@ -152,7 +152,7 @@ describe('政策时效', () => {
 
     test('过期要明说（结果仅供参考）', () => {
         window.EuriskoTaxRegistry = { statusOf: () => ({ expired: true }) };
-        expect(QR().policyLine(TOOL)).toContain('已过期');
+        expect(QR().policyLine(TOOL)).toContain('已过有效期');
     });
 
     test('拿不到就整行不写（宁缺毋滥，不编一个日期）', () => {

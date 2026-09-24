@@ -144,10 +144,11 @@ describe('EuriskoPlan 三档体系（基础版/体验版/专业版）档位描�
     });
 });
 
-// 「版本与权益」弹窗列的是**对用户的承诺**：列错一项，用户在付费前后都会来问。
-// 这里守住三条已经踩过的坑：① 把全员能力（政策要点）写成专业版权益；
-// ② 列一个没有任何实现支撑的权益；③ 弹窗里再硬编码一份版本号。
-describe('「版本与权益」弹窗的档位口径', () => {
+// 阶段20（v1.105.0）定位切换：定位从「升级专业版」改为「升级码只承接已经拿到码的人」。
+// 「版本与权益」弹窗随之重做为「升级码」弹窗：权益对比表与购买 FAQ 整体下线（属付费营销）。
+// 这里守住：① 弹窗不再卖档位，只给「有码就开通 / 没码就留资」；
+// ② gate 提示点名的能力仍是真实生效的那几项；③ 弹窗里不硬编码版本号。
+describe('「升级码」弹窗的档位口径（原「版本与权益」弹窗）', () => {
     const block = (() => {
         const start = INDEX_HTML.indexOf('id="upgrade-modal"');
         const end = INDEX_HTML.indexOf('id="alert-modal"', start);
@@ -155,19 +156,24 @@ describe('「版本与权益」弹窗的档位口径', () => {
         return INDEX_HTML.slice(start, end).replace(/<!--[\s\S]*?-->/g, '');
     })();
 
-    test('政策要点 / 更新公告不得列为专业版专属', () => {
-        // 阶段11 起 tax-policy.js 取消免费版短路、游客也发起请求 —— 写进专业版权益等于卖免费能力
-        const proStart = block.indexOf('专业版</span>');
-        const proCol = block.slice(proStart, block.indexOf('</ul>', proStart));
-        expect(proCol).not.toContain('政策');
-        // 反过来，它必须出现在基础版（免费）权益里
-        expect(block).toMatch(/政策要点与更新公告[^<]*<\/li>/);
+    test('PAY-04：弹窗只承接「已经拿到码的人」—— 无权益对比、无购买 FAQ', () => {
+        // 权益对比表与「线上购买通道后续开放」FAQ 都属付费营销，与本期定位（不做付费、全留资）冲突
+        expect(block).not.toContain('基础版 vs 专业版');
+        expect(block).not.toContain('了解专业版');
+        expect(block).not.toContain('立即购买');
+        expect(block).not.toContain('线上购买通道');
+        // 「优先问题跟进与数据保障」全仓库无对应实现，随对比表一并下线
+        expect(block).not.toContain('优先问题跟进');
+        // 取代它的是三个东西：码输入框、开通按钮、留资出口
+        expect(block).toContain('id="upgrade-redeem-input"');
+        expect(block).toContain('id="upgrade-redeem-btn"');
+        expect(block).toContain('id="upgrade-lead-btn"');
     });
 
-    test('专业版权益只列真实生效的差异项', () => {
-        ['云端同步', '汇算清缴 PDF 完整报告', '方案对比库'].forEach((t) => expect(block).toContain(t));
-        // 「优先问题跟进与数据保障」全仓库无对应实现，已下线
-        expect(block).not.toContain('优先问题跟进');
+    test('没码的人有去处：弹窗内必须给出留资出口（不是把人晾在开通框前）', () => {
+        expect(block).toContain('还没有升级码？');
+        // 政策要点对所有用户开放（含未登录）—— 写进付费权益等于卖免费能力，所以这里要反过来声明
+        expect(block).toContain('政策要点与更新公告对所有用户开放');
     });
 
     test('标题旁显示当前版本号，且由 __APP_VERSION__ 填充而非硬编码', () => {
@@ -182,42 +188,41 @@ describe('「版本与权益」弹窗的档位口径', () => {
     test('PRO gate 文案不再声称「购买即将开放」，并点明全员能力', () => {
         const hint = planLib().PRO_FEATURE_HINT;
         expect(hint).not.toContain('购买即将开放');
-        expect(hint).toContain('兑换码');
+        // PAY-10：开通方式只说「升级码」，不再说档位名
+        expect(hint).toContain('升级码');
         expect(hint).toContain('对所有用户开放');
     });
 
     // 下面三条守的是「同一件事写在两处、其中一处改了另一处没改」——这类漂移不会报错，
     // 只会让用户在 gate 提示里看到 14 天、在 FAQ 里看到别的天数，或者付费后拿不到文案承诺的额度。
-    test('体验天数：弹窗文案 / gate 提示 / plan.js / 服务端授予时长四处同口径', () => {
+    test('PAY-01：体验领取已下线 —— 站内任何一处都不再许诺「14 天体验」', () => {
         const days = String(planLib().TRIAL_DAYS);
-        expect(block).toContain(`${days} 天`);
-        expect(planLib().PRO_FEATURE_HINT).toContain(`${days} 天专业版体验`);
-        // 服务端才是真正发放时长的地方，它不同步就是「文案承诺 ≠ 实际到手」
+        expect(block).not.toContain(`${days} 天`);
+        [planLib().PRO_FEATURE_HINT, planLib().TRIAL_ACTIVE_HINT,
+            planLib().EXPIRED_TRIAL_HINT, planLib().EXPIRED_PRO_HINT].forEach((hint) => {
+            expect({ hint, hit: hint.includes('免费领取') }).toEqual({ hint, hit: false });
+        });
+        // 已领取体验的用户权益到期前照常生效，服务端才是真正发放时长的地方 —— 常量同步仍是硬要求
         const serverSrc = readSrc('server/src/services/authService.js');
         const m = serverSrc.match(/const TRIAL_DAYS = (\d+);/);
         expect(m).not.toBeNull();
         expect(m[1]).toBe(days);
     });
 
-    test('方案对比库上限：弹窗数字取自 scenario-store 常量而非手写', () => {
+    test('方案对比库上限不再写进弹窗（同一件事只写一处，避免弹窗与额度提示漂移）', () => {
+        expect(block).not.toContain('方案对比库');
+        // 上限仍在场景库里，且额度提示文案直接读常量，不手写数字
         const store = window.EuriskoScenarios;
         expect(store).toBeTruthy();
-        expect(block).toContain(`方案对比库 ${store.MAX_FREE} 套 → ${store.MAX_PRO} 套`);
-    });
-
-    test('gate 提示点名的专业版能力必须都出现在弹窗专业版列（两处清单不能各说各话）', () => {
-        const hint = planLib().PRO_FEATURE_HINT;
-        const proStart = block.indexOf('专业版</span>');
-        const proCol = block.slice(proStart, block.indexOf('</ul>', proStart));
-        ['云端同步', '汇算清缴 PDF 完整报告', '方案对比库'].forEach((name) => {
-            expect({ name, inHint: hint.includes(name) }).toEqual({ name, inHint: true });
-            expect({ name, inProCol: proCol.includes(name) }).toEqual({ name, inProCol: true });
-        });
+        const scenarioUi = readSrc('src/js/ui/scenario-ui.js');
+        expect(scenarioUi).toContain('MAX_FREE');
+        expect(scenarioUi).not.toContain('专业版可保存');
     });
 });
 
 // gate 提示一度对所有人都是同一句（「基础版可免费领取 14 天体验」），对三类人是错的：
-// 付费权益过期的人被降级、体验中的人被当成没在用、体验过期的人没被告知还能再领。
+// 付费权益过期的人被降级、体验中的人被当成没在用、体验过期的人被告知还能再领（实际做不到）。
+// 阶段20 定位切换后：体验领取下线，四类身份的下一句统一收口到留资。
 // 这里守住「一句话对一个身份」，以及那份能力清单只有一处、不会随档位漂移。
 describe('gate 提示按档位取词', () => {
     const userOf = (plan, expiresAt, grantedBy) => ({ plan, plan_expires_at: expiresAt, pro_granted_by: grantedBy });
@@ -228,8 +233,9 @@ describe('gate 提示按档位取词', () => {
         expect(planLib().featureHintFor(undefined)).toBe(planLib().PRO_FEATURE_HINT);
     });
 
-    test('基础版 = 默认文案（同时保留免费体验与兑换码两条路径）', () => {
+    test('未开通 = 默认文案（下一句就是留资）', () => {
         expect(hintOf('free', null, null)).toBe(planLib().PRO_FEATURE_HINT);
+        expect(planLib().PRO_FEATURE_HINT).toContain('留资');
     });
 
     test('体验进行中：不再叫他去领取体验（他已经在体验期内了）', () => {
@@ -238,10 +244,11 @@ describe('gate 提示按档位取词', () => {
         expect(hint).not.toContain('可免费领取');
     });
 
-    test('体验已到期：明确告知还能再领一轮', () => {
+    test('体验已到期：只给留资出口，不再许诺还能再领一轮', () => {
         const hint = hintOf('pro', pastISO(2), 'trial');
         expect(hint).toBe(planLib().EXPIRED_TRIAL_HINT);
-        expect(hint).toContain('再次免费领取');
+        expect(hint).toContain('留资');
+        expect(hint).not.toContain('再次免费领取');
     });
 
     test('付费权益已到期：给恢复入口，而不是把他推回免费体验', () => {

@@ -77,7 +77,8 @@
         try {
             var s = window.EuriskoTaxRegistry.statusOf(key);
             if (!s) return '';
-            if (s.expired) return '政策已过期 · 结果仅供参考';
+            // C-04 / D 型：政策过期提示与全站同口径
+            if (s.expired) return '该政策已过有效期，测算结果仅供参考；请以最新政策与主管税务机关认定为准。';
             if (s.expiresOn) return '政策有效期至 ' + s.expiresOn;
             return '长期有效';
         } catch (e) {
@@ -172,8 +173,9 @@
             basis +
             (policy ? '<div class="qr-note">政策时效：' + esc(policy) + '</div>' : '') +
             (version ? '<div class="qr-note">政策版本：' + esc(version) + '</div>' : '') +
-            '<div class="qr-foot">本报告由 EuriskoTax 在本地浏览器完成计算并生成，计算过程不上传任何数据；' +
-            '结果为测算参考，实际纳税请以税务机关核算为准。</div>' +
+            // S-07 / C-05：页脚与全站同口径 —— 本机计算 + 主管税务机关认定
+            '<div class="qr-foot">本报告由 EuriskoTax 在您的浏览器本机完成测算并生成，不上传任何数据；' +
+            '本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</div>' +
             '</div>';
     }
 

@@ -175,8 +175,10 @@
     }
 
     // 距离某个月日还有多少天（今年或明年）
-    function daysUntilMonthDay(monthDay) {
-        const now = new Date();
+    // base 可注入：日历是日期驱动的，纯建模函数要把「今天」传进来才测得动
+    // （不传就是真实当前时间，既有调用点的行为不变）。
+    function daysUntilMonthDay(monthDay, base) {
+        const now = base || new Date();
         const year = now.getFullYear();
         let target = new Date(year, monthDay[0] - 1, monthDay[1]);
         let diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
@@ -454,10 +456,29 @@
         if (!parts.length) {
             card.classList.add('hidden');
             box.innerHTML = '';
+            syncTodoCard();   // 待办段空了，整张「接下来要办」可能该收起
             return;
         }
         card.classList.remove('hidden');
         box.innerHTML = parts.join('');
+        syncTodoCard();
+    }
+
+    /**
+     * 「接下来要办」这张壳的显隐（阶段20 P1 · ④）：三段（待办 / 截止 / 漏填）**全空就整卡不出现**。
+     * 判定只问「子块是不是还挂着 hidden」—— 不重复任何一段自己的判定逻辑
+     * （待办要不要出、漏填要不要出，各自的渲染函数已经算过一遍，再算第二遍必然长出第二套口径）。
+     * 新客因此看到的是干净首页，不是一张「你漏了 5 项」的空壳。
+     */
+    function syncTodoCard() {
+        var card = document.getElementById('home-todo-card');
+        if (!card) return;
+        var blocks = ['home-assets-card', 'home-calendar-section', 'home-missing-card'];
+        var any = blocks.some(function (id) {
+            var el = document.getElementById(id);
+            return !!el && !el.classList.contains('hidden');
+        });
+        card.classList.toggle('hidden', !any);
     }
 
     // ====== 渲染：漏填提醒（阶段19-2 遗留 · §3.3 ④）======
@@ -526,6 +547,7 @@
             card.classList.add('hidden');
             box.innerHTML = '';
             if (progress) progress.textContent = '';
+            syncTodoCard();   // 漏填段收起后，整张「接下来要办」可能也该收起
             return;
         }
 
@@ -544,6 +566,7 @@
             '<button type="button" class="btn btn-primary home-missing-cta" data-action="' + model.cta.action +
             '" data-target="' + model.cta.target + '">' + model.cta.text + '</button>' +
             '</div>';
+        syncTodoCard();
     }
 
     // 卡内内容每次重画，事件绑在卡片上（委托）——绑在按钮上会随重画丢掉
@@ -712,8 +735,8 @@
         if (plan.visible) {
             // 上限照实说（免费 2/2 已用满）。**不挂升级按钮** —— 升级入口全局只有顶栏 pill
             // 与个人中心两处（19-6b 定下的纪律），这里再长一颗就是第三处。
-            var quota = '已存 ' + plan.count + '/' + plan.limit + ' 套'
-                + (plan.isPro ? '' : (plan.full ? '（专业版 10 套）' : ''));
+            // PAY-09：不再括注「专业版 10 套」—— 那是档位营销；额度照实说即可
+            var quota = '已存 ' + plan.count + '/' + plan.limit + ' 套';
             var diffText = '';
             if (plan.diff) {
                 diffText = plan.diff.same
@@ -820,12 +843,13 @@
         }
         container.style.flexWrap = '';
 
-        // 按时间倒序，最多5条
+        // 按时间倒序，最多 3 条（阶段20 P1 · ⑥）：首页这一块只回答「接着上次算哪个」，
+        // 3 条够覆盖「上次那个」；再多就是清单，清单归「我的 → 计算历史」（卡头那颗「全部 ›」）。
         const sorted = [...history].sort((a, b) => {
             const da = new Date(a.date || a.created_at || 0);
             const db = new Date(b.date || b.created_at || 0);
             return db - da;
-        }).slice(0, 5);
+        }).slice(0, 3);
 
         const typeMap = {
             comprehensive: { name: '综合所得', icon: 'fa-calculator', color: 'text-primary' },
@@ -869,14 +893,16 @@
         });
     }
 
-    // ====== 渲染：税务日历提醒 ======
-    function renderTaxCalendar() {
-        const container = document.getElementById('home-calendar-list');
-        const yearEl = document.getElementById('home-calendar-year');
-        if (!container) return;
-        const now = new Date();
-        if (yearEl) yearEl.textContent = now.getFullYear();
+    // ====== 渲染：截止段（原「税务提醒」卡，阶段20 P1 收编进「接下来要办」）======
+    // 关键口径改动：**只列 90 天内到期的节点**。
+    // 旧实现里「经营所得减半优惠截止 2027/12/31」永远存在（剩 400+ 天），
+    // 结果就是这张卡**永远在、也永远没人看** —— 一条一年后才到期的节点占着「接下来要办」的第一行，
+    // 等于把待办区变成了装饰。90 天是「还来得及安排」的量级，更远的节点不进待办。
+    // 判定抽成纯函数（buildCalendarItems(now)）是为了单测能直接问「这天该出哪几条」，
+    // 不必靠改系统时间或等某个月份才能测。
+    const CALENDAR_HORIZON_DAYS = 90;
 
+    function buildCalendarItems(now) {
         const items = [];
 
         // 本月剩余的税务节点
@@ -910,7 +936,7 @@
                 date: '6/30',
                 name: '综合所得汇算清缴截止',
                 color: 'bg-success',
-                daysLeft: daysUntilMonthDay([6, 30])
+                daysLeft: daysUntilMonthDay([6, 30], now)
             });
         }
         if (currentMonth >= 1 && currentMonth <= 3) {
@@ -918,11 +944,12 @@
                 date: '3/31',
                 name: '经营所得汇算清缴截止',
                 color: 'bg-success',
-                daysLeft: daysUntilMonthDay([3, 31])
+                daysLeft: daysUntilMonthDay([3, 31], now)
             });
         }
 
-        // 经营所得减半优惠截止
+        // 经营所得减半优惠截止（2027/12/31）：离得远，正常情况下进不了 90 天窗口，
+        // 到 2027 年秋天它才会自己冒出来 —— 那时它才是「接下来要办」的事。
         items.push({
             date: '2027/12/31',
             name: '经营所得减半优惠截止',
@@ -930,13 +957,27 @@
             daysLeft: Math.ceil((new Date('2027-12-31') - now) / (1000 * 60 * 60 * 24))
         });
 
-        // 按剩余天数排序
-        items.sort((a, b) => a.daysLeft - b.daysLeft);
+        return items
+            .filter(it => it.daysLeft <= CALENDAR_HORIZON_DAYS)   // 远期节点不占待办位
+            .sort((a, b) => a.daysLeft - b.daysLeft)
+            .slice(0, 4);
+    }
 
-        // 最多显示4条
-        const display = items.slice(0, 4);
+    function renderTaxCalendar() {
+        const container = document.getElementById('home-calendar-list');
+        if (!container) return;
+        const section = document.getElementById('home-calendar-section');
+        const items = buildCalendarItems(new Date());
 
-        container.innerHTML = display.map(item => {
+        if (!items.length) {
+            container.innerHTML = '';
+            if (section) section.classList.add('hidden');
+            syncTodoCard();
+            return;
+        }
+        if (section) section.classList.remove('hidden');
+
+        container.innerHTML = items.map(item => {
             const daysText = item.daysLeft > 0 ? `剩 ${item.daysLeft} 天` : '今天截止';
             const urgencyColor = item.daysLeft <= 7 ? 'text-danger' : (item.daysLeft <= 30 ? 'text-warning' : 'text-gray-500');
             return `
@@ -950,6 +991,7 @@
                 </div>
             `;
         }).join('');
+        syncTodoCard();
     }
 
     // ====== 渲染：税务小贴士 ======
@@ -1093,6 +1135,9 @@
         HomePerf.measure('initHome → 渲染事件卡上轴', renderEventRail);
         HomePerf.measure('initHome → 渲染我的税务资产', renderAssets);
         HomePerf.measure('initHome → 渲染漏填提醒', renderMissing);
+        // 三段各自渲染时都会调 syncTodoCard，这里再兜一次：顺序依赖（例如截止段先跑、
+        // 待办段后跑）不会让壳的显隐停在中间态
+        syncTodoCard();
         HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 9 });
 
         setupMissionCta();
@@ -1117,7 +1162,9 @@
         renderRecentCalculations();
         renderMission();
         renderAssets();
+        renderTaxCalendar();  // 归档/存方案不会改日期，但漏了它「接下来要办」的壳就不会重算
         renderMissing();   // 算完可能刚补上一项，这张卡的漏项要跟着变
+        syncTodoCard();
     }
 
     // 暴露到全局
@@ -1128,6 +1175,12 @@
     window.renderAssets = renderAssets;
     window.renderMissing = renderMissing;
     window.renderPlans = renderPlans;
+    window.renderTaxCalendar = renderTaxCalendar;
+    window.syncTodoCard = syncTodoCard;
+    // 截止段同款套路：建模是纯函数（单测直接问「这天该出哪几条」），渲染只负责落 DOM
+    window.EuriskoHomeCalendar = {
+        pure: { buildCalendarItems: buildCalendarItems, HORIZON_DAYS: CALENDAR_HORIZON_DAYS }
+    };
     // 判定的纯函数单独导出：单测可以只问「该不该出卡、出口开哪个」，不必拼一整个首页
     window.EuriskoHomeMissing = {
         pure: { buildMissingModel: buildMissingModel, MISSING_TOOL_OF: MISSING_TOOL_OF },

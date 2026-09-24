@@ -224,7 +224,7 @@ describe('阶段13B+ 咨询情境 - 跨文件契约', () => {
     });
 
     test('「提交后会有人联系」只留一句话，成功态只确认「收到了」', () => {
-        expect(INDEX_HTML).toContain('提交后客服会与您联系');
+        expect(INDEX_HTML).toContain('提交后顾问会与您联系');
         const start = INDEX_HTML.indexOf('id="lead-success"');
         const end = INDEX_HTML.indexOf('id="lead-modal-footer"', start);
         expect(start).toBeGreaterThan(-1);

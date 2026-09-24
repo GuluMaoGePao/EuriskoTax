@@ -1371,6 +1371,16 @@
             background: #1f2937;
             border-top-color: #374151;
         }
+        /* 助手回答底部免责（X-02/C-07）：与结果区同口径的 B 型短句 —— 弱化字号，但一句都不能省 */
+        .assistant-qa-disclaimer {
+            margin: 8px 0 0;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #9ca3af;
+        }
+        .dark .assistant-qa-disclaimer {
+            color: #6b7280;
+        }
         .assistant-mark {
             background: #fef08a;
             color: #1f2937;

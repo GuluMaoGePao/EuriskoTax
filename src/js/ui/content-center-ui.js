@@ -51,7 +51,7 @@
 
     // ---------- 公告弹窗 ----------
     function noticeCardHTML(item) {
-        var title = item.title || item.summary || '更新公告';
+        var title = item.title || item.summary || '公告与更新';
         var meta = [];
         if (item.publishedAt) meta.push(fmtDate(item.publishedAt));
         if (item.type === 'operation') meta.push('运营活动');
@@ -99,7 +99,7 @@
         var titleEl = modal.querySelector('#' + MODAL_ID + '-title');
         if (!list) return;
 
-        if (titleEl) titleEl.innerHTML = '<i class="fa fa-bullhorn mr-2"></i>' + esc(opts.title || '更新公告');
+        if (titleEl) titleEl.innerHTML = '<i class="fa fa-bullhorn mr-2"></i>' + esc(opts.title || '公告与更新');
 
         var sorted = (Array.isArray(items) ? items.slice() : []).sort(function (a, b) {
             var ta = a && a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
@@ -153,7 +153,7 @@
         if (!items.length) { startupDone = true; return; }
 
         startupDone = true;
-        openNoticeModal(items, { title: '更新公告', markSeen: true });
+        openNoticeModal(items, { title: '公告与更新', markSeen: true });
     }
 
     function scheduleStartupModal() {
@@ -183,7 +183,7 @@
             return;
         }
 
-        var title = item.title || item.summary || '更新公告';
+        var title = item.title || item.summary || '公告与更新';
         host.classList.remove('hidden');
         host.innerHTML =
             '<div class="mb-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-3.5">' +
@@ -212,7 +212,7 @@
         var open = host.querySelector('[data-content-banner-open]');
         if (open) {
             open.addEventListener('click', function () {
-                openNoticeModal([item], { title: '更新公告', markSeen: false });
+                openNoticeModal([item], { title: '公告与更新', markSeen: false });
             });
         }
     }

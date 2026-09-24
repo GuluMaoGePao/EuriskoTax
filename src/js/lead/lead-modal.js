@@ -240,7 +240,7 @@
             return;
         }
         var title = typeof cfg.advisorTitle === 'string' ? cfg.advisorTitle.trim() : '';
-        node.textContent = '客服：' + name + (title ? ' · ' + title : '');
+        node.textContent = '顾问：' + name + (title ? ' · ' + title : '');
         node.classList.remove('hidden');
     }
 
@@ -412,9 +412,11 @@
             var data = await window.apiClient.submitLead(payload);
             var sub = el('lead-success-sub');
             if (sub) {
-                sub.textContent = (data && data.merged)
-                    ? '已收到您的补充信息，客服会尽快联系您。'
-                    : '客服会在 1 个工作日内联系您，请留意来电或微信。';
+                // 文案单一真源（§5.6 L-12）：统一一句，**不带任何时效**
+                // （「1 个工作日内」做不到，写了就是虚假承诺；见 §2.5 留资时效铁律）
+                sub.textContent = ((typeof window !== 'undefined' && window.CopyStandard && window.CopyStandard.LEAD)
+                    ? window.CopyStandard.LEAD.success
+                    : '') || '已收到您的信息，顾问会尽快与您联系，请留意来电或微信。';
             }
             setView('success');
             document.dispatchEvent(new CustomEvent('euriskotax:lead-submit', {
@@ -488,7 +490,7 @@
         if (scene) {
             state.scene = scene;
             if (textEl) textEl.textContent = '参考您的测算：' + scene;
-            if (hintEl) hintEl.textContent = '客服会提前看到，沟通时无需重复说明。';
+            if (hintEl) hintEl.textContent = '顾问会提前看到，沟通时无需重复说明。';
             if (pickerEl) pickerEl.classList.add('hidden');
             sceneEl.classList.remove('hidden');
             return;

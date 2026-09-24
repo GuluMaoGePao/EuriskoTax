@@ -215,6 +215,55 @@ describe('按 index.html 的真实顺序装配一遍', () => {
     // 上面那条只钉「算不算得出东西」（deep 的输入是多步向导攒出来的，默认值未必构成一次合法输入，
     // 所以不对它的数值下断言）；20 个速算器是单屏直算、默认值就是一份合法输入，这里按与
     // tests/tool-registry.test.js 相同的口径把数值也钉住 —— 同一份代码跑在两个装配环境里。
+    // 阶段20 P0 导航去重（R1 顶栏去「个人中心」/ R2 顶栏去帮助按钮 / R5 首页删「关于本站」）。
+    // 这三刀砍的都是 DOM，而砍 DOM 最贵的后果不是少一个按钮 —— 是**少一个按钮却留着它的绑定**：
+    // getElementById(...) 返回 null 后在 DOMContentLoaded 里抛 TypeError，
+    // 后面所有初始化（登录态、历史记录）静默全残，界面看着正常，功能全废。
+    // 所以这里同时钉两头：DOM 里没有、脚本里也不许再 getElementById 它。
+    describe('导航去重（阶段20 P0）：删 DOM 必须同步删绑定', () => {
+        const readSrc = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+        // 注释里会引用「已删除的元素 id」做说明（那正是留给后人看的），所以先剥注释再判定
+        const stripComments = (text) => text
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+        const ALL_SCRIPTS = CLASSIC.concat(['index.html'])
+            .map((rel) => ({ rel, text: stripComments(rel === 'index.html' ? HTML : readSrc(rel)) }));
+
+        const references = (id) => ALL_SCRIPTS
+            .filter((f) => f.text.indexOf("getElementById('" + id + "'") > -1)
+            .map((f) => f.rel);
+
+        test('R1：顶栏不再有「个人中心」，且没人再绑 profile-link', () => {
+            expect(stripComments(HTML)).not.toContain('id="profile-link"');
+            expect(references('profile-link')).toEqual([]);
+            // 目的地没被删，只是收敛到 Tab：顶栏 / 底栏的「我的」都还在
+            expect(HTML).toContain('class="top-tab" data-tab="profile-page"');
+            expect(HTML).toContain('class="bottom-tab" data-tab="profile-page"');
+        });
+
+        test('R2：顶栏帮助按钮撤掉，但「使用帮助」仍有两处可达', () => {
+            expect(stripComments(HTML)).not.toContain('id="help-btn"');
+            expect(references('help-btn')).toEqual([]);
+            // 帮助弹窗本身不能跟着删：我的页那张卡与助手 FAB 还在打开它
+            expect(HTML).toContain('id="help-modal"');
+            const authUi = readSrc('src/js/auth/auth-ui.js');
+            expect(authUi).toContain('profile-card-help');
+        });
+
+        test('R5：首页「关于本站」长文删除，页尾留一行信任标签', () => {
+            expect(stripComments(HTML)).not.toContain('关于本站');
+            expect(HTML).toContain('home-trust-line');
+            expect(stripComments(HTML)).toContain('41 个场景 · 数据不出本机');
+            // 删掉的信任信息不能丢，得在「关于我们」里找得回来
+            const aboutStart = HTML.indexOf('id="about-modal"');
+            expect(aboutStart).toBeGreaterThan(-1);
+            const aboutBlock = stripComments(HTML.slice(aboutStart, aboutStart + 6000));
+            expect(aboutBlock).toContain('不上传任何数据');
+        });
+    });
+
     test('装配后 20 个速算器用默认值算出的数：无 error、primary 有限且非负', () => {
         const registry = window.EuriskoToolRegistry;
         const bad = [];

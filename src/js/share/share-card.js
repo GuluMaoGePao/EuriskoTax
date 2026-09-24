@@ -26,7 +26,11 @@
 
     var SHARE_IMAGE_WIDTH = 750; // 分享图宽度：移动端长图主流宽度，够清晰又不过大
     var SHARE_IMAGE_SCALE = 2;   // 2 倍像素密度，微信二次压缩后仍清晰
-    var DISCLAIMER = '本测算结果仅供参考，不构成税务建议';
+    // C-03 / B 型：主句固定，取自文案单一真源（copy-standard.js）（守护断言 1）。
+    // 后缀按分享图宽度做了取舍：图上只挂主句，完整口径在页脚与报告里给全。
+    var DISCLAIMER = ((typeof window !== 'undefined' && window.CopyStandard && window.CopyStandard.DISCLAIMER)
+        ? window.CopyStandard.DISCLAIMER.shortMain
+        : '') || '本测算结果仅供参考，不构成税务建议；';
     var LOGO_SRC = 'images/logo-zoomed.png';
     var CTA_BLOCK_ID = 'share-card-cta';
     var PREVIEW_ID = 'share-preview-modal';

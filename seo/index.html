@@ -10,14 +10,14 @@
          站内路径断了 —— 从「月薪个税」进站的人看不到「年终奖 / 离职补偿 / 增值税」，
          App 里也一个入口都没有。这一页把全部工具摆在一屏内，
          既给读者做目录，也给爬虫做一张 HTML 版 sitemap（正文 + ItemList 结构化数据）。 -->
-    <title>税务测算工具箱 2026：个税 / 企业税 / 用工成本 20 个免费计算器（免注册，附政策依据）</title>
+    <title>税务测算工具箱 2026：个税 / 企业税 / 用工成本 20 个税费测算（免注册，附政策依据）</title>
     <meta name="description" content="20 个税务测算工具一次列全：月薪个税、税后工资倒算（谈薪）、个税汇算清缴、年终奖、专项附加扣除、个人养老金、税优健康险、企业年金、离职补偿、提前退休、劳务报酬、股权激励、外籍津补贴、增值税、企业所得税、附加税与印花税、个体工商户经营所得（核定 vs 查账）、社保公积金、企业用工成本、残保金与工会经费。每个都能在线算，口径与 App 同源（累计预扣法、60%~300% 社保上下限、小微企业所得税优惠、社平 2 倍工资封顶），并标注政策依据文号。免注册、不采集收入金额。">
     <link rel="canonical" href="https://euriskotax.zeabur.app/seo/index.html">
     <meta name="robots" content="index, follow">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="EuriskoTax 税费计算器">
-    <meta property="og:title" content="税务测算工具箱：20 个免费计算器">
+    <meta property="og:title" content="税务测算工具箱：20 个税费测算">
     <meta property="og:description" content="个税、企业税、五险一金，一页列全，点开即算。">
     <meta property="og:url" content="https://euriskotax.zeabur.app/seo/index.html">
     <meta name="twitter:card" content="summary">
@@ -74,8 +74,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_index">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_index">打开完整测算</a>
     </div>
 </header>
 
@@ -189,17 +189,19 @@
 
         <section class="cta">
             <h2>要算年度汇算、年终奖和专项附加扣除？</h2>
-            <p>上面的单页工具各管一段；把所有收入放一起算、保存历史、生成结果分享图，用完整版计算器。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_index">打开 EuriskoTax 完整计算器</a>
+            <p>上面的单页工具各管一段；把所有收入放一起算、保存历史、生成结果分享图，用完整测算工具。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_index">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
-        <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/net-salary.html">税后工资倒算</a> · <a href="/seo/salary-tax.html">月薪个税</a> · <a href="/seo/social-base.html">社保公积金</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

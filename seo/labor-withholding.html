@@ -84,7 +84,7 @@
                         "name": "这个测算结果能直接作为报税依据吗？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。"
                         }
                     }
                 ]
@@ -96,8 +96,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_withholding">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_withholding">打开完整测算</a>
     </div>
 </header>
 
@@ -291,22 +291,23 @@
         </details>
         <details>
             <summary>这个测算结果能直接作为报税依据吗？</summary>
-            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。</p>
         </details>
 
         <section class="cta">
             <h2>把全年收支一起算，看看到底退还是补</h2>
-            <p>输入工资、社保公积金、专项附加扣除与劳务 / 稿酬收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_withholding">打开 EuriskoTax 完整计算器</a>
+            <p>输入工资、社保公积金、专项附加扣除与劳务 / 稿酬收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_withholding">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
-        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/labor-withholding.html">劳务报酬个税计算器</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -391,5 +392,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

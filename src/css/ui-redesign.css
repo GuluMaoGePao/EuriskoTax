@@ -95,6 +95,173 @@
     outline: none;
     box-shadow: var(--sh-focus);
 }
+/* 首页页尾信任标签（阶段20 P0 · R5）：原「关于本站」长文删掉后，
+   信任信息压缩成一行 —— 41 个场景（能力口径）+ 数据不出本机（隐私口径），
+   完整说明移到「我的 → 关于我们」。 */
+.home-trust-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    text-align: center;
+}
+/* --- 首页顶部常驻搜索条（阶段20 P1 · ①）---
+   原来是一张 .home-card 卡片：卡片形态会把它和下面的内容卡排成同一层，
+   视觉上仍是「又一个入口」；改成条状 + 上移到首屏最上，才是动线第一步。
+   颜色/圆角/阴影一律取既有令牌，不发明新色。 */
+.home-searchbar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    margin-bottom: var(--sp-3);
+    padding: 10px var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--c-text-2);
+    font-size: var(--fs-sm);
+    box-shadow: var(--sh-1);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+}
+.home-searchbar:hover {
+    border-color: var(--c-brand);
+    color: var(--c-brand);
+}
+.home-searchbar:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+.home-searchbar-count {
+    margin-left: auto;
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+}
+.dark .home-searchbar {
+    background: #1f2937;
+    border-color: var(--c-border);
+}
+
+/* --- 首页身份 chip 行（阶段20 P1 · ⑤）---
+   身份卡降为一行 chip：身份是「设置默认视角」，不是导航，不值得占一整卡。
+   只在 .identity-chip-row 容器里改写排版 —— 同一批 DOM 在别处（工具页等）仍是整卡。 */
+.identity-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+}
+.identity-chip-row .scenario-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+}
+.identity-chip-row .scenario-pick {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+}
+.identity-chip-row .scenario-card .fa {
+    margin-bottom: 0;
+    font-size: 13px;
+}
+/* 「接下来要办」卡内三段：段间留一点呼吸，段本身不再带卡片皮（它们已经是卡的一部分） */
+#home-todo-card > .hidden + *,
+#home-todo-card > * + * {
+    margin-top: var(--sp-2);
+}
+
+/* --- 我的页高频四宫格（阶段20 P3 · §6.1）---
+   历史 / 台账 / 档案 / 日历 四项上提成宫格：宫格是**扫视**型（看图标定位），
+   列表是**阅读**型（逐行读标题）—— 高频入口该用前一种，低频才配用后一种。
+   手机 2×2、桌面一行 4 个（≥640px）：宫格的意义在**一屏看完**，
+   在 1024px 容器里只排两列会空掉半屏，那就和列表没区别了。
+   颜色 / 圆角 / 阴影一律取既有令牌，不发明新色。 */
+.profile-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+@media (min-width: 640px) {
+    .profile-quick-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+.profile-quick-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: var(--sp-3) var(--sp-2);
+    background: #fff;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card-sm);
+    box-shadow: var(--sh-1);
+    cursor: pointer;
+    transition: box-shadow .2s, transform .15s, border-color .2s;
+}
+.profile-quick-tile:hover {
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+    border-color: #c7d7fb;
+}
+.profile-quick-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-card-sm);
+    background: rgba(30, 64, 175, .08);
+    color: var(--c-brand);
+    font-size: 18px;
+}
+.profile-quick-title {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+}
+/* 角标（如税务日历「本月 N 项」）：没有数字就不渲染这个元素，不显示「0 项」 */
+.profile-quick-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 1px 6px;
+    border-radius: var(--r-pill);
+    background: rgba(234, 88, 12, .10);
+    color: #c2410c;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+}
+.dark .profile-quick-tile {
+    background: #1f2937;
+    border-color: var(--c-border);
+}
+.dark .profile-quick-title {
+    color: #e5e7eb;
+}
+.dark .profile-quick-icon {
+    background: rgba(59, 130, 246, .15);
+    color: #60a5fa;
+}
+.dark .profile-quick-badge {
+    color: #fdba74;
+}
+
+/* 备案位占位态（ICP 号待下发）：位置先占住，避免号一下来页脚跳版；
+   弱化显示是因为它只是「主体名 + 状态」，不是法定展示项（法定项是号）。 */
+.site-filing--pending {
+    opacity: 0.75;
+}
 
 /* --- 2.3 行动条（Action Bar）：结果页四按钮常驻行（§3.5）---
    手机上横向可滑，桌面均分；每个按钮 ≥ 44px 触控高度。 */

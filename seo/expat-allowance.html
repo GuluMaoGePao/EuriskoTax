@@ -109,8 +109,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_expat">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_expat">打开完整测算</a>
     </div>
 </header>
 
@@ -275,7 +275,7 @@
             随后由 2023 年第 29 号公告延续到 2027-12-31。<strong>跨年度适用前请先核对当年是否仍在执行期内</strong>。
         </p>
 
-        <h2>三条最容易踩的口径</h2>
+        <h2>三条常见易错口径</h2>
         <h3>1. 二选一，不是叠加；且一年内不得变更</h3>
         <p>
             享受津补贴免税就<strong>不能同时</strong>扣专项附加扣除，反过来也一样。
@@ -323,8 +323,8 @@
 
         <section class="cta">
             <h2>把两条路径放进全年账一起算</h2>
-            <p>输入全年工资、社保公积金与扣除/免税项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_expat">打开 EuriskoTax 完整计算器</a>
+            <p>输入全年工资、社保公积金与扣除/免税项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_expat">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
@@ -335,6 +335,7 @@
         <p>政策依据：《关于延续实施外籍个人有关津补贴个人所得税政策的公告》（财政部 税务总局公告 2023 年第 29 号，执行至 2027-12-31）、《关于个人所得税若干政策问题的通知》（财税字〔1994〕020 号）、《关于外籍个人取得有关补贴征免个人所得税执行问题的通知》（国税发〔1997〕54 号）、《关于外籍个人取得港澳地区住房等补贴征免个人所得税的通知》（财税〔2004〕29 号）。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/expat-allowance.html">外籍个人津补贴免税测算</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -424,5 +425,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('euriskotax:tax-rates-updated', render);
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

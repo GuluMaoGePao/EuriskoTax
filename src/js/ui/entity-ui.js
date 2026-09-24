@@ -235,11 +235,19 @@
         return res;
     }
 
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    var LEAD_COPY = COPY.LEAD || {};
+    var UPGRADE_COPY = COPY.UPGRADE || {};
+    function txt(v, fallback) { return v || fallback; }
+
     // 反馈文案一处给出：两页各写一句，迟早有一处改成别的话术，那时用户就只剩猜。
+    // PAY-06：额度提示不再提「专业版 / 升级入口」，只说当前额度 + 留资出口。
     function hintFor(res) {
         if (!res) return '存不了模板';
         if (res.ok) return '已存为模板「' + (res.template ? res.template.name : '') + '」· 下次进工具可一键带出';
-        if (res.reason === 'limit') return '免费 ' + res.limit + ' 份模板已用完（一份没删）；专业版不限';
+        if (res.reason === 'limit') return '可保存的 ' + res.limit + ' 份模板已用完（一份没删）；'
+            + txt(UPGRADE_COPY.needCode, '需升级码开通') + '更多';
         if (res.reason === 'empty') return '这份参数里没有可复用的字段';
         return '存不了模板';
     }
@@ -274,8 +282,8 @@
     // 额度满了只说一句话，不新增第三颗升级按钮（见文件头纪律 ②）
     function limitNote(count, isPro, limit) {
         if (isPro || count < limit) return '';
-        return '<p class="entity-form-note">已到免费上限（' + count + '/' + limit + '）：旧的都不会删，' +
-            '继续用也不影响任何测算。专业版不限数量，升级入口见顶栏与个人中心。</p>';
+        return '<p class="entity-form-note">已到当前可保存上限（' + count + '/' + limit + '）：旧的都不会删，' +
+            '继续用也不影响任何测算。' + txt(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›') + '</p>';
     }
 
     function quotaOf(store) {
@@ -401,7 +409,8 @@
                 var res = ent.save(payload);
                 if (!res.ok) {
                     flashError(res.reason === 'name' ? '名称不能为空'
-                        : '已到免费上限（免费版 1 个主体），旧的不会删；专业版不限');
+                        : '已到当前可保存上限（1 个主体），旧的不会删；'
+                            + txt(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›'));
                     return;
                 }
                 editingId = null;
@@ -497,11 +506,12 @@
         if (typeof lib.isPro === 'function' && lib.isPro()) return '';
         var months = lib.FREE_MONTHS;
         if (!hidden) {
-            return '<p class="entity-form-note">免费版看最近 ' + months + ' 个月，专业版不限。' +
+            return '<p class="entity-form-note">当前可看最近 ' + months + ' 个月，'
+                + txt(UPGRADE_COPY.needCode, '需升级码开通') + '更多。' +
                 '更老的<b>一条都不会删</b>，只是暂时收起来 —— 视野之外，不是数据之外。</p>';
         }
-        return '<p class="entity-form-note">另有 ' + hidden + ' 条更早的记录：免费版只列最近 ' + months +
-            ' 个月。它们一直在，专业版可见；升级入口仍在顶栏与个人中心。</p>';
+        return '<p class="entity-form-note">另有 ' + hidden + ' 条更早的记录：当前只列最近 ' + months +
+            ' 个月。它们一直在，' + txt(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›') + '</p>';
     }
 
     function statusOptionsHtml(current) {

@@ -84,7 +84,8 @@
         try {
             var s = window.EuriskoTaxRegistry.statusOf(policyKey);
             if (!s) return '';
-            if (s.expired) return '<span class="tool-badge tool-badge-danger">政策已过期 · 结果仅供参考</span>';
+            // C-04 / D 型：过期徽标同口径（徽标是短位，取 D 型前半句，不缩短到「仅供参考」四个字就完事）
+            if (s.expired) return '<span class="tool-badge tool-badge-danger">政策已过有效期 · 结果仅供参考</span>';
             if (s.daysLeft !== null && s.daysLeft <= 180) {
                 return '<span class="tool-badge tool-badge-warn">优惠至 ' + esc(s.expiresOn) + ' · 剩 ' + s.daysLeft + ' 天</span>';
             }
@@ -326,6 +327,13 @@
         var lib = identityLib();
         var current = lib ? lib.get() : '';
 
+        // chip 形态（阶段20 P1 · ⑤）：容器挂 `.identity-chip-row` 时只渲染「图标 + 名字」这一行，
+        // **不渲染**描述与「看这类工具 ›」—— 那颗按钮会把它变成工具页之外的第二套分类入口，
+        // 而身份在这儿的职责只有一个：设为默认视角。找工具走首页搜索条与底部 Tab。
+        // 判定挂在**容器 class** 上而不是另传参数：首页是 chip、别处（若有）仍是整卡，
+        // 现有单测（identity-pref / toolbox-ui）的 fixture 都是 scenario-grid，因此不受影响。
+        var chip = box.classList.contains('identity-chip-row');
+
         // 外层是 div 而不是 button：卡里有两颗按钮（设默认 / 看这类工具），
         // 嵌套 button 会让键盘与读屏同时错乱（阶段19-10a 在组头上已踩过一次）。
         box.innerHTML = R().scenarios().map(function (s) {
@@ -337,9 +345,10 @@
                 '<i class="fa ' + esc(s.icon || 'fa-user') + '"></i>' +
                 '<span class="scenario-name">' + esc(s.name) +
                 (on ? '<em class="scenario-badge">当前默认</em>' : '') + '</span>' +
-                '<span class="scenario-desc">' + esc(s.desc) + '</span>' +
+                (chip ? '' : '<span class="scenario-desc">' + esc(s.desc) + '</span>') +
                 '</button>' +
-                '<button type="button" class="scenario-tools" data-scenario="' + esc(s.id) + '">看这类工具 ›</button>' +
+                (chip ? '' :
+                    '<button type="button" class="scenario-tools" data-scenario="' + esc(s.id) + '">看这类工具 ›</button>') +
                 '</div>';
         }).join('');
 
@@ -398,6 +407,90 @@
     }
 
     // ====== 工具页 ======
+    // ---- T1（阶段20 P2）：类型筛选 ----
+    // 三个视图互斥：all（现状）/ quick（只要速算器）/ deep（只要完整测算）。
+    // 会话级变量，不落 localStorage —— 下次进来停在「完整测算」会被当成列表坏了（plan §5.2）。
+    var currentType = 'all';
+
+    function renderTypeFilter() {
+        var bar = document.getElementById('toolbox-type-filter');
+        if (!bar || !R()) return;
+        var all = (R().all() || []).length;
+        var deep = (R().deep() || []).length;
+        var set = function (id, n) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = n;
+        };
+        // 计数从注册表算，不写死 41/20/21 —— 加工具不用回来改这句话
+        set('toolbox-count-all', all + deep);
+        set('toolbox-count-quick', all);
+        set('toolbox-count-deep', deep);
+        bar.querySelectorAll('.tool-type-chip').forEach(function (btn) {
+            var on = btn.getAttribute('data-tool-type') === currentType;
+            btn.classList.toggle('is-on', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        // 每次渲染都顺手补一次绑定（函数内部按 data-bound 幂等）：
+        // 页面初始化时工具页还没进过，而测试环境是直接调 renderToolbox 的
+        bindTypeFilter();
+    }
+
+    function bindTypeFilter() {
+        var bar = document.getElementById('toolbox-type-filter');
+        if (!bar || bar.getAttribute('data-bound') === '1') return;
+        bar.setAttribute('data-bound', '1');
+        bar.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.tool-type-chip') : null;
+            if (!btn) return;
+            currentType = btn.getAttribute('data-tool-type') || 'all';
+            var kw = document.getElementById('toolbox-search');
+            renderToolbox(kw ? kw.value : '');
+        });
+    }
+
+    // ---- T3（阶段20 P2）：场景锚点 chip 条（桌面跳读用，手机由 CSS 隐藏）----
+    function renderAnchors() {
+        var bar = document.getElementById('toolbox-anchors');
+        if (!bar || !R()) return;
+        if (currentType === 'deep') {
+            // 只剩一组时不需要锚点：一行只有一个 chip，那是装饰不是跳读
+            bar.classList.add('hidden');
+            bar.innerHTML = '';
+            return;
+        }
+        var groups = (R().groups() || []).map(function (g) {
+            return { id: g.id, name: g.name };
+        });
+        if (currentType !== 'quick') groups.push({ id: 'deep', name: '完整测算' });
+        if (currentScenario) groups.unshift({ id: 'scenario', name: '为你推荐' });
+        if (groups.length < 2) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+
+        bar.classList.remove('hidden');
+        bar.innerHTML = groups.map(function (g) {
+            return '<button type="button" class="tool-anchor-chip" data-anchor="' + esc(g.id) + '">' + esc(g.name) + '</button>';
+        }).join('');
+        bindAnchors();   // 委托绑在条上、按 data-bound 幂等，重画不会丢也不会重复
+    }
+
+    function bindAnchors() {
+        var bar = document.getElementById('toolbox-anchors');
+        if (!bar || bar.getAttribute('data-bound') === '1') return;
+        bar.setAttribute('data-bound', '1');
+        bar.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.tool-anchor-chip') : null;
+            if (!btn) return;
+            var id = btn.getAttribute('data-anchor');
+            var target = document.querySelector('#toolbox-groups [data-group="' + id + '"]')
+                || document.getElementById('toolbox-deep');
+            if (target) {
+                // 目标组可能是折叠的：跳过去看到的是空组，等于没跳 —— 顺手展开
+                var collapsed = target.classList.contains('is-collapsed');
+                if (collapsed) { setGroupOpen(id, true); applyGroupOpen(target, true); }
+                if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
     function renderScenarioChip() {
         var chip = document.getElementById('toolbox-scenario-chip');
         if (!chip) return;
@@ -428,6 +521,8 @@
         // 微标签读的是历史：每次重渲染都重新取一次，否则刚算完的那一条不显示「今天算过」
         refreshFlags();
         var forceOpen = !!currentScenario || !!result.matched;
+        // T1：选了「完整测算」时不渲染速算器组（互斥视图），选「速算」时反过来（见下面 deepBox 的 hidden）
+        var showQuick = currentType !== 'deep';
 
         // 按身份挑工具 = **推荐组置顶**，其余分组照常渲染（19-2 遗留清偿③）：
         // 原实现走的是 else-if，等于只渲染推荐组 —— 其余 36 个入口当场消失，那是筛选，
@@ -438,11 +533,13 @@
                 { id: 'scenario', forceOpen: forceOpen, defaultOpen: true });
         }
         if (result.matched) {
-            R().groups().forEach(function (g) {
-                var tools = (result.tools || []).filter(function (t) { return t.group === g.id; });
-                html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
-            });
-        } else {
+            if (showQuick) {
+                R().groups().forEach(function (g) {
+                    var tools = (result.tools || []).filter(function (t) { return t.group === g.id; });
+                    html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
+                });
+            }
+        } else if (showQuick) {
             // 「清空」跟着这组走（阶段19-10a）：原本它长在首页那张同名卡上，卡撤了以后
             // 这里是唯一的清空入口 —— 不补回来的话，列表只能靠新的使用记录挤掉旧的。
             var recent = recentTools();
@@ -475,12 +572,15 @@
         // （原来还带「按身份筛选时收起」—— 身份不再是筛选，完整测算照样该在。）
         var deepBox = document.getElementById('toolbox-deep');
         if (deepBox) {
-            var hideDeep = result.matched && (!result.deep || result.deep.length === 0);
+            // T1 反向：选「速算」时整块完整测算不出现（同一份互斥，不是"排在最后"）
+            var hideDeep = (currentType === 'quick')
+                || (result.matched && (!result.deep || result.deep.length === 0));
             if (hideDeep) deepBox.classList.add('hidden');
             else deepBox.classList.remove('hidden');
             // 完整测算组是静态 HTML（4 张 mode card 的事件在别处绑定），这里只补折叠与计数，
             // 绝不重建它的 DOM —— 重建会让那 4 颗隐藏按钮的初始化逻辑全部失效。
-            applyGroupOpen(deepBox, forceOpen || isGroupOpen('deep', false));
+            // 「完整测算」视图下它就是页面上唯一的一组，默认收起等于整个视图是空的
+            applyGroupOpen(deepBox, forceOpen || currentType === 'deep' || isGroupOpen('deep', false));
             var deepCount = document.getElementById('toolbox-deep-count');
             if (deepCount) deepCount.textContent = (R().deep() || []).length + ' 个';
             if (deepBox.getAttribute('data-group-bound') !== '1') {
@@ -490,6 +590,8 @@
         }
         renderDeepEntries();
         renderScenarioChip();
+        renderTypeFilter();   // T1：三个视图的计数与选中态
+        renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图下只有一组，不出条）
     }
 
     // ====== 完整测算：增量接线（为阶段17「deep 工具 > 4 个」铺路） ======
@@ -898,7 +1000,7 @@
                 scBtn.innerHTML = res.ok
                     ? '<i class="fa fa-check"></i>已存为方案'
                     : '<i class="fa fa-info-circle"></i>' + esc(
-                        res.reason === 'limit' ? '方案已达上限（专业版 10 套）'
+                        res.reason === 'limit' ? '已达当前可保存上限'
                             : res.reason === 'no-result' ? '先算出结果再存'
                                 : '存不了方案'
                     );
@@ -1896,6 +1998,8 @@
         bindAdvancedSignal();
         renderScenarios();
         renderToolbox('');
+        bindTypeFilter();   // T1
+        bindAnchors();      // T3
 
         // 首页搜索入口：进入工具页并聚焦搜索框（41 个工具时，搜索比浏览快）
         var entry = document.getElementById('toolbox-search-entry');

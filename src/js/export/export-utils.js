@@ -1,3 +1,13 @@
+// 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+var DISCLAIMER_COPY = COPY.DISCLAIMER || {};
+
+// S-03：报告声明（原写「税务部门核算」，统一为主管税务机关）
+function reportStatementText() {
+    return DISCLAIMER_COPY.reportStatement
+        || '本报告仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。';
+}
+
 // 导出到Word文档
 function exportToWord(elementId, title, opts) {
     opts = opts || {};
@@ -7,7 +17,7 @@ function exportToWord(elementId, title, opts) {
     // 17B-2（v1.48.0）：原先这半句还判 reverseCalculationResults —— 那个全局变量随旧页面删除了，
     // 留着是**必炸**的（未声明变量直接抛 ReferenceError），而删掉它不影响任何现役入口。
     if (!opts.skipResultCheck && Object.keys(calculationResults).length === 0) {
-        showAlert('请先进行计算，再导出文档');
+        showAlert('请先完成测算，再导出文档');
         return;
     }
     
@@ -242,7 +252,7 @@ function generateWordDocumentContent(title) {
         <h2>1. 报告概述</h2>
         <p>本报告根据《中华人民共和国个人所得税法》及其实施条例，结合您提供的个人收入和扣除信息，对2026年度综合所得进行了详细计算。</p>
         <p>报告涵盖年度总览、收入明细、扣除项明细、月度个税明细、税率分布分析、税收优化建议及结论等内容，旨在为您提供清晰的税务状况分析和合规的税务规划建议。</p>
-        <p class="note">声明：本报告仅供参考，实际纳税情况以税务部门核算结果为准。</p>
+        <p class="note">声明：${reportStatementText()}</p>
     </div>
     
     <!-- 年度总览 -->
@@ -518,7 +528,7 @@ function generateWordDocumentContent(title) {
         <h2>8. 结论</h2>
         <p>经计算，2026年度您的应纳税额合计为 ${taxDetails.totalTax.toFixed(2)} 元，税后年收入为 ${taxDetails.netIncome.toFixed(2)} 元。</p>
         <p>若全年累计已预缴税额为 ${taxDetails.prepaidTax.toFixed(2)} 元，则 ${taxDetails.refundTax >= 0 ? '应补税额' : '应退税额'} 为 ${Math.abs(taxDetails.refundTax).toFixed(2)} 元。</p>
-        <p>建议您依据本报告中的税收优化建议，合理规划个人税务，充分利用各项法定扣除政策，合规降低税负。同时，请妥善保存相关扣除凭证，以备税务部门核查。</p>
+        <p>建议您依据本报告中的税收优化建议，合理规划个人税务，充分利用各项法定扣除政策，合规降低税负。同时，请妥善保存相关扣除凭证，以备主管税务机关核查。</p>
         <p>本报告数据截至生成之日，如遇税收政策调整，以最新政策为准。</p>
     </div>
     

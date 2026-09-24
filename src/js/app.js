@@ -45,11 +45,10 @@ window.addEventListener('DOMContentLoaded', function() {
     // 这类「删页面留下的空指针」比少一个按钮严重得多：界面看着正常，功能静默全残。
     // 返回动作由向导自己的 dw-back 承担（工具栏那套通用返回也是同一条路）。
 
-    // 帮助按钮
-    document.getElementById('help-btn').addEventListener('click', function() {
-        openModal(document.getElementById('help-modal'));
-    });
-    
+    // R2（阶段20 P0）：顶栏 #help-btn 已随 DOM 一起删除，绑定必须同步删 ——
+    // 留一句 getElementById('help-btn').addEventListener 会在 DOMContentLoaded 里抛 TypeError，
+    // 后面所有初始化（登录态、历史记录）静默全残。使用帮助仍在「我的 → 使用帮助」卡与助手 FAB 两处。
+
     // 关闭模态框按钮
     document.getElementById('close-help-modal').addEventListener('click', function() {
         closeModal(document.getElementById('help-modal'));

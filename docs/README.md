@@ -4,6 +4,8 @@
 > 维护原则：按用途分类存放，本文件为统一入口索引
 > 2026-09-23 合回：阶段15~19 的全部内容已从 `feature/stage15-17-wip` 合回 `main`（主干此前停在锚点 `4f381e8` 对外 v1.17.0）。**合回不等于上线** —— 公网仍是 v1.17.0，发布是**手动动作**（GUI「🚀 发布」或 `tools/ops/ops-publish.ps1`）。拆分原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)
 > 2026-09-20 清理：删除散落产物与零引用文件（根目录 `server-dev.log`、空目录 `backup/`、`coverage/`、`.playwright-cli/` 87 张临时截图、`tools/dup_reg_alert.png`）与从未使用过的 `tech-reports/health-check-report-template.md`（上线自检以 `ops-check-prod.ps1` 的 37 项指纹为准）；`clean-browser-cache.bat` 归位 `tools/ops/`；`logs/README.md` 恢复入库（`.gitignore` 写 `logs/` 会让 `!` 例外失效的坑见 [file-management-policy.md §6](development/file-management-policy.md)）
+> 2026-09-24 新增：**`docs/guides/user-facing-copy-standard.md`（面向用户展示文案规范与集中台账 · 单一真源）** —— 含本期定位（不做付费、全留资→私域→客服发升级码）、合规审核状态定义、术语表与禁用词、免责主句固定+后缀枚举、PAY-01~16 付费文案改造清单、14 类模块逐条台账（位置/现状/规范/状态）、ICP 备案专项（21 个落地页缺备案位🔴）、CP-1~5 批次与 7 条守护断言；**改文案前先改本文**
+> 2026-09-24 新增：**`docs/development/stage20-ia-and-ui-alignment-plan.md`（阶段20 信息架构与 UI 优化方案 · 方案稿未开工）** —— 功能架构图（七层 + 依赖交互 + 商业映射）、四层导航模型与去重规则、首页/工具页/我的页重排、电脑网页与手机小程序差异适配、P0–P4 路线；6 项待用户拍板后再动手
 > 2026-09-20 更新：「当前状态」重写为 v1.80.0 事实（原为 v1.17.0 过期快照）；层级总图补阶段17/18/19；新增「文档新鲜度分级」（🟢活 / 🟡历史快照 / 🔵过程稿）；文档清单刷新更新日期并逐份标注状态；新增「新增文档该放哪 / 该改哪」的硬规则
 > 2026-09-18 新增：**「文档层级总图」章节**（下面的表格是平的，只回答「有哪些」；新增这一节回答「什么关系、我要做的事该读哪一份」）；登记 `docs/guides/site-structure-map.md`（全站现状测绘）
 > 2026-09-14 新增：`docs/marketing/business-plan-for-partners.md`（合伙人版商业企划）与 `docs/marketing/gtm-execution-plan.md`（90 天落地执行手册）
@@ -20,7 +22,7 @@
 - **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
 - **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
 - **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，`https://euriskotax.zeabur.app`；ICP 备案通过后迁腾讯云轻量（上海），执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)
-- **测试**：112 套件 2092 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **测试**：115 套件 2130 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
   - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）
@@ -168,6 +170,7 @@ EuriskoTax/
 | [development/stage17-full-tax-coverage-plan.md](development/stage17-full-tax-coverage-plan.md) | 🟡 **阶段17 全税种完整测算方案（核心卖点兑现）** —— UI 排版前置 → 17A spec 扩展 / 17B 反向迁移已有 4 个 deep / **17D 个税纵深补齐（P0）** / 17C 铺齐 5 类税种；目标覆盖 6/6 类 + 个税场景完整度 10/16（现状 6/6、**16/16 收官**） | 2026-09-19 |
 | [development/stage18-spec-driven-followup.md](development/stage18-spec-driven-followup.md) | 🟢 **阶段18 spec 驱动配套链路收口**（修的是「21 个完整测算里只有 4 个被照顾到、其余 17 个静默失败」）：18-1 加载顺序装配守护 / 18-2 历史查看按注册表统一分发 / 18-3+18-5 分享图取数与入口（改事件委托）/ 18-4 留资情境兜底 / 18-6a 真机补跑；**剩两项待定**（18-6 补场景待用户输入、留资引导白名单待拍板） | 2026-09-20 |
 | [development/stage19-ui-redesign-plan.md](development/stage19-ui-redesign-plan.md) | 🟢 **阶段19 UI 重构与留存设计方案** —— 现有核心功能全景（L0–L5 分层）/ 竞品对标（TurboTax·NerdWallet·国内工具站）/ 五个留存断点诊断 / **11 类 persona 完整使用旅程（§2.5，含常态×事件双轴模型）** / **首页双轴导航（事件卡组 × 身份卡组，§3.3）** / 工具页降载 · 结果页双栏与省钱卡 · 我的页权益可视化 / **效率层（§3.10：主体 E1→模板 E2→台账 E3→快捷 E5→批量 E4）** / 设计令牌增补（只增不改）/ 19-0~19-11 落地路线与门禁 | 2026-09-19 |
+| [development/stage20-ia-and-ui-alignment-plan.md](development/stage20-ia-and-ui-alignment-plan.md) | 🔵 **阶段20 信息架构与 UI 优化方案（方案稿，未开工）** —— **功能架构图（L0 环境 / L1 全局 / L2 目的地 / L3 任务 / L4 情境 / L5 能力 / L6 支撑）** + 依赖与交互关系 + 模块×商业指标映射；**四层导航模型与去重规则**（顶部=身份与环境 / 底部与顶部 Tab=同一导航的两种投影，同一目的地只有一条稳定路径）+ 7 条现状重复清单；首页 10 区块→7 区块重排（搜索常驻 / Hero / 事件卡 / 「接下来要办」三合一 / 身份降 chip / 继续上次 / 呼吸区）；工具页 21 个完整测算提为**并列类型筛选** + 桌面多列网格；我的页三段式 + 高频四宫格；**电脑网页 vs 手机小程序差异适配**（含小程序形态判定：现为 H5+PWA，只做外壳适配层 storage/导出/导航/支付）；P0–P4 落地路线与 6 项待拍板 | 2026-09-24 |
 | [guides/deep-wizard-ui-spec.md](guides/deep-wizard-ui-spec.md) | 🟢 **通用多步测算向导 UI 排版规范**（阶段17 的开工前置）—— 结果页「区域词典」（15 区块 / 5 必选 / 顺序固定）、统一栅格三档、明细表三型、入口层 5 处必修、响应式与暗色约定、10 条新增守护断言、现有 4 页迁移清单 | 2026-09-19 |
 | [guides/site-structure-map.md](guides/site-structure-map.md) | 🟢 **站点结构图（现状测绘 as-is）**：画面清单（14 个 App 视图 / 12 个页内步骤 / 21 个 SEO 落地页 / 20 个浮层）、UI 结构图（双端）、内容结构图（IA）、三条用户主流程、逐页结构图 + 功能入口去向表（全部附代码行号） | 2026-09-19 |
 
@@ -178,6 +181,7 @@ EuriskoTax/
 | [guides/ui-design-spec.md](guides/ui-design-spec.md) | 🟢 **UI 设计方案（确定性版本 · 开发唯一执行依据）**：商业模式/目标群体/核心功能 · 导航架构 · 层级架构 · 24 页逐页内容与排版 · 结果页八段模板 · 后期开发注意事项与准入清单 | 2026-09-19 |
 | [guides/ui-ux-master-plan.md](guides/ui-ux-master-plan.md) | 🔵 UI/UX 上位方案 **论证过程稿**（90KB，含取舍修订记录；**结论已收敛到 `ui-design-spec.md`**，日常开发不必读） | 2026-09-18 |
 | [guides/dual-end-ui-plan.md](guides/dual-end-ui-plan.md) | 🔵 **Phase 0 实施记录**（设计令牌/z 层级/断点/屏幕预算/容器加宽/助手推开/打印，S0–S8 ✅ 全完成） | 2026-09-18 |
+| [guides/user-facing-copy-standard.md](guides/user-facing-copy-standard.md) | 🟢 **面向用户展示文案规范与集中台账（单一真源）** —— 本期定位「不做付费功能、全部引导留资→私域成交→客服发升级码」与三条铁律 / **合规审核状态定义（✅通过·🟡待改·🔴必改·⏳待生效·⬜废弃·🆕新增）** / 全局术语表与禁用词 / **免责声明「主句固定 + 主管部门后缀 5 选 1」** / 广告法·税务·ICP·个保四条红线 / **付费文案改造清单 PAY-01~16（删除·改写·保留三类）** / 14 类页面模块逐条台账（ID·用途·位置·现状·规范·状态）/ ICP 备案专项（主站容器就绪⏳、21 个落地页缺备案位🔴）/ CP-1~5 批次与 7 条守护断言 | 2026-09-24 |
 | [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 🟢 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-09-19 |
 | [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 🟢 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-09-14 |
 | [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 🟢 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-19 |

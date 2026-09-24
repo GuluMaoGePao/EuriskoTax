@@ -25,7 +25,12 @@
 
     var FREE_ROWS = 5;
     var PREVIEW_ROWS = 20;        // 预览只画前 20 行：它是给人**核对列认对了没有**的，不是给人读数据的
-    var DISCLAIMER = '（由 EuriskoTax 批量测算，仅供参考；正式申报以税务机关核定为准）';
+    var DISCLAIMER = '（由 EuriskoTax 批量测算，仅供参考；正式申报以主管税务机关核定为准）';
+
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    var LEAD_COPY = COPY.LEAD || {};
+    function txt(v, fallback) { return v || fallback; }
 
     function R() { return (typeof window !== 'undefined') ? window.EuriskoToolRegistry : null; }
 
@@ -478,10 +483,11 @@
                 '认错了不会有任何提示，最好在表里补一行表头（如「税前月薪」）。');
         var gate = canRun(matrix.length);
         var gateNote = gate.ok
-            ? noteOf('共 ' + matrix.length + ' 行' + (gate.limit ? ' · 免费版一次 ' + gate.limit + ' 行' : ' · 专业版不限行数') + '。')
-            : noteOf('共 ' + matrix.length + ' 行，超过免费版一次 ' + gate.limit + ' 行 —— ' +
+            ? noteOf('共 ' + matrix.length + ' 行' + (gate.limit ? ' · 一次最多 ' + gate.limit + ' 行' : '') + '。')
+            : noteOf('共 ' + matrix.length + ' 行，超过一次最多 ' + gate.limit + ' 行 —— ' +
                 '这一版<b>不会替你只算前 ' + gate.limit + ' 行</b>：半份工资表看起来跟完整的一份一模一样，' +
-                '发出去就是事故。专业版不限行数，升级入口仍在顶栏与个人中心。', true);
+                '发出去就是事故。删到 ' + gate.limit + ' 行以内再算，或'
+                + txt(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›'), true);
 
         host.innerHTML = headNote + gateNote +
             '<div style="overflow-x:auto"><table class="ledger-table"><thead>' + headHtml +
@@ -512,9 +518,10 @@
         if (!res.ok) {
             if (status) {
                 status.innerHTML = res.reason === 'limit'
-                    ? noteOf('本批 ' + res.count + ' 行，免费版一次 ' + res.limit + ' 行 —— 一行都没算。' +
+                    ? noteOf('本批 ' + res.count + ' 行，一次最多 ' + res.limit + ' 行 —— 一行都没算。' +
                         '<b>不会只算前 ' + res.limit + ' 行</b>：半份工资表与完整的一份长得一样，' +
-                        '发出去就是事故。删到 ' + res.limit + ' 行以内再算，或升级专业版（入口仍在顶栏与个人中心）。', true)
+                        '发出去就是事故。删到 ' + res.limit + ' 行以内再算，或'
+                        + txt(LEAD_COPY.needMore, '需要更多？留资，由顾问协助 ›'), true)
                     : noteOf('没能算：' + (res.reason === 'empty' ? '没读到表格内容。' : '这个工具暂时不支持批量。'));
             }
             host.innerHTML = '';

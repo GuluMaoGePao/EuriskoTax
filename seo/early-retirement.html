@@ -108,8 +108,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_earlyretire">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_earlyretire">打开完整测算</a>
     </div>
 </header>
 
@@ -334,7 +334,7 @@
             </table>
         </div>
 
-        <h2>三条最容易踩的口径</h2>
+        <h2>三条常见易错口径</h2>
         <h3>1. 内部退养的「平均」不是分摊计税</h3>
         <p>
             一次性收入按所属月份平均后，只用于<strong>找税率档</strong>；
@@ -380,8 +380,8 @@
 
         <section class="cta">
             <h2>把这笔一次性收入放进全年账一起看</h2>
-            <p>输入全年工资、社保公积金与各项扣除，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_earlyretire">打开 EuriskoTax 完整计算器</a>
+            <p>输入全年工资、社保公积金与各项扣除，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_earlyretire">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
@@ -392,6 +392,7 @@
         <p>政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第五条（二）（三）（财税〔2018〕164 号）、《关于个人所得税有关政策问题的通知》第一条（国税发〔1999〕58 号）。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/severance.html">离职补偿金个税</a> · <a href="/seo/early-retirement.html">提前退休 / 内部退养测算</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -526,5 +527,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

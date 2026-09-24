@@ -83,7 +83,7 @@
                         "name": "这个测算结果能直接作为报税依据吗？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。"
                         }
                     }
                 ]
@@ -95,8 +95,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_bonus">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_bonus">打开完整测算</a>
     </div>
 </header>
 
@@ -118,7 +118,7 @@
                 <button class="btn btn-primary" id="calc-reset" type="button">重算</button>
             </div>
             <p class="small muted" id="calc-note" style="margin-top:10px">
-                本页只算<strong>单独计税</strong>的结果。要判断「单独计税 vs 并入综合所得」哪个更省，需要结合全年工资与各项扣除，请用<a href="/?source=seo_bonus">完整计算器一键对比</a>。
+                本页只算<strong>单独计税</strong>的结果。要判断「单独计税 vs 并入综合所得」哪个更省，需要结合全年工资与各项扣除，请用<a href="/?source=seo_bonus">完整测算一键对比</a>。
             </p>
 
             <div class="results" id="calc-results" hidden>
@@ -229,22 +229,23 @@
         </details>
         <details>
             <summary>这个测算结果能直接作为报税依据吗？</summary>
-            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。</p>
         </details>
 
         <section class="cta">
             <h2>把全年工资一起算，看两种算法的差额</h2>
-            <p>输入工资、社保公积金与专项附加扣除，App 会同时给出「单独计税」与「并入综合所得」的结果、差额与最优拆分建议。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_bonus">打开 EuriskoTax 完整计算器</a>
+            <p>输入工资、社保公积金与专项附加扣除，App 会同时给出「单独计税」与「并入综合所得」的结果、差额与拆分测算。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_bonus">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
-        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/bonus-tax.html">年终奖个税计算器</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -327,5 +328,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

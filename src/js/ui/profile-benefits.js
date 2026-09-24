@@ -18,11 +18,18 @@
 (function () {
     'use strict';
 
-    // 三档刻度：顺序即阶梯顺序（基础版 → 体验版 → 专业版）
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    var UPGRADE_COPY = COPY.UPGRADE || {};
+    var LEAD_COPY = COPY.LEAD || {};
+    function txt(v, fallback) { return v || fallback; }
+
+    // 三档刻度：顺序即阶梯顺序。
+    // §8-6：前端对未开通用户停用「专业版」一词（后端档位仍叫 pro，已开通的人必须看得见自己有什么）。
     var TIER_STEPS = [
-        { key: 'free', label: '基础版' },
+        { key: 'free', label: '未开通' },
         { key: 'trial', label: '体验版' },
-        { key: 'pro', label: '专业版' }
+        { key: 'pro', label: '已开通' }
     ];
 
     function esc(s) {
@@ -89,7 +96,9 @@
                     ? '云同步已开启 · 上次同步 ' + agoText(sync.lastSyncAt, now)
                     : '云同步已开启 · 尚未同步过';
             } else {
-                syncText = '云同步未开启（专业版可用）';
+                // PAY-05：不再说「专业版可用」—— 那是档位营销；说清开通方式即可
+                syncText = txt(UPGRADE_COPY.needCode, '需升级码开通');
+                syncText = '云同步未开启（' + syncText + '）';
             }
         }
 
@@ -100,8 +109,10 @@
             steps: steps,
             usageText: usageText,
             syncText: syncText,
-            // 已经是专业版的人不需要被"了解专业版"，那句话对他没信息量
-            ctaText: tierKey === 'pro' ? '查看版本与权益' : '了解专业版'
+            // M-02：已开通的人看「我的权益」；未开通的人整卡讲的是额度，标题不做权益暗示
+            tierTitle: tierKey === 'pro' ? '我的权益' : '我的额度',
+            // PAY-03：未开通不给「了解专业版」这种档位营销，直接给留资出口
+            ctaText: tierKey === 'pro' ? '查看我的权益' : '需要更多协助？留资，顾问联系您'
         };
     }
 
@@ -158,8 +169,11 @@
         if (!model.visible) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
 
+        // 标题随档位：未开通讲「额度」，已开通才讲「权益」（M-02）
+        var titleEl = document.getElementById('profile-benefits-title');
+        if (titleEl) titleEl.textContent = model.tierTitle;
         var tierEl = document.getElementById('profile-benefits-tier');
-        if (tierEl) tierEl.textContent = model.tierLabel + '权益';
+        if (tierEl) tierEl.textContent = model.tierLabel;
 
         var stepsEl = document.getElementById('profile-benefits-steps');
         if (stepsEl) stepsEl.innerHTML = stepsHtml(model.steps);

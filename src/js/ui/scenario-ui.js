@@ -21,6 +21,12 @@
 
     const CURRENCY = '¥';
 
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    const LEAD_COPY = COPY.LEAD || {};
+    // 额度满了之后的唯一去处：留资（站内不出现档位营销与购买语义）
+    function leadCta() { return LEAD_COPY.needMore || '需要更多？留资，由顾问协助 ›'; }
+
     // 挂载态：root = 卡片容器，ctx = 本次测算的入参与结果
     const state = { root: null, ctx: null };
 
@@ -258,11 +264,14 @@
 
     function proHint() {
         const planLib = (typeof window !== 'undefined') ? window.EuriskoPlan : null;
-        if (!planLib) return '方案数量上限为专业版（PRO）功能。';
+        // PAY-08：不再提「专业版（PRO）功能」—— 那是档位营销；只说当前额度与留资出口
+        const fallback = '当前可保存 ' + (window.EuriskoScenarios ? window.EuriskoScenarios.MAX_FREE : 2)
+            + ' 套方案。' + leadCta();
+        if (!planLib) return fallback;
         // 同一个上限提示，不同身份的人看到的下一句应不同：
-        // 尤其是「付过钱但权益已到期」的用户 —— 让他回去领免费体验是明显的降级话术。
+        // 尤其是「已交付过但权益已到期」的用户 —— 让他回去领体验是明显的降级话术。
         if (planLib.featureHintFor) return planLib.featureHintFor(getCurrentUser());
-        return planLib.PRO_FEATURE_HINT || '方案数量上限为专业版（PRO）功能。';
+        return planLib.PRO_FEATURE_HINT || fallback;
     }
 
     // ======================= DOM 渲染 =======================
@@ -405,8 +414,7 @@
 
         const isPro = getIsPro();
         if (!isPro) {
-            showHint('基础版最多保存 ' + window.EuriskoScenarios.MAX_FREE + ' 套方案，专业版可保存 '
-                + window.EuriskoScenarios.MAX_PRO + ' 套并支持云同步。', '');
+            showHint('当前可保存 ' + window.EuriskoScenarios.MAX_FREE + ' 套方案。' + leadCta(), '');
         }
     }
 
@@ -538,7 +546,8 @@
         return '<div class="card">' +
             '<div class="mb-3">' +
                 '<h3 class="text-sm font-bold text-gray-800">方案对比</h3>' +
-                '<p class="text-xs text-gray-500 mt-0.5">把几套口径摆在一起比 —— 基础版 2 套、专业版 10 套</p>' +
+                '<p class="text-xs text-gray-500 mt-0.5">把几套口径摆在一起比 —— 当前可保存 '
+                    + (window.EuriskoScenarios ? window.EuriskoScenarios.MAX_FREE : 2) + ' 套</p>' +
             '</div>' +
             '<div class="flex flex-wrap gap-2 mb-3">' +
                 '<button type="button" class="dw-sc-save-btn btn btn-secondary text-sm flex-1">' +
@@ -614,7 +623,8 @@
             '<div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
             '<div class="flex justify-between items-center">' +
             '<div><h3 class="text-lg font-bold">我的方案</h3>' +
-            '<p class="text-white/80 text-xs mt-0.5">存过的口径摆在一起比 · 基础版 2 套、专业版 10 套</p></div>' +
+            '<p class="text-white/80 text-xs mt-0.5">存过的口径摆在一起比 · 当前可保存 '
+                + (window.EuriskoScenarios ? window.EuriskoScenarios.MAX_FREE : 2) + ' 套</p></div>' +
             '<button type="button" id="' + LIBRARY_CLOSE_ID + '"' +
             ' class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">' +
             '<i class="fa fa-times"></i></button>' +

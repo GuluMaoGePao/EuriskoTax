@@ -121,7 +121,7 @@ describe('19-12 三种时效状态的措辞', () => {
 
     test('已过期 → 明说结果仅供参考（不能让用户拿一个过期政策的结果去报税）', () => {
         window.EuriskoTaxRegistry = { statusOf: () => ({ expired: true, daysLeft: -5, expiresOn: '2020-01-01' }) };
-        expect(TB().policyBadgeOf('x')).toContain('已过期');
+        expect(TB().policyBadgeOf('x')).toContain('已过有效期');
     });
 
     test('180 天内到期 → 给出到期日与剩余天数（这才叫提醒）', () => {

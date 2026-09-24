@@ -1374,8 +1374,10 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 与个人养老金页同一套守护（可访问性 / 结构化数据 / 静态表对账 / 示例表 / 易错口径 / CTA 归因），
         // 各加两条本页独有的口径断言 ——
         //   健康险：① 保险赔款免征个税（没有领取税，与个人养老金的 3% 对照）；
-        //           ② 节税上限 2400 × 45% = 1080 元/年，页面只给这个上限并写明「不构成购买建议」
+        //           ② 节税上限 2400 × 45% = 1080 元/年，页面只给这个上限并写明「不构成保险产品购买建议」
         //              （「值不值得买」属消费与理财判断，备案承诺书不承接）；
+        //              措辞随 user-facing-copy-standard.md 的 C 型追加句统一（E-07），
+        //              与 copy-standard.js 的 EXTRA.insurance 逐字一致 —— 改那里，这里要跟着改；
         //   年金：  ① 个人免税上限 = 计税基数 × 4%（社平 300% 封顶），超 4% 部分税后扣缴；
         //           ② 领取按全额（含单位缴费）单独计税，能算出「净优惠为负」的另一面。
         const hiPage = await request(PORT, 'GET', '/seo/health-insurance.html');
@@ -1404,10 +1406,10 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && hiRuleBlock.includes('免征个人所得税')
             && hiPage.raw.includes('>240.00<') && hiPage.raw.includes('>480.00<')
             && hiPage.raw.includes('>1080.00<') && hiPage.raw.includes('>79.00<'), '');
-        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、只给节税上限且不构成购买建议），线索来源已入白名单',
+        record('税优健康险落地页写明两条易错口径（扣的是应纳税所得额、只给节税上限且不构成保险产品购买建议），线索来源已入白名单',
             hiPage.status === 200
             && hiPage.raw.includes('少交的税 = 扣除前的应纳税额 − 扣除后的应纳税额')
-            && hiPage.raw.includes('本页不构成购买建议')
+            && hiPage.raw.includes('本页不构成保险产品购买建议')
             && hiPage.raw.includes('税优识别码')
             && leadSrc.includes("'seo_health_insurance'")
             && hiPage.raw.includes('?source=seo_health_insurance'),

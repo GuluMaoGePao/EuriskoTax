@@ -99,7 +99,7 @@
                         "name": "年终奖会影响汇算结果吗？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整计算器对比差额。"
+                            "text": "年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整测算对比差额。"
                         }
                     },
                     {
@@ -107,7 +107,7 @@
                         "name": "这个测算结果能直接作为申报依据吗？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。"
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。"
                         }
                     }
                 ]
@@ -120,8 +120,8 @@
 <body>
 <header class="site-header">
     <div class="wrap">
-        <a class="brand" href="/">EuriskoTax<span>个人所得税预算规划工具</span></a>
-        <a class="btn btn-ghost btn-sm" href="/?source=seo_settlement">打开完整计算器</a>
+        <a class="brand" href="/">EuriskoTax<span>税费测算工具</span></a>
+        <a class="btn btn-ghost btn-sm" href="/?source=seo_settlement">打开完整测算</a>
     </div>
 
 </header>
@@ -163,10 +163,10 @@
                 <button class="btn btn-primary" id="calc-reset" type="button" style="align-self:flex-end">重算</button>
             </div>
             <p class="small muted" id="calc-note" style="margin-top:10px">
-                「已预缴税额」填 <strong>个人所得税 App → 收入纳税明细查询</strong> 里的合计已缴税额最准；留空时按累计预扣法推演
+                「已预缴税额」填 <strong>个人所得税 App → 收入纳税明细查询</strong> 里的合计已缴税额更贴近实报口径；留空时按累计预扣法推演
                 （全年等额月薪、扣除均已申报时，推演值就等于全年应纳税额，差额 0 —— 说明你本来就该补退为 0）。
                 本页只算<strong>工资薪金</strong>这一类综合所得；有劳务报酬、稿酬、特许权使用费或多处工资薪金时，请用
-                <a href="/?source=seo_settlement">完整计算器</a>分别录入。
+                <a href="/?source=seo_settlement">完整测算</a>分别录入。
             </p>
 
             <div class="results" id="calc-results" hidden>
@@ -337,7 +337,7 @@
         <p><strong>常见补税情形</strong>：在两处及以上单位领取工资薪金，各单位分别按 5000 元/月重复减除费用、分别预扣，合并后适用档位更高；有劳务报酬等所得且预扣不足；一年内扣除项目发生变化而预缴未同步。</p>
         <p class="muted small">所以「预缴多少」与「全年该缴多少」本来就可能不一致 —— 汇算就是把这两者对齐，多退少补，而不是重新征一次税。</p>
 
-        <h2>三条最容易踩的口径（多处任职 / 跳槽时特别注意）</h2>
+        <h2>三条常见易错口径（多处任职 / 跳槽时特别注意）</h2>
         <h3>1. 跳槽补税不一定是因为「多扣了 6 万」</h3>
         <p>
             无缝跳槽（月数合计 12）时，基本减除费用一份没多扣，<strong>照样会补税</strong> ——
@@ -409,26 +409,27 @@
         </details>
         <details>
             <summary>年终奖会影响汇算结果吗？</summary>
-            <p>年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整计算器对比差额。</p>
+            <p>年终奖选择单独计税时，不属于综合所得，不参与综合所得汇算；选择并入综合所得计税时，则与工资薪金等一并汇算，可能改变适用档位，从而影响应退或应补税额。两种方式哪个更省，可以在个税 App 里分别试算，或用本页下方的完整测算对比差额。</p>
         </details>
         <details>
             <summary>这个测算结果能直接作为申报依据吗？</summary>
-            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以税务部门核算为准；本测算结果仅供参考，不构成税务建议。</p>
+            <p>不能。本页与 App 均按公开政策口径做测算，实际纳税请以主管税务机关认定为准；本测算结果仅供参考，不构成税务建议。</p>
         </details>
 
         <section class="cta">
             <h2>把工资、年终奖、劳务报酬一起算，看全年该退还是该补</h2>
-            <p>输入各项收入与扣除，App 会给出全年应纳税额、已预缴税额、应退/应补税额，并对比年终奖「单独计税」与「并入综合所得」两种方式的差额。免费使用，不采集收入金额。</p>
-            <a class="btn btn-primary" href="/?source=seo_settlement">打开 EuriskoTax 完整计算器</a>
+            <p>输入各项收入与扣除，App 会给出全年应纳税额、已预缴税额、应退/应补税额，并对比年终奖「单独计税」与「并入综合所得」两种方式的差额。免注册使用 · 不采集收入金额。</p>
+            <a class="btn btn-primary" href="/?source=seo_settlement">打开 EuriskoTax 完整测算</a>
         </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
-        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以税务部门核算为准。</p>
+        <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/salary-tax.html">月薪个税计算器</a> · <a href="/seo/bonus-tax.html">年终奖个税计算器</a></p>
     </div>
+    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：
@@ -629,5 +630,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+<script src="/src/js/ui/site-filing-ui.js" defer></script>
 </body>
 </html>

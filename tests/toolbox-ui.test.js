@@ -68,6 +68,12 @@ beforeEach(() => {
         <div id="mode-selection-page" class="page active"></div>
         <div id="tools-page" class="page hidden">
             <input id="toolbox-search" />
+            <div id="toolbox-type-filter">
+                <button type="button" class="tool-type-chip is-on" data-tool-type="all">全部 <span id="toolbox-count-all"></span></button>
+                <button type="button" class="tool-type-chip" data-tool-type="quick">速算 <span id="toolbox-count-quick"></span></button>
+                <button type="button" class="tool-type-chip" data-tool-type="deep">完整测算 <span id="toolbox-count-deep"></span></button>
+            </div>
+            <div id="toolbox-anchors"></div>
             <div id="toolbox-scenario-chip" class="hidden"></div>
             <div id="toolbox-groups"></div>
             <div id="toolbox-deep">
@@ -116,12 +122,68 @@ beforeEach(() => {
     if (window.EuriskoParamMemory) window.EuriskoParamMemory.clearAll();
     // 显式传 null：清掉上一个用例可能设置的身份筛选，保证每个用例都从完整工具页开始
     window.EuriskoToolbox.renderToolbox('', null);
+    // 类型筛选（阶段20 P2 T1）是**模块级会话状态**：不重置会跨用例污染 ——
+    // 上一条选了「完整测算」，下一条看到的就只剩完整测算，一堆断言跟着红。
+    // 生产环境这个状态是会话级的（不写 localStorage，刷新即回到「全部」），测试里手动点回来。
+    const allChip = document.querySelector('#toolbox-type-filter .tool-type-chip[data-tool-type="all"]');
+    if (allChip) allChip.click();
 });
 
 describe('工具页', () => {
     test('默认渲染 20 个速算器入口，并给出 5 个分组标题', () => {
         expect(document.querySelectorAll('#toolbox-groups .tool-entry')).toHaveLength(20);
         expect(document.querySelectorAll('#toolbox-groups .tool-group')).toHaveLength(5);
+    });
+
+    // ====== T1（阶段20 P2）：类型筛选（全部 / 速算 / 完整测算 三个互斥视图）======
+    const clickType = (t) => document.querySelector(`#toolbox-type-filter .tool-type-chip[data-tool-type="${t}"]`).click();
+    const quickEntries = () => document.querySelectorAll('#toolbox-groups .tool-entry');
+    const deepBox = () => document.getElementById('toolbox-deep');
+
+    test('计数从注册表算：全部 41 / 速算 20 / 完整测算 21（加工具不用回来改数字）', () => {
+        const reg = window.EuriskoToolRegistry;
+        expect(document.getElementById('toolbox-count-all').textContent).toBe(String(reg.all().length + reg.deep().length));
+        expect(document.getElementById('toolbox-count-quick').textContent).toBe(String(reg.all().length));
+        expect(document.getElementById('toolbox-count-deep').textContent).toBe(String(reg.deep().length));
+    });
+
+    test('选「速算」：速算器照常，完整测算整块收起', () => {
+        clickType('quick');
+        expect(quickEntries()).toHaveLength(20);
+        expect(deepBox().classList.contains('hidden')).toBe(true);
+    });
+
+    test('选「完整测算」：速算器组不渲染，完整测算组可见且默认展开', () => {
+        clickType('deep');
+        expect(quickEntries()).toHaveLength(0);
+        expect(deepBox().classList.contains('hidden')).toBe(false);
+        // 它是这个视图里唯一的一组：默认收起 = 整个视图是空的
+        expect(deepBox().classList.contains('is-collapsed')).toBe(false);
+    });
+
+    test('切回「全部」：41 个入口仍然都在（筛选是视图，不是删入口）', () => {
+        clickType('deep');
+        clickType('all');
+        expect(quickEntries()).toHaveLength(20);
+        expect(deepBox().classList.contains('hidden')).toBe(false);
+    });
+
+    test('筛选是会话级的：不写 localStorage（下次进来停在子视图会被当成列表坏了）', () => {
+        clickType('quick');
+        const keys = Object.keys(localStorage);
+        expect(keys.some((k) => /type|filter/i.test(k))).toBe(false);
+    });
+
+    // ====== T3（阶段20 P2）：场景锚点条 ======
+    test('锚点条按当前视图生成（默认 5 组 + 完整测算）', () => {
+        const chips = Array.from(document.querySelectorAll('#toolbox-anchors .tool-anchor-chip'));
+        expect(chips.length).toBe(6);
+        expect(chips[chips.length - 1].getAttribute('data-anchor')).toBe('deep');
+    });
+
+    test('只剩一组时锚点条不出（一行一个 chip 是装饰，不是跳读）', () => {
+        clickType('deep');
+        expect(document.getElementById('toolbox-anchors').classList.contains('hidden')).toBe(true);
     });
 
     test('搜索能过滤到唯一工具', () => {

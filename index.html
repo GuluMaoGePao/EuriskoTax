@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.104.0';
+        window.__APP_VERSION__ = '1.106.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -333,7 +333,7 @@
                         <button type="button" id="guest-entry-btn" class="text-sm text-gray-600 hover:text-primary transition-colors">
                             免登录使用 →
                         </button>
-                        <p class="text-xs text-gray-500 mt-1.5">不注册也能用全部计税功能，数据仅存本机</p>
+                        <p class="text-xs text-gray-500 mt-1.5">不注册也能用全部测算功能，全部计算在本机完成。</p>
                     </div>
                 </div>
                 
@@ -345,7 +345,7 @@
                     登录即表示同意 <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="underline hover:text-white">用户协议</a> 和 <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="underline hover:text-white">隐私政策</a>
                 </p>
                 <p class="text-blue-300 text-xs">
-                    © 2026 EuriskoTax 税费计算器 · 仅供参考，实际纳税请以税务部门核算为准
+                    © 2026 EuriskoTax 税费计算器 · 20 个速算器 + 21 个完整测算 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
                 </p>
                 <p class="text-blue-200/90 text-xs mt-1">
                     <a href="clean-cache.html?auto=1" class="underline hover:text-white">遇到旧版页面？点此一键重置缓存</a>
@@ -371,9 +371,9 @@
                     <button id="theme-toggle" class="nav-icon-btn" title="切换主题">
                         <i class="fa fa-moon-o"></i>
                     </button>
-                    <button id="help-btn" class="nav-icon-btn" title="使用帮助">
-                        <i class="fa fa-question-circle"></i>
-                    </button>
+                    <!-- R2（阶段20 P0）：顶栏帮助按钮已撤 —— 「使用帮助」有我的页那张卡与助手 FAB 两处，
+                         顶栏再放一颗就是第三处，且与 Tab 目的地撞车（同名入口互相稀释）。
+                         DOM 与 app.js 的绑定一并删除：留着空 id 才是隐患（删 DOM 忘删绑定 = 初始化抛错中断）。 -->
                     <!-- 游客会话（免登录使用）时唯一的登录入口：非游客一律隐藏。
                          此前 index.html 里没有 auth-section，登录墙被拆掉后必须补一个回来的路 -->
                     <button id="guest-login-btn" type="button"
@@ -395,9 +395,9 @@
                             </button>
                             <div id="user-dropdown" class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 hidden z-50 origin-top-right animate-dropdown">
                                 <!-- 「版本与权益」不再在此重复入口：顶栏 pill（#topbar-plan-badge）就在菜单按钮左侧，同屏两个入口互相稀释（阶段14 入口收敛） -->
-                                <a href="#" id="profile-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
-                                    <i class="fa fa-user-circle text-gray-500"></i>个人中心
-                                </a>
+                                <!-- R1（阶段20 P0）：顶栏菜单只留**账号动作**，「个人中心」是目的地不是动作 ——
+                                     它与顶部/底部 Tab 的「我的」是同一个页面（syncNav 一份状态驱动），
+                                     顶栏再留一个入口等于给同一目的地挂两个名字。auth-ui.js 的绑定同步删除。 -->
                                 <a href="#" id="logout-link" class="flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 text-sm">
                                     <i class="fa fa-sign-out text-gray-500"></i>退出登录
                                 </a>
@@ -432,6 +432,17 @@
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
 
+                <!-- ① 搜索条（阶段20 P1）：41 个入口早已越过「搜索优先于浏览」的 25 阈值，
+                     搜索因此从**一张卡**升级为**常驻条**，并上移到首屏最上（动线第一步）。
+                     不是卡片：卡片形态会把它和下面的内容卡排成同一层，视觉上仍是「又一个入口」。
+                     点击 = 进工具页并聚焦搜索框（app.js 绑定），不另起一套搜索实现 ——
+                     全站搜索只有工具页 #toolbox-search 与助手抽屉两处，这条是它们的入口。 -->
+                <button id="toolbox-search-entry" type="button" class="home-searchbar">
+                    <i class="fa fa-search"></i>
+                    <span>搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
+                    <span class="home-searchbar-count">41 个 ›</span>
+                </button>
+
                 <!-- 卡片1：Mission Hero（阶段19-2）—— 首屏唯一焦点，回答「你现在该办的事」。
                      三态文案由 home-mission.js 判定、home-ui.js 渲染：首访 / 有历史 / 临近节点。
                      底是品牌渐变（终点取 --c-brand-deep，保证白字达 AA；取 --c-accent 时副文案只有 3.68:1），
@@ -441,7 +452,7 @@
                         <span id="home-greeting">你好 👋</span> · <span id="home-date-text">今天是 ...</span>
                     </p>
                     <h2 id="home-mission-title" class="hero-card__title">你今年要交多少税？</h2>
-                    <p id="home-mission-subtitle" class="hero-card__sub">41 个场景，全在你手机里算完，数据不出本机</p>
+                    <p id="home-mission-subtitle" class="hero-card__sub">41 个场景，全在本机算完，数据不上传</p>
                     <button id="home-mission-cta" type="button" class="hero-card__cta">
                         <i class="fa fa-arrow-down"></i>
                         <span id="home-mission-cta-text">开始测算</span>
@@ -467,21 +478,33 @@
                     </div>
                 </div>
 
-                <!-- 卡片3：我的税务资产（阶段19-2）—— 仅**回访用户**可见（新客隐藏，空状态会劝退）。
-                     内容不是凭空列的节点：待办与截止 = 税务日历 × 已保存的测算；
-                     今年税负概览要 ≥2 次测算才出现（1 条数据画「构成」是自欺欺人）。 -->
-                <div id="home-assets-card" class="home-card hidden">
+                <!-- ④ 接下来要办（阶段20 P1 · 三合一）—— 原「我的税务资产」待办 + 原「税务提醒」+ 原「漏填提醒」。
+                     拆成三张卡只是三种分类视角，用户读到的却是「三处都在催我」；合并成一张后
+                     顺序按「先到期的先办」（截止类 → 漏填/台账类），且**一项都没有时整卡不出现** ——
+                     新客看到的是干净首页，不是「你漏了 5 项」的噪音。
+                     三段各自的显隐仍由 home-ui.js 里各自的渲染函数管（fill 完调 syncTodoCard），
+                     外层这张壳只管「三段全空就整卡收起」，不重复实现任何一段的判定。 -->
+                <div id="home-todo-card" class="home-card hidden">
                     <div class="home-card-header">
                         <div class="home-card-title">
-                            <i class="fa fa-briefcase text-primary mr-2"></i>
-                            <span>我的税务资产</span>
+                            <i class="fa fa-clock-o text-primary mr-2"></i>
+                            <span>接下来要办</span>
                         </div>
                         <span id="home-assets-year" class="text-xs text-gray-500"></span>
                     </div>
-                    <div id="home-assets-list" class="flex flex-col gap-2">
-                        <!-- 由 home-ui.js 按 home-mission.js 的 buildTodos / buildYearOverview 渲染 -->
+                    <!-- 待办段：税务日历 × 已保存的测算（home-mission.buildTodos） -->
+                    <div id="home-assets-card" class="hidden">
+                        <div id="home-assets-list" class="flex flex-col gap-2">
+                            <!-- 由 home-ui.js 按 home-mission.js 的 buildTodos / buildYearOverview 渲染 -->
+                        </div>
                     </div>
-                </div>
+                    <!-- 截止段：只列 90 天内到期的节点（远期的那条不进待办，否则这张卡永远在、
+                         也就永远没人看）。规则见 home-ui.js 的 buildCalendarItems -->
+                    <div id="home-calendar-section" class="hidden">
+                        <div id="home-calendar-list" class="space-y-1">
+                            <!-- 由 home-ui.js 的 renderTaxCalendar 渲染 -->
+                        </div>
+                    </div>
 
                 <!-- 卡片3b：漏填提醒（阶段19-2 遗留 · §3.3 ④）—— 默认 hidden，只有**档案填了一部分、还差几项**才出现。
                      两条不出卡的规矩：① 一项都没填的新客不显示（"你漏了 5 项"是噪音，那是结果页引导卡的活）；
@@ -489,23 +512,28 @@
                      出口直接开对应的**速算器**（不是跳「我的 → 我的情况」）—— 免登录也能补，
                      且算完的值会被档案吸收（tax-profile.absorb），补填这件事因此不用再写第二套表单。
                      金额一律不写：几个子女、怎么分摊都不知道，硬算出来的「可能多缴 ¥1,200」是假的。 -->
-                <div id="home-missing-card" class="home-card hidden">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-exclamation-circle text-primary mr-2"></i>
-                            <span>漏填提醒</span>
+                    <!-- 漏填段（原「漏填提醒」卡，阶段20 P1 收编为待办卡第三段）：
+                         id 与渲染逻辑都不动（renderMissing 仍管它自己的 hidden），
+                         只是从独立卡片降为卡内一段。 -->
+                    <div id="home-missing-card" class="hidden">
+                        <div class="home-card-header">
+                            <div class="home-card-title">
+                                <i class="fa fa-exclamation-circle text-primary mr-2"></i>
+                                <span>漏填提醒</span>
+                            </div>
+                            <span id="home-missing-progress" class="text-xs text-gray-500"></span>
                         </div>
-                        <span id="home-missing-progress" class="text-xs text-gray-500"></span>
+                        <div id="home-missing-body">
+                            <!-- 由 home-ui.js 按 tax-profile.js 的 completeness 渲染 -->
+                        </div>
                     </div>
-                    <div id="home-missing-body">
-                        <!-- 由 home-ui.js 按 tax-profile.js 的 completeness 渲染 -->
-                    </div>
-                </div>
+                </div><!-- /#home-todo-card -->
 
-                <!-- 卡片4：下轴「我是谁」（身份卡）—— 作用是**设置默认视角**，不是筛选工具：
-                     41 个入口永远都能进，身份只改默认的视图密度（plan §3.3.4）。
-                     点卡 = 设为默认视角（就地，不跳走、不筛选）；卡内那颗「看这类工具 ›」
-                     才跳工具页（推荐组置顶，其余入口照常在）。 -->
+                <!-- ⑤ 身份 chip 一行（阶段20 P1）：原「我是谁」整卡 → 一行 chip。
+                     身份是**设置默认视角**，不是导航：占一整卡会与工具页的场景组形成两套分类，
+                     而用户只需要「点一下设为默认」这一个动作。
+                     因此 chip 形态**不渲染**描述与「看这类工具 ›」—— 那颗按钮正是它变成第二套分类的原因；
+                     要找工具靠 ① 搜索条与底部 Tab。渲染分支见 toolbox-ui.js 的 renderScenarios。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
@@ -514,7 +542,7 @@
                         </div>
                         <span class="text-xs text-gray-500">选一个当默认视角，不限制你能用什么</span>
                     </div>
-                    <div id="home-scenarios" class="scenario-grid">
+                    <div id="home-scenarios" class="identity-chip-row">
                         <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
                     </div>
                     <!-- 选完的反馈行（没选过就整行不出现）：设默认不跳页、不筛选，
@@ -522,12 +550,8 @@
                     <div id="home-identity-note" class="identity-note hidden"></div>
                 </div>
 
-                <!-- 卡片4：搜索入口（41 个工具时搜索比浏览快；点击进入工具页并聚焦搜索框） -->
-                <button id="toolbox-search-entry" type="button" class="home-card tool-search-entry">
-                    <i class="fa fa-search tool-search-entry-icon"></i>
-                    <span class="tool-search-entry-text">搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
-                    <span class="tool-search-entry-count">41 个 ›</span>
-                </button>
+                <!-- （原「搜索入口卡」已上移为首页顶部的常驻搜索条 ① —— 见 #home-searchbar，
+                     位置在 Mission Hero 之前。此处不再留第二颗搜索按钮：同一页两颗搜索=第三处搜索入口。） -->
 
                 <!-- 阶段19-10a（入口清理）：这里原本还有一张「最近使用」卡，撤掉了 ——
                      它和工具页第一组「最近使用」读的是**同一份 localStorage**，等于同一份数据
@@ -536,48 +560,38 @@
                      回访入口保留在工具页那一组（含「清空」，见 toolbox-ui.js）——
                      要找下一个工具本来就要进工具页，入口长在那儿比长在首页更顺手。 -->
 
-                <!-- 卡片5：我的方案与台账（阶段19-2 遗留清偿④ · §3.3.5 ①）——
-                     原「最近计算」只是一条流水：算完往历史里一扔，看不出**存了几套方案、
-                     这个月办到哪一步**。这里补上那两层资产心智，流水降为下面那一小段（不撤 ——
-                     它是"接着上次算"的入口，撤了就是丢功能）。
-                     两条规矩：① 零感知 —— 没存方案 / 没有台账行，这两段**整段不出现**，
-                     新客看到的还是原来那张卡；② 出口必须真能打开 ——
+                <!-- ⑥ 继续上次（阶段20 P1）：原「我的方案与台账」卡精简 ——
+                     清单（全部历史）归「我的 → 计算历史」，首页只留「接着算」这一个动作，**最多 3 条**
+                     （3 条够覆盖「上次那个」，再多就是清单了，清单有它该在的地方）。
+                     方案段与台账段仍在这张卡里，但它们是**零感知**的：没存方案 / 没有台账行就整段不出现，
+                     所以新客看到的只有「还没有计算记录」那一行。
+                     方案 / 台账两条规矩不变：出口必须真能打开 ——
                      方案 → 方案库弹窗（scenario-ui.js 的 openLibrary，与结果页共用同一张对比表），
-                     台账 → 已有台账弹窗（entity-ui.js 的 openLedger）。
+                     台账 → 已有台账弹窗（entity-ui.js 的 openLedger）；
                      上限照实说（已存 2/2 套），但**不挂升级按钮** —— 升级入口全局只有顶栏 pill
                      与个人中心两处，这里再长一颗就是第三处。 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title">
                             <i class="fa fa-history text-purple-500 mr-2"></i>
-                            <span>我的方案与台账</span>
+                            <span>继续上次</span>
                         </div>
                         <a href="#" id="home-view-all-history" class="text-xs text-primary hover:underline">全部 ›</a>
                     </div>
                     <div id="home-plans-box" class="plans-box hidden">
                         <!-- 由 home-ui.js 的 renderPlans 渲染（方案段 + 台账段） -->
                     </div>
-                    <div id="home-plans-recent-label" class="plans-recent-label hidden">最近算过</div>
+                    <!-- 原「最近算过」小标题随卡名改成「继续上次」一并删：卡名已经说了这件事，
+                         再挂一行标签是把同一句话说两遍（renderPlans 里对它的取用带判空，删 DOM 不炸）。 -->
                     <div id="home-recent-list" class="recent-scroll">
-                        <!-- 由 home-ui.js 动态填充 -->
+                        <!-- 由 home-ui.js 动态填充（最多 3 条） -->
                     </div>
                 </div>
 
-                <!-- 卡片6：税务日历提醒 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-calendar text-orange-500 mr-2"></i>
-                            <span>税务提醒</span>
-                        </div>
-                        <span class="text-xs text-gray-500" id="home-calendar-year">2026</span>
-                    </div>
-                    <div id="home-calendar-list" class="space-y-1">
-                        <!-- 由 home-ui.js 动态填充 -->
-                    </div>
-                </div>
+                <!-- （原「卡片6：税务提醒」已收编为 ④ 接下来要办的截止段 —— 见 #home-calendar-section。
+                     卡头那个年份 span 随卡一起删，renderTaxCalendar 对它是判空取用，不会因此抛错。） -->
 
-                <!-- 卡片7：呼吸卡（阶段19-2）—— 今日税感与税务小贴士合并成一张，放在页脚前。
+                <!-- ⑦ 呼吸卡（阶段19-2）—— 今日税感与税务小贴士合并成一张，放在页脚前。
                      两者都是「看了有用、不看也不阻塞」的内容，各占一张卡只会把首页拉长。 -->
                 <div class="home-card">
                     <div class="home-card-header">
@@ -603,16 +617,12 @@
                     </div>
                 </div>
 
-                <!-- 关于本站（口径说明：多税种 + 纯前端计算） -->
-                <div class="mt-2 p-4 bg-blue-50 rounded-lg">
-                    <div class="flex items-start">
-                        <i class="fa fa-info-circle text-primary mt-0.5 mr-2"></i>
-                        <div>
-                            <h4 class="font-medium text-primary mb-1 text-sm">关于本站</h4>
-                            <p class="text-xs text-gray-600">EuriskoTax 税费计算器：覆盖个人所得税、企业所得税、增值税、附加税印花税、社保公积金等 <strong>20 个速算器</strong>，外加 <strong>21 个多步骤完整测算</strong>（按年填全、出完整预算表），<strong>共 41 个入口全部内置</strong>。先按身份选场景，找不到就搜（「年终奖」「增值税」「残保金」），每个结果都给出拆解、易错口径与政策依据，也都能保存与导出 PDF。全部计算在你的浏览器本地完成，不上传任何数据；结果仅供参考，实际纳税请以税务部门核算为准。</p>
-                        </div>
-                    </div>
-                </div>
+                <!-- R5（阶段20 P0）：首页底部「关于本站」长文已删 —— 它与「我的 → 关于我们」是同一段说明，
+                     首页是动作页不是说明书。信任信息压缩成页尾一行标签（41 个场景 · 数据不出本机），
+                     完整口径移到「关于我们」弹窗（含本机计算承诺与免责）。 -->
+                <p class="home-trust-line">
+                    <i class="fa fa-shield"></i><span>41 个场景 · 数据不出本机</span>
+                </p>
 
             </div>
         </div>
@@ -632,6 +642,21 @@
                     <i class="fa fa-search tool-search-icon"></i>
                     <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
                 </div>
+                <!-- T1（阶段20 P2）：类型筛选 —— 完整测算从「末位折叠组」提为并列视图。
+                     21 个完整测算既是核心卖点也是付费值厚度，藏在末位折叠组等于对浏览者不存在。
+                     筛选是**互斥视图**，不是混排：选「完整测算」时只有它，选「速算」时只有速算器 ——
+                     因此不违反「速算与完整测算不混排」的旧约束（同一税种在两个视图各出现一次是对的）。
+                     计数由 JS 从注册表写（加工具不用回来改数字）；筛选状态是**会话级**的，
+                     不写 localStorage —— 下次进来停在「完整测算」会被当成列表坏了。 -->
+                <div id="toolbox-type-filter" class="tool-type-filter">
+                    <button type="button" class="tool-type-chip is-on" data-tool-type="all">全部 <span id="toolbox-count-all"></span></button>
+                    <button type="button" class="tool-type-chip" data-tool-type="quick">速算 <span id="toolbox-count-quick"></span></button>
+                    <button type="button" class="tool-type-chip" data-tool-type="deep">完整测算 <span id="toolbox-count-deep"></span></button>
+                </div>
+                <!-- T3（阶段20 P2）：场景锚点 chip 条（桌面 sticky，手机隐藏）——
+                     横向一行是**跳读**（我知道要哪一类，直接跳过去），不是分类树；
+                     §5.3 否决的是左侧深层级树状导航，两者不是一回事。 -->
+                <div id="toolbox-anchors" class="tool-anchor-bar"></div>
                 <div id="toolbox-scenario-chip" class="tool-scenario-chip hidden"></div>
                 <div id="toolbox-groups">
                     <!-- 由 toolbox-ui.js 按 tool-registry.js 渲染（5 个场景组 + 搜索结果） -->
@@ -833,7 +858,8 @@
                     <!-- 免责声明（Phase 2 补齐：结果页就地声明，不藏在页脚）
                          此前 20 个速算器的屏幕上没有免责，而导出报告与分享图都有 ——
                          可带走的东西有声明、看得最久的那一屏反而没有。文案与 SEO 落地页同源。 -->
-                    <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以税务机关核定为准。</p>
+                    <!-- A 型整句：与 src/js/copy/copy-standard.js 的 DISCLAIMER.result 逐字一致（守护断言 2） -->
+                    <p class="result-disclaimer">测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以主管税务机关核定为准。</p>
                 </div>
 
                 <!-- 行动条：四按钮**常驻**（阶段19-4）。
@@ -1112,7 +1138,7 @@
                                 <ul class="text-sm text-gray-600 space-y-1">
                                     <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>本工具为年度预算规划工具，计算结果基于年度税率表</li>
                                     <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>实际月度预缴可能因累计减除费用新规产生差异</li>
-                                    <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>预算结果仅供参考，实际应纳税额以年度汇算清缴结果为准</li>
+                                    <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>测算结果仅供参考，实际应纳税额以年度汇算清缴与主管税务机关认定为准。</li>
                                 </ul>
                             </div>
                         </div>
@@ -1185,22 +1211,25 @@
         </div>
     </div>
 
-    <!-- 版本权益模态框（三档体系：基础版 / 体验版 / 专业版；入口仅 2 处 —— 顶栏 pill #topbar-plan-badge 与个人中心横幅 #profile-nav-upgrade，见 auth-ui.js openUpgradeModal） -->
+    <!-- 升级码模态框（PAY-04，v1.106.0）：只承接「已经拿到码的人」—— 不做权益对比、不做购买引导。
+         入口仍为 2 处：顶栏 pill #topbar-plan-badge 与个人中心横幅 #profile-nav-upgrade（见 auth-ui.js openUpgradeModal）。
+         还没有码的人走留资（#upgrade-lead-btn → 留资弹窗），由顾问协助；交易在站外完成后发码，用户回站自助开通。
+         原「基础版 vs 专业版」权益对比表与「线上购买通道后续开放」FAQ 已整体下线（属付费营销，与本期定位冲突）。 -->
     <div id="upgrade-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[88vh] overflow-hidden flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[88vh] overflow-hidden flex flex-col">
             <div class="bg-gradient-to-r from-violet-600 to-purple-700 text-white p-5 rounded-t-xl">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center">
                         <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
-                            <i class="fa fa-crown text-xl"></i>
+                            <i class="fa fa-ticket text-xl"></i>
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <h3 class="text-lg font-bold">版本与权益</h3>
+                                <h3 class="text-lg font-bold">升级码</h3>
                                 <!-- 版本号由 auth-ui.js 从 window.__APP_VERSION__ 填充：不新增手工同步落点 -->
                                 <span id="upgrade-version" class="hidden rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold leading-none"></span>
                             </div>
-                            <p class="text-white/80 text-xs">计税能力始终免费 · 云增值服务解锁专业体验</p>
+                            <p class="text-white/80 text-xs">已有升级码？输入后即时开通。</p>
                         </div>
                     </div>
                     <button id="close-upgrade-modal" onclick="closeModal(document.getElementById('upgrade-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
@@ -1209,87 +1238,32 @@
                 </div>
             </div>
             <div class="p-6 overflow-y-auto">
-                <!-- 当前版本状态 + 领取 CTA（按档位动态填充：基础版/体验版/专业版） -->
+                <!-- 当前档位状态（按档位动态填充：已开通 / 已到期 / 未开通），见 auth-ui.js upgradeHeroHtml -->
                 <div id="upgrade-hero" class="rounded-xl border border-violet-200 bg-violet-50 p-4 mb-5"></div>
 
-                <!-- 权益对比：**只列真实实现且当前生效的档位边界**（见 tests/plan.test.js 的反向守护）。历史上这里挂过
-                     「政策要点增量更新推送」，但政策要点自阶段11 起对所有用户（含未登录游客）开放，写进专业版权益
-                     就是在卖已经免费的东西；「优先问题跟进与数据保障」则没有任何对应实现。两项均已按事实改写。 -->
-                <h4 class="text-sm font-bold text-gray-500 mb-3">基础版 vs 专业版</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                    <div class="rounded-xl border border-gray-200 p-4">
-                        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 mb-3">基础版 · 免费</span>
-                        <ul class="space-y-2 text-sm text-gray-600">
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>综合 / 经营 / 分类所得全功能计算</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>反向倒算、本地历史与税务档案</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>社保 / 公积金基数达最低标准校验</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>政策要点与更新公告</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>JSON / CSV 导出 · 结果分享图</li>
-                            <li><i class="fa fa-check text-green-500 mr-2"></i>测算结果 PDF（基础截图导出）</li>
-                        </ul>
-                    </div>
-                    <div class="relative rounded-xl border-2 border-amber-300 bg-amber-50/60 p-4">
-                        <span class="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-amber-950">PRO</span>
-                        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 mb-3">专业版</span>
-                        <ul class="space-y-2 text-sm text-gray-700">
-                            <li><i class="fa fa-cloud-upload text-violet-500 mr-2"></i>云端同步 · 多设备自动漫游</li>
-                            <li><i class="fa fa-file-pdf-o text-violet-500 mr-2"></i>汇算清缴 PDF 完整报告</li>
-                            <li><i class="fa fa-columns text-violet-500 mr-2"></i>方案对比库 2 套 → 10 套</li>
-                            <li><i class="fa fa-database text-violet-500 mr-2"></i>云端数据长期保留（到期不删除）</li>
-                        </ul>
-                    </div>
-                </div>
-                <p class="text-[11px] text-gray-500 mb-6 leading-relaxed">
-                    <i class="fa fa-info-circle mr-1"></i>计税、社保口径、政策要点与更新公告对所有用户开放（含未登录），分档的只有云端能力。
-                </p>
-
-                <!-- 兑换码开通（阶段14 变现：线下收款客户自助开通） -->
-                <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-4 sm:p-5 mb-6">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-violet-600 text-white flex items-center justify-center shrink-0">
-                            <i class="fa fa-ticket"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <h4 class="text-sm font-bold text-violet-900">已有兑换码？在此自助开通专业版</h4>
-                            <p class="text-xs text-violet-700/80 mt-0.5 leading-relaxed">购买后我们会把兑换码发送给您，输入并点击「兑换开通」即时生效，无需等待人工处理。每个兑换码仅限一次使用，开通后不可转赠。</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2 mt-3">
-                        <input id="upgrade-redeem-input" type="text" autocomplete="off" spellcheck="false" placeholder="PRO-XXXX-XXXX"
+                <!-- 升级码开通：只承接已经拿到码的人（不做权益对比、不做购买引导，见 PAY-04） -->
+                <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-4 sm:p-5">
+                    <label for="upgrade-redeem-input" class="block text-sm font-bold text-violet-900">升级码</label>
+                    <p class="text-xs text-violet-700/80 mt-0.5 mb-3 leading-relaxed">输入升级码后即时开通，无需等待人工处理。每个升级码仅限一次使用，开通后不可转赠。</p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input id="upgrade-redeem-input" type="text" autocomplete="off" spellcheck="false" placeholder="EUR-XXXX-XXXX"
                                class="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm tracking-widest uppercase placeholder-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-400">
                         <button id="upgrade-redeem-btn" type="button"
                                 class="inline-flex items-center justify-center rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold px-5 py-2 text-sm shadow whitespace-nowrap">
-                            兑换开通
+                            开通
                         </button>
                     </div>
-                    <p class="text-[11px] text-violet-700/70 mt-2 leading-relaxed">
-                        <i class="fa fa-shield mr-1"></i>限时兑换码会在现有到期日上累加；已是永久专业版的账号无需再次兑换。
-                    </p>
                 </div>
 
-                <!-- FAQ -->
-                <h4 class="text-sm font-bold text-gray-500 mb-3">常见问题</h4>
-                <div class="space-y-2 text-sm text-gray-600">
-                    <details class="rounded-lg border border-gray-200 p-3">
-                        <summary class="cursor-pointer font-medium text-gray-700">体验版和专业版有什么区别？</summary>
-                        <p class="mt-2 text-gray-500">体验版即限时（14 天）专业版，功能完全一致。正式专业版支持兑换码开通（线下购买后发放，见上方输入框），线上购买通道后续开放；体验期间同步的数据会完整保留。</p>
-                    </details>
-                    <details class="rounded-lg border border-gray-200 p-3">
-                        <summary class="cursor-pointer font-medium text-gray-700">体验到期后，我的数据会丢失吗？</summary>
-                        <p class="mt-2 text-gray-500">不会。云同步记录按账号归属云端，到期仅是停用同步能力；本地历史不受影响，再次领取体验或升级正式版后即可继续同步取回。</p>
-                    </details>
-                    <details class="rounded-lg border border-gray-200 p-3">
-                        <summary class="cursor-pointer font-medium text-gray-700">政策要点和更新公告需要专业版吗？</summary>
-                        <p class="mt-2 text-gray-500">不需要，未登录也能看。计税能力、社保口径、政策要点与更新公告对所有用户开放；专业版解锁的是云增值能力（多设备同步、完整 PDF 报告、更大的方案对比库）。</p>
-                    </details>
-                    <details class="rounded-lg border border-gray-200 p-3">
-                        <summary class="cursor-pointer font-medium text-gray-700">如何升级到正式专业版？</summary>
-                        <p class="mt-2 text-gray-500">在「版本与权益」弹窗内输入兑换码即可自助开通（上方「已有兑换码？」输入框）。线上购买通道上线前，如需开通请联系开发者获取兑换码；每个兑换码仅限一次使用，请妥善保管。</p>
-                    </details>
-                </div>
+                <!-- 还没有码的人：不留在这里做营销，直接走留资闭环（§0.1） -->
+                <p class="text-xs text-gray-500 mt-4 leading-relaxed">
+                    还没有升级码？
+                    <button id="upgrade-lead-btn" type="button" class="text-primary hover:underline">留资，由顾问协助 ›</button>
+                    <span class="block mt-1">测算、社保口径、政策要点与更新公告对所有用户开放（含未登录）。</span>
+                </p>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-between items-center">
-                <p class="text-xs text-gray-500">公测期领取体验不限次数 · 到期后可再次领取</p>
+                <p class="text-xs text-gray-500">升级码由顾问在站外交付后发放。</p>
                 <button id="upgrade-cancel-btn" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-5 py-2 rounded-lg text-sm">关闭</button>
             </div>
         </div>
@@ -1453,7 +1427,7 @@
                 <p>使用本应用前，请仔细阅读以下协议。点击"注册"即视为您已阅读并同意本协议全部内容。</p>
 
                 <p><strong>一、服务内容</strong></p>
-                <p>本应用提供个人所得税计算参考功能，包括综合所得、经营所得、分类所得及反向倒算等计税模式。所有计算结果仅供参考，不构成专业税务建议。</p>
+                <p>本应用提供个人所得税测算参考功能，包括综合所得、经营所得、分类所得及反向倒算等测算模式。所有测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
 
                 <p><strong>二、用户责任</strong></p>
                 <p>1. 用户应提供真实、准确的注册信息。</p>
@@ -1464,7 +1438,7 @@
                 <p>本应用的界面设计、图标、文案及源代码版权归开发者所有，未经授权不得复制、传播或用于商业用途。</p>
 
                 <p><strong>四、免责声明</strong></p>
-                <p>1. 本应用所有计算结果仅供参考，实际纳税请以税务部门核算为准。</p>
+                <p>1. 本应用所有测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
                 <p>2. 因网络故障、数据丢失等原因导致的任何损失，开发者不承担责任。</p>
                 <p>3. 本应用可能随时更新或停止服务，不另行通知。</p>
 
@@ -1548,11 +1522,12 @@
                 <div class="space-y-4">
                     <div class="text-center mb-6">
                         <img src="images/logo.png" alt="EuriskoTax" class="modal-logo mx-auto mb-3">
-                        <p class="text-sm text-gray-500">个人所得税预算规划工具</p>
+                        <p class="text-sm text-gray-500">税费测算工具 · 覆盖 20 个税种</p>
                     </div>
                     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
                         <p class="text-sm text-gray-700 leading-relaxed">
-                            EuriskoTax是一款专业的个人所得税预算规划工具，基于2026年最新个税计算规则设计，支持正向计税和反向倒算，帮助用户科学规划个税支出。
+                            EuriskoTax 税费计算器覆盖个税、企业税、社保等 20 个速算器与 21 个完整测算，按 2026 年现行政策口径测算。
+                            全部计算在您的浏览器本机完成，不上传任何数据。
                         </p>
                     </div>
                     <div class="border-t border-gray-200 pt-4">
@@ -1573,7 +1548,7 @@
                     <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
                         <p class="text-xs text-yellow-800">
                             <i class="fa fa-exclamation-triangle mr-1"></i>
-                            <strong>免责声明：</strong>本工具仅供参考使用，实际纳税请以税务部门核算为准。
+                            <strong>免责声明：</strong>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
                         </p>
                     </div>
                     <div class="text-center pt-2 border-t border-gray-100">
@@ -1582,7 +1557,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.104.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.106.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -1633,13 +1608,16 @@
                         class="absolute top-4 right-4 z-10 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                     <i class="fa fa-times"></i>
                 </button>
-                <p class="relative text-[11px] font-semibold tracking-widest text-white/70">使用协助 · 有问必答</p>
-                <h3 id="lead-modal-title" class="relative text-lg font-bold mt-1.5 pr-10">算完先自查，该退的税别漏掉</h3>
-                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，这三项最容易填错 —— 有疑问可以发给我们，协助您核对填写的参数。</p>
+                <!-- 文案见 docs/guides/user-facing-copy-standard.md §5.6（L-06/L-07/L-08）：
+                     「有问必答」是绝对化承诺 → 改为「留个问题，顾问帮您核对」；
+                     信任三枚第三枚**不写任何时效**（1 个工作日做不到，见 §2.5 留资时效铁律） -->
+                <p class="relative text-[11px] font-semibold tracking-widest text-white/70">使用协助 · 留个问题，顾问帮您核对</p>
+                <h3 id="lead-modal-title" class="relative text-lg font-bold mt-1.5 pr-10">算完先自查：参数填错，结果就跟着错。</h3>
+                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，这三项是常见易错口径 —— 有疑问可以发给我们，顾问协助您核对填写的参数。</p>
                 <ul class="relative flex flex-wrap gap-1.5 mt-3 text-[11px] text-white/90">
-                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-check-circle"></i>免费使用</li>
+                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-check-circle"></i>免注册使用</li>
                     <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-lock"></i>不采集收入金额</li>
-                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-clock-o"></i>1 个工作日内回复</li>
+                    <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-user-o"></i>顾问核对后与您联系</li>
                 </ul>
             </div>
 
@@ -1673,25 +1651,24 @@
                              href 由 lead-modal.js 按入口取码写入（wecomQrByChannel → wecomQrUrl 兜底） -->
                         <div class="shrink-0">
                             <a id="lead-wecom-link" href="#" target="_blank" rel="noopener"
-                               title="扫码或点此联系客服"
+                               title="扫码或点此联系顾问"
                                class="block rounded-lg border border-gray-200 bg-white p-1">
-                                <img id="lead-wecom-qr" src="" alt="客服二维码"
+                                <img id="lead-wecom-qr" src="" alt="顾问二维码"
                                      class="w-28 h-28 rounded-lg bg-white object-contain" />
                             </a>
-                            <p id="lead-wecom-fallback" class="hidden text-[11px] text-blue-600 mt-1 text-center">点此联系客服 →</p>
+                            <p id="lead-wecom-fallback" class="hidden text-[11px] text-blue-600 mt-1 text-center">点此联系顾问 →</p>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-sm font-semibold text-gray-800">扫码联系客服</p>
+                            <p class="text-sm font-semibold text-gray-800">扫码联系顾问</p>
                             <p id="lead-advisor" class="hidden text-[11px] text-blue-600 mt-1"></p>
-                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，客服会协助您核对填写的参数是否有误。</p>
-                            <p class="text-[11px] text-gray-500 mt-1.5">服务时间：工作日 9:00–18:00</p>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">把疑问发过来就行，顾问会协助您核对填写的参数是否有误。</p>
                         </div>
                     </div>
                 </div>
 
                 <div id="lead-divider" class="hidden text-center text-[11px] text-gray-500 mb-4">
                     <span class="inline-flex items-center gap-3 w-full">
-                        <span class="h-px bg-gray-200 flex-1"></span>也可以留下联系方式，客服会在 1 个工作日内联系您<span class="h-px bg-gray-200 flex-1"></span>
+                        <span class="h-px bg-gray-200 flex-1"></span>也可以留下联系方式，顾问会尽快与您联系<span class="h-px bg-gray-200 flex-1"></span>
                     </span>
                 </div>
 
@@ -1824,11 +1801,11 @@
                 <p id="lead-form-error" class="hidden text-xs text-red-600 mb-2"></p>
                 <label class="flex items-start gap-2 cursor-pointer">
                     <input id="lead-consent" type="checkbox" form="lead-form" class="mt-0.5" />
-                    <span class="text-[11px] text-gray-500 leading-relaxed">我已阅读并同意<a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>，并同意客服通过电话或微信与我联系。</span>
+                    <span class="text-[11px] text-gray-500 leading-relaxed">我已阅读并同意<a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>，并同意顾问通过电话或微信与我联系。</span>
                 </label>
                 <p class="text-[11px] text-gray-500 mt-1.5 pl-6 leading-relaxed">不采集收入金额 · 测算结果仅供参考，不构成税务建议</p>
                 <button type="submit" form="lead-form" id="lead-submit-btn" class="btn btn-primary w-full mt-3 py-2.5 rounded-lg font-semibold"><i class="fa fa-paper-plane-o mr-1.5"></i>提交信息</button>
-                <p class="text-[11px] text-gray-500 mt-2 text-center leading-relaxed">提交后客服会与您联系，无需其他操作</p>
+                <p class="text-[11px] text-gray-500 mt-2 text-center leading-relaxed">提交后顾问会与您联系，无需其他操作</p>
             </div>
         </div>
     </div>
@@ -1842,6 +1819,9 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
+    <!-- 面向用户文案单一真源（docs/guides/user-facing-copy-standard.md）：无依赖、必须最先加载，
+         所有 src/js/** 的面向用户文案一律引用 window.CopyStandard，不再字面量硬编码 -->
+    <script src="src/js/copy/copy-standard.js"></script>
     <!-- 税法常量（税率表 / 缴费基数下限）：单一事实来源，必须最先加载，供 calculation 与 utils 分组消费 -->
     <script src="src/js/calculation/tax-constants.js"></script>
     <!-- 阶段12 C1：税制参数热更新同步层（管理台热改税率 → 校验后覆盖全局税率变量 + localStorage 缓存）。
@@ -2083,18 +2063,21 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 权益进度条（阶段19-6b §3.6 ①）：档位刻度 + 方案用量 + 云同步状态 + 升级入口。
-                 内容由 src/js/ui/profile-benefits.js 填充（取不到的数据整行不出现，不补 0）；
-                 未登录 / 拿不到档位时整张卡保持隐藏。
-                 ⚠️ 这颗 #profile-nav-upgrade 就是**全局第 2 处**升级入口（另一处是顶栏 pill），
-                 它只是从上面的横幅搬到了这里 —— id 不变、数量不变（阶段14 入口收敛约束）。 -->
-            <div id="profile-benefits-card" class="bg-white rounded-lg shadow-card mb-5 p-4 sm:p-5 hidden">
+                <!-- 权益进度条（阶段19-6b §3.6 ①）：档位刻度 + 方案用量 + 云同步状态 + 升级入口。
+                     内容由 src/js/ui/profile-benefits.js 填充（取不到的数据整行不出现，不补 0）；
+                     未登录 / 拿不到档位时整块保持隐藏。
+                     ⚠️ 这颗 #profile-nav-upgrade 就是**全局第 2 处**升级入口（另一处是顶栏 pill），
+                     id 不变、数量不变（阶段14 入口收敛约束）。
+                     阶段20 P3（§6.1 头）：它原先是横幅下面**另一张**卡 —— 身份与权益被切成两张，
+                     中间还隔着一条缝，读起来像两个人的信息。现在并入同一张卡的白色区域，
+                     仍是同一颗按钮、同一处入口，只是不再另起一张卡。 -->
+                <div id="profile-benefits-card" class="p-4 sm:p-5 hidden">
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <span class="w-1 h-4 rounded-full bg-primary"></span>
-                        <h4 class="text-sm font-bold text-gray-700">我的权益</h4>
+                        <!-- M-02：整卡标题随档位变 —— 未开通的人讲「额度」，已开通的人才讲「权益」 -->
+                        <h4 id="profile-benefits-title" class="text-sm font-bold text-gray-700">我的额度</h4>
                     </div>
                     <span id="profile-benefits-tier" class="text-xs font-semibold text-gray-600"></span>
                 </div>
@@ -2102,9 +2085,17 @@
                 <p id="profile-benefits-usage" class="benefit-line mt-3 hidden"></p>
                 <p id="profile-benefits-sync" class="benefit-line hidden"></p>
                 <button type="button" id="profile-nav-upgrade" class="mt-3 inline-flex items-center justify-center w-full sm:w-auto bg-primary hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
-                    <i class="fa fa-crown mr-2"></i><span>了解专业版</span>
+                    <i class="fa fa-crown mr-2"></i><span>需要更多协助？留资，顾问联系您</span>
                 </button>
             </div>
+
+            <!-- 高频四宫格（阶段20 P3 §6.1）：历史 / 台账 / 档案 / 日历。
+                 这四项占「我的」真实点击的绝大部分，而原先 13 卡一维罗列时它们散在两组里 ——
+                 找「我的档案」要往下翻一屏。宫格是**扫视**型（看图标定位），列表是**阅读**型
+                 （逐行读标题）：高频用前一种，低频才配用后一种。
+                 这四张**不再**出现在下方列表里 —— 同一入口两处 = 第二条稳定路径（去重铁律 §3.3）。
+                 内容由 auth-ui.js 的 renderProfileQuick 渲染（与列表读同一份 PROFILE_CARDS_CONFIG）。 -->
+            <div id="profile-quick-grid" class="profile-quick-grid"></div>
 
             <!-- 资产概览（统计卡由 JS 动态生成） -->
             <div class="flex items-center gap-2 mb-3 mt-1 px-1">
@@ -2527,12 +2518,12 @@
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    © 2026 EuriskoTax 税费计算器 | 个税 / 企业税 / 社保等 20 个税种速算器 · 仅供参考，不构成税务建议
+                    © 2026 EuriskoTax 税费计算器 · 20 个速算器 + 21 个完整测算 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
                 </div>
                 <!-- 阶段15：App 内通往 15 个落地页的唯一入口（此前站内完全没有路径，
                      已装 App 的用户看不到年终奖 / 社保 / 增值税等单页工具） -->
                 <div class="text-sm">
-                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">测算工具总目录（20 个）→</a>
+                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">测算工具总目录（20 个速算器 + 21 个完整测算）→</a>
                 </div>
                 <!-- 备案信息：ICP 号与公安联网备案号。
                      备案号**下发后**才渲染（未备案时展示备案号同样违规），

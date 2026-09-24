@@ -92,6 +92,8 @@ function buildProfileDOM() {
                 <p id="profile-benefits-sync" class="hidden"></p>
                 <button id="profile-nav-upgrade"><span>了解专业版</span></button>
             </div>
+            <!-- 阶段20 P3：高频四宫格（历史 / 台账 / 档案 / 日历），与下方列表共用同一份入口定义 -->
+            <div id="profile-quick-grid"></div>
             <div id="profile-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
             <div id="profile-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
@@ -149,8 +151,7 @@ function buildProfileDOM() {
             <button id="back-from-calendar" class="back-btn"></button>
             <div id="tax-calendar-list" class="space-y-3"></div>
         </div>
-        <!-- 导航 -->
-        <a href="#" id="profile-link"></a>
+        <!-- 导航（R1：顶栏菜单只留账号动作，「个人中心」已随 DOM 删除） -->
         <a href="#" id="logout-link"></a>
         <a href="#" id="profile-nav-settings"></a>
         <!-- 模态框 -->
@@ -216,17 +217,17 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(secondCount).toBe(4);
     });
 
-    test('renderProfileCards 应渲染 13 个模块卡片', () => {
+    // 阶段20 P3（§6.1）：高频四张上提成四宫格，列表从 13 卡降到 9 卡。
+    // 断言必须跟着改 —— 旧的那条「13 个模块卡片」一旦留着，等于替「13 卡一维罗列」这个
+    // 本次要治的病背书：设计改了，钉住旧设计的断言会反过来阻止新设计落地。
+    test('renderProfileCards 应渲染 9 个模块卡片（高频四张已上提成宫格）', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
-        expect(cards.length).toBe(13);
+        expect(cards.length).toBe(9);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
-        expect(ids).toContain('profile-card-history');
-        expect(ids).toContain('profile-card-tax');
         expect(ids).toContain('profile-card-data');
-        expect(ids).toContain('profile-card-calendar');
         expect(ids).toContain('profile-card-help');
         expect(ids).toContain('profile-card-about');
         // 阶段8：意见反馈入口卡片
@@ -238,21 +239,20 @@ describe('个人中心 - 渲染逻辑', () => {
         // 阶段19-9：效率层「工作台」——主体管理与参数模板
         expect(ids).toContain('profile-card-entity');
         expect(ids).toContain('profile-card-template');
-        // 阶段19-10：效率层 E3 台账 —— 按月归档的那本账
-        expect(ids).toContain('profile-card-ledger');
         // 阶段19-11：效率层 E4 批量 —— 一份表一次算完
         expect(ids).toContain('profile-card-batch');
     });
 
-    // 阶段19-6b（§3.6 ③）：卡片从「常用功能 / 服务与支持」两组改成按场景三组
-    // 阶段19-9：新增「工作台」组（主体 · 模板），插在「我的税务」与「服务与支持」之间
-    test('renderProfileCards 应按场景分成三组', () => {
+    // 阶段20 P3（§6.1）：四组降到两组 ——「我的数据」「我的税务」两组的高频四张进了宫格，
+    // 剩下的低频项合进「工作台」，于是只剩「工作台 / 服务与支持」两组。
+    test('renderProfileCards 应按场景分成两组', () => {
         renderProfileCards();
         const text = document.getElementById('profile-cards-grid').textContent;
-        expect(text).toContain('我的数据');
-        expect(text).toContain('我的税务');
+        expect(text).toContain('工作台');
         expect(text).toContain('服务与支持');
-        // 分组内成员：历史/数据管理在「我的数据」，档案/日历在「我的税务」
+        // 被掏空的两组不该再留下组标题（留着就是一行没有卡片的空标题）
+        expect(text).not.toContain('我的数据');
+        expect(text).not.toContain('我的税务');
         const groupOf = (cardId) => {
             const card = document.getElementById(cardId);
             let prev = card.previousElementSibling;
@@ -263,16 +263,48 @@ describe('个人中心 - 渲染逻辑', () => {
             }
             return '';
         };
-        expect(groupOf('profile-card-history')).toBe('我的数据');
-        expect(groupOf('profile-card-data')).toBe('我的数据');
-        expect(groupOf('profile-card-tax')).toBe('我的税务');
-        expect(groupOf('profile-card-calendar')).toBe('我的税务');
+        // 阶段20 P3：数据管理归「工作台」（「我的数据」组撤了，它不能无处可去）
+        expect(groupOf('profile-card-data')).toBe('工作台');
         expect(groupOf('profile-card-lead')).toBe('服务与支持');
-        // 阶段19-9：主体 / 模板归到「工作台」；阶段19-10：台账同一组
+        // 阶段19-9：主体 / 模板归到「工作台」；阶段19-11：批量同一组
         expect(groupOf('profile-card-entity')).toBe('工作台');
         expect(groupOf('profile-card-template')).toBe('工作台');
-        expect(groupOf('profile-card-ledger')).toBe('工作台');
         expect(groupOf('profile-card-batch')).toBe('工作台');
+    });
+
+    // ====== 阶段20 P3：高频四宫格 ======
+    test('renderProfileQuick 应渲染四项高频入口（历史 / 台账 / 档案 / 日历）', () => {
+        renderProfileQuick();
+        const tiles = document.getElementById('profile-quick-grid').querySelectorAll('[id^="profile-card-"]');
+        const ids = Array.from(tiles).map((t) => t.id);
+        expect(ids).toEqual([
+            'profile-card-history',
+            'profile-card-ledger',
+            'profile-card-tax',
+            'profile-card-calendar'
+        ]);
+    });
+
+    // 去重铁律（§3.3）：一个目的地只有一条稳定路径。宫格与列表共用一份入口定义，
+    // 一旦有人往两边各加一次，同一个 id 就会在页面上出现两遍 —— 这条就是为那种改法设的。
+    test('同一入口不会同时出现在宫格与列表里（无重复落点）', () => {
+        renderProfileQuick();
+        renderProfileCards();
+        const quick = Array.from(document.getElementById('profile-quick-grid')
+            .querySelectorAll('[id^="profile-card-"]')).map((t) => t.id);
+        const list = Array.from(document.getElementById('profile-cards-grid')
+            .querySelectorAll('[id^="profile-card-"]')).map((c) => c.id);
+        expect(quick.filter((id) => list.includes(id))).toEqual([]);
+        // 两边加起来仍是全部 13 个入口：上提不是删除
+        expect(quick.length + list.length).toBe(13);
+    });
+
+    test('renderProfileQuick 幂等：重复调用不重复渲染', () => {
+        renderProfileQuick();
+        const first = document.getElementById('profile-quick-grid').children.length;
+        renderProfileQuick();
+        expect(document.getElementById('profile-quick-grid').children.length).toBe(first);
+        expect(first).toBe(4);
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {
@@ -503,7 +535,10 @@ describe('个人中心 - 事件绑定', () => {
         buildProfileDOM();
         loadAuthUI(mockApi);
         // 渲染卡片以便后续点击测试
+        // 阶段20 P3：高频四张（历史 / 台账 / 档案 / 日历）现在长在**宫格**里，
+        // 不渲染宫格就 getElementById 取到 null，下面几条点击用例会当场炸。
         renderProfileStats();
+        renderProfileQuick();
         renderProfileCards();
         // 绑定事件
         setupAuthEventListeners();
@@ -511,15 +546,13 @@ describe('个人中心 - 事件绑定', () => {
         clearPageHistory();
     });
 
-    test('点击 profile-link 应跳转到个人中心页', () => {
-        jest.useFakeTimers();
-        const link = document.getElementById('profile-link');
-        link.click();
-        // profile-link 内部用 requestAnimationFrame 调度 loadProfile
-        // showPage 在初始导航分支会立即隐藏所有页面并显示目标页
-        expect(global.showPage).toBeDefined();
-        jest.runAllTimers();
-        jest.useRealTimers();
+    // R1（阶段20 P0）：顶栏菜单里的「个人中心」是目的地不是账号动作，入口收敛到 Tab「我的」。
+    // 这条守的是「删 DOM 没删绑定」的反向事故 —— 绑定还在就会在初始化时 getElementById 取到 null 而抛错，
+    // 表现为界面正常但登录态与历史全不加载。所以这里断言的是：绑定这一步本身不抛，且元素确实不在。
+    test('顶栏菜单只留账号动作：profile-link 已无绑定（R1）', () => {
+        expect(document.getElementById('profile-link')).toBeNull();
+        expect(() => setupAuthEventListeners()).not.toThrow();
+        expect(document.getElementById('logout-link')).not.toBeNull();
     });
 
     test('点击计算历史卡片应跳转到历史页', () => {

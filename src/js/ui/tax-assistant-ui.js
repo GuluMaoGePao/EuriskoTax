@@ -14,6 +14,16 @@
         log: function () {}
     };
 
+    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
+    const DISCLAIMER_COPY = COPY.DISCLAIMER || {};
+
+    // X-02（🆕🔴）：助手每条回答都要带免责 —— 回答里全是政策口径，不带等于把「仅供参考」留在了别的页面上。
+    // B 型：主句固定 + 默认后缀（税务口径）。
+    const ANSWER_DISCLAIMER = DISCLAIMER_COPY.shortMain && DISCLAIMER_COPY.suffix
+        ? DISCLAIMER_COPY.shortMain + DISCLAIMER_COPY.suffix.tax
+        : '本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。';
+
     // ====== 状态 ======
     let isOpen = false;
     let currentCategory = 'all';
@@ -340,6 +350,7 @@
                 '</div>' +
                 '<div class="assistant-qa-a" style="display:none;">' +
                 '<div class="assistant-qa-a-text">' + a.replace(/\n/g, '<br>') + '</div>' +
+                '<p class="assistant-qa-disclaimer">' + escapeHtml(ANSWER_DISCLAIMER) + '</p>' +
                 '<div class="assistant-qa-footer">' +
                 '<button class="' + favCls + '" data-fav-id="' + item.id + '"><i class="fa ' + favIcon + '"></i> ' + favText + '</button>' +
                 '<span class="assistant-feedback">' +
