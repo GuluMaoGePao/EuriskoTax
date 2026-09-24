@@ -706,45 +706,48 @@ async function loadProfile() {
 //   取不到的一律显示「—」（见 computeProfileAssets 返回 null 的分支）：
 //   宁可空着，也不摆一个会被读成"你一套方案都没存"的 0。
 const PROFILE_STATS_CONFIG = [
+    // 深色变体（阶段20 基线重拍时人眼翻出来的存量缺口）：原先四张卡只有浅色档的
+    // from-*-50/100 底，深色模式下浅底 + 浅字，「测算次数」几乎不可读。
+    // 底统一走项目深色惯例（dark:from-slate-800，见 home-ui.js），色相靠文字保留。
     {
         id: 'profile-stats-calculations',
         icon: 'fa-calculator',
         label: '测算次数',
-        cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200',
+        cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3',
-        labelClass: 'text-sm text-blue-600 font-medium',
-        valueClass: 'text-2xl sm:text-3xl font-bold text-blue-800',
-        subClass: 'text-xs text-blue-700'
+        labelClass: 'text-sm text-blue-600 font-medium dark:text-blue-300',
+        valueClass: 'text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-200',
+        subClass: 'text-xs text-blue-700 dark:text-blue-400'
     },
     {
         id: 'profile-stats-scenarios',
         icon: 'fa-clone',
         label: '已存方案',
-        cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200',
+        cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3',
-        labelClass: 'text-sm text-green-600 font-medium',
-        valueClass: 'text-2xl sm:text-3xl font-bold text-green-800',
-        subClass: 'text-xs text-green-700'
+        labelClass: 'text-sm text-green-600 font-medium dark:text-green-300',
+        valueClass: 'text-2xl sm:text-3xl font-bold text-green-800 dark:text-green-200',
+        subClass: 'text-xs text-green-700 dark:text-green-400'
     },
     {
         id: 'profile-stats-kinds',
         icon: 'fa-sitemap',
         label: '覆盖税种',
-        cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200',
+        cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3',
-        labelClass: 'text-sm text-purple-600 font-medium',
-        valueClass: 'text-2xl sm:text-3xl font-bold text-purple-800',
-        subClass: 'text-xs text-purple-700'
+        labelClass: 'text-sm text-purple-600 font-medium dark:text-purple-300',
+        valueClass: 'text-2xl sm:text-3xl font-bold text-purple-800 dark:text-purple-200',
+        subClass: 'text-xs text-purple-700 dark:text-purple-400'
     },
     {
         id: 'profile-stats-last',
         icon: 'fa-clock-o',
         label: '上次测算',
-        cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200',
+        cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mr-3',
-        labelClass: 'text-sm text-orange-600 font-medium',
-        valueClass: 'text-2xl sm:text-3xl font-bold text-orange-800',
-        subClass: 'text-xs text-orange-700'
+        labelClass: 'text-sm text-orange-600 font-medium dark:text-orange-300',
+        valueClass: 'text-2xl sm:text-3xl font-bold text-orange-800 dark:text-orange-200',
+        subClass: 'text-xs text-orange-700 dark:text-orange-400'
     }
 ];
 
@@ -2838,6 +2841,12 @@ function initAuth() {
 window.deleteHistoryItem = deleteHistoryItem;
 window.showPage = showPage;
 window.goBack = goBack;
+// 阶段20：三个「我的页」渲染函数也挂出来 —— 统计 / 四宫格 / 卡片都长在 loadProfile 的
+// 登录分支里，视觉基线（tools/ops/ui-lib/screenshot-kit.js 的 profile prepare）在无后端的
+// 截图环境里拿不到登录态，只能手动触发。三个函数本身幂等，真机重复调用不会叠出两份。
+window.renderProfileQuick = renderProfileQuick;
+window.renderProfileStats = renderProfileStats;
+window.renderProfileCards = renderProfileCards;
 
 // Phase 1.5：把「系统返回 / 返回手势」接到与 UI 返回按钮同一个动作上。
 // 在此之前站点一条 history 条目都不产生，PWA standalone 里按返回 = 退出应用。

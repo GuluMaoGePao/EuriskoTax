@@ -121,7 +121,16 @@ const TARGETS = [
     {
         id: 'profile',
         name: '我的页',
-        prepare: `if (window.showPage) window.showPage('profile-page');`
+        // ⚠️ 统计卡 / 四宫格 / 模块卡都长在 loadProfile 的**登录分支**里：截图环境没有后端，
+        // 未登录时这三段根本不渲染 —— 不补这几行，profile 基线拍到的就只是
+        // 「横幅 + 空资产概览 + 退出登录」的空壳，P3 的三段式一张都没进图
+        // （阶段19 期间 13 卡也是同样缺席，只是没人翻过这张图所以一直没发现）。
+        // 渲染函数都是幂等的，重复进页不会叠出两份；数值由 updateProfileStats 填，
+        // 那一步依赖登录态，这里不调 —— 基线看的是布局与样式，不是数字。
+        prepare: `if (window.showPage) window.showPage('profile-page');
+            if (window.renderProfileQuick) window.renderProfileQuick();
+            if (window.renderProfileStats) window.renderProfileStats();
+            if (window.renderProfileCards) window.renderProfileCards();`
     }
 ];
 
