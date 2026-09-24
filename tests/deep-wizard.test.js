@@ -352,6 +352,37 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
         expect(window.exportToWord.mock.calls[0][2].content).toContain('应纳增值税');
     });
 
+    // 阶段20 P5（v1.107.0）：上面那条测的是「EuriskoReport 不在场时的兜底」，
+    // 这里测的是**真机链路** —— final-report.js 在 index.html 里是加载的，
+    // 所以点导出一定会先过交付版报告那一层。断了两年没人发现，正是因为
+    // 从前只有「模块自己」的测试，没有「按钮 → 模块」的测试。
+    test('加载 final-report 后，导出 PDF 先过交付版报告（不再直接 exportToPDF）', () => {
+        loadSource('src/js/export/final-report.js');
+        window.exportToPDF = jest.fn();
+        window.exportToWord = jest.fn();
+        const spy = jest.spyOn(window.EuriskoReport, 'exportFinalReport');
+
+        toResult('vat-deep');
+        document.getElementById('dw-export-pdf').click();
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(window.exportToPDF).not.toHaveBeenCalled();   // 未付费不能被直接推走导出
+        const opts = spy.mock.calls[0][0];
+        expect(opts.kind).toBe('vat-deep');
+        // 明细必须来自向导自己的结果，不是那份读不到数的旧页面取数
+        expect(opts.coreHtml).toContain('应纳增值税');
+        // 选「标准版」仍回到原来那串（skipResultCheck + 自拼 HTML），不能变成点了没反应
+        expect(typeof opts.onStandard).toBe('function');
+        opts.onStandard();
+        expect(window.exportToPDF).toHaveBeenCalledTimes(1);
+        expect(window.exportToPDF.mock.calls[0][2].skipResultCheck).toBe(true);
+        expect(window.exportToPDF.mock.calls[0][2].contentBuilder()).toContain('应纳增值税');
+        spy.mockRestore();
+        // 摘掉它，后面的用例仍落在「报告不在场」的旧路径上 —— 这条验证的是真机链路，
+        // 不是要把整份文件的导出行为都改成走报告（前者兑现权益，后者是另一批）。
+        delete window.EuriskoReport;
+    });
+
     test('还没到结果步就没有保存 / 导出按钮（不许导出半截结果）', () => {
         W().open('vat-deep', { fresh: true });
         expect(document.getElementById('dw-save')).toBeFalsy();

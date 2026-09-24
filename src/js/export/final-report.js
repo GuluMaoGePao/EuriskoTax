@@ -222,30 +222,43 @@
     }
 
     // 专业报告 HTML：封面 + 复用明细核心 + 政策要点 + 免责声明
-    // meta 可省略（默认按 kind 解析），便于单测直接构造
-    function buildProDocHtml(kind, meta) {
-        meta = meta || META[kind] || META.comprehensive;
+    // 阶段20 P5（v1.107.0）：这份报告从「只能给综合所得用」改成**三处数据源可注入**。
+    // 为什么必须改签名：旧实现的三个数据源全是已删除的旧页面的全局量 ——
+    //   window.calculationResults（柱状图）/ generateWordDocumentContent(legacyTitle)（明细）/
+    //   META 里唯一的 comprehensive 标题（封面）。spec 向导一个都没有，
+    // 于是就算把按钮接上，导出的也只是「封面是汇算清缴 + 明细失败 + 一张全 0 柱状图」的假报告。
+    // 现在：
+    //   coreHtml  明细正文 —— 由调用方（向导用自己的 exportHtml）拼，不再依赖取不到的旧取数
+    //   structure 税负结构 —— **六项全 0 时不画柱状图**：宁缺，也不摆一张会被读成
+    //            「你这套方案一分钱税都没有」的图（与资产概览「取不到就显示 —」同一条原则）
+    //   meta      封面标题 / 副标题 —— 按工具名来，21 个税种不再共用一个「综合所得汇算」封面
+    function buildProDocHtml(kind, opts) {
+        opts = opts || {};
+        // 兼容旧调用 buildProDocHtml(kind, meta)：meta 本体带 legacyTitle / reportTitle
+        const meta = (opts.reportTitle || opts.legacyTitle) ? opts : (META[kind] || META.comprehensive);
         const email = (getCurrentUser() || {}).email || '';
-        const core = (typeof generateWordDocumentContent === 'function')
-            ? generateWordDocumentContent(meta.legacyTitle)
-            : '<p>（明细内容生成失败）</p>';
-        return proStyles() +
-            coverHtml(meta, email) +
-            core +
-            '<div class="pro-section"><div class="pro-section-title">税负结构对比</div>' +
-            '<div class="pro-chart-box"><canvas id="pro-tax-chart" width="740" height="320"></canvas></div>' +
-            '<p class="pro-chart-note">' + escapeHtml(taxStructure(kind).note) + '</p>' +
-            '</div>' +
-            policySectionHtml(kind) +
-            disclaimerHtml();
+        const core = opts.coreHtml !== undefined ? opts.coreHtml
+            : ((typeof generateWordDocumentContent === 'function')
+                ? generateWordDocumentContent(meta.legacyTitle)
+                : '<p>（明细内容生成失败）</p>');
+        const structure = opts.structure !== undefined ? opts.structure : taxStructure(kind);
+        let html = proStyles() + coverHtml(meta, email) + core;
+        if (structure && (structure.values || []).some(function (v) { return num(v) !== 0; })) {
+            html += '<div class="pro-section"><div class="pro-section-title">税负结构对比</div>' +
+                '<div class="pro-chart-box"><canvas id="pro-tax-chart" width="740" height="320"></canvas></div>' +
+                '<p class="pro-chart-note">' + escapeHtml(structure.note || '') + '</p>' +
+                '</div>';
+        }
+        return html + policySectionHtml(kind) + disclaimerHtml();
     }
 
-    // === 截图前回调：绘制税负对比图 ===
-    function renderProChart(kind, container) {
+    // 截图前回调：绘制税负对比图。structure 可由调用方注入（向导没有 window.calculationResults）。
+    function renderProChart(kind, container, structureArg) {
         if (typeof window === 'undefined' || !window.Chart) return; // Chart.js 未加载时跳过（不阻塞导出）
         const canvas = container && container.querySelector ? container.querySelector('#pro-tax-chart') : null;
         if (!canvas) return;
-        const structure = taxStructure(kind);
+        const structure = structureArg || taxStructure(kind);
+        if (!structure) return;
 
         // 在每个柱上方标注数值（Chart.js 未内置 datalabels）
         const valueLabel = {
@@ -339,8 +352,7 @@
             '    <button type="button" data-rv="pro" class="w-full text-left rounded-xl border border-amber-200 bg-amber-50/60 p-4 transition-colors hover:border-amber-300">',
             '      <div class="font-semibold text-slate-900">精装版</div>',
             '      <div class="mt-1 text-sm text-slate-600">封面 + 政策要点 + 税负结构图表，可直接交付给他人。</div>',
-            // PAY-13：不再说「属专业版权益」—— 那是档位营销；交付版的获取方式只有留资一条
-            '      <div class="mt-2 text-xs text-amber-700">需要交付版？留资，由顾问协助 ›</div>',
+            '      <div data-rv-hook class="mt-2 text-xs text-amber-700">需要交付版？留资，由顾问协助 ›</div>',
             '    </button>',
             '  </div>',
             '  <div class="px-6 py-4">',
@@ -358,19 +370,34 @@
         dlg.classList.add('hidden');
     }
 
-    // 留资换权益（钩子）。LeadModal 不可用时兜底为标准导出 —— **免费必须能导**。
-    function openEntitlement(kind) {
-        if (!hookAllowed(kind)) { legacyPdf(kind); return; }
+    // 留资换权益（钩子）。LeadModal 不可用 / 该 kind 不允许挂钩子时，兜底为标准导出 —— **免费必须能导**。
+    // 护栏 keep 现状：只有 ALLOWED_TYPES 里的 kind 才可能出现留资钩子（产品投放口径，未拍板不扩围）。
+    function openEntitlement(kind, opts) {
+        const o = opts || {};
+        const fallback = function () {
+            if (typeof o.onStandard === 'function') o.onStandard();
+            else legacyPdf(kind);
+        };
+        if (!hookAllowed(kind)) { fallback(); return; }
         if (window.LeadModal && typeof window.LeadModal.open === 'function') {
             window.LeadModal.open({ source: 'report_pro', type: kind });
             return;
         }
-        legacyPdf(kind);
+        fallback();
     }
 
-    function openVersionDialog(kind) {
+    // opts.onStandard：调用方自己的「标准版导出」。旧默认 legacyPdf 走 exportToPDF(meta.resultElId)，
+    // 那条路径会做结果校验 —— spec 向导没有那些全局 results，会被「请先进行计算」挡回来
+    // （deep-wizard-ui 为此专门加了 skipResultCheck）。所以向导必须把标准导出传进来，
+    // 否则选了「标准版」会得到一次什么都不发生的点击。
+    function openVersionDialog(kind, opts) {
         var dlg = dialogEl();
         dlg.dataset.kind = kind;
+        dlg.__reportOpts = opts || null;
+        // 这句「留资，由顾问协助」是承诺：只有该 kind 真能挂上留资钩子时才显示。
+        // 护栏外的税种点了「精装版」会直接导出标准版 —— 不显示，就不用遁词来解释点了没反应。
+        var hookLine = dlg.querySelector('[data-rv-hook]');
+        if (hookLine) hookLine.style.display = hookAllowed(kind) ? '' : 'none';
         if (dlg.dataset.rvBound !== '1') {
             dlg.dataset.rvBound = '1';
             dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDialog(dlg); });
@@ -379,9 +406,14 @@
                 btns[i].addEventListener('click', function () {
                     var v = this.getAttribute('data-rv');
                     var k = dlg.dataset.kind || 'comprehensive';
+                    var o = dlg.__reportOpts || {};
                     closeDialog(dlg);
-                    if (v === 'standard') legacyPdf(k);
-                    else if (v === 'pro') openEntitlement(k);
+                    if (v === 'standard') {
+                        if (typeof o.onStandard === 'function') o.onStandard();
+                        else legacyPdf(k);
+                    } else if (v === 'pro') {
+                        openEntitlement(k, o);
+                    }
                 });
             }
         }
@@ -392,19 +424,25 @@
         }
     }
 
-    function exportFinalReport(kind) {
-        const meta = META[kind] || META.comprehensive;
+    // 阶段20 P5：改接 opts 对象（仍兼容字符串 kind）。
+    // opts = { kind, coreHtml, structure, meta, filename, onStandard }
+    function exportFinalReport(opts) {
+        const o = (typeof opts === 'string') ? { kind: opts } : (opts || {});
+        const kind = o.kind || KIND_COMPREHENSIVE;
+        const meta = o.meta || META[kind] || META.comprehensive;
         if (isProUser()) {
-            exportToPDF(meta.resultElId, meta.reportTitle(), {
-                filename: proFilename(),
-                contentBuilder: function () { return buildProDocHtml(kind, meta); },
-                beforeCapture: function (container) { renderProChart(kind, container); }
+            const docOpts = { meta: meta, coreHtml: o.coreHtml, structure: o.structure };
+            return exportToPDF(o.resultElId || meta.resultElId, meta.reportTitle(), {
+                // 文件名同样按调用方：默认那串「汇算清缴报告_YYYY-MM」是给综合所得起的，
+                // 拿去命名增值税 / 经营所得的报告，用户存到硬盘上就再也找不着了。
+                filename: o.filename || (typeof meta.filename === 'function' ? meta.filename() : proFilename()),
+                contentBuilder: function () { return buildProDocHtml(kind, docOpts); },
+                beforeCapture: function (container) { renderProChart(kind, container, o.structure); }
             });
-            return;
         }
         // 非专业版：给「两个版本」的选择，而不是一道障碍（§1.5⑨）。
         // 精装版的价值说明在点导出「之后、选版之前」就可见 —— 即 Phase 3.5 的「付费预期」。
-        openVersionDialog(kind);
+        openVersionDialog(kind, o);
     }
 
     window.EuriskoReport = {

@@ -426,6 +426,49 @@
         }, tool.id, tool.name);
     }
 
+    // 标准版 PDF：原本就是这里自己的一串（contentBuilder + skipResultCheck），抽出来给
+    // 版本弹窗的「标准版」用 —— 那是魔法般的第二轮调用，不能走 final-report 的 legacyPdf
+    // （它读 meta.resultElId 且带结果校验，向导场景会被「请先进行计算」挡回来）。
+    function standardPdf(title, html) {
+        if (typeof exportToPDF !== 'function') {
+            console.warn('[deep-wizard] exportToPDF 未加载，导出被跳过');
+            return;
+        }
+        // skipResultCheck：导出函数默认校验存量 4 页的全局 results，spec 向导没有那些变量
+        exportToPDF(null, title, { skipResultCheck: true, contentBuilder: function () { return html; } });
+    }
+
+    // YYYY-MM 后缀，与 final-report 的 proFilename 同一套补零规矩，只是前缀换成工具名
+    function pdfStamp() {
+        var d = new Date();
+        var m = d.getMonth() + 1;
+        return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m;
+    }
+
+    // 交付版报告的柱状图数据源。向导结果只有 rows/primary（label+value+kind），
+    // 而那份报告原本读的是 window.calculationResults —— spec 向导永远没有这个全局量。
+    // 挑法：**只要金额型**（percent / text 混进来会把税负率当金额画同一根轴），最多 6 项；
+    // 凑不齐 2 项就返回 null —— 报告那边据此整段不画，而不是画一张全 0 的图。
+    function structureFor(out) {
+        var pick = [];
+        if (out.primary && out.primary.kind === 'money' && Number(out.primary.value)) {
+            pick.push(out.primary);
+        }
+        (out.rows || []).forEach(function (r) {
+            if (pick.length >= 6) return;
+            if (r.kind !== 'money') return;
+            var n = Number(r.value);
+            if (!isFinite(n) || n === 0) return;
+            pick.push(r);
+        });
+        if (pick.length < 2) return null;
+        return {
+            labels: pick.map(function (r) { return String(r.label); }),
+            values: pick.map(function (r) { return Number(r.value) || 0; }),
+            note: '单位：元。按本次测算结果的关键金额项排序，用于横向比较各部分的量级。'
+        };
+    }
+
     function exportResult(tool, kind) {
         var out = state.lastResult;
         if (!out) {
@@ -435,12 +478,35 @@
         var html = exportHtml(tool, out);
         var title = tool.name + '测算表';
         if (kind === 'pdf') {
-            if (typeof exportToPDF !== 'function') {
-                console.warn('[deep-wizard] exportToPDF 未加载，导出被跳过');
-                return;
+            // 阶段20 P5（v1.107.0）：接回 final-report —— 精装版 PDF 是已收费权益
+            // （business-plan 的 ProCode 权益表里的「汇算清缴 PDF 完整报告」），
+            // 但阶段17 删旧页面时这条链路连同 UI 一起断开了，此后零调用：
+            // Pro 用户拿到的是自拼 HTML 的标准版，承诺的封面/图表/政策要点一份都没给过。
+            var rep = window.EuriskoReport;
+            if (rep && typeof rep.exportFinalReport === 'function') {
+                try {
+                    rep.exportFinalReport({
+                        kind: tool.id,
+                        meta: {
+                            resultElId: 'dw-result-card',
+                            legacyTitle: title,
+                            // 封面按工具名，21 个税种不再共用「综合所得汇算」这一个标题
+                            reportTitle: function () { return tool.name + '交付版报告'; },
+                            kindLabel: tool.name
+                        },
+                        // 文件名同样带工具名：默认那串「汇算清缴报告_YYYY-MM」会让
+                        // 增值税 / 经营所得的报告在下载目录里长成一个名字，事后根本认不出
+                        filename: tool.name + '交付版报告_' + pdfStamp() + '.pdf',
+                        coreHtml: html,
+                        structure: structureFor(out),
+                        onStandard: function () { standardPdf(title, html); }
+                    });
+                    return;
+                } catch (e) {
+                    console.warn('[deep-wizard] 交付版报告导出失败，回落标准 PDF', e);
+                }
             }
-            // skipResultCheck：导出函数默认校验存量 4 页的全局 results，spec 向导没有那些变量
-            exportToPDF(null, title, { skipResultCheck: true, contentBuilder: function () { return html; } });
+            standardPdf(title, html);
             return;
         }
         if (typeof exportToWord !== 'function') {

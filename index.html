@@ -18,7 +18,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.106.0';
+        window.__APP_VERSION__ = '1.107.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1211,7 +1211,7 @@
         </div>
     </div>
 
-    <!-- 升级码模态框（PAY-04，v1.106.0）：只承接「已经拿到码的人」—— 不做权益对比、不做购买引导。
+    <!-- 升级码模态框（PAY-04，v1.107.0）：只承接「已经拿到码的人」—— 不做权益对比、不做购买引导。
          入口仍为 2 处：顶栏 pill #topbar-plan-badge 与个人中心横幅 #profile-nav-upgrade（见 auth-ui.js openUpgradeModal）。
          还没有码的人走留资（#upgrade-lead-btn → 留资弹窗），由顾问协助；交易在站外完成后发码，用户回站自助开通。
          原「基础版 vs 专业版」权益对比表与「线上购买通道后续开放」FAQ 已整体下线（属付费营销，与本期定位冲突）。 -->
@@ -1557,7 +1557,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.106.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.107.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
