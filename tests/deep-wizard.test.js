@@ -378,6 +378,82 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
         expect(window.exportToPDF.mock.calls[0][2].skipResultCheck).toBe(true);
         expect(window.exportToPDF.mock.calls[0][2].contentBuilder()).toContain('应纳增值税');
         spy.mockRestore();
+    });
+
+    // P5 只真机点过 1 个税种（增值税），而要服务的是 21 个。每个 spec 的 rows 长得不一样
+    // （有的是 percent、有的 primary 不是 money），「在增值税上成立」推不出「在经营所得上也成立」。
+    // 这里补齐覆盖面。**取数不走 UI 导航**：21 个 spec 里只有一部分能靠默认值点到底，
+    // 其余有必填项（阶段19 真机冒烟 41/41 出数，缺的是默认值不是能力）—— 靠点 next 去凑
+    // 覆盖面，量到的只是「哪些 spec 给了全默认值」，不是「报告在 21 个税种上取数对不对」。
+    test('21 个完整测算逐一取数：交付版报告在每一个税种上都拼得出来', () => {
+        loadSource('src/js/export/final-report.js');
+        const tools = R().deep();
+        const problems = [];
+        let withChart = 0;
+        let covered = 0;
+        const stillNeeds = [];
+        // 这 13 个 spec 的必需入参**没有默认值可算**（annual-settlement-deep 的第一步就是
+        // repeater「任职段」，默认给的是一条空条目；business / donation 同理）—— 用户填了才有结果，
+        // 不是能力缺失。它们不进默认覆盖面，但要登记在案：新增 spec 若默认算不出，必须显式加进来
+        // （说明它也是"要用户填"），不许悄悄变成"默认打不开"；反之补了 default 就要移出、进覆盖面。
+        const NEEDS_INPUT = [
+            'business', 'withholding-deep', 'bonus-tax-deep', 'equity-deep', 'severance-deep',
+            'early-retirement-deep', 'expat-deep', 'annual-settlement-deep', 'special-deduction-deep',
+            'private-pension-deep', 'donation', 'property-transfer', 'non-resident'
+        ];
+
+        tools.forEach((tool) => {
+            // 用向导自己填的那份默认入参（defaultsOf 含 repeater 的空条目）。
+            // 只 open 的话 state.values 里只有当前步的字段，后面步骤还没进值 —— 那是取数方式不对，
+            // 不是 tool 的病。
+            let out = null;
+            try { out = tool.compute(W().defaultsOf(tool)); } catch (e) { out = null; }
+            const listed = NEEDS_INPUT.indexOf(tool.id) >= 0;
+            if (!out || !out.primary) {
+                // 名单里的仍算不出 = 现状没变；哪天补上了 default，ready 会少一个，提示移出名单
+                if (listed) stillNeeds.push(tool.id);
+                else problems.push(tool.id + '：默认入参算不出结果，且不在「需用户填值」名单里');
+                return;
+            }
+            if (listed) { problems.push(tool.id + '：名单里说要用户填，实际默认就算得出 —— 移出名单让它进覆盖面'); return; }
+            covered += 1;
+
+            const s = W().structureFor(out);
+            if (s) {
+                if (s.labels.length !== s.values.length) problems.push(tool.id + '：图表标签与数值不等长');
+                if (s.labels.length > 6) problems.push(tool.id + '：图表取了超过 6 项');
+                if (!s.values.every((v) => Number(v) !== 0)) problems.push(tool.id + '：图表里混进了 0 值项');
+                withChart += 1;
+            }
+
+            const meta = {
+                resultElId: 'dw-result-card',
+                reportTitle: () => tool.name + '交付版报告',
+                kindLabel: tool.name
+            };
+            let html = '';
+            try {
+                html = window.EuriskoReport.buildProDocHtml(tool.id, {
+                    meta: meta, coreHtml: '<p>明细</p>', structure: s
+                });
+            } catch (e) {
+                problems.push(tool.id + '：拼报告抛错 ' + e.message);
+                return;
+            }
+            if (html.indexOf('pro-cover') < 0) problems.push(tool.id + '：报告没有封面');
+            if (html.indexOf(tool.name) < 0) problems.push(tool.id + '：封面标题不带税种');
+            if (html.indexOf('免责声明') < 0) problems.push(tool.id + '：报告没有免责');
+            // 有数据要画、没数据就不画 —— 两头都不许错
+            if (s && html.indexOf('pro-tax-chart') < 0) problems.push(tool.id + '：有数据却没画图');
+            if (!s && html.indexOf('pro-tax-chart') >= 0) problems.push(tool.id + '：没数据却画了图');
+        });
+
+        expect(problems).toEqual([]);
+        expect(tools.length).toBe(21);
+        expect(covered).toBe(21 - NEEDS_INPUT.length);   // 能默认算的都过了一遍
+        expect(stillNeeds.sort()).toEqual(NEEDS_INPUT.slice().sort());
+        expect(withChart).toBeGreaterThan(0);            // 覆盖面里至少有一部分画得出图
+        delete window.EuriskoReport;
         // 摘掉它，后面的用例仍落在「报告不在场」的旧路径上 —— 这条验证的是真机链路，
         // 不是要把整份文件的导出行为都改成走报告（前者兑现权益，后者是另一批）。
         delete window.EuriskoReport;

@@ -1233,6 +1233,13 @@
         stepsOf: stepsOf,
         fieldsOfStep: fieldsOfStep,
         // 暴露给单测：断言「切换视图不丢值」这类肉眼极难发现的回归
-        values: function () { return state.values; }
+        values: function () { return state.values; },
+        // 暴露给单测：交付版报告的柱状图取数要覆盖 21 个税种，而 UI 上只点得通
+        // 有默认值的一部分（其余 spec 有必填项，走到结果步要靠用户填）。
+        // 直接对 compute 的结果取数，才能把「21 个都取对」钉住而不是钉住 8 个。
+        structureFor: structureFor,
+        // 全量默认入参（含 repeater 的空条目）：单测要在 21 个税种上验报告取数，
+        // 总不能手拼一份 —— 手拼的结果只是「我猜的入参」，要用向导自己填的那份。
+        defaultsOf: defaultsOf
     };
 })();

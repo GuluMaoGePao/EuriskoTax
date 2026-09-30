@@ -234,8 +234,13 @@
     //   meta      封面标题 / 副标题 —— 按工具名来，21 个税种不再共用一个「综合所得汇算」封面
     function buildProDocHtml(kind, opts) {
         opts = opts || {};
-        // 兼容旧调用 buildProDocHtml(kind, meta)：meta 本体带 legacyTitle / reportTitle
-        const meta = (opts.reportTitle || opts.legacyTitle) ? opts : (META[kind] || META.comprehensive);
+        // 三种调用形态都认：① opts.meta（exportFinalReport 就是这么传的）
+        // ② 旧调用 buildProDocHtml(kind, meta)：meta 本体带 legacyTitle / reportTitle
+        // ③ 都不给 → 按 kind 回落。
+        // ⚠️ ① 这条是 v1.108.0 补的：原先只认 ②，于是 exportFinalReport 传的 { meta } 被静默
+        // 丢掉，封面回落到 META.comprehensive —— 21 个税种的精装报告封面全写着「综合所得汇算清缴」，
+        // 而单测只断言了「有封面」（默认封面也有 pro-cover 这个类名），所以一直没红。
+        const meta = opts.meta || ((opts.reportTitle || opts.legacyTitle) ? opts : (META[kind] || META.comprehensive));
         const email = (getCurrentUser() || {}).email || '';
         const core = opts.coreHtml !== undefined ? opts.coreHtml
             : ((typeof generateWordDocumentContent === 'function')
