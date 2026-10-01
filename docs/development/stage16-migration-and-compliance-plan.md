@@ -215,6 +215,99 @@
 | 验收 | `ops-check-prod.ps1` 线上指纹在新域名全绿；切换后老域名可回退 |
 | 硬前置 | ICP 备案通过 |
 
+#### 16A.1 执行手册（ICP 已于 2026-10-01 通过，可开工）
+
+**0. 开工前先看清三件事**
+
+| # | 事实 | 影响 |
+|---|---|---|
+| ① | **远端仍停在 v1.17.0，本地领先 6 个版本（v1.107~v1.112）未 push** | 境内服务器拉代码前必须先 push，否则部署的是一年前的旧代码 |
+| ② | 生产在**境外**（`euriskotax.zeabur.app`），`euriskotax.com` 尚未解析 | 备案已下但接入仍在境外，公安备案的 IP / 接入商会与备案信息对不上 |
+| ③ | 单镜像部署：`server` 托管前端静态 + API（3000 端口），Prisma + PostgreSQL | 迁的是**一个容器 + 一个库**，但库里有真实用户数据 |
+
+**1. 顺序（先看为什么是这个顺序）**
+
+```
+① 建腾讯云库 → ② 迁数据 → ③ 部署应用（连新库）
+   → ④ 用公网 IP 直连验证（此时不动 DNS）→ ⑤ DNS 切流 → ⑥ 观察 → ⑦ 公安备案
+```
+
+两条关键：
+- **先迁数据、后切流**：数据不对就停在 ④，切流纯粹是改一条 A 记录；
+- **验证阶段用 IP 访问、不动 DNS**：这样 ⑤ 是"秒级可回滚"的一步，而不是"边切边调"的一步。
+
+**2. 数据库：整库迁，别挑表**
+
+腾讯云侧二选一（**待拍板**）：
+- **TencentDB PostgreSQL**（推荐）：托管、自动备份、故障可回滚，成本约几十元/月；
+- **服务器自建**（`docker-compose.postgres.yml` 已有）：省成本，但**备份与恢复要自己做**，且数据在容器卷里，服务器挂了就一起没。
+
+```bash
+# 源库（Zeabur Postgres，需先开公网访问拿到连接串）
+pg_dump "$SRC_URL" --format=custom --no-owner --no-privileges -f eurisko.dump
+
+# 目标库（腾讯云）
+pg_restore --dbname="$DST_URL" --no-owner --no-privileges eurisko.dump
+```
+
+要迁的 14 张表按"丢了会怎样"分三档 —— **整库 dump 最省事也最不容易漏**，分档只在需要挑着迁时用：
+
+| 档 | 表 | 丢了会怎样 |
+|---|---|---|
+| **事故** | `User`、`Lead`、`ProCode`、`InviteCode`、`Calculation` | 用户登不上；**留资线索（付费获客资产）找不回来**；用户花钱买的 Pro 权益没了 |
+| **要重配** | `ContentItem`、`ContentRelease`、`SupportScript`、`TaxRateConfig`、`CitySocialConfig` | 新环境"没内容"，得在后台一条条重录 |
+| **可丢** | `VerificationCode`（短时效）、`CalcEvent`、`FunnelEvent`（运营统计） | 可接受，但整库迁时顺带带走 |
+
+**3. 环境变量（逐项，照抄到腾讯云）**
+
+| 变量 | 取值 | 踩坑 |
+|---|---|---|
+| `DATABASE_URL` | 腾讯云 PG 连接串 | 同地域用内网串更快更省；跨机才用公网 + SSL |
+| `JWT_SECRET` | **必须与 Zeabur 完全一致** | 换了 → 老用户 token 全部验签失败，表现为"集体掉线 + 历史对不上"，且**不可逆**（除非再换回去） |
+| `ADMIN_TOKEN` | 沿用或换新 | 换了要同步 `ops-check-prod.ps1` 与 GUI 缓存 |
+| `CORS_ORIGIN` | `https://euriskotax.com` | 留 `*` 在新域名下会被拦，表现为"页面能开、所有请求失败" |
+| `SEED_GRANT_PRO` | **收费后必须 `false`** | 忘了关 = 人人注册白得专业版 |
+| `SMTP_*` | 沿用 `smtp.qq.com` **465** | **腾讯云出方向封禁 25 端口**，465/587 可用；切完必须实测"注册验证码能收到" |
+| `PORT` / `NODE_ENV` | `3000` / `production` | Dockerfile 启动时自动跑 `prisma migrate deploy`（16 个迁移，已 restore 的数据会幂等跳过） |
+
+**4. 部署与 HTTPS**
+
+- 同一份 `Dockerfile` 直接构建即可（`COPY . .` 前后端一体）；注意 Zeabur 构建机用的 DaoCloud 加速源，腾讯云上可 `--build-arg BASE_IMAGE=node:22-slim` 走官方源；
+- 反代：Caddy / Nginx 把 80/443 → 3000；**安全组放行 80/443**（3000 不必对外暴露）；
+- SSL：腾讯云免费证书，或 Caddy 自动签 Let's Encrypt。
+
+**5. 切流同批：`canonical` / `og:url` 必须换域（107 处 / 23 个文件）**
+
+21 个落地页 + index.html 里的 `canonical` 与 `og:url` 现在全部指向 `https://euriskotax.zeabur.app`。
+切了正式域名却不改这个 → 搜索引擎判定 `euriskotax.com` 的页面是 zeabur.app 的**副本**，
+权重归给旧域，**21 个落地页等于白做**（这是它们存在的全部意义）。
+
+- **不能提前改**：域名还没解析时把 canonical 指过去，抓取直接失败，比不改更糟；
+- **不能忘**：107 处手工替换，只改一半是常态 —— 因此先加了断言 9
+  （`tests/copy-standard.test.js`）：全站 canonical 只允许一个域名，
+  **现在全站是同一个旧域所以是绿的；切换那天谁漏了一批，域名分裂成两个，立刻红**。
+- 替换范围：`seo/*.html`（21 页）+ `index.html` + `robots.txt` 里的 `zeabur.app`。
+  `sitemap.xml` 已经用的是 `euriskotax.com`，不用改（这也是为什么不一致会更糟）。
+
+**6. 切换窗口：最容易亏钱的十分钟**
+
+DNS 有缓存（TTL），切换后仍有用户打到 Zeabur 旧库 —— 这部分写入新库没有：
+- 提前把 TTL 调到 **300 秒**，选**低峰（凌晨）**切；
+- 切完按 `createdAt` 从旧库**补增量**，优先补 `Lead`（线索是买来的）与 `User` / `ProCode`；
+- Zeabur **先别删**，保留 ≥ 1 周作回滚路径。
+
+**7. 验证（切流前后各跑一遍）**
+
+- `GET /health` → 200；
+- `tools/ops/ops-check-prod.ps1` 对新域名全绿（页面 / 登录 / 内容 / 线索 / 兑换码端点）；
+- 真实链路四条：注册验证码**收得到**（验 SMTP）、登录、云端历史读写、留资写入；
+- 21 个落地页可访问，页脚备案号与工信部链接在（v1.112.0 已铺全站）；
+- 老域名仍可访问（回滚路径还在）。
+
+**8. 回滚**：DNS 改回 Zeabur（TTL 调小后分钟级生效）。
+
+**9. 切完之后**：公安备案要填的 **IP 与接入商**这时才对得上 → 办结拿到 `沪公网安备 XXXXXXXXXXXX号` → 只改 `site-filing-ui.js` 的 `policeNumber` 一行，22 页自动生效（合规文档 §6.5）。
+
 ### 16B 官方支付（微信 / 支付宝）
 
 | 项 | 内容 |

@@ -162,6 +162,50 @@ describe('断言 5：备案位一页都不能漏', () => {
     });
 });
 
+// 断言 9（v1.112.0）：canonical / og:url 的**域名必须全站一致**。
+//
+// 背景：21 个落地页的 canonical 与 og:url 现在都指向 https://euriskotax.zeabur.app（境外），
+// 全站共 107 处 / 23 个文件。切境内节点（阶段16A）时必须整体换成 euriskotax.com ——
+// 换不完的后果是**搜索权重被送去旧域**：正式域名的页面被判定为 zeabur.app 的副本，
+// 21 个落地页等于白做。而这是 107 处手工替换，只改一半是常态。
+//
+// 断言现在就成立（全站同一个旧域），所以当下是绿的；它的价值在切换那天：
+// 谁漏了一批页面，canonical 域名就会分裂成两个，这里立刻红。
+describe('断言 9：canonical / og:url 全站同一域名（切境内节点时防改一半）', () => {
+    const pages = () => ['index.html'].concat(seoFiles());
+
+    test('每个页面的 canonical 与 og:url 域名相同，且是已知主域之一', () => {
+        const KNOWN = ['euriskotax.zeabur.app', 'euriskotax.com'];   // 切换后应只剩后者
+        const problems = [];
+        pages().forEach((f) => {
+            const src = readSrc(f);
+            const hosts = [];
+            // 取 host 到第一个 / 为止（URL 后面还跟着路径，结尾不能写死引号）
+            [/<link[^>]+rel="canonical"[^>]+href="https?:\/\/([^/"]+)/,
+                /<meta[^>]+property="og:url"[^>]+content="https?:\/\/([^/"]+)/].forEach((re) => {
+                const m = src.match(re);
+                if (m) hosts.push(m[1]);
+            });
+            hosts.forEach((h) => {
+                if (KNOWN.indexOf(h) < 0) problems.push(f + '：出现未知域名 ' + h);
+            });
+            if (hosts.length === 2 && hosts[0] !== hosts[1]) {
+                problems.push(f + '：canonical(' + hosts[0] + ') 与 og:url(' + hosts[1] + ') 不一致');
+            }
+        });
+        expect(problems).toEqual([]);
+    });
+
+    test('全站 canonical 只允许一个域名（不许一部分旧域、一部分正式域）', () => {
+        const hosts = new Set();
+        pages().forEach((f) => {
+            const m = readSrc(f).match(/<link[^>]+rel="canonical"[^>]+href="https?:\/\/([^/"]+)/);
+            if (m) hosts.add(m[1]);
+        });
+        expect(hosts.size).toBe(1);
+    });
+});
+
 // 断言 8（v1.111.0）：隐私政策的**法定告知项**不许被改没。
 //
 // 背景：留资弹窗收手机号 / 微信号 / 单位 / 省市并 POST /leads 上报服务端，但隐私政策里
