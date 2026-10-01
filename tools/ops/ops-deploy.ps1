@@ -235,7 +235,7 @@ function Test-ServerPrerequisites {
     $remotePath = $Config.deploy.remotePath
     $releasesDir = "$remotePath/releases"
     $result = Invoke-RemoteCommand -Config $Config -Command "mkdir -p $releasesDir && echo 'OK'"
-    if ($result.Output -notmatch "OK") {
+    if ((($result.Output | Out-String)) -notmatch "OK") {
         Write-DeployLog "ERROR" "无法创建部署目录: $releasesDir"
         exit 1
     }
@@ -285,7 +285,9 @@ function Sync-RemoteEnvFile {
     # 合并：先复制 .env.shared，再追加默认变量（不覆盖已存在的 key）
     $mergeCmd = "cp $serverEnvFile $targetEnvFile && echo '$escapedDefaults' >> $targetEnvFile && echo 'ENV_SYNCED' && wc -l $targetEnvFile"
     $result = Invoke-RemoteCommand -Config $Config -Command $mergeCmd
-    if ($result.Output -notmatch "ENV_SYNCED") {
+    # Output 是 ssh 输出的行数组：-notmatch 对数组返回"所有不匹配的行"（非空即真），
+    # 会把成功的多行输出误判为失败 —— 必须先合并成单字符串再匹配。
+    if ((($result.Output | Out-String)) -notmatch "ENV_SYNCED") {
         Write-DeployLog "ERROR" "环境变量同步失败"
         Write-DeployLog "ERROR" $result.Output
         exit 1
@@ -298,7 +300,7 @@ function Sync-RemoteEnvFile {
     # 验证关键变量是否存在
     $validateCmd = "grep -c 'JWT_SECRET' $targetEnvFile && grep -c 'DATABASE_URL' $targetEnvFile && echo 'ENV_VALID'"
     $validateResult = Invoke-RemoteCommand -Config $Config -Command $validateCmd
-    if ($validateResult.Output -notmatch "ENV_VALID") {
+    if ((($validateResult.Output | Out-String)) -notmatch "ENV_VALID") {
         Write-DeployLog "WARN" "环境变量文件中可能缺少 JWT_SECRET 或 DATABASE_URL"
         Write-DeployLog "WARN" "请在服务器 $serverEnvFile 中补充这些变量"
     } else {
@@ -322,7 +324,7 @@ function Invoke-RemoteDeploy {
     # 2. 解压到发布目录
     Write-DeployLog "INFO" "解压到发布目录: $releaseDir"
     $result = Invoke-RemoteCommand -Config $Config -Command "mkdir -p $releaseDir && tar -xzf $remoteArchive -C $releaseDir && rm -f $remoteArchive && echo 'EXTRACT_OK'"
-    if ($result.Output -notmatch "EXTRACT_OK") {
+    if ((($result.Output | Out-String)) -notmatch "EXTRACT_OK") {
         Write-DeployLog "ERROR" "解压失败"
         exit 1
     }
@@ -335,7 +337,7 @@ function Invoke-RemoteDeploy {
     Write-DeployLog "INFO" "安装后端依赖（可能需要 1-2 分钟）..."
     $installCmd = "cd $releaseDir/server && npm install --production 2>&1 && npx prisma generate 2>&1 && npx prisma migrate deploy 2>&1 && echo 'INSTALL_OK'"
     $result = Invoke-RemoteCommand -Config $Config -Command $installCmd -Timeout 180
-    if ($result.Output -notmatch "INSTALL_OK") {
+    if ((($result.Output | Out-String)) -notmatch "INSTALL_OK") {
         Write-DeployLog "ERROR" "依赖安装或迁移失败"
         Write-DeployLog "ERROR" $result.Output
         exit 1
@@ -353,7 +355,7 @@ function Invoke-RemoteDeploy {
     Write-DeployLog "INFO" "切换 current 软链接..."
     $switchCmd = "cd $remotePath && if [ -L current ] || [ -d current ]; then rm -f current; fi && ln -s $releaseDir current && echo 'SWITCH_OK'"
     $result = Invoke-RemoteCommand -Config $Config -Command $switchCmd
-    if ($result.Output -notmatch "SWITCH_OK") {
+    if ((($result.Output | Out-String)) -notmatch "SWITCH_OK") {
         Write-DeployLog "ERROR" "软链接切换失败"
         exit 1
     }
@@ -365,12 +367,12 @@ function Invoke-RemoteDeploy {
         Write-DeployLog "INFO" "通过 PM2 重启服务..."
         $restartCmd = "cd $serverDir && pm2 delete $processName 2>/dev/null; pm2 start src/app.js --name $processName && pm2 save && echo 'PM2_OK'"
         $result = Invoke-RemoteCommand -Config $Config -Command $restartCmd
-        if ($result.Output -notmatch "PM2_OK") {
+        if ((($result.Output | Out-String)) -notmatch "PM2_OK") {
             # 如果 delete 失败（首次部署），尝试直接 start
             $startCmd = "cd $serverDir && pm2 start src/app.js --name $processName && pm2 save && echo 'PM2_OK'"
             $result = Invoke-RemoteCommand -Config $Config -Command $startCmd
         }
-        if ($result.Output -notmatch "PM2_OK") {
+        if ((($result.Output | Out-String)) -notmatch "PM2_OK") {
             Write-DeployLog "ERROR" "PM2 启动失败"
             Write-DeployLog "ERROR" $result.Output
             exit 1
@@ -404,7 +406,7 @@ WantedBy=multi-user.target
         $escapedSvc = $serviceContent -replace "'", "'\''"
         $svcCmd = "echo '$escapedSvc' | sudo tee /etc/systemd/system/$svcName.service > /dev/null && sudo systemctl daemon-reload && sudo systemctl restart $svcName && sudo systemctl enable $svcName && echo 'SYSTEMD_OK'"
         $result = Invoke-RemoteCommand -Config $Config -Command $svcCmd
-        if ($result.Output -notmatch "SYSTEMD_OK") {
+        if ((($result.Output | Out-String)) -notmatch "SYSTEMD_OK") {
             Write-DeployLog "ERROR" "systemd 服务启动失败"
             exit 1
         }
@@ -415,7 +417,7 @@ WantedBy=multi-user.target
         Write-DeployLog "INFO" "通过 nohup 启动服务..."
         $directCmd = "cd $serverDir && pkill -f 'node src/app.js' 2>/dev/null; nohup node src/app.js > /var/log/euriskotax.log 2>&1 & echo 'DIRECT_OK'"
         $result = Invoke-RemoteCommand -Config $Config -Command $directCmd
-        if ($result.Output -notmatch "DIRECT_OK") {
+        if ((($result.Output | Out-String)) -notmatch "DIRECT_OK") {
             Write-DeployLog "ERROR" "服务启动失败"
             exit 1
         }
@@ -429,9 +431,13 @@ WantedBy=multi-user.target
     }
 
     # 9. 清理旧版本
+    # ⚠ 不能用 `ls -dt`（mtime）：tar 解压会恢复归档里记录的目录 mtime，排序与部署顺序无关，
+    #   曾把 current 正指向的**最新** release 删掉，留下悬空软链 + PM2 从已删目录跑的进程
+    #   （进程活着、静态文件全部 404）。release 目录名是时间戳，按名字倒序就是新→旧；
+    #   并保护 current 指向的目录永不被删。
     $keepReleases = $Config.deploy.keepReleases
-    Write-DeployLog "INFO" "清理旧版本（保留最近 $keepReleases 个）..."
-    $cleanupCmd = "cd $releasesDir && ls -dt */ | tail -n +$($keepReleases + 1) | xargs rm -rf 2>/dev/null; echo 'CLEANUP_OK'"
+    Write-DeployLog "INFO" "清理旧版本（保留最近 $keepReleases 个，current 除外）..."
+    $cleanupCmd = "cd $releasesDir && cur=`$(basename `"`$(readlink -f ../current)`") && ls -d */ | sort -r | tail -n +$($keepReleases + 1) | grep -v `"^`$cur/`" | xargs -r rm -rf; echo 'CLEANUP_OK'"
     Invoke-RemoteCommand -Config $Config -Command $cleanupCmd | Out-Null
     Write-DeployLog "OK" "旧版本清理完成"
 }
@@ -483,7 +489,7 @@ function Invoke-Rollback {
 
     $switchCmd = "cd $remotePath && rm -f current && ln -s $targetVersion current && echo 'ROLLBACK_OK'"
     $result = Invoke-RemoteCommand -Config $Config -Command $switchCmd
-    if ($result.Output -notmatch "ROLLBACK_OK") {
+    if ((($result.Output | Out-String)) -notmatch "ROLLBACK_OK") {
         Write-DeployLog "ERROR" "回滚失败"
         exit 1
     }
@@ -532,7 +538,8 @@ if ($InitEnv) {
     # 检查是否已存在
     $checkResult = Invoke-RemoteCommand -Config $Config -Command "test -f $serverEnvFile && echo 'EXISTS' || echo 'NOT_EXISTS'"
 
-    if ($checkResult.Output -match "EXISTS") {
+    // NOT_EXISTS 也包含 EXISTS 子串（弱匹配误判），且 Output 是行数组 —— 先合并再反向判断
+    if ((($checkResult.Output | Out-String)) -notmatch "NOT_EXISTS") {
         Write-DeployLog "WARN" "环境变量文件已存在: $serverEnvFile"
         $readResult = Invoke-RemoteCommand -Config $Config -Command "cat $serverEnvFile | grep -E '^[A-Z]' | sed 's/=.*/=***/' "
         Write-DeployLog "INFO" "当前变量（值已脱敏）:"

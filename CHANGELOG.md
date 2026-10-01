@@ -11,6 +11,54 @@
 
 ---
 
+## [1.115.0] - 2026-10-01 - 16A 实发：境内节点已在腾讯云跑通（IP 直连验证全绿）
+
+部署要素齐备后当天完成首投：**应用已在 `101.42.89.184` 运行 v1.115.0，IP 直连验证全绿**。
+距 DNS 切换还差两件事：把 `JWT_SECRET` 换成 Zeabur 真值、迁历史数据（见文末）。
+
+### 服务器侧（全部完成）
+
+- SSH（密钥 `euriskotax_sskkey.pem` → `ubuntu@101.42.89.184`，Ubuntu 24.04，Node 22 预装）；
+- PostgreSQL **16.15**（apt 版，比 Docker 省 ~150M 内存——2G 机器上这是真金白银），
+  库 `eurisko` 已建，**16 个 Prisma 迁移全部应用**，连接串只存在服务器本地；
+- `.env.shared`（600）：DATABASE_URL 用本地 PG、SMTP 复用本地邮件配置、
+  CORS 指向正式域名；**`JWT_SECRET` / `ADMIN_TOKEN` 是随机占位**（见文末 ⚠）；
+- PM2（脚本自动装）跑 `euriskotax`，内存 101MB；Caddy 反代 80 → 3000
+  （IP 验证模式；DNS 解析后换成域名即自动签 HTTPS，`cn` 301 → 主域）；
+- 验证：首页 / `version.json`(1.115.0) / 落地页 / 静态 JS / SW / manifest 全 200，
+  备案号在脚本里，留资与登录端点参数校验工作（400），内存余量 1.2G。
+
+### `ops-deploy.ps1` 首次实发踩出四个 bug（都修了）
+
+这脚本"写好但从未启用"——首次真跑暴露的坑，恰好都是只在真机上出现的：
+
+1. **PM2 全局安装 EACCES**：脚本用 `npm install -g`，`ubuntu` 用户没权限写
+   `/usr/lib/node_modules` → 手动 `sudo` 装好（脚本没改成 sudo，留个日志现场）；
+2. **`serverEnvFile` 相对路径**：config 里写 `.env.shared`，SSH 登录目录是 home，
+   `test -f` 永远找不到 → 改绝对路径（config 修复）；
+3. **数组弱匹配**：`$result.Output` 是 ssh 输出的**行数组**，`-notmatch "X"` 对数组
+   返回"所有不匹配的行"（非空即真）——`ENV_SYNCED`、`INSTALL_OK` 明明输出了仍判失败，
+   连环假红 10 处 → 统一先 `Out-String` 合并再匹配；
+4. **清理逻辑会删掉正在运行的版本**（最险的一个）：`ls -dt */` 按 mtime 排序，而
+   **tar 解压会恢复归档里记录的目录 mtime**，排序与部署顺序无关——曾把 `current`
+   正指向的最新 release 删掉，留下悬空软链 + PM2 从已删目录跑的进程
+   （进程活着、静态文件全 404、API 正常——一半绿一半 404，极具迷惑性）。
+   改为按目录名排序（时间戳天然有序）+ `current` 指向的目录永不删除。
+
+### ⚠ 切 DNS 前必须完成的两件事
+
+1. **`JWT_SECRET` 换成 Zeabur 控制台里的真值**（`/home/ubuntu/euriskotax/.env.shared`，
+   600 权限）——现在占位值直接切流 = 全体老用户 token 验签失败，集体掉线且不可逆；
+   `ADMIN_TOKEN` 同步核对（`ops-check-prod.ps1` 用它查线上指纹）。
+2. **迁历史数据**：`User` / `Lead` / `ProCode` / `InviteCode` / `Calculation` 五张表 +
+   内容配置（新库只有空表，`ops-seed-prod.js` 可补内容但**补不出线索**）——
+   等 Zeabur PG 开公网拿连接串，整库 dump → restore → 行数核对。
+
+### 验收
+
+- 单测 **115 套件 2158 例**全绿；门禁 `verify:local` **259/259**、线上指纹 **37 项**；
+- 腾讯云节点 IP 直连验证全绿（见上）。
+
 ## [1.114.0] - 2026-10-01 - 16A 落到真机上：服务器与备案信息填实，换域脚本就位
 
 用户发来腾讯云控制台截图，部署要素齐了。把执行手册里的假设全部换成**核实的现状**，
