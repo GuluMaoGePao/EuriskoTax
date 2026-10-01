@@ -162,6 +162,52 @@ describe('断言 5：备案位一页都不能漏', () => {
     });
 });
 
+// 断言 8（v1.111.0）：隐私政策的**法定告知项**不许被改没。
+//
+// 背景：留资弹窗收手机号 / 微信号 / 单位 / 省市并 POST /leads 上报服务端，但隐私政策里
+// 原本只写了注册信息与本机数据，连运营主体是谁都没写 —— 收集了却没告知，不是文案瑕疵，
+// 是《个人信息保护法》第 17 条要求的"真实、准确、完整"告知缺项。留资白名单一旦扩围
+// （4 个场景 → 更多税种），这个缺口的暴露面跟着放大，所以**先补告知、再谈扩围**。
+describe('断言 8：隐私政策的法定告知项（《个保法》第 17 条）', () => {
+    const privacyText = () => {
+        // 只取隐私政策模态框那一段：断言的是"对用户展示的承诺"，全文件匹配会串到别的文案上
+        const html = readSrc('index.html');
+        const start = html.indexOf('id="privacy-policy-modal"');
+        const end = html.indexOf('id="user-agreement-modal"') >= 0
+            ? html.indexOf('id="user-agreement-modal"')
+            : html.length;
+        // 剥标签：正文里夹着 <strong>，不剥的话"保存 12 个月"被切成两段，正则永远对不上
+        const raw = start >= 0 ? html.slice(start, end > start ? end : html.length) : '';
+        return raw.replace(/<[^>]+>/g, '');
+    };
+
+    test('写明了个人信息处理者（运营主体）', () => {
+        expect(privacyText()).toContain('上海鑫惟商务咨询服务有限公司');
+    });
+
+    test('主体名与页脚备案位同一份（两处漂移 = 备案主体与隐私政策对不上）', () => {
+        const filing = readSrc('src/js/ui/site-filing-ui.js');
+        const m = filing.match(/owner\s*[:=]\s*'([^']+)'/);
+        expect(m).not.toBeNull();
+        expect(privacyText()).toContain(m[1]);
+    });
+
+    test('披露了留资这一路收集：收什么 / 不收什么 / 用来做什么', () => {
+        const t = privacyText();
+        // 收的字段与"不采集计税输入"的承诺，缺一样就是告知不完整
+        ['手机号或微信号', '单位名称', '所在省份与城市', '不采集', '仅用于顾问'].forEach((needle) => {
+            expect(t).toContain(needle);
+        });
+    });
+
+    test('写明了保存期限与撤回同意（这两项是第 17 条明确列举的告知事项）', () => {
+        const t = privacyText();
+        expect(t).toContain('保存期限');
+        expect(t).toMatch(/保存\s*\d+\s*个月/);
+        expect(t).toContain('撤回同意');
+    });
+});
+
 describe('断言 7：术语统一', () => {
     test('全站「税务部门」出现次数为 0（法定表述是「主管税务机关」）', () => {
         const hits = [];
