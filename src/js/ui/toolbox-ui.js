@@ -68,6 +68,25 @@
         return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
     }
 
+    // 易错口径的渲染真源 —— v1.110.0：这段文字此前在四处各渲染一遍（页面 / 速算器 PDF /
+    // 精装报告 / deep 报告），彼此独立演进。四份里三份忘了处理 **加粗** 标记，于是屏幕上与
+    // PDF 里直接印着一对裸星号（20/20 速算器的 pitfalls 都带加粗）。这里是唯一实现，
+    // 其余几处一律引用它 —— 分家只是再犯一次同一件事的时间问题。
+    function strongify(s) {
+        return String(s === undefined || s === null ? '' : s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
+    function pitfallHtml(p) {
+        return '<li>' + strongify(esc(p)) + '</li>';
+    }
+
+    // 任何一段「数据里带 **加粗** 的文案」都走这里：先转义（数据是数据），再加粗（标记是格式）。
+    // 不只 pitfalls —— compute 回的 note 也带加粗（如「按**全部不含税销售额**判断」），
+    // 消费者各自 esc 一遍就完事的话，屏幕上就是一对裸星号。
+    function escRich(s) {
+        return strongify(esc(s));
+    }
+
     function showPageFn(pageId) {
         if (typeof window.showPage === 'function') window.showPage(pageId);
     }
@@ -144,9 +163,11 @@
         }
         wrap.classList.remove('hidden');
         body.innerHTML = basis.map(function (b) {
+            // 政策依据的**文号数据里也可能带加粗**（如「社平 3 倍降为 **2 倍**」）—— 是数据作者
+            // 用来强调政策变化点的写法，渲染时一并处理，页面上不剩裸星号。
             return '<div class="tool-basis-item">' +
-                (b.doc ? '<div class="text-gray-700 font-medium">' + esc(b.doc) + '</div>' : '') +
-                (b.title ? '<div>' + esc(b.title) + '</div>' : '') +
+                (b.doc ? '<div class="text-gray-700 font-medium">' + escRich(b.doc) + '</div>' : '') +
+                (b.title ? '<div>' + escRich(b.title) + '</div>' : '') +
                 '</div>';
         }).join('');
 
@@ -1589,7 +1610,7 @@
             barsBlock +
             '<div class="tool-result-rows">' + rowsHtml + '</div>' +
             stepsHtml +
-            (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + esc(out.note) + '</div>' : '');
+            (out.note ? '<div class="tool-result-note"><i class="fa fa-info-circle mr-1"></i>' + escRich(out.note) + '</div>' : '');
 
         // 阶段19-8：只在**算得出来**时记参数。记一份算不出结果的参数，下次带出来就是
         // "页面坏了" —— 而带出这件事本身是静默的，用户只会把账算在算法头上。
@@ -1791,7 +1812,7 @@
         if (pitEl) {
             pitEl.innerHTML = (tool.pitfalls || []).length
                 ? '<div class="tool-pitfall-head"><i class="fa fa-exclamation-triangle mr-1"></i>易错口径</div><ul>' +
-                tool.pitfalls.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>'
+                tool.pitfalls.map(pitfallHtml).join('') + '</ul>'
                 : '';
         }
 
@@ -2073,6 +2094,13 @@
         partitionFields: partitionFields,
         isFullMode: isFullMode,
         fmtValue: fmtValue,
+        // v1.110.0：金额 / 百分比 / 易错口径的格式与渲染真源在页面这一侧，速算器 PDF 与
+        // 精装报告都到这里来取 —— 报告是要给老板看的，金额口径与页面分家就是自相矛盾。
+        fmtMoney: fmtMoney,
+        fmtPercent: fmtPercent,
+        pitfallHtml: pitfallHtml,
+        strongify: strongify,
+        escRich: escRich,
         renderToolbox: renderToolbox,
         renderScenarios: renderScenarios,
         openTool: openTool,

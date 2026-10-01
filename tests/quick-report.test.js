@@ -14,6 +14,86 @@ const { loadSource } = require('./helpers/load-source.js');
 
 loadSource('src/js/export/quick-report.js');
 
+// v1.110.0：上面的独立用例走的是**兜底分支**（没加载 toolbox-ui）。覆盖面用例要在真实链路上跑，
+// 否则「 bolster 掉哪一份实现」是测不出来的 —— 这与 v1.109.0 docOpts 丢字段是同一类教训：
+// 只看下层函数对不对，抓不到「中间层没接上」。
+describe('覆盖面：20 个速算器 × 页面与 PDF 同源（真实链路）', () => {
+    beforeAll(() => {
+        // 与 toolbox-ui.test.js 同一份依赖链：20 个速算器的 compute 住在 *-quick.js 里，
+        // 不加载它们，默认入参永远算不出结果（覆盖面会退化成「20 个跳过的空跑」）。
+        loadSource('src/js/calculation/tax-constants.js');
+        loadSource('src/js/calculation/tax-calculator.js');
+        loadSource('src/js/calculation/tax-registry.js');
+        ['social-insurance-quick.js', 'salary-tax-quick.js', 'bonus-tax-quick.js', 'net-salary-quick.js',
+            'special-deduction-quick.js', 'annual-settlement-quick.js', 'withholding-quick.js',
+            'equity-incentive-quick.js', 'severance-quick.js', 'early-retirement-quick.js',
+            'expat-allowance-quick.js', 'private-pension-quick.js', 'health-insurance-quick.js',
+            'annuity-quick.js', 'employer-cost-quick.js', 'disability-fund-quick.js',
+            'surtax-stamp-quick.js', 'business-income-quick.js', 'vat-quick.js',
+            'corporate-income-tax-quick.js'].forEach((f) => loadSource('src/js/calculation/' + f));
+        loadSource('src/js/data/tool-registry.js');
+        loadSource('src/js/ui/toolbox-ui.js');   // 格式化与易错口径渲染的真源
+    });
+
+    const defaultsOf = (tool) => {
+        const v = {};
+        (tool.fields || []).forEach((f) => {
+            if (f.default !== undefined) { v[f.key] = f.default; return; }
+            v[f.key] = f.type === 'money' ? 10000 : f.type === 'number' ? 1
+                : f.type === 'percent' ? 0.03
+                    : f.type === 'select' && f.options ? f.options[0].value
+                        : f.type === 'switch' ? false : '';
+        });
+        return v;
+    };
+
+    test('渲染与格式化都取自页面真源（这条不先成立，覆盖面就白跑了）', () => {
+        expect(typeof window.EuriskoToolbox.pitfallHtml).toBe('function');
+        expect(typeof window.EuriskoToolbox.strongify).toBe('function');
+        expect(QR().fmtValue(1234.567, 'money')).toBe(window.EuriskoToolbox.fmtValue(1234.567, 'money'));
+    });
+
+    test('每个速算器的 PDF：易错口径带加粗但不留裸星号，金额与页面同口径', () => {
+        const problems = [];
+        window.EuriskoToolRegistry.all().forEach((tool) => {
+            const vals = defaultsOf(tool);
+            let out = null;
+            try { out = tool.compute(vals); } catch (e) {
+                problems.push(tool.id + '：compute 抛错 ' + e.message.slice(0, 50));
+                return;
+            }
+            if (!out || !out.primary) { problems.push(tool.id + '：默认入参算不出结果'); return; }
+
+            let html = '';
+            try { html = QR().buildDocHtml(tool, vals, out); } catch (e) {
+                problems.push(tool.id + '：拼文档抛错 ' + e.message.slice(0, 50));
+                return;
+            }
+
+            // ① 加粗标记总闸：整份文档不许出现裸 ** —— 不论它来自 pitfalls 还是 out.note。
+            // 修复前两种都漏（pitfalls 一处、note 一处），所以这条按「全文」断言，不指定来源：
+            // 将来再冒出第三种带加粗的字段，这里会先红，而不是等用户在 PDF 里看见星号。
+            const hasStar = (tool.pitfalls || []).some((p) => String(p).indexOf('**') >= 0)
+                || String(out.note || '').indexOf('**') >= 0;
+            if (hasStar && html.indexOf('**') >= 0) {
+                const at = html.indexOf('**');
+                problems.push(tool.id + '：报告里残留裸 ** 加粗标记 @[' + html.slice(Math.max(0, at - 60), at + 40) + ']');
+            }
+            if (hasStar && html.indexOf('<strong>') < 0) problems.push(tool.id + '：加粗没渲染成 strong');
+
+            // ② 金额口径：页面「¥1,234.56」导出成 PDF 变成「¥1,235」，而这份 PDF 是交给别人的。
+            (out.rows || []).filter((r) => r.kind === 'money').forEach((r) => {
+                const page = window.EuriskoToolbox.fmtValue(r.value, 'money');
+                if (html.indexOf(page) < 0) {
+                    problems.push(tool.id + '：明细「' + (r.label || '') + '」报告口径 ' +
+                        QR().fmtValue(r.value, 'money') + ' ≠ 页面 ' + page);
+                }
+            });
+        });
+        expect(problems).toEqual([]);
+    });
+});
+
 const QR = () => window.EuriskoQuickReport;
 
 const TOOL = {
@@ -83,8 +163,12 @@ describe('文件名', () => {
 });
 
 describe('值回显', () => {
+    // v1.110.0：这条原先把「¥3,390」（取整）钉成预期 —— 那是被修掉的缺陷本身留下的化石：
+    // 页面是两位小数，报告抹成整数，用户页面上看到的金额与导出 PDF 对不上，而 PDF 是要交出去的。
+    // 现在 money 与页面同源（两位小数），断言跟着改成页面口径。标题写的「同一套口径」才名副其实。
     test('money / percent / 原样 与结果区同一套口径', () => {
-        expect(QR().pure.fmtValue(3390, 'money')).toBe('¥3,390');
+        expect(QR().pure.fmtValue(3390, 'money')).toBe('¥3,390.00');
+        expect(QR().pure.fmtValue(3390.5, 'money')).toBe('¥3,390.50');   // 小数不能丢
         expect(QR().pure.fmtValue(0.13, 'percent')).toBe('13.00%');
         expect(QR().pure.fmtValue('单独计税')).toBe('单独计税');
     });
@@ -98,7 +182,7 @@ describe('值回显', () => {
     test('switch 回显是/否，money 回显带币种', () => {
         expect(QR().pure.fmtInput(TOOL.fields[2], true)).toBe('是');
         expect(QR().pure.fmtInput(TOOL.fields[2], false)).toBe('否');
-        expect(QR().pure.fmtInput(TOOL.fields[0], 36000)).toBe('¥36,000');
+        expect(QR().pure.fmtInput(TOOL.fields[0], 36000)).toBe('¥36,000.00');   // 与页面同口径
     });
 });
 

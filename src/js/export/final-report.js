@@ -43,6 +43,14 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // 转义 + **加粗**：加粗渲染只有页面那一份实现（Toolbox.escRich），这里借过来，
+    // 免得报告与页面各混一种加法（屏幕上加粗了、PDF 里印着星号，或反过来）。
+    function richHtml(s) {
+        const tb = window.EuriskoToolbox;
+        if (tb && typeof tb.escRich === 'function') return tb.escRich(s);
+        return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
     function num(v) {
         const n = Number(v);
         return Number.isFinite(n) ? n : 0;
@@ -162,7 +170,10 @@
                 if (!p) return;
                 // pitfalls 用 **加粗** 强调易错点（Markdown 习惯）。转成 <strong>，
                 // 不转的话 PDF 里就是一对裸星号（真机截图见过：**普票不是扣税凭证**）。
-                const body = renderAnswerText(String(p)).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                // 加粗这一步只有一份实现（页面侧 Toolbox.strongify），这里先转行与转义、再借它加粗。
+                const body = (window.EuriskoToolbox && typeof window.EuriskoToolbox.strongify === 'function'
+                    ? window.EuriskoToolbox.strongify(renderAnswerText(String(p)))
+                    : renderAnswerText(String(p)).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'));
                 list += '<div class="pro-policy-item"><div class="pro-policy-a">' + body + '</div></div>';
             });
             if (list) {
@@ -272,7 +283,8 @@
         if (structure && (structure.values || []).some(function (v) { return num(v) !== 0; })) {
             html += '<div class="pro-section"><div class="pro-section-title">税负结构对比</div>' +
                 '<div class="pro-chart-box"><canvas id="pro-tax-chart" width="740" height="320"></canvas></div>' +
-                '<p class="pro-chart-note">' + escapeHtml(structure.note || '') + '</p>' +
+                // 图注也可能带 **加粗**（与页面、速算器 PDF 共用同一份渲染，不在报告里再抄一遍）
+                '<p class="pro-chart-note">' + (richHtml(structure.note || '')) + '</p>' +
                 '</div>';
         }
         return html + policySectionHtml(kind, opts.policies) + disclaimerHtml();

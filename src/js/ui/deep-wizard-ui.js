@@ -53,6 +53,14 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // 转义 + **加粗**：加粗渲染只有页面那一份实现（Toolbox.escRich），这里借过来。
+    // compute 回的 note 里带加粗（如「按**全部不含税销售额**判断」），直接输出就是一对裸星号。
+    function richEsc(s) {
+        var tb = window.EuriskoToolbox;
+        if (tb && typeof tb.escRich === 'function') return tb.escRich(s);
+        return esc(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
     function showPageFn(pageId) {
         if (typeof window.showPage === 'function') window.showPage(pageId);
     }
@@ -400,7 +408,7 @@
             extrasExportHtml(out.extras) +
             // 多口径测算必须连对比表一起导出：只看一个数就签字，正是这类工具最容易踩的坑
             (out.compare ? compareExportHtml(out.compare) : '') +
-            (out.note ? '<p style="margin-top:12px;font-size:12px;color:#6b7280">' + esc(out.note) + '</p>' : '') +
+            (out.note ? '<p style="margin-top:12px;font-size:12px;color:#6b7280">' + richEsc(out.note) + '</p>' : '') +
             '<p style="margin-top:16px;font-size:11px;color:#9ca3af">' + DISCLAIMER + '</p>' +
             '</div>';
     }

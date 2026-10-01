@@ -1006,3 +1006,31 @@ describe('阶段19-4：复制结果', () => {
         });
     });
 });
+
+// ====== v1.110.0：覆盖面（页面这一侧不许留裸星号）======
+// 放在文件末尾：这段会把 20 个速算器逐个点开、也会写档案状态，插到中间会污染别的用例
+// （排在它前面的「税务档案完成度引导」就是被它点坏的）。覆盖面测试的代价是「动全局状态」，
+// 所以要么最后跑，要么自己还原 —— 这里选前者。
+describe('覆盖面：20 个速算器逐个点开后，页面上不剩裸星号', () => {
+    test('易错口径 / 政策依据 / 结果区都不出现 **（加粗已渲染）', () => {
+        document.querySelector('[data-tool-id="vat"]').click();   // 先画一次工具箱，入口才存在
+        const problems = [];
+        window.EuriskoToolRegistry.all().forEach((tool) => {
+            const card = document.querySelector('[data-tool-id="' + tool.id + '"]');
+            if (!card) { problems.push(tool.id + '：工具页没有入口'); return; }
+            card.click();
+            const starry = (tool.pitfalls || []).some((p) => String(p).indexOf('**') >= 0);
+            const pitHtml = (document.getElementById('quick-pitfalls') || {}).innerHTML || '';
+            if (starry) {
+                if (pitHtml.indexOf('**') >= 0) problems.push(tool.id + '：易错口径残留裸 **');
+                if (pitHtml.indexOf('<strong>') < 0) problems.push(tool.id + '：加粗没渲染成 strong');
+            }
+            // 政策依据的文号数据里也带加粗（如「社平 3 倍降为 **2 倍**」），结果备注同理
+            ['quick-policy-basis-body', 'quick-result-card'].forEach((id) => {
+                const h = (document.getElementById(id) || {}).innerHTML || '';
+                if (h.indexOf('**') >= 0) problems.push(tool.id + '：' + id + ' 残留裸 **');
+            });
+        });
+        expect(problems).toEqual([]);
+    });
+});

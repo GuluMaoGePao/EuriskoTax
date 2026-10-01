@@ -23,15 +23,34 @@
         return isFinite(n) ? n : 0;
     }
 
+    // 口径真源是**页面**（toolbox-ui.fmtValue）—— v1.110.0 之前这里自己抄了一份 money
+    // （Math.round 取整），页面是两位小数：页面上「¥1,234.56」导出成 PDF 变成「¥1,235」，
+    // 而这份 PDF 是要交给老板 / 客户的。注释当时还写着「与工具箱同一套口径」，说的与实际相反。
+    function pageFmt(value, kind) {
+        var tb = window.EuriskoToolbox;
+        if (tb && typeof tb.fmtValue === 'function') return tb.fmtValue(value, kind);
+        // 兜底：必须与 toolbox-ui 的 fmtMoney / fmtPercent 同口径（两位小数 / ×100），
+        // 仅用于 toolbox-ui 未就绪的场景，不许在日常链路里走到。
+        if (kind === 'money') return '¥' + num(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (kind === 'percent') return (num(value) * 100).toFixed(2) + '%';
+        return (value === undefined || value === null || value === '') ? '—' : String(value);
+    }
+
     function money(n) {
-        return '¥' + Math.round(num(n)).toLocaleString('zh-CN');
+        return pageFmt(n, 'money');
+    }
+
+    // 转义 + **加粗** 渲染：与页面共用同一份实现（toolbox-ui.escRich）。
+    // 兜底只在 toolbox-ui 未就绪时走到 —— 走到了说明加载顺序有变化，不是靠拷贝实现掩盖的地方。
+    function escRich(s) {
+        var tb = window.EuriskoToolbox;
+        if (tb && typeof tb.escRich === 'function') return tb.escRich(s);
+        return esc(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     }
 
     // 与工具箱结果区同一套显示口径（money / percent / 原样），避免「页面 ¥1,234 报告里 1234」
     function fmtValue(value, kind) {
-        if (kind === 'money') return money(value);
-        if (kind === 'percent') return (num(value) * 100).toFixed(2) + '%';
-        return (value === undefined || value === null || value === '') ? '—' : String(value);
+        return pageFmt(value, kind);
     }
 
     // 输入回显：select 必须回显**选项文字**而不是内部值 —— 用户看 'general' 不知道自己选了什么
@@ -119,7 +138,7 @@
             var list = reg.basisOf(key) || [];
             if (!list.length) return '';
             return '<div class="qr-h">政策依据</div><ul>' + list.map(function (b) {
-                return '<li>' + esc([b.doc, b.title].filter(Boolean).join(' —— ')) + '</li>';
+                return '<li>' + escRich([b.doc, b.title].filter(Boolean).join(' —— ')) + '</li>';
             }).join('') + '</ul>';
         } catch (e) {
             return '';
@@ -149,7 +168,14 @@
 
         var pitfalls = (tool.pitfalls || []).length
             ? '<div class="qr-h">易错口径</div><ul>' +
-                tool.pitfalls.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>'
+                tool.pitfalls.map(function (p) {
+                    // 渲染（含 **加粗** → <strong>）只有一份实现，在页面那里：这行走到本地兜底
+                    // 说明 toolbox-ui 没加载，那是加载顺序的问题，不该靠拷贝实现来解决。
+                    var tb = window.EuriskoToolbox;
+                    return (tb && typeof tb.pitfallHtml === 'function')
+                        ? tb.pitfallHtml(p)
+                        : '<li>' + String(p).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') + '</li>';
+                }).join('') + '</ul>'
             : '';
 
         var policy = policyLine(tool);
@@ -168,7 +194,7 @@
             '</div>' +
             (rowsHtml ? '<div class="qr-h">结果拆解</div><table>' + rowsHtml + '</table>' : '') +
             (inputsHtml ? '<div class="qr-h">测算输入</div><table>' + inputsHtml + '</table>' : '') +
-            (out.note ? '<div class="qr-note">' + esc(out.note) + '</div>' : '') +
+            (out.note ? '<div class="qr-note">' + escRich(out.note) + '</div>' : '') +
             pitfalls +
             basis +
             (policy ? '<div class="qr-note">政策时效：' + esc(policy) + '</div>' : '') +
