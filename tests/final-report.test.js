@@ -156,6 +156,26 @@ describe('注入式数据源（阶段20 P5）', () => {
         expect(html).toContain('年终奖');
         expect(html).not.toContain('综合所得汇算清缴报告');
     });
+
+    // v1.109.0：政策要点按税种注入。此前 pickPolicyItems 收了 kind 却没用 —— 21 个税种共用
+    // 问答库里「综合所得/汇算清缴」的条目，增值税的精装报告里写着「子女教育专项附加扣除」
+    // （真机截图实锤，用户是会拿去给客户的）。
+    test('policies 注入：报告的政策要点用税种自己的 pitfalls，**加粗** 渲染成 strong', () => {
+        const html = report().buildProDocHtml('vat-deep', {
+            coreHtml: '<p>x</p>',
+            structure: null,
+            policies: ['**普票不是扣税凭证**：增值税普通发票、收据一律不得抵扣']
+        });
+        expect(html).toContain('普票不是扣税凭证');
+        expect(html).toContain('<strong>');          // Markdown 加粗转 strong，不出裸星号
+        expect(html).not.toContain('**');
+        expect(html).not.toContain('个人养老金能抵扣吗？');  // 问答库的个税条目不再混入
+    });
+
+    test('policies 不传时回落问答库：旧调用（legacy 综合所得）行为不变', () => {
+        const html = report().buildProDocHtml('comprehensive', { coreHtml: '<p>x</p>' });
+        expect(html).toContain('个人养老金能抵扣吗？');   // POLICY_QA 里的条目仍在
+    });
 });
 
 describe('exportFinalReport 分流（专业版 / 非专业版）', () => {
@@ -191,6 +211,23 @@ describe('exportFinalReport 分流（专业版 / 非专业版）', () => {
         expect(captured.title).toBe('年终奖交付版报告');
         expect(captured.opts.filename).toBe('年终奖交付版报告_2026-09.pdf');
         expect(captured.opts.contentBuilder()).toContain('向导明细');
+    });
+
+    // v1.109.0：policies 也要透传。这条用 exportFinalReport 全链路（向导同款调用形态）——
+    // 只测 buildProDocHtml 的话，docOpts 逐字段抄写丢字段这类病是抓不到的（meta / policies 各丢过一次）。
+    test('专业版全链路：policies 透传到报告，政策要点不回落问答库', () => {
+        localStorage.setItem('current_user', JSON.stringify({ email: 'pro@example.com', plan: 'pro', plan_expires_at: null }));
+        report().exportFinalReport({
+            kind: 'vat-deep',
+            coreHtml: '<p>增值税明细</p>',
+            structure: null,
+            policies: ['**普票不是扣税凭证**：收据白条一律不得抵扣'],
+            meta: { resultElId: 'dw-result-card', reportTitle: () => '增值税交付版报告', kindLabel: '增值税' }
+        });
+        const html = captured.opts.contentBuilder();
+        expect(html).toContain('普票不是扣税凭证');
+        expect(html).toContain('<strong>');
+        expect(html).not.toContain('年度汇算清缴怎么办理？');  // 问答库条目不再混入
     });
 
     test('非专业版：不直接导出，先给版本选择；点「标准版」回到调用方自己的导出', () => {

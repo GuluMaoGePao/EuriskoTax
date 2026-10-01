@@ -229,8 +229,9 @@ describe('主页 - 截止段（90 天窗口）', () => {
     });
 
     test('渲染：窗口内没有节点时，截止段收起、整卡跟着收起', () => {
-        // 9/20 这个 fixture 日期没有任何 90 天内的节点，正好验证「没有就不占位」
-        window.renderTaxCalendar();
+        // now 必须显式传（真实系统时间一变，90 天窗口里就会进别的节点 —— 这条测试今天真炸过）。
+        // 9/20 这个日期没有任何 90 天内的节点，正好验证「没有就不占位」。
+        window.renderTaxCalendar(new Date('2026-09-20T00:00:00'));
         expect(document.getElementById('home-calendar-section').classList.contains('hidden')).toBe(true);
         expect(document.getElementById('home-calendar-list').innerHTML).toBe('');
         expect(document.getElementById('home-todo-card').classList.contains('hidden')).toBe(true);

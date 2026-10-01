@@ -963,11 +963,14 @@
             .slice(0, 4);
     }
 
-    function renderTaxCalendar() {
+    // now 可注入：日历是日期驱动的，靠真实系统时间测不出「窗口内没有节点」这类形态 ——
+    // 这条测试今天就炸过（fixture 假设"今天=9/20"，10/1 一过 90 天窗口里就进了别的节点）。
+    // 生产调用不传 now（走真实时间），测试传固定日期钉住。
+    function renderTaxCalendar(now) {
         const container = document.getElementById('home-calendar-list');
         if (!container) return;
         const section = document.getElementById('home-calendar-section');
-        const items = buildCalendarItems(new Date());
+        const items = buildCalendarItems(now || new Date());
 
         if (!items.length) {
             container.innerHTML = '';

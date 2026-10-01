@@ -2103,8 +2103,11 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             // 清空该账号此前云端同步行，保证上限断言基数可预期（上限被 SYNC_MAX_RECORDS=3 覆盖）
             await prisma.calculation.deleteMany({ where: { user_id: devUserId, client_id: { not: null } } });
 
-            const tOld = '2026-01-01T00:00:00.000Z';
-            const tNew = '2026-09-01T00:00:00.000Z';
+            // 时间戳用相对 now 的动态日期，不许钉死 —— 墓碑有 30 天 TTL 物理清理
+            //（calcSyncController.js），钉死 2026-09-01 的那版在 10/1 之后必然变红：
+            // 测试自己推的墓碑刚落库就被清掉，deletedClientIds 永远不广播。
+            const tOld = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString(); // 90 天前（相对旧）
+            const tNew = new Date(Date.now() - 24 * 3600 * 1000).toISOString();      // 1 天前（< 30 天 TTL，永远新鲜）
             const recA = `${syncPrefix}A`;
             const recB = `${syncPrefix}B`;
             const recC = `${syncPrefix}C`;

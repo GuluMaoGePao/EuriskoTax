@@ -499,6 +499,10 @@
                         filename: tool.name + '交付版报告_' + pdfStamp() + '.pdf',
                         coreHtml: html,
                         structure: structureFor(out),
+                        // 政策要点用这个税种**自己**的（spec.pitfalls）：含文号、口径、算错的后果。
+                        // 修复前报告里那节是问答库的「综合所得/汇算清缴」条目 —— 增值税的报告里
+                        // 写着子女教育专项附加扣除（真机截图实锤）。
+                        policies: (tool.pitfalls || []).slice(0, 6),
                         onStandard: function () { standardPdf(title, html); }
                     });
                     return;

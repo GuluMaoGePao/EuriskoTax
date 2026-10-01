@@ -434,7 +434,10 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
             let html = '';
             try {
                 html = window.EuriskoReport.buildProDocHtml(tool.id, {
-                    meta: meta, coreHtml: '<p>明细</p>', structure: s
+                    meta: meta, coreHtml: '<p>明细</p>', structure: s,
+                    // 与 exportResult 同源：政策要点按税种注入（v1.109.0）。不注入的话，
+                    // 增值税的报告里写着「子女教育专项附加扣除」—— 个税的政策，真机截图实锤过。
+                    policies: (tool.pitfalls || []).slice(0, 6)
                 });
             } catch (e) {
                 problems.push(tool.id + '：拼报告抛错 ' + e.message);
@@ -443,6 +446,28 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
             if (html.indexOf('pro-cover') < 0) problems.push(tool.id + '：报告没有封面');
             if (html.indexOf(tool.name) < 0) problems.push(tool.id + '：封面标题不带税种');
             if (html.indexOf('免责声明') < 0) problems.push(tool.id + '：报告没有免责');
+            // 政策要点必须是这个税种自己的：取 pitfalls 第一条（去加粗标记）的前 12 个字当指纹。
+            // 有 pitfalls 却对不上 = 注入链路断了，报告又在共用别家的政策。
+            const fp = (function () {
+                const p = (tool.pitfalls || [])[0];
+                return p ? String(p).replace(/\*\*/g, '').replace(/\s+/g, '').slice(0, 12) : '';
+            })();
+            if (fp) {
+                // 报告把 **x** 渲染成 <strong>x</strong>，所以两边都剥掉标记再比文字本身
+            const plain = html.replace(/\s+/g, '').replace(/<\/?strong>/g, '');
+            if (plain.indexOf(fp) < 0) {
+                    let diag = '';
+                    if (tool.id === 'vat-deep') {
+                        const i = html.indexOf('政策要点');
+                        diag = ' pitfalls-in=' + Array.isArray(tool.pitfalls) + '/' + (tool.pitfalls || []).length +
+                            ' section=[' + (i >= 0 ? html.slice(i, i + 200) : 'NONE') + ']';
+                    }
+                    problems.push(tool.id + '：政策要点不含自己的 pitfalls（指纹 ' + fp + '）' + diag);
+                }
+                if (html.indexOf('子女教育') >= 0 && tool.id !== 'annual-settlement-deep') {
+                    problems.push(tool.id + '：报告里出现个税专项扣除的政策（共用问答库没按税种分流）');
+                }
+            }
             // 有数据要画、没数据就不画 —— 两头都不许错
             if (s && html.indexOf('pro-tax-chart') < 0) problems.push(tool.id + '：有数据却没画图');
             if (!s && html.indexOf('pro-tax-chart') >= 0) problems.push(tool.id + '：没数据却画了图');

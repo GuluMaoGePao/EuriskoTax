@@ -151,7 +151,28 @@
         return escapeHtml(answer).replace(/\n•/g, '<br>•').replace(/\n/g, '<br>');
     }
 
-    function policySectionHtml(kind) {
+    function policySectionHtml(kind, policies) {
+        // 政策要点的**真源是税种自己**（spec.pitfalls，向导注入）：含文号、口径、算错的后果，
+        // 每个税种都不一样。问答库 pickPolicyItems 是综合所得/汇算清缴的素材 —— v1.108.0
+        // 曾让 21 个税种共用它，增值税报告里写着「子女教育专项附加扣除」，真机截图实锤。
+        // 注入优先；旧调用（无注入）才回落问答库。
+        if (Array.isArray(policies) && policies.length) {
+            let list = '';
+            policies.forEach(function (p) {
+                if (!p) return;
+                // pitfalls 用 **加粗** 强调易错点（Markdown 习惯）。转成 <strong>，
+                // 不转的话 PDF 里就是一对裸星号（真机截图见过：**普票不是扣税凭证**）。
+                const body = renderAnswerText(String(p)).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                list += '<div class="pro-policy-item"><div class="pro-policy-a">' + body + '</div></div>';
+            });
+            if (list) {
+                return '<div class="pro-section">' +
+                    '<div class="pro-section-title">政策要点与注意事项</div>' +
+                    list +
+                    '<p class="pro-policy-src">' + escapeHtml(policySourceText()) + '</p>' +
+                    '</div>';
+            }
+        }
         const items = pickPolicyItems(kind, 6);
         if (!items.length) {
             return '<div class="pro-section">' +
@@ -254,7 +275,7 @@
                 '<p class="pro-chart-note">' + escapeHtml(structure.note || '') + '</p>' +
                 '</div>';
         }
-        return html + policySectionHtml(kind) + disclaimerHtml();
+        return html + policySectionHtml(kind, opts.policies) + disclaimerHtml();
     }
 
     // 截图前回调：绘制税负对比图。structure 可由调用方注入（向导没有 window.calculationResults）。
@@ -356,7 +377,10 @@
             '    </button>',
             '    <button type="button" data-rv="pro" class="w-full text-left rounded-xl border border-amber-200 bg-amber-50/60 p-4 transition-colors hover:border-amber-300">',
             '      <div class="font-semibold text-slate-900">精装版</div>',
-            '      <div class="mt-1 text-sm text-slate-600">封面 + 政策要点 + 税负结构图表，可直接交付给他人。</div>',
+            // 副文案按 kind 动态写：该场景没开精装版时，用户必须在**点之前**就知道拿到的是什么。
+            // 修复前这里永远写「封面 + 政策要点 + 图表」，点击后 hookAllowed 拦住、静默换成标准版
+            // 下载 —— 用户以为自己拿到的是精装版，从文件名上一个字都看不出来。
+            '      <div class="mt-1 text-sm text-slate-600" data-rv-pro-desc>封面 + 政策要点 + 税负结构图表，可直接交付给他人。</div>',
             '      <div data-rv-hook class="mt-2 text-xs text-amber-700">需要交付版？留资，由顾问协助 ›</div>',
             '    </button>',
             '  </div>',
@@ -403,6 +427,15 @@
         // 护栏外的税种点了「精装版」会直接导出标准版 —— 不显示，就不用遁词来解释点了没反应。
         var hookLine = dlg.querySelector('[data-rv-hook]');
         if (hookLine) hookLine.style.display = hookAllowed(kind) ? '' : 'none';
+        // 同理，精装版副文案也要对得上承诺：白名单外的场景没有精装内容（政策要点是
+        // 综合所得的、封面徽章不对口），点下去只会拿到标准版 —— 把这句话在点击前说出来，
+        // 不许静默降级（用户点了「精装版」却下载到标准版，一个字的解释都没有）。
+        var proDesc = dlg.querySelector('[data-rv-pro-desc]');
+        if (proDesc) {
+            proDesc.textContent = hookAllowed(kind)
+                ? '封面 + 政策要点 + 税负结构图表，可直接交付给他人。'
+                : '该场景暂未开通精装版，点按将为你导出标准版 PDF。';
+        }
         if (dlg.dataset.rvBound !== '1') {
             dlg.dataset.rvBound = '1';
             dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDialog(dlg); });
@@ -436,7 +469,10 @@
         const kind = o.kind || KIND_COMPREHENSIVE;
         const meta = o.meta || META[kind] || META.comprehensive;
         if (isProUser()) {
-            const docOpts = { meta: meta, coreHtml: o.coreHtml, structure: o.structure };
+            // ⚠️ docOpts 必须逐字段透传调用方注入的数据源 —— v1.108.0 在这里丢过 meta
+            //（封面一律回落综合所得），v1.109.0 又丢过 policies（政策要点一律回落问答库）。
+            // 同型病犯两次的原因相同：这行是「我认识的三样抄过去」，而不是「注入什么带什么」。
+            const docOpts = { meta: meta, coreHtml: o.coreHtml, structure: o.structure, policies: o.policies };
             return exportToPDF(o.resultElId || meta.resultElId, meta.reportTitle(), {
                 // 文件名同样按调用方：默认那串「汇算清缴报告_YYYY-MM」是给综合所得起的，
                 // 拿去命名增值税 / 经营所得的报告，用户存到硬盘上就再也找不着了。
