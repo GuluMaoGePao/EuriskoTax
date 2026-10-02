@@ -350,6 +350,36 @@ DNS 有缓存（TTL），切换后仍有用户打到 Zeabur 旧库 —— 这部
 
 **9. 切完之后**：公安备案要填的 **IP 与接入商**这时才对得上 → 办结拿到 `沪公网安备 XXXXXXXXXXXX号` → 只改 `site-filing-ui.js` 的 `policeNumber` 一行，22 页自动生效（合规文档 §6.5）。
 
+**10. 切流后运维收尾（2026-10-02 补齐）**
+
+切完巡检才发现漏了两项，都属于「平时没事、出事就是大事」，重建服务器时必须照做：
+
+| 项 | 为什么 | 做法与验证 |
+|---|---|---|
+| **pm2 开机自启** | Caddy 是 `enabled`，pm2 却不是 —— 机器重启后 Caddy 起来了、后端没起来，站点全 **502**。而重启一年总会发生一次（系统补丁 / 机房迁移） | `sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu` 然后 `pm2 save`；验证 `systemctl is-enabled pm2-ubuntu` 输出 `enabled` |
+| **每日数据库备份** | 切流前只有迁移前那一份**手动**备份，crontab 是空的 —— 一次误删就没了。数据量小不代表可以不备份，`InviteCode` 这类是发不回来的 | 见下方脚本 + `cron` 每天 03:00 |
+
+服务器上 `/home/ubuntu/euriskotax/scripts/pg-backup.sh`（custom 格式，保留 7 天，避免撑满 40G 盘）：
+
+```bash
+#!/bin/bash
+set -e
+DIR=/home/ubuntu/pg-backups
+mkdir -p "$DIR"
+LOCAL=$(grep ^DATABASE_URL= /home/ubuntu/euriskotax/current/server/.env | cut -d= -f2- | tr -d '"' | tr -d "'")
+STAMP=$(date +%Y%m%d-%H%M%S)
+pg_dump "$LOCAL" --format=custom -f "$DIR/pg-$STAMP.dump"
+find "$DIR" -name "pg-*.dump" -mtime +7 -delete
+echo "$(date +%F' '%T) backup ok: pg-$STAMP.dump $(du -h "$DIR/pg-$STAMP.dump" | cut -f1)" >> "$DIR/backup.log"
+```
+
+配完**一定要手工跑一次**再收工（`bash scripts/pg-backup.sh`），确认真能出备份 ——
+等到真要恢复时才发现脚本是坏的，就晚了。
+
+> 坑：注册 cron 别写 `( crontab -l | grep -v xxx; echo "$LINE") | crontab -`。
+> 脚本若开了 `set -e`，`grep -v` 无匹配时返回非 0 会中断管道，结果是
+> **crontab 被清空**（不是"没加上"，而是把已有的也抹了）。直接 `printf '%s\n' "$LINE" | crontab -`。
+
 ### 16B 官方支付（微信 / 支付宝）
 
 | 项 | 内容 |
