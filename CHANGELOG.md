@@ -11,6 +11,73 @@
 
 ---
 
+## [1.116.0] - 2026-10-01 - 切进境内节点：域名解析 + HTTPS + 换掉 107 处旧域 canonical
+
+域名指向腾讯云、HTTPS 生效，站点正式跑在 `https://euriskotax.com`。切流前担心的两件事
+（数据、密钥）都落在了实处，也各自踩到一个坑。
+
+### 数据迁移：真实数据量比预估小得多，但差点被估算值骗了
+
+源库（Zeabur PG 18）精确 `count(*)` 后是：`User=3`、`InviteCode=30`、`ContentItem=6`、
+`ContentRelease=1`、`FunnelEvent=14`，而 **`Lead=0`、`ProCode=0`、`Calculation=0`** ——
+之前最担心的"线索是买来的""ProCode 是用户花钱买的"两样**一条都不存在**，迁移风险随之大幅降低。
+
+两个坑：
+
+1. **不要用 `n_live_tup` 判断表是不是空的**。我第一次查行数用的是
+   `pg_stat_user_tables.n_live_tup`（估算值），没 ANALYZE 过的表一律显示 0 —— 差点据此判定
+   "源库是空的、不用迁"，那 3 个注册用户就丢了。改用 `count(*)` 才看到真实数字。
+2. **主键是 `Int autoincrement`，导入后必须 `setval`**。否则下次注册从 id=1 开始撞主键。
+   现在 `User 3/3`、`InviteCode 50/50`、`FunnelEvent 73/73` 全部追平。
+
+`SupportScript` 两边都是同一批 9 条（只是 id 顺序不同），未动。`euriskotax.cn` 的 20 个 seed
+邀请码与线上 30 个无重复，按 `code` 去重并入（共 50）。迁移前备份了目标库。
+源库是 **PG 18** 而服务器是 PG 16，`pg_dump` 版本倒退用不了 —— 数据量只有几十行，
+改走 `psql \copy CSV` 在同机中转，数据不出服务器。
+
+### 密钥：改 `.env.shared` 不等于生效
+
+`JWT_SECRET` 与 `ADMIN_TOKEN` 都已换成 Zeabur 真值。但第一次改完**没生效且看不出来**：
+`health` 200、日志无异常，而进程用的还是旧值——`ops-deploy.ps1` 只在部署那一刻把
+`.env.shared` 复制进新 release 的 `server/.env`，已在跑的 `current` 不会同步。
+已补 `cp .env.shared current/server/.env && pm2 restart`，并把这条写进手册 §3.1。
+
+### 换域：107 处 canonical，另有 10 个测试把旧域名写死
+
+`swap-canonical-domain.js` 把 21 个落地页 + `index.html` + `robots.txt` 的
+`canonical` / `og:url` 全换成 `euriskotax.com`（`sitemap.xml` 本来就是 com），仓库里
+`zeabur.app` 引用归零。
+
+换完红了 10 个测试——它们把 `canonical` 的**完整 URL 写死在断言里**（含 zeabur 域名）。
+这类断言换域必然红，属于状态过期不是缺陷，但**不该逐个改成新域名**（下次换域又要改一遍）：
+统一改成"canonical 指向本页面路径"的正则，域名一致性交给断言 9（全站唯一域名）守着。
+
+### 顺带补的：首页根本没有 canonical
+
+21 个落地页都有 `canonical` / `og:url`，**首页（权重最高的页面）反而一个都没有**；
+同时 Caddy 让 `www` 和主域都返回 200，首页等于有两个内容完全相同的入口——
+和落地页指向旧域是同一类权重损失。已补首页 canonical + og:url，并把
+`www.euriskotax.com` / `euriskotax.cn` / `www.euriskotax.cn` 全部 301 到主域。
+
+### 运维侧
+
+- 外网 80/443：腾讯云**轻量控制台的防火墙**（不是 CVM 安全组，也不是 ufw——服务器侧
+  Caddy 监听 `*:80`、ufw inactive，INPUT 挂在云厂商自己的 `YJ-FIREWALL-INPUT` 链上）。
+- DNS：DNSPod 免费版 TTL 下限是 **600**（填不了 300），回滚窗口约 10 分钟。
+- HTTPS：Caddy 自动签 Let's Encrypt（`CN = euriskotax.com`）。443 在 IP 模式下不通是预期的
+  （没有域名就签不了证，Caddy 不监听 443）。
+- `ops-check-prod.ps1 -BaseUrl https://euriskotax.com` **37/37**。
+
+### 验收
+
+- 单测 **115 套件 2158 例**全绿（jest 实跑 2170）。
+- 门禁 `verify:local` **259/259**、线上指纹 **37 项**；发布预检通过。
+
+### 下一步
+
+公安备案（IP 与接入商这时才对得上）→ 拿到 `沪公网安备 XXXXXXXXXXXX号` →
+只改 `site-filing-ui.js` 的 `policeNumber` 一行，22 页自动生效。
+
 ## [1.115.0] - 2026-10-01 - 16A 实发：境内节点已在腾讯云跑通（IP 直连验证全绿）
 
 部署要素齐备后当天完成首投：**应用已在 `101.42.89.184` 运行 v1.115.0，IP 直连验证全绿**。

@@ -1,9 +1,9 @@
 ﻿# EuriskoTax 线上部署校验脚本
-# 用法: .\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]
+# 用法: .\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]
 # 作用: push 后轮询线上资源，确认 Zeabur 已部署到最新版本（认证/按钮/SW 版本指纹）
 #       任一检查不过时退出码非 0，用于发布门禁或人工核对。
 param(
-    [string]$BaseUrl = "https://euriskotax.zeabur.app"
+    [string]$BaseUrl = "https://euriskotax.com"
 )
 
 $ErrorActionPreference = "Stop"

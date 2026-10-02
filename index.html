@@ -11,6 +11,13 @@
     <link rel="icon" type="image/png" href="/images/icon-192.png">
     <link rel="apple-touch-icon" href="/images/icon-192.png">
     <title>EuriskoTax 税费计算器 - 个税 / 企业税 / 社保在线测算</title>
+    <!-- canonical / og:url（v1.116.0 补）：21 个落地页早就有，首页反而没有。
+         而当时 www 与主域都返回 200 —— 首页等于有两个内容完全相同的入口，权重被分散
+         （跟落地页 canonical 指向旧域是同一类损失）。补上这两行 + Caddy 把 www 301 到主域。
+         域名与落地页同源，切境内节点时由 tools/ops/swap-canonical-domain.js 一并按带协议的完整 URL 换；
+         全站 canonical 只允许一个域名，由 tests/copy-standard.test.js 断言 9 守着。 -->
+    <link rel="canonical" href="https://euriskotax.com/">
+    <meta property="og:url" content="https://euriskotax.com/">
     <!-- 版本哨兵：与线上 /version.json 比对，发现本页滞后则自动重置缓存并重载（用户无感）。
          发版时版本号需同步**五处**：package.json / 本页 window.__APP_VERSION__ / 关于弹窗「版本 x.y.z」
          / 根目录 version.json / CHANGELOG 最新条目。
@@ -18,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.115.0';
+        window.__APP_VERSION__ = '1.116.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1562,7 +1569,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.115.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.116.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

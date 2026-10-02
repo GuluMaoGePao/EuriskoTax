@@ -35,7 +35,10 @@ const PROJECT_ROOT = path.resolve(OPS_DIR, '..', '..');
 const SERVER_DIR = path.join(PROJECT_ROOT, 'server');
 const SERVER_ENV_FILE = path.join(SERVER_DIR, '.env');
 const CONTENT_FILE = path.join(SERVER_DIR, 'data', 'content', 'tax-policy.json');
-const DEFAULT_BASE_URL = 'https://euriskotax.zeabur.app';
+// v1.116.0：切境内节点后生产地址改为正式域名。留着旧域的后果是——
+// 切流后再跑播种，内容会灌进 Zeabur 那个旧库，而新库（腾讯云）里一条都没有，
+// 表现为「线上没内容」且极难定位（脚本退 0、看着像成功了）。
+const DEFAULT_BASE_URL = 'https://euriskotax.com';
 
 const EXIT_OK = 0;
 const EXIT_FAIL = 1;

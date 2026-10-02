@@ -57,7 +57,7 @@
 | 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
 | push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
 | 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.zeabur.app]` | 37 项线上指纹，全绿退出码 0 |
+| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]` | 37 项线上指纹，全绿退出码 0 |
 
 ---
 

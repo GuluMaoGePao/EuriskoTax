@@ -208,7 +208,8 @@ describe('外籍个人津补贴免税落地页：静态口径与页面声明（�
     });
 
     test('页面含 canonical / FAQPage 结构化数据、政策文号、同源脚本与 CTA 归因参数', () => {
-        expect(html).toContain('rel="canonical" href="https://euriskotax.zeabur.app/seo/expat-allowance.html"');
+        // 域名不写死：全站 canonical 域名唯一由断言 9 守着，这条只管指向本页面路径
+        expect(html).toMatch(/rel="canonical" href="https:\/\/[^/]+\/seo\/expat-allowance.html"/);
         expect(html).toContain('FAQPage');
         expect(html).toContain('2023 年第 29 号');
         expect(html).toContain('财税字〔1994〕020 号');

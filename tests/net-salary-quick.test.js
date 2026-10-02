@@ -215,7 +215,8 @@ describe('税后工资落地页：静态口径与页面声明（爬虫不执行 
     });
 
     test('页面含 canonical / FAQPage 结构化数据、政策文号、同源脚本与 CTA 归因参数', () => {
-        expect(html).toContain('rel="canonical" href="https://euriskotax.zeabur.app/seo/net-salary.html"');
+        // 域名不写死：全站 canonical 域名唯一由断言 9 守着，这条只管指向本页面路径
+        expect(html).toMatch(/rel="canonical" href="https:\/\/[^/]+\/seo\/net-salary.html"/);
         expect(html).toContain('FAQPage');
         expect(html).toContain('主席令第九号');
         expect(html).toContain('2018 年第 61 号');

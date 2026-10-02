@@ -1,4 +1,4 @@
-# EuriskoTax（https://euriskotax.zeabur.app）
+# EuriskoTax（https://euriskotax.com）
 # 允许抓取公开计算器与内容页；屏蔽接口、运维后台与排障页（无收录价值，抓了只是消耗配额）
 
 User-agent: *
@@ -8,4 +8,4 @@ Disallow: /api/
 Disallow: /admin.html
 Disallow: /clean-cache.html
 
-Sitemap: https://euriskotax.zeabur.app/sitemap.xml
+Sitemap: https://euriskotax.com/sitemap.xml

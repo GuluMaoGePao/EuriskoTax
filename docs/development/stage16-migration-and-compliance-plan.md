@@ -281,6 +281,26 @@ pg_restore --dbname="$DST_URL" --no-owner --no-privileges eurisko.dump
 | `SMTP_*` | 沿用 `smtp.qq.com` **465** | **腾讯云出方向封禁 25 端口**，465/587 可用；切完必须实测"注册验证码能收到" |
 | `PORT` / `NODE_ENV` | `3000` / `production` | Dockerfile 启动时自动跑 `prisma migrate deploy`（16 个迁移，已 restore 的数据会幂等跳过） |
 
+#### 3.1 改环境变量的正确姿势（2026-10-01 实踩）
+
+`JWT_SECRET` 已于 2026-10-01 换成 Zeabur 真值（切 DNS 的硬前置之一）。换的时候踩到一个坑，
+不记下来下次一定再踩：
+
+**改 `.env.shared` ≠ 生效。** `ops-deploy.ps1` 只在**部署那一刻**把 `.env.shared` 复制到
+新 release 的 `server/.env`；已经在跑的 `current` release **不会自动同步**。因此改完共享文件
+后进程用的还是旧值 —— 且服务一切正常（`health` 200、日志无异常），**看不出没生效**。
+
+```bash
+# 改完 .env.shared 之后，必须再做这一步（或干脆重新部署一次）
+cp .env.shared current/server/.env && pm2 restart euriskotax
+
+# 验证：只看前 8 位就够了，别把整串密钥打印出来（会进终端历史/日志/聊天记录）
+grep ^JWT_SECRET= current/server/.env | cut -c1-19
+```
+
+下次重新部署会自动带上新值（新 release 复制一份），所以**不会静默回退**；
+旧 release 里留着旧值是回滚路径的一部分，不要挨个改。
+
 **4. 部署与 HTTPS（走仓库现成的 `ops-deploy.ps1`，不另起炉灶）**
 
 部署基建早已备好但从未启用：`tools/ops/ops-deploy.ps1`（打包 → 传输 → 安装依赖 →

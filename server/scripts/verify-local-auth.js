@@ -647,12 +647,16 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         record('robots.txt 允许抓取公开页且声明 sitemap',
             robots.status === 200 && /User-agent:\s*\*/i.test(robots.raw)
             && /Disallow:\s*\/api\//.test(robots.raw)
-            && robots.raw.includes('Sitemap: https://euriskotax.zeabur.app/sitemap.xml'),
+            // v1.116.0：这里原来写死 zeabur.app，切境内节点换域后必然红。
+            // 「声明了 sitemap」才是要守的事，域名本身由 copy-standard 断言 9（全站 canonical 唯一域名）
+            // 统一守着 —— 否则每换一次域就要改一批校验脚本。
+            && /Sitemap:\s*https:\/\/[^/\s]+\/sitemap\.xml/.test(robots.raw),
             `HTTP ${robots.status}`);
         const sitemap = await request(PORT, 'GET', '/sitemap.xml');
         const sitemapLocs = (sitemap.raw.match(/<loc>([^<]+)<\/loc>/g) || []).map((s) => s.replace(/<\/?loc>/g, ''));
         record('sitemap.xml 可访问且收录首页与全部落地页',
-            sitemap.status === 200 && sitemapLocs.includes('https://euriskotax.zeabur.app/')
+            // v1.116.0：同上，不写死域名；首页 loc 的特征是「域名后仅一个 /」。
+            sitemap.status === 200 && sitemapLocs.some((u) => /^https:\/\/[^/]+\/$/.test(u))
             && sitemapLocs.some((u) => u.endsWith('/seo/bonus-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/salary-tax.html'))
             && sitemapLocs.some((u) => u.endsWith('/seo/annual-settlement.html'))

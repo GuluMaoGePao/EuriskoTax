@@ -227,7 +227,10 @@ describe('提前退休 / 内部退养落地页：静态口径与页面声明（�
     });
 
     test('页面含 canonical / FAQPage 结构化数据、政策文号、同源脚本与 CTA 归因参数', () => {
-        expect(html).toContain('rel="canonical" href="https://euriskotax.zeabur.app/seo/early-retirement.html"');
+        // v1.116.0：这里原来把 zeabur.app 域名写死在断言里，切境内节点换 canonical 后必然红。
+        // 域名该由断言 9（全站 canonical 唯一域名）统一守着，这条只管「canonical 指向本页面路径」，
+        // 否则每换一次域就要改一批测试。
+        expect(html).toMatch(/rel="canonical" href="https:\/\/[^/]+\/seo\/early-retirement\.html"/);
         expect(html).toContain('FAQPage');
         expect(html).toContain('财税〔2018〕164 号');
         expect(html).toContain('国税发〔1999〕58 号');

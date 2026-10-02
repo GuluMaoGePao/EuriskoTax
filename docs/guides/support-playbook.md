@@ -9,7 +9,7 @@
 ## 一、先记住这一个链接
 
 ```
-【排障短链】https://euriskotax.zeabur.app/reset
+【排障短链】https://euriskotax.com/reset
 ```
 
 它做三件事：注销本站 Service Worker → 清空离线缓存 → 自动跳回首页。
@@ -39,7 +39,7 @@
 用户反馈「打不开」时，先确认服务是否正常：
 
 ```
-GET https://euriskotax.zeabur.app/health
+GET https://euriskotax.com/health
 → {"status":"ok","timestamp":"..."}
 ```
 
@@ -78,7 +78,7 @@ GET https://euriskotax.zeabur.app/health
 
 请按下面两步操作：
 1. 打开这个链接（会自动清理旧缓存并回到首页）：
-   https://euriskotax.zeabur.app/reset
+   https://euriskotax.com/reset
 2. 等页面提示「已完成」后会自动跳转，再试一次刚才的操作。
 
 此操作不会影响你的登录状态和已保存的计算记录。

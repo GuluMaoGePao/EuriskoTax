@@ -246,7 +246,8 @@ describe('企业年金落地页：静态口径与页面声明（爬虫不执行 
     });
 
     test('页面含 canonical / FAQPage 结构化数据、政策文号、同源脚本与 CTA 归因参数', () => {
-        expect(html).toContain('rel="canonical" href="https://euriskotax.zeabur.app/seo/enterprise-annuity.html"');
+        // 域名不写死：全站 canonical 域名唯一由断言 9 守着，这条只管指向本页面路径
+        expect(html).toMatch(/rel="canonical" href="https:\/\/[^/]+\/seo\/enterprise-annuity.html"/);
         expect(html).toContain('FAQPage');
         expect(html).toContain('财税〔2013〕103 号');
         expect(html).toContain('/src/js/calculation/tax-constants.js');

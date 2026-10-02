@@ -30,7 +30,7 @@
 
 | 环境 | 地址 |
 |------|------|
-| 生产环境 | https://euriskotax.zeabur.app |
+| 生产环境 | https://euriskotax.com |
 | 本地开发 | http://localhost:3000 |
 | Swagger UI | http://localhost:3000/api/docs |
 | OpenAPI JSON | http://localhost:3000/api/docs.json |
@@ -738,18 +738,18 @@ CSV 导出（供销售导入自有 CRM）。筛选条件与列表一致，最多
 
 ```bash
 # ① 发送验证码
-curl -X POST https://euriskotax.zeabur.app/api/auth/send-code \
+curl -X POST https://euriskotax.com/api/auth/send-code \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com"}'
 # → { "success": true, "data": { "cooldownMs": 60000 } }
 
 # ② 注册（verificationCode 为邮件中的 6 位数字，inviteCode 向开发者获取）
-curl -X POST https://euriskotax.zeabur.app/api/auth/register \
+curl -X POST https://euriskotax.com/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"zhangsan","email":"user@example.com","password":"secret123","inviteCode":"EURISKO-XXXX-XXXX","verificationCode":"123456"}'
 
 # ③ 登录拿 token
-curl -X POST https://euriskotax.zeabur.app/api/auth/login \
+curl -X POST https://euriskotax.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"secret123"}'
 ```
@@ -758,19 +758,19 @@ curl -X POST https://euriskotax.zeabur.app/api/auth/login \
 
 ```bash
 # ① 向已注册邮箱发送重置验证码（未注册邮箱返回 404，不发送邮件）
-curl -X POST https://euriskotax.zeabur.app/api/auth/send-reset-code \
+curl -X POST https://euriskotax.com/api/auth/send-reset-code \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com"}'
 # → { "success": true, "data": { "cooldownMs": 60000 } }
 
 # ② 提交新密码（verificationCode 为邮件中的 6 位数字）
-curl -X POST https://euriskotax.zeabur.app/api/auth/reset-password \
+curl -X POST https://euriskotax.com/api/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","verificationCode":"123456","newPassword":"newsecret123"}'
 # → { "success": true, "data": { "message": "Password reset successfully" } }
 
 # ③ 用新密码登录
-curl -X POST https://euriskotax.zeabur.app/api/auth/login \
+curl -X POST https://euriskotax.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"newsecret123"}'
 ```
