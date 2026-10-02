@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.119.0';
+        window.__APP_VERSION__ = '1.120.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -156,7 +156,7 @@
                         <span class="auth-brand__wordmark">EuriskoTax</span>
                     </div>
                     <h1 class="auth-brand__title">个人所得税预算规划工具</h1>
-                    <p class="auth-brand__sub">算得清税，守得住钱</p>
+                    <p class="auth-brand__sub">个税 / 企业税 / 社保在线测算</p>
                 </aside>
 
                 <!-- 右侧表单面板 -->
@@ -355,7 +355,11 @@
                      入口是三个面板（登录/注册/重置）共用的卡内页脚，不替代登录，
                      只是给「先算一次」留出一条路。原先只在重置面板里有，是布局遗留。 -->
                 <div class="auth-alt">
-                    <button type="button" id="guest-entry-btn">游客登录 →</button>
+                    <!-- v1.120.0：游客入口做成正式按钮（原来是一行裸链接，看着像"顺带一提"，
+                         实际它和「登录」是平级的两条路：先算一次 vs 有账号） -->
+                    <button type="button" id="guest-entry-btn" class="auth-btn-outline auth-alt__btn">
+                        <i class="fa fa-user-secret mr-2" aria-hidden="true"></i>游客登录
+                    </button>
                     <p class="auth-alt__hint">无需注册，直接使用全部测算功能</p>
                 </div>
                 </main>
@@ -1582,7 +1586,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.119.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.120.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

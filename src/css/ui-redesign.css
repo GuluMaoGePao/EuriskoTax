@@ -1245,22 +1245,51 @@
     box-shadow: var(--sh-3);
 }
 
-/* --- 左：品牌面板（深蓝渐变 + 价值主张） --- */
+/* --- 左：品牌面板（深蓝渐变 + 品牌主张） ---
+   v1.120.0 重排：logo 竖排居中、占据左栏约 1/3（左栏内容宽约 320px → 106px 上下），
+   字标与主张居中对齐。此前是「小 logo + 字标」横排贴顶，logo 只占 46px，
+   在 380px 宽的左栏里像顺手放的水印，撑不起品牌区。 */
 .auth-brand {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
     padding: var(--sp-8);
     background: linear-gradient(150deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
     color: #fff;
 }
-.auth-brand__mark { display: flex; align-items: center; gap: var(--sp-3); }
-.auth-brand__logo { width: 46px; height: 46px; border-radius: var(--r-ctrl); }
-.auth-brand__wordmark { font-size: var(--fs-lg); font-weight: 700; letter-spacing: .02em; }
+.auth-brand__mark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-4);
+    /* 给百分比一个确定的参考宽度：不写这行，logo 的 width% 会以「由 logo 自己撑开」
+       的 mark 宽度为准，百分比退化为 min-width（实测只剩 96px / 25%）。 */
+    width: 100%;
+}
+/* 左栏内容宽约 319px × 40% ≈ 128px，即整栏（383px）的三分之一 */
+.auth-brand__logo {
+    width: 40%;
+    min-width: 96px;
+    max-width: 132px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    padding: var(--sp-2);
+    border-radius: var(--r-hero);
+    background: rgba(255, 255, 255, .14);
+}
+.auth-brand__wordmark {
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    letter-spacing: .04em;
+}
 .auth-brand__title {
-    margin-top: var(--sp-6);
-    font-size: var(--fs-2xl);
+    margin-top: var(--sp-5);
+    font-size: var(--fs-xl);
     font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.45;
 }
 .auth-brand__sub { margin-top: var(--sp-2); font-size: var(--fs-sm); opacity: .85; }
 
@@ -1350,14 +1379,27 @@
     border-top: 1px solid var(--c-border);
     text-align: center;
 }
-.auth-alt button {
+/* 只管「裸文字按钮」：.auth-alt button 是 (0,1,1)，比组件类 .auth-btn-outline (0,1,0)
+   更高，写了 border/background 会把游客按钮的描边压没 —— 用 :not() 排除掉。
+   （同一个坑在 v1.117.0 出现过：ui-redesign.css 排在 tailwind 之后，高优先级选择器
+   会静默吃掉组件类的样式。） */
+.auth-alt button:not(.auth-btn-outline) {
     border: 0;
     background: none;
     color: var(--c-text-2);
     font-size: var(--fs-sm);
     cursor: pointer;
 }
-.auth-alt button:hover { color: var(--c-brand); }
+.auth-alt button:not(.auth-btn-outline):hover { color: var(--c-brand); }
+/* 游客入口：与「登录」平级的两条路之一，做成整宽的描边按钮而不是一行裸链接 */
+.auth-alt__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    font-size: var(--fs-base);
+}
 .auth-alt__hint { margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--c-text-3); }
 
 /* 卡外页脚 */
@@ -1398,13 +1440,25 @@
 /* --- 窄屏：品牌面板收成卡内横条，价值主张让位给表单 --- */
 @media (max-width: 860px) {
     .auth-card { grid-template-columns: 1fr; }
+    /* 窄屏左栏收成横条：大 logo 会让品牌条比表单还高，必须退回小图标横排 */
     .auth-brand {
         flex-direction: row;
         flex-wrap: wrap;
         align-items: center;
+        justify-content: flex-start;
+        text-align: left;
         gap: var(--sp-2) var(--sp-4);
         padding: var(--sp-5) var(--sp-6);
     }
+    .auth-brand__mark { flex-direction: row; gap: var(--sp-3); }
+    .auth-brand__logo {
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+        padding: 0;
+        background: none;
+    }
+    .auth-brand__wordmark { font-size: var(--fs-lg); }
     .auth-brand__title { margin-top: 0; font-size: var(--fs-lg); }
     .auth-brand__sub { margin-top: 0; font-size: var(--fs-xs); }
     .auth-main, .auth-brand { padding: var(--sp-6); }
