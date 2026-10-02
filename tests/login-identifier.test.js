@@ -84,10 +84,12 @@ describe('前端登录框：文案与输入类型跟着改', () => {
         expect(tag).not.toMatch(/type="email"/);
     });
 
-    test('label 与页面提示同步，并指明忘记账号时走注册邮箱找回', () => {
+    test('label 与 placeholder 同步；登录页保持极简（v1.119.0 去掉表单下的重复说明行）', () => {
         const html = readSrc('index.html');
         expect(html).toContain('<label for="login-email" class="label">邮箱或用户名</label>');
-        expect(html).toContain('两种都可以登录');
+        // 登录表单内不再出现解释性小字：placeholder 已说明一切，说明行是重复信息
+        const loginForm = html.slice(html.indexOf('id="login-form"'), html.indexOf('id="register-form"'));
+        expect(loginForm).not.toContain('text-xs text-gray-500');
     });
 
     test('handleLogin 取值为账号语义，空值提示不再只提邮箱', () => {
@@ -113,10 +115,10 @@ describe('前端登录框：文案与输入类型跟着改', () => {
 });
 
 describe('手机号口径：注册页与个人中心都写明「不用于登录」', () => {
-    test('注册页：选填 + 仅作联系方式', () => {
+    test('注册页：选填 + 一句话讲清用途（v1.119.0 精简为「仅用于顾问回电，不用于登录」）', () => {
         const html = readSrc('index.html');
         expect(html).toContain('<label for="register-phone" class="label">联系手机号（选填）</label>');
-        expect(html).toContain('仅作联系方式，不用于登录');
+        expect(html).toContain('仅用于顾问回电，不用于登录');
     });
 
     test('个人中心：label 与提示同步', () => {
@@ -132,6 +134,49 @@ describe('手机号口径：注册页与个人中心都写明「不用于登录�
         const ui = readSrc('src/js/auth/auth-ui.js');
         // 必填清单里不应出现 register-phone
         expect(ui.slice(ui.indexOf('const requiredChecks'), ui.indexOf('let firstInvalidId'))).not.toContain('register-phone');
+    });
+});
+
+describe('登录页用户视角口径（v1.119.0：内部口径与运维入口不上登录页）', () => {
+    const html = () => readSrc('index.html');
+    const loginSection = () => {
+        const src = html();
+        return src.slice(src.indexOf('id="login-page"'), src.indexOf('id="app-container"'));
+    };
+
+    test('游客入口叫「游客登录」，说明是一句人话（不再出现「免登录使用」这种内部口径）', () => {
+        const alt = loginSection().slice(loginSection().indexOf('class="auth-alt"'));
+        expect(alt).toContain('游客登录');
+        expect(alt).not.toContain('免登录使用');
+    });
+
+    test('登录页页脚有备案号容器，与主应用页脚共用同一份配置渲染', () => {
+        expect(loginSection()).toContain('id="site-filing"');
+        // 渲染器是唯一取数处：登录页不维护第二份备案信息
+        expect(readSrc('src/js/ui/site-filing-ui.js')).toContain("getElementById('site-filing')");
+    });
+
+    test('运维排障入口（一键重置缓存）不出现在登录页 —— 用户视角没有"旧版页面"概念', () => {
+        expect(loginSection()).not.toContain('clean-cache.html');
+        // 入口收进「关于」弹窗：用户主动打开才可见
+        expect(html()).toContain('clean-cache.html?auto=1');
+    });
+
+    test('品牌面板不再罗列功能清单（"20 个速算器 · 21 个完整测算"是开发口径）', () => {
+        const section = loginSection();
+        expect(section).not.toContain('auth-brand__points');
+        expect(section).not.toContain('20 个速算器');
+        // 失去消费方的样式一并删掉，防止 DOM 回潮时样式还在"兜底"
+        const css = readSrc('src/css/ui-redesign.css');
+        expect(css).not.toContain('.auth-brand__points');
+        expect(css).not.toContain('.auth-brand__note');
+    });
+
+    test('syncNav 在登录页可见时不放行导航栏（"下滑进主页"的根治点）', () => {
+        const src = readSrc('src/js/ui/toolbox-ui.js');
+        const fn = src.slice(src.indexOf('function syncNav'), src.indexOf('function syncNav') + 900);
+        expect(fn).toContain("getElementById('login-page')");
+        expect(fn).toContain("classList.contains('hidden')");
     });
 });
 

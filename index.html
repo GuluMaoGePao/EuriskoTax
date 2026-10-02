@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.118.0';
+        window.__APP_VERSION__ = '1.119.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -156,13 +156,7 @@
                         <span class="auth-brand__wordmark">EuriskoTax</span>
                     </div>
                     <h1 class="auth-brand__title">个人所得税预算规划工具</h1>
-                    <p class="auth-brand__sub">专业税务参考 · 智能薪酬规划</p>
-                    <ul class="auth-brand__points">
-                        <li><i class="fa fa-calculator"></i><span>20 个速算器 · 21 个完整测算，全税种覆盖</span></li>
-                        <li><i class="fa fa-shield"></i><span>测算在本机完成，免登录也可用全部功能</span></li>
-                        <li><i class="fa fa-book"></i><span>政策要点随版本更新，计算口径可追溯</span></li>
-                    </ul>
-                    <p class="auth-brand__note">本测算结果仅供参考，不构成税务建议。</p>
+                    <p class="auth-brand__sub">算得清税，守得住钱</p>
                 </aside>
 
                 <!-- 右侧表单面板 -->
@@ -185,7 +179,6 @@
                             <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                             <input type="text" id="login-email" class="input-field pl-10" placeholder="请输入邮箱或用户名" autocomplete="username">
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">两种都可以登录；忘记账号时可用注册邮箱找回密码</p>
                     </div>
                     <div class="auth-field">
                         <label for="login-password" class="label">密码</label>
@@ -209,9 +202,6 @@
 
                 <!-- 注册表单 -->
                 <form id="register-form" class="auth-form hidden">
-                    <div class="auth-form__hint text-right">
-                        <span class="text-xs text-gray-500">带 <i class="req-star" aria-hidden="true">*</i> 的为必填项，请如实填写</span>
-                    </div>
                     <div class="auth-grid-2">
                         <div class="auth-field">
                             <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
@@ -252,7 +242,7 @@
                                 <input type="tel" id="register-phone" class="input-field pl-10" placeholder="选填，用于顾问回电" autocomplete="tel">
                             </div>
                             <p id="register-phone-error" class="field-error hidden" role="alert"></p>
-                            <p class="text-xs text-gray-500 mt-1">仅作联系方式，不用于登录（登录请用邮箱或用户名）</p>
+                            <p class="text-xs text-gray-500 mt-1">仅用于顾问回电，不用于登录</p>
                         </div>
                         <div class="auth-field">
                             <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
@@ -365,21 +355,21 @@
                      入口是三个面板（登录/注册/重置）共用的卡内页脚，不替代登录，
                      只是给「先算一次」留出一条路。原先只在重置面板里有，是布局遗留。 -->
                 <div class="auth-alt">
-                    <button type="button" id="guest-entry-btn">免登录使用 →</button>
-                    <p class="auth-alt__hint">不注册也能用全部测算功能，全部计算在本机完成。</p>
+                    <button type="button" id="guest-entry-btn">游客登录 →</button>
+                    <p class="auth-alt__hint">无需注册，直接使用全部测算功能</p>
                 </div>
                 </main>
             </div>
 
-            <!-- 卡外页脚：协议随所在面板联动（auth-ui.js 按登录/注册/重置改写文案） -->
+            <!-- 卡外页脚：协议随所在面板联动（auth-ui.js 按登录/注册/重置改写文案）。
+                 备案号容器与主应用页脚同一个配置渲染（site-filing-ui.js）——
+                 登录页也是 22 页之一，页脚展示备案号是法定义务，不能只留给主应用。 -->
             <footer class="auth-foot">
                 <p id="auth-agreement-text" class="auth-foot__agreement">
                     登录即表示同意 <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="auth-link">用户协议</a> 和 <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="auth-link">隐私政策</a>
                 </p>
                 <p class="auth-foot__meta">© 2026 EuriskoTax 税费计算器 · 实际纳税请以主管税务机关认定为准</p>
-                <p class="auth-foot__meta">
-                    <a href="clean-cache.html?auto=1" class="auth-link">遇到旧版页面？点此一键重置缓存</a>
-                </p>
+                <p id="site-filing" class="auth-foot__meta" style="display:none"></p>
             </footer>
         </div>
     </div>
@@ -1592,7 +1582,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.118.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.119.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>

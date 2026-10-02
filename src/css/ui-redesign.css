@@ -1263,30 +1263,6 @@
     line-height: 1.35;
 }
 .auth-brand__sub { margin-top: var(--sp-2); font-size: var(--fs-sm); opacity: .85; }
-.auth-brand__points {
-    margin: var(--sp-6) 0 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-}
-.auth-brand__points li {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    font-size: var(--fs-sm);
-    line-height: 1.6;
-    opacity: .94;
-}
-.auth-brand__points i { width: 1.2em; text-align: center; opacity: .85; }
-.auth-brand__note {
-    margin-top: auto;
-    padding-top: var(--sp-6);
-    font-size: var(--fs-xs);
-    line-height: 1.6;
-    opacity: .75;
-}
 
 /* --- 右：表单面板 --- */
 .auth-main {
@@ -1431,7 +1407,6 @@
     }
     .auth-brand__title { margin-top: 0; font-size: var(--fs-lg); }
     .auth-brand__sub { margin-top: 0; font-size: var(--fs-xs); }
-    .auth-brand__points, .auth-brand__note { display: none; }
     .auth-main, .auth-brand { padding: var(--sp-6); }
 }
 

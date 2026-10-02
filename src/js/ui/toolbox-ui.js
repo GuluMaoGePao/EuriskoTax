@@ -1927,6 +1927,12 @@
         var activeId = activeEl ? activeEl.id : null;
         var visible = TAB_PAGES.indexOf(activeId) !== -1;
 
+        // 登录页是独立一屏（v1.119.0 踩坑）：初始 DOM 里 mode-selection-page 自带 .active，
+        // 而登录页自己不是 .page —— 只看 activeId 会误判「在首页」，于是 fixed 的
+        // 底部 Tab 栏浮在登录页上，用户往下滑就「进了主页」。登录页可见时一律不显导航。
+        var loginPageEl = document.getElementById('login-page');
+        if (loginPageEl && !loginPageEl.classList.contains('hidden')) visible = false;
+
         // 阶段19-3：进工具页就聚焦搜索框 —— 41 个入口靠翻不如靠搜。
         // 只在「刚切进来」的那一次聚焦：页面内反复同步时不抢用户的焦点。
         // 手机不聚焦：键盘一上来顶掉半屏，而用户还没决定搜什么。
