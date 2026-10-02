@@ -119,12 +119,13 @@ function triggerContentSync() {
 }
 
 async function handleLogin() {
-    const email = document.getElementById('login-email').value.trim();
+    // 登录标识：邮箱 或 用户名（后端按形态识别，前端不做格式约束，避免挡住纯用户名账号）
+    const account = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const btn = document.getElementById('login-submit');
     
-    if (!email || !password) {
-        showAlert('请输入邮箱和密码');
+    if (!account || !password) {
+        showAlert('请输入邮箱或用户名、密码');
         return;
     }
     
@@ -134,7 +135,7 @@ async function handleLogin() {
 
     try {
         setLoading(btn, true);
-        await apiClient.loginUser(email, password, rememberMe);
+        await apiClient.loginUser(account, password, rememberMe);
         clearPageHistory();
         exitGuestSession(); // 已变成真登录态，游客会话标记就该摘掉
         updateAuthUI();
@@ -194,6 +195,38 @@ function clearAllRegisterFieldErrors() {
         'register-invite-code',
         'register-agree'
     ].forEach(clearRegisterFieldError);
+}
+
+// === 注册密码强度提示：三段条 + 文案，纯前端启发式（不做任何网络请求） ===
+// 口径与后端一致：≥6 位才可注册；这里额外给「字母+数字组合 / 更长密码」一个正反馈，
+// 减少注册成功后立即被弱密码困扰的情况。评分只影响提示，不拦截提交。
+const PWD_STRENGTH_LABELS = { 1: '偏弱：建议加入字母或数字', 2: '中等：再加一位或一个符号更稳', 3: '较强' };
+
+function scorePassword(value) {
+    if (!value || value.length < 6) return 0;
+    const hasLetter = /[a-zA-Z]/.test(value);
+    const hasDigit = /\d/.test(value);
+    const hasSymbol = /[^a-zA-Z0-9]/.test(value);
+    if (value.length >= 10 && (hasDigit + hasLetter + hasSymbol) >= 2) return 3;
+    if (hasLetter && hasDigit) return 2;
+    return 1;
+}
+
+function updatePasswordStrength(value) {
+    const meter = document.getElementById('register-password-strength');
+    if (!meter) return;
+    const level = scorePassword(value);
+    meter.dataset.level = String(level);
+    meter.hidden = level === 0;
+    const label = meter.querySelector('.pwd-strength__label');
+    if (label) label.textContent = level > 0 ? PWD_STRENGTH_LABELS[level] : '';
+}
+
+function setupPasswordStrength() {
+    const field = document.getElementById('register-password');
+    if (!field) return;
+    field.addEventListener('input', () => updatePasswordStrength(field.value));
+    updatePasswordStrength(field.value);
 }
 
 async function handleRegister() {
@@ -367,11 +400,22 @@ async function handleSendCode() {
 }
 
 // === 登录/注册 Tab 与底部协议文案联动 ===
+// Tab 激活态走 .auth-tab--active（分段式控件，样式在 ui-redesign.css 的 auth-* 一节）。
+// 兼容旧版页面的裸 Tab：若元素没有 auth-tab 类，退回旧的 Tailwind 类切换，
+// 保证老缓存页面在换版过渡期切换态不丢。
 function setActiveTab(mode) {
     const loginTab = document.getElementById('login-tab');
     const registerTab = document.getElementById('register-tab');
     if (!loginTab || !registerTab) return;
     const loginActive = mode === 'login';
+    const segmented = loginTab.classList.contains('auth-tab') && registerTab.classList.contains('auth-tab');
+    if (segmented) {
+        loginTab.classList.toggle('auth-tab--active', loginActive);
+        registerTab.classList.toggle('auth-tab--active', !loginActive);
+        loginTab.setAttribute('aria-selected', String(loginActive));
+        registerTab.setAttribute('aria-selected', String(!loginActive));
+        return;
+    }
     loginTab.classList.toggle('border-primary', loginActive);
     loginTab.classList.toggle('text-primary', loginActive);
     loginTab.classList.toggle('border-transparent', !loginActive);
@@ -386,9 +430,9 @@ function updateAuthAgreementText(mode) {
     const el = document.getElementById('auth-agreement-text');
     if (!el) return;
     const links =
-        '<a href="#" onclick="openPolicyModal(event, \'user-agreement-modal\')" class="underline hover:text-white">用户协议</a>' +
+        '<a href="#" onclick="openPolicyModal(event, \'user-agreement-modal\')" class="auth-link">用户协议</a>' +
         ' 和 ' +
-        '<a href="#" onclick="openPolicyModal(event, \'privacy-policy-modal\')" class="underline hover:text-white">隐私政策</a>';
+        '<a href="#" onclick="openPolicyModal(event, \'privacy-policy-modal\')" class="auth-link">隐私政策</a>';
     if (mode === 'register') {
         el.innerHTML = '点击「注册」按钮即表示已阅读并同意' + links;
     } else if (mode === 'reset') {
@@ -411,10 +455,13 @@ function showResetPasswordPanel() {
     if (!panel || !loginForm) return;
     clearAllRegisterFieldErrors();
 
-    // 复制当前登录邮箱到重置面板，减少输入
+    // 复制当前登录邮箱到重置面板，减少输入。登录框现在可能是用户名 ——
+    // 只有形似邮箱才复制，否则会把用户名塞进「接收验证码的邮箱」，白等一封永不到达的邮件。
     const loginEmailValue = document.getElementById('login-email')?.value.trim() || '';
     const resetEmail = document.getElementById('reset-email');
-    if (resetEmail && loginEmailValue) resetEmail.value = loginEmailValue;
+    if (resetEmail && loginEmailValue && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmailValue)) {
+        resetEmail.value = loginEmailValue;
+    }
 
     loginForm.classList.add('hidden');
     if (registerForm) registerForm.classList.add('hidden');
@@ -2171,6 +2218,8 @@ function setupAuthEventListeners() {
             clearRegisterFieldError('register-confirm-password');
         });
     });
+    // 注册密码强度提示（输入实时刷新；元素不存在时静默跳过）
+    setupPasswordStrength();
     const registerAgreeCheckbox = document.getElementById('register-agree');
     if (registerAgreeCheckbox) {
         registerAgreeCheckbox.addEventListener('change', () => clearRegisterFieldError('register-agree'));

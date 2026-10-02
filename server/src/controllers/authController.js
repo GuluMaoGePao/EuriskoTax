@@ -94,9 +94,11 @@ const sendCode = async (req, res, next) => {
 
 const login = async (req, res, next) => {
     try {
+        // 字段名沿用 email（兼容既有客户端），取值允许是「邮箱 或 用户名」
         const { email, password } = req.body;
+        const account = typeof email === 'string' ? email.trim() : '';
         
-        if (!email || !password) {
+        if (!account || !password) {
             return res.status(400).json({
                 success: false,
                 error: {
@@ -106,7 +108,7 @@ const login = async (req, res, next) => {
             });
         }
         
-        const result = await authService.loginUser(email, password);
+        const result = await authService.loginUser(account, password);
         
         res.status(200).json({
             success: true,

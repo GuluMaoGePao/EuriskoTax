@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.116.2';
+        window.__APP_VERSION__ = '1.118.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -145,38 +145,49 @@
         <button id="sw-update-refresh" class="underline font-bold hover:text-blue-200 ml-1">点击刷新</button>
         以使用最新功能
     </div>
-    <!-- 登录页面 -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
-        <div class="w-full max-w-md mx-4">
-            <!-- 品牌标识 -->
-            <div class="text-center mb-6">
-                <img src="images/logo.png" alt="EuriskoTax" class="login-logo mx-auto">
-                <h1 class="text-2xl font-bold text-white mb-2">个人所得税预算规划工具</h1>
-                <p class="text-blue-200">专业税务参考 · 智能薪酬规划</p>
-            </div>
-            
-            <!-- 登录表单卡片 -->
-            <div class="bg-white rounded-2xl shadow-2xl p-8">
-                <!-- 标签切换 -->
-                <div class="flex mb-6">
-                    <button id="login-tab" class="flex-1 py-3 text-center font-medium border-b-2 border-primary text-primary">
+    <!-- 登录页面（正式版：桌面左右分栏 —— 左品牌价值主张、右表单；窄屏收成单列卡 -->
+    <div id="login-page" class="auth-page min-h-screen">
+        <div class="auth-shell">
+            <div class="auth-card">
+                <!-- 左侧品牌面板：与主应用 Mission Hero 同一套品牌渐变令牌 -->
+                <aside class="auth-brand">
+                    <div class="auth-brand__mark">
+                        <img src="images/logo.png" alt="EuriskoTax" class="auth-brand__logo">
+                        <span class="auth-brand__wordmark">EuriskoTax</span>
+                    </div>
+                    <h1 class="auth-brand__title">个人所得税预算规划工具</h1>
+                    <p class="auth-brand__sub">专业税务参考 · 智能薪酬规划</p>
+                    <ul class="auth-brand__points">
+                        <li><i class="fa fa-calculator"></i><span>20 个速算器 · 21 个完整测算，全税种覆盖</span></li>
+                        <li><i class="fa fa-shield"></i><span>测算在本机完成，免登录也可用全部功能</span></li>
+                        <li><i class="fa fa-book"></i><span>政策要点随版本更新，计算口径可追溯</span></li>
+                    </ul>
+                    <p class="auth-brand__note">本测算结果仅供参考，不构成税务建议。</p>
+                </aside>
+
+                <!-- 右侧表单面板 -->
+                <main class="auth-main">
+                <!-- 标签切换（分段式） -->
+                <div class="auth-tabs" role="tablist" aria-label="登录或注册">
+                    <button id="login-tab" class="auth-tab auth-tab--active" role="tab" aria-selected="true" type="button">
                         登录
                     </button>
-                    <button id="register-tab" class="flex-1 py-3 text-center font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    <button id="register-tab" class="auth-tab" role="tab" aria-selected="false" type="button">
                         注册
                     </button>
                 </div>
-                
+
                 <!-- 登录表单 -->
-                <form id="login-form" class="space-y-4">
-                    <div>
-                        <label for="login-email" class="label">邮箱</label>
+                <form id="login-form" class="auth-form">
+                    <div class="auth-field">
+                        <label for="login-email" class="label">邮箱或用户名</label>
                         <div class="relative">
-                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="email" id="login-email" class="input-field pl-10" placeholder="请输入邮箱">
+                            <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                            <input type="text" id="login-email" class="input-field pl-10" placeholder="请输入邮箱或用户名" autocomplete="username">
                         </div>
+                        <p class="text-xs text-gray-500 mt-1">两种都可以登录；忘记账号时可用注册邮箱找回密码</p>
                     </div>
-                    <div>
+                    <div class="auth-field">
                         <label for="login-password" class="label">密码</label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
@@ -184,107 +195,119 @@
                             <i id="login-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="auth-form__aux">
                         <label class="inline-flex items-center cursor-pointer select-none" title="勾选后，登录状态将在本机保持；未勾选则关闭浏览器后自动退出登录">
                             <input type="checkbox" id="remember-me" class="form-checkbox text-primary">
                             <span class="ml-2 text-sm text-gray-600">保持登录状态</span>
                         </label>
-                        <a href="#" id="forgot-password" class="text-sm text-primary hover:underline">忘记密码？</a>
+                        <a href="#" id="forgot-password" class="auth-link text-sm">忘记密码？</a>
                     </div>
-                    <button type="button" id="login-submit" class="btn btn-primary w-full py-3 text-lg">
-                        登录
+                    <button type="button" id="login-submit" class="btn btn-primary auth-submit">
+                        登 录
                     </button>
                 </form>
-                
+
                 <!-- 注册表单 -->
-                <form id="register-form" class="space-y-4 hidden">
-                    <div class="text-right -mb-1">
+                <form id="register-form" class="auth-form hidden">
+                    <div class="auth-form__hint text-right">
                         <span class="text-xs text-gray-500">带 <i class="req-star" aria-hidden="true">*</i> 的为必填项，请如实填写</span>
                     </div>
-                    <div>
-                        <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
-                        <div class="relative">
-                            <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="text" id="register-username" class="input-field pl-10" placeholder="请输入用户名">
+                    <div class="auth-grid-2">
+                        <div class="auth-field">
+                            <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
+                            <div class="relative">
+                                <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="text" id="register-username" class="input-field pl-10" placeholder="请输入用户名" autocomplete="username">
+                            </div>
+                            <p id="register-username-error" class="field-error hidden" role="alert"></p>
                         </div>
-                        <p id="register-username-error" class="field-error hidden" role="alert"></p>
-                    </div>
-                    <div>
-                        <label for="register-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
-                        <div class="relative">
-                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="email" id="register-email" class="input-field pl-10" placeholder="请输入邮箱">
+                        <div class="auth-field">
+                            <label for="register-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
+                            <div class="relative">
+                                <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="email" id="register-email" class="input-field pl-10" placeholder="请输入邮箱" autocomplete="email">
+                            </div>
+                            <p id="register-email-error" class="field-error hidden" role="alert"></p>
                         </div>
-                        <p id="register-email-error" class="field-error hidden" role="alert"></p>
                     </div>
-                    <div>
+                    <div class="auth-field">
                         <label for="register-code" class="label">邮箱验证码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
+                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric">
                             </div>
-                            <button type="button" id="send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
+                            <button type="button" id="send-code-btn" class="btn auth-btn-outline whitespace-nowrap" disabled>
                                 发送验证码
                             </button>
                         </div>
                         <p id="register-code-error" class="field-error hidden" role="alert"></p>
                         <p class="text-xs text-gray-500 mt-1">验证码将发送至您填写的邮箱，请在 10 分钟内完成输入</p>
                     </div>
-                    <div>
-                        <label for="register-phone" class="label">手机号（选填）</label>
-                        <div class="relative">
-                            <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="tel" id="register-phone" class="input-field pl-10" placeholder="请输入手机号">
+                    <div class="auth-grid-2">
+                        <div class="auth-field">
+                            <label for="register-phone" class="label">联系手机号（选填）</label>
+                            <div class="relative">
+                                <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="tel" id="register-phone" class="input-field pl-10" placeholder="选填，用于顾问回电" autocomplete="tel">
+                            </div>
+                            <p id="register-phone-error" class="field-error hidden" role="alert"></p>
+                            <p class="text-xs text-gray-500 mt-1">仅作联系方式，不用于登录（登录请用邮箱或用户名）</p>
                         </div>
-                        <p id="register-phone-error" class="field-error hidden" role="alert"></p>
-                    </div>
-                    <div>
-                        <label for="register-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
-                        <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="请输入密码（至少 6 位）">
-                            <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                        <div class="auth-field">
+                            <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
+                            <div class="relative">
+                                <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="公测期邀请码（一码一用）" autocomplete="off">
+                            </div>
+                            <p id="register-invite-code-error" class="field-error hidden" role="alert"></p>
+                            <p class="text-xs text-gray-500 mt-1">每个邀请码仅限注册一个账号，请通过开发者获取</p>
                         </div>
-                        <p id="register-password-error" class="field-error hidden" role="alert"></p>
                     </div>
-                    <div>
-                        <label for="register-confirm-password" class="label">确认密码<i class="req-star" aria-hidden="true">*</i></label>
-                        <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码">
-                            <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                    <div class="auth-grid-2">
+                        <div class="auth-field">
+                            <label for="register-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
+                            <div class="relative">
+                                <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="至少 6 位" autocomplete="new-password">
+                                <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                            </div>
+                            <p id="register-password-error" class="field-error hidden" role="alert"></p>
+                            <!-- 密码强度：三段条 + 文案，输入时实时更新（空值时整块隐藏） -->
+                            <div id="register-password-strength" class="pwd-strength" data-level="0" hidden>
+                                <div class="pwd-strength__bars" aria-hidden="true"><span></span><span></span><span></span></div>
+                                <span class="pwd-strength__label" aria-live="polite"></span>
+                            </div>
                         </div>
-                        <p id="register-confirm-password-error" class="field-error hidden" role="alert"></p>
-                    </div>
-                    <div>
-                        <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
-                        <div class="relative">
-                            <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="公测期邀请码（一码一用）" autocomplete="off">
+                        <div class="auth-field">
+                            <label for="register-confirm-password" class="label">确认密码<i class="req-star" aria-hidden="true">*</i></label>
+                            <div class="relative">
+                                <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码" autocomplete="new-password">
+                                <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                            </div>
+                            <p id="register-confirm-password-error" class="field-error hidden" role="alert"></p>
                         </div>
-                        <p id="register-invite-code-error" class="field-error hidden" role="alert"></p>
-                        <p class="text-xs text-gray-500 mt-1">每个邀请码仅限注册一个账号，请通过开发者获取</p>
                     </div>
-                    <div>
+                    <div class="auth-field">
                         <div class="flex items-start">
                             <input type="checkbox" id="register-agree" class="form-checkbox text-primary mt-0.5">
                             <label for="register-agree" class="ml-2 text-xs text-gray-500 leading-relaxed">
                                 我已阅读并同意
-                                <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="text-primary hover:underline">《用户协议》</a>
+                                <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="auth-link">《用户协议》</a>
                                 和
-                                <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
+                                <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="auth-link">《隐私政策》</a>
                             </label>
                         </div>
                         <p id="register-agree-error" class="field-error hidden" role="alert"></p>
                     </div>
-                    <button type="button" id="register-submit" class="btn btn-primary w-full py-3 text-lg">
-                        注册
+                    <button type="button" id="register-submit" class="btn btn-primary auth-submit">
+                        注 册
                     </button>
                 </form>
 
                 <!-- 重置密码面板（忘记密码自助找回：验证邮箱 → 设置新密码） -->
-                <div id="reset-password-form" class="space-y-4 hidden">
+                <div id="reset-password-form" class="auth-form hidden">
                     <div class="flex items-center justify-between mb-1">
                         <h3 class="text-base font-semibold text-gray-800">
                             <i class="fa fa-key text-primary mr-2"></i>重置密码
@@ -296,68 +319,68 @@
                     <p class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">
                         输入注册邮箱获取验证码，验证通过后即可设置新密码。验证码 10 分钟内有效。
                     </p>
-                    <div>
+                    <div class="auth-field">
                         <label for="reset-email" class="label">注册邮箱</label>
                         <div class="relative">
                             <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="email" id="reset-email" class="input-field pl-10" placeholder="请输入注册邮箱">
+                            <input type="email" id="reset-email" class="input-field pl-10" placeholder="请输入注册邮箱" autocomplete="email">
                         </div>
                     </div>
-                    <div>
+                    <div class="auth-field">
                         <label for="reset-code" class="label">邮箱验证码</label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off">
+                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric">
                             </div>
-                            <button type="button" id="reset-send-code-btn" class="btn btn-primary whitespace-nowrap px-4 py-2 text-sm" disabled>
+                            <button type="button" id="reset-send-code-btn" class="btn auth-btn-outline whitespace-nowrap" disabled>
                                 发送验证码
                             </button>
                         </div>
                     </div>
-                    <div>
-                        <label for="reset-new-password" class="label">新密码</label>
-                        <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少 6 位）">
-                            <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                    <div class="auth-grid-2">
+                        <div class="auth-field">
+                            <label for="reset-new-password" class="label">新密码</label>
+                            <div class="relative">
+                                <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少 6 位）" autocomplete="new-password">
+                                <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                            </div>
+                        </div>
+                        <div class="auth-field">
+                            <label for="reset-confirm-password" class="label">确认新密码</label>
+                            <div class="relative">
+                                <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码" autocomplete="new-password">
+                                <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label for="reset-confirm-password" class="label">确认新密码</label>
-                        <div class="relative">
-                            <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码">
-                            <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
-                        </div>
-                    </div>
-                    <button type="button" id="reset-submit" class="btn btn-primary w-full py-3 text-lg">
+                    <button type="button" id="reset-submit" class="btn btn-primary auth-submit">
                         重置密码
                     </button>
-                    <!-- 阶段10 口径：游客（未登录）= 免费版全功能，不做登录前置 ——
-                         入口做得克制但明确：不替代登录，只是给「先算一次」留出一条路 -->
-                    <div class="mt-5 pt-4 border-t border-gray-100 text-center">
-                        <button type="button" id="guest-entry-btn" class="text-sm text-gray-600 hover:text-primary transition-colors">
-                            免登录使用 →
-                        </button>
-                        <p class="text-xs text-gray-500 mt-1.5">不注册也能用全部测算功能，全部计算在本机完成。</p>
-                    </div>
                 </div>
-                
+
+                <!-- 阶段10 口径：游客（未登录）= 免费版全功能，不做登录前置 ——
+                     入口是三个面板（登录/注册/重置）共用的卡内页脚，不替代登录，
+                     只是给「先算一次」留出一条路。原先只在重置面板里有，是布局遗留。 -->
+                <div class="auth-alt">
+                    <button type="button" id="guest-entry-btn">免登录使用 →</button>
+                    <p class="auth-alt__hint">不注册也能用全部测算功能，全部计算在本机完成。</p>
+                </div>
+                </main>
             </div>
-            
-            <!-- 底部信息 -->
-            <div class="text-center mt-6 space-y-2">
-                <p id="auth-agreement-text" class="text-blue-200 text-sm leading-relaxed">
-                    登录即表示同意 <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="underline hover:text-white">用户协议</a> 和 <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="underline hover:text-white">隐私政策</a>
+
+            <!-- 卡外页脚：协议随所在面板联动（auth-ui.js 按登录/注册/重置改写文案） -->
+            <footer class="auth-foot">
+                <p id="auth-agreement-text" class="auth-foot__agreement">
+                    登录即表示同意 <a href="#" onclick="openPolicyModal(event, 'user-agreement-modal')" class="auth-link">用户协议</a> 和 <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="auth-link">隐私政策</a>
                 </p>
-                <p class="text-blue-300 text-xs">
-                    © 2026 EuriskoTax 税费计算器 · 20 个速算器 + 21 个完整测算 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
+                <p class="auth-foot__meta">© 2026 EuriskoTax 税费计算器 · 实际纳税请以主管税务机关认定为准</p>
+                <p class="auth-foot__meta">
+                    <a href="clean-cache.html?auto=1" class="auth-link">遇到旧版页面？点此一键重置缓存</a>
                 </p>
-                <p class="text-blue-200/90 text-xs mt-1">
-                    <a href="clean-cache.html?auto=1" class="underline hover:text-white">遇到旧版页面？点此一键重置缓存</a>
-                </p>
-            </div>
+            </footer>
         </div>
     </div>
 
@@ -1569,7 +1592,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.116.2</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.118.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -2166,14 +2189,14 @@
                         <input type="email" id="profile-email" class="input-field !pl-3" readonly>
                     </div>
                     <div class="form-group md:col-span-2">
-                        <label class="label">手机号</label>
+                        <label class="label">联系手机号（选填）</label>
                         <div class="flex flex-col sm:flex-row gap-3">
-                            <input type="tel" id="profile-phone" class="input-field !pl-3 flex-1" placeholder="请输入手机号">
+                            <input type="tel" id="profile-phone" class="input-field !pl-3 flex-1" placeholder="选填，用于顾问回电">
                             <button type="button" id="profile-phone-save" class="btn bg-gray-100 text-primary hover:bg-blue-50 w-full sm:w-auto sm:shrink-0">
                                 <i class="fa fa-save mr-1"></i>保存
                             </button>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面</p>
+                        <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面；仅作联系方式，不用于登录（登录请用邮箱或用户名）</p>
                     </div>
                 </div>
             </div>

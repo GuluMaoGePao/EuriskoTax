@@ -60,9 +60,11 @@ const RESPONSE_ERROR_MESSAGE = '服务器返回了非预期内容：请打开 ht
 // 后端英文错误消息 → 用户友好的中文提示（未匹配到的原样透出）
 const ERROR_MESSAGE_MAP = {
     'Username, email and password are required': '请填写用户名、邮箱和密码',
-    'Email and password are required': '请填写邮箱和密码',
+    'Email and password are required': '请填写账号和密码',
     'Username or email already exists': '用户名或邮箱已被注册',
-    'Invalid email or password': '邮箱或密码错误',
+    // v1.118.0：登录标识支持邮箱或用户名，错误提示不再单指邮箱
+    'Invalid account or password': '账号或密码错误，请检查邮箱/用户名与密码',
+    'Invalid email or password': '账号或密码错误，请检查邮箱/用户名与密码',
     'Invalid invite code. Public beta requires an invite code.': '邀请码无效，公测期注册需要有效邀请码',
     'Invite code is required': '请填写邀请码',
     'Invite code not found': '邀请码无效，请向开发者获取',
@@ -202,9 +204,10 @@ async function resetPassword(email, verificationCode, newPassword) {
 }
 
 // remember = true → token 存 localStorage（勾选"保持登录状态"），false → sessionStorage（关闭浏览器即失效）
-async function loginUser(email, password, remember = true) {
+// account：邮箱 或 用户名（后端按形态自动识别；字段名沿用 email 以兼容既有客户端）
+async function loginUser(account, password, remember = true) {
     const result = await apiRequest('/auth/login', 'POST', {
-        email,
+        email: account,
         password
     });
     if (result.token) {

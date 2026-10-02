@@ -1215,3 +1215,223 @@
     }
     .event-card:hover { transform: none; }
 }
+
+/* ==========================================================================
+   阶段21 · 登录/注册页正式化（auth-*）
+   布局：桌面左右分栏（左品牌价值主张 / 右表单），窄屏收成单列卡。
+   取值全部来自 tokens.css（品牌渐变用 --c-hero-*，与 Mission Hero 同源）；
+   DOM 里的全部 id 与 auth-ui.js 的绑定约定（hidden / field-error / fa-eye）
+   均未改动 —— 本节只动"长什么样"，不动"怎么工作"。
+   ========================================================================== */
+
+.auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-6) var(--sp-4);
+    background: linear-gradient(180deg, var(--c-brand-subtle) 0%, var(--c-bg-2) 100%);
+}
+.dark .auth-page { background: var(--c-bg); }
+
+.auth-shell { width: 100%; max-width: 920px; }
+
+.auth-card {
+    display: grid;
+    grid-template-columns: minmax(300px, 5fr) 7fr;
+    overflow: hidden;
+    background: var(--c-surface-0);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-hero);
+    box-shadow: var(--sh-3);
+}
+
+/* --- 左：品牌面板（深蓝渐变 + 价值主张） --- */
+.auth-brand {
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-8);
+    background: linear-gradient(150deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
+    color: #fff;
+}
+.auth-brand__mark { display: flex; align-items: center; gap: var(--sp-3); }
+.auth-brand__logo { width: 46px; height: 46px; border-radius: var(--r-ctrl); }
+.auth-brand__wordmark { font-size: var(--fs-lg); font-weight: 700; letter-spacing: .02em; }
+.auth-brand__title {
+    margin-top: var(--sp-6);
+    font-size: var(--fs-2xl);
+    font-weight: 600;
+    line-height: 1.35;
+}
+.auth-brand__sub { margin-top: var(--sp-2); font-size: var(--fs-sm); opacity: .85; }
+.auth-brand__points {
+    margin: var(--sp-6) 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+.auth-brand__points li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    opacity: .94;
+}
+.auth-brand__points i { width: 1.2em; text-align: center; opacity: .85; }
+.auth-brand__note {
+    margin-top: auto;
+    padding-top: var(--sp-6);
+    font-size: var(--fs-xs);
+    line-height: 1.6;
+    opacity: .75;
+}
+
+/* --- 右：表单面板 --- */
+.auth-main {
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-8);
+}
+
+/* 分段式 Tab（替代原先的裸文字下划线） */
+.auth-tabs {
+    display: flex;
+    gap: var(--sp-1);
+    margin-bottom: var(--sp-6);
+    padding: 4px;
+    background: var(--c-surface-2);
+    border-radius: var(--r-pill);
+}
+.auth-tab {
+    flex: 1;
+    min-height: 40px;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--c-text-2);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--dur-micro) var(--ease), color var(--dur-micro) var(--ease);
+}
+.auth-tab:hover { color: var(--c-brand); }
+.auth-tab--active {
+    background: var(--c-surface-0);
+    color: var(--c-brand);
+    box-shadow: var(--sh-1);
+}
+.auth-tab:focus-visible,
+.auth-alt button:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* 表单骨架：纵向节奏统一为 16px；字段对（如 用户名+邮箱）桌面双列。
+   注意：本文件排在 tailwind.css 之后，.auth-form 的 display:flex 会压过 .hidden 的
+   display:none —— 三面板切换靠 hidden 类，必须显式把 hidden 抢回来（踩过：首拍
+   登录/注册/重置三张表单同屏叠放，就是这条优先级反转造成的）。 */
+.auth-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+.auth-form.hidden { display: none; }
+.auth-form__aux {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.auth-form__hint { margin-bottom: calc(-1 * var(--sp-2)); }
+.auth-grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
+@media (min-width: 560px) { .auth-grid-2 { grid-template-columns: 1fr 1fr; } }
+
+/* 主按钮与描边按钮（发送验证码） */
+.auth-submit {
+    width: 100%;
+    min-height: 46px;
+    margin-top: var(--sp-2);
+    font-size: var(--fs-lg);
+    letter-spacing: .2em;
+    border-radius: var(--r-ctrl);
+    box-shadow: var(--sh-1);
+}
+.auth-btn-outline {
+    min-height: 40px;
+    padding: 0 var(--sp-4);
+    border: 1px solid var(--c-brand-line);
+    border-radius: var(--r-ctrl);
+    background: var(--c-surface-0);
+    color: var(--c-brand);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.auth-btn-outline:hover:not(:disabled) { background: var(--c-brand-subtle); }
+.auth-btn-outline:disabled {
+    border-color: var(--c-border);
+    background: var(--c-surface-1);
+    color: var(--c-text-disabled);
+}
+
+/* 卡内页脚：免登录入口（登录/注册/重置三态共用） */
+.auth-alt {
+    margin-top: var(--sp-6);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--c-border);
+    text-align: center;
+}
+.auth-alt button {
+    border: 0;
+    background: none;
+    color: var(--c-text-2);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+.auth-alt button:hover { color: var(--c-brand); }
+.auth-alt__hint { margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--c-text-3); }
+
+/* 卡外页脚 */
+.auth-foot {
+    margin-top: var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    text-align: center;
+}
+.auth-foot__agreement { font-size: var(--fs-sm); color: var(--c-text-2); }
+.auth-foot__meta { font-size: var(--fs-xs); color: var(--c-text-3); }
+.auth-link { color: var(--c-brand); }
+.auth-link:hover { text-decoration: underline; }
+
+/* 密码强度：三段条 + 文案（空值时 JS 置 hidden） */
+.pwd-strength {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-1);
+}
+/* 同一条优先级反转：display:flex 会压过 hidden 属性的 UA display:none */
+.pwd-strength[hidden] { display: none; }
+.pwd-strength__bars { display: flex; gap: 3px; }
+.pwd-strength__bars span {
+    width: 26px;
+    height: 4px;
+    border-radius: var(--r-pill);
+    background: var(--c-border);
+    transition: background-color var(--dur-micro) var(--ease);
+}
+.pwd-strength__label { font-size: var(--fs-xs); color: var(--c-text-3); }
+.pwd-strength[data-level="1"] .pwd-strength__bars span:nth-child(1) { background: var(--c-danger); }
+.pwd-strength[data-level="2"] .pwd-strength__bars span:nth-child(-n+2) { background: var(--c-warning); }
+.pwd-strength[data-level="3"] .pwd-strength__bars span { background: var(--c-success); }
+
+/* --- 窄屏：品牌面板收成卡内横条，价值主张让位给表单 --- */
+@media (max-width: 860px) {
+    .auth-card { grid-template-columns: 1fr; }
+    .auth-brand {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sp-2) var(--sp-4);
+        padding: var(--sp-5) var(--sp-6);
+    }
+    .auth-brand__title { margin-top: 0; font-size: var(--fs-lg); }
+    .auth-brand__sub { margin-top: 0; font-size: var(--fs-xs); }
+    .auth-brand__points, .auth-brand__note { display: none; }
+    .auth-main, .auth-brand { padding: var(--sp-6); }
+}
+

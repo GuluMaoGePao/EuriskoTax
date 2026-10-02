@@ -153,13 +153,22 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
     }
 };
 
-const loginUser = async (email, password) => {
-    const user = await prisma.user.findUnique({
-        where: { email: normalizeEmail(email) }
+// v1.118.0：登录标识支持「邮箱 或 用户名」。形似邮箱（含 @ 且有域名段）按邮箱查，
+// 其余按用户名查 —— 用户名注册时即唯一校验，无需额外验证手段，零成本扩登录入口。
+// 手机号**不**作为登录凭据：它是未验证字段（任何人可填任意 11 位），当凭据会出现
+// 串号/冒领，要支持必须先接短信验证码（决策见 CHANGELOG 1.118.0）。
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const loginUser = async (account, password) => {
+    const identifier = String(account || '').trim();
+    const user = await prisma.user.findFirst({
+        where: EMAIL_RE.test(identifier)
+            ? { email: normalizeEmail(identifier) }
+            : { username: identifier }
     });
-    
+
     if (!user) {
-        const error = new Error('Invalid email or password');
+        const error = new Error('Invalid account or password');
         error.statusCode = 401;
         throw error;
     }
@@ -167,7 +176,7 @@ const loginUser = async (email, password) => {
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
-        const error = new Error('Invalid email or password');
+        const error = new Error('Invalid account or password');
         error.statusCode = 401;
         throw error;
     }

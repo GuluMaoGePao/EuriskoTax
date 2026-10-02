@@ -71,12 +71,13 @@ describe('网络层失败 → 中文可操作提示', () => {
 });
 
 describe('后端业务错误照旧翻译并带状态码', () => {
-    test('401 Invalid email or password → 邮箱或密码错误，且 statusCode 保留', async () => {
+    // v1.118.0：登录标识支持邮箱或用户名，后端错误串改为 Invalid account or password
+    test('401 Invalid account or password → 中文提示，且 statusCode 保留', async () => {
         global.fetch = jest.fn().mockResolvedValue(jsonResponse({
             success: false,
-            error: { message: 'Invalid email or password', statusCode: 401 }
+            error: { message: 'Invalid account or password', statusCode: 401 }
         }, 401));
-        await expect(apiRequest('/auth/login', 'POST', {})).rejects.toThrow('邮箱或密码错误');
+        await expect(apiRequest('/auth/login', 'POST', {})).rejects.toThrow('账号或密码错误');
         try {
             await apiRequest('/auth/login', 'POST', {});
         } catch (err) {

@@ -90,13 +90,7 @@
             .tab-inactive {
                 @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
             }
-            /* 页面 Logo 样式 */
-            .login-logo {
-                width: 250px;
-                height: 250px;
-                margin-top: -50px;
-                margin-bottom: -50px;
-            }
+            /* 弹窗 Logo 样式（升级码等模态仍在用） */
             .modal-logo {
                 width: 200px;
                 height: 200px;

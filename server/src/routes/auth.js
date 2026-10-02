@@ -112,7 +112,7 @@ router.post('/register', authController.register);
  *   post:
  *     tags: [认证 Auth]
  *     summary: 用户登录，获取 JWT
- *     description: 用邮箱密码登录，成功返回 access_token（JWT）
+ *     description: 用「邮箱 或 用户名」+ 密码登录，成功返回 access_token（JWT）。含 @ 的标识按邮箱匹配（大小写不敏感），其余按用户名精确匹配。手机号不可作为登录凭据（未验证字段）。
  *     requestBody:
  *       required: true
  *       content:
@@ -121,7 +121,7 @@ router.post('/register', authController.register);
  *             type: object
  *             required: [email, password]
  *             properties:
- *               email:    { type: string, format: email, example: dev@example.com }
+ *               email:    { type: string, example: dev@example.com, description: 邮箱或用户名（字段名沿用 email 以兼容既有客户端） }
  *               password: { type: string, example: password }
  *     responses:
  *       '200': { description: 登录成功，返回 JWT token }
