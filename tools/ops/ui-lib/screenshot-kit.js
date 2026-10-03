@@ -320,21 +320,101 @@ function resolveAgentBrowserEntry() {
 }
 
 /**
+ * 找 playwright —— 只给兜底引擎（KIT_BROWSER=pw）用。
+ *
+ * 为什么要兜底（2026-10-04 踩到）：agent-browser 的浏览器会话会坏掉，表现为
+ * `open` 命令**不报错、不返回**，一直挂着（--version 正常、close --all 也正常，
+ * 只有真正起浏览器那一步挂死）。此时基线脚本会卡在第一张图上，看不出是代码问题
+ * 还是工具问题。playwright 走的是另一套浏览器启动路径，可以绕开。
+ *
+ * 本机可能只装了 @playwright/cli（playwright-core 藏在它下面），所以三种路径都试一遍。
+ */
+function resolvePlaywright() {
+    for (const m of ['playwright-core', 'playwright']) {
+        try { return require(m); } catch (e) { /* 没装，试下一种 */ }
+    }
+    const appData = process.env.APPDATA || '';
+    if (appData) {
+        const candidate = path.join(appData, 'npm', 'node_modules', '@playwright', 'cli', 'node_modules', 'playwright-core');
+        try { return require(candidate); } catch (e) { /* 还是没有 */ }
+    }
+    return null;
+}
+
+/**
  * 创建一个绑定了会话名的浏览器句柄。
  *
  * 为什么用工厂而不是导出一个全局 ab：会话名必须隔离 —— 截图脚本用 ui-baseline、
  * 对比度脚本用 ui-a11y，否则两个脚本交替跑会互相顶掉彼此的浏览器状态
  * （尤其是 viewport 和当前页面）。工厂让调用方在一处决定会话名，
  * 后续调用签名与原来完全一致（ab(['open', url])），改造成本最小。
+ *
+ * 两种引擎：默认 agent-browser；`KIT_BROWSER=pw` 切到 playwright（见 resolvePlaywright
+ * 的注释）。**两套引擎拍出来的图不在同一台浏览器上渲染，像素可能微差** —— 所以
+ * 生成基线与比对基线要用同一个引擎，别一半一半。
  */
 function createBrowser(session) {
+    const engine = String(process.env.KIT_BROWSER || '').toLowerCase() === 'pw' ? 'pw' : 'ab';
+
+    /* ---------- 兜底引擎：playwright ---------- */
+    let pwRef = null;
+    async function pwPage() {
+        if (pwRef) return pwRef;
+        const core = resolvePlaywright();
+        if (!core) throw new Error('KIT_BROWSER=pw，但本机找不到 playwright-core（npm i -D playwright-core）');
+        const browser = await core.chromium.launch();
+        const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        pwRef = page;
+        return page;
+    }
+
+    async function abPlaywright(args) {
+        const page = await pwPage();
+        const cmd = args[0];
+        switch (cmd) {
+            case 'open':
+                await page.goto(String(args[1]), { waitUntil: 'domcontentloaded' });
+                return 'ok';
+            case 'reload':
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                return 'ok';
+            case 'eval': {
+                // 兼容两种写法：表达式（(function(){...})()）与语句块（themeJs 那种）。
+                // 先按表达式求值 —— 这样能拿到返回值（waitForReady 靠返回值判断就绪）；
+                // 语法不对再当脚本体跑一遍。
+                const src = String(args[1]);
+                const r = await page.evaluate((s) => {
+                    try { return new Function('return (' + s + ')')(); }
+                    catch (e) { return new Function(s)(); }
+                }, src);
+                // 与 agent-browser 的输出对齐：字符串结果带引号（waitForReady 会剥掉）
+                return r === undefined ? 'undefined' : JSON.stringify(r);
+            }
+            case 'set':
+                if (args[1] === 'viewport') {
+                    await page.setViewportSize({ width: Number(args[2]), height: Number(args[3]) });
+                    return 'ok';
+                }
+                throw new Error('pw 引擎不支持 set ' + args[1]);
+            case 'wait':
+                await page.waitForTimeout(Number(args[1]));
+                return 'ok';
+            case 'screenshot':
+                // 视口截图（不是全页）—— 与 agent-browser 那边的产物一致，尺寸即视口尺寸
+                await page.screenshot({ path: String(args[1]) });
+                return 'ok';
+            default:
+                throw new Error('pw 引擎尚不支持命令：' + cmd);
+        }
+    }
+
     /**
      * 必须用**异步** spawn，不能用 spawnSync。
      * 原因（踩过）：spawnSync 会阻塞本进程事件循环，而静态服务器就跑在同一个进程里 ——
      * 浏览器来请求时主线程正卡在 spawnSync 上，没人 accept，于是连接超时
      * （实测报错 os error 10060，表象是"页面打不开"，根因在脚本自己）。
      */
-    function ab(args, timeoutMs) {
+    function abSpawn(args, timeoutMs) {
         return new Promise((resolve, reject) => {
             const child = spawn(
                 process.execPath,
@@ -372,6 +452,10 @@ function createBrowser(session) {
      *
      * @returns {boolean} 是否等到就绪（false = 超时）
      */
+    function ab(args, timeoutMs) {
+        return engine === 'pw' ? abPlaywright(args) : abSpawn(args, timeoutMs);
+    }
+
     async function waitForReady(maxRounds) {
         const probe = `(function(){return document.readyState+'|'+(document.fonts?document.fonts.status:'none')})()`;
         const rounds = maxRounds || 6;
