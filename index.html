@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.128.0';
+        window.__APP_VERSION__ = '1.129.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1598,7 +1598,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.128.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.129.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1648,7 +1648,11 @@
              class="bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] flex flex-col overflow-hidden transform scale-95 transition-transform duration-300">
             <!-- 头部：一句话价值主张 + 三条信任点，第一屏就回答「凭什么把联系方式留给你」。
                  两枚光晕是纯装饰（pointer-events-none），用来打散大色块的平铺感 -->
-            <div class="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-blue-600 text-white px-5 sm:px-6 pt-5 pb-5">
+            <!-- shrink-0（v1.129.0）：容器是 flex-col + max-h-[90vh]，flex 子项默认可被压缩 ——
+                 矮视口下（内容 + footer 超高）弹窗会先压扁头部，价值主张被拦腰裁掉
+                 （用户截图：说明文字只剩"……有疑问可以发给我"）。头部是这张弹窗的说服层，
+                 一行都不能丢，必须整块保住；空间不够时该滚的是下面的 body -->
+            <div class="relative shrink-0 overflow-hidden bg-gradient-to-br from-primary via-primary to-blue-600 text-white px-5 sm:px-6 pt-5 pb-5">
                 <span aria-hidden="true" class="pointer-events-none absolute -top-12 -right-8 w-32 h-32 rounded-full bg-white/10"></span>
                 <span aria-hidden="true" class="pointer-events-none absolute -bottom-16 right-16 w-24 h-24 rounded-full bg-white/5"></span>
                 <button type="button" id="lead-modal-close" aria-label="关闭"
@@ -1660,7 +1664,7 @@
                      信任三枚第三枚**不写任何时效**（1 个工作日做不到，见 §2.5 留资时效铁律） -->
                 <p class="relative text-[11px] font-semibold tracking-widest text-white/70">使用协助 · 留个问题，顾问帮您核对</p>
                 <h3 id="lead-modal-title" class="relative text-lg font-bold mt-1.5 pr-10">算完先自查：参数填错，结果就跟着错。</h3>
-                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，这三项是常见易错口径 —— 有疑问可以发给我们，顾问协助您核对填写的参数。</p>
+                <p class="relative text-xs text-white/85 mt-1.5 leading-relaxed">专项附加扣除、年终奖计税方式、退税补税结论，这三项是常见易错口径 —— 有疑问先发给我们核对。</p>
                 <ul class="relative flex flex-wrap gap-1.5 mt-3 text-[11px] text-white/90">
                     <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-check-circle"></i>免注册使用</li>
                     <li class="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1"><i class="fa fa-lock"></i>不采集收入金额</li>
@@ -1668,7 +1672,7 @@
                 </ul>
             </div>
 
-            <div id="lead-modal-body" class="px-5 sm:px-6 py-5 overflow-y-auto flex-1 bg-gray-50">
+            <div id="lead-modal-body" class="px-5 sm:px-6 py-5 overflow-y-auto flex-1 min-h-0 bg-gray-50">
                 <!-- 情境卡：只展示可核实的真实信息 ——
                      结果页进入时由 lead-context.js 从已渲染结果反推（类型 / 汇算结论 / 适用税率，不含金额）；
                      个人中心等无测算入口则列出本地已保存记录供用户主动选择；
@@ -1844,7 +1848,7 @@
                  同意勾选在表单外，用 form 属性归属到 #lead-form —— 因此 form.reset() 同样会清空它。
                  排版：同意行 + 一行灰字说明 + 通栏主按钮 + 按钮下的一句安抚；
                  按钮下那句是弹窗里**唯一**保留的流程说明 —— 一句话说完，不拆步骤图 -->
-            <div id="lead-modal-footer" class="px-5 sm:px-6 py-4 border-t border-gray-200 bg-white">
+            <div id="lead-modal-footer" class="shrink-0 px-5 sm:px-6 py-4 border-t border-gray-200 bg-white">
                 <p id="lead-form-error" class="hidden text-xs text-red-600 mb-2"></p>
                 <label class="flex items-start gap-2 cursor-pointer">
                     <input id="lead-consent" type="checkbox" form="lead-form" class="mt-0.5" />
