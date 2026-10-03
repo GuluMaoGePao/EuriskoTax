@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.134.0';
+        window.__APP_VERSION__ = '1.135.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -451,7 +451,11 @@
         <div id="mode-selection-page" class="page active">
             <!-- data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。
                  别改成用宽度工具类选择容器 —— 宽度会被反复调，锚点不能跟着漂。 -->
-            <div class="max-w-5xl mx-auto pt-2 pb-6" data-page-container>
+            <!-- px-4（v1.135.0）：工具页 / 我的页的容器都自带 px-4，首页没有 —— 同一个
+                 max-w-5xl 下首页内容 1024、另两页 992，切页时卡片区宽窄跳 32px。补上即三页同宽。
+                 ⚠️ 类名 max-w-5xl 别摘：share-landing.js 用 `#mode-selection-page .max-w-5xl`
+                 定位首页容器挂载分享落地引导。 -->
+            <div class="max-w-5xl mx-auto pt-2 pb-6 px-4" data-page-container>
 
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
@@ -1624,7 +1628,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="privacy.html" target="_blank" rel="noopener" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.134.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.135.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2096,9 +2100,20 @@
     </script>
 
 
+    <!-- v1.135.0：这 7 个「我的」系列页面原先**不在** .container 里 —— 首页 / 工具页 /
+         深度测算 / 速算器四个页都在（父级给 16px 左右留白），只有它们直接挂在
+         #app-container 下，于是手机上「我的」内容 358px、首页 326px，切过去留白跳一截。
+         补上同一个 .container，七页与其余四页共用一条栅格。
+         ⚠️ 不加 pt-4：各页自己的容器带 pt/pb，再垫一层顶距会把首屏往下推。 -->
+    <div class="container mx-auto px-4">
+
     <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
-        <div class="max-w-4xl mx-auto px-4 pb-6">
+        <!-- 容器原为 max-w-4xl(896px)：与首页 / 工具页的 1024 差一档，从「工具」切到「我的」
+             留白会跳一下 —— 同一个 App 的顶层页不该各写一条栅格。改 max-w-5xl，
+             与首页（#mode-selection-page）/ 工具页（#tools-page）/ 深度测算同栅格。
+             ⚠️ 反过来：个人中心的**二级页**不跟这里对齐，它们守 768（见 profile-*-page）。 -->
+        <div class="max-w-5xl mx-auto px-4 pb-6">
             <!-- 页头已撤（2026-10-03）：原来的「← 返回 + 个人中心」把顶层 Tab 页当二级页用 ——
                  返回去的就是首页，与底部/顶部 Tab 的「首页」是同一目的地的第二条路径；
                  「个人中心」也不是这一页的名字（这页叫「我的」，Tab 已经写着），它是页内的一个入口，
@@ -2188,7 +2203,10 @@
 
     <!-- 个人中心（从「我的」页卡片点击进入，不再叫「账户设置」） -->
     <div id="profile-settings-page" class="page hidden">
-        <div class="max-w-2xl mx-auto px-4 pb-6">
+        <!-- 二级页统一 768（max-w-3xl）：原先六个二级页写了三种宽度（672 / 768 / 896），
+             在「我的」页里点进点出，留白来回跳。二级页比顶层窄一档是层级表达，
+             但六个之间必须同宽。面包屑条 .profile-sub-nav-inner 跟着这个值（见 tailwind.src.css）。 -->
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-settings" class="profile-sub-nav-back">
@@ -2431,7 +2449,7 @@
 
     <!-- 数据管理页面 -->
     <div id="profile-data-page" class="page hidden">
-        <div class="max-w-2xl mx-auto px-4 pb-6">
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-data" class="profile-sub-nav-back">
@@ -2527,7 +2545,7 @@
 
     <!-- 批量计算页面（个人中心内 · 阶段19-11 E4） -->
     <div id="profile-batch-page" class="page hidden">
-        <div class="max-w-4xl mx-auto px-4 pb-6">
+        <div class="max-w-3xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-batch" class="profile-sub-nav-back">
@@ -2577,6 +2595,8 @@
             </div>
         </div>
     </div>
+
+    </div><!-- /.container（v1.135.0：包住上面 7 个「我的」系列页面，与其余内页同栅格） -->
 
     <!-- 页尾为什么整块删掉（2026-10-03）—— 不是"省地方"，是它本来就不该长在 App 里：
          ── 经历过两次改，两次都站不住 ──

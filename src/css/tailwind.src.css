@@ -276,12 +276,20 @@
             }
 
             /* === 个人中心子页面顶栏 === */
+            /* v1.135.0：左右内距从条上**挪到 inner 上**。
+               条是全宽（sticky 通栏），内距压在条上 = inner 比下面的内容区窄 64px，
+               返回按钮的左边缘就跟内容对不齐（实测 704 vs 768）。
+               内距挪到 inner（与内容容器同为 px-4）后，两者左边缘重合。 */
             .profile-sub-nav {
                 @apply sticky top-14 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 transition-all duration-200;
-                padding: 0.625rem 1rem;
+                padding: 0.625rem 0;
             }
+            /* v1.135.0：去掉 max-w-3xl + mx-auto + px-4。
+               这条 nav 就长在二级页的内容容器**里面**（容器 max-w-3xl px-4 → 可用 736），
+               内层的 inner 再限一次 768、再补一次 px-4，是双重缩进 —— 返回按钮的左边缘
+               比下面内容右移 16px（实测 704 vs 736）。它已经在内容区里了，撑满即可。 */
             .profile-sub-nav-inner {
-                @apply flex items-center relative max-w-4xl mx-auto;
+                @apply flex items-center relative;
             }
             .profile-sub-nav-back {
                 @apply flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-150 font-medium text-sm py-1.5 px-3 rounded-lg hover:bg-primary/5 cursor-pointer;
@@ -306,7 +314,7 @@
             /* 个人中心子页面顶栏：手机窄屏适配（加大返回热区、收紧留白） */
             @media (max-width: 640px) {
                 .profile-sub-nav {
-                    padding: 0.5rem 0.5rem;
+                    padding: 0.5rem 0;   /* 同上：左右内距交给 inner 的 px-4 */
                 }
                 .profile-sub-nav-back {
                     min-height: 40px;
