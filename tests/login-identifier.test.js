@@ -150,10 +150,12 @@ describe('登录页用户视角口径（v1.119.0：内部口径与运维入口�
         expect(alt).not.toContain('免登录使用');
     });
 
-    test('登录页页脚有备案号容器，与主应用页脚共用同一份配置渲染', () => {
+    test('登录页页脚有备案号容器，与其它备案位（关于弹窗 / 落地页）共用同一份配置渲染', () => {
         expect(loginSection()).toContain('id="site-filing"');
-        // 渲染器是唯一取数处：登录页不维护第二份备案信息
-        expect(readSrc('src/js/ui/site-filing-ui.js')).toContain("getElementById('site-filing')");
+        // 渲染器是唯一取数处：登录页不维护第二份备案信息。
+        // v1.123.0 起渲染器按 querySelectorAll 渲染全部容器（曾用 getElementById 只命中
+        // 第一个 —— 多处共存时其余静默留空），断言钉的是"唯一取数"这件事本身
+        expect(readSrc('src/js/ui/site-filing-ui.js')).toContain("querySelectorAll('#site-filing, [data-site-filing]')");
     });
 
     test('运维排障入口（一键重置缓存）不出现在登录页 —— 用户视角没有"旧版页面"概念', () => {

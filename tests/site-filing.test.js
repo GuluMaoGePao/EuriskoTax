@@ -67,6 +67,40 @@ describe('备案位：已备案（当前状态 · ICP 号已下发）', () => {
     });
 });
 
+// v1.123.0：主应用的「每页常驻页尾」删掉了（它先后长错过两个地方：先是嵌在
+// #profile-page 里只有一页可见，再是提为全站页尾让每个页面底部压一条 157px——
+// 其中 64px 是为避开固定 Tab 栏垫的空白）。App 内的备案落点改为「我的 → 关于我们」弹窗；
+// 对外可见性由登录页（= 域名首页）与 21 个落地页的页脚承载。这组断言守的是**落点**：
+// 页尾不许被原样加回来，弹窗里的备案容器不许被搬走。
+describe('备案位落点：App 内没有每页页尾，弹窗是唯一落点', () => {
+    const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+
+    test('主应用不得再加回「每个页面底部一条」的常驻页尾', () => {
+        // 原页尾的特征开头 —— 原样加回来在这里先红；真要恢复，先读 index.html 里
+        // 原位置留下的整段注释（两次改错的历史都在那里），再想清楚要不要重蹈。
+        expect(INDEX).not.toContain('<footer class="bg-white border-t');
+    });
+
+    test('「关于我们」弹窗内有备案容器（App 内用户够得着的唯一落点）', () => {
+        const start = INDEX.indexOf('id="about-modal"');
+        expect(start).toBeGreaterThan(-1);
+        const block = INDEX.slice(start, start + 6000).split('<!-- 阶段11')[0];
+        expect(block).toContain('id="site-filing"');
+    });
+
+    test('渲染作用于全部容器（多处共存时不许只写第一个）', () => {
+        // getElementById 只命中第一个且不报错 —— 静默漏备案位，这是最阴的一种坏
+        document.body.innerHTML = '<div id="site-filing"></div><div data-site-filing></div>';
+        window.eval(SRC);
+        const hosts = Array.from(document.querySelectorAll('#site-filing, [data-site-filing]'));
+        expect(hosts.length).toBe(2);
+        hosts.forEach((h) => {
+            expect(h.textContent).toContain('沪ICP备');
+            expect(h.querySelector('a')).not.toBeNull();
+        });
+    });
+});
+
 // 管局核验「网站名称与填报一致」：备案填报名是「EuriskoTax税费计算器」（录入不带空格）。
 // 这条不是页脚的事，但改 title / 站点名的人不会想到备案订单里还挂着一个名字，
 // 所以把一致性钉在这里 —— 谁改了 title 把站名改没，这里先红。

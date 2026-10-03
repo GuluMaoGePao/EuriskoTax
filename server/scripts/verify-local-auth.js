@@ -1487,8 +1487,12 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             indexPage.status === 200 && toolCards === 20 && indexPage.raw.includes('"numberOfItems": 20'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
-        record('App 首页底部有落地页总目录入口（防 App 内无通路）',
-            appHome.status === 200 && appHome.raw.includes('/seo/index.html?source=app_footer'),
+        // v1.123.0：主应用每页常驻页尾删除（页尾时代它带着 ?source=app_footer 参数的
+        // 「测算工具总目录」链接），落点改为首页 quick-seo-link。门禁守的是
+        // 「App 内到落地页总目录的**通路**存在」，不再死盯页尾参数 —— 否则页尾一删，
+        // 通路明明还在，门禁却永远红。
+        record('App 首页有落地页总目录通路（防 App 内无通路）',
+            appHome.status === 200 && appHome.raw.includes('href="/seo/index.html"'),
             `HTTP ${appHome.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);

@@ -105,8 +105,8 @@
     "height": 900,
     "theme": "light",
     "file": "deep-step1-1280.png",
-    "bytes": 81112,
-    "sha256": "b02dae74d5b68adedf7106a1e54f80549bb20bd8a5d0039d3efc115e68712a47",
+    "bytes": 66356,
+    "sha256": "c988fa525ce6db15ae67db63ce7cc36168c2c5d5d6d271bad7a1f1c68c890703",
     "ready": true
   },
   {
@@ -127,8 +127,8 @@
     "height": 812,
     "theme": "light",
     "file": "deep-step1-375.png",
-    "bytes": 54907,
-    "sha256": "1b6d3c4462fc303b7ddc52933c54b51894e366dcdc42cc78bda26ebdfd04e26a",
+    "bytes": 41803,
+    "sha256": "05636bc9219fa949a23b404eeffe4fb91244b226b1a5880abde743d416f6e87c",
     "ready": true
   },
   {

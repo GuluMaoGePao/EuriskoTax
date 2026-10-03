@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.123.0';
+        window.__APP_VERSION__ = '1.124.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1586,8 +1586,14 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.123.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.124.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
+                        <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
+                             落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
+                             同源于 src/js/ui/site-filing-ui.js 的配置，改一处三地同步。
+                             注意：全站有多个 #site-filing 容器，组件已按"渲染全部"处理 ——
+                             别改回 getElementById（只会命中第一个，其余页面留空却不报错）。 -->
+                        <p id="site-filing" class="text-xs text-gray-500 mt-1"></p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
                         </p>
@@ -2130,10 +2136,12 @@
     </div>
     <!-- ↑ 2130 这行是 2026-10-03 补的 #profile-page 闭合标签 ——
          此前它一直没有闭合，浏览器在 app-container 结尾处才兜底关掉，
-         于是六个子页（设置/档案/数据/日历/历史/批量）与下面的全站页尾全被
+         于是六个子页（设置/档案/数据/日历/历史/批量）与当时更下面的全站页尾全被
          **嵌套进 profile-page 里**：① 六个子页跟着父一起隐藏 → 点了「计算历史」
          什么都没弹出来（computed display 看着是 block，实际 rects=0，骗过了肉眼）；
-         ② 页尾只在「我的」页出现，其余页面连备案号都没有。
+         ② 页尾只在「我的」页出现，其余页面连备案号都没有（那份页尾本身已于同日整块
+             删除 —— 它每改一次换一个地方出错，见原位置留下的注释；备案改由登录页页尾、
+             「关于我们」弹窗与 21 个落地页承载）。
          现在这六个子页与首页 / 工具页同级 —— 各自是独立的 .page，互不遮挡。 -->
 
     <!-- 个人中心（从「我的」页卡片点击进入，不再叫「账户设置」） -->
@@ -2528,23 +2536,24 @@
         </div>
     </div>
 
-    <!-- 全站页尾（2026-10-03）：原先这个 footer 整个**长在 #profile-page 里面**，
-         于是只有「我的」页看得到它，其余页面连备案号都没有 —— 备案展示是每个页面的义务，
-         不是某一页的装饰。现在提到这里：与首页 / 工具页同级，所有主应用页面共用同一份。
-         内容按「合规必需」收齐：版权与免责、备案号。原先那颗「测算工具总目录」链接撤掉 ——
-         它不是页尾义务，放在这里只会把视线从备案与免责上带走。 -->
-    <footer class="bg-white border-t border-gray-200 py-4">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    © 2026 EuriskoTax 税费计算器 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
-                </div>
-                <!-- 备案信息：ICP 号与公安联网备案号。
-                     备案号**下发后**才渲染（未备案时展示备案号同样违规），
-                     所以这里留空容器，只改 src/js/ui/site-filing-ui.js 里的配置即可生效。 -->
-                <div id="site-filing" class="text-xs text-gray-500 w-full text-center md:text-left mt-2"></div>
-        </div>
-    </footer>
+    <!-- 页尾为什么整块删掉（2026-10-03）—— 不是"省地方"，是它本来就不该长在 App 里：
+         ── 经历过两次改，两次都站不住 ──
+         ① 它原先长在 #profile-page 里面：只有「我的」页看得到，其余页面连备案号都没有；
+         ② 于是提到这里做「全站页尾」：问题反转 —— 每个页面底部都压着一条 157px
+            （375px 手机实测），其中 64px 是为避开固定 Tab 栏垫的空白，等于屏幕底部
+            永远留一条不能用的地带。
+         ── 根因 ──
+         页尾是**内容型网站**的产物，不是**应用界面**的产物。参照 VS Code / Gmail /
+         Notion / Figma：主界面滚到底就是最后一条内容，版权与合规放在「关于」里。
+         主应用是 App 形态（底部 Tab 栏 + 全屏内容），每个页面压一条页尾，是拿做网站的
+         习惯做 App —— 压成 40px 一行只是把症状变小，垫白那条痛点还在。
+         ── 删了备案号还合规吗 ──
+         合规。工信部口径是备案号在**网站首页底部**展示并链到 beian.miit.gov.cn，
+         而本域名首页（/）打开就是登录页，登录页页尾有；21 个落地页页尾也都有
+         （同一份 site-filing-ui.js 配置，copy-standard 断言 5 守着 22 页不漏）。
+         主应用内则由「我的 → 关于我们」弹窗承载同一份备案号 + 版权 + 免责。
+         也就是说：22 个页面负责"对外可见"，App 内负责"用户够得着"。
+         ⚠ 若将来要加回来，别再加成"每页一条" —— 那是本注释开头两版反复出错的形态。 -->
 
     <!-- ====== 底部 Tab 栏（手机形态，<768px） ======
          只在顶层页出现（首页 / 工具 / 我的）：计算页有自己的预览条与返回逻辑，

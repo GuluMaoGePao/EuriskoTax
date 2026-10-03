@@ -16,8 +16,11 @@
  * ── 备案号下发后的操作（只有下面这两行）─────────────────────────
  *   ① ✅ 已完成：icpNumber 已填管局下发的号；
  *   ② ⏳ 公安联网备案办结后填 policeNumber。
- *   占位行会被自动替换掉，无需改任何 HTML —— 全站 22 个页面（App + 21 个落地页）
- *   共用这一个配置，覆盖情况由 tests/copy-standard.test.js 断言 5 与
+ *   占位行会被自动替换掉，无需改任何 HTML —— 全站多处容器共用这一个配置：
+ *   ① App 登录页页尾（本域名首页 / 打开就是它 —— 工信部口径的「首页底部」即此处）；
+ *   ② App 内「我的 → 关于我们」弹窗（v1.123.0：主应用**每个页面底部那条常驻页尾已删**，
+ *      这里是 App 内唯一的备案落点）；③ 21 个落地页页脚。
+ *   覆盖情况由 tests/copy-standard.test.js 断言 5 与
  *   tests/site-filing.test.js 守住。
  *
  * ── 两件与备案核验有关、但不在这个文件里的事 ────────────────────
@@ -60,25 +63,33 @@
         return '<a href="' + href + '" target="_blank" rel="noopener" class="hover:underline">' + text + '</a>';
     }
 
+    /**
+     * 收集全部承载容器并逐个渲染。
+     *
+     * 为什么不能退回 getElementById：全站**不止一处**备案位 —— 登录页页尾、App 内
+     * 「关于我们」弹窗（v1.123.0 起，主应用常驻页尾删掉后它就是 App 内的落点）、
+     * 21 个落地页各自的页脚。getElementById 只命中第一个，其余留空**且不报错** ——
+     * 页面看着正常，备案号实际只在首页出现 —— 这种静默漏页脚的局面往往半年后才被发现。
+     */
     function render() {
-        var host = document.getElementById('site-filing');
-        if (!host) return;
+        const hosts = document.querySelectorAll('#site-filing, [data-site-filing]');
+        if (!hosts.length) return;
 
-        var parts = [];
+        const parts = [];
         if (ICP.icpNumber) parts.push(link(ICP.icpUrl, ICP.icpNumber));
         if (ICP.policeNumber) parts.push(link(ICP.policeUrl, ICP.policeNumber));
 
-        if (parts.length) {
-            host.classList.remove('site-filing--pending');
-            host.innerHTML = ICP.owner + ' · ' + parts.join(' · ');
-        } else {
+        const hasNumber = parts.length > 0;
+        const html = hasNumber
+            ? ICP.owner + ' · ' + parts.join(' · ')
             // 未备案：显示占位行（占住页脚位置），但绝不显示号
-            host.classList.add('site-filing--pending');
-            host.innerHTML = ICP.pendingText
-                ? ICP.owner + ' · ' + ICP.pendingText
-                : ICP.owner;
-        }
-        host.style.display = '';
+            : (ICP.pendingText ? ICP.owner + ' · ' + ICP.pendingText : ICP.owner);
+
+        hosts.forEach(host => {
+            host.classList.toggle('site-filing--pending', !hasNumber);
+            host.innerHTML = html;
+            host.style.display = '';
+        });
     }
 
     window.EuriskoSiteFiling = { config: ICP, render: render };

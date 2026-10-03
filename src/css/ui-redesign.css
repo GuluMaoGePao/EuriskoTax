@@ -1408,18 +1408,12 @@
 }
 .auth-alt__hint { margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--c-text-3); }
 
-/* --- 全站页尾（2026-10-03：从「我的」页内部提到 #app-container 直接子级） ---
-   原先它整个长在 #profile-page 里，只有那一页看得到；其余页面连备案号都没有。
-   现在与首页 / 工具页同级，所有主应用页面共用同一份。
-   底部的留白不是排版趣味：手机形态的 Tab 栏是 position:fixed，页尾作为文档最后一个
-   元素若不预留这段高度，最后一行（备案号）会被 Tab 栏压在下面 —— 而那一行正是
-   页尾里最不该被盖住的内容。桌面形态底栏隐藏，不需要留。 */
-@media (max-width: 767px) {
-    #app-container > footer {
-        /* 44px 底栏内容高 + 上下 padding ≈ 56px，再叠安全区 inset */
-        padding-bottom: calc(64px + env(safe-area-inset-bottom));
-    }
-}
+/* (2026-10-03) 主应用页尾连同这条规则一并删除：
+   页尾是内容型网站的产物 —— App 形态（固定 Tab 栏 + 全屏内容）的每个页面底部压一条页尾，
+   代价就是这条 64px 垫白：为了不让最后一行被 Tab 栏压住，屏幕底部永远留一条不能用的地带。
+   删掉之后，内容不被底栏压住由 toolbox.css 的
+   `body.has-tabbar [data-page-container] { padding-bottom }` 兜着：它跟着 has-tabbar 走，
+   没有底栏的页面（计算页等）不会凭空多出一段留白 —— 这正是页尾方案填不平的坑。 */
 
 /* 卡外页脚（登录/注册/重置面板） */
 .auth-foot {
