@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用户协议 · EuriskoTax 个人所得税测算</title>
+<meta name="description" content="EuriskoTax 用户协议：服务内容、用户责任、知识产权、免责声明、账号安全与注销、公测期说明、协议变更。">
+<link rel="stylesheet" href="src/css/tokens.css">
+<style>
+    /* 为什么是独立页面而不是弹窗（v1.132.0）：
+       协议是**法律文本** —— 要能分享链接、能打印存档、能被搜索到、JS 挂了也还在。
+       这四件事弹窗一件都做不到：弹窗没有 URL、打印只剩一屏、内容在 JS 里、关掉就没了。
+       所以正文在这里**静态硬编码**，不靠脚本注入。
+
+       代价是正文存在两份（本页 + index.html 的协议弹窗）。为什么仍保留弹窗：
+       注册表单与留资表单里的「我已阅读并同意《用户协议》」必须**当场可读** ——
+       跳走会丢已填内容，那是合规入口最不该有的体验。两份正文的一致性由
+       tests/policy-page.test.js 逐字比对守着：改一边忘另一边会直接红。 */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: var(--font-sans);
+        background: var(--c-brand-subtle);
+        color: #1f2937;
+        line-height: 1.75;
+        padding: 0 16px 48px;
+    }
+    .head {
+        max-width: var(--c-prose);
+        margin: 0 auto;
+        padding: 28px 0 16px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .head h1 {
+        font-size: var(--fs-2xl);
+        color: var(--c-brand);
+        letter-spacing: -0.01em;
+    }
+    .back {
+        font-size: var(--fs-sm);
+        color: var(--c-brand);
+        text-decoration: none;
+        white-space: nowrap;
+    }
+    .back:hover { text-decoration: underline; }
+    .prose {
+        max-width: var(--c-prose);
+        margin: 0 auto;
+        background: #fff;
+        border-radius: var(--r-sheet);
+        box-shadow: var(--sh-1);
+        padding: 28px 24px;
+        font-size: var(--fs-base); /* 长文阅读：桌面正文取 16px，不用弹窗里的 14px */
+    }
+    .prose p { margin-bottom: 14px; }
+    .prose p:last-child { margin-bottom: 0; }
+    .prose strong { font-weight: 600; color: #111827; }
+    .foot {
+        max-width: var(--c-prose);
+        margin: 20px auto 0;
+        font-size: var(--fs-xs);
+        color: #6b7280;
+        text-align: center;
+        line-height: 1.9;
+    }
+    @media (max-width: 640px) {
+        .prose { padding: 22px 18px; font-size: var(--fs-sm); }
+        .head h1 { font-size: var(--fs-xl); }
+    }
+    /* 打印存档：这是选页面的理由之一，别让导航和阴影跟着进纸 */
+    @media print {
+        body { background: #fff; padding: 0; }
+        .head { padding-top: 0; }
+        .back { display: none; }
+        .prose { box-shadow: none; border-radius: 0; max-width: none; }
+    }
+</style>
+</head>
+<body>
+    <div class="head">
+        <h1>用户协议</h1>
+        <a class="back" href="index.html">← 返回 EuriskoTax</a>
+    </div>
+
+    <main class="prose" data-policy-body="user-agreement">
+        <p><strong>欢迎使用 EuriskoTax 个人所得税预算规划工具（以下简称"本应用"）。</strong></p>
+
+        <p>使用本应用前，请仔细阅读以下协议。点击"注册"即视为您已阅读并同意本协议全部内容。</p>
+
+        <p><strong>一、服务内容</strong></p>
+        <p>本应用提供个人所得税测算参考功能，包括综合所得、经营所得、分类所得及反向倒算等测算模式。所有测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
+
+        <p><strong>二、用户责任</strong></p>
+        <p>1. 用户应提供真实、准确的注册信息。</p>
+        <p>2. 用户不得将本应用用于任何违法用途。</p>
+        <p>3. 用户应妥善保管账号密码，因密码泄露导致的损失由用户自行承担。</p>
+
+        <p><strong>三、知识产权</strong></p>
+        <p>本应用的界面设计、图标、文案及源代码版权归开发者所有，未经授权不得复制、传播或用于商业用途。</p>
+
+        <p><strong>四、免责声明</strong></p>
+        <p>1. 本应用所有测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
+        <p>2. 因网络故障、数据丢失等原因导致的任何损失，开发者不承担责任。</p>
+        <p>3. 本应用可能随时更新或停止服务，不另行通知。</p>
+
+        <p><strong>五、账号安全与注销</strong></p>
+        <p>1. 若忘记密码，您可在登录页点击"忘记密码"，通过注册邮箱获取验证码后自助重置密码。</p>
+        <p>2. 修改手机号、修改密码等操作，可在登录后进入"个人中心 → 账户设置"完成。</p>
+        <p>3. 注销账号可在"个人中心 → 账户设置"自助操作，注销后账号及个人数据将被删除且不可恢复。</p>
+
+        <p><strong>六、公测期说明</strong></p>
+        <p>本应用目前处于公测阶段，注册需要邀请码。每个邀请码仅可注册一个账号。如遇注册或登录问题，请联系开发者邮箱：2044781167@qq.com。</p>
+
+        <p><strong>七、协议变更</strong></p>
+        <p>开发者保留随时修改本协议的权利，修改后的协议自发布之日起生效。</p>
+    </main>
+
+    <footer class="foot">
+        <!-- 备案号不写死：与登录页页尾、App 内「关于」共用 site-filing-ui.js 渲染，
+             写死就会出现「备案主体与页面对不上」的漂移 -->
+        <div id="site-filing"></div>
+        <p><a class="back" href="privacy.html">隐私政策</a></p>
+    </footer>
+
+    <script src="src/js/ui/site-filing-ui.js"></script>
+</body>
+</html>
