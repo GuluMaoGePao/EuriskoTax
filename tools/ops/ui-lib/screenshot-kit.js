@@ -121,12 +121,14 @@ const TARGETS = [
     {
         id: 'profile',
         name: '我的页',
-        // ⚠️ 统计卡 / 四宫格 / 模块卡都长在 loadProfile 的**登录分支**里：截图环境没有后端，
-        // 未登录时这三段根本不渲染 —— 不补这几行，profile 基线拍到的就只是
-        // 「横幅 + 空资产概览 + 退出登录」的空壳，P3 的三段式一张都没进图
-        // （阶段19 期间 13 卡也是同样缺席，只是没人翻过这张图所以一直没发现）。
-        // 渲染函数都是幂等的，重复进页不会叠出两份；数值由 updateProfileStats 填，
-        // 那一步依赖登录态，这里不调 —— 基线看的是布局与样式，不是数字。
+        // ⚠️ 统计卡 / 四宫格 / 模块卡此前只长在 loadProfile 里，而 loadProfile 只在点
+        // 「账户设置」时才被调（v1.122.0 前）：进「我的」页本身不触发渲染，拍到的就只是
+        // 「横幅 + 空资产概览 + 退出登录」的空壳（阶段19 期间 13 卡同样缺席，只是没人翻过
+        // 这张图所以一直没发现）。现在 showPage('profile-page') 会自行 prepare（幂等），
+        // 下面三行是双保险 —— 万一路由改回去，基线也不至于退回空壳。
+        // 截图环境没有后端 → 身份是游客：横幅显示「游客 / 免登录使用中」且「账户设置」
+        // 「退出登录」隐藏（renderProfileIdentity 的未登录分支），这是基线应有的样子。
+        // 渲染函数都是幂等的，重复进页不会叠出两份。
         prepare: `if (window.showPage) window.showPage('profile-page');
             if (window.renderProfileQuick) window.renderProfileQuick();
             if (window.renderProfileStats) window.renderProfileStats();

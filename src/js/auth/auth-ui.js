@@ -663,81 +663,159 @@ const ProfilePerf = {
     }
 };
 
+/**
+ * 身份横幅（登录态 / 游客态同一处渲染）—— 游客不给假账号
+ *
+ * 游客进「我的」曾看到：头像旁「用户名」、下一行 email@example.com（HTML 里的占位假数据）、
+ * 「账户设置」「退出登录」两个对游客不成立的按钮。根因不是文案没改，而是 loadProfile
+ * 第一条语句 getProfile() 在游客态 401 抛错、整条渲染链被跳过，横幅就一直停在写死的
+ * 占位值上。
+ *
+ * 写成同一个函数的两个分支，而不是「游客态藏、登录态显」两处各写一半：少一处分支就少
+ * 一半"藏了不恢复"的机会 —— 游客 → 登录 的切换只需再调一次本函数。
+ */
+function renderProfileIdentity(user) {
+    const guest = !user;
+    const nameEl = document.getElementById('profile-display-name');
+    const emailEl = document.getElementById('profile-display-email');
+    const settingsEl = document.getElementById('profile-nav-settings');
+    const logoutEl = document.getElementById('profile-logout-link');
+    const noteEl = document.getElementById('profile-session-note');
+
+    if (nameEl) nameEl.textContent = guest ? '游客' : (user.username || '用户');
+    if (emailEl) {
+        emailEl.textContent = guest
+            ? '免登录使用中 · 测算记录仅保存在本机'
+            : (user.email || '');
+    }
+    // 游客没有账户可设置、也没有「退出登录」这回事：顶栏那颗「登录」就是出口
+    // （点它 exitGuestSession 后回登录页），这里再挂一个只会让人犹豫。
+    if (settingsEl) settingsEl.classList.toggle('hidden', guest);
+    if (logoutEl) logoutEl.classList.toggle('hidden', guest);
+    if (noteEl) {
+        noteEl.textContent = guest
+            ? '当前为免登录使用，数据仅存本机；登录后可用云同步与权益'
+            : '当前为本地登录会话，可在「账户设置」中管理密码与账号安全';
+    }
+}
+
+/** 当前身份（登录态取本地缓存的 user；游客 / 未登录 → null） */
+function currentIdentityUser() {
+    if (!(apiClient && typeof apiClient.isLoggedIn === 'function') || !apiClient.isLoggedIn()) return null;
+    return typeof apiClient.getCurrentUser === 'function' ? apiClient.getCurrentUser() : null;
+}
+
+// 个人中心里**只读本地存储**的那几块：统计卡 / 资产概览 / 四宫格 / 模块卡 / 档案 / 日历。
+// 它们与登录态无关（口径：游客 = 免费版，全部计税功能 + 本地历史），全部幂等。
+function renderProfileLocalParts() {
+    ProfilePerf.measure('渲染统计卡片', renderProfileStats);
+    ProfilePerf.measure('更新统计数据', updateProfileStats);
+    ProfilePerf.measure('渲染高频四宫格', renderProfileQuick);
+    ProfilePerf.measure('渲染模块卡片', renderProfileCards);
+    ProfilePerf.measure('加载税务档案', loadTaxProfile);
+    ProfilePerf.measure('渲染税务日历', renderTaxCalendar);
+}
+
+/**
+ * 进「我的」页的一次性准备：身份横幅 + 本地卡片。
+ *
+ * 挂页而非挂按钮：这些渲染原先只长在 loadProfile 里，而 loadProfile 只在点「账户设置」
+ * 时才被调用 —— 直接点 Tab 进「我的」时，四宫格 / 资产概览 / 模块卡一个都不渲染，
+ * 页面看着像没做完（游客态尤其明显：连账户设置都点不动）。showPage 是全局唯一路由，
+ * 按页触发才不会漏。
+ */
+function prepareProfilePage() {
+    const user = currentIdentityUser();
+    renderProfileIdentity(user);
+    renderPlanBadges(user);
+    renderProfileLocalParts();
+}
+
 async function loadProfile() {
     const totalStart = performance.now();
     ProfilePerf.log('loadProfile → 开始', 0, { timestamp: Date.now() });
     let apiDuration = 0;
     let syncDuration = 0;
     let rafScheduledAt = 0;
-    try {
-        // 阶段1：API 获取用户信息
-        const apiStart = performance.now();
-        const user = await ProfilePerf.measureAsync('loadProfile → API获取用户信息', () => apiClient.getProfile());
-        apiDuration = performance.now() - apiStart;
-        ProfilePerf.log('loadProfile → 阶段1完成-API', apiDuration, { user: user.username, phone: !!user.phone });
+    let user = null;
 
-        // 阶段2：同步更新顶栏关键信息（5 个字段）
-        const syncStart = performance.now();
-        document.getElementById('profile-username').value = user.username;
-        document.getElementById('profile-email').value = user.email;
-        document.getElementById('profile-phone').value = user.phone || '';
-        // 账户设置：同步"邮箱验证码改密"提示中的绑定邮箱，并启用发送按钮
-        const verifyEmailEl = document.getElementById('profile-verify-email');
-        if (verifyEmailEl) verifyEmailEl.textContent = user.email;
-        const sendCodeBtn = document.getElementById('profile-send-code-btn');
-        if (sendCodeBtn && !profileCodeTimer) sendCodeBtn.disabled = !user.email;
-        document.getElementById('profile-display-name').textContent = user.username;
-        document.getElementById('profile-display-email').textContent = user.email;
-        // 阶段10/11：profile 返回最新 plan/过期时间 → 刷新版本徽标与同步引擎授权（三档：基础版/体验版/专业版）
-        renderPlanBadges(user);
-        if (window.EuriskoSync && typeof window.EuriskoSync.updateUser === 'function') {
-            window.EuriskoSync.updateUser(user);
-        }
-        syncDuration = performance.now() - syncStart;
-        ProfilePerf.log('loadProfile → 阶段2完成-同步更新顶栏', syncDuration, { fields: 5 });
+    // 游客（免登录使用）没有服务端身份：getProfile 必然 401。
+    // 以前是「先取 user 再渲染」一条链，401 进 catch 把整页渲染全部跳过 ——
+    // 而个人中心的四宫格 / 资产概览 / 模块卡读的全是 localStorage，与服务端无关，
+    // 于是游客看到的「我的」只剩空壳 + 写死的占位假数据。
+    // 现在：服务端身份只在登录态取；本地那几块无论如何都渲染。
+    const loggedIn = !!(apiClient && typeof apiClient.isLoggedIn === 'function' && apiClient.isLoggedIn());
+    if (loggedIn) {
+        try {
+            // 阶段1：API 获取用户信息
+            const apiStart = performance.now();
+            user = await ProfilePerf.measureAsync('loadProfile → API获取用户信息', () => apiClient.getProfile());
+            apiDuration = performance.now() - apiStart;
+            ProfilePerf.log('loadProfile → 阶段1完成-API', apiDuration, { user: user.username, phone: !!user.phone });
 
-        // 阶段3：调度 requestAnimationFrame 延迟非关键 DOM 渲染
-        // 涉及大量 innerHTML 与连续 input value 写入，同步执行会阻塞页面切换动画
-        rafScheduledAt = performance.now();
-        ProfilePerf.log('loadProfile → 阶段3-调度rAF延迟渲染', 0, { scheduledAt: +rafScheduledAt.toFixed(2) });
-
-        requestAnimationFrame(() => {
-            // 测量 rAF 实际触发延迟（若过长说明主线程被阻塞）
-            const rafDelay = performance.now() - rafScheduledAt;
-            ProfilePerf.log('loadProfile → rAF回调触发', rafDelay, { waitDelay: +rafDelay.toFixed(2) });
-
-            // 阶段4：执行 5 个渲染子步骤
-            const renderStart = performance.now();
-            ProfilePerf.measure('loadProfile → 渲染统计卡片', renderProfileStats);
-            ProfilePerf.measure('loadProfile → 更新统计数据', updateProfileStats);
-            ProfilePerf.measure('loadProfile → 渲染高频四宫格', renderProfileQuick);
-            ProfilePerf.measure('loadProfile → 渲染模块卡片', renderProfileCards);
-            ProfilePerf.measure('loadProfile → 加载税务档案', loadTaxProfile);
-            ProfilePerf.measure('loadProfile → 渲染税务日历', renderTaxCalendar);
-            const renderDuration = performance.now() - renderStart;
-
-            // 阶段5：汇总
-            const totalDuration = performance.now() - totalStart;
-            ProfilePerf.log('loadProfile → 阶段4完成-渲染', renderDuration, { steps: 5 });
-            ProfilePerf.log('loadProfile → 总耗时', totalDuration, {
-                user: user.username,
-                breakdown: {
-                    api: +apiDuration.toFixed(2),
-                    syncUpdate: +syncDuration.toFixed(2),
-                    rafWait: +rafDelay.toFixed(2),
-                    rendering: +renderDuration.toFixed(2)
-                }
+            // 阶段2：同步更新顶栏关键信息（5 个字段）
+            const syncStart = performance.now();
+            document.getElementById('profile-username').value = user.username;
+            document.getElementById('profile-email').value = user.email;
+            document.getElementById('profile-phone').value = user.phone || '';
+            // 账户设置：同步"邮箱验证码改密"提示中的绑定邮箱，并启用发送按钮
+            const verifyEmailEl = document.getElementById('profile-verify-email');
+            if (verifyEmailEl) verifyEmailEl.textContent = user.email;
+            const sendCodeBtn = document.getElementById('profile-send-code-btn');
+            if (sendCodeBtn && !profileCodeTimer) sendCodeBtn.disabled = !user.email;
+            // 阶段10/11：profile 返回最新 plan/过期时间 → 同步引擎授权随之更新
+            if (window.EuriskoSync && typeof window.EuriskoSync.updateUser === 'function') {
+                window.EuriskoSync.updateUser(user);
+            }
+            syncDuration = performance.now() - syncStart;
+            ProfilePerf.log('loadProfile → 阶段2完成-同步更新顶栏', syncDuration, { fields: 5 });
+        } catch (error) {
+            const errorDuration = performance.now() - totalStart;
+            ProfilePerf.log('loadProfile → 错误', errorDuration, {
+                error: error.message,
+                stack: error.stack,
+                phase: apiDuration === 0 ? 'api' : 'sync'
             });
-        });
-    } catch (error) {
-        const errorDuration = performance.now() - totalStart;
-        ProfilePerf.log('loadProfile → 错误', errorDuration, {
-            error: error.message,
-            stack: error.stack,
-            phase: apiDuration === 0 ? 'api' : (syncDuration === 0 ? 'sync' : 'rAF')
-        });
-        showAlert('加载失败: ' + error.message);
+            showAlert('加载失败: ' + error.message);
+            // 不 return：账号信息取不到，也不该让本地那几块数据跟着一起消失 ——
+            // user 保持 null，下面按未登录渲染游客横幅，本地数据照常出来。
+            user = null;
+        }
     }
+
+    // 身份横幅与徽标：登录态用真账号，游客态换成游客语义（同一处渲染，不留"藏了不恢复"的缝）
+    renderProfileIdentity(user);
+    // 阶段10/11：profile 返回最新 plan/过期时间 → 刷新版本徽标（三档：基础版/体验版/专业版）
+    renderPlanBadges(user);
+
+    // 阶段3：调度 requestAnimationFrame 延迟非关键 DOM 渲染
+    // 涉及大量 innerHTML 与连续 input value 写入，同步执行会阻塞页面切换动画
+    rafScheduledAt = performance.now();
+    ProfilePerf.log('loadProfile → 阶段3-调度rAF延迟渲染', 0, { scheduledAt: +rafScheduledAt.toFixed(2) });
+
+    requestAnimationFrame(() => {
+        // 测量 rAF 实际触发延迟（若过长说明主线程被阻塞）
+        const rafDelay = performance.now() - rafScheduledAt;
+        ProfilePerf.log('loadProfile → rAF回调触发', rafDelay, { waitDelay: +rafDelay.toFixed(2) });
+
+        // 阶段4：执行 5 个渲染子步骤（全部读本地存储，与登录态无关）
+        const renderStart = performance.now();
+        renderProfileLocalParts();
+        const renderDuration = performance.now() - renderStart;
+
+        // 阶段5：汇总
+        const totalDuration = performance.now() - totalStart;
+        ProfilePerf.log('loadProfile → 阶段4完成-渲染', renderDuration, { steps: 5 });
+        ProfilePerf.log('loadProfile → 总耗时', totalDuration, {
+            user: user ? user.username : '(游客)',
+            breakdown: {
+                api: +apiDuration.toFixed(2),
+                syncUpdate: +syncDuration.toFixed(2),
+                rafWait: +rafDelay.toFixed(2),
+                rendering: +renderDuration.toFixed(2)
+            }
+        });
+    });
 }
 
 // === 个人中心统计卡片配置 ===
@@ -2697,6 +2775,10 @@ function showPage(pageId) {
     if (window.TaskMode && typeof window.TaskMode.sync === 'function') {
         window.TaskMode.sync(pageId);
     }
+
+    // 「我的」页按页准备（幂等）：放在两个分支之前，初次导航与常规导航都覆盖得到。
+    // 渲染在页面淡入前的 200ms 里就做完，用户切过去时内容已经在那儿。
+    if (pageId === 'profile-page') prepareProfilePage();
 
     const wasInitial = isInitialNavigation;
     ProfilePerf.log('showPage → 开始', 0, {

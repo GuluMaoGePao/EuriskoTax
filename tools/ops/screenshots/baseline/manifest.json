@@ -193,8 +193,8 @@
     "height": 900,
     "theme": "light",
     "file": "profile-1280.png",
-    "bytes": 170232,
-    "sha256": "90117284326bd14f446ce2522c028a5db3f43a5222ffc14273a9f33d47df3a24",
+    "bytes": 171417,
+    "sha256": "76cbaccea2fd29cfde5b7df81c5d9c3f8d8f66e0fd04319c47410e62032f2f82",
     "ready": true
   },
   {
@@ -215,8 +215,8 @@
     "height": 812,
     "theme": "light",
     "file": "profile-375.png",
-    "bytes": 81720,
-    "sha256": "317249da129e23b01cebe0608fb064dba19aae928845778d688f6ed51413c03d",
+    "bytes": 87001,
+    "sha256": "4194258ef153171e55e54254d2d2402d3d3f91fbc83fe70d0f6475cb7b6d3286",
     "ready": true
   },
   {
