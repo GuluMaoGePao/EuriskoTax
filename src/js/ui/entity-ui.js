@@ -263,7 +263,7 @@
         div.id = id;
         div.className = 'modal-mask hidden opacity-0 transition-opacity duration-300';
         div.setAttribute('onclick', 'if(event.target===this)closeModal(this)');
-        div.innerHTML = '<div class="modal-shell modal-shell--md bg-white transform scale-95' +
+        div.innerHTML = '<div class="modal-shell modal-shell--lg bg-white transform scale-95' +
             ' transition-transform duration-300">' +
             '<div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
             '<div class="flex justify-between items-center">' +

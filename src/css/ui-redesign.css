@@ -1554,8 +1554,42 @@
 }
 
 .modal-shell--sm { max-width: var(--w-modal-sm); }
-.modal-shell--md { max-width: var(--w-modal-md); }
-.modal-shell--xl { max-width: var(--w-modal-xl); }
+.modal-shell--lg { max-width: var(--w-modal-lg); }
+
+/* ====== 手机：内容型弹窗铺满全屏（v1.134.0） ======
+   为什么：768px 的弹窗在 390px 的手机上只剩 390-32=358px 可用，留资那种 8 个控件的表单
+   要滚很久才能看全，「头尾固定 + 中间滚」的骨架在这种宽度下反而是负担（可视区太矮）。
+   铺满全屏后可视高度从 85vh 变成 100dvh，横向也从 358 回到 390 —— 两头都多一点。
+
+   ⚠️ 只给 --lg：alert / confirm / 导出版本是一句话决策，铺满一屏只为了中间放一行字，
+      反而更难扫；它们保持居中卡片（--sm）。
+
+   几个必须一起改的点，少一个就是 bug：
+     ① max-height 要摘（不然 85vh 的限高让「全屏」变「85% 屏」，底部留一条遮罩）
+     ② border-radius 归零，且 head 自己的 rounded-t-xl 也要跟着归零 ——
+        否则方形外壳里露出两个圆角，四角像缺了一块
+     ③ 100dvh：dvh 会跟着移动浏览器的地址栏伸缩，vh 不会（iOS Safari 上会漏一条白边）；
+        前面那行 100vh 是老浏览器的兜底
+     ④ 安全区：iPhone 底部小黑条会压住 foot 的按钮，顶部刘海会压住 head 的标题 ——
+        用 env(safe-area-inset-*) 补，没刘海的设备是 0，不影响 */
+@media (max-width: 639.98px), (max-height: 480px) {
+    .modal-shell--lg {
+        max-width: none;
+        width: 100%;
+        margin: 0;
+        height: 100vh;
+        height: 100dvh;
+        max-height: none;
+        border-radius: 0;
+    }
+    .modal-shell--lg > .modal-head {
+        border-radius: 0;
+        padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    }
+    .modal-shell--lg > .modal-foot {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+}
 
 /* 头尾不许压：容器限高后 flex 会先压缩没有 min-content 保护的那一层，
    被压的往往是最不能丢的标题条与操作区（v1.129.0 的 lead 页头就是这么被裁的）。 */

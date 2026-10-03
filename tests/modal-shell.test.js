@@ -60,19 +60,24 @@ describe('弹窗统一外壳：基类与尺寸档', () => {
     // v1.131.0：初版分了四档（28 / 32 / 36 / 48rem），其中 32 与 36 只差 64px ——
     // 反馈、公告、三个管理器是 512，留资是 576，挨着用的两个弹窗一宽一窄，看着就是没统一。
     // 收敛为三档后**默认档只有一个宽度**，弹窗要么「标准」要么「宽」。
-    test('只有三档宽度（sm 短决策 / md 默认 / xl 长文表格）', () => {
-        ['sm', 'md', 'xl'].forEach((k) => {
+    // v1.134.0 再并一次：36（标准）与 48（宽）差 192px —— 挨着用的弹窗（留资 576 →
+    // 使用帮助 768）一个窄一个宽，用户眼里还是「没统一」。内容型只剩一个宽度，
+    // 取原来更宽的那档（= 使用帮助），窄档留给一句话决策。
+    test('只有两档宽度（sm 一句话决策 / lg 内容型）', () => {
+        ['sm', 'lg'].forEach((k) => {
             expect(TOKENS).toContain(`--w-modal-${k}:`);
             expect(CSS).toContain(`.modal-shell--${k} { max-width: var(--w-modal-${k}); }`);
         });
         expect(TOKENS).toContain('--h-modal:');
-        // 被并掉的那一档不许再冒出来
-        expect(TOKENS).not.toContain('--w-modal-lg');
-        expect(CSS).not.toContain('.modal-shell--lg');
+        // 被并掉的两档不许再冒出来
+        expect(TOKENS).not.toContain('--w-modal-md');
+        expect(TOKENS).not.toContain('--w-modal-xl');
+        expect(CSS).not.toContain('.modal-shell--md');
+        expect(CSS).not.toContain('.modal-shell--xl');
     });
 
-    test('默认档确实是 36rem（原先的 md 32rem 与 lg 36rem 已并档）', () => {
-        expect(TOKENS).toMatch(/--w-modal-md:\s*36rem/);
+    test('内容型档 = 48rem（与使用帮助同宽）', () => {
+        expect(TOKENS).toMatch(/--w-modal-lg:\s*48rem/);
     });
 
     // transform 若写进基类，openModal 摘掉 scale-95 类后弹窗永远缩着 ——
@@ -99,7 +104,7 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
 
     test('每个外壳都挑了宽度档（不能只有基类没有档）', () => {
         const shells = (HTML.match(/modal-shell(?= |")/g) || []).length;
-        const sized = (HTML.match(/modal-shell--(sm|md|xl)/g) || []).length;
+        const sized = (HTML.match(/modal-shell--(sm|lg)/g) || []).length;
         expect(shells).toBeGreaterThan(0);
         expect(sized).toBe(shells);
     });
@@ -108,22 +113,21 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         JS_TPL.forEach((p) => {
             const src = read(p);
             expect(src).toContain('modal-shell');
-            expect(src).toMatch(/modal-shell--(sm|md|xl)/);
+            expect(src).toMatch(/modal-shell--(sm|lg)/);
         });
     });
 
     // 「宽度统一」的可度量表达：绝大多数弹窗落在**同一个**默认档上。
     // 只有内容本身需要（长文要少换行、一句话决策要窄）才离开默认档。
-    test('默认档覆盖多数弹窗，非默认档有明确理由', () => {
+    test('内容型档覆盖除决策型外的全部弹窗', () => {
         const all = [HTML, ...JS_TPL.map(read)].join('\n');
-        const md = (all.match(/modal-shell--md/g) || []).length;
+        const lg = (all.match(/modal-shell--lg/g) || []).length;
         const sm = (all.match(/modal-shell--sm/g) || []).length;
-        const xl = (all.match(/modal-shell--xl/g) || []).length;
-        // 6 = 反馈 / 升级码 / 公告 / 关于 / 留资 + 三个管理器共用的一处模板
-        expect(md).toBe(6);
+        // 11 = 反馈 / 升级码 / 公告 / 关于 / 留资 / 协议×2 / 帮助 + 三处 JS 模板
+        //       （三个管理器共用一处 / 税率表 / 我的方案）
+        expect(lg).toBe(11);
         expect(sm).toBe(3);                   // alert / confirm / 导出版本：一句话决策
-        expect(xl).toBe(5);                   // 协议×2 / 帮助 / 税率表 / 我的方案
-        expect(md + sm + xl).toBe(14);        // 与「所有外壳都挑了档」那条的总数对齐
+        expect(lg + sm).toBe(14);             // 与「所有外壳都挑了档」那条的总数对齐
     });
 
     // 限高只走 --h-modal 一处：再有手写的 max-h-[85vh] / [88vh] / [90vh]，
@@ -173,6 +177,38 @@ describe('遮罩层：底色与层级走令牌', () => {
     test('14 处背景层都换成 modal-mask', () => {
         const all = [HTML, ...JS_TPL.map(read)].join('\n');
         expect((all.match(/modal-mask/g) || []).length).toBe(14);
+    });
+});
+
+describe('手机端：内容型弹窗铺满全屏', () => {
+    // 这条守的是「伪全屏」：只改 width 不改 max-height，弹窗仍是 85vh，底部留一条遮罩；
+    // 只改外壳不改 head 的圆角，方形外壳里会露出两个圆角，四角像缺了一块。
+    const mqStart = () => CSS.indexOf('@media (max-width: 639.98px), (max-height: 480px)');
+
+    test('有窄屏/矮屏的全屏规则，且只作用于 --lg', () => {
+        const at = mqStart();
+        expect(at).toBeGreaterThan(-1);
+        const block = CSS.slice(at, CSS.indexOf('\n}', at));
+        expect(block).toContain('.modal-shell--lg');
+        expect(block).not.toContain('.modal-shell--sm');   // 一句话决策不全屏
+        expect(block).toContain('max-width: none');
+        expect(block).toContain('max-height: none');       // ① 摘掉 85vh，否则不是全屏
+        expect(block).toContain('border-radius: 0');       // ② 外壳圆角归零
+    });
+
+    test('高度用 100dvh（vh 不跟地址栏伸缩，iOS 上会漏一条白边）', () => {
+        const block = CSS.slice(mqStart(), CSS.indexOf('\n}', mqStart()));
+        expect(block).toMatch(/height:\s*100vh;/);         // 老浏览器兜底
+        expect(block).toMatch(/height:\s*100dvh;/);
+    });
+
+    test('头尾补了安全区（刘海压标题 / 小黑条压按钮）', () => {
+        const block = CSS.slice(mqStart(), CSS.indexOf('\n}', mqStart()));
+        expect(block).toContain('env(safe-area-inset-top');
+        expect(block).toContain('env(safe-area-inset-bottom');
+        // head 自己的 rounded-t-xl 也得跟着归零
+        expect(block).toContain('.modal-shell--lg > .modal-head');
+        expect(block).toContain('.modal-shell--lg > .modal-foot');
     });
 });
 
@@ -230,7 +266,7 @@ describe('表单型弹窗（意见反馈 / 留资 / 升级码）：宽度与内�
         FORM_MODALS.forEach((id) => {
             const shell = blockOf(id).match(/class="[^"]*modal-shell[^"]*"/);
             expect(shell).not.toBeNull();
-            expect(shell[0]).toContain('modal-shell--md');
+            expect(shell[0]).toContain('modal-shell--lg');
         });
     });
 
