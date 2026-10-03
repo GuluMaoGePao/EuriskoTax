@@ -1104,11 +1104,8 @@
     color: var(--c-text-2); background: var(--c-surface-3); border-radius: var(--r-ctrl);
 }
 
-/* v1.128.0：留资弹窗的表单控件与其他弹窗（意见反馈等）统一到 14px。
-   .input-field 本身不带字号（继承 body 16px），意见反馈那边是逐控件补了 text-sm 的；
-   留资弹窗 8 个控件逐个补既啰嗦又保证不了将来新增的控件不漏 —— 按容器收口一处管全部。
-   字号下来之后输入框高度也跟着回落（py-2 + 14px ≈ 38px，与反馈弹窗一致）。 */
-#lead-modal .input-field { font-size: var(--fs-sm); }
+/* v1.128.0 写在 #lead-modal 上，v1.133.0 收编进 .modal-form（表单型弹窗通用）——
+   理由与写法见本文件 .modal-form 段，弹窗 body 挂上 .modal-form 即生效。 */
 .entity-row {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);
@@ -1572,6 +1569,27 @@
     min-height: 0;
     overflow-y: auto;
 }
+
+/* ====== 表单型弹窗（v1.133.0）：留资 / 意见反馈 / 升级码 ======
+   为什么要有这一类：宽度档位（--md，36rem）三年前就统一了，**宽度实测一致（547px）**，
+   但打开起来仍不像一家 —— 差的是**内部度量**，不是外壳：
+     · body 内距：留资 20/24px、意见反馈 24px、升级码 24px，各写各的
+     · 控件宽度：意见反馈的「整体评分」没写 w-full，比上面的下拉窄一截
+     · 控件字号：留资靠容器收口到 14px，意见反馈是逐控件补 text-sm
+   三处都是"每个弹窗自己写一遍"，写漏一遍就对不齐。收口成一个类：弹窗 body 挂
+   .modal-form，内距与控件字号由这里一处管；控件**宽度仍由各自的 w-full 负责**
+   （不在这里写死 —— 升级码那种「输入框 + 按钮」横排组合不该被拉满）。
+   ⚠ 本文件在 tailwind.css 之后引入：挂在 body 上的 p-6 / px-5 等内距类会被这里覆盖，
+      所以加了 .modal-form 就要把那几个内距类摘掉，别留两处互相打架。 */
+.modal-form {
+    padding: 20px;
+}
+@media (min-width: 640px) {
+    .modal-form { padding: 20px 24px; }
+}
+/* .input-field 本身不带字号（继承 body 16px），在弹窗里偏大 —— 按容器收口，
+   新增控件自动生效，不用逐个补 text-sm（v1.128.0 起是 #lead-modal 一条，此处收编） */
+.modal-form .input-field { font-size: var(--fs-sm); }
 
 /* 细滚动条（v1.131.0）：这套规格原先只挂在 .help-modal-scrollbar 上，只有「使用帮助」
    和「税率表」两个弹窗在用 —— 其余 12 个弹窗的滚动条是浏览器默认宽度，同一个站里

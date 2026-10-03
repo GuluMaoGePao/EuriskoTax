@@ -212,3 +212,73 @@ describe('关于本程序：矮屏不再顶出视口', () => {
         expect(block).not.toMatch(/覆盖\s*\d+\s*个税种/);
     });
 });
+
+describe('表单型弹窗（意见反馈 / 留资 / 升级码）：宽度与内部度量统一', () => {
+    // 为什么要单拎这一组（v1.133.0）：宽度档位早就统一了（三颗都是 md，实测桌面 547px），
+    // 但打开起来仍不像一家 —— 差的是**内部度量**：body 内距各写各的、控件宽度少一个
+    // w-full、控件字号一个靠容器收口一个逐个补。这些"每个弹窗自己写一遍"的东西，
+    // 写漏一遍就对不齐，所以收口成 .modal-form 一处 + 下面这组断言。
+    const FORM_MODALS = ['feedback-modal', 'lead-modal', 'upgrade-modal'];
+
+    const blockOf = (id) => {
+        const at = HTML.indexOf(`id="${id}"`);
+        expect(at).toBeGreaterThan(-1);
+        return HTML.slice(at, HTML.indexOf('id="alert-modal"') > at ? HTML.indexOf('id="alert-modal"') : at + 12000);
+    };
+
+    test('三颗都在同一个宽度档（md）—— 宽度同源', () => {
+        FORM_MODALS.forEach((id) => {
+            const shell = blockOf(id).match(/class="[^"]*modal-shell[^"]*"/);
+            expect(shell).not.toBeNull();
+            expect(shell[0]).toContain('modal-shell--md');
+        });
+    });
+
+    test('三颗 body 都挂 .modal-form（内距与控件字号一处收口）', () => {
+        FORM_MODALS.forEach((id) => {
+            const body = blockOf(id).match(/class="[^"]*modal-body[^"]*"/);
+            expect(body).not.toBeNull();
+            expect(body[0]).toContain('modal-form');
+        });
+    });
+
+    // 本文件在 tailwind.css 之后引入：body 上若还留着 p-6 / px-5，会被 .modal-form 盖掉，
+    // 留着只是让人误以为内距由那几个类决定 —— 两处写同一件事，改一处看起来没生效。
+    test('body 上不再留手写内距类（内距只由 .modal-form 一处决定）', () => {
+        FORM_MODALS.forEach((id) => {
+            const body = blockOf(id).match(/class="[^"]*modal-body[^"]*"/)[0];
+            expect(body).not.toMatch(/\b(p|px|py|pt|pb)-\d/);
+        });
+    });
+
+    // 「整体评分」原先没写宽度，按内容自适应，比上面「反馈类型」窄一截 ——
+    // 两颗上下挨着却不对齐，是这颗弹窗最扎眼的宽度不一致。
+    test('意见反馈的控件全部 w-full（下拉与文本框同宽）', () => {
+        const block = blockOf('feedback-modal');
+        const controls = block.match(/<(select|textarea)[^>]*class="([^"]*)"/g) || [];
+        expect(controls.length).toBe(3); // 反馈类型 / 整体评分 / 反馈内容
+        controls.forEach((c) => {
+            expect(c).toMatch(/class="[^"]*\bw-full\b/);
+            expect(c).toMatch(/class="[^"]*\btext-sm\b/);
+        });
+    });
+
+    // 50 多字的副标题在 576px 头部里折三行，把头顶到 110px（同类 76~80px）——
+    // 同一类弹窗的「头」不一样高。后半句已挪到 body 顶部提示条。
+    test('意见反馈头部副标题保持一行（不许再把长文案塞回头顶）', () => {
+        const head = blockOf('feedback-modal').match(/<div class="modal-head[\s\S]*?<\/div>\s*<\/div>/);
+        expect(head).not.toBeNull();
+        const paras = head[0].match(/<p[^>]*>([^<]+)<\/p>/g) || [];
+        paras.forEach((p) => {
+            expect(p.replace(/<[^>]+>/g, '').length).toBeLessThanOrEqual(30);
+        });
+    });
+
+    test('.modal-form 收口了控件字号，且旧的那条 #lead-modal 规则已收编', () => {
+        const start = CSS.indexOf('.modal-form {');
+        expect(start).toBeGreaterThan(-1);
+        expect(CSS).toContain('.modal-form .input-field');
+        // 收编前是 #lead-modal .input-field —— 只有留资生效，新增表单弹窗吃不到
+        expect(CSS).not.toMatch(/#lead-modal \.input-field/);
+    });
+});

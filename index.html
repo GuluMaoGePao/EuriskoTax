@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.132.0';
+        window.__APP_VERSION__ = '1.133.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1187,9 +1187,13 @@
                         <div class="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center mr-3">
                             <i class="fa fa-comments text-lg"></i>
                         </div>
+                        <!-- 副标题只留一行：原先那句「……采纳的改进会记录在更新日志并致谢」
+                             有 50 多字，在 576px 的头部里要折三行，把这颗弹窗的头顶到 110px
+                             （升级码 / 关于 都是 76~80px）—— 同一类弹窗的「头」就不一样高了。
+                             后半句挪到 body 顶部的提示条，一句话的信息没丢，头部回到一行。 -->
                         <div>
                             <h3 class="text-lg font-bold">意见反馈</h3>
-                            <p class="text-white/80 text-xs">发现 Bug、想要新功能或有任何建议都可以告诉我们——每条反馈我们都会认真查看，采纳的改进会记录在更新日志并致谢</p>
+                            <p class="text-white/80 text-xs">发现 Bug、想要新功能或有建议都可以告诉我们</p>
                         </div>
                     </div>
                     <button id="close-feedback-modal" onclick="closeModal(document.getElementById('feedback-modal'))" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
@@ -1197,7 +1201,13 @@
                     </button>
                 </div>
             </div>
-            <div class="modal-body p-6">
+            <!-- modal-form（v1.133.0）：内距与控件字号由 .modal-form 一处收口，
+                 与留资 / 升级码同度量，不再各写各的 p-6 / px-5 -->
+            <div class="modal-body modal-form">
+                <!-- 头部挪下来的后半句：信息保留，但不再撑高头部 -->
+                <p class="text-xs text-gray-500 mb-4 leading-relaxed">
+                    <i class="fa fa-info-circle mr-1"></i>每条反馈我们都会认真查看，采纳的改进会记录在更新日志并致谢。
+                </p>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">反馈类型</label>
                     <select id="feedback-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -1208,7 +1218,9 @@
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">整体评分（选填）</label>
-                    <select id="feedback-rating" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- w-full：原先这颗下拉没写宽度，按内容自适应，比上面「反馈类型」窄一截
+                         —— 两颗控件上下挨着却不对齐，是这颗弹窗最明显的「宽度不统一」 -->
+                    <select id="feedback-rating" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">不评分</option>
                         <option value="5">5 星 · 非常满意</option>
                         <option value="4">4 星 · 满意</option>
@@ -1266,7 +1278,8 @@
                     </button>
                 </div>
             </div>
-            <div class="modal-body p-6">
+            <!-- modal-form：与留资 / 意见反馈同度量（内距一处收口） -->
+            <div class="modal-body modal-form">
                 <!-- 当前档位状态（按档位动态填充：已开通 / 已到期 / 未开通），见 auth-ui.js upgradeHeroHtml -->
                 <div id="upgrade-hero" class="rounded-xl border border-violet-200 bg-violet-50 p-4 mb-5"></div>
 
@@ -1611,7 +1624,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="privacy.html" target="_blank" rel="noopener" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.132.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.133.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1685,7 +1698,7 @@
                 </ul>
             </div>
 
-            <div id="lead-modal-body" class="modal-body px-5 sm:px-6 py-5 bg-gray-50">
+            <div id="lead-modal-body" class="modal-body modal-form bg-gray-50">
                 <!-- 情境卡：只展示可核实的真实信息 ——
                      结果页进入时由 lead-context.js 从已渲染结果反推（类型 / 汇算结论 / 适用税率，不含金额）；
                      个人中心等无测算入口则列出本地已保存记录供用户主动选择；
