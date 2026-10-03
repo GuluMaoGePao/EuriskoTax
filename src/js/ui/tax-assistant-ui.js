@@ -578,10 +578,10 @@
                 '</div>';
         }
 
-        return '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] mx-4 transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col">' +
+        return '<div class="modal-shell modal-shell--xl bg-white transform scale-95 transition-transform duration-300">' +
             // 渐变起点原为 blue-500(#3b82f6)：白字压在它上面只有 3.68:1，不达 AA（16/18px 非大字）。
             // 起点降到 blue-600(#2563eb) 后为 5.15:1；终点 indigo-600 本来就有 6.4:1，不动。
-            '<div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">' +
+            '<div class="modal-head bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">' +
                 '<div class="flex justify-between items-center">' +
                     '<div class="flex items-center">' +
                         '<div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">' +
@@ -597,7 +597,7 @@
                     '</button>' +
                 '</div>' +
             '</div>' +
-            '<div class="overflow-y-auto p-6 help-modal-scrollbar">' +
+            '<div class="modal-body p-6 help-modal-scrollbar">' +
                 buildTable('综合所得', '工资薪金、劳务报酬、稿酬、特许权使用费合并计税', comprehensive, '全年应纳税所得额（元）') +
                 buildTable('年终奖单独计税', '年终奖÷12 按月度税率表确定适用税率', bonus, '月均奖金额（元）') +
                 buildTable('经营所得', '个体工商户、个人独资企业、合伙企业', business, '全年应纳税所得额（元）') +

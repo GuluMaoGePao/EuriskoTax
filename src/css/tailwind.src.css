@@ -90,12 +90,16 @@
             .tab-inactive {
                 @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
             }
-            /* 弹窗 Logo 样式（升级码等模态仍在用） */
+            /* 弹窗 Logo 样式（只有「关于本程序」在用）。
+               v1.130.0：200px + 上下各 -40px 负边距是给「内容短、弹窗矮」的年代定的 ——
+               现在 about 的内容（说明 + 核心价值 + 免责 + 版本 + 备案）已经排到 810px，
+               矮屏上直接顶出视口、备案号飞到屏幕外。Logo 在这张弹窗里是**认得出就行**的
+               元素，不是主角：收到 96px、去掉负边距，整窗矮掉 200px，滚动区内一眼看全。 */
             .modal-logo {
-                width: 200px;
-                height: 200px;
-                margin-top: -40px;
-                margin-bottom: -40px;
+                width: 96px;
+                height: 96px;
+                margin-top: 0;
+                margin-bottom: 0;
             }
             /* 提示卡片图标 */
             .tip-icon-wrapper {

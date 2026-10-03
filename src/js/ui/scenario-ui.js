@@ -618,9 +618,9 @@
         div.id = LIBRARY_MODAL_ID;
         div.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
         div.setAttribute('onclick', 'if(event.target===this)closeModal(this)');
-        div.innerHTML = '<div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4 transform scale-95' +
-            ' transition-transform duration-300 max-h-[85vh] overflow-hidden flex flex-col">' +
-            '<div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
+        div.innerHTML = '<div class="modal-shell modal-shell--xl bg-white dark:bg-gray-800 transform scale-95' +
+            ' transition-transform duration-300">' +
+            '<div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
             '<div class="flex justify-between items-center">' +
             '<div><h3 class="text-lg font-bold">我的方案</h3>' +
             '<p class="text-white/80 text-xs mt-0.5">存过的口径摆在一起比 · 当前可保存 '
@@ -629,7 +629,7 @@
             ' class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">' +
             '<i class="fa fa-times"></i></button>' +
             '</div></div>' +
-            '<div class="p-5 overflow-y-auto" id="' + LIBRARY_BODY_ID + '"></div>' +
+            '<div class="modal-body p-5" id="' + LIBRARY_BODY_ID + '"></div>' +
             '</div>';
         document.body.appendChild(div);
         document.getElementById(LIBRARY_CLOSE_ID).addEventListener('click', function () { closeModalById(LIBRARY_MODAL_ID); });

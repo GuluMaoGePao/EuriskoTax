@@ -378,11 +378,11 @@
         dlg.className = 'fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
         dlg.innerHTML = [
             '<div role="dialog" aria-modal="true" aria-labelledby="report-version-title"',
-            ' class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform scale-95 transition-transform duration-300">',
-            '  <div class="px-6 pt-6 pb-3">',
+            ' class="modal-shell modal-shell--sm bg-white transform scale-95 transition-transform duration-300">',
+            '  <div class="modal-head px-6 pt-6 pb-3">',
             '    <h3 id="report-version-title" class="text-lg font-bold text-slate-900">选择导出版本</h3>',
             '  </div>',
-            '  <div class="px-6 space-y-3">',
+            '  <div class="modal-body px-6 space-y-3">',
             '    <button type="button" data-rv="standard" class="w-full text-left rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-300">',
             '      <div class="text-sm font-semibold text-slate-900">标准版</div>',
             '      <div class="mt-1 text-sm text-slate-600">你正在看的完整测算结果，PDF 格式，现在即可导出。</div>',

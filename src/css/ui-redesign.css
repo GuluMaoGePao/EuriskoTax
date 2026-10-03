@@ -1508,3 +1508,49 @@
 .auth-page.hidden { display: none; }
 .top-tabbar.hidden { display: none !important; }
 
+/* ====== 弹窗统一外壳（v1.130.0）======
+   加这一组前，16 个弹窗的外壳是 14 处**手抄**的 Tailwind 串：宽度 5 档、限高 4 档
+   （还有 3 个压根没限高 —— about / alert / confirm，内容一长就顶出视口，矮屏上
+   备案号那条直接飞到屏幕外），头尾**没有一处**写 shrink-0（lead 是唯一例外，还是
+   v1.129.0 修 bug 时顺手补的），滚动区**没有一处**写 min-h-0。同一件事抄 14 遍，
+   抄漏的那一遍就是 bug —— 这次统一成一套类，弹窗只挑**宽度档**，其余由基类保证：
+
+     .modal-shell                外壳：满宽 + 左右留边 + 圆角 + 投影 + 限高 + 纵向 flex
+     .modal-shell--sm/md/lg/xl   只管宽度（--w-modal-*），按内容性质挑，不写像素
+     .modal-head/body/foot       头尾不许压、中间滚
+
+   两条硬约束（改这些类之前先看）：
+   ① **transform / scale 不写在这里**。openModal / closeModal（auth-ui.js:2750 / 2767）
+      是靠在外壳上摘挂 `scale-95` 类做入场动画的；基类若写死 transform，那个类摘了
+      也回不到 1，弹窗永远缩着 —— 所以 HTML 上仍保留 `transform scale-95
+      transition-transform duration-300`。
+   ② **外壳必须是背景层的第一个 div 子元素**（openModal 取 firstElementChild）。 */
+.modal-shell {
+    width: 100%;
+    margin-left: 1rem;
+    margin-right: 1rem;
+    border-radius: var(--r-sheet);
+    box-shadow: var(--sh-3);
+    max-height: var(--h-modal);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.modal-shell--sm { max-width: var(--w-modal-sm); }
+.modal-shell--md { max-width: var(--w-modal-md); }
+.modal-shell--lg { max-width: var(--w-modal-lg); }
+.modal-shell--xl { max-width: var(--w-modal-xl); }
+
+/* 头尾不许压：容器限高后 flex 会先压缩没有 min-content 保护的那一层，
+   被压的往往是最不能丢的标题条与操作区（v1.129.0 的 lead 页头就是这么被裁的）。 */
+.modal-head,
+.modal-foot { flex-shrink: 0; }
+
+/* 中间滚：flex 列布局里 flex-1 + overflow-y-auto 必须配 min-h-0，
+   否则 min-height 默认 auto、滚动区被内容顶开，外面那层限高就形同虚设。 */
+.modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
