@@ -2846,6 +2846,15 @@ function showPage(pageId) {
         const hideStart = performance.now();
         document.querySelectorAll('.page').forEach(page => {
             page.classList.add('hidden');
+            // v1.126.0：**连 active 一起清**。这一分支原先只加 hidden、不动 active ——
+            // 隐含假设是「初始状态只有一页带 active」，而这条假设在游客进入后被打破：
+            // 「免登录使用」那条路径并不走 showPage（它只是把主容器放出来），于是
+            // isInitialNavigation 一直留到**用户第一次点底部 Tab** 才被消耗 ——
+            // 那一次点击走的正是这个分支：目标页加上 active，而首页那份 active 没人管，
+            // 两页同时 .active。页面内容是对的（工具页确实显示了），但底栏高亮取的是
+            // 文档里靠前的那个 —— 首页，于是「进了工具页，亮的还是首页」。
+            // 初始导航只是"无动画直达"，它同样意味着**目标页独占**，所以这里一并清。
+            page.classList.remove('active');
         });
         ProfilePerf.log('showPage → 初始导航-隐藏所有页面', performance.now() - hideStart);
 

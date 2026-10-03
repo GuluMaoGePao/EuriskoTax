@@ -176,7 +176,10 @@ describe('登录页用户视角口径（v1.119.0：内部口径与运维入口�
 
     test('syncNav 在登录页可见时不放行导航栏（"下滑进主页"的根治点）', () => {
         const src = readSrc('src/js/ui/toolbox-ui.js');
-        const fn = src.slice(src.indexOf('function syncNav'), src.indexOf('function syncNav') + 900);
+        // 按**函数边界**切，不用固定长度窗口：v1.126.0 在 syncNav 开头补了几行注释，
+        // 900 字符的窗口立刻把函数尾巴切掉，断言红得莫名其妙 —— 注释一长就再犯。
+        const start = src.indexOf('function syncNav');
+        const fn = src.slice(start, src.indexOf('function initTabBar'));
         expect(fn).toContain("getElementById('login-page')");
         expect(fn).toContain("classList.contains('hidden')");
     });

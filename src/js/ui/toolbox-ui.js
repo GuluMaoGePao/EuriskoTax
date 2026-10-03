@@ -1923,7 +1923,14 @@
     // 两套 DOM 是**同一份状态的两种投影**，由 syncNav() 统一驱动，
     // 绝不各自维护显隐逻辑 —— 否则两端迟早不同步。
     function syncNav() {
-        var activeEl = document.querySelector('.page.active');
+        // v1.126.0：只认**看得见**的那一页。`.page.active` 允许有残留（v1.126.0 前的
+        // 初始导航分支会留下两页同时 active），但用户眼里当前页永远只有一个：
+        // 没有 hidden 的那个。高亮跟着"用户看见的页面"走，而不是跟着"DOM 里靠前的
+        // active"走 —— 后者一旦有残留就静默错位，且只在个别路径上发作。
+        // 优先取「看得见」的那个 active；若一个都没有（切换动画的 200ms 里，showPage 先摘
+        // active 再延迟加），退回 .active —— 那段时间页面还在淡出，高亮停在旧页是对的。
+        var activeEl = document.querySelector('.page.active:not(.hidden)')
+            || document.querySelector('.page.active');
         var activeId = activeEl ? activeEl.id : null;
         var visible = TAB_PAGES.indexOf(activeId) !== -1;
 

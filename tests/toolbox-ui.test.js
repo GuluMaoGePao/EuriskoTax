@@ -553,6 +553,42 @@ describe('导航双形态（手机底栏 + 桌面顶栏）', () => {
     test('updateTabBar 与 syncNav 等价（兼容旧调用点）', () => {
         expect(window.EuriskoToolbox.updateTabBar).toBe(window.EuriskoToolbox.syncNav);
     });
+
+    // v1.126.0 真机 bug：游客进入后**第一次**点底部「工具」，页面进了工具页、底栏却还亮着首页。
+    // 现场是两页同时 .active —— 首页那份是初始导航留下的（它只加 hidden、不动 active），
+    // 而 syncNav 取 `querySelector('.page.active')` 命中的是 DOM 里靠前的首页。
+    test('两页同时 active 时，高亮跟的是**看得见**的那一页', () => {
+        document.querySelectorAll('.page').forEach((p) => {
+            p.classList.remove('active');
+            p.classList.remove('hidden');
+        });
+        const home = document.getElementById('mode-selection-page');
+        home.classList.add('active');
+        home.classList.add('hidden');          // 已切走，但 active 没被清 —— bug 现场
+        document.getElementById('tools-page').classList.add('active');
+
+        window.EuriskoToolbox.syncNav();
+        expect(document.querySelector('#bottom-tabbar .bottom-tab.active').dataset.tab).toBe('tools-page');
+        expect(document.querySelector('#top-tabbar .top-tab.active').dataset.tab).toBe('tools-page');
+
+        // 复原：这条用例把首页摆成了 active+hidden，别把这份脏状态带进下一条
+        home.classList.remove('hidden');
+    });
+
+    // 治本在 showPage 的「初始导航」分支：那一支为"页面刚打开、无动画直达"而设，原先只加
+    // hidden、不动 active（隐含假设：初始状态只有一页带 active）。游客进入那条路径不走
+    // showPage，于是 isInitialNavigation 留到用户第一次点 Tab 才被消耗 —— 第一次点 Tab 走的
+    // 正是这一支，双 active 由此而来。这一支同样意味着"目标页独占"，所以必须一并清。
+    test('showPage 的初始导航分支连 active 一起清（不给第二页留 active）', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const src = fs.readFileSync(path.join(__dirname, '../src/js/auth/auth-ui.js'), 'utf8');
+        const start = src.indexOf('isInitialNavigation = false;');
+        expect(start).toBeGreaterThan(-1);
+        const branch = src.slice(start, start + 700);
+        expect(branch).toContain("classList.add('hidden')");
+        expect(branch).toContain("classList.remove('active')");
+    });
 });
 
 // S2（底栏避让）与 S5（容器加宽）的交叉点。这条 padding 原本写在 `#tools-page .max-w-3xl` 上，
