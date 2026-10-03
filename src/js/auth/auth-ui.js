@@ -678,25 +678,16 @@ function renderProfileIdentity(user) {
     const guest = !user;
     const nameEl = document.getElementById('profile-display-name');
     const emailEl = document.getElementById('profile-display-email');
-    const settingsEl = document.getElementById('profile-nav-settings');
-    const logoutEl = document.getElementById('profile-logout-link');
-    const noteEl = document.getElementById('profile-session-note');
 
     if (nameEl) nameEl.textContent = guest ? '游客' : (user.username || '用户');
     if (emailEl) {
+        // HTML 里的 email@example.com 只是占位假数据：游客看到它会被读成"我的账号邮箱是 example.com"
         emailEl.textContent = guest
             ? '免登录使用中 · 测算记录仅保存在本机'
             : (user.email || '');
     }
-    // 游客没有账户可设置、也没有「退出登录」这回事：顶栏那颗「登录」就是出口
-    // （点它 exitGuestSession 后回登录页），这里再挂一个只会让人犹豫。
-    if (settingsEl) settingsEl.classList.toggle('hidden', guest);
-    if (logoutEl) logoutEl.classList.toggle('hidden', guest);
-    if (noteEl) {
-        noteEl.textContent = guest
-            ? '当前为免登录使用，数据仅存本机；登录后可用云同步与权益'
-            : '当前为本地登录会话，可在「账户设置」中管理密码与账号安全';
-    }
+    // 「账户设置」按钮与底部那块自制页尾（含退出登录）已于 2026-10-03 撤掉：前者由下方
+    // 「个人中心」卡承担，后者由统一的全站页尾承担，退出登录仍在顶栏用户菜单里。
 }
 
 /** 当前身份（登录态取本地缓存的 user；游客 / 未登录 → null） */
@@ -956,6 +947,24 @@ const PROFILE_CARDS_CONFIG = [
         iconClass: 'fa fa-calendar text-xl text-orange-600'
     },
     {
+        // 2026-10-03：账号的那一摞（资料 / 安全 / 权益）此前是横幅上一颗叫「账户设置」的按钮，
+        // 挂在名字旁边不像入口倒像个设置图标 —— 用户第一反应是"改个密码"，而不是"我的账号"。
+        // 现在它成为卡片列表的一员：「个人中心」是目的地名，与 Tab「我的」区分开（前者是账号，
+        // 后者是容器）。游客态同一张卡换成登录引导（见 guest 分支）：对没有账号的人讲
+        // 「个人中心」是讲不通的，他要的那一步是「登录 / 注册」。
+        id: 'profile-card-account',
+        group: 'service',
+        icon: 'fa-id-card',
+        title: '个人中心',
+        desc: '账号资料、密码安全与版本权益',
+        guest: {
+            title: '登录 / 注册',
+            desc: '登录后可云同步历史、跨设备继续算'
+        },
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-id-card text-xl text-blue-600'
+    },
+    {
         // 阶段13B：个人中心常驻留资入口（商业价值最高，置于服务组首位）
         // L-14：这一条是留资文案的标准范例 —— 说清「什么问题 + 留下什么 + 谁联系你」，不做任何时效承诺。
         id: 'profile-card-lead',
@@ -1147,7 +1156,16 @@ function profileCardHtml({ id, title, desc, tag, badge, iconWrapClass, iconClass
 // 点击委托见 manageProfileEventBindings（按 [id^="profile-card-"] 匹配，组标题不参与）。
 function renderProfileCards() {
     const grid = document.getElementById('profile-cards-grid');
-    if (!grid || grid.children.length > 0) return; // 已渲染则跳过
+    if (!grid) return;
+    // 幂等，但**登录态变了要重渲染**：「个人中心」卡在游客态是「登录 / 注册」，
+    // 游客 → 登录之后若沿用首次渲染的结果，用户会看到一张自己已经不需要的引导卡。
+    // 判据记在容器上，比"每次进页面都重刷"便宜，也不会像从前那样一次渲染定终身。
+    const state = (isGuestSession() || !apiClient.isLoggedIn()) ? 'guest' : 'member';
+    if (grid.children.length > 0 && grid.dataset.identityState === state) return;
+    grid.innerHTML = '';
+    grid.dataset.identityState = state;
+    // 游客态：带 guest 文案的卡换成那一套（没有账号的人不该被讲「个人中心」）
+    const guest = state === 'guest';
 
     grid.innerHTML = PROFILE_CARD_GROUPS.map((group, index) => {
         // 高频四张已在四宫格（renderProfileQuick），这里不再重复渲染 ——
@@ -1162,7 +1180,7 @@ function renderProfileCards() {
             </div>`;
         // badge 是渲染时算一次的（如税务日历的「本月 N 项」）：它随月份变，不随会话变，
         // 没必要为此把整张卡片改成每次进页面重渲染 —— renderProfileCards 只在首次进我的页时跑。
-        return head + cards.map((c) => profileCardHtml(Object.assign({}, c, {
+        return head + cards.map((c) => profileCardHtml(Object.assign({}, c, guest && c.guest ? c.guest : {}, {
             badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
         }))).join('');
     }).join('');
@@ -2381,10 +2399,9 @@ function setupAuthEventListeners() {
     if (profileSendCodeBtn) profileSendCodeBtn.addEventListener('click', handleSendProfileCode);
     const profilePasswordSubmitBtn = document.getElementById('profile-password-submit');
     if (profilePasswordSubmitBtn) profilePasswordSubmitBtn.addEventListener('click', handleChangeProfilePassword);
-    document.getElementById('profile-logout-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        handleLogout();
-    });
+    // #profile-logout-link 已于 2026-10-03 随「我的」页那块自制页尾一起删除：退出登录的入口
+    // 是顶栏用户菜单的 #logout-link（同一个 handleLogout）。元素没了还绑定会在初始化时抛错、
+    // 中断它后面的所有绑定 —— 这条纪律在 2355 行旁边已经踩过一次（顶栏 #profile-link）。
     document.getElementById('profile-delete-account').addEventListener('click', (e) => {
         e.preventDefault();
         deleteAccount();
@@ -2487,6 +2504,15 @@ function setupAuthEventListeners() {
         { cardId: 'profile-card-ledger', specialFn: () => { if (window.EuriskoEntityUI) window.EuriskoEntityUI.openLedger(); } },
         // 阶段19-11 · E4 批量：一张表一次算完（它是子页不是弹窗 —— 粘贴区与结果表都装不进弹窗）
         { cardId: 'profile-card-batch', pageId: 'profile-batch-page' },
+        // 2026-10-03：横幅那颗「账户设置」按钮换成这张「个人中心」卡，目的地不变。
+        // 游客态点它 = 去登录页（卡片文案此时也是「登录 / 注册」），与顶栏「登录」是同一条路，
+        // 两处都指向 showLoginPage —— 不新开第三条路径。
+        {
+            cardId: 'profile-card-account',
+            pageId: 'profile-settings-page',
+            loadFn: loadProfileSettings,
+            guestFn: () => showLoginPage()
+        },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
         { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },
@@ -2521,6 +2547,10 @@ function setupAuthEventListeners() {
             const config = profileCardConfigs.find(c => c.cardId === card.id);
             if (!config) return;
             const eventTime = Date.now();
+            if (config.guestFn && isGuestSession()) {
+                ProfilePerf.measure('卡片点击 → 游客态', config.guestFn, { cardId: card.id, eventTime });
+                return;
+            }
             if (config.specialFn) {
                 ProfilePerf.measure('卡片点击 → 特殊处理', config.specialFn, {
                     cardId: card.id, target: 'modal', eventTime
@@ -2543,14 +2573,9 @@ function setupAuthEventListeners() {
         if (el) bindProfileCardClicks(el);
     });
 
-    document.getElementById('profile-nav-settings').addEventListener('click', (e) => {
-        e.preventDefault();
-        const eventTime = Date.now();
-        ProfilePerf.measureSteps('导航 → 账户设置', [
-            ['loadProfileSettings', () => loadProfileSettings()],
-            ['showPage', () => showPage('profile-settings-page')]
-        ], { eventTime });
-    });
+    // 横幅上的「账户设置」按钮已于 2026-10-03 撤掉，入口改由下方卡片列表里的
+    // 「个人中心」卡承担（profileCardConfigs 里同一个 pageId / loadFn）。
+    // 元素删除后这里的绑定同步删除（同 2355 行的纪律）。
 
     // 个人中心的「升级码」入口（阶段14 收敛的 2 处入口之一）。
     // 未开通的人进来看到的是「尚未开通 + 留资」，已开通的人看到自己的权益 —— 同一个弹窗，两种内容。

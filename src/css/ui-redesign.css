@@ -1408,7 +1408,20 @@
 }
 .auth-alt__hint { margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--c-text-3); }
 
-/* 卡外页脚 */
+/* --- 全站页尾（2026-10-03：从「我的」页内部提到 #app-container 直接子级） ---
+   原先它整个长在 #profile-page 里，只有那一页看得到；其余页面连备案号都没有。
+   现在与首页 / 工具页同级，所有主应用页面共用同一份。
+   底部的留白不是排版趣味：手机形态的 Tab 栏是 position:fixed，页尾作为文档最后一个
+   元素若不预留这段高度，最后一行（备案号）会被 Tab 栏压在下面 —— 而那一行正是
+   页尾里最不该被盖住的内容。桌面形态底栏隐藏，不需要留。 */
+@media (max-width: 767px) {
+    #app-container > footer {
+        /* 44px 底栏内容高 + 上下 padding ≈ 56px，再叠安全区 inset */
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    }
+}
+
+/* 卡外页脚（登录/注册/重置面板） */
 .auth-foot {
     margin-top: var(--sp-5);
     display: flex;

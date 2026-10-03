@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.122.0';
+        window.__APP_VERSION__ = '1.123.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1586,7 +1586,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.122.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.123.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <p class="text-xs mt-2">
                             <a href="clean-cache.html?auto=1" class="text-primary hover:underline">遇到旧版页面？点此一键重置缓存</a>
@@ -2051,15 +2051,10 @@
     <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
         <div class="max-w-4xl mx-auto px-4 pb-6">
-            <div class="profile-sub-nav">
-                <div class="profile-sub-nav-inner">
-                    <button id="back-from-profile" class="profile-sub-nav-back">
-                        <i class="fa fa-arrow-left"></i><span>返回</span>
-                    </button>
-                    <span class="profile-sub-nav-title">个人中心</span>
-                </div>
-            </div>
-            
+            <!-- 页头已撤（2026-10-03）：原来的「← 返回 + 个人中心」把顶层 Tab 页当二级页用 ——
+                 返回去的就是首页，与底部/顶部 Tab 的「首页」是同一目的地的第二条路径；
+                 「个人中心」也不是这一页的名字（这页叫「我的」，Tab 已经写着），它是页内的一个入口，
+                 即下方服务组那张「个人中心」卡（进的是账号与安全设置）。 -->
             <!-- 用户信息横幅卡（版本徽标与说明由 renderPlanBadges 动态填充） -->
             <div class="bg-white rounded-lg shadow-card mb-6 overflow-hidden">
                 <div class="bg-gradient-to-r from-primary via-blue-600 to-blue-700 px-5 py-6 sm:px-7 sm:py-7">
@@ -2079,16 +2074,6 @@
                                  只换来不达标 —— 层级交给字号（14 / 12px）与顺序表达。 -->
                             <p id="profile-display-email" class="text-white break-all text-sm mt-1 leading-relaxed">email@example.com</p>
                             <p id="profile-plan-note" class="text-white text-xs mt-1 leading-relaxed hidden"></p>
-                        </div>
-                        <div class="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2 justify-center">
-                            <!-- 「版本与权益」按钮已从横幅移到下方权益进度条里（id 不变，仍是全局第 2 处升级入口）：
-                                 横幅上那颗按钮旁边就是档位徽标，用户看得见自己是哪个版本，却看不见"用掉了多少、
-                                 云同步开没开" —— 权益要说清的是后者，所以它该长在进度条旁边（阶段19-6b §3.6 ①）。 -->
-                            <!-- 原为 bg-white/15 + 白字：半透明白压在品牌渐变上合成出的浅蓝底，白字只有 3.97:1。
-                                 改用深蓝半透明（bg-blue-900/40）：底更暗，白字 6.7:1，仍是半透明玻璃质感。 -->
-                            <a href="#" id="profile-nav-settings" class="inline-flex items-center justify-center w-full sm:w-auto bg-blue-900/40 border border-white/30 text-white hover:bg-blue-900/60 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]">
-                                <i class="fa fa-cog mr-2"></i><span>账户设置</span>
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -2136,21 +2121,22 @@
             <!-- 功能与服务（模块卡片由 JS 按「常用功能 / 服务与支持」分组生成，组标题占满整行） -->
             <div id="profile-cards-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"></div>
 
-            <!-- 底部操作 -->
-            <div class="bg-white rounded-lg shadow-card mt-6 p-4 sm:p-5">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <p class="text-xs text-gray-500 flex items-center justify-center sm:justify-start">
-                        <i class="fa fa-shield mr-2 text-gray-300"></i><span id="profile-session-note">当前为本地登录会话，可在「账户设置」中管理密码与账号安全</span>
-                    </p>
-                    <button id="profile-logout-link" class="btn bg-gray-100 text-gray-600 hover:bg-gray-200 w-full sm:w-auto">
-                        <i class="fa fa-sign-out mr-2"></i>退出登录
-                    </button>
-                </div>
-            </div>
+            <!-- 自制「底部操作」块已撤（2026-10-03）：它长得像页尾却只在这一页出现，
+                 与提炼出来的全站页尾并存时看着像两个页脚。其中的「退出登录」顶栏用户菜单里本来就有
+                 （#logout-link，绑定到同一个 handleLogout）；那句「本地登录会话」的说明随页头一起撤 ——
+                 身份已由横幅（用户名 / 游客）说清，不必再复述一遍。 -->
         </div>
     </div>
-    
-    <!-- 账户设置页面 -->
+    </div>
+    <!-- ↑ 2130 这行是 2026-10-03 补的 #profile-page 闭合标签 ——
+         此前它一直没有闭合，浏览器在 app-container 结尾处才兜底关掉，
+         于是六个子页（设置/档案/数据/日历/历史/批量）与下面的全站页尾全被
+         **嵌套进 profile-page 里**：① 六个子页跟着父一起隐藏 → 点了「计算历史」
+         什么都没弹出来（computed display 看着是 block，实际 rects=0，骗过了肉眼）；
+         ② 页尾只在「我的」页出现，其余页面连备案号都没有。
+         现在这六个子页与首页 / 工具页同级 —— 各自是独立的 .page，互不遮挡。 -->
+
+    <!-- 个人中心（从「我的」页卡片点击进入，不再叫「账户设置」） -->
     <div id="profile-settings-page" class="page hidden">
         <div class="max-w-2xl mx-auto px-4 pb-6">
             <div class="profile-sub-nav">
@@ -2158,7 +2144,7 @@
                     <button id="back-from-settings" class="profile-sub-nav-back">
                         <i class="fa fa-arrow-left"></i><span>返回</span>
                     </button>
-                    <span class="profile-sub-nav-title">账户设置</span>
+                    <span class="profile-sub-nav-title">个人中心</span>
                 </div>
             </div>
             
@@ -2542,17 +2528,16 @@
         </div>
     </div>
 
-    <!-- 底部导航栏 -->
+    <!-- 全站页尾（2026-10-03）：原先这个 footer 整个**长在 #profile-page 里面**，
+         于是只有「我的」页看得到它，其余页面连备案号都没有 —— 备案展示是每个页面的义务，
+         不是某一页的装饰。现在提到这里：与首页 / 工具页同级，所有主应用页面共用同一份。
+         内容按「合规必需」收齐：版权与免责、备案号。原先那颗「测算工具总目录」链接撤掉 ——
+         它不是页尾义务，放在这里只会把视线从备案与免责上带走。 -->
     <footer class="bg-white border-t border-gray-200 py-4">
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    © 2026 EuriskoTax 税费计算器 · 20 个速算器 + 21 个完整测算 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
-                </div>
-                <!-- 阶段15：App 内通往 15 个落地页的唯一入口（此前站内完全没有路径，
-                     已装 App 的用户看不到年终奖 / 社保 / 增值税等单页工具） -->
-                <div class="text-sm">
-                    <a href="/seo/index.html?source=app_footer" class="text-primary hover:text-primary/80 font-medium">测算工具总目录（20 个速算器 + 21 个完整测算）→</a>
+                    © 2026 EuriskoTax 税费计算器 · 本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。
                 </div>
                 <!-- 备案信息：ICP 号与公安联网备案号。
                      备案号**下发后**才渲染（未备案时展示备案号同样违规），
