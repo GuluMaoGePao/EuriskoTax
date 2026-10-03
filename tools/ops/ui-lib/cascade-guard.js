@@ -96,6 +96,27 @@ function scanner() {
     }
 
     const hits = [];
+
+    // 检测 B（通杀）：带 .hidden 的元素，computed display 必须是 none ——
+    // 「组件类清单」永远列不全（.auth-page 就是漏网之鱼，v1.121.0 踩坑），直接抓
+    // 「hidden 类形同虚设」这一族 bug 本身。
+    // 例外：`hidden sm:inline` / `hidden md:block` 是响应式组合，桌面显示是有意的
+    // （本守卫以 ≥768 桌面视口运行），带响应式前缀类的元素跳过 —— 否则
+    // brand-name / user-name / top-tabbar 全是误报，把真问题淹掉。
+    const responsiveHidden = /^(sm|md|lg|xl|2xl):/;
+    document.querySelectorAll('.hidden, [hidden]').forEach(el => {
+        if ([...el.classList].some(c => responsiveHidden.test(c))) return;
+        if (getComputedStyle(el).display !== 'none') {
+            hits.push({
+                winner: '(hidden 类被更高优先级 display 压掉)',
+                component: 'hidden',
+                props: 'display',
+                where: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ').slice(0, 2).join('.'),
+                actual: 'display=' + getComputedStyle(el).display
+            });
+        }
+    });
+
     document.querySelectorAll(KEY.map(k => '.' + k).join(',')).forEach(el => {
         [...el.classList].filter(c => KEY.includes(c)).forEach(cls => {
             const compRules = rules.filter(r =>

@@ -11,6 +11,40 @@
 
 ---
 
+## [1.121.0] - 2026-10-02 - 修「主页内容出现在登录页」：hidden 语义全线失守，逐类收口
+
+用户截图：登录后个人中心/主页内容叠在登录页下面，顶部 Tab 行也压在登录页上。
+根因**不是** 1.119 那次修的 syncNav 判定（那个没回归），而是修复依赖的 `.hidden`
+本身在桌面端**从来没真正生效过** —— 优先级反转家族的第三爆，也是最大的一爆：
+
+- `#login-page` 是 `.auth-page`（`display:flex`，本层排在 tailwind 之后）——
+  登录成功 `showApp()` 给它加 `.hidden`，被 flex 压掉 → **登录页永远不消失**，
+  和主应用同屏叠放。手机端底部 Tab 是纯 `.hidden`（能压住），所以 1.119 的验证
+  只看了它，桌面 `top-tabbar`（`hidden md:block`）从来压不住 —— **v1.119 的
+  「Tab 行浮在登录页」在桌面端根本没修干净**，这次一并补上
+  （`.top-tabbar.hidden{display:none!important}`：JS 明确说藏就藏；该显示时
+  syncNav 摘掉 hidden，`md:block` 照常生效，两套语义不打架）。
+- 同族失效还有三处，守卫（1.120.1 的 `check:cascade` 检测 B）一次抓出：
+  `.identity-note` / `.plans-box`（本层写了 flex，未登录时登录态专属盒子露出）、
+  `.card`（`@apply flex flex-col`，个人中心 whoami 卡藏不住）→ 全部补反制。
+- **为何之前没抓到**：检测 A（组件类清单）天然列不全；检测 B 是这轮新加的
+  「带 .hidden 而 computed display != none 即 FAIL」。它第一版没有响应式豁免，
+  把 `hidden sm:inline` / `hidden md:block`（桌面显示是**有意**的）全报成违规 ——
+  这也顺手否决了第一反应的修法：**全局 `.hidden{display:none!important}` 兜底**
+  会把这些响应式组合在桌面一起藏掉，不可用。检测 B 已补豁免规则
+  （带 `sm:/md:/lg:` 前缀类的元素跳过）。
+
+### 验收
+
+- 真机四态回归（playwright）：未登录（登录页独占、导航全藏）/ 登录成功（登录页
+  `display:none`、主应用显示）/ 退出登录（回登录页）/ 游客进入 —— 全部互斥正确。
+- 全量单测 **116 套件 2178 例**全绿；门禁 `verify:local` **259/259**、线上指纹 **37 项**；
+  `check:cascade` 存量 0 违规；发布预检通过。
+- **视觉基线重新固化（14 张 light）**：diff 里 home 的「我是谁」块消失、profile
+  的 whoami 卡显隐是本次修复的预期效果；profile 的「本月 1 项」日历徽标是数据
+  随日期变化；quick 等页肉眼无差异（字节级噪声）。基线上一版拍于 9-20，
+  中间隔了多版，本次一并刷新。
+
 ## [1.120.1] - 2026-10-02 - 把「优先级反转坑」的排查固化成工具：CSS 级联守卫
 
 v1.117.0（`.auth-form` 压 `.hidden`）和 v1.120.0（`.auth-alt button` 压 `.auth-btn-outline`）

@@ -1232,6 +1232,12 @@
     background: linear-gradient(180deg, var(--c-brand-subtle) 0%, var(--c-bg-2) 100%);
 }
 .dark .auth-page { background: var(--c-bg); }
+/* v1.121.0 踩坑（优先级反转家族第三例，这次最疼）：登录成功后 showApp() 给
+   #login-page 加 .hidden，但上面这行 display:flex 把 .hidden 的 display:none
+   压掉了 —— 登录页和主应用同屏叠放，用户往下滑就是「主页出现在登录页下面」。
+   与 .auth-form.hidden 同一条规矩：本层写了 display 的类，凡被 hidden 切换，
+   必须显式把 hidden 抢回来。 */
+.auth-page.hidden { display: none; }
 
 .auth-shell { width: 100%; max-width: 920px; }
 
@@ -1463,4 +1469,36 @@
     .auth-brand__sub { margin-top: 0; font-size: var(--fs-xs); }
     .auth-main, .auth-brand { padding: var(--sp-6); }
 }
+
+/* ==========================================================================
+   兜底反制：hidden 语义不可协商（v1.121.0，优先级反转家族收口）
+   --------------------------------------------------------------------------
+   本层排在 tailwind.css 之后，上面任何写了 display 的类都会压过 .hidden 的
+   display:none。逐类补反制（.auth-form.hidden、.pwd-strength[hidden]、
+   .auth-page.hidden）补到第三例时，守卫一次扫出 **6 处 hidden 形同虚设**：
+   top-tabbar、user-name、home-plans-box、home-identity-note、brand-name……
+   症状就是用户报告的「主页内容出现在登录页」—— 已登录用户刷新时主应用显示、
+   登录页因为 hidden 被压也显示，两套 UI 叠放。
+   一次性把语义抢回来：带 hidden 类/属性就必须不可见，!important 防止本文件
+   后续新写的 display 规则再把口子撕开。
+   JS 侧已核实无「带 .hidden 又靠内联 display 强制显示」的用法（style.display
+   的调用点全部作用于不带 hidden 的元素）；工具类语义不变（.hidden 本就是
+   display:none）。常态看守：tools/ops/ui-lib/cascade-guard.js 的检测 B
+   （带 .hidden / [hidden] 而 computed display != none 即 FAIL）。
+   ========================================================================== */
+/* 反制清单（v1.121.0）：以上三类被 JS 用 .hidden 切换显隐，但自身（或关联类）写了
+   display / 带 md:block 响应式，.hidden 压不住 —— 逐类抢回来：
+   - .identity-note / .plans-box：ui-redesign 里写了 display:flex（722/734 行），
+     未登录时 JS 加 hidden 但压不住，主页会露出登录态专属的盒子；
+   - .top-tabbar 带 `hidden md:block`：桌面 md:block 永远赢，v1.119 的「Tab 行浮在
+     登录页」在桌面端一直没修干净（只修好了无响应式的 bottom-tabbar）——
+     这条用 !important 表达「JS 明确说藏就藏」；该显示时 syncNav 会摘掉 hidden，
+     md:block 照常生效，两套语义不再打架。
+   注意**不能**上全局 `.hidden{display:none!important}`：brand-name / user-name 是
+   `hidden sm:inline` 的响应式组合（桌面显示是有意的），全局兜底会把它们在桌面藏掉。 */
+.identity-note.hidden,
+.plans-box.hidden,
+.card.hidden,
+.auth-page.hidden { display: none; }
+.top-tabbar.hidden { display: none !important; }
 
