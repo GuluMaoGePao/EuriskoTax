@@ -384,11 +384,11 @@
             '  </div>',
             '  <div class="px-6 space-y-3">',
             '    <button type="button" data-rv="standard" class="w-full text-left rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-300">',
-            '      <div class="font-semibold text-slate-900">标准版</div>',
+            '      <div class="text-sm font-semibold text-slate-900">标准版</div>',
             '      <div class="mt-1 text-sm text-slate-600">你正在看的完整测算结果，PDF 格式，现在即可导出。</div>',
             '    </button>',
             '    <button type="button" data-rv="pro" class="w-full text-left rounded-xl border border-amber-200 bg-amber-50/60 p-4 transition-colors hover:border-amber-300">',
-            '      <div class="font-semibold text-slate-900">精装版</div>',
+            '      <div class="text-sm font-semibold text-slate-900">精装版</div>',
             // 副文案按 kind 动态写：该场景没开精装版时，用户必须在**点之前**就知道拿到的是什么。
             // 修复前这里永远写「封面 + 政策要点 + 图表」，点击后 hookAllowed 拦住、静默换成标准版
             // 下载 —— 用户以为自己拿到的是精装版，从文件名上一个字都看不出来。

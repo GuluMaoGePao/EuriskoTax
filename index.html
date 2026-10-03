@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.126.0';
+        window.__APP_VERSION__ = '1.127.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -969,7 +969,7 @@
                             <i class="fa fa-question-circle text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-xl font-bold">使用帮助</h3>
+                            <h3 class="text-lg font-bold">使用帮助</h3>
                             <p class="text-white/80 text-sm">了解如何使用本工具</p>
                         </div>
                     </div>
@@ -981,16 +981,16 @@
             
             <div class="border-b border-gray-100 px-6">
                 <div class="flex space-x-2 py-4 overflow-x-auto">
-                    <button class="help-tab-btn active px-4 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg transition-colors" data-tab="calculation">
+                    <button class="help-tab-btn active shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg transition-colors" data-tab="calculation">
                         <i class="fa fa-calculator mr-2"></i>计算功能
                     </button>
-                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="data">
+                    <button class="help-tab-btn shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="data">
                         <i class="fa fa-database mr-2"></i>数据管理
                     </button>
-                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="rules">
+                    <button class="help-tab-btn shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="rules">
                         <i class="fa fa-book mr-2"></i>计税规则
                     </button>
-                    <button class="help-tab-btn px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="tips">
+                    <button class="help-tab-btn shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" data-tab="tips">
                         <i class="fa fa-lightbulb-o mr-2"></i>实操提示
                     </button>
                 </div>
@@ -1005,7 +1005,7 @@
                                 <i class="fa fa-arrow-up text-blue-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">正向计税</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">正向计税</h4>
                                 <p class="text-sm text-gray-600">输入您的收入和扣除项信息，系统将自动计算年度个人所得税，并生成标准化年度个税预算表。</p>
                             </div>
                         </div>
@@ -1017,7 +1017,7 @@
                                 <i class="fa fa-arrow-down text-green-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">反向倒算</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">反向倒算</h4>
                                 <p class="text-sm text-gray-600">输入税额信息和扣除项，系统将自动反推税前收入，适用于财务人员和薪酬规划。</p>
                             </div>
                         </div>
@@ -1029,7 +1029,7 @@
                                 <i class="fa fa-building text-purple-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">经营所得计税</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">经营所得计税</h4>
                                 <p class="text-sm text-gray-600">适用于个体工商户、个人独资企业、合伙企业投资者，支持成本、费用等扣除项。</p>
                             </div>
                         </div>
@@ -1041,7 +1041,7 @@
                                 <i class="fa fa-tags text-orange-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">分类所得计税</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">分类所得计税</h4>
                                 <p class="text-sm text-gray-600">适用于利息、股息、红利所得、财产租赁、转让所得及偶然所得的计税计算。</p>
                             </div>
                         </div>
@@ -1055,7 +1055,7 @@
                                 <i class="fa fa-save text-blue-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">数据保存</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">数据保存</h4>
                                 <p class="text-sm text-gray-600">您可以保存计算结果，以便后续查看和比较。所有数据仅保存在本地，不会上传至服务器。</p>
                             </div>
                         </div>
@@ -1067,7 +1067,7 @@
                                 <i class="fa fa-download text-green-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">数据导出</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">数据导出</h4>
                                 <p class="text-sm text-gray-600">支持将计算历史导出为JSON或CSV格式，方便数据备份和迁移。</p>
                             </div>
                         </div>
@@ -1079,7 +1079,7 @@
                                 <i class="fa fa-file-pdf-o text-purple-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">PDF导出</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">PDF导出</h4>
                                 <p class="text-sm text-gray-600">计算完成后，您可以将预算表导出为PDF格式，方便打印和保存。</p>
                             </div>
                         </div>
@@ -1093,7 +1093,7 @@
                                 <i class="fa fa-book text-blue-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-1">计税规则依据</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">计税规则依据</h4>
                                 <p class="text-sm text-gray-600">本小程序根据2026年个人所得税计算规则手册设计，确保计算结果准确无误。</p>
                             </div>
                         </div>
@@ -1105,7 +1105,7 @@
                                 <i class="fa fa-shield text-amber-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">个税免征特殊规则</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">个税免征特殊规则</h4>
                                 <ul class="text-sm text-gray-600 space-y-1">
                                     <li><i class="fa fa-check-circle text-amber-500 mr-2"></i>福利彩票、体育彩票单次中奖收入≤10000元（含1万元），免征个人所得税</li>
                                     <li><i class="fa fa-check-circle text-amber-500 mr-2"></i>餐饮发票等单张发票奖金≤800元，免征个人所得税</li>
@@ -1123,7 +1123,7 @@
                                 <i class="fa fa-calendar-check-o text-green-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">汇算清缴时间</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">汇算清缴时间</h4>
                                 <ul class="text-sm text-gray-600 space-y-1">
                                     <li><i class="fa fa-clock-o text-green-500 mr-2"></i>综合所得年度汇算清缴：次年3月1日至6月30日</li>
                                     <li><i class="fa fa-clock-o text-green-500 mr-2"></i>经营所得年度汇算清缴：次年1月1日至3月31日</li>
@@ -1138,7 +1138,7 @@
                                 <i class="fa fa-file-text-o text-blue-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">专项附加扣除</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">专项附加扣除</h4>
                                 <p class="text-sm text-gray-600">专项附加扣除需在个人所得税APP中据实填报，留存相关佐证材料备查。</p>
                             </div>
                         </div>
@@ -1150,7 +1150,7 @@
                                 <i class="fa fa-exchange text-purple-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">汇算差异说明</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">汇算差异说明</h4>
                                 <p class="text-sm text-gray-600">劳务报酬、稿酬、特许权使用费预缴时按固定税率计税，年度汇算时并入综合所得，通常会产生税额差额，需通过汇算多退少补。</p>
                             </div>
                         </div>
@@ -1162,7 +1162,7 @@
                                 <i class="fa fa-info-circle text-amber-600"></i>
                             </div>
                             <div>
-                                <h4 class="font-semibold text-gray-800 mb-2">预算与实际差异</h4>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">预算与实际差异</h4>
                                 <ul class="text-sm text-gray-600 space-y-1">
                                     <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>本工具为年度预算规划工具，计算结果基于年度税率表</li>
                                     <li><i class="fa fa-exclamation-circle text-amber-500 mr-2"></i>实际月度预缴可能因累计减除费用新规产生差异</li>
@@ -1311,9 +1311,9 @@
                         <i class="fa fa-times text-gray-500"></i>
                     </button>
                 </div>
-                <div id="alert-modal-message" class="mb-6 text-gray-700"></div>
+                <div id="alert-modal-message" class="mb-6 text-sm leading-relaxed text-gray-700"></div>
                 <div class="flex justify-end">
-                    <button id="alert-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg">
+                    <button id="alert-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg text-sm">
                         确定
                     </button>
                 </div>
@@ -1336,12 +1336,12 @@
                         <i class="fa fa-times text-gray-500"></i>
                     </button>
                 </div>
-                <div id="confirm-modal-message" class="mb-6 text-gray-700"></div>
+                <div id="confirm-modal-message" class="mb-6 text-sm leading-relaxed text-gray-700"></div>
                 <div class="flex justify-end space-x-3">
-                    <button id="confirm-modal-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-lg">
+                    <button id="confirm-modal-cancel" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-lg text-sm">
                         取消
                     </button>
-                    <button id="confirm-modal-confirm" class="btn btn-primary px-6 py-2 rounded-lg">
+                    <button id="confirm-modal-confirm" class="btn btn-primary px-6 py-2 rounded-lg text-sm">
                         确认
                     </button>
                 </div>
@@ -1598,7 +1598,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.126.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.127.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1619,12 +1619,12 @@
     <div id="content-notice-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col transform scale-95 transition-transform duration-300">
             <div class="bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl flex items-center justify-between">
-                <h3 id="content-notice-modal-title" class="text-base font-bold"><i class="fa fa-bullhorn mr-2"></i>更新公告</h3>
+                <h3 id="content-notice-modal-title" class="text-lg font-bold"><i class="fa fa-bullhorn mr-2"></i>更新公告</h3>
                 <button id="content-notice-modal-close" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                     <i class="fa fa-times"></i>
                 </button>
             </div>
-            <div id="content-notice-modal-list" class="p-5 overflow-y-auto flex-1 space-y-4"></div>
+            <div id="content-notice-modal-list" class="p-5 overflow-y-auto flex-1 space-y-4 text-sm"></div>
             <div class="p-4 border-t border-gray-200 flex justify-end">
                 <button id="content-notice-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg">我知道了</button>
             </div>

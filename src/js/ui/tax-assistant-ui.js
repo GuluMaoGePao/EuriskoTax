@@ -588,7 +588,7 @@
                             '<i class="fa fa-table text-xl"></i>' +
                         '</div>' +
                         '<div>' +
-                            '<h3 class="text-xl font-bold">税率表速查</h3>' +
+                            '<h3 class="text-lg font-bold">税率表速查</h3>' +
                             '<p class="text-white/80 text-sm">综合所得 / 经营所得 / 年终奖</p>' +
                         '</div>' +
                     '</div>' +
