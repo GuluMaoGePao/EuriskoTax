@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.127.0';
+        window.__APP_VERSION__ = '1.128.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1598,7 +1598,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.127.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.128.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页

@@ -243,8 +243,31 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-template');
         // 阶段19-11：效率层 E4 批量 —— 一份表一次算完
         expect(ids).toContain('profile-card-batch');
-        // 2026-10-03：账号入口入列（原横幅上的「账户设置」按钮）
+        // 2026-10-03：账号入口入列（原横幅上的「账户设置」按钮）。本套件的 mock 是登录态，
+        // 所以这张卡在 —— 游客态的行为见下一条。
         expect(ids).toContain('profile-card-account');
+    });
+
+    // v1.128.0：游客态「登录 / 注册」卡不再渲染。顶栏在游客态本来就有「登录」按钮
+    // （#guest-login-btn），服务与支持里再摆一张同目的地的卡 = 同一屏两条一样的路；
+    // 去重铁律管的是这个，不是管"目的地能不能有两个名字"。
+    test('游客态：服务与支持里不再出现「登录 / 注册」卡（顶栏已有登录入口）', () => {
+        window.EuriskoGuestSession = { isGuest: () => true, exit: () => {} };
+        try {
+            // renderProfileCards 按容器上的 identityState 做幂等 —— 上一条用例渲染过
+            // 登录态的卡，换态必须清掉重渲，否则断言的是上一态的残留。
+            const grid = document.getElementById('profile-cards-grid');
+            grid.innerHTML = '';
+            delete grid.dataset.identityState;
+            renderProfileCards();
+            const ids = Array.from(grid.querySelectorAll('[id^="profile-card-"]')).map((c) => c.id);
+            expect(ids).not.toContain('profile-card-account');
+            // 其余服务卡照常在
+            expect(ids).toContain('profile-card-lead');
+            expect(ids).toContain('profile-card-help');
+        } finally {
+            delete window.EuriskoGuestSession;
+        }
     });
 
     // 阶段20 P3（§6.1）：四组降到两组 ——「我的数据」「我的税务」两组的高频四张进了宫格，

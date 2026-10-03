@@ -1103,6 +1103,12 @@
     margin-bottom: 12px; padding: 10px 12px; font-size: var(--fs-xs); line-height: 1.7;
     color: var(--c-text-2); background: var(--c-surface-3); border-radius: var(--r-ctrl);
 }
+
+/* v1.128.0：留资弹窗的表单控件与其他弹窗（意见反馈等）统一到 14px。
+   .input-field 本身不带字号（继承 body 16px），意见反馈那边是逐控件补了 text-sm 的；
+   留资弹窗 8 个控件逐个补既啰嗦又保证不了将来新增的控件不漏 —— 按容器收口一处管全部。
+   字号下来之后输入框高度也跟着回落（py-2 + 14px ≈ 38px，与反馈弹窗一致）。 */
+#lead-modal .input-field { font-size: var(--fs-sm); }
 .entity-row {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--c-border);

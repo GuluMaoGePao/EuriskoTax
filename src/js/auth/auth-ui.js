@@ -977,17 +977,17 @@ const PROFILE_CARDS_CONFIG = [
         // 2026-10-03：账号的那一摞（资料 / 安全 / 权益）此前是横幅上一颗叫「账户设置」的按钮，
         // 挂在名字旁边不像入口倒像个设置图标 —— 用户第一反应是"改个密码"，而不是"我的账号"。
         // 现在它成为卡片列表的一员：「个人中心」是目的地名，与 Tab「我的」区分开（前者是账号，
-        // 后者是容器）。游客态同一张卡换成登录引导（见 guest 分支）：对没有账号的人讲
-        // 「个人中心」是讲不通的，他要的那一步是「登录 / 注册」。
+        // 后者是容器）。
+        // v1.128.0：游客态**整卡不渲染**（原先换成「登录 / 注册」引导卡）。用户指出来了：
+        // 顶栏在游客态本来就有「登录」按钮（#guest-login-btn），服务与支持里再摆一张同目的地的
+        // 卡，是同一屏两条一样的路 —— 去重铁律管的是这个。游客点「个人中心」也讲不通，
+        // 但讲不通的正确解法是收起，而不是把卡改成另一个名字继续占位。
         id: 'profile-card-account',
         group: 'service',
+        guestHidden: true,
         icon: 'fa-id-card',
         title: '个人中心',
         desc: '账号资料、密码安全与版本权益',
-        guest: {
-            title: '登录 / 注册',
-            desc: '登录后可云同步历史、跨设备继续算'
-        },
         iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-id-card text-xl text-blue-600'
     },
@@ -1197,7 +1197,9 @@ function renderProfileCards() {
     grid.innerHTML = PROFILE_CARD_GROUPS.map((group, index) => {
         // 高频四张已在四宫格（renderProfileQuick），这里不再重复渲染 ——
         // 同一入口出现两处，等于又造出第二条稳定路径。
-        const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key && !c.quick);
+        // guestHidden（v1.128.0）：游客态整卡收起 —— 顶栏已有「登录」，服务与支持里
+        // 再摆一张同目的地的「登录 / 注册」卡就是同一屏两条一样的路。
+        const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key && !c.quick && !(guest && c.guestHidden));
         if (!cards.length) return '';
         const head = `
             <div class="md:col-span-2 flex items-center gap-2 px-1 ${index === 0 ? '' : 'pt-3'}">
@@ -2532,13 +2534,13 @@ function setupAuthEventListeners() {
         // 阶段19-11 · E4 批量：一张表一次算完（它是子页不是弹窗 —— 粘贴区与结果表都装不进弹窗）
         { cardId: 'profile-card-batch', pageId: 'profile-batch-page' },
         // 2026-10-03：横幅那颗「账户设置」按钮换成这张「个人中心」卡，目的地不变。
-        // 游客态点它 = 去登录页（卡片文案此时也是「登录 / 注册」），与顶栏「登录」是同一条路，
-        // 两处都指向 showLoginPage —— 不新开第三条路径。
+        // v1.128.0：guestFn 撤了 —— 游客态这张卡**整卡不渲染**（guestHidden），原先
+        // 「点卡 = 去登录页」与顶栏「登录」按钮是同一屏两条一样的路。游客要登录，
+        // 顶栏那颗就是唯一入口；这张卡只对已登录的人讲「账号资料 / 密码 / 权益」。
         {
             cardId: 'profile-card-account',
             pageId: 'profile-settings-page',
-            loadFn: loadProfileSettings,
-            guestFn: () => showLoginPage()
+            loadFn: loadProfileSettings
         },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
         { cardId: 'profile-card-about', specialFn: () => { fillAboutBlurb(); openModal(document.getElementById('about-modal')); } },
