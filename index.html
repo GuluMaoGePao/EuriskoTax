@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.124.0';
+        window.__APP_VERSION__ = '1.125.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -476,7 +476,10 @@
                         <span id="home-greeting">你好 👋</span> · <span id="home-date-text">今天是 ...</span>
                     </p>
                     <h2 id="home-mission-title" class="hero-card__title">你今年要交多少税？</h2>
-                    <p id="home-mission-subtitle" class="hero-card__sub">41 个场景，全在本机算完，数据不上传</p>
+                    <!-- 副标题由 home-mission.js 写入（数字在运行时从 tool-registry 现数）——
+                     这里不写默认值：写过的那版默认文案带着手写的 "41"，JS 覆盖后它永远不显示，
+                     却会误导下一个改文案的人以为改这里有用于是改了个寂寞。 -->
+                <p id="home-mission-subtitle" class="hero-card__sub"></p>
                     <button id="home-mission-cta" type="button" class="hero-card__cta">
                         <i class="fa fa-arrow-down"></i>
                         <span id="home-mission-cta-text">开始测算</span>
@@ -641,12 +644,13 @@
                     </div>
                 </div>
 
-                <!-- R5（阶段20 P0）：首页底部「关于本站」长文已删 —— 它与「我的 → 关于我们」是同一段说明，
-                     首页是动作页不是说明书。信任信息压缩成页尾一行标签（41 个场景 · 数据不出本机），
-                     完整口径移到「关于我们」弹窗（含本机计算承诺与免责）。 -->
-                <p class="home-trust-line">
-                    <i class="fa fa-shield"></i><span>41 个场景 · 数据不出本机</span>
-                </p>
+                <!-- (v1.125.0) 底部这行「41 个场景 · 数据不出本机」已删，两件事并到 hero 副标题一处：
+                     ① **同一句在首页说了两遍**（hero 一遍、这里一遍），首页是动作页不是说明书；
+                     ② v1.124.0 删掉全站页尾之后，这行灰字独自挂在首页最后一个元素上，看着像页尾没删干净。
+                     场景数也不再手写在 HTML 里（原先三处各写一遍 "41"）—— 由 home-mission.js 的
+                     missionSubtitle() 从 tool-registry 现数（all() 速算器 + deep() 完整测算）；
+                     口径同步纠正：不再说「数据不出本机」（登录用户的计算历史会镜像到云端），
+                     改说真正成立的那条 —— **计税输入不上云**。完整承诺在「关于我们」弹窗，两跳可达。 -->
 
             </div>
         </div>
@@ -1555,8 +1559,16 @@
                     </div>
                     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
                         <p class="text-sm text-gray-700 leading-relaxed">
-                            EuriskoTax 税费计算器覆盖个税、企业税、社保等 20 个速算器与 21 个完整测算，按 2026 年现行政策口径测算。
+                            <!-- 场景数由 auth-ui.js 的 fillAboutBlurb() 在打开弹窗时从 tool-registry 现数
+                                 （原先手写「20 个速算器与 21 个完整测算」，三个数分布在 hero、这里、测试里，
+                                 加一个测算就得改三处；漏改的结果是页面自己跟自己打架）。
+                                 取不到数就保留下面这版**不带数字**的兜底 —— 不编数字比缺数字糟。 -->
+                            <span id="about-scenario-blurb">EuriskoTax 税费计算器覆盖个税、企业税、社保等税费场景，按 2026 年现行政策口径测算。</span>
                             全部计算在您的浏览器本机完成，不上传任何数据。
+                            <!-- v1.125.0 补这条例外：上面那句对**登录用户**是半真的 —— 同步打开后
+                                 测算**记录**会镜像到云端（换设备接着看历史），计税输入（薪资、扣除项等
+                                 原始数据）始终只在本机。不说破这层，等于把首页那句承诺的漏洞搬进弹窗。 -->
+                            <span class="block mt-2 text-xs text-gray-500">登录后测算记录会镜像到云端，方便换设备接着看；计税输入（薪资、扣除项等原始数据）始终只留在本机。</span>
                         </p>
                     </div>
                     <div class="border-t border-gray-200 pt-4">
@@ -1586,7 +1598,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.124.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.125.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页

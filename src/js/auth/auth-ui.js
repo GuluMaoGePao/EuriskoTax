@@ -690,6 +690,33 @@ function renderProfileIdentity(user) {
     // 「个人中心」卡承担，后者由统一的全站页尾承担，退出登录仍在顶栏用户菜单里。
 }
 
+/**
+ * 「关于本程序」弹窗的场景数（v1.125.0）：不再手写「20 个速算器与 21 个完整测算」。
+ *
+ * 那串数字有两个毛病：① 三个数分布在 hero、这里、以及测试断言里，加一个测算就得
+ * 改三处 —— 漏改的结果是页面自相矛盾（hero 说 42 个场景，这里还说 21 个完整测算）；
+ * ② login-identifier.test.js 早就判定「20 个速算器 · 21 个完整测算」是**开发口径**，
+ * 不该出现在用户看得见的地方。这里写成用户视角的一句话，数字同样从 tool-registry 现数。
+ *
+ * 取不到数就一个字都不改 —— HTML 里留了一版不带数字的兜底文案：宁缺数字，不编数字。
+ */
+function fillAboutBlurb() {
+    const el = document.getElementById('about-scenario-blurb');
+    const registry = window.EuriskoToolRegistry;
+    if (!el || !registry || typeof registry.all !== 'function' || typeof registry.deep !== 'function') return;
+
+    let count = 0;
+    try {
+        count = registry.all().length + registry.deep().length;
+    } catch (error) {
+        return;
+    }
+    if (count > 0) {
+        el.textContent = 'EuriskoTax 税费计算器覆盖个税、企业税、社保等 '
+            + count + ' 个测算场景，按 2026 年现行政策口径测算。';
+    }
+}
+
 /** 当前身份（登录态取本地缓存的 user；游客 / 未登录 → null） */
 function currentIdentityUser() {
     if (!(apiClient && typeof apiClient.isLoggedIn === 'function') || !apiClient.isLoggedIn()) return null;
@@ -2514,7 +2541,7 @@ function setupAuthEventListeners() {
             guestFn: () => showLoginPage()
         },
         { cardId: 'profile-card-help', specialFn: () => openModal(document.getElementById('help-modal')) },
-        { cardId: 'profile-card-about', specialFn: () => openModal(document.getElementById('about-modal')) },
+        { cardId: 'profile-card-about', specialFn: () => { fillAboutBlurb(); openModal(document.getElementById('about-modal')); } },
         { cardId: 'profile-card-feedback', specialFn: () => openModal(document.getElementById('feedback-modal')) },
         {
             cardId: 'profile-card-notices',

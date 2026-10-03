@@ -323,6 +323,35 @@
     // 优先级：临近节点 > 有历史 > 首访 —— 临近节点是最该被看见的那一句，
     // 但它只在**用户已经有测算**时才升级为 deadline 态：新客连结果都没有，
     // 给他一个倒计时只会劝退（plan §3.3.5 同款顾虑：空状态不放给新客看）。
+    /**
+     * 首页那句自我介绍的副标题（v1.125.0）。
+     *
+     * 两件事在这里一起改：
+     *
+     * ① **场景数不再手写**：以前 "41" 同时写在 home-mission.js、index.html 底部那行
+     *    信任标签、以及 tests/index-assembly.test.js 的断言里，共三处 —— 加一个工具
+     *    就要改三处，漏一处页面就开始自己骗自己（写 41 实际 42，谁也不会发现）。
+     *    现在由 tool-registry 现数：`all()` 是 20 个速算器，`deep()` 是 21 个完整测算。
+     *    取不到就干脆不提数字 —— 宁缺一个数字，也不给一个错的。
+     *
+     * ② **不再说「数据不出本机」**：登录用户的计算历史会镜像到云端（history-sync.js
+     *    明写「写主在本端，云端仅镜像」），这句承诺对登录用户是**半假的** —— 而它偏偏
+     *    印在每一个新访客的第一屏。真正成立、也才是用户真正关心的那条是：
+     *    **计税输入不上云**（薪资金额、专项附加扣除这些原始数据从不出本机）。
+     */
+    function missionSubtitle() {
+        const registry = (typeof window !== 'undefined') ? window.EuriskoToolRegistry : null;
+        let count = 0;
+        if (registry && typeof registry.all === 'function' && typeof registry.deep === 'function') {
+            try {
+                count = registry.all().length + registry.deep().length;
+            } catch (error) {
+                count = 0;   // 数不出来就不报数 —— 假数字比没数字糟
+            }
+        }
+        return (count > 0 ? count + ' 个场景，' : '') + '全在你手机里算完，计税输入不上云';
+    }
+
     function detectMission(options = {}) {
         const now = options.now || new Date();
         const history = options.history || readHistory();
@@ -332,7 +361,7 @@
             return {
                 state: 'first-visit',
                 title: '你今年要交多少税？',
-                subtitle: '41 个场景，全在你手机里算完，数据不出本机',
+                subtitle: missionSubtitle(),
                 cta: { text: '开始测算', action: 'scroll', target: 'home-events' },
                 node: null,
                 last: null

@@ -252,15 +252,27 @@ describe('按 index.html 的真实顺序装配一遍', () => {
             expect(authUi).toContain('profile-card-help');
         });
 
-        test('R5：首页「关于本站」长文删除，页尾留一行信任标签', () => {
+        test('R5：首页「关于本站」长文删除，信任标签并入 hero 一处（不再首页两遍）', () => {
             expect(stripComments(HTML)).not.toContain('关于本站');
-            expect(HTML).toContain('home-trust-line');
-            expect(stripComments(HTML)).toContain('41 个场景 · 数据不出本机');
+            // v1.125.0：底部那行第二遍信任标签删除 —— 同一句话 hero 刚说过一遍，
+            // 且它挂在首页最后一个元素上看着像页尾残留（页尾 v1.124.0 刚删）。
+            expect(HTML).not.toContain('home-trust-line');
+            // 场景数不允许再手写进 HTML —— 以前三处各写一遍 "41"，漏改一处页面就开始自己骗自己。
+            expect(stripComments(HTML)).not.toContain('41 个场景');
+            // hero 副标题容器在（文案由 home-mission.js 运行时从 tool-registry 现数）
+            expect(HTML).toContain('id="home-mission-subtitle"');
             // 删掉的信任信息不能丢，得在「关于我们」里找得回来
             const aboutStart = HTML.indexOf('id="about-modal"');
             expect(aboutStart).toBeGreaterThan(-1);
             const aboutBlock = stripComments(HTML.slice(aboutStart, aboutStart + 6000));
             expect(aboutBlock).toContain('不上传任何数据');
+            // v1.125.0：关于弹窗不再手写「20 个速算器与 21 个完整测算」—— 那是**开发口径**
+            // （login-identifier.test.js 判过一次，登录页不许出现），用户看得见的地方只说
+            // 场景总数，而且那份数由 fillAboutBlurb() 从 registry 现数。
+            expect(aboutBlock).not.toContain('20 个速算器');
+            expect(aboutBlock).toContain('id="about-scenario-blurb"');
+            // 「不上传任何数据」对登录用户是半真的（记录会镜像到云端），例外必须写在同一段里
+            expect(aboutBlock).toContain('计税输入');
         });
     });
 
