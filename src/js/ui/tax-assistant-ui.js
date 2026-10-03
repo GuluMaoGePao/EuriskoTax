@@ -615,7 +615,7 @@
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'rate-table-modal';
-            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+            modal.className = 'modal-mask hidden opacity-0 transition-opacity duration-300';
             modal.innerHTML = buildRateTableModalHTML();
             document.body.appendChild(modal);
             // 绑定关闭按钮

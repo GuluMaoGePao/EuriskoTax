@@ -1515,9 +1515,9 @@
    v1.129.0 修 bug 时顺手补的），滚动区**没有一处**写 min-h-0。同一件事抄 14 遍，
    抄漏的那一遍就是 bug —— 这次统一成一套类，弹窗只挑**宽度档**，其余由基类保证：
 
-     .modal-shell                外壳：满宽 + 左右留边 + 圆角 + 投影 + 限高 + 纵向 flex
-     .modal-shell--sm/md/lg/xl   只管宽度（--w-modal-*），按内容性质挑，不写像素
-     .modal-head/body/foot       头尾不许压、中间滚
+     .modal-shell              外壳：满宽 + 左右留边 + 圆角 + 投影 + 限高 + 纵向 flex
+     .modal-shell--sm/md/xl    只管宽度（--w-modal-*），按内容性质挑，不写像素
+     .modal-head/body/foot     头尾不许压、中间滚
 
    两条硬约束（改这些类之前先看）：
    ① **transform / scale 不写在这里**。openModal / closeModal（auth-ui.js:2750 / 2767）
@@ -1536,9 +1536,28 @@
     flex-direction: column;
     overflow: hidden;
 }
+/* 遮罩层（v1.131.0）：14 处弹窗的背景层原先各写一遍
+   `fixed inset-0 bg-black/50 flex items-center justify-center z-50`，
+   层级还用字面量 z-50 —— tokens 里早就有 --z-modal: 100（明确要求固定层取表内值），
+   谁都没消费。收成一个类后，层级与底色都只有一处定义。
+
+   ⚠️ display 必须写成 :not(.hidden)：openModal / closeModal 是靠挂摘 `hidden` 类
+   开关弹窗的，若这里直接写 display: flex，与 `.hidden{display:none}` 同为单类选择器、
+   而本文件在 tailwind.css 之后引入 —— 后引入者胜，弹窗就再也关不掉了。 */
+.modal-mask {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    background: var(--c-mask);
+}
+.modal-mask:not(.hidden) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .modal-shell--sm { max-width: var(--w-modal-sm); }
 .modal-shell--md { max-width: var(--w-modal-md); }
-.modal-shell--lg { max-width: var(--w-modal-lg); }
 .modal-shell--xl { max-width: var(--w-modal-xl); }
 
 /* 头尾不许压：容器限高后 flex 会先压缩没有 min-content 保护的那一层，
@@ -1553,4 +1572,17 @@
     min-height: 0;
     overflow-y: auto;
 }
+
+/* 细滚动条（v1.131.0）：这套规格原先只挂在 .help-modal-scrollbar 上，只有「使用帮助」
+   和「税率表」两个弹窗在用 —— 其余 12 个弹窗的滚动条是浏览器默认宽度，同一个站里
+   两种粗细。既然滚动区已经统一成 .modal-body，滚动条就跟着走一处。 */
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-track { background: transparent; }
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+.modal-body::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 

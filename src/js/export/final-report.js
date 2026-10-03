@@ -375,7 +375,7 @@
         if (dlg) return dlg;
         dlg = document.createElement('div');
         dlg.id = DIALOG_ID;
-        dlg.className = 'fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+        dlg.className = 'modal-mask hidden opacity-0 transition-opacity duration-300';
         dlg.innerHTML = [
             '<div role="dialog" aria-modal="true" aria-labelledby="report-version-title"',
             ' class="modal-shell modal-shell--sm bg-white transform scale-95 transition-transform duration-300">',

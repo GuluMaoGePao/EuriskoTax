@@ -616,7 +616,7 @@
         if (document.getElementById(LIBRARY_MODAL_ID)) return;
         var div = document.createElement('div');
         div.id = LIBRARY_MODAL_ID;
-        div.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300';
+        div.className = 'modal-mask hidden opacity-0 transition-opacity duration-300';
         div.setAttribute('onclick', 'if(event.target===this)closeModal(this)');
         div.innerHTML = '<div class="modal-shell modal-shell--xl bg-white dark:bg-gray-800 transform scale-95' +
             ' transition-transform duration-300">' +

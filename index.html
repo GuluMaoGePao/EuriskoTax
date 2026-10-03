@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.130.0';
+        window.__APP_VERSION__ = '1.131.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -960,7 +960,7 @@
     </div>
 
     <!-- 帮助模态框 -->
-    <div id="help-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="help-modal" onclick="if(event.target===this)closeModal(this)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--xl bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -1179,7 +1179,7 @@
     </div>
 
     <!-- 意见反馈模态框（个人中心入口，登录后提交；内容落库供开发者跟进） -->
-    <div id="feedback-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="feedback-modal" onclick="if(event.target===this)closeModal(this)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--md bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -1244,7 +1244,7 @@
          入口仍为 2 处：顶栏 pill #topbar-plan-badge 与个人中心横幅 #profile-nav-upgrade（见 auth-ui.js openUpgradeModal）。
          还没有码的人走留资（#upgrade-lead-btn → 留资弹窗），由顾问协助；交易在站外完成后发码，用户回站自助开通。
          原「基础版 vs 专业版」权益对比表与「线上购买通道后续开放」FAQ 已整体下线（属付费营销，与本期定位冲突）。 -->
-    <div id="upgrade-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="upgrade-modal" onclick="if(event.target===this)closeModal(this)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--md bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-violet-600 to-purple-700 text-white p-5 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -1298,7 +1298,7 @@
         </div>
     </div>
 
-    <div id="alert-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="alert-modal" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--sm bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-body p-6">
                 <div class="flex justify-between items-center mb-4">
@@ -1323,7 +1323,7 @@
     </div>
 
     <!-- 自定义确认模态框 -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="confirm-modal" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--sm bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-body p-6">
                 <div class="flex justify-between items-center mb-4">
@@ -1440,7 +1440,7 @@
     </script>
 
     <!-- 用户协议模态框 -->
-    <div id="user-agreement-modal" onclick="closePolicyModalIfBackdrop(event)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="user-agreement-modal" onclick="closePolicyModalIfBackdrop(event)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--xl bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -1489,7 +1489,7 @@
     </div>
 
     <!-- 隐私政策模态框 -->
-    <div id="privacy-policy-modal" onclick="closePolicyModalIfBackdrop(event)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="privacy-policy-modal" onclick="closePolicyModalIfBackdrop(event)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--xl bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -1542,8 +1542,8 @@
     </div>
 
     <!-- 关于模态框 -->
-    <div id="about-modal" onclick="if(event.target===this)closeModal(this)" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="modal-shell modal-shell--sm bg-white transform scale-95 transition-transform duration-300">
+    <div id="about-modal" onclick="if(event.target===this)closeModal(this)" class="modal-mask hidden opacity-0 transition-opacity duration-300">
+        <div class="modal-shell modal-shell--md bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-6 rounded-t-xl">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-bold">关于本程序</h3>
@@ -1602,7 +1602,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.130.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.131.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1620,7 +1620,7 @@
     </div>
 
     <!-- 阶段11：内容中心公告弹窗（启动推送与个人中心「公告与更新」列表复用） -->
-    <div id="content-notice-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div id="content-notice-modal" class="modal-mask hidden opacity-0 transition-opacity duration-300">
         <div class="modal-shell modal-shell--md bg-white transform scale-95 transition-transform duration-300">
             <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl flex items-center justify-between">
                 <h3 id="content-notice-modal-title" class="text-lg font-bold"><i class="fa fa-bullhorn mr-2"></i>更新公告</h3>
@@ -1646,10 +1646,10 @@
          注意：所有由 lead-modal.js 切换显示的元素（#lead-wecom-channel / #lead-divider / #lead-form /
          #lead-success / #lead-modal-footer）外层都不带 display 工具类，只靠 hidden 控制 ——
          避免 flex 与 hidden 的优先级之争（表单滚动时「提交」始终停留在视野内） -->
-    <div id="lead-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300"
+    <div id="lead-modal" class="modal-mask hidden opacity-0 transition-opacity duration-300"
          onclick="if(event.target===this && window.LeadModal) window.LeadModal.close()">
         <div role="dialog" aria-modal="true" aria-labelledby="lead-modal-title"
-             class="modal-shell modal-shell--lg bg-white transform scale-95 transition-transform duration-300">
+             class="modal-shell modal-shell--md bg-white transform scale-95 transition-transform duration-300">
             <!-- 头部：一句话价值主张 + 三条信任点，第一屏就回答「凭什么把联系方式留给你」。
                  两枚光晕是纯装饰（pointer-events-none），用来打散大色块的平铺感 -->
             <!-- modal-head（v1.129.0）：容器是 flex 列布局 + 限高，flex 子项默认可被压缩 ——

@@ -57,12 +57,22 @@ describe('弹窗统一外壳：基类与尺寸档', () => {
         expect(block).toContain('overflow-y: auto');
     });
 
-    test('四档宽度都有令牌，且各档消费对应令牌', () => {
-        ['sm', 'md', 'lg', 'xl'].forEach((k) => {
+    // v1.131.0：初版分了四档（28 / 32 / 36 / 48rem），其中 32 与 36 只差 64px ——
+    // 反馈、公告、三个管理器是 512，留资是 576，挨着用的两个弹窗一宽一窄，看着就是没统一。
+    // 收敛为三档后**默认档只有一个宽度**，弹窗要么「标准」要么「宽」。
+    test('只有三档宽度（sm 短决策 / md 默认 / xl 长文表格）', () => {
+        ['sm', 'md', 'xl'].forEach((k) => {
             expect(TOKENS).toContain(`--w-modal-${k}:`);
             expect(CSS).toContain(`.modal-shell--${k} { max-width: var(--w-modal-${k}); }`);
         });
         expect(TOKENS).toContain('--h-modal:');
+        // 被并掉的那一档不许再冒出来
+        expect(TOKENS).not.toContain('--w-modal-lg');
+        expect(CSS).not.toContain('.modal-shell--lg');
+    });
+
+    test('默认档确实是 36rem（原先的 md 32rem 与 lg 36rem 已并档）', () => {
+        expect(TOKENS).toMatch(/--w-modal-md:\s*36rem/);
     });
 
     // transform 若写进基类，openModal 摘掉 scale-95 类后弹窗永远缩着 ——
@@ -89,7 +99,7 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
 
     test('每个外壳都挑了宽度档（不能只有基类没有档）', () => {
         const shells = (HTML.match(/modal-shell(?= |")/g) || []).length;
-        const sized = (HTML.match(/modal-shell--(sm|md|lg|xl)/g) || []).length;
+        const sized = (HTML.match(/modal-shell--(sm|md|xl)/g) || []).length;
         expect(shells).toBeGreaterThan(0);
         expect(sized).toBe(shells);
     });
@@ -98,8 +108,22 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         JS_TPL.forEach((p) => {
             const src = read(p);
             expect(src).toContain('modal-shell');
-            expect(src).toMatch(/modal-shell--(sm|md|lg|xl)/);
+            expect(src).toMatch(/modal-shell--(sm|md|xl)/);
         });
+    });
+
+    // 「宽度统一」的可度量表达：绝大多数弹窗落在**同一个**默认档上。
+    // 只有内容本身需要（长文要少换行、一句话决策要窄）才离开默认档。
+    test('默认档覆盖多数弹窗，非默认档有明确理由', () => {
+        const all = [HTML, ...JS_TPL.map(read)].join('\n');
+        const md = (all.match(/modal-shell--md/g) || []).length;
+        const sm = (all.match(/modal-shell--sm/g) || []).length;
+        const xl = (all.match(/modal-shell--xl/g) || []).length;
+        // 6 = 反馈 / 升级码 / 公告 / 关于 / 留资 + 三个管理器共用的一处模板
+        expect(md).toBe(6);
+        expect(sm).toBe(3);                   // alert / confirm / 导出版本：一句话决策
+        expect(xl).toBe(5);                   // 协议×2 / 帮助 / 税率表 / 我的方案
+        expect(md + sm + xl).toBe(14);        // 与「所有外壳都挑了档」那条的总数对齐
     });
 
     // 限高只走 --h-modal 一处：再有手写的 max-h-[85vh] / [88vh] / [90vh]，
@@ -116,6 +140,48 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         const hits = HTML.match(re) || [];
         expect(hits.length).toBeGreaterThan(0);
         hits.forEach((h) => expect(h).toContain('scale-95'));
+    });
+});
+
+describe('遮罩层：底色与层级走令牌', () => {
+    test('遮罩类存在，且用 --z-modal / --c-mask', () => {
+        const start = CSS.indexOf('.modal-mask {');
+        expect(start).toBeGreaterThan(-1);
+        const block = CSS.slice(start, CSS.indexOf('}', start));
+        expect(block).toContain('z-index: var(--z-modal)');
+        expect(block).toContain('background: var(--c-mask)');
+        expect(TOKENS).toContain('--c-mask:');
+    });
+
+    // 这条守的是「弹窗关不掉」：本文件在 tailwind.css 之后引入，同为单类选择器时
+    // 后引入者胜 —— 若直接写 display: flex，会压过 `.hidden{display:none}`。
+    test('display 只在 :not(.hidden) 时给（否则弹窗永远关不掉）', () => {
+        const start = CSS.indexOf('.modal-mask {');
+        const block = CSS.slice(start, CSS.indexOf('}', start));
+        expect(block).not.toContain('display: flex');
+        expect(CSS).toContain('.modal-mask:not(.hidden)');
+        const shown = CSS.slice(CSS.indexOf('.modal-mask:not(.hidden) {'), CSS.indexOf('}', CSS.indexOf('.modal-mask:not(.hidden) {')));
+        expect(shown).toContain('display: flex');
+    });
+
+    test('不再有遮罩底色与 z-50 字面量', () => {
+        const all = [HTML, ...JS_TPL.map(read)].join('\n');
+        expect(all).not.toContain('bg-black/50 flex items-center justify-center z-50');
+        expect(all).not.toContain('bg-slate-900/60 flex items-center justify-center z-50');
+    });
+
+    test('14 处背景层都换成 modal-mask', () => {
+        const all = [HTML, ...JS_TPL.map(read)].join('\n');
+        expect((all.match(/modal-mask/g) || []).length).toBe(14);
+    });
+});
+
+describe('滚动条粗细统一', () => {
+    test('细滚动条规格挂在 .modal-body 上（不再只有两个弹窗有）', () => {
+        const start = CSS.indexOf('.modal-body::-webkit-scrollbar {');
+        expect(start).toBeGreaterThan(-1);
+        const block = CSS.slice(start, CSS.indexOf('.modal-body::-webkit-scrollbar-track'));
+        expect(block).toContain('width: 6px');
     });
 });
 
