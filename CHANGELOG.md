@@ -51,7 +51,9 @@
   线上指纹 **37 项**；发布预检通过。基线 `home` / `profile`（浅色 + 深色，共 8 张）按新宽度
   重生成 —— 拍摄时 agent-browser 会话挂起（`open` 不报错也不返回），给公共底座
   `ui-lib/screenshot-kit.js` 加了 `KIT_BROWSER=pw` 兜底引擎（playwright）完成拍摄；
-  manifest 哈希 8/8 一致、`ready=true`。
+  manifest 哈希 8/8 一致、`ready=true`。`--check` 复查浅色 / 深色各 **4/4 零差异** ——
+  复查跑在上午、基线拍于凌晨，`FREEZE_JS` 里写死的问候语（`上午好 👋`）挡住了按时段
+  漂移，这正是这套稳定化要证明的事。
 
 ## [1.134.0] - 2026-10-03 - 弹窗宽度统一到「使用帮助」那一档 + 手机端全屏
 
