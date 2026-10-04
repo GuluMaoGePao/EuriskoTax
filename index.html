@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.135.0';
+        window.__APP_VERSION__ = '1.136.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1628,7 +1628,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="privacy.html" target="_blank" rel="noopener" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.135.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.136.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2137,6 +2137,13 @@
                                  只换来不达标 —— 层级交给字号（14 / 12px）与顺序表达。 -->
                             <p id="profile-display-email" class="text-white break-all text-sm mt-1 leading-relaxed">email@example.com</p>
                             <p id="profile-plan-note" class="text-white text-xs mt-1 leading-relaxed hidden"></p>
+                            <!-- v1.136.0：手机端顶栏隐藏后，游客的登录入口从顶栏迁到这里。
+                                 显隐由 renderProfileIdentity 按登录态切换（游客显 / 登录隐），
+                                 行为与顶栏 #guest-login-btn 完全一致（退游客态 → 回登录页）。 -->
+                            <button id="profile-guest-login" type="button"
+                                    class="hidden mt-3 inline-flex items-center gap-1.5 rounded-full bg-white text-primary px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-blue-50 transition-colors">
+                                <i class="fa fa-user-o"></i><span>登录 / 注册，测算记录云端同步</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2246,6 +2253,16 @@
                         </div>
                         <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面；仅作联系方式，不用于登录（登录请用邮箱或用户名）</p>
                     </div>
+                </div>
+                <!-- v1.136.0：退出登录从顶栏用户菜单迁到这里 —— 手机端顶栏整体隐藏
+                     （导航分端：手机只留底部 Tab 栏），这是手机上唯一的退出入口。
+                     #profile-logout-link 是恢复 2026-10-03 撤掉的旧 id：当时撤它是因为
+                     "顶栏用户菜单里已有"，那个理由在手机端不再成立。绑定在 auth-ui.js。 -->
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <button type="button" id="profile-logout-link"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+                        <i class="fa fa-sign-out text-gray-400"></i><span>退出登录</span>
+                    </button>
                 </div>
             </div>
 

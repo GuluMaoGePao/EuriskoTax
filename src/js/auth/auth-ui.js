@@ -686,6 +686,10 @@ function renderProfileIdentity(user) {
             ? '免登录使用中 · 测算记录仅保存在本机'
             : (user.email || '');
     }
+    // v1.136.0：手机端顶栏隐藏后，横幅这颗「登录 / 注册」是游客在手机上的唯一登录入口
+    //（桌面仍有顶栏按钮）。同一个函数的两个分支里切换显隐，游客 → 登录 再调一次即对齐。
+    const guestLoginBtn = document.getElementById('profile-guest-login');
+    if (guestLoginBtn) guestLoginBtn.classList.toggle('hidden', !guest);
     // 「账户设置」按钮与底部那块自制页尾（含退出登录）已于 2026-10-03 撤掉：前者由下方
     // 「个人中心」卡承担，后者由统一的全站页尾承担，退出登录仍在顶栏用户菜单里。
 }
@@ -1040,6 +1044,18 @@ const PROFILE_CARDS_CONFIG = [
         iconClass: 'fa fa-info-circle text-xl text-indigo-600'
     },
     {
+        // v1.136.0：手机端顶栏隐藏（导航分端）后，「切换主题」从顶栏迁到这里。
+        // 顶栏按钮在桌面保留 —— 同一功能两端各一处入口，与 Tab 栏的桌面/底部同理由：
+        // 入口跟着设备形态走，不是重复。图标与说明文案由 syncThemeCard 按当前主题对齐。
+        id: 'profile-card-theme',
+        group: 'service',
+        icon: 'fa-moon-o',
+        title: '深色模式',
+        desc: '切换深浅配色，选择会被记住',
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center shrink-0',
+        iconClass: 'fa fa-moon-o text-xl text-gray-600'
+    },
+    {
         // 阶段19-9 · 效率层 E1：主体给模板归类（下一阶段的台账 / 批量也挂它下面）。
         // 配色**复用已有档**（teal / cyan 之类不在 tailwind.css 构建产物里，写出来是白搭），
         // 跟「税务档案」撞了同一档绿，靠图标区分；宁可少一种颜色，不要一处没有样式。
@@ -1213,6 +1229,22 @@ function renderProfileCards() {
             badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
         }))).join('');
     }).join('');
+    // 深色模式卡的图标/文案要跟当前主题对齐（渲染时配置里写的是浅色默认值）
+    syncThemeCard();
+}
+
+// 深色模式卡与当前主题对齐：图标与说明随状态变。渲染后与每次切换后各调一次。
+function syncThemeCard() {
+    const card = document.getElementById('profile-card-theme');
+    if (!card) return;
+    const dark = document.documentElement.classList.contains('dark');
+    const icon = card.querySelector('i');
+    if (icon) {
+        icon.classList.toggle('fa-sun-o', dark);
+        icon.classList.toggle('fa-moon-o', !dark);
+    }
+    const desc = card.querySelector('p');
+    if (desc) desc.textContent = dark ? '当前深色 · 点击切回浅色' : '当前浅色 · 点击切换深色';
 }
 
 // 单条历史里的税额：与 CSV 导出、首页年度税负概览同一套取数口径（别各写一份）
@@ -2285,6 +2317,15 @@ function setupAuthEventListeners() {
             showLoginPage();
         });
     }
+    // v1.136.0：手机端顶栏隐藏后，「我的」页横幅这颗是游客在手机上的登录入口。
+    // 行为与顶栏按钮完全一致（退游客态 → 回登录页），两处是同一动作的两个位置。
+    const profileGuestLogin = document.getElementById('profile-guest-login');
+    if (profileGuestLogin) {
+        profileGuestLogin.addEventListener('click', () => {
+            exitGuestSession();
+            showLoginPage();
+        });
+    }
     // 忘记密码 → 打开重置密码面板（自助找回）
     const forgotPassword = document.getElementById('forgot-password');
     if (forgotPassword) {
@@ -2428,9 +2469,18 @@ function setupAuthEventListeners() {
     if (profileSendCodeBtn) profileSendCodeBtn.addEventListener('click', handleSendProfileCode);
     const profilePasswordSubmitBtn = document.getElementById('profile-password-submit');
     if (profilePasswordSubmitBtn) profilePasswordSubmitBtn.addEventListener('click', handleChangeProfilePassword);
-    // #profile-logout-link 已于 2026-10-03 随「我的」页那块自制页尾一起删除：退出登录的入口
-    // 是顶栏用户菜单的 #logout-link（同一个 handleLogout）。元素没了还绑定会在初始化时抛错、
-    // 中断它后面的所有绑定 —— 这条纪律在 2355 行旁边已经踩过一次（顶栏 #profile-link）。
+    // #profile-logout-link 于 2026-10-03 随「我的」页那块自制页尾一起删除过 —— 当时的理由
+    // 是"顶栏用户菜单里已有"。v1.136.0 手机端顶栏整体隐藏（导航分端），那个理由在手机端
+    // 不再成立，DOM（个人中心页）与这条绑定一并恢复：handleLogout 仍是同一个，不另写一份。
+    // 元素没了还绑定会在初始化时抛错、中断它后面的所有绑定 —— 这条纪律在 2355 行旁边
+    // 已经踩过一次（顶栏 #profile-link），所以恢复 DOM 与恢复绑定必须同一次提交。
+    const profileLogoutLink = document.getElementById('profile-logout-link');
+    if (profileLogoutLink) {
+        profileLogoutLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+        });
+    }
     document.getElementById('profile-delete-account').addEventListener('click', (e) => {
         e.preventDefault();
         deleteAccount();
@@ -2562,6 +2612,17 @@ function setupAuthEventListeners() {
                 if (window.LeadModal && typeof window.LeadModal.open === 'function') {
                     window.LeadModal.open({ source: 'profile' });
                 }
+            }
+        },
+        {
+            // v1.136.0：深色模式卡。点击 = 触发顶栏按钮的既有 handler —— display:none
+            // 的元素 click() 照常派发，切换逻辑与 localStorage 仍只有 app.js 那一份，
+            // 这里不复制第二份（分叉的状态迟早对不上）。随后把卡片图标/文案对齐新状态。
+            cardId: 'profile-card-theme',
+            specialFn: () => {
+                const topbarBtn = document.getElementById('theme-toggle');
+                if (topbarBtn) topbarBtn.click();
+                syncThemeCard();
             }
         }
     ];

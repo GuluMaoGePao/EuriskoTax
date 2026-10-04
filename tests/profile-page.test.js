@@ -220,13 +220,14 @@ describe('个人中心 - 渲染逻辑', () => {
     // 阶段20 P3（§6.1）：高频四张上提成四宫格，列表从 13 卡降到 9 卡。
     // 断言必须跟着改 —— 旧的那条「13 个模块卡片」一旦留着，等于替「13 卡一维罗列」这个
     // 本次要治的病背书：设计改了，钉住旧设计的断言会反过来阻止新设计落地。
-    test('renderProfileCards 应渲染 10 个模块卡片（高频四张已上提成宫格）', () => {
+    test('renderProfileCards 应渲染 11 个模块卡片（高频四张已上提成宫格）', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
         // 2026-10-03：账号那一摞从横幅按钮变成卡片「个人中心」（游客态是「登录 / 注册」），
         // 9 → 10。同样是「设计改了，钉住旧设计的断言要跟着改」，否则它会替旧设计背书。
-        expect(cards.length).toBe(10);
+        // v1.136.0：手机端顶栏隐藏（导航分端），「深色模式」卡承接顶栏的主题切换，10 → 11。
+        expect(cards.length).toBe(11);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-data');
@@ -246,6 +247,8 @@ describe('个人中心 - 渲染逻辑', () => {
         // 2026-10-03：账号入口入列（原横幅上的「账户设置」按钮）。本套件的 mock 是登录态，
         // 所以这张卡在 —— 游客态的行为见下一条。
         expect(ids).toContain('profile-card-account');
+        // v1.136.0：深色模式卡（承接手机端顶栏的主题切换）
+        expect(ids).toContain('profile-card-theme');
     });
 
     // v1.128.0：游客态「登录 / 注册」卡不再渲染。顶栏在游客态本来就有「登录」按钮
@@ -322,8 +325,9 @@ describe('个人中心 - 渲染逻辑', () => {
         const list = Array.from(document.getElementById('profile-cards-grid')
             .querySelectorAll('[id^="profile-card-"]')).map((c) => c.id);
         expect(quick.filter((id) => list.includes(id))).toEqual([]);
-        // 两边加起来仍是全部入口：上提不是删除（2026-10-03 加了「个人中心」卡 → 14）
-        expect(quick.length + list.length).toBe(14);
+        // 两边加起来仍是全部入口：上提不是删除（2026-10-03 加了「个人中心」卡 → 14；
+        // v1.136.0 加「深色模式」卡承接手机端顶栏的主题切换 → 15）
+        expect(quick.length + list.length).toBe(15);
     });
 
     test('renderProfileQuick 幂等：重复调用不重复渲染', () => {
