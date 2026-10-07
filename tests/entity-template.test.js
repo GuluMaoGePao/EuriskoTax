@@ -312,3 +312,65 @@ describe('挂载主体的模板：可见范围与「删主体不删模板」', (
         expect(TPL().byId(TPL().listOf('vat')[1].id).entityId).toBeNull();
     });
 });
+
+// ==========================================================================
+describe('手机端顶栏隐藏后：「我的」页那张主体卡要说出当前主体（v1.137.0）', () => {
+    // 导航分端（v1.136.0）把手机端顶栏整条隐藏，顶栏那颗主体切换器在手机上看不见了。
+    // **切换功能没丢**（管理弹窗里的「用它 / 取消使用」一直在），丢的是可见性 ——
+    // 这几个用例的职责是：卡片必须说出当前是谁，且主体被删空时**不许留着上一个主体的名字**
+    // （陈旧信息比没有信息更糟：用户会以为自己还在按一个已经删掉的主体在算）。
+    const ORIGINAL_TITLE = '主体管理';
+    const ORIGINAL_DESC = '给模板归类用的纳税实体；不建也不影响任何测算';
+
+    function mountEntityCard() {
+        document.body.insertAdjacentHTML('beforeend',
+            '<div id="profile-card-entity"><h3>' + ORIGINAL_TITLE + '</h3><p>' + ORIGINAL_DESC + '</p></div>');
+        return document.getElementById('profile-card-entity');
+    }
+    const titleOf = () => document.querySelector('#profile-card-entity h3').textContent;
+    const descOf = () => document.querySelector('#profile-card-entity p').textContent;
+
+    test('没建主体时卡片一字不改（90% 的用户没有第二个主体，给他们换文案是加噪音）', () => {
+        mountEntityCard();
+        UI().syncEntityCard();
+        expect(titleOf()).toBe(ORIGINAL_TITLE);
+        expect(descOf()).toBe(ORIGINAL_DESC);
+    });
+
+    test('指定了当前主体：卡标题把这个主体的名字说出来', () => {
+        mountEntityCard();
+        ENT().save({ name: '杭州某某科技' });
+        UI().syncEntityCard();
+        expect(titleOf()).toContain('杭州某某科技');
+        expect(descOf()).toContain('点开可切换主体');
+    });
+
+    test('切回不按主体：卡上写明「不按主体」，不静默留白', () => {
+        mountEntityCard();
+        ENT().save({ name: '甲公司' });
+        ENT().setCurrent('');
+        UI().syncEntityCard();
+        expect(titleOf()).toBe(ORIGINAL_TITLE);
+        expect(descOf()).toContain('不按主体');
+    });
+
+    test('删光主体后还原原文案 —— 卡上不许挂着已不存在的主体名', () => {
+        mountEntityCard();
+        ENT().save({ name: '甲公司' });
+        const eid = ENT().current().id;
+        UI().syncEntityCard();
+        expect(titleOf()).toContain('甲公司');
+        ENT().remove(eid);
+        UI().syncEntityCard();
+        expect(titleOf()).toBe(ORIGINAL_TITLE);
+        expect(descOf()).toBe(ORIGINAL_DESC);
+    });
+
+    test('顶栏切换器与这张卡是同一个事实的两处显示：renderSwitcher 顺带同步卡片', () => {
+        mountEntityCard();
+        ENT().save({ name: '乙公司' });
+        UI().renderSwitcher();
+        expect(document.getElementById('entity-switcher').textContent).toContain('乙公司');
+        expect(titleOf()).toContain('乙公司');
+    });
+});

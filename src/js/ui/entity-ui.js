@@ -119,13 +119,64 @@
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSwitcherPanel(); });
     }
 
+    /**
+     * 「我的」页那张「主体管理」卡：把**当前主体**写在脸上（v1.137.0）。
+     *
+     * 起因是导航分端（v1.136.0）：手机端顶栏整条隐藏，顶栏那颗主体切换器在手机上
+     * 就看不见了。**切换功能本身没丢** —— 管理弹窗里「用它 / 取消使用」一直都在，
+     * 丢的是**可见性**：多主体用户在手机上不知道自己此刻以哪个主体在算，而主体决定
+     * 模板归类，选错了带出来的是别家那套参数。
+     *
+     * 为什么改这张卡的文案、而不是在「我的」页再造一个切换下拉：入口去重铁律 ——
+     * 同一个目的地（切换/管理主体）只留一条稳定路径，卡片点开就是那个弹窗。
+     * 显示当前主体是**补信息**，不是**加入口**。
+     *
+     * 没建主体时一字不改：90% 的个人用户没有第二个纳税主体，给他们换文案是加噪音。
+     */
+    function syncEntityCard() {
+        var card = document.getElementById('profile-card-entity');
+        if (!card) return;                      // 还没进过「我的」页，卡不在 DOM 里
+        var ent = E();
+        var list = (ent && typeof ent.all === 'function') ? ent.all() : [];
+        var title = card.querySelector('h3');
+        var desc = card.querySelector('p');
+        if (!title || !desc) return;
+
+        // 主体被删空时要还原成渲染时那套原文案 —— 否则卡上会挂着「当前主体 · 某某」，
+        // 而那个主体已经不存在了（陈旧信息比没有信息更糟：用户会以为自己还在按它算）。
+        // 原文案只在首次改写前备份一次，来源仍是卡片配置本身，不在本文件里抄第二份。
+        if (!list.length) {
+            if (card.dataset.entityCardTitle) {
+                title.textContent = card.dataset.entityCardTitle;
+                desc.textContent = card.dataset.entityCardDesc;
+                delete card.dataset.entityCardTitle;
+                delete card.dataset.entityCardDesc;
+            }
+            return;
+        }
+        if (!card.dataset.entityCardTitle) {
+            card.dataset.entityCardTitle = title.textContent;
+            card.dataset.entityCardDesc = desc.textContent;
+        }
+        var cur = (ent && typeof ent.current === 'function') ? ent.current() : null;
+        title.textContent = cur ? '当前主体 · ' + cur.name : '主体管理';
+        desc.textContent = cur
+            ? '点开可切换主体或改资料；模板按当前主体归类'
+            : '当前：不按主体 · 点开可指定一个';
+    }
+
     function renderSwitcher() {
         var host = document.getElementById(SWITCHER_ID);
         if (!host) return;
         var ent = E();
         var list = (ent && typeof ent.all === 'function') ? ent.all() : [];
         // 没建主体就彻底不出现：不是「显示一个空下拉」，而是这块 DOM 都不留
-        if (!list.length) { host.innerHTML = ''; host.classList.add('hidden'); return; }
+        if (!list.length) {
+            host.innerHTML = '';
+            host.classList.add('hidden');
+            syncEntityCard();                   // 卡上若留着上一个主体的名字，要跟着清掉
+            return;
+        }
         var cur = ent && typeof ent.current === 'function' ? ent.current() : null;
         var items = list.map(function (it) { return panelItemHtml(it, !!cur && cur.id === it.id); }).join('') +
             '<button type="button" class="entity-panel-item' + (cur ? '' : ' is-on') + '" data-entity-id="">' +
@@ -171,6 +222,7 @@
                 }
             });
         }
+        syncEntityCard();       // 顶栏与「我的」页那张卡是同一个事实的两处显示，一起更新
     }
 
     // ====== 工具页「从模板填充」条 ======
@@ -337,6 +389,7 @@
             limitNote(q.count, q.isPro, q.limit) +
             entityFormHtml(editingId);
         bindEntityBody();
+        syncEntityCard();       // 弹窗里点了「用它 / 取消使用」，「我的」页那张卡要跟着变
     }
 
     function openEntityManager() {
@@ -671,6 +724,8 @@
         openEntityManager: openEntityManager,
         openTemplateManager: openTemplateManager,
         openLedger: openLedger,
+        // v1.137.0：供「我的」页渲染后回调 —— 卡可能在 renderSwitcher 之后才第一次进 DOM
+        syncEntityCard: syncEntityCard,
         drawLedgerBody: drawLedgerBody,
         MODAL_IDS: { entity: ENTITY_MODAL_ID, template: TEMPLATE_MODAL_ID, ledger: LEDGER_MODAL_ID }
     };

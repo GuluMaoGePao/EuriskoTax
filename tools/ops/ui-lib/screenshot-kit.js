@@ -209,6 +209,27 @@ const FREEZE_JS = `(function(){
         if (tf) tf.innerHTML = '<div class="flex items-start"><span class="tax-reminder-dot bg-warning"></span>'
             + '<span>经营所得减半优惠剩 467 天（至 2027.12.31）</span></div>';
     } catch (e) {}
+
+    // 7. 待办与税务日历里的「剩 N 天」（v1.137.0 补）。
+    //    漏了它的表现：月度预缴申报是「每月 15 日前」，daysLeft = 15 - today，
+    //    **每天减一** —— 首页基线每隔一天就红一次，而用户什么都没改。那会让首页
+    //    这套基线彻底失去意义（真改动淹没在日更噪声里，久了就没人看 check 结果了）。
+    //    只钉天数文本、不动结构与条数：**条数随月份变是真实的产品行为**，该反映就反映。
+    //    钉成 8 天（>7）顺带避开「≤7 天转红色紧急态」—— 紧急态是另一个值得单独测的
+    //    场景，不该被首页基线顺路撞上。
+    try {
+        var freezeDays = function (root) {
+            if (!root) return;
+            var nodes = root.querySelectorAll('span, div');
+            for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].children.length) continue;      // 只处理文本叶子，不破坏结构
+                var t = (nodes[i].textContent || '').trim();
+                if (/^剩 \\d+ 天$/.test(t) || t === '今天截止') nodes[i].textContent = '剩 8 天';
+            }
+        };
+        freezeDays(document.getElementById('home-calendar-list'));
+        freezeDays(document.getElementById('home-todo-card'));
+    } catch (e) {}
     return 'ok';
 })()`;
 
@@ -372,9 +393,21 @@ function createBrowser(session) {
         const page = await pwPage();
         const cmd = args[0];
         switch (cmd) {
-            case 'open':
-                await page.goto(String(args[1]), { waitUntil: 'domcontentloaded' });
+            case 'open': {
+                // 超时 60s（默认 30s 不够）+ **失败重试一次**。
+                // 卡住的是**第一张**：静态服务器刚 listen、浏览器刚 launch、页面还要拉
+                // 6 个外网 CDN，三者叠起来偶发超过 60s（表现为"第一张失败、后面全 OK"，
+                // 极易被误读成页面坏了）。重试一次比一味加长超时好 —— 第二次往往是热缓存，
+                // 秒开；而无限加长只会让"真的坏了"的情况也慢吞吞才报错。
+                const url = String(args[1]);
+                const opts = { waitUntil: 'domcontentloaded', timeout: 60000 };
+                try {
+                    await page.goto(url, opts);
+                } catch (e) {
+                    await page.goto(url, opts);
+                }
                 return 'ok';
+            }
             case 'reload':
                 await page.reload({ waitUntil: 'domcontentloaded' });
                 return 'ok';

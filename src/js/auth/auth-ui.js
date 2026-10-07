@@ -1231,6 +1231,11 @@ function renderProfileCards() {
     }).join('');
     // 深色模式卡的图标/文案要跟当前主题对齐（渲染时配置里写的是浅色默认值）
     syncThemeCard();
+    // v1.137.0：主体管理卡要比顶栏切换器晚进 DOM（进「我的」页才渲染），这里补一次 ——
+    // 否则先建主体、后进「我的」页，卡上还是那句不带主体的原文案。
+    if (window.EuriskoEntityUI && typeof window.EuriskoEntityUI.syncEntityCard === 'function') {
+        window.EuriskoEntityUI.syncEntityCard();
+    }
 }
 
 // 深色模式卡与当前主题对齐：图标与说明随状态变。渲染后与每次切换后各调一次。
