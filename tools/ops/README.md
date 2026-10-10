@@ -19,7 +19,7 @@
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
 | `seo-copy-batch.js` | **21 个落地页文案批量对齐**（`node tools/ops/seo-copy-batch.js [--check]`）：术语 / 广告法极限词 / 免责后缀 5 选 1 / 备案位；落地页是静态 HTML 引用不了 `src/js/copy/copy-standard.js` 的常量，一致性靠它 + `tests/copy-standard.test.js` 的守护断言 | ✅ |
-| `swap-canonical-domain.js` | **canonical / og:url / robots 换域**（阶段16A 切流当天一次性动作，`--check` 先预览）：`euriskotax.zeabur.app` → `euriskotax.com`（107 处 / 23 文件）；幂等可重跑，只换带协议的完整 URL；DNS 未解析前不许执行（见 stage16 文档 §16A.1-5） | ✅ |
+| `swap-canonical-domain.js` | **canonical / og:url / robots 换域**（阶段16A 切流当天一次性动作，`--check` 先预览）：`euriskotax.com` → `euriskotax.com`（107 处 / 23 文件）；幂等可重跑，只换带协议的完整 URL；DNS 未解析前不许执行（见 stage16 文档 §16A.1-5） | ✅ |
 | `ops-md2docx.py` | **Markdown → Word 发送版导出**（`docs/marketing/*.md` → 同名 `.docx`；需 Python + `pip install python-docx`） | ✅ |
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |

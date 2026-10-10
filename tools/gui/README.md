@@ -125,7 +125,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🔵 查看生产/本地邀请码** | `GET /api/invites` | 拉取列表，按未使用/已使用分组展示（已使用显示注册用户名+时间） |
 | **🟢 复制生产未使用邀请码** | `GET /api/invites` | 整批复制到剪贴板（一行一个），便于直接发给用户 |
 
-> 邀请码按钮通过管理员令牌认证，**本地与生产使用各自独立的令牌**：本地读 `server/.env` 的 `ADMIN_TOKEN`，生产读 `ADMIN_TOKEN_PROD`（在 Zeabur 控制台 → 项目 → Variables 中查看）；缺失时弹窗输入一次并回存到 `server/.env`，下次免输入。生产令牌失效（401）会自动清除本地缓存并要求重新输入。生产地址 `https://euriskotax.zeabur.app`，本地 `http://localhost:3000`。
+> 邀请码按钮通过管理员令牌认证，**本地与生产使用各自独立的令牌**：本地读 `server/.env` 的 `ADMIN_TOKEN`，生产读 `ADMIN_TOKEN_PROD`（在腾讯云服务器 `/home/ubuntu/euriskotax/.env.shared` 中查看）；缺失时弹窗输入一次并回存到 `server/.env`，下次免输入。生产令牌失效（401）会自动清除本地缓存并要求重新输入。生产地址 `https://euriskotax.com`，本地 `http://localhost:3000`。
 
 ### 3. 🧪 测试
 
@@ -208,7 +208,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 ### 7. 🔐 Git & 账号
 
-> 本面板包含 **4 个功能卡片**：① 分支管理与版本切换  ② Git 操作与项目文档  ③ 账号密码管理  ④ 🚀 安全发布（Zeabur 唯一上线入口）
+> 本面板包含 **4 个功能卡片**：① 分支管理与版本切换  ② Git 操作与项目文档  ③ 账号密码管理  ④ 🚀 安全发布（腾讯云 · 唯一上线入口）
 
 #### 7.1 分支管理 & 版本切换 ⭐新增
 
@@ -292,17 +292,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 | **🔐 JWT Secret Key** | 后端 JWT 签名密钥（server/.env） | `dev-secret-key-change-in-production` |
 | **📧 QQ邮箱授权码** | 看门狗邮件通知（tools/ops/notify.config.json） | 自行配置 |
 
-#### 7.4 安全发布（Zeabur 云端 · 唯一上线入口）⭐
+#### 7.4 安全发布（腾讯云 · 唯一上线入口）⭐
 
 > **正式上线只走这里**，替代"裸 git push"。内部流水线（`tools/ops/ops-publish.ps1`）：
-> ① 本地登录链路门禁 `verify:local`（**不过立刻中止**，不会 push）→ ② `git add -A` + `commit`（提交说明弹窗填写，可留空自动生成）→ ③ `git push origin main`（触发 Zeabur 构建部署）→ ④ 自动轮询线上资源指纹（`ops-check-prod.ps1`）直至核对为新版本。
+> ① 本地登录链路门禁 `verify:local`（**不过立刻中止**，不会 push）→ ② `git add -A` + `commit`（提交说明弹窗填写，可留空自动生成）→ ③ `git push origin main`（腾讯云部署另跑 `tools/ops/ops-deploy.ps1 -SkipTest`）→ ④ 自动轮询线上资源指纹（`ops-check-prod.ps1`）直至核对为新版本。
 
 | 按钮 | 执行脚本 | 说明 |
 |------|---------|------|
 | **🚀 安全发布** | `ops-publish.ps1 -CommitMsg "..."` | 一键受控上线：本地全绿 → commit → push → 线上核对。执行前弹窗确认提交说明，点【取消】则中止 |
 | **🧪 安全发布试运行** | `ops-publish.ps1 -DryRun` | 零风险预演：只跑本地 verify:local 门禁，不 commit、不 push。正式发布前建议先点它确认能全绿 |
 
-> 🛡️ **发布纪律**：本地门禁不过 → 脚本直接退出，代码不会进入远程 main → 不会触发 Zeabur 自动部署。只有"本地验证全绿"的代码才能被发布上线。
+> 🛡️ **发布纪律**：本地门禁不过 → 脚本直接退出，代码不会进入远程 main → 不会被部署上线。只有"本地验证全绿"的代码才能被推送上线。
 | **🌐 Cpolar Token** | 内网穿透授权 | 自行注册配置 |
 | **🔑 获取 Bearer Token** | 自动调用登录 API 获取 JWT（1小时有效） | 自动生成并复制到剪贴板 |
 | **🖥 部署 SSH 配置** | 生产服务器 SSH 账号（ops-deploy.config.json） | 自行配置 |

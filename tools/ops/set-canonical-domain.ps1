@@ -1,6 +1,9 @@
 ﻿# 一键切换站点规范域名（canonical / og:url / JSON-LD / sitemap / robots）
 #
-# 背景：现在生产跑在 Zeabur（euriskotax.zeabur.app），全站有 50+ 处硬编码了这个域名：
+# 状态（2026-10-10）：换域**已完成**，本脚本是阶段16A 的一次性工具，日常不需要再跑
+#   （Zeabur 已降级为测试环境，正式公网是腾讯云 euriskotax.com）。不带 -Apply 时仍可当体检用。
+#
+# 背景（切流当时）：生产跑在 Zeabur（euriskotax.zeabur.app），全站有 50+ 处硬编码了这个域名：
 #   · 20 个落地页各 3 处：<link rel="canonical">、og:url、JSON-LD 的 url
 #   · sitemap.xml：22 个 <loc>
 #   · robots.txt：Sitemap 行

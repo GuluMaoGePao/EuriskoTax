@@ -4,6 +4,13 @@
 # 纪律：本地 verify:local 全绿才允许 commit + push；push 后轮询线上指纹直至就绪。
 # 这是所有"上线"动作的唯一入口（GUI: Git & 账号 -> 安全发布）。
 #
+# 正式公网环境（2026-10-10 起）= 腾讯云 https://euriskotax.com（pm2 进程 euriskotax）。
+#   push 本身不会让它上线 —— 部署动作是 tools\ops\ops-deploy.ps1（读 deploy.config.json，
+#   打包 -> 上传 -> 依赖与迁移 -> pm2 重启 -> 健康检查）。本脚本只负责
+#   「本地门禁 + 提交推送 + 线上指纹核对」这三段，第 4 步核对的就是腾讯云正式域。
+#   -BaseUrl 默认已是正式域；Zeabur（https://euriskotax.zeabur.app）降级为**测试环境**，
+#   要核对它必须显式 -BaseUrl https://euriskotax.zeabur.app，且本机网络未必连得通。
+#
 # 阶段11 起：公共内容端点改为读数据库，生产库为空会让线上核对「假失败」（version 为空 + items=0）。
 #   因此 push 后会在轮询间隙自动执行 ops-seed-prod.js 幂等补种（读 ADMIN_TOKEN_PROD）；
 #   拿不到 Token 自动跳过、补种失败只告警不阻断 —— 是否放行仍由线上指纹门禁决定。
@@ -32,7 +39,7 @@
 # =============================================================================
 param(
     [string]$CommitMsg = "",
-    [string]$BaseUrl = "https://euriskotax.zeabur.app",
+    [string]$BaseUrl = "https://euriskotax.com",
     [switch]$DryRun,
     [int]$PollMaxSeconds = 600,
     [switch]$SkipVerifyGenerate,
@@ -151,7 +158,8 @@ Write-Host "  [OK] 已推送" -ForegroundColor Green
 # ---- [4/4] 线上核对（先幂等补种生产内容，再轮询部署指纹直到全绿或超时） ----
 Write-Host ""
 Write-Host "[4/4] 核对线上部署指纹: $BaseUrl" -ForegroundColor Yellow
-Write-Host "  Zeabur 收到 push 后会重新构建（通常 2~6 分钟），将持续轮询直至通过或超时 ..." -ForegroundColor Gray
+Write-Host "  正式站跑在腾讯云，push 不会自动触发构建：请另开终端跑 .\tools\ops\ops-deploy.ps1 -SkipTest 完成部署。" -ForegroundColor Gray
+Write-Host "  这里只做核对，将持续轮询直至指纹全绿或超时 ..." -ForegroundColor Gray
 
 $seedState = "off"
 if (-not $NoSeedProd) {
@@ -201,7 +209,7 @@ if (-not $ok) {
         Write-Host "  [提示] 若失败项是内容端点（version 为空 / items=0）：生产库尚未种子化。" -ForegroundColor Yellow
         Write-Host "         配置 ADMIN_TOKEN_PROD 后执行 node tools\ops\ops-seed-prod.js，再重跑 ops-check-prod.ps1" -ForegroundColor Gray
     }
-    Exit-Fail "等待 ${PollMaxSeconds}s 后线上仍未就绪。请稍后手动执行 .\tools\ops\ops-check-prod.ps1 复核，或查看 Zeabur 构建日志。"
+    Exit-Fail "等待 ${PollMaxSeconds}s 后线上仍未就绪。先确认是否已跑 .\tools\ops\ops-deploy.ps1 部署到腾讯云，或手动执行 .\tools\ops\ops-check-prod.ps1 复核（服务端日志: ssh 后 pm2 logs euriskotax）。"
 }
 
 # ---- [5/5] 发布后自动打版本标签（幂等：标签已存在则跳过；-NoAutoTag 关闭） ----

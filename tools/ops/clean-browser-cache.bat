@@ -15,7 +15,7 @@ echo.
 echo    本脚本会：
 echo      1) 强制关闭 Chrome / Edge 等浏览器
 echo      2) 删除浏览器里的 Service Worker 与缓存文件
-echo      3) 重新打开 https://euriskotax.zeabur.app
+echo      3) 重新打开 https://euriskotax.com
 echo.
 echo    不会影响：
 echo      书签、保存的密码、历史记录、其它网站的登录状态。
@@ -42,7 +42,7 @@ echo  [3/4] 清理 Edge 缓存 ...
 call :PurgeProfile "%LOCALAPPDATA%\Microsoft\Edge\User Data"
 
 echo  [4/4] 重新打开网站 ...
-start "" "https://euriskotax.zeabur.app"
+start "" "https://euriskotax.com"
 
 echo.
 echo  ============================================================

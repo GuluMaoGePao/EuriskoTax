@@ -164,7 +164,7 @@ describe('断言 5：备案位一页都不能漏', () => {
 
 // 断言 9（v1.112.0）：canonical / og:url 的**域名必须全站一致**。
 //
-// 背景：21 个落地页的 canonical 与 og:url 现在都指向 https://euriskotax.zeabur.app（境外），
+// 背景：21 个落地页的 canonical 与 og:url 现在都指向 https://euriskotax.com（正式域，腾讯云），
 // 全站共 107 处 / 23 个文件。切境内节点（阶段16A）时必须整体换成 euriskotax.com ——
 // 换不完的后果是**搜索权重被送去旧域**：正式域名的页面被判定为 zeabur.app 的副本，
 // 21 个落地页等于白做。而这是 107 处手工替换，只改一半是常态。
@@ -175,7 +175,7 @@ describe('断言 9：canonical / og:url 全站同一域名（切境内节点时�
     const pages = () => ['index.html'].concat(seoFiles());
 
     test('每个页面的 canonical 与 og:url 域名相同，且是已知主域之一', () => {
-        const KNOWN = ['euriskotax.zeabur.app', 'euriskotax.com'];   // 切换后应只剩后者
+        const KNOWN = ['euriskotax.zeabur.app', 'euriskotax.com'];   // 旧域保留：Zeabur 已降级为测试环境，仍可能合法出现
         const problems = [];
         pages().forEach((f) => {
             const src = readSrc(f);

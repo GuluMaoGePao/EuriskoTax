@@ -1,6 +1,6 @@
 ﻿# EuriskoTax 线上部署校验脚本
 # 用法: .\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]
-# 作用: push 后轮询线上资源，确认 Zeabur 已部署到最新版本（认证/按钮/SW 版本指纹）
+# 作用: 部署后轮询线上资源，确认腾讯云正式站已更新到最新版本（认证/按钮/SW 版本指纹）
 #       任一检查不过时退出码非 0，用于发布门禁或人工核对。
 param(
     [string]$BaseUrl = "https://euriskotax.com"
@@ -226,7 +226,7 @@ Write-Host ""
 Write-Host ("  结果: " + ($checks.Count - $fail.Count) + "/" + $checks.Count + " 通过") -ForegroundColor Cyan
 
 if ($fail.Count -gt 0) {
-    Write-Host "  => 线上尚未完全更新：Zeabur 可能还在构建，或需要等待数分钟后再跑一次。" -ForegroundColor Yellow
+    Write-Host "  => 线上尚未完全更新：可能还没跑 ops-deploy.ps1 部署，或部署刚完成、资源尚未生效，等数分钟后再跑一次。" -ForegroundColor Yellow
     Write-Host "     （旧浏览器用户还需在页面上 Unregister Service Worker + Clear site data）" -ForegroundColor Gray
     exit 1
 }

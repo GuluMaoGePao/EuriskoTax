@@ -1,5 +1,8 @@
 /**
- * canonical / og:url / robots 换域脚本 —— 阶段16A 切流当天的一次性动作（v1.114.0）
+ * canonical / og:url / robots 换域脚本 —— 阶段16A 切流当天的一次性动作（v1.114.0，**已完成**）
+ *
+ * 状态（2026-10-10）：换域早已完成，本脚本是**一次性历史工具**，日常不需要再跑；
+ *       Zeabur 已降级为测试环境。`--check` 仍可用于核对全站 canonical 是否只剩正式域。
  *
  * 背景：21 个落地页 + index.html + robots.txt 里的站点 URL 现在指向
  *       https://euriskotax.zeabur.app（境外），共 107 处 / 23 个文件。

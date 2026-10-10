@@ -1257,11 +1257,11 @@ function Show-InputBox {
 function Get-AdminToken {
     param([string]$Target = "local")
     # 本地与生产使用各自独立的令牌：本地读 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD
-    # （生产令牌在 Zeabur 控制台单独配置，可能与本地不同，不能混用）
+    # （生产令牌在腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 单独配置，可能与本地不同，不能混用）
     $envFile = Join-Path $ServerDir ".env"
     $key = if ($Target -eq "prod") { "ADMIN_TOKEN_PROD" } else { "ADMIN_TOKEN" }
     $hint = if ($Target -eq "prod") {
-        "请输入生产环境 ADMIN_TOKEN（在 Zeabur 控制台 → 项目 → Variables 中查看；输入一次后自动保存到 server\.env，下次免输入）："
+        "请输入生产环境 ADMIN_TOKEN（在腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 中查看；输入一次后自动保存到 server\.env，下次免输入）："
     } else {
         "请输入 ADMIN_TOKEN（本地环境；输入一次后自动保存到 server\.env，下次免输入）："
     }
@@ -1292,7 +1292,9 @@ function Get-AdminToken {
 # ==============================================================================
 function Invoke-InviteApi {
     param([string]$Method, [string]$Target, [object]$Body)
-    $base = if ($Target -eq "prod") { "https://euriskotax.zeabur.app" } else { "http://localhost:3000" }
+    # 正式环境（prod）= 腾讯云 https://euriskotax.com。
+    # Zeabur（https://euriskotax.zeabur.app）已降级为**测试环境**：要打到它就把下面这行的域名换过去（本机网络未必连得通）。
+    $base = if ($Target -eq "prod") { "https://euriskotax.com" } else { "http://localhost:3000" }
     $token = Get-AdminToken -Target $Target
     if (-not $token) { return @{ Ok = $false; Error = "未提供管理员令牌（ADMIN_TOKEN），操作已取消" } }
     try {
@@ -1331,7 +1333,7 @@ function Invoke-InviteApi {
                     $kept = Get-Content $envFile | Where-Object { $_ -notmatch '^ADMIN_TOKEN_PROD=' }
                     Set-Content -Path $envFile -Value $kept -Encoding UTF8
                 }
-                $msg = "生产环境管理员令牌无效（401）。已清除本地保存的生产令牌，请再次点击按钮，在弹窗中输入 Zeabur 控制台配置的 ADMIN_TOKEN"
+                $msg = "生产环境管理员令牌无效（401）。已清除本地保存的生产令牌，请再次点击按钮，在弹窗中输入腾讯云服务器 .env.shared 里配置的 ADMIN_TOKEN"
             } else {
                 $msg = "本地管理员令牌无效（401）。请核对 server\.env 中的 ADMIN_TOKEN 是否与本地服务启动时加载的一致，重启服务后重试"
             }
@@ -2912,14 +2914,14 @@ Add-SectionCard -TabCtx $tab1Ctx `
 Add-SectionCard -TabCtx $tab1Ctx `
     -Title "4. 线上环境（生产站点）" `
     -Subtitle "直接打开生产页面：站点 · 管理台 · 缓存清洗（不需要本地后端）" `
-    -Description "详细说明：三个链接都指向已部署的生产环境 https://euriskotax.zeabur.app。管理台用于看用户反馈（反馈 Tab）、用户列表与兑换码，登录令牌填 Zeabur 控制台 Variables 里的 ADMIN_TOKEN_PROD（勾选「在本机记住令牌」后免输）；线上缓存清洗页用于用户反馈「页面还是旧的」时一键重置。" `
+    -Description "详细说明：三个链接都指向已部署的生产环境 https://euriskotax.com。管理台用于看用户反馈（反馈 Tab）、用户列表与兑换码，登录令牌填腾讯云服务器 .env.shared 里的 ADMIN_TOKEN_PROD（勾选「在本机记住令牌」后免输）；线上缓存清洗页用于用户反馈「页面还是旧的」时一键重置。" `
     -AccentColor $C_SUCCESS -Buttons @(
-    @{ Text = "🌐 打开线上站点`neuriskotax.zeabur.app"; Desc = "在默认浏览器打开生产环境首页，也就是发给用户的正式地址。"; Color = "85, 180, 110";
-       OnClick = { Start-Process "https://euriskotax.zeabur.app"; Write-Log "已打开线上站点: https://euriskotax.zeabur.app" "INFO" } },
-    @{ Text = "🛠 打开管理台`n用户反馈 / 用户 / 兑换码"; Desc = "打开 https://euriskotax.zeabur.app/admin.html，粘贴 ADMIN_TOKEN_PROD 后进入：「反馈」Tab 看用户提交的 Bug/建议（含附图，可改状态并保存），「用户」Tab 可搜索用户、授予限时专业版，「兑换码」Tab 管理一机一码。"; Color = "100, 150, 240";
-       OnClick = { Start-Process "https://euriskotax.zeabur.app/admin.html"; Write-Log "已打开线上管理台: https://euriskotax.zeabur.app/admin.html（令牌用 ADMIN_TOKEN_PROD）" "INFO" } },
-    @{ Text = "🧹 线上缓存清洗页`n用户说「页面还是旧的」时给他"; Desc = "打开 https://euriskotax.zeabur.app/clean-cache.html：注销全部 Service Worker + 清空缓存后跳回首页。发新版后用户仍看到旧页面时，把这条链接发给他。"; Color = "230, 160, 70";
-       OnClick = { Start-Process "https://euriskotax.zeabur.app/clean-cache.html"; Write-Log "已打开线上缓存清洗页: https://euriskotax.zeabur.app/clean-cache.html" "INFO" } }
+    @{ Text = "🌐 打开线上站点`neuriskotax.com"; Desc = "在默认浏览器打开生产环境首页，也就是发给用户的正式地址。"; Color = "85, 180, 110";
+       OnClick = { Start-Process "https://euriskotax.com"; Write-Log "已打开线上站点: https://euriskotax.com" "INFO" } },
+    @{ Text = "🛠 打开管理台`n用户反馈 / 用户 / 兑换码"; Desc = "打开 https://euriskotax.com/admin.html，粘贴 ADMIN_TOKEN_PROD 后进入：「反馈」Tab 看用户提交的 Bug/建议（含附图，可改状态并保存），「用户」Tab 可搜索用户、授予限时专业版，「兑换码」Tab 管理一机一码。"; Color = "100, 150, 240";
+       OnClick = { Start-Process "https://euriskotax.com/admin.html"; Write-Log "已打开线上管理台: https://euriskotax.com/admin.html（令牌用 ADMIN_TOKEN_PROD）" "INFO" } },
+    @{ Text = "🧹 线上缓存清洗页`n用户说「页面还是旧的」时给他"; Desc = "打开 https://euriskotax.com/clean-cache.html：注销全部 Service Worker + 清空缓存后跳回首页。发新版后用户仍看到旧页面时，把这条链接发给他。"; Color = "230, 160, 70";
+       OnClick = { Start-Process "https://euriskotax.com/clean-cache.html"; Write-Log "已打开线上缓存清洗页: https://euriskotax.com/clean-cache.html" "INFO" } }
 )
 
 # ==============================================================================
@@ -2963,7 +2965,7 @@ Add-SectionCard -TabCtx $tab2Ctx `
 Add-SectionCard -TabCtx $tab2Ctx `
     -Title "3. 邀请码管理（一机一码）" `
     -Subtitle "注册邀请码：生成 · 查看 · 复制（生产 / 本地）" `
-    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证，本地与生产各用独立令牌：本地读 server\.env 的 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD（Zeabur 控制台 → Variables 查看），缺失会弹窗输入一次并回存 server\.env。生产目标 https://euriskotax.zeabur.app，本地 http://localhost:3000（需后端已启动）。" `
+    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证，本地与生产各用独立令牌：本地读 server\.env 的 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD（腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 查看），缺失会弹窗输入一次并回存 server\.env。生产目标 https://euriskotax.com，本地 http://localhost:3000（需后端已启动）。" `
     -AccentColor $C_PURPLE -Buttons @(
     @{ Text = "生成邀请码到生产`n自动复制到剪贴板"; Desc = "输入数量（1-100）后调用生产环境邀请码接口生成，成功后自动复制到剪贴板并弹窗提示，明细写入下方日志区。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = {
@@ -3575,13 +3577,13 @@ Add-SectionCard -TabCtx $tab6bCtx `
 )
 
 Add-SectionCard -TabCtx $tab6bCtx `
-    -Title "4. 🚀 安全发布（Zeabur 云端 · 唯一上线入口）" `
+    -Title "4. 🚀 安全发布（腾讯云 · 唯一上线入口）" `
     -Subtitle "流程：本地 verify:local 门禁 → 自动 commit → push → 线上指纹核对" `
-    -Description "详细说明：正式上线只走这里。先跑本地登录链路门禁（全绿才继续），然后自动提交、推送远程 main 触发 Zeabur 构建，并轮询线上资源直至核对为新版本。本地不过 → 不会 push → 不会部署坏代码。推荐先用下面的 试运行 预演一次。" `
+    -Description "详细说明：正式上线只走这里。先跑本地登录链路门禁（全绿才继续），然后自动提交、推送远程 main；腾讯云不会由 push 自动构建，部署要另跑 tools\ops\ops-deploy.ps1 -SkipTest，这里随后轮询腾讯云正式域的线上资源直至核对为新版本。本地不过 → 不会 push → 不会部署坏代码。推荐先用下面的 试运行 预演一次。" `
     -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
     @{ Text = "🚀 安全发布`n本地验证→commit→push→线上核对`n⭐上线专用"; Desc = "受控上线：本地 verify:local 全绿 → 自动 commit → push origin main → 自动核对线上指纹直至部署完成。执行前会弹窗让你确认提交说明。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
        OnClick = {
-            $msg = Show-InputBox -Title "🚀 安全发布" -Prompt "将执行：`n  ① 本地登录链路门禁 verify:local（必须全绿）`n  ② git add -A + commit`n  ③ git push origin main（触发 Zeabur 构建部署）`n  ④ 轮询线上核对，直到部署完成`n`n请输入本次提交说明（留空则自动生成）：" -DefaultValue ""
+            $msg = Show-InputBox -Title "🚀 安全发布" -Prompt "将执行：`n  ① 本地登录链路门禁 verify:local（必须全绿）`n  ② git add -A + commit`n  ③ git push origin main（腾讯云部署另跑 ops-deploy.ps1）`n  ④ 轮询腾讯云正式域，直到核对完成`n`n请输入本次提交说明（留空则自动生成）：" -DefaultValue ""
             if ($null -eq $msg) { Write-Log "[发布] 已取消" "WARN"; return }
             $msg = $msg -replace "['`r`n]", " "
             $msg = $msg -replace "'", "''"

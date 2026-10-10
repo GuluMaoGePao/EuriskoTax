@@ -10,7 +10,7 @@
 //
 // 与 server/scripts/seed-content.js 的关系：
 //   同一份种子源、同一套字段映射；区别是前者直连数据库（本地/可访问库），
-//   本脚本走 HTTP（生产库通常只在 Zeabur 内网，本地直连不到）。
+//   本脚本走 HTTP（正式库在腾讯云服务器内网，本地直连不到）。
 //
 // 幂等性：
 //   - 条目按 item_id 判断，已存在一律跳过（不覆盖后台人工改动）；
@@ -36,7 +36,7 @@ const SERVER_DIR = path.join(PROJECT_ROOT, 'server');
 const SERVER_ENV_FILE = path.join(SERVER_DIR, '.env');
 const CONTENT_FILE = path.join(SERVER_DIR, 'data', 'content', 'tax-policy.json');
 // v1.116.0：切境内节点后生产地址改为正式域名。留着旧域的后果是——
-// 切流后再跑播种，内容会灌进 Zeabur 那个旧库，而新库（腾讯云）里一条都没有，
+// 若把 BASE_URL 指回 Zeabur（已降级的测试环境）再跑播种，内容会灌进那个旧库，而正式库（腾讯云）里一条都没有，
 // 表现为「线上没内容」且极难定位（脚本退 0、看着像成功了）。
 const DEFAULT_BASE_URL = 'https://euriskotax.com';
 
@@ -150,7 +150,7 @@ async function waitForAdminApi(token, seconds) {
             return { ok: false, fatal: true, detail: '后台拒绝了 ADMIN_TOKEN_PROD（401）：令牌与生产环境 ADMIN_TOKEN 不一致' };
         }
         if (r.status === 503) {
-            return { ok: false, fatal: true, detail: '生产服务端未配置 ADMIN_TOKEN（503）：请先在 Zeabur 设置该环境变量' };
+            return { ok: false, fatal: true, detail: '生产服务端未配置 ADMIN_TOKEN（503）：请先在腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 设置该环境变量' };
         }
         lastDetail = `HTTP ${r.status || 'N/A'}${r.error ? ` (${r.error})` : ''}`;
         if (Date.now() >= deadline) {
