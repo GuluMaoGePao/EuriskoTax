@@ -42,8 +42,12 @@ const Q = () => window.EuriskoBusinessIncomeQuick;
 // 默认形态：本企业 32 万（利润 20 万 + 业主工资调增 12 万），另有乙企业 +80 万、丙企业 −40 万
 function values(extra) {
     const base = {};
-    R().get('business').fields.forEach((f) => { base[f.key] = f.default; });
-    return Object.assign(base, extra || {});
+    R().get('business').fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
+    // 同上：默认形态这一户是「还开着别的企业 + 享受减半 + 另有综合所得」，属用户自己声明的事，
+    // 现在产品默认一律不勾，用例要写明。
+    return Object.assign(base, {
+        hasOtherEntities: true, halve: true, hasComprehensiveIncome: true
+    }, extra || {});
 }
 
 function compute(extra) {
@@ -273,6 +277,10 @@ describe('走向导：由 spec 驱动', () => {
 
     test('关掉「还有别的企业」后，企业清单消失（repeater 是条件字段）', () => {
         W().open('business', { fresh: true });
+        // 这一项默认不勾（用户没说就是没有），先替用户勾上，清单才展开
+        const on = document.getElementById('qf-hasOtherEntities');
+        on.checked = true;
+        on.dispatchEvent(new Event('change'));
         expect(document.getElementById('qf-otherEntities-0-taxable')).toBeTruthy();
         expect(document.getElementById('qf-otherEntities-1-taxable')).toBeTruthy();
 

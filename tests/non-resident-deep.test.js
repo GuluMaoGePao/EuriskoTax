@@ -42,7 +42,7 @@ const Q = () => window.EuriskoNonResidentQuick;
 // 当月 30 天里境内工作 20 天，另有数月奖金 12 万
 function values(extra) {
     const base = {};
-    R().get('non-resident').fields.forEach((f) => { base[f.key] = f.default; });
+    R().get('non-resident').fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     return Object.assign(base, extra || {});
 }
 

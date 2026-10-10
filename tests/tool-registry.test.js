@@ -263,7 +263,7 @@ describe('工具注册表：App 内速算器（native）可用', () => {
     test('用默认值计算：结果有限、非负，且带 primary 与 rows', () => {
         natives().forEach((tool) => {
             const values = {};
-            tool.fields.forEach((f) => { values[f.key] = f.default; });
+            tool.fields.forEach((f) => { values[f.key] = (f.sample !== undefined ? f.sample : f.default); });
             const out = tool.compute(values);
             expect(out).toBeTruthy();
             expect(out.error).toBeUndefined();
@@ -285,7 +285,7 @@ describe('工具注册表：App 内速算器（native）可用', () => {
     test('企业所得税两种填法都能算（直接填 vs 收入成本纳税调整）', () => {
         const cit = R().get('corporate-income-tax');
         const base = {};
-        cit.fields.forEach((f) => { base[f.key] = f.default; });
+        cit.fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
 
         const direct = cit.compute(Object.assign({}, base, { mode: 'direct', taxable: 2800000 }));
         expect(direct.error).toBeUndefined();
@@ -308,7 +308,7 @@ describe('工具注册表：App 内速算器（native）可用', () => {
     test('社保公积金：逐项明细合计 = 月缴合计，全年口径 = 月度 × 12', () => {
         const sb = R().get('social-base');
         const base = {};
-        sb.fields.forEach((f) => { base[f.key] = f.default; });
+        sb.fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
         const r = sb.compute(base);                 // 月薪 15000、社平 8000、公积金 12%
         expect(r.error).toBeUndefined();
 
@@ -333,7 +333,7 @@ describe('工具注册表：App 内速算器（native）可用', () => {
     test('残保金：分档减缴边际递减，30 人临界点的跳变被量化出来', () => {
         const df = R().get('disability-fund');
         const base = {};
-        df.fields.forEach((f) => { base[f.key] = f.default; });
+        df.fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
         const r = df.compute(base);                 // 50 人、0 名残疾、社平 8000、年均工资 12 万
         expect(r.error).toBeUndefined();
 
@@ -358,7 +358,7 @@ describe('工具注册表：App 内速算器（native）可用', () => {
         const vat = R().get('vat');
         ['small', 'general', 'split'].forEach((variant) => {
             const values = {};
-            vat.fields.forEach((f) => { values[f.key] = f.default; });
+            vat.fields.forEach((f) => { values[f.key] = (f.sample !== undefined ? f.sample : f.default); });
             values.variant = variant;
             const out = vat.compute(values);
             expect(out.error).toBeUndefined();
@@ -416,5 +416,66 @@ describe('工具注册表：搜索', () => {
         const result = R().search('');
         expect(result.matched).toBe(false);
         expect(result.tools).toHaveLength(20);
+    });
+});
+
+// v1.138.0：金额预填全部归零 —— 用户没输就是 0，产品不替用户先填一个数。
+//
+// 为什么要钉住：预填一个「示例金额」（月薪 30000、年终奖 36000）看起来是贴心，
+// 实际是把**别人的数**塞进用户的表单 —— 用户没看见自己填过，却会把它当成自己的数，
+// 算出来的税不对，这笔账会记在算法头上。而更隐蔽的一层：测试会把默认值当用例数据，
+// 默认值一改，一片断言同时变红，红的理由跟被测逻辑毫无关系。
+//
+// 于是原来的示例值没有丢，它们挪到了 `sample` 上，只作测试与演示的基线，不参与渲染。
+describe('工具注册表：金额不预填（用户没输就是 0）', () => {
+    const allFields = () => {
+        const out = [];
+        R().all().concat(R().deep()).forEach((t) => {
+            (t.fields || []).forEach((f) => out.push({ tool: t.id, field: f }));
+        });
+        return out;
+    };
+
+    test('money 字段的 default 一律是 0（没有第二个例外）', () => {
+        const bad = allFields()
+            .filter((x) => x.field.type === 'money')
+            .filter((x) => Number(x.field.default) !== 0)
+            .map((x) => x.tool + '.' + x.field.key + ' = ' + x.field.default);
+        expect(bad).toEqual([]);
+    });
+
+    test('带了 sample 的字段：sample 是有效示例值，且 default 已归零', () => {
+        const bad = allFields()
+            .filter((x) => x.field.sample !== undefined)
+            .filter((x) => !(Number(x.field.sample) > 0) || Number(x.field.default) !== 0)
+            .map((x) => x.tool + '.' + x.field.key);
+        expect(bad).toEqual([]);
+    });
+
+    // 边界的另一头：比例与法定标准不是「用户填的数」，不能被这轮归零误伤 ——
+    // 养老 8%、公积金 5%、增值税 13% 归零会让五险一金与税额直接塌掉。
+    test('比例与选项未被误伤（percent / select / switch 的 default 照旧）', () => {
+        const rates = allFields().filter((x) => x.field.type === 'percent');
+        expect(rates.length).toBeGreaterThan(0);
+        expect(rates.filter((x) => Number(x.field.default) > 0).length).toBeGreaterThan(0);
+    });
+
+    // 勾选框是同一个道理的另一面：默认勾上「享受专项附加扣除」「缴纳社保」「还有别的企业」，
+    // 等于替用户声明了他有什么。用户没勾就是没有 —— 勾了才展开下面那一片。
+    //
+    // 例外是**口径类**：它问的不是「有没有」而是「怎么算」（同一笔年终奖并入还是单独计税、
+    // 同月多笔合不合并、报价含不含税），默认开是产品给定的计入口径，不是替用户假设事实。
+    // 新增口径类必须把它加进白名单并写明理由 —— 这条断言的作用就是逼出这句话。
+    test('声明类勾选默认不勾（有的话用户自己勾）', () => {
+        const CALIBER = {
+            bonusInclude: '年终奖并入综合所得计税（口径）',
+            mergeByMonth: '同一个月内的多笔合并为「一次」（口径）',
+            taxIncluded: '金额为含税价（口径）'
+        };
+        const bad = allFields()
+            .filter((x) => x.field.type === 'switch' && x.field.default === true)
+            .filter((x) => !CALIBER[x.field.key])
+            .map((x) => x.tool + '.' + x.field.key);
+        expect(bad).toEqual([]);
     });
 });

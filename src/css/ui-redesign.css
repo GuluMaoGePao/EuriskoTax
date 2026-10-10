@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 阶段19 UI 重构 · 新增样式层（src/css/ui-redesign.css）
  *
  * 为什么独立一个文件，而不是直接改 tokens.css / toolbox.css / tailwind.css：
@@ -54,46 +54,222 @@
 }
 
 /* --- 2.2 Mission Hero：首页首屏唯一焦点（§3.3.2）---
-   全站唯一使用品牌渐变 + 大留白的区域，高度 ≤ 一屏 45%。 */
+   全站唯一使用品牌渐变 + 大留白的区域，高度 ≤ 一屏 45%。
+   底数次易稿（v1.139.0）：135° 双蓝（两蓝太近，看着是平的）→ 拉开跨度 →
+   靛紫（偏得太远）→ 正交网格 + 右上柔光 → 现在这版：**顶栏蓝 + 45° 斜纹**。
+   反复换色得到的结论：让 Hero 不像色卡的是**纹理**，不是色相也不是光。这一版明确
+   不要那块右上柔光（它会在内容区上方留一块亮斑，把同一层文字的对比度拖下去），
+   预算全给底纹 —— 45° 单向细斜纹取自票据 / 凭证的防伪纹，
+   比正交网格更有方向性、更贴"算税"这件事，且整片亮度均匀，不需要靠高光撑场面。
+   三层叠在一个 background 里而不是真加 DOM —— Hero 的 DOM 每多一个节点，
+   后面的内容布局就多一层约束，装饰元素不配。 */
 .hero-card {
     position: relative;
     overflow: hidden;
     padding: var(--sp-6);
     border-radius: var(--r-hero);
-    /* 底用 --c-hero-from/to，不直接用 --c-brand：深色档的 --c-brand 是**文字色**（浅蓝），
-       拿去当底时 Hero 的白字只有 2.34:1（19-2 首轮审计实测）。见 tokens.css 的 --c-hero-* 注释。 */
-    background: linear-gradient(135deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
+    /* 打底的必须是**顶栏那一支蓝本身**（浅色档 --c-hero-from 就是 var(--c-brand)），
+       不能拿它的深墨同族当底：那样大面积看到的是深墨端，"和顶栏同色"就落空了。
+       体积感交给一层 overlay：左上 6% 白 / 右下 16% 黑，主色始终在那里，
+       不再引入第二个色相（上一版正是靠"换一个更深的蓝"做跨度，结果越换越偏）。
+       斜纹 5% 白、18px 一道：更淡就看不见纹理，更密/更浓就跟内容抢，
+       它是背景里的暗纹，不是装饰条。（上一版的深墨纹给的是亮底，这里底回深蓝，
+       纹理当然跟着翻回白；叠加后最亮处白字 6.8:1、最淡的 .72 层仍有 4.7:1。） */
+    background-color: var(--c-hero-from);
+    background-image:
+        linear-gradient(160deg, rgba(255, 255, 255, .06) 0%, rgba(0, 0, 0, .16) 100%),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 18px);
     color: #fff;
     box-shadow: var(--sh-3);
 }
-.hero-card__title {
-    font-size: var(--fs-2xl);
+/* v1.139.0：Hero 右上那块**柔光**（.hero-card::before，一道 radial-gradient 白斑）
+   在这里连同规则一起删掉 —— 用户明确"不要亮光"。它的代价不止审美：那块亮斑压在内容
+   区上方，会把同一层文字的对比度往下拖，是 ui-contrast-audit 里"渐变底最难处理"的那一类。
+   让 Hero 不像色卡的活交给上面那层 45° 斜纹去做，高光从这个 Hero 里退场。 */
+/* (v1.139.0) .hero-card__title / __sub / __cta 连同样式一并删除：那是三态文案与那颗
+   「开始测算 / 继续上次测算」按钮的样式，Hero 改成「问候 + 今日税感 + 小贴士」后没有对应 DOM ——
+   留着只会让下一个改 Hero 的人以为这里还能改出一句自我介绍。
+   （配套令牌 --c-hero-cta-ink 也随之从 tokens.css 撤掉：它是为「白底品牌字按钮」单独设的，
+    Hero 里那颗按钮没了，就没有第二个地方用它 —— 留一个没人取的色值是下一个人的陷阱。） */
+
+/* ====== Hero 内部排版（v1.139.0 三版）：主次两级，不再框上叠框 ======
+   二版的面板（半透明白底块）解决了"一片字"，但两块框叠在渐变上还是闷：
+   每一块都在跟渐变要边界，边界一多就失去了呼吸。三版反过来 ——
+   **渐变底直接当画布**：主动态（今日税感）无框大字，次动态（小贴士）
+   一条分隔线 + 弱化小字。层级靠"有没有框、字多大"，不靠底色深浅。
+   白字压在渐变上仍是深底白字（对比度同 .hero-card），不另发明颜色。 */
+/* 「我的」页身份卡的文字（v1.139.0）
+   为什么是**固定深色**而不是 text-gray-*：这张卡的底是写死的 bg-indigo-50 —— 深色档它
+   不会跟着变深，而 Tailwind 的 gray 类在 .dark 下会被反色（800→100 近白、500→400）。
+   两者凑在一起就是"浅白字压浅蓝底"，对比度审计实测 **1.02:1**（dark/profile），标题实为不可见。
+   结论：**底写了死色，文字就不能跟主题反色** —— 这也是本项目别处的同一条规矩
+   （--c-btn-primary-bg/ink、mode-card-subtitle 都是这么定的）。
+   副标取 gray-600 而不是原来的 500：浅模式下 500 在 #eef2ff 上只有 4.32:1，差一点不达 AA；
+   600 为 6.7:1。 */
+.profile-identity__title {
+    color: #1f2937;
+}
+.profile-identity__sub {
+    color: #4b5563;
+}
+
+/* 头部一行：问候独占（logo 已挪去右上角做标识），右侧让出一截给它。 */
+.hero-card__greeting {
+    font-size: var(--fs-xs);
+    color: rgba(255, 255, 255, .82);
+    margin-bottom: var(--sp-4);
+    padding-right: 104px;
+}
+/* logo (v1.139.0)：44 → 68 → **136px**（＝再放大 2 倍，桌面 176px）。
+   它是手机上唯一的品牌标记，也该有标识的体量 —— 但仍严控两件事：
+   ① 绝对定位在右上，不与任何文字抢同一行的宽度（68px 那版蹭着问候排，就把问候挤换行了）；
+   ② 只用 -6px 的轻微出血 + 卡片 overflow:hidden 裁边，不做满幅水印 ——
+      水印会被内容压住观感，品牌标识应该"站在"画面里，不是铺在下面。
+   一点投影不是补对比度（它在深底上本来就清晰），是让它不被柔光吃掉边缘。 */
+.hero-card__logo {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 136px;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .3));
+    pointer-events: none;
+}
+@media (min-width: 640px) {
+    .hero-card__logo {
+        width: 176px;
+    }
+    .hero-card__greeting {
+        padding-right: 144px;
+    }
+}
+/* 区块小标签：大写间距式的"栏目名"，只负责说这是哪一块，
+   不跟内容抢 —— 所以比内容小一号、字距拉开，并且可以**淡一度**（深蓝底上 .72 白仍有
+   5.4:1，比次级正文还低一档也够 AA —— 这条红利是底足够深才有的）。 */
+.hero-card__label {
+    font-size: 11px;
     font-weight: 600;
-    line-height: 1.3;
+    letter-spacing: .08em;
+    color: rgba(255, 255, 255, .72);
+    margin-bottom: var(--sp-2);
 }
-.hero-card__sub {
-    margin-top: var(--sp-2);
+/* 主行：节点名 + 大字天数 + 截止。天数是这张卡唯一的数字，
+   22px 加粗是它应得的重量；名字与截止都向它让位（降一级白、降一号字）。 */
+.hero-card__feel {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.hero-card__feel-main {
+    flex: 1;
+    min-width: 0;
+}
+.hero-card__feel-name {
     font-size: var(--fs-sm);
-    opacity: .92;
+    font-weight: 600;
+    /* 主行名字取纯白，与次级正文（.82）拉开一档 —— 深蓝底撑得起这个透明度差。 */
+    color: #fff;
 }
-/* Hero 内的主按钮：白底品牌字（渐变底上唯一的实心按钮） */
-.hero-card__cta {
+.hero-card__feel-count {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+.hero-card__feel-days {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: #fff;
+    font-style: normal;
+}
+.hero-card__feel-until {
+    font-size: var(--fs-xs);
+    /* 次级正文统一 .82：深蓝底给得起，不必像上一版亮底那样全 Hero 挤成同一个实色。 */
+    color: rgba(255, 255, 255, .82);
+}
+/* 次要条目行（主行之外的小字提醒）：dot + 一句话，14px 以下、白 .8。 */
+.hero-card__feel-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: var(--fs-xs);
+    line-height: 1.6;
+    color: rgba(255, 255, 255, .82);
+}
+.hero-card__feel-row + .hero-card__feel-row {
+    margin-top: var(--sp-1);
+}
+/* 主行之后的次要行要跟主行再拉开一点 —— 上一条只管次行之间的行距。 */
+.hero-card__feel ~ .hero-card__feel-row {
+    margin-top: var(--sp-2);
+}
+/* 节点小圆点：success / warning / danger 三色在亮蓝底上本身就跳，但都是**中明度**色
+   —— 加一圈深墨描边把点与亮底切开，描边补的是可见性，不是换语义（颜色照旧表紧急程度）。 */
+.hero-card .tax-reminder-dot {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+}
+/* 提醒项的「剩 N 天」紧急 / 临期文字（对比度审计发现的既有破口）：
+   它们原先挂 Tailwind 的 text-danger / text-warning —— 那是**徽章底色档**的饱和色，
+   当文字色在白底上只有 3.76:1（12px 需 4.5），深色档更是 3.9:1。
+   tokens 里早就备了「白底可读档」成对令牌（--c-danger-text / --c-warning-text），
+   差别只是没人把这两处接上去 —— 语义不变（红=紧急、黄=临期），深度够了才看得清。 */
+.tax-reminder-urgent { color: var(--c-danger-text); }
+.tax-reminder-soon { color: var(--c-warning-text); }
+/* 次动态：小贴士。一条 1px 分隔线就是它全部的"容器"——
+   位置在主行下面、视觉重量低一档，「看了有用、不看不阻塞」。 */
+.hero-card__tip {
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-4);
+    border-top: 1px solid rgba(255, 255, 255, .16);
+}
+.hero-card__tip-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-1);
+}
+.hero-card__tip-label {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
-    margin-top: var(--sp-4);
-    padding: var(--sp-3) var(--sp-6);
-    min-height: 44px;              /* 触控目标下限（可访问性） */
-    border-radius: var(--r-ctrl);
-    background: #fff;
-    /* 白底按钮上的字：深色档若跟着 --c-brand 变浅蓝，就成了「白底浅蓝字」（实测 2.54:1） */
-    color: var(--c-hero-cta-ink);
+    gap: 6px;
+    font-size: var(--fs-xs);
     font-weight: 600;
-    box-shadow: var(--sh-1);
+    letter-spacing: .04em;
+    /* 同 __feel-until：冷蓝底上 12px 的 AA 下界 */
+    color: rgba(255, 255, 255, .82);
 }
-.hero-card__cta:focus-visible {
-    outline: none;
-    box-shadow: var(--sh-focus);
+.hero-card__tip-label i {
+    font-size: 12px;
+    /* 灯泡图标回到亮黄（上一版是为了压得住亮蓝底才取深黄）：深蓝底上
+       --c-warning-text 那种琥珀暗色会"熄掉"，图标该是这行里发光的那一点。 */
+    color: rgba(251, 191, 36, .9);
+}
+.hero-card__tip-body {
+    font-size: var(--fs-xs);
+    line-height: 1.7;
+    color: rgba(255, 255, 255, .82);
+}
+/* 「换一条」：挂在小贴士标题行右端的小字按钮。不做下划线常显 —— 标题行的位置 + 「›」
+   已经是可点的暗示，下划线常显会把标题行搅乱；hover / 聚焦时才补上下划线。 */
+.hero-card__link {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    letter-spacing: normal;
+    color: rgba(255, 255, 255, .82);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.hero-card__link:hover,
+.hero-card__link:focus-visible {
+    color: #fff;
+    text-decoration: underline;
 }
 /* 首页页尾信任标签（阶段20 P0 · R5）：原「关于本站」长文删掉后，
    信任信息压缩成一行 —— 41 个场景（能力口径）+ 数据不出本机（隐私口径），
@@ -182,10 +358,18 @@
     gap: var(--sp-2);
     margin-bottom: var(--sp-3);
 }
+/* v1.139.0：第 5 格（个人中心）进宫格后不再写死 4 列 ——
+   auto-fit 会把**空余的轨道折叠掉**，于是 5 张时五等分、游客态 4 张时四等分，
+   两种张数都铺满整行，不会留半行空白（写死 4 列时第 5 张会孤零零吊在第二行）。 */
 @media (min-width: 640px) {
     .profile-quick-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
+}
+/* 手机 2 列时，张数为奇数则最后一张拉满整行 —— 3 行里的最后一行只站半格，
+   看着像漏了一块，补满即可（不是"重要所以要加宽"，是补齐缺口）。 */
+.profile-quick-grid .profile-quick-tile:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
 }
 .profile-quick-tile {
     position: relative;
@@ -248,6 +432,117 @@
 }
 .dark .profile-quick-badge {
     color: #fdba74;
+}
+
+/* ====== 「我是谁」身份弹窗（v1.139.0）======
+   6 张身份卡：手机单列也读得下（名字 + 一句话说明），≥640 两列。
+   选中的表达是**品牌描边 + 右上角勾**，不是换满底色 —— 满底色容易被读成"禁用/不可点"。
+   颜色 / 圆角 / 阴影一律取既有令牌，不发明新色。 */
+.identity-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: var(--sp-2);
+}
+@media (min-width: 640px) {
+    .identity-pick-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.identity-pick {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    text-align: left;
+    background: #fff;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card-sm);
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.identity-pick:hover {
+    border-color: var(--c-brand-line);
+    box-shadow: var(--sh-1);
+}
+.identity-pick > .fa:first-child {
+    margin-top: 2px;
+    font-size: 16px;
+    color: var(--c-brand);
+}
+.identity-pick-name {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.identity-pick-desc {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    color: var(--c-text-3);
+}
+.identity-pick-check {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 12px;
+    color: var(--c-brand);
+    opacity: 0;
+}
+.identity-pick.is-on {
+    border-color: var(--c-brand);
+    background: rgba(30, 64, 175, .04);
+    box-shadow: var(--sh-1);
+}
+.identity-pick.is-on .identity-pick-check {
+    opacity: 1;
+}
+
+/* 个人中心里的身份摘要：键左值右一行一条。
+   未填的显示「未填写」并弱化 —— 既不写「无」吓人，也不留白让人以为没加载出来。 */
+.identity-settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--c-border);
+    font-size: var(--fs-sm);
+}
+.identity-settings-row:last-child {
+    border-bottom: none;
+}
+.identity-settings-key {
+    color: var(--c-text-3);
+}
+.identity-settings-val {
+    font-weight: 600;
+    color: var(--c-text);
+    text-align: right;
+}
+.identity-settings-val.is-empty {
+    font-weight: 400;
+    color: var(--c-text-3);
+}
+
+.dark .identity-pick {
+    background: #1f2937;
+    border-color: var(--c-border);
+}
+.dark .identity-pick-name {
+    color: #e5e7eb;
+}
+.dark .identity-pick > .fa:first-child {
+    color: #60a5fa;
+}
+.dark .identity-pick.is-on {
+    background: rgba(59, 130, 246, .12);
+    border-color: #3b82f6;
+}
+.dark .identity-settings-val {
+    color: #e5e7eb;
 }
 
 /* 备案位占位态（ICP 号待下发）：位置先占住，避免号一下来页脚跳版；
@@ -349,9 +644,13 @@
    3. 双轴导航（§3.3）—— 19-2 接线
    ========================================================================== */
 
-/* --- 3.1 事件轴：横向滑动卡片组 ---
-   手机 scroll-snap 横滑（首屏露 1.5 张暗示可滑），桌面转网格。
-   事件卡是首页转化主力，**任何断点都不折叠**。 */
+/* --- 3.1 事件轴：手机两列网格（尾部可展开），桌面 auto-fill 网格 ---
+   手机端原本是"横向滑动 + scroll-snap"，v1.139.0 实测 375 宽下 scrollWidth 2468 /
+   可视 304 —— 9 张卡要横滑 8 屏才看全，且**没有任何"还能滑"的提示**（滚动条也隐藏了），
+   用户实际只看到前两张就走了。横滑适合 3–5 张，装 9 张是错的工具：
+   它需要用户先猜到"这里能滑"，再付出 8 屏的手势成本，回报却是最后那几张。
+   改成两列网格 + 尾部可展开：卡片一眼看得到边界、不需要手势、也不需要猜。
+   整块仍**不折叠**（事件卡是首页转化主力）—— 折叠的只是列表尾部那几张，不是这一块。 */
 .event-rail {
     display: grid;
     gap: var(--sp-3);
@@ -359,23 +658,48 @@
 }
 @media (max-width: 767px) {
     .event-rail {
-        display: flex;
-        grid-template-columns: none;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        /* 负边距 + 内边距：让卡片能贴边滚动到容器外沿 */
-        margin-inline: calc(-1 * var(--sp-4));
-        padding-inline: var(--sp-4);
-        scrollbar-width: none;
+        grid-template-columns: repeat(2, 1fr);
     }
-    .event-rail::-webkit-scrollbar { display: none; }
+    /* 两列 3 行 = 6 张：再往上放就是"要滚很久才够到展开按钮"，
+       不如先给一屏半，把选择权交给那颗按钮。 */
+    .event-rail.is-collapsed > .event-card:nth-child(n + 7) { display: none; }
+}
+/* 展开 / 收起按钮：默认不出现（卡片数不够或桌面），由 home-ui.js 加 is-visible 点亮。 */
+.event-rail-more {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    margin-top: var(--sp-3);
+    min-height: 44px;                 /* 触控高度下限，与 action-bar 同一条线 */
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-brand);
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    transition: border-color var(--dur-micro) var(--ease),
+                background var(--dur-micro) var(--ease);
+}
+.event-rail-more.is-visible { display: inline-flex; }
+.event-rail-more:hover {
+    border-color: var(--c-brand);
+    background: rgba(30, 64, 175, .04);
+}
+.event-rail-more:focus-visible {
+    outline: none;
+    box-shadow: var(--sh-focus);
+}
+/* 展开后箭头翻上来：状态不能只靠文案，文案会被"展开全部/收起"这两个词看腻 */
+.event-rail-more[aria-expanded="true"] i { transform: rotate(180deg); }
+@media (min-width: 768px) {
+    /* 桌面网格本来就铺得下 9 张，这颗按钮在那里只会是"多出来的一步" */
+    .event-rail-more,
+    .event-rail-more.is-visible { display: none; }
 }
 
 .event-card {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-    width: min(78vw, 260px);
     padding: var(--sp-4);
     border: 1px solid var(--c-border);
     border-radius: var(--r-card);
@@ -384,9 +708,6 @@
     text-align: left;
     transition: box-shadow var(--dur-micro) var(--ease),
                 transform var(--dur-micro) var(--ease);
-}
-@media (min-width: 768px) {
-    .event-card { width: auto; }
 }
 .event-card:hover {
     box-shadow: var(--sh-2);
@@ -1259,6 +1580,8 @@
     text-align: center;
     padding: var(--sp-8);
     background: linear-gradient(150deg, var(--c-hero-from) 0%, var(--c-hero-to) 100%);
+    /* 与 Hero 同一支 Token pair —— 两者必须一起改：Hero 的底翻回深蓝，这边
+       跟着翻回白字（上一轮就是反过来走同一套逻辑，别再记错方向）。 */
     color: #fff;
 }
 .auth-brand__mark {
@@ -1280,6 +1603,7 @@
     object-fit: contain;
     padding: var(--sp-2);
     border-radius: var(--r-hero);
+    /* logo 承片（深底上的白片 .14）：上一版为亮蓝底翻成深墨片，底回深蓝后跟着翻回来。 */
     background: rgba(255, 255, 255, .14);
 }
 .auth-brand__wordmark {
@@ -1293,7 +1617,7 @@
     font-weight: 600;
     line-height: 1.45;
 }
-.auth-brand__sub { margin-top: var(--sp-2); font-size: var(--fs-sm); opacity: .85; }
+.auth-brand__sub { margin-top: var(--sp-2); font-size: var(--fs-sm); font-weight: 500; }
 
 /* --- 右：表单面板 --- */
 .auth-main {

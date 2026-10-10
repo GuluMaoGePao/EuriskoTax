@@ -177,7 +177,8 @@ describe('端到端：综合所得向导结果区自动挂上方案对比卡', (
     });
 
     function toResult() {
-        W().open('forward', { fresh: true });
+        // 带上最小可用入参：金额预填归零后，什么都不填主指标就是 0，存进库的也是 0
+        W().open('forward', { fresh: true, values: baseValues() });
         for (let i = 0; i < 10; i++) {
             const next = document.getElementById('dw-next');
             if (!next) break;

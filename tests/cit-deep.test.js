@@ -39,27 +39,31 @@ const C = () => window.EuriskoCorporateQuick;
 //   收入 1200 万 − 成本 880 万 = 320 万，三大限额调增 24 万 → 344 万（超 300 万门槛，25%）
 //   研发 100 万按 100% 加计 → 244 万（回到门槛内，5%）
 //   往年亏损只有一笔 2019 年的 150 万 → 一般企业 2024 年度已到期作废
+// 走向导与直接调 compute 必须吃**同一份**输入：金额预填归零后（v1.138.0）向导只读 default，
+// 而 default 现在是空的 —— 两边各按各的算，一致性断言就变成「0 等于 0」，什么也钉不住。
+const CIT_BASE = {
+    highTech: false,
+    smeTech: false,
+    industry: 'general',
+    restricted: false,
+    quarters: [
+        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+        { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
+        { staffBegin: 380, staffEnd: 250, assetsBegin: 3000, assetsEnd: 3000 }
+    ],
+    revenue: 12000000,
+    cost: 8800000,
+    entertainment: 100000,
+    advertising: 2000000,
+    donation: 300000,
+    rdExpense: 1000000,
+    currentYear: 2026,
+    losses: [{ year: 2019, amount: 1500000 }]
+};
+
 function compute(values) {
-    return R().get('corporate-income-tax-deep').compute(Object.assign({
-        highTech: false,
-        smeTech: false,
-        industry: 'general',
-        restricted: false,
-        quarters: [
-            { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
-            { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
-            { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
-            { staffBegin: 380, staffEnd: 250, assetsBegin: 3000, assetsEnd: 3000 }
-        ],
-        revenue: 12000000,
-        cost: 8800000,
-        entertainment: 100000,
-        advertising: 2000000,
-        donation: 300000,
-        rdExpense: 1000000,
-        currentYear: 2026,
-        losses: [{ year: 2019, amount: 1500000 }]
-    }, values || {}));
+    return R().get('corporate-income-tax-deep').compute(Object.assign({}, CIT_BASE, values || {}));
 }
 
 function row(out, label) {
@@ -372,7 +376,7 @@ describe('走向导：分步填、repeater 与结果都能走通', () => {
     });
 
     test('走到结果步，算出的税与直接调 compute 一致', () => {
-        W().open('corporate-income-tax-deep', { fresh: true });
+        W().open('corporate-income-tax-deep', { fresh: true, values: CIT_BASE });
         for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
             document.getElementById('dw-next').click();
         }

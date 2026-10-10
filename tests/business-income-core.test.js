@@ -292,7 +292,7 @@ describe('经营所得走向导：business 由 spec 驱动', () => {
 
         const tool = R().get('business');
         const values = {};
-        tool.fields.forEach((f) => { values[f.key] = f.default; });
+        tool.fields.forEach((f) => { values[f.key] = (f.sample !== undefined ? f.sample : f.default); });
 
         // 17D-11（v1.67.0）：spec 新增的三个口径（投资者工资调增 / 合伙企业分配比例 /
         // 多家企业汇总定档）都是**增量** —— 把它们关掉，主结果必须仍等于内核那一个数。

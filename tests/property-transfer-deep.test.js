@@ -40,8 +40,13 @@ const Q = () => window.EuriskoPropertyTransferQuick;
 // 持有 6 年但**非**家庭唯一，卖后 1 年内在同城买了 400 万
 function values(extra) {
     const base = {};
-    R().get('property-transfer').fields.forEach((f) => { base[f.key] = f.default; });
-    return Object.assign(base, extra || {});
+    R().get('property-transfer').fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
+    // 声明类勾选项由用户自己勾（v1.138.0 起产品默认不勾），本套用例钉的是
+    // 「有原值凭证 + 卖后一年内同城买了新房、本人是新购产权人」这一户 —— 写在这里而不是
+    // 指望默认值，默认值归零后这里就是唯一能说明「这户人家什么情况」的地方。
+    return Object.assign(base, {
+        hasValueProof: true, repurchase: true, sameCity: true, isNewOwner: true
+    }, extra || {});
 }
 
 function compute(extra) {
@@ -302,6 +307,11 @@ describe('走向导：由 spec 驱动', () => {
 
     test('条件字段：受赠才问原捐赠人成本、非住房不问唯一、凭证不全才问核定率', () => {
         W().open('property-transfer', { fresh: true });
+        // 「能提供完整、准确的房屋原值凭证」是用户自己的声明，默认不勾 —— 这一户有凭证，先勾上，
+        // 否则一进来就在问核定率（凭证不全那条路），下面三句断言的前提就不成立
+        const proofOn = document.getElementById('qf-hasValueProof');
+        proofOn.checked = true;
+        proofOn.dispatchEvent(new Event('change'));
         expect(document.getElementById('qf-donorCost')).toBeNull();
         expect(document.getElementById('qf-assessRate')).toBeNull();
         expect(document.getElementById('qf-originalValue')).toBeTruthy();

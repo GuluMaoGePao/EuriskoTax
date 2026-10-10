@@ -2,7 +2,8 @@
 // 首页要从「按身份挑工具」改成「先问你遇到了什么事」（plan §3.3）：
 //   Hero（你现在该办的事）→ 事件轴（我要做什么）→ 资产（我已有的）→ 身份轴（我是谁）→ 兜底
 // 本模块只负责这四件事的**判定与数据**，渲染仍在 home-ui.js：
-//   1. Mission 三态判定（首访 / 有历史 / 临近节点）—— 决定 Hero 里那句话与主 CTA
+//   1. ((v1.139.0) 原「Mission 三态判定」已撤 —— Hero 不再讲「你现在该办的事」那句话，
+//      也不再有主 CTA；见下文件内同名的那段注释。)
 //   2. 9 张事件卡的数据（生活语言 → 落到具体工具）
 //   3. 待办与截止（税务日历 × 已保存的测算推导，不是凭空列节点）
 //   4. 今年税负概览（≥2 次测算才出现，避免新客看到空图劝退）
@@ -19,12 +20,8 @@
     'use strict';
 
     // ====== 常量 ======
-    // 节点进入「临近」态的阈值：30 天内开始占用 Hero（plan §3.3.2：临近申报节点是三态之一）
-    const DEADLINE_WINDOW_DAYS = 30;
-    // 只有**年度汇算清缴**能升级成 Hero 的 deadline 态 —— 月度 / 季度预缴是例行申报
-    // （每月 15 日，任何一天距下一次都 ≤30 天），若也算临近，deadline 态会永久命中、
-    // 「有历史」态永远显示不出来，Hero 就退化成一块每月都一样的倒计时牌。
-    const HERO_NODE_TYPES = ['settlement'];
+    // ((v1.139.0) 原 DEADLINE_WINDOW_DAYS 与 HERO_NODE_TYPES 随 Hero 三态判定一起删除：
+    //  它们是「多近的节点才占用首屏那句话」的阈值，Hero 不再讲那句话，阈值就没有消费者。)
     // 概览要出现至少几次测算（plan §3.3.5：≥2 次测算后出现），避免 1 条数据画「构成」
     const OVERVIEW_MIN_COUNT = 2;
 
@@ -319,85 +316,12 @@
         return '刚刚';
     }
 
-    // ====== Mission 三态判定（plan §3.3.2）======
-    // 优先级：临近节点 > 有历史 > 首访 —— 临近节点是最该被看见的那一句，
-    // 但它只在**用户已经有测算**时才升级为 deadline 态：新客连结果都没有，
-    // 给他一个倒计时只会劝退（plan §3.3.5 同款顾虑：空状态不放给新客看）。
-    /**
-     * 首页那句自我介绍的副标题（v1.125.0）。
-     *
-     * 两件事在这里一起改：
-     *
-     * ① **场景数不再手写**：以前 "41" 同时写在 home-mission.js、index.html 底部那行
-     *    信任标签、以及 tests/index-assembly.test.js 的断言里，共三处 —— 加一个工具
-     *    就要改三处，漏一处页面就开始自己骗自己（写 41 实际 42，谁也不会发现）。
-     *    现在由 tool-registry 现数：`all()` 是 20 个速算器，`deep()` 是 21 个完整测算。
-     *    取不到就干脆不提数字 —— 宁缺一个数字，也不给一个错的。
-     *
-     * ② **不再说「数据不出本机」**：登录用户的计算历史会镜像到云端（history-sync.js
-     *    明写「写主在本端，云端仅镜像」），这句承诺对登录用户是**半假的** —— 而它偏偏
-     *    印在每一个新访客的第一屏。真正成立、也才是用户真正关心的那条是：
-     *    **计税输入不上云**（薪资金额、专项附加扣除这些原始数据从不出本机）。
-     */
-    function missionSubtitle() {
-        const registry = (typeof window !== 'undefined') ? window.EuriskoToolRegistry : null;
-        let count = 0;
-        if (registry && typeof registry.all === 'function' && typeof registry.deep === 'function') {
-            try {
-                count = registry.all().length + registry.deep().length;
-            } catch (error) {
-                count = 0;   // 数不出来就不报数 —— 假数字比没数字糟
-            }
-        }
-        return (count > 0 ? count + ' 个场景，' : '') + '全在你手机里算完，计税输入不上云';
-    }
-
-    function detectMission(options = {}) {
-        const now = options.now || new Date();
-        const history = options.history || readHistory();
-        const last = lastRecord(history);
-
-        if (!last) {
-            return {
-                state: 'first-visit',
-                title: '你今年要交多少税？',
-                subtitle: missionSubtitle(),
-                cta: { text: '开始测算', action: 'scroll', target: 'home-events' },
-                node: null,
-                last: null
-            };
-        }
-
-        // 临近节点：只认年度汇算（见 HERO_NODE_TYPES 的说明 —— 例行申报不占用首屏）
-        const urgent = upcomingNodes(now).find(n =>
-            HERO_NODE_TYPES.includes(n.type) && n.daysLeft >= 0 && n.daysLeft <= DEADLINE_WINDOW_DAYS);
-        if (urgent) {
-            const tax = recordTax(last);
-            return {
-                state: 'deadline',
-                title: `距${urgent.name}还有 ${urgent.daysLeft} 天`,
-                subtitle: tax > 0
-                    ? `上次测算：${recordTitle(last)} 应纳 ¥${tax.toFixed(0)} · ${relativeTime(recordTime(last), now)}`
-                    : `${urgent.deadlineLabel} 截止，趁现在把数填进去`,
-                cta: { text: '现在更新测算', action: 'open-last', target: last.id },
-                node: urgent,
-                last
-            };
-        }
-
-        const tax = recordTax(last);
-        return {
-            state: 'has-history',
-            title: tax > 0
-                ? `上次测算：${recordTitle(last)} 应纳 ¥${tax.toFixed(0)}`
-                : `上次测算：${recordTitle(last)}`,
-            subtitle: `${relativeTime(recordTime(last), now)} · ${recordTime(last).getFullYear()} 年度`,
-            cta: { text: '继续', action: 'open-last', target: last.id },
-            altCta: { text: '换个方案对比', action: 'scroll', target: 'home-events' },
-            node: null,
-            last
-        };
-    }
+    // (v1.139.0) Mission 三态判定（detectMission / missionSubtitle / DEADLINE_WINDOW_DAYS /
+    // HERO_NODE_TYPES）整段删除 —— 它是为 Hero 那句三态文案与那颗「开始测算」按钮写的，
+    // v1.139.0 起 Hero 装的是问候 + 今日税感 + 小贴士，首页不再有「你现在该办的事」这句判定，
+    // 也不再有大按钮（动手的入口是搜索条与「我遇到了什么事」）。
+    // 留下的判定都还活着：**待办与截止**（buildTodos）服务于「接下来要办」，
+    // **今天有哪些节点**（今日税感）由 home-ui.js 按同一份 TAX_NODES 现算 —— 节点口径仍只有这一处。
 
     // ====== 待办与截止（plan §3.3.5 ②）======
     // 由「税务日历 × 已保存的测算」推导：只提示**与我已算过的东西有关**的节点，
@@ -468,14 +392,11 @@
 
     // ====== 暴露 ======
     window.EuriskoHomeMission = {
-        DEADLINE_WINDOW_DAYS,
-        HERO_NODE_TYPES,
         OVERVIEW_MIN_COUNT,
         nodes: TAX_NODES,
         eventCards: EVENT_CARDS,
         nodeDeadline,
         upcomingNodes,
-        detectMission,
         buildTodos,
         buildYearOverview,
         // 下面几个是渲染层也要用的小工具，一并导出，避免 home-ui 再抄一份相对时间口径

@@ -296,9 +296,10 @@ describe('阶段13D+ 分享落地引导', () => {
     });
 
     test('CTA 锚点在页面中真实存在（锚点被改名 = 按钮点了没反应）', () => {
-        // 锚点随信息架构调整而变（原「开始计算」卡片已移入工具页，首页第一屏是「我是谁」场景入口）
-        expect(INDEX_HTML).toContain('id="home-scenarios"');
-        expect(readSrc('src/js/share/share-landing.js')).toContain('home-scenarios');
+        // 锚点随信息架构调整而变：原「开始计算」卡片已移入工具页；
+        // v1.139.0「我是谁」（#home-scenarios）也撤出首页，落地锚点改指「我遇到了什么事」。
+        expect(INDEX_HTML).toContain('id="home-event-rail"');
+        expect(readSrc('src/js/share/share-landing.js')).toContain('home-event-rail');
     });
 
     test('落地引导不承担归因与埋点（职责单一，可整体下线而不影响闭环）', () => {

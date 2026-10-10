@@ -105,7 +105,7 @@ function firstToolId() {
 // 扰动后算不出结果就退回纯默认值 —— 这不影响要验证的东西：存入—取回必须是同一份输入。
 function validInput(tool) {
     const base = {};
-    (tool.fields || []).forEach((f) => { base[f.key] = f.default; });
+    (tool.fields || []).forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     const tries = [];
     const moneyKeys = (tool.fields || []).filter((f) => f.type === 'money' || f.type === 'number')
         .map((f) => f.key);

@@ -18,7 +18,7 @@ const W = () => window.EuriskoDeepWizard;
 function valuesOf(overrides) {
     const tool = R().get('forward');
     const v = {};
-    tool.fields.forEach(function (f) { v[f.key] = f.default; });
+    tool.fields.forEach(function (f) { v[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     return Object.assign(v, overrides || {});
 }
 
@@ -322,6 +322,11 @@ describe('正向计税走向导：forward 由 spec 驱动', () => {
         W().open('forward', { fresh: true });
         document.getElementById('dw-next').click();            // → 各项所得
         document.getElementById('dw-next').click();            // → 扣除项明细
+        // 专项附加扣除是「我有没有这些支出」的声明，默认不勾；走了两步到扣除页才勾得上，
+        // 勾上之后下面那一片才展开
+        const sa = document.getElementById('qf-specialAdditionalDeductionCheckbox');
+        sa.checked = true;
+        sa.dispatchEvent(new Event('change'));
         expect(document.getElementById('qf-rentDeduction')).toBeTruthy();
 
         const select = document.getElementById('qf-housingType');

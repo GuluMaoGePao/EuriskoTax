@@ -25,6 +25,12 @@
 
     var KEY = 'euriskoPrefIdentity';
 
+    // v1.139.0：职务名称 / 公司名**另存一个键**，不并进上面那个 ——
+    // 上面那个键存的是**纯 id 字符串**（老用户 localStorage 里就是 'employee' 这种形态，
+    // 现有单测也按这个形态断言）。把 JSON 混进去会让两边的读法一起改坏，
+    // 收益（少一个键）远小于代价（兼容分支散在读取处）。两条线各存各的：身份 id / 身份详情。
+    var PROFILE_KEY = 'euriskoIdentityProfile';
+
     // 默认视图密度：依据是 plan §3.3.4 身份卡表格（上班族 / 自由职业 / HR 简明；
     // 老板个体户 / 企业财务 完整）。executive 与 agent 未登记 —— 见文件头第 3 条。
     var DEFAULT_MODE_OF = {
@@ -49,6 +55,35 @@
         try {
             if (id) window.localStorage.setItem(KEY, id);
             else window.localStorage.removeItem(KEY);
+        } catch (e) { /* 存不下就只是这次不记住 */ }
+    }
+
+    // 身份详情（职务 / 公司 / 是否已看过引导）。存不下或存的是坏 JSON 都退回空详情 ——
+    // 详情是**锦上添花**（只影响显示），绝不能因为它坏了就让身份本身读不出来。
+    function readProfile() {
+        var empty = { title: '', company: '', onboarded: false };
+        try {
+            var raw = window.localStorage.getItem(PROFILE_KEY) || '';
+            if (!raw) return empty;
+            var o = JSON.parse(raw);
+            if (!o || typeof o !== 'object') return empty;
+            return {
+                title: typeof o.title === 'string' ? o.title : '',
+                company: typeof o.company === 'string' ? o.company : '',
+                onboarded: !!o.onboarded
+            };
+        } catch (e) {
+            return empty;
+        }
+    }
+
+    function writeProfile(p) {
+        try {
+            window.localStorage.setItem(PROFILE_KEY, JSON.stringify({
+                title: p.title || '',
+                company: p.company || '',
+                onboarded: !!p.onboarded
+            }));
         } catch (e) { /* 存不下就只是这次不记住 */ }
     }
 
@@ -95,6 +130,40 @@
             emit('');
             return '';
         },
+        /** 身份详情（职务 / 公司）连 id 一起读回：{ id, title, company, onboarded } */
+        profile: function () {
+            var p = readProfile();
+            p.id = read();
+            return p;
+        },
+        /**
+         * 一次写完身份三件套（弹窗「下一步」走这里）。
+         * id 传 undefined 表示只改详情、不动当前身份 —— 个人中心里改公司名不该顺手改身份。
+         */
+        save: function (o) {
+            o = o || {};
+            var prevId = read();
+            var p = readProfile();
+            var nextId = typeof o.id === 'string' ? o.id : prevId;
+            if (nextId !== prevId) {
+                write(nextId);
+                applyDefaultMode(nextId);   // 与 set 同一条规矩：不推翻用户显式切过的视图
+            }
+            writeProfile({
+                title: typeof o.title === 'string' ? o.title : p.title,
+                company: typeof o.company === 'string' ? o.company : p.company,
+                onboarded: true             // 存过一次 = 走过引导，下次登录不再弹
+            });
+            emit(nextId);
+            return api.profile();
+        },
+        onboarded: function () { return readProfile().onboarded; },
+        /** 只标「引导看过了」，不动身份与详情（弹窗里点「暂时不填」走这里） */
+        markOnboarded: function () {
+            var p = readProfile();
+            if (p.onboarded) return;
+            writeProfile({ title: p.title, company: p.company, onboarded: true });
+        },
         modeOf: modeOf,
         onChange: function (cb) {
             if (typeof cb !== 'function') return function () {};
@@ -107,7 +176,10 @@
         /** 测试用：退回默认并清空订阅（用例之间不串味） */
         reset: function () {
             subs.length = 0;
-            try { window.localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+            try {
+                window.localStorage.removeItem(KEY);
+                window.localStorage.removeItem(PROFILE_KEY);
+            } catch (e) { /* ignore */ }
         }
     };
 

@@ -37,22 +37,25 @@ const W = () => window.EuriskoDeepWizard;
 const S = () => window.EuriskoSocialQuick;
 
 // 单位职工默认场景：月薪 1 万 + 年终奖 12 万 → 上年度月平均 2 万（速算器只按 1 万）
+// 同上：向导与直接 compute 共用这一份
+const SOCIAL_BASE = {
+    identity: 'employee',
+    socialAverage: 8000,
+    monthlyWage: 10000,
+    annualBonus: 120000,
+    monthlyAllowance: 0,
+    monthlyOvertime: 0,
+    paidMonths: 12,
+    housingRate: 12,
+    housingBaseMode: 'same',
+    housingBase: 30000,
+    specialMonthly: 0,
+    declaredBase: 4800,
+    auditYears: 1
+};
+
 function compute(values) {
-    return R().get('social-base-deep').compute(Object.assign({
-        identity: 'employee',
-        socialAverage: 8000,
-        monthlyWage: 10000,
-        annualBonus: 120000,
-        monthlyAllowance: 0,
-        monthlyOvertime: 0,
-        paidMonths: 12,
-        housingRate: 12,
-        housingBaseMode: 'same',
-        housingBase: 30000,
-        specialMonthly: 0,
-        declaredBase: 4800,
-        auditYears: 1
-    }, values || {}));
+    return R().get('social-base-deep').compute(Object.assign({}, SOCIAL_BASE, values || {}));
 }
 
 // 没有奖金津贴加班时，上年度月平均 = 本月工资 —— 此时 deep 必须与速算器逐点相等
@@ -359,7 +362,7 @@ describe('走向导：条件字段与结果都能走通', () => {
     });
 
     test('走到结果步，算出的数与直接调 compute 一致', () => {
-        W().open('social-base-deep', { fresh: true });
+        W().open('social-base-deep', { fresh: true, values: SOCIAL_BASE });
         for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
             document.getElementById('dw-next').click();
         }

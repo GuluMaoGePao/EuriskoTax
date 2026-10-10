@@ -907,6 +907,10 @@ describe('阶段19-4：行动条四按钮常驻', () => {
     test('没有完整测算但有相关工具时，第四步是「算完还能干什么」', () => {
         expect(window.EuriskoToolbox.deepCounterpartOf({ id: 'net-salary' })).toBe('');
         document.querySelector('[data-tool-id="net-salary"]').click();
+        // 倒算器得先有目标才有解：金额预填归零后（v1.138.0）首屏是空的，这里替用户填一个
+        const target = document.getElementById('qf-targetMonthly');
+        target.value = '10000';
+        target.dispatchEvent(new window.Event('input', { bubbles: true }));
         expect(document.getElementById('quick-open-deep')).toBeNull();
         expect(document.getElementById('quick-next-tools')).toBeTruthy();
         expect(document.querySelectorAll('#quick-actions .quick-action-btn')).toHaveLength(4);

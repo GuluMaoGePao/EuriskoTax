@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.137.0';
+        window.__APP_VERSION__ = '1.139.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -155,8 +155,18 @@
                         <img src="images/logo.png" alt="EuriskoTax" class="auth-brand__logo">
                         <span class="auth-brand__wordmark">EuriskoTax</span>
                     </div>
-                    <h1 class="auth-brand__title">个人所得税预算规划工具</h1>
-                    <p class="auth-brand__sub">个税 / 企业税 / 社保在线测算</p>
+                    <!-- 品牌名称（v1.139.0 统一）：上面那行字标是英文品牌，这里承接它的**中文名** ——
+                         合起来读作「EuriskoTax 税费计算器」，与备案/对外承诺的网站全称
+                         （tests/filing-compliance.test.js 断言每个对外页面都要带）同口径。
+                         旧称「个人所得税预算规划工具」把产品窄化成了个税 —— 本站实际覆盖
+                         个税、企业税、增值税、附加税印花税、社保公积金等，且与 <title>、
+                         meta description、页脚版权三处的全称互相打架。
+                         副文案同理：不再写含糊的「在线测算」，改列**真能算的场景**。
+                         （数量型文案是开发口径 —— login-identifier.test.js 明确禁止罗列
+                         上登录页：那种数字一旦加一个测算就得同步多处，还会自己跟自己打架。
+                         同理，本注释也不复述被禁的原句，否则会被那条断言当成回潮。） -->
+                    <h1 class="auth-brand__title">尤里斯科税费计算器</h1>
+                    <p class="auth-brand__sub">个税 · 企业税 · 增值税 · 社保公积金，一次算清</p>
                 </aside>
 
                 <!-- 右侧表单面板 -->
@@ -471,25 +481,48 @@
                     <span class="home-searchbar-count">41 个 ›</span>
                 </button>
 
-                <!-- 卡片1：Mission Hero（阶段19-2）—— 首屏唯一焦点，回答「你现在该办的事」。
-                     三态文案由 home-mission.js 判定、home-ui.js 渲染：首访 / 有历史 / 临近节点。
-                     底是品牌渐变（终点取 --c-brand-deep，保证白字达 AA；取 --c-accent 时副文案只有 3.68:1），
+                <!-- 卡片1：Hero（阶段19-2 的 Mission Hero，v1.139.0 与「今日税感 · 小贴士」合一）。
+                     原先这里是三态文案 + 一颗大按钮（「你今年要交多少税？」/「开始测算」/「继续上次测算」），
+                     底下另有一张白卡放「今日税感 · 小贴士」。两处合一的理由：**它们讲的是同一件事的两半** ——
+                     Hero 说的是"你该办什么"，税感说的是"最近有什么节点"，而首页真正能动手的地方
+                     在搜索条与「我遇到了什么事」上，不在一颗写着「开始测算」的按钮上。
+                     于是：文案与按钮撤掉（动手交给 ① 搜索条与 ② 事件卡，那里一步就到具体工具），
+                     Hero 留下的是**一句问候 + 今天该知道的两件事** —— 品牌底仍在，但内容换成当天有用的信息。
+                     底是品牌渐变（终点取 --c-hero-to，保证白字达 AA；取 --c-accent 时副文案只有 3.68:1），
                      文字继承 .hero-card 的白色 —— 这里不要再叠 text-gray-*，那是深底上的深灰字。 -->
                 <section id="home-mission" class="hero-card">
-                    <p class="text-xs opacity-90 mb-3">
-                        <span id="home-greeting">你好 👋</span> · <span id="home-date-text">今天是 ...</span>
+                    <!-- 品牌标记：手机端顶栏整体隐藏（导航分端），Hero 是它**唯一露面的地方**。
+                         (v1.139.0) 放大到 2 倍后就不再和问候同排 —— 同排意味着它只能占
+                         "问候行剩下的那点宽度"，再怎么改也是个图标。挪到右上角、内容之上，
+                         问候行只需让出右侧一截（padding-right），下面的主行与小贴士仍是全宽。 -->
+                    <img src="images/logo.png" alt="EuriskoTax" class="hero-card__logo">
+
+                    <p class="hero-card__greeting">
+                        <span id="home-greeting">你好 👋</span> · <span id="home-date-text">9月20日 · 周日</span>
                     </p>
-                    <h2 id="home-mission-title" class="hero-card__title">你今年要交多少税？</h2>
-                    <!-- 副标题由 home-mission.js 写入（数字在运行时从 tool-registry 现数）——
-                     这里不写默认值：写过的那版默认文案带着手写的 "41"，JS 覆盖后它永远不显示，
-                     却会误导下一个改文案的人以为改这里有用于是改了个寂寞。 -->
-                <p id="home-mission-subtitle" class="hero-card__sub"></p>
-                    <button id="home-mission-cta" type="button" class="hero-card__cta">
-                        <i class="fa fa-arrow-down"></i>
-                        <span id="home-mission-cta-text">开始测算</span>
-                    </button>
-                    <!-- 次要动作（「有历史」态才有）：主 CTA 是「继续」，这里给「换个方案对比」 -->
-                    <button id="home-mission-alt" type="button" class="hidden mt-3 text-xs text-white underline opacity-90">换个方案对比 ›</button>
+
+                    <!-- 主动态：今日税感（由 home-ui.js 按 TAX_NODES 现算）。
+                         三版排版（v1.139.0）：**主次两级** —— 带倒计时的第一条升为主行
+                         （节点名 + 大字天数 + 截止），其余退为小字；不再装框压框，
+                         渐变底直接成为主角。大字天数是这张卡唯一的数字，值得被放大。 -->
+                    <div class="hero-card__label">今日税感</div>
+                    <div id="home-tax-feel-content">
+                        <!-- 由 home-ui.js 动态填充 -->
+                    </div>
+
+                    <!-- 次动态：税务小贴士。不再是一块面板，一条分隔线就够了 ——
+                         「看了有用、不看不阻塞」，视觉重量就该比主行轻一档。 -->
+                    <div class="hero-card__tip">
+                        <div class="hero-card__tip-head">
+                            <span class="hero-card__tip-label">
+                                <i class="fa fa-lightbulb-o"></i>税务小贴士
+                            </span>
+                            <button id="home-next-tip" type="button" class="hero-card__link">换一条 ›</button>
+                        </div>
+                        <div id="home-tip-content" class="hero-card__tip-body">
+                            <!-- 由 home-ui.js 动态填充 -->
+                        </div>
+                    </div>
                 </section>
 
                 <!-- 卡片2：上轴「我遇到了什么事」（阶段19-2）—— 9 张事件卡。
@@ -504,9 +537,21 @@
                         </div>
                         <span class="text-xs text-gray-500">不用先懂税，认得自己的事就行</span>
                     </div>
-                    <div id="home-event-rail" class="event-rail">
+                    <div id="home-event-rail" class="event-rail is-collapsed">
                         <!-- 由 home-ui.js 按 home-mission.js 的 eventCards 渲染 -->
                     </div>
+                    <!-- 手机端「展开全部 / 收起」（v1.139.0）：
+                         这块原先靠**横滑**看全 9 张，实测 375 宽下 scrollWidth 2468 / 可视 304，
+                         要滑 8 屏以上，且没有任何"还能滑"的提示 —— 用户实际只看到前两张。
+                         改成两列网格 + 尾部可展开后，手势不再是唯一出路。
+                         按钮文案（含件数）由 home-ui.js 填：事件卡是配置数据，
+                         写死"9 件"会在增删一张卡时立刻变成假话。
+                         桌面（≥768px）由 CSS 隐藏 —— 那里是 auto-fill 网格，本来就铺得下。 -->
+                    <button type="button" id="home-event-more" class="event-rail-more"
+                            aria-expanded="false" aria-controls="home-event-rail">
+                        <span id="home-event-more-text">展开全部</span>
+                        <i class="fa fa-chevron-down ml-1" aria-hidden="true"></i>
+                    </button>
                 </div>
 
                 <!-- ④ 接下来要办（阶段20 P1 · 三合一）—— 原「我的税务资产」待办 + 原「税务提醒」+ 原「漏填提醒」。
@@ -560,26 +605,16 @@
                     </div>
                 </div><!-- /#home-todo-card -->
 
-                <!-- ⑤ 身份 chip 一行（阶段20 P1）：原「我是谁」整卡 → 一行 chip。
-                     身份是**设置默认视角**，不是导航：占一整卡会与工具页的场景组形成两套分类，
-                     而用户只需要「点一下设为默认」这一个动作。
-                     因此 chip 形态**不渲染**描述与「看这类工具 ›」—— 那颗按钮正是它变成第二套分类的原因；
-                     要找工具靠 ① 搜索条与底部 Tab。渲染分支见 toolbox-ui.js 的 renderScenarios。 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-user-circle-o text-primary mr-2"></i>
-                            <span>我是谁</span>
-                        </div>
-                        <span class="text-xs text-gray-500">选一个当默认视角，不限制你能用什么</span>
-                    </div>
-                    <div id="home-scenarios" class="identity-chip-row">
-                        <!-- 由 toolbox-ui.js 按 tool-registry.js 的 scenarios 渲染 -->
-                    </div>
-                    <!-- 选完的反馈行（没选过就整行不出现）：设默认不跳页、不筛选，
-                         屏幕上没有变化的话，用户不知道自己刚才那一下生效了什么。 -->
-                    <div id="home-identity-note" class="identity-note hidden"></div>
-                </div>
+                <!-- ⑤ 「我是谁」已于 v1.139.0 **撤出首页** —— 它现在长在两个该在的地方：
+                     ① 首次登录后的弹窗（#identity-modal，选完点「下一步」即关，手机全屏）；
+                     ② 个人中心（常驻显示 + 随时修改），「我的」页顶部另给一张身份卡（#profile-identity-card）
+                        做一眼可见的入口。
+                     撤的理由：身份改的是**默认视角**，不改任何入口的可达性（41 个入口照旧全开）。
+                     把它摆在首页第 5 张卡上，用户一打开先被问"你是谁"，而答案对他接下来要做的事
+                     没有影响 —— 首页是动作页，不是问卷。
+                     ⚠️ #home-scenarios / #home-identity-note 两个 id 随卡一起删：
+                     toolbox-ui.js 的 renderScenarios / renderIdentityNote 对它们是**判空取用**（删了不炸），
+                     首页漏填提醒的兜底 CTA 与分享落地锚点已改指 #home-event-rail（home-ui.js / share-landing.js）。 -->
 
                 <!-- （原「搜索入口卡」已上移为首页顶部的常驻搜索条 ① —— 见 #home-searchbar，
                      位置在 Mission Hero 之前。此处不再留第二颗搜索按钮：同一页两颗搜索=第三处搜索入口。） -->
@@ -622,39 +657,19 @@
                 <!-- （原「卡片6：税务提醒」已收编为 ④ 接下来要办的截止段 —— 见 #home-calendar-section。
                      卡头那个年份 span 随卡一起删，renderTaxCalendar 对它是判空取用，不会因此抛错。） -->
 
-                <!-- ⑦ 呼吸卡（阶段19-2）—— 今日税感与税务小贴士合并成一张，放在页脚前。
-                     两者都是「看了有用、不看也不阻塞」的内容，各占一张卡只会把首页拉长。 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title">
-                            <i class="fa fa-lightbulb-o text-yellow-500 mr-2"></i>
-                            <span>今日税感 · 小贴士</span>
-                        </div>
-                        <button id="home-next-tip" class="text-xs text-primary hover:underline">换一条 ›</button>
-                    </div>
-                    <div id="home-tax-feel" class="tip-card">
-                        <div class="flex items-start">
-                            <i class="fa fa-calendar-check-o text-primary mt-0.5 mr-3 text-lg"></i>
-                            <div class="flex-1">
-                                <h4 class="font-medium text-primary mb-1 text-sm">📅 今日税感</h4>
-                                <div id="home-tax-feel-content" class="text-sm text-gray-600">
-                                    <!-- 由 home-ui.js 动态填充 -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="home-tip-content" class="text-sm text-gray-600 leading-relaxed mt-3">
-                        <!-- 由 home-ui.js 动态填充 -->
-                    </div>
-                </div>
+                <!-- (v1.139.0) 原「⑦ 呼吸卡 · 今日税感 / 小贴士」整卡撤下 —— 两块内容上移进 Hero
+                     （#home-mission）合为一张：今日税感是"最近有什么节点"，小贴士是"顺手知道一件事"，
+                     两者与 Hero 那句问候同属「看一眼就走」的信息，各占一张只是把首页拉长。
+                     #home-tax-feel / #home-tip-content / #home-next-tip 三个 id 跟着搬进 Hero（id 不变），
+                     渲染函数（renderTaxFeel / renderTaxTip）与「换一条」的绑定因此一行都不用改。
+                     原卡头那颗黄色灯泡与「📅」emoji 不搬：Hero 里已经有对应图标，同一句话不说两遍。 -->
 
                 <!-- (v1.125.0) 底部这行「41 个场景 · 数据不出本机」已删，两件事并到 hero 副标题一处：
                      ① **同一句在首页说了两遍**（hero 一遍、这里一遍），首页是动作页不是说明书；
                      ② v1.124.0 删掉全站页尾之后，这行灰字独自挂在首页最后一个元素上，看着像页尾没删干净。
-                     场景数也不再手写在 HTML 里（原先三处各写一遍 "41"）—— 由 home-mission.js 的
-                     missionSubtitle() 从 tool-registry 现数（all() 速算器 + deep() 完整测算）；
-                     口径同步纠正：不再说「数据不出本机」（登录用户的计算历史会镜像到云端），
-                     改说真正成立的那条 —— **计税输入不上云**。完整承诺在「关于我们」弹窗，两跳可达。 -->
+                     （v1.139.0 后续：那句副标题随 Hero 的三态文案一起撤了 —— 首页不再自我介绍，
+                     场景数因此只剩 ① 搜索条上那处「41 个 ›」。隐私承诺不再吊在首屏：
+                     「计税输入不上云」的完整说明在「我的 → 关于我们」，两跳可达。） -->
 
             </div>
         </div>
@@ -1628,7 +1643,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="privacy.html" target="_blank" rel="noopener" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.137.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.139.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1657,6 +1672,45 @@
             <div id="content-notice-modal-list" class="modal-body p-5 space-y-4 text-sm"></div>
             <div class="modal-foot p-4 border-t border-gray-200 flex justify-end">
                 <button id="content-notice-modal-ok" class="btn btn-primary px-6 py-2 rounded-lg">我知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v1.139.0：「我是谁」身份弹窗 —— 首次登录自动弹一次；个人中心与「我的」页身份卡可随时改。
+         两档里的**内容型**（--lg）：6 张身份卡各带一句话说明才选得动，--sm（448）塞不下；
+         手机上内容型档（--lg）自动铺满全屏（ui-redesign.css），与其余弹窗同一手感。
+         ⚠️ 注释里别写完整类名：modal-shell.test.js 按类名计数，注释里的同名串会被算进去。
+         foot 是「下一步」而不是「确定」：这一步的语义是"选完 → 进应用"，不是"确认一个对话框"。
+         × 与点遮罩都**只关弹窗、不落盘**（弹窗里那一次选择作废）；首访那次额外给「暂时不填」，
+         从个人中心点进来时不给 —— 已经点开要改的人不需要一颗"算了"。 -->
+    <div id="identity-modal" class="modal-mask hidden opacity-0 transition-opacity duration-300">
+        <div class="modal-shell modal-shell--lg bg-white transform scale-95 transition-transform duration-300">
+            <div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl flex items-center justify-between">
+                <h3 id="identity-modal-title" class="text-lg font-bold"><i class="fa fa-user-circle-o mr-2"></i>我是谁</h3>
+                <button id="identity-modal-close" class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors" aria-label="关闭">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body p-5">
+                <p class="text-sm text-gray-600 mb-4">选一个最贴近你的身份，测算会默认按这个场景给参数。不选也照常用全部入口 —— 身份只改默认视角，不限制你能用什么。</p>
+                <div id="identity-modal-list" class="identity-pick-grid">
+                    <!-- 由 identity-onboarding.js 按 tool-registry.js 的 scenarios 渲染 -->
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div class="form-group">
+                        <label class="label" for="identity-modal-job">职务名称（选填）</label>
+                        <input type="text" id="identity-modal-job" class="input-field !pl-3" placeholder="如：财务经理" maxlength="40">
+                    </div>
+                    <div class="form-group">
+                        <label class="label" for="identity-modal-company">公司名称（选填）</label>
+                        <input type="text" id="identity-modal-company" class="input-field !pl-3" placeholder="如：某某科技有限公司" maxlength="60">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-3">这两项只用于显示与推荐，<b>不参与任何计算</b>，也随时能在个人中心里改。</p>
+            </div>
+            <div class="modal-foot p-4 border-t border-gray-200 flex items-center gap-3">
+                <button id="identity-modal-skip" type="button" class="hidden mr-auto text-sm text-gray-500 hover:text-gray-700">暂时不填</button>
+                <button id="identity-modal-next" type="button" class="btn btn-primary px-6 py-2 rounded-lg">下一步</button>
             </div>
         </div>
     </div>
@@ -1976,6 +2030,10 @@
     <!-- 阶段19-2 遗留清偿③：身份视角偏好（「我是谁」那 6 张卡选的是默认视角，不是筛选）——
          必须在 toolbox-ui.js 之前（卡片渲染时读它），且在 mode-pref.js 之后（要调 applyDefault）。 -->
     <script src="src/js/ui/identity-pref.js"></script>
+    <!-- v1.139.0：「我是谁」弹窗与两处身份卡（我的页 / 个人中心）。
+         必须排在 identity-pref.js 之后（读写入口在它身上）、tool-registry.js 之后（6 张身份卡的数据源）。
+         openModal / closeModal 是**运行时**才取（window.openModal，由 auth-ui.js 挂上），所以不必等 auth-ui.js。 -->
+    <script src="src/js/ui/identity-onboarding.js"></script>
     <!-- 阶段19-8：效率层 E5 —— 参数记忆与带参链接都是**可选模块**：
          取不到就整块功能不出现，绝不影响测算本身。两者都必须排在 toolbox-ui.js 之前
          （速算器在渲染时就读记忆；带参链接在 init 里调用 openTool）。 -->
@@ -2148,6 +2206,31 @@
                     </div>
                 </div>
 
+                <!-- 身份卡（v1.139.0）：「我是谁」撤出首页后，这里补回**一眼可见的当前身份 + 入口**。
+                     放横幅正下方而不是丢进下方列表：身份是"我是谁"这类常驻属性，
+                     与权益同属这一屏的头部信息，不该和「意见反馈」「关于我们」排在一起。
+                     文案与点击行为都在 identity-onboarding.js（syncIdentityCard / open）。
+                     ⚠️ id 不取 profile-card-* 前缀：下方列表的点击委托按 [id^="profile-card-"] 匹配，
+                     这颗卡走的是自己的绑定（开弹窗，不跳页）。 -->
+                <div id="profile-identity-card" class="mx-4 sm:mx-5 mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50 cursor-pointer profile-card-hover">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0">
+                            <i class="fa fa-user-circle-o text-indigo-600"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <!-- 这里的文字**不能用 text-gray-800 / text-gray-500**：
+                                 那两个类在 .dark 下被反色（.dark .text-gray-800 → text-gray-100 近白、
+                                 .dark .text-gray-500 → text-gray-400），而这张卡的底 bg-indigo-50
+                                 是**写死的浅色**、深色档不跟着变深 —— 浅白字压浅蓝底只有 1.02:1，
+                                 等于看不见（对比度审计在 dark/profile 抓到的）。改用自定义类钉住深色，
+                                 见 ui-redesign.css 的 .profile-identity__title / __sub。 -->
+                            <h3 id="profile-identity-title" class="profile-identity__title font-semibold text-[15px] leading-snug">我是谁</h3>
+                            <p id="profile-identity-sub" class="profile-identity__sub text-xs mt-1 leading-relaxed">选一个最贴近你的身份，也可以只填职务与公司名称</p>
+                        </div>
+                        <i class="fa fa-chevron-right text-gray-300 flex-shrink-0"></i>
+                    </div>
+                </div>
+
                 <!-- 权益进度条（阶段19-6b §3.6 ①）：档位刻度 + 方案用量 + 云同步状态 + 升级入口。
                      内容由 src/js/ui/profile-benefits.js 填充（取不到的数据整行不出现，不补 0）；
                      未登录 / 拿不到档位时整块保持隐藏。
@@ -2223,6 +2306,27 @@
                 </div>
             </div>
             
+            <!-- 我的身份（v1.139.0）：身份撤出首页后的**常驻位置** —— 显示 + 随时修改。
+                 排在账号信息之前：身份是每次测算都用得着的偏好，账号资料是一次性的设置。
+                 点「修改身份」开的是与首次登录同一个弹窗（#identity-modal）——
+                 一个目的地只有一条路径，不再写第二份表单。 -->
+            <div class="card mb-5">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <i class="fa fa-user-circle-o"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">我的身份</h3>
+                        <p class="text-xs text-gray-500">只影响默认视角与称呼，不影响任何计算口径</p>
+                    </div>
+                </div>
+                <div id="identity-settings-summary" class="identity-settings"></div>
+                <button type="button" id="identity-settings-edit"
+                        class="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-primary hover:bg-blue-50 transition-colors">
+                    <i class="fa fa-pencil"></i><span>修改身份</span>
+                </button>
+            </div>
+
             <!-- 账号信息 -->
             <div class="card mb-5">
                 <div class="flex items-center gap-3 mb-6">

@@ -190,22 +190,26 @@ EuriskoTax
 ┌─ mode-selection-page ─────────────────────────────────────────────┐
 │ ① Mission Hero            #home-mission 423（首屏唯一焦点）        │
 │ ② 我遇到了什么事（9 张事件卡）#home-event-rail 449                 │
-│ ③ 我的税务资产            #home-assets-card 457（回访用户才出现）   │
-│ ④ 我是谁（身份卡）        #home-scenarios 480                      │
-│ ⑤ 搜索入口卡片           #toolbox-search-entry 486 「41 个 ›」    │
-│ ⑥ 最近计算               #home-recent-list 508 「全部 ›」506       │
-│ ⑦ 税务提醒               #home-calendar-list 522                   │
-│ ⑧ 今日税感 · 小贴士      #home-tax-feel 544 「换一条」542          │
-│ ⑨ 关于本站（20 速算 + 21 完整 = 41 入口说明）561                   │
-│ ＋ #content-home-banner 417（公告注入）／分享落地横幅（动态）      │
+│ ① 搜索条（常驻，非卡片） #toolbox-search-entry 「41 个 ›」         │
+│ ② Mission Hero            #home-mission                            │
+│ ③ 我遇到了什么事（9 张事件卡）#home-event-rail                     │
+│ ④ 接下来要办（待办 / 截止 / 漏填三段合一）#home-todo-card          │
+│ ⑤ 继续上次（最多 3 条）   #home-recent-list 「全部 ›」             │
+│ ⑥ 今日税感 · 小贴士      #home-tax-feel「换一条」                  │
+│ ＋ #content-home-banner（公告注入）／分享落地横幅（动态）          │
+│ − v1.139.0 撤掉「我是谁」整卡（#home-scenarios / #home-identity-note）│
+│   身份改在：首次登录弹窗 #identity-modal + 个人中心「我的身份」    │
+│   ＋「我的」页顶部身份卡 #profile-identity-card（点开同一弹窗）    │
 │ − 阶段19-10a 撤掉「最近使用」卡：与工具页第一组同源，不再两处显示  │
+│ ⚠️ 上面不写行号：区块行号随版本漂，以 tests/home-ia.test.js 为准   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 | 功能入口 | → 去向 | 实现 |
 |---|---|---|
 | `#toolbox-search-entry` | 工具页 + 聚焦搜索框 | `toolbox-ui.js` `init()` 内 `toolbox-search-entry` 绑定 |
-| 身份卡 ×N | 工具页（按身份筛选） | `openScenario()` |
+| `#identity-modal` 身份弹窗（6 张身份卡 + 职务 / 公司选填） | 保存为本机偏好：默认视角 + 显示备注 | `identity-onboarding.js`（首次登录自动弹一次；个人中心与「我的」页身份卡可再开） |
+| `#profile-identity-card` 「我的」页身份卡 | 开同一个 `#identity-modal` | `identity-onboarding.js` |
 | `#home-view-all-history` | 我的 → 自动进计算历史 | `home-ui.js:554-567` |
 | `#home-next-tip` | 换一条贴士 | `home-ui.js:545` |
 | 品牌 Logo `#brand-home-link` | 回首页 | `home-ui.js:570-577` |

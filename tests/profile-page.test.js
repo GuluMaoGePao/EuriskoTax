@@ -220,14 +220,16 @@ describe('个人中心 - 渲染逻辑', () => {
     // 阶段20 P3（§6.1）：高频四张上提成四宫格，列表从 13 卡降到 9 卡。
     // 断言必须跟着改 —— 旧的那条「13 个模块卡片」一旦留着，等于替「13 卡一维罗列」这个
     // 本次要治的病背书：设计改了，钉住旧设计的断言会反过来阻止新设计落地。
-    test('renderProfileCards 应渲染 11 个模块卡片（高频四张已上提成宫格）', () => {
+    // v1.139.0：「个人中心」上提成宫格第 5 格，列表 11 → 10（它原先在服务组首位，要翻一屏才看得到）
+    test('renderProfileCards 应渲染 10 个模块卡片（高频四张 + 个人中心已上提成宫格）', () => {
         renderProfileCards();
         const grid = document.getElementById('profile-cards-grid');
         const cards = grid.querySelectorAll('[id^="profile-card-"]');
         // 2026-10-03：账号那一摞从横幅按钮变成卡片「个人中心」（游客态是「登录 / 注册」），
         // 9 → 10。同样是「设计改了，钉住旧设计的断言要跟着改」，否则它会替旧设计背书。
         // v1.136.0：手机端顶栏隐藏（导航分端），「深色模式」卡承接顶栏的主题切换，10 → 11。
-        expect(cards.length).toBe(11);
+        // v1.139.0：「个人中心」从列表上提成宫格第 5 格（本套件是登录态，它在宫格里），11 → 10。
+        expect(cards.length).toBe(10);
         // 验证包含预期的卡片
         const ids = Array.from(cards).map(c => c.id);
         expect(ids).toContain('profile-card-data');
@@ -244,9 +246,10 @@ describe('个人中心 - 渲染逻辑', () => {
         expect(ids).toContain('profile-card-template');
         // 阶段19-11：效率层 E4 批量 —— 一份表一次算完
         expect(ids).toContain('profile-card-batch');
-        // 2026-10-03：账号入口入列（原横幅上的「账户设置」按钮）。本套件的 mock 是登录态，
-        // 所以这张卡在 —— 游客态的行为见下一条。
-        expect(ids).toContain('profile-card-account');
+        // 2026-10-03：账号入口入列（原横幅上的「账户设置」按钮）。
+        // v1.139.0：它**离开列表**上提成宫格第 5 格 —— 服务组在整页最下面，用户翻不到就以为没有入口。
+        // 落点只有宫格这一处，列表里不该再有它（同一入口两处 = 第二条稳定路径）。
+        expect(ids).not.toContain('profile-card-account');
         // v1.136.0：深色模式卡（承接手机端顶栏的主题切换）
         expect(ids).toContain('profile-card-theme');
     });
@@ -303,7 +306,9 @@ describe('个人中心 - 渲染逻辑', () => {
     });
 
     // ====== 阶段20 P3：高频四宫格 ======
-    test('renderProfileQuick 应渲染四项高频入口（历史 / 台账 / 档案 / 日历）', () => {
+    // v1.139.0：第 5 格补「个人中心」—— 它原先在服务组首位（要翻过工作台四张才看得到），
+    // 用户因此以为「我的」里没有个人中心入口。
+    test('renderProfileQuick 应渲染五项高频入口（历史 / 台账 / 档案 / 日历 / 个人中心）', () => {
         renderProfileQuick();
         const tiles = document.getElementById('profile-quick-grid').querySelectorAll('[id^="profile-card-"]');
         const ids = Array.from(tiles).map((t) => t.id);
@@ -311,7 +316,8 @@ describe('个人中心 - 渲染逻辑', () => {
             'profile-card-history',
             'profile-card-ledger',
             'profile-card-tax',
-            'profile-card-calendar'
+            'profile-card-calendar',
+            'profile-card-account'
         ]);
     });
 
@@ -335,7 +341,7 @@ describe('个人中心 - 渲染逻辑', () => {
         const first = document.getElementById('profile-quick-grid').children.length;
         renderProfileQuick();
         expect(document.getElementById('profile-quick-grid').children.length).toBe(first);
-        expect(first).toBe(4);
+        expect(first).toBe(5);   // 四项高频 + v1.139.0 上提的「个人中心」
     });
 
     test('renderProfileCards 幂等：重复调用不重复渲染', () => {
@@ -539,7 +545,13 @@ describe('个人中心 - loadProfile 异步加载', () => {
         expect(document.getElementById('profile-email').value).toBe('test@example.com');
         expect(document.getElementById('profile-phone').value).toBe('13800138000');
         expect(document.getElementById('profile-display-name').textContent).toBe('测试用户');
-        expect(document.getElementById('profile-display-email').textContent).toBe('test@example.com');
+        // v1.139.0：账号资料（用户名 / 邮箱 / 手机号 / 密码）**只归个人中心** ——
+        // 「我的」横幅只回答"我是谁"（名字 + 身份卡），不再把邮箱挂在名字下面：
+        // 摆着却不能改会让人以为这里能改，而改它的入口只有一个（个人中心 → 账号信息）。
+        // 邮箱本身仍在个人中心的 #profile-email（上一行断言的就是它）。
+        const bannerEmail = document.getElementById('profile-display-email');
+        expect(bannerEmail.textContent).toBe('');
+        expect(bannerEmail.classList.contains('hidden')).toBe(true);
     });
 
     test('loadProfile API 失败应调用 showAlert', async () => {

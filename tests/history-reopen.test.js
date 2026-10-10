@@ -101,7 +101,7 @@ function numericField(fields) {
 
 function defaultsOf(fields) {
     const v = {};
-    (fields || []).forEach((f) => { v[f.key] = f.default; });
+    (fields || []).forEach((f) => { v[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     return v;
 }
 

@@ -67,7 +67,7 @@ beforeEach(() => {
 // 否则对拍就变成在拿 null 比 null（理由见 entity-template.test.js）
 function validInput(tool) {
     const base = {};
-    (tool.fields || []).forEach((f) => { base[f.key] = f.default; });
+    (tool.fields || []).forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     const tries = [];
     const numKeys = (tool.fields || []).filter((f) => f.type === 'money' || f.type === 'number').map((f) => f.key);
     if (numKeys.length) {

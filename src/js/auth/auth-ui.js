@@ -147,6 +147,12 @@ async function handleLogin() {
         triggerContentSync();
         // 登录成功后直接进入应用，不再弹「操作成功」确认框打断流程
         // （顶栏用户名与版本徽标已是明确的成功反馈）
+        // v1.139.0：唯一还会弹一次的是「我是谁」—— 只在**没走过引导**时弹，
+        // 且是这一刻唯一需要用户动手的事（选完点「下一步」即关）。
+        // 判据记在 identity-pref 的 onboarded 上：点过「暂时不填」的人下次登录不再被追问。
+        if (window.EuriskoIdentityOnboarding && typeof window.EuriskoIdentityOnboarding.maybeOpenAfterLogin === 'function') {
+            window.EuriskoIdentityOnboarding.maybeOpenAfterLogin();
+        }
     } catch (error) {
         showAlert(error.message);
     } finally {
@@ -682,9 +688,12 @@ function renderProfileIdentity(user) {
     if (nameEl) nameEl.textContent = guest ? '游客' : (user.username || '用户');
     if (emailEl) {
         // HTML 里的 email@example.com 只是占位假数据：游客看到它会被读成"我的账号邮箱是 example.com"
-        emailEl.textContent = guest
-            ? '免登录使用中 · 测算记录仅保存在本机'
-            : (user.email || '');
+        // v1.139.0：登录态**不再把邮箱挂在名字下面** —— 账号资料（用户名 / 邮箱 / 手机号 / 密码）
+        // 只归个人中心一处，横幅上是"我是谁"（名字 + 下方身份卡），不是账号卡片。
+        // 摆着却不能改，只会让人以为这里能改；改它的入口在个人中心，路径只有一条。
+        // 游客态那句是**状态说明**不是账号资料（"免登录使用中…"），它保留 —— 游客没有个人中心可去。
+        emailEl.textContent = guest ? '免登录使用中 · 测算记录仅保存在本机' : '';
+        emailEl.classList.toggle('hidden', !guest);
     }
     // v1.136.0：手机端顶栏隐藏后，横幅这颗「登录 / 注册」是游客在手机上的唯一登录入口
     //（桌面仍有顶栏按钮）。同一个函数的两个分支里切换显隐，游客 → 登录 再调一次即对齐。
@@ -736,6 +745,15 @@ function renderProfileLocalParts() {
     ProfilePerf.measure('渲染模块卡片', renderProfileCards);
     ProfilePerf.measure('加载税务档案', loadTaxProfile);
     ProfilePerf.measure('渲染税务日历', renderTaxCalendar);
+    // v1.139.0：身份卡（「我的」页顶部）与个人中心身份摘要都是**纯本地**渲染，
+    // 与上面几块同一口径（游客也有身份偏好），所以跟着一起刷，不另挂在登录回调上。
+    ProfilePerf.measure('同步身份卡', syncIdentityBlocks);
+}
+
+/** 身份两处显示的统一刷新口（「我的」页身份卡 + 个人中心「我的身份」摘要） */
+function syncIdentityBlocks() {
+    const O = window.EuriskoIdentityOnboarding;
+    if (O && typeof O.syncAll === 'function') O.syncAll();
 }
 
 /**
@@ -988,6 +1006,7 @@ const PROFILE_CARDS_CONFIG = [
         // 但讲不通的正确解法是收起，而不是把卡改成另一个名字继续占位。
         id: 'profile-card-account',
         group: 'service',
+        quick: true,        // v1.139.0：进高频宫格第 5 格（原先在服务组首位，要翻一屏才看得到）
         guestHidden: true,
         icon: 'fa-id-card',
         title: '个人中心',
@@ -1139,11 +1158,18 @@ const PROFILE_CARD_GROUPS = [
 // 高频四宫格的顺序（阶段20 P3 §6.1）：这四项占「我的」真实点击的绝大部分，
 // 宫格比列表扫得快 —— 找入口是**扫视**动作，列表要逐行读标题，宫格看图标就定位。
 // 写 id 而不是重写一份配置：入口定义只有 PROFILE_CARDS_CONFIG 一处。
+//
+// v1.139.0：第五格补「个人中心」—— 它原先是服务与支持组的第一张卡，
+// 而服务组排在整页最下面（要翻过工作台四张才看得到），用户因此以为"没有个人中心入口"。
+// 账号资料本身就是低频但**找不着就慌**的那类入口，放进宫格而不是再往上抬：
+// 宫格是这一屏最先扫到的区域，抬到横幅上又会和身份卡抢位置。
+// ⚠️ 它带 guestHidden：游客态宫格回到 4 格（宫格宽度自适应，见 ui-redesign.css）。
 const PROFILE_QUICK_ORDER = [
     'profile-card-history',
     'profile-card-ledger',
     'profile-card-tax',
-    'profile-card-calendar'
+    'profile-card-calendar',
+    'profile-card-account'
 ];
 
 function profileQuickCards() {
@@ -1163,13 +1189,22 @@ function profileQuickTileHtml({ id, title, badge, iconClass }) {
     `;
 }
 
-// 渲染高频四宫格（幂等：只在首次进我的页时跑，与卡片列表同一套规矩）
+// 渲染高频四宫格（v1.139.0：与卡片列表同一套规矩 —— 幂等，但**登录态变了要重渲染**）
+// 原先只判 children.length，游客 → 登录 之后沿用首次结果，「个人中心」那一格就永远补不上；
+// 而它恰恰是 guestHidden（没有账号的人不该被讲个人中心），游客态宫格是 4 格、登录态 5 格。
 function renderProfileQuick() {
     const grid = document.getElementById('profile-quick-grid');
-    if (!grid || grid.children.length > 0) return;
-    grid.innerHTML = profileQuickCards().map((c) => profileQuickTileHtml(Object.assign({}, c, {
-        badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
-    }))).join('');
+    if (!grid) return;
+    const state = (isGuestSession() || !apiClient.isLoggedIn()) ? 'guest' : 'member';
+    if (grid.children.length > 0 && grid.dataset.identityState === state) return;
+    grid.innerHTML = '';
+    grid.dataset.identityState = state;
+    const guest = state === 'guest';
+    grid.innerHTML = profileQuickCards()
+        .filter((c) => !(guest && c.guestHidden))
+        .map((c) => profileQuickTileHtml(Object.assign({}, c, {
+            badge: typeof c.badgeFn === 'function' ? c.badgeFn() : ''
+        }))).join('');
 }
 
 // 单张功能卡片（横向紧凑式：图标 + 标题/说明 + 箭头）
@@ -1354,6 +1389,8 @@ function getMonthlyReminders() {
 
 async function loadProfileSettings() {
     await loadProfile();
+    // v1.139.0：个人中心是身份的常驻位置，进页面刷一次摘要（身份可能被弹窗改过）
+    syncIdentityBlocks();
 }
 
 function loadProfileTax() {

@@ -123,11 +123,11 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         const all = [HTML, ...JS_TPL.map(read)].join('\n');
         const lg = (all.match(/modal-shell--lg/g) || []).length;
         const sm = (all.match(/modal-shell--sm/g) || []).length;
-        // 11 = 反馈 / 升级码 / 公告 / 关于 / 留资 / 协议×2 / 帮助 + 三处 JS 模板
-        //       （三个管理器共用一处 / 税率表 / 我的方案）
-        expect(lg).toBe(11);
+        // 12 = 反馈 / 升级码 / 公告 / 关于 / 留资 / 协议×2 / 帮助 / **身份（v1.139.0）**
+        //       + 三处 JS 模板（三个管理器共用一处 / 税率表 / 我的方案）
+        expect(lg).toBe(12);
         expect(sm).toBe(3);                   // alert / confirm / 导出版本：一句话决策
-        expect(lg + sm).toBe(14);             // 与「所有外壳都挑了档」那条的总数对齐
+        expect(lg + sm).toBe(15);             // 与「所有外壳都挑了档」那条的总数对齐
     });
 
     // 限高只走 --h-modal 一处：再有手写的 max-h-[85vh] / [88vh] / [90vh]，
@@ -174,9 +174,10 @@ describe('遮罩层：底色与层级走令牌', () => {
         expect(all).not.toContain('bg-slate-900/60 flex items-center justify-center z-50');
     });
 
-    test('14 处背景层都换成 modal-mask', () => {
+    // 15 = 此前 14 处 + v1.139.0「我是谁」身份弹窗
+    test('15 处背景层都换成 modal-mask', () => {
         const all = [HTML, ...JS_TPL.map(read)].join('\n');
-        expect((all.match(/modal-mask/g) || []).length).toBe(14);
+        expect((all.match(/modal-mask/g) || []).length).toBe(15);
     });
 });
 

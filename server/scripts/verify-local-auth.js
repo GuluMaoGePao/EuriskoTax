@@ -461,13 +461,14 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && leadPage.raw.includes('src/js/export/capture.js') && leadPage.raw.includes('qrcode'), `HTTP ${leadPage.status}`);
         const shareLandingJs = await request(PORT, 'GET', '/src/js/share/share-landing.js');
         // 落地首屏锚点跟着信息架构走：原「开始计算」卡片已移入工具页，
-        // 首页第一屏是「我是谁」场景入口，分享落地 CTA 也改指这里（#home-scenarios）
+        // v1.139.0：「我是谁」（#home-scenarios）也撤出首页（身份改在登录弹窗与个人中心），
+        // 分享落地 CTA 改指「我遇到了什么事」（#home-event-rail）—— 那是首页第一个可点的动作区。
         record('share-landing.js 提供分享落地首屏引导(?source=share)',
             shareLandingJs.status === 200 && shareLandingJs.raw.includes('source=share')
-            && shareLandingJs.raw.includes('home-scenarios'), `HTTP ${shareLandingJs.status}`);
-        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-scenarios)',
+            && shareLandingJs.raw.includes('home-event-rail'), `HTTP ${shareLandingJs.status}`);
+        record('index.html 引入 share-landing.js 且含落地 CTA 锚点(#home-event-rail)',
             leadPage.status === 200 && leadPage.raw.includes('src/js/share/share-landing.js')
-            && leadPage.raw.includes('id="home-scenarios"'), `HTTP ${leadPage.status}`);
+            && leadPage.raw.includes('id="home-event-rail"'), `HTTP ${leadPage.status}`);
         const captureJs = await request(PORT, 'GET', '/src/js/export/capture.js');
         record('capture.js 暴露 window.Capture.captureHtml（PDF 与分享图共用截图层）',
             captureJs.status === 200 && captureJs.raw.includes('window.Capture') && captureJs.raw.includes('captureHtml'), `HTTP ${captureJs.status}`);

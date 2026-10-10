@@ -14,7 +14,9 @@
  *   早期首页是「深度测算」+「税务工具箱」两个并列卡片 —— 那是**实现形态**的分界
  *   （多步骤向导 vs 一屏算完），不是用户心智的分界。现在入口层只有一套按「人/场景」
  *   组织的分类，形态差异降为工具页最后那组「完整测算」的一行说明：
- *     · 首页：Mission Hero → 我遇到了什么事 → 我的税务资产 → 我是谁（身份卡）→ 搜索入口 → 最近计算 → 税务提醒 → 今日税感
+ *     · 首页：搜索条 → Hero（问候 + 今日税感 + 小贴士）→ 我遇到了什么事 → 接下来要办 → 继续上次
+ *            （v1.139.0：身份卡撤出首页，呼吸卡「今日税感 · 小贴士」并入 Hero；
+ *              v1.138.0 之前那串「Mission Hero → … → 税务提醒 → 今日税感」的八块动线已重排）
  *     · 工具页：搜索 → 5 个场景组 → 完整测算（原 4 张 mode card，按年填全 · 出完整预算表）
  *     · 速算器结果页：结果 + 易错口径 + **下一步**（相关工具 / 保存历史 / 导出 PDF）
  *   保存与导出不再是多步骤流程的专利（阶段16 下放）：差别只剩「填多填少」，不是「能不能存」。
@@ -788,7 +790,11 @@
         } else if (f.type === 'percent') {
             input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" step="0.1" min="0" inputmode="decimal"' + ekh + '><span class="tool-input-unit">%</span></div>';
         } else {
-            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" inputmode="decimal"' + ekh +
+            // 「默认没有」的最后一环：金额是 0（用户没填）时框里显示空，而不是一个像填过的 0。
+            // 空框在 readValues 里照旧归 0，两种呈现算的是同一个数；用户自己填 0 再渲染回空
+            // 也无妨 —— 0 和空在这里语义相同。number（天数、人数这类）不在此列，默认值有含义。
+            var shown = (f.type === 'money' && Number(cur) === 0) ? '' : cur;
+            input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(shown) + '" inputmode="decimal"' + ekh +
                 (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>' +
                 '<span class="tool-input-unit">' + (f.type === 'money' ? '元' : '') + '</span></div>';
         }

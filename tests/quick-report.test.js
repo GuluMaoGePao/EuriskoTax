@@ -38,7 +38,7 @@ describe('覆盖面：20 个速算器 × 页面与 PDF 同源（真实链路）'
     const defaultsOf = (tool) => {
         const v = {};
         (tool.fields || []).forEach((f) => {
-            if (f.default !== undefined) { v[f.key] = f.default; return; }
+            if (f.default !== undefined) { v[f.key] = (f.sample !== undefined ? f.sample : f.default); return; }
             v[f.key] = f.type === 'money' ? 10000 : f.type === 'number' ? 1
                 : f.type === 'percent' ? 0.03
                     : f.type === 'select' && f.options ? f.options[0].value

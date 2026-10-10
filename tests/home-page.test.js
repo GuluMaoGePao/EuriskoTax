@@ -21,12 +21,9 @@ beforeEach(() => {
     document.body.innerHTML = `
         <div id="mode-selection-page" class="page active">
             <div class="max-w-5xl mx-auto pt-2 pb-6">
-                <!-- 卡片1：欢迎 -->
-                <div class="home-card">
-                    <h2 id="home-greeting"></h2>
-                    <p id="home-date-text"></p>
-                    <div id="home-tax-feel-content"></div>
-                </div>
+                <!-- (v1.139.0) 原「卡片1：欢迎」删掉：问候语 / 日期 / 今日税感 / 小贴士
+                     现在都在 Hero（#home-mission）里，这里再放一份就是重复 id ——
+                     getElementById 只取第一个，测试会因此测到一份页面上并不存在的 DOM。 -->
                 <!-- 卡片2：模式选择 -->
                 <div class="home-card">
                     <div class="home-card-header">
@@ -59,14 +56,27 @@ beforeEach(() => {
                     </div>
                     <div id="home-recent-list" class="recent-scroll"></div>
                 </div>
-                <!-- 阶段19-2：Mission Hero（首屏那句话）+ 上轴事件卡 + 我的税务资产 -->
+                <!-- 阶段19-2：Hero + 上轴事件卡 + 我的税务资产。
+                     v1.139.0：Hero 与「今日税感 · 小贴士」合一 —— 三态文案与主 CTA 撤掉，
+                     Hero 里现在是问候 + 今日税感 + 小贴士（原本各自一张卡）。 -->
                 <section id="home-mission" class="hero-card">
-                    <h2 id="home-mission-title"></h2>
-                    <p id="home-mission-subtitle"></p>
-                    <button id="home-mission-cta"><span id="home-mission-cta-text"></span></button>
-                    <button id="home-mission-alt" class="hidden"></button>
+                    <p class="text-xs">
+                        <span id="home-greeting"></span>
+                        <span id="home-date-text"></span>
+                    </p>
+                    <div class="hero-card__panel">
+                        <div id="home-tax-feel-content"></div>
+                    </div>
+                    <div class="hero-card__panel">
+                        <div id="home-tip-content"></div>
+                        <button id="home-next-tip">换一条 ›</button>
+                    </div>
                 </section>
-                <div id="home-event-rail" class="event-rail"></div>
+                <div id="home-event-rail" class="event-rail is-collapsed"></div>
+                <!-- (v1.139.0) 手机端「展开全部 / 收起」：9 张卡横滑看不全，改成网格 + 可展开 -->
+                <button id="home-event-more" aria-expanded="false" aria-controls="home-event-rail">
+                    <span id="home-event-more-text">展开全部</span>
+                </button>
                 <!-- 卡片4：接下来要办（阶段20 P1 三合一：待办 + 截止 + 漏填）——
                      外层这张壳由 syncTodoCard 管显隐，三段各自管自己的 hidden -->
                 <div id="home-todo-card" class="home-card hidden">
@@ -85,14 +95,8 @@ beforeEach(() => {
                         <div id="home-missing-body"></div>
                     </div>
                 </div>
-                <!-- 卡片5：小贴士 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title"><span>税务小贴士</span></div>
-                        <button id="home-next-tip">换一条 ›</button>
-                    </div>
-                    <div id="home-tip-content"></div>
-                </div>
+                <!-- (v1.139.0) 原「卡片5：小贴士」删掉：小贴士与「换一条」搬进 Hero，
+                     首页不再单独为它立一张卡。 -->
             </div>
         </div>
         <!-- 模态框（showModeInfo 需要） -->
@@ -123,8 +127,8 @@ describe('主页 - 问候语与日期渲染', () => {
 
     test('日期文本应包含"今天是"', () => {
         const dateText = document.getElementById('home-date-text').textContent;
-        expect(dateText).toContain('今天是');
-        expect(dateText).toMatch(/年.*月.*日/);
+        // (v1.139.0) 问候行与 logo 同排：不带年份也不带「今天是」，长度才压得住 375px 一行
+        expect(dateText).toMatch(/^\d+月\d+日 · 周[一二三四五六日]$/);
     });
 
     test('问候语应根据时间段变化', () => {
@@ -139,8 +143,9 @@ describe('主页 - 今日税感渲染', () => {
     test('今日税感容器应有内容', () => {
         const container = document.getElementById('home-tax-feel-content');
         expect(container.innerHTML).not.toBe('');
-        // 应包含至少一个提醒项
-        expect(container.querySelectorAll('.flex.items-start').length).toBeGreaterThan(0);
+        // (v1.139.0) 排版改主次两级：不再固定输出 .flex.items-start 行，按有无倒计时
+        // 输出主行（.hero-card__feel）或小字行（.hero-card__feel-row）—— 按子元素断言。
+        expect(container.children.length).toBeGreaterThan(0);
     });
 
     test('提醒项应包含 tax-reminder-dot', () => {
@@ -250,10 +255,10 @@ describe('主页 - 截止段（90 天窗口）', () => {
 
 // ====== 渲染：税务小贴士 ======
 describe('主页 - 税务小贴士渲染', () => {
-    test('小贴士容器应有内容', () => {
+    test('小贴士容器应有内容（纯文本，不再带引号装饰图标 —— 面板已有灯泡图标位）', () => {
         const container = document.getElementById('home-tip-content');
-        expect(container.innerHTML).not.toBe('');
-        expect(container.querySelector('.fa-quote-left')).toBeTruthy();
+        expect(container.textContent.trim()).not.toBe('');
+        expect(container.querySelector('.fa-quote-left')).toBeNull();
     });
 
     test('点击"换一条"应切换小贴士', () => {
@@ -339,48 +344,35 @@ describe('主页 - 其他交互绑定', () => {
     });
 });
 
-// ====== 阶段19-2：Mission Hero（首屏那句话）======
-describe('主页 - Mission Hero', () => {
-    test('首访：问「你今年要交多少税」，CTA 滚到事件轴', () => {
-        localStorage.clear();
-        global.window.refreshHomeRecent();
-
-        expect(document.getElementById('home-mission-title').textContent).toContain('你今年要交多少税');
-        expect(document.getElementById('home-mission-cta-text').textContent).toBe('开始测算');
-        expect(document.getElementById('home-mission-cta').getAttribute('data-mission-action')).toBe('scroll');
-        expect(document.getElementById('home-mission-cta').getAttribute('data-mission-target')).toBe('home-events');
-        // 首访没有「换个方案对比」—— 还没有方案可换
-        expect(document.getElementById('home-mission-alt').classList.contains('hidden')).toBe(true);
+// ====== Hero（v1.139.0：问候 + 今日税感 + 小贴士合一，三态文案与主 CTA 已撤）======
+describe('主页 - Hero', () => {
+    test('问候语与日期落在 Hero 上（首页唯一一句「人味」的话）', () => {
+        expect(document.getElementById('home-mission').querySelector('#home-greeting').textContent).toBeTruthy();
+        expect(document.getElementById('home-mission').querySelector('#home-date-text').textContent)
+            .toMatch(/\d+月\d+日 · 周/);
     });
 
-    test('有历史：改成「上次测算…」并给出「继续」与次要动作', () => {
+    test('今日税感渲染在 Hero 内，至少一条（没有节点时给的那条兜底文案也算）', () => {
+        const box = document.getElementById('home-mission').querySelector('#home-tax-feel-content');
+        expect(box.children.length).toBeGreaterThan(0);
+        expect(box.textContent.trim()).not.toBe('');
+    });
+
+    test('小贴士渲染在 Hero 内，「换一条」换的是下一条', () => {
+        const box = document.getElementById('home-mission').querySelector('#home-tip-content');
+        const first = box.textContent;
+        expect(first.trim()).not.toBe('');
+
+        document.getElementById('home-next-tip').click();
+        expect(box.textContent).not.toBe(first);
+    });
+
+    test('保存计算后刷新首页：不再有「首访 → 有历史」的状态要转，刷新不炸且税感仍在', () => {
         localStorage.setItem('taxCalculationHistory', JSON.stringify([
             { id: 'm1', type: 'comprehensive', title: '月薪个税', date: new Date().toISOString(), results: { taxDetails: { totalTax: 1200 } } }
         ]));
-        global.window.refreshHomeRecent();
-
-        const title = document.getElementById('home-mission-title').textContent;
-        // 9 月可能撞上年度汇算的 30 天窗口 → 只断言「不再问你今年要交多少税」且带上测算名
-        expect(title).not.toContain('你今年要交多少税');
-        expect(title + document.getElementById('home-mission-subtitle').textContent).toContain('月薪个税');
-        expect(document.getElementById('home-mission-cta-text').textContent).toBeTruthy();
-    });
-
-    test('点击主 CTA：scroll 动作滚到事件轴，open-last 动作打开上次记录', () => {
-        localStorage.setItem('taxCalculationHistory', JSON.stringify([
-            { id: 'm2', type: 'comprehensive', title: '月薪个税', date: new Date().toISOString(), results: { taxDetails: { totalTax: 1200 } } }
-        ]));
-        global.window.refreshHomeRecent();
-
-        const cta = document.getElementById('home-mission-cta');
-        const action = cta.getAttribute('data-mission-action');
-        if (action === 'open-last') {
-            cta.click();
-            expect(global.viewHistoryRecord).toHaveBeenCalledWith('m2');
-        } else {
-            // scroll 动作：目标元素存在就不该抛错（jsdom 没有 scrollIntoView 实现，代码里做了类型检查）
-            expect(() => cta.click()).not.toThrow();
-        }
+        expect(() => global.window.refreshHomeRecent()).not.toThrow();
+        expect(document.getElementById('home-tax-feel-content').children.length).toBeGreaterThan(0);
     });
 });
 
@@ -407,6 +399,31 @@ describe('主页 - 事件卡上轴', () => {
         const titles = [...document.querySelectorAll('#home-event-rail .event-card__title')].map(e => e.textContent);
         const terms = ['所得', '税率', '计税', '预扣', '汇算', '申报'];
         titles.forEach(t => terms.forEach(x => expect(t).not.toContain(x)));
+    });
+
+    // (v1.139.0) 手机端 9 张卡横滑要滑 8 屏才看全 —— 改成网格 + 尾部可展开。
+    // 这两条守的是"看得全"这件事本身：按钮不出现、或点了不放开，问题就回来了。
+    test('卡片多于一屏半时出现「展开全部」，且件数由数据现算', () => {
+        const btn = document.getElementById('home-event-more');
+        expect(btn.classList.contains('is-visible')).toBe(true);
+        const total = document.querySelectorAll('#home-event-rail .event-card').length;
+        expect(document.getElementById('home-event-more-text').textContent)
+            .toBe('展开全部 ' + total + ' 件');   // 不写死 9：eventCards 增删一张就得同步改文案
+    });
+
+    test('点「展开全部」后收起状态解除，再点收回去', () => {
+        const rail = document.getElementById('home-event-rail');
+        const btn = document.getElementById('home-event-more');
+        expect(rail.classList.contains('is-collapsed')).toBe(true);
+
+        btn.click();
+        expect(rail.classList.contains('is-collapsed')).toBe(false);
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        expect(document.getElementById('home-event-more-text').textContent).toBe('收起');
+
+        btn.click();
+        expect(rail.classList.contains('is-collapsed')).toBe(true);
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
     });
 });
 

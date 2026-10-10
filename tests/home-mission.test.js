@@ -1,6 +1,10 @@
 // 首页 Mission 层单元测试（阶段19-2）
-// home-mission.js 是纯逻辑（三态判定 / 节点倒计时 / 事件卡数据 / 待办 / 概览），
+// home-mission.js 是纯逻辑（节点倒计时 / 事件卡数据 / 待办 / 概览），
 // 不碰 DOM —— 所以这里全部走**给定 now 的确定性断言**：时间是最容易造出偶发红的输入。
+//
+// (v1.139.0) 原「Mission 三态」那一组用例随 Hero 的三态文案一起删：首页不再判定
+// 「你现在该办的事」，那句话与主 CTA 都没有了 —— 钉住旧判定的断言只会阻止新设计落地。
+// 节点倒计时与排序的口径仍要守：今日税感（Hero 内）与「接下来要办」的截止段都读它。
 
 const { loadSource } = require('./helpers/load-source');
 
@@ -28,63 +32,16 @@ function rec(over = {}) {
     };
 }
 
-// ====== 1. Mission 三态 ======
-describe('Mission 三态判定', () => {
-    test('首访（无历史）：问「你今年要交多少税」，CTA 落到事件轴', () => {
-        const m = M().detectMission({ history: [], now: new Date('2026-09-21T10:00:00') });
-        expect(m.state).toBe('first-visit');
-        expect(m.title).toContain('你今年要交多少税');
-        expect(m.cta.action).toBe('scroll');
-        expect(m.cta.target).toBe('home-events');
-        expect(m.last).toBeNull();
-    });
-
-    test('有历史：显示上次测算的标题与税额，主 CTA 是「继续」', () => {
-        const m = M().detectMission({ history: [rec()], now: new Date('2026-09-01T10:00:00') });
-        expect(m.state).toBe('has-history');
-        expect(m.title).toContain('月薪个税');
-        expect(m.title).toContain('¥1235'); // 四舍五入到整数
-        expect(m.subtitle).toContain('2026 年度');
-        expect(m.cta.action).toBe('open-last');
-        expect(m.cta.target).toBe('h-1');
-        expect(m.altCta.text).toBe('换个方案对比');
-    });
-
-    test('临近节点（≤30 天）：升级为 deadline 态，标题给倒计时', () => {
-        // 6/20 → 综合所得汇算 6/30 截止，剩 10 天
-        const m = M().detectMission({ history: [rec()], now: new Date('2026-06-20T10:00:00') });
-        expect(m.state).toBe('deadline');
-        expect(m.title).toBe('距综合所得汇算清缴还有 10 天');
-        expect(m.node.id).toBe('comprehensive-settlement');
-        expect(m.node.daysLeft).toBe(10);
-        expect(m.cta.text).toBe('现在更新测算');
-    });
-
-    test('新客即使撞上临近节点也不进 deadline 态 —— 没有结果可更新，倒计时只会劝退', () => {
-        const m = M().detectMission({ history: [], now: new Date('2026-06-20T10:00:00') });
-        expect(m.state).toBe('first-visit');
-        expect(m.node).toBeNull();
-    });
-
-    test('deadline 态的副标题带上次的测算（有税额时）', () => {
-        const m = M().detectMission({ history: [rec()], now: new Date('2026-06-20T10:00:00') });
-        expect(m.subtitle).toContain('上次测算');
-        expect(m.subtitle).toContain('月薪个税');
-    });
-
-    test('例行申报（月度预缴）不升级为 deadline 态 —— 否则每月都在倒计时，has-history 永远显示不出来', () => {
-        // 9/10：距本月 15 日的月度预缴只剩 5 天，在 30 天窗口内
+// ====== 1. 节点排序（今日税感与「接下来要办」共用的口径）======
+describe('节点排序', () => {
+    test('例行申报（月度预缴）：距下次永远 ≤ 一个月 —— 所以它不制造紧迫感', () => {
+        // 9/10：距本月 15 日的月度预缴只剩 5 天
         const nodes = M().upcomingNodes(new Date('2026-09-10T10:00:00'));
         const monthly = nodes.find(n => n.id === 'monthly-prepaid');
         expect(monthly.daysLeft).toBe(5);
-        expect(M().HERO_NODE_TYPES).not.toContain('prepaid');
-
-        const m = M().detectMission({ history: [rec()], now: new Date('2026-09-10T10:00:00') });
-        expect(m.state).toBe('has-history');
-        expect(m.node).toBeNull();
     });
 
-    test('政策到期不占用首屏：排序里 policy 一定排在申报类之后', () => {
+    test('政策到期排在申报类之后：它不制造紧迫感', () => {
         const nodes = M().upcomingNodes(new Date('2026-09-21T10:00:00'));
         const firstPolicyIdx = nodes.findIndex(n => n.isPolicy);
         expect(firstPolicyIdx).toBeGreaterThan(0);

@@ -187,7 +187,7 @@ describe('按 index.html 的真实顺序装配一遍', () => {
 
         function defaultsOf(tool) {
             const values = {};
-            (tool.fields || []).forEach(function (f) { values[f.key] = f.default; });
+            (tool.fields || []).forEach(function (f) { values[f.key] = (f.sample !== undefined ? f.sample : f.default); });
             return values;
         }
 
@@ -259,8 +259,16 @@ describe('按 index.html 的真实顺序装配一遍', () => {
             expect(HTML).not.toContain('home-trust-line');
             // 场景数不允许再手写进 HTML —— 以前三处各写一遍 "41"，漏改一处页面就开始自己骗自己。
             expect(stripComments(HTML)).not.toContain('41 个场景');
-            // hero 副标题容器在（文案由 home-mission.js 运行时从 tool-registry 现数）
-            expect(HTML).toContain('id="home-mission-subtitle"');
+            // v1.139.0：那句副标题随 Hero 的三态文案一起撤了 —— 首页不再自我介绍，
+            // Hero 装的是问候 + 今日税感 + 小贴士（原「今日税感 · 小贴士」整卡并入，id 跟着搬）。
+            expect(HTML).not.toContain('id="home-mission-subtitle"');
+            expect(HTML).not.toContain('home-mission-cta');
+            const heroStart = HTML.indexOf('id="home-mission"');
+            const heroBlock = stripComments(HTML.slice(heroStart, heroStart + 2500));
+            expect(heroBlock).toContain('id="home-greeting"');
+            expect(heroBlock).toContain('id="home-tax-feel-content"');
+            expect(heroBlock).toContain('id="home-tip-content"');
+            expect(heroBlock).toContain('id="home-next-tip"');
             // 删掉的信任信息不能丢，得在「关于我们」里找得回来
             const aboutStart = HTML.indexOf('id="about-modal"');
             expect(aboutStart).toBeGreaterThan(-1);
@@ -281,7 +289,7 @@ describe('按 index.html 的真实顺序装配一遍', () => {
         const bad = [];
         registry.all().forEach(function (tool) {
             const values = {};
-            tool.fields.forEach(function (f) { values[f.key] = f.default; });
+            tool.fields.forEach(function (f) { values[f.key] = (f.sample !== undefined ? f.sample : f.default); });
             const out = tool.compute(values);
             if (out.error) bad.push(tool.id + '：' + out.error);
             else if (!Number.isFinite(Number(out.primary.value))) bad.push(tool.id + '：primary 不是有限数');

@@ -84,9 +84,10 @@ describe('完整测算结果步：出卡', () => {
         expect(box().querySelector('.saving-nudge-amount')).toBeNull();
     });
 
-    test('这次带上了就不出卡（默认就带：开关默认开、租金默认 1500）', () => {
+    test('这次带上了就不出卡（开关勾了、租金填了）', () => {
         seedProfile(['rent']);
-        openAtResult('forward', {});
+        // 「带上了」是用户自己勾的开关 + 自己填的租金，不再靠默认值替他带上
+        openAtResult('forward', { specialAdditionalDeductionCheckbox: true, rentDeduction: 1500 });
         expect(box().classList.contains('hidden')).toBe(true);
         expect(box().innerHTML).toBe('');
     });

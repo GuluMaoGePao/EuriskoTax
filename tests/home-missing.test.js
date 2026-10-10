@@ -15,7 +15,8 @@ const CARD_HTML = `
         </div>
         <div id="home-missing-body"></div>
     </div>
-    <div id="home-scenarios"></div>
+    <!-- v1.139.0：「我是谁」（#home-scenarios）撤出首页后，兜底 CTA 滚到事件轴 -->
+    <div id="home-event-rail"></div>
 `;
 
 global.showPage = jest.fn();
@@ -91,7 +92,7 @@ describe('漏填提醒 · 可见性', () => {
     });
 
     test('DOM 里没有这张卡：不抛错（首页精简 fixture 与真实页面都可能没有）', () => {
-        document.body.innerHTML = '<div id="home-scenarios"></div>';
+        document.body.innerHTML = '<div id="home-event-rail"></div>';
         window.EuriskoTaxProfile.patch({ identity: 'employee' });
         expect(() => render()).not.toThrow();
     });
@@ -139,12 +140,12 @@ describe('漏填提醒 · 出口', () => {
         expect(model().cta.target).toBe('bonus-tax');     // 最后 bonus
     });
 
-    test('漏的第一项是身份 → 没有对应工具，滚到首页身份卡组', () => {
+    test('漏的第一项是身份 → 没有对应工具，滚到「我遇到了什么事」', () => {
         const scroll = jest.fn();
-        document.getElementById('home-scenarios').scrollIntoView = scroll;
+        document.getElementById('home-event-rail').scrollIntoView = scroll;
         window.EuriskoTaxProfile.patch({ city: '上海' });   // 只填了城市，identity 仍是漏的第一项
         render();
-        expect(model().cta).toEqual({ action: 'scroll', target: 'home-scenarios', text: '挑一个身份当默认视角' });
+        expect(model().cta).toEqual({ action: 'scroll', target: 'home-event-rail', text: '挑一件你遇到的事' });
         document.querySelector('.home-missing-cta').click();
         expect(scroll).toHaveBeenCalled();
         expect(window.EuriskoToolbox.openTool).not.toHaveBeenCalled();

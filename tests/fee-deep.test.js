@@ -42,25 +42,28 @@ const W = () => window.EuriskoDeepWizard;
 const Q = () => window.EuriskoDisabilityFundQuick;
 
 // 默认场景：常年 25 人 + 季节性 24 人×4 月（折算 8）+ 派遣 12 人 → 月平均 45 人
+// 与 cit-deep 同理：向导与直接 compute 共用这一份（金额预填归零后向导首屏是空的）
+const FEE_BASE = {
+    variant: 'levy',
+    socialAverage: 8000,
+    regularCount: 25,
+    seasonalCount: 24,
+    seasonalMonths: 4,
+    dispatchCount: 12,
+    dispatchHere: true,
+    avgAnnualWage: 120000,
+    disabled: 0,
+    hireAnnualWage: 120000,
+    monthlyWage: 30000,
+    monthlyAllowance: 0,
+    annualBonus: 0,
+    paidMonths: 12,
+    hasUnion: true,
+    actual: 0
+};
+
 function compute(values) {
-    return R().get('disability-fund-deep').compute(Object.assign({
-        variant: 'levy',
-        socialAverage: 8000,
-        regularCount: 25,
-        seasonalCount: 24,
-        seasonalMonths: 4,
-        dispatchCount: 12,
-        dispatchHere: true,
-        avgAnnualWage: 120000,
-        disabled: 0,
-        hireAnnualWage: 120000,
-        monthlyWage: 30000,
-        monthlyAllowance: 0,
-        annualBonus: 0,
-        paidMonths: 12,
-        hasUnion: true,
-        actual: 0
-    }, values || {}));
+    return R().get('disability-fund-deep').compute(Object.assign({}, FEE_BASE, values || {}));
 }
 
 function row(out, label) {
@@ -342,7 +345,7 @@ describe('走向导：条件字段与结果都能走通', () => {
     });
 
     test('走到结果步，算出的数与直接调 compute 一致', () => {
-        W().open('disability-fund-deep', { fresh: true });
+        W().open('disability-fund-deep', { fresh: true, values: FEE_BASE });
         for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
             document.getElementById('dw-next').click();
         }

@@ -139,7 +139,8 @@
 
     function getTodayStr() {
         const d = new Date();
-        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        // (v1.139.0) 不再带年份：唯一消费者是问候行（见 renderGreeting 内的注释）。
+        return `${d.getMonth() + 1}月${d.getDate()}日`;
     }
 
     function getWeekdayStr() {
@@ -194,7 +195,9 @@
         const greetingEl = document.getElementById('home-greeting');
         const dateEl = document.getElementById('home-date-text');
         if (greetingEl) greetingEl.textContent = `${getGreeting()} 👋`;
-        if (dateEl) dateEl.textContent = `今天是 ${getTodayStr()} · ${getWeekdayStr()}`;
+        // (v1.139.0) 日期不带年份、不写「今天是」（见 getTodayStr 内注释）：问候行与 logo 同排 ——
+        // logo 是手机上唯一的品牌标记，「上午好 👋 · 9月20日 · 周日」这个长度才压得住一行。
+        if (dateEl) dateEl.textContent = `${getTodayStr()} · ${getWeekdayStr()}`;
     }
 
     // ====== 渲染：今日税感（动态） ======
@@ -212,6 +215,10 @@
             const endDiff = daysUntilMonthDay(compSettlement.endMonthDay);
             reminders.push({
                 color: 'bg-success',
+                title: '综合所得汇算清缴',
+                until: '3/1 - 6/30',
+                // 快截止才升级成主行大字，平时一句话带过
+                daysText: endDiff <= 15 ? `剩 ${endDiff} 天` : null,
                 text: `综合所得汇算清缴进行中（3/1-6/30）${endDiff <= 15 ? `，剩 ${endDiff} 天截止` : ''}`
             });
         }
@@ -221,6 +228,9 @@
             const endDiff = daysUntilMonthDay(bizSettlement.endMonthDay);
             reminders.push({
                 color: 'bg-success',
+                title: '经营所得汇算清缴',
+                until: '1/1 - 3/31',
+                daysText: endDiff <= 15 ? `剩 ${endDiff} 天` : null,
                 text: `经营所得汇算清缴进行中（1/1-3/31）${endDiff <= 15 ? `，剩 ${endDiff} 天截止` : ''}`
             });
         }
@@ -231,6 +241,9 @@
         if (policyEndDiff > 0 && policyEndDiff < 730) { // 2年内提示
             reminders.push({
                 color: 'bg-warning',
+                title: '经营所得减半优惠',
+                until: `至 ${halfPolicy.period.split(' - ')[1]}`,
+                daysText: `剩 ${policyEndDiff} 天`,
                 text: `经营所得减半优惠剩 ${policyEndDiff} 天（至 ${halfPolicy.period.split(' - ')[1]}）`
             });
         }
@@ -242,6 +255,9 @@
             if (left <= 5) {
                 reminders.push({
                     color: left <= 2 ? 'bg-danger' : 'bg-warning',
+                    title: '综合所得月度预缴',
+                    until: '每月 15 日前',
+                    daysText: `剩 ${left} 天`,
                     text: `本月综合所得预缴申报剩 ${left} 天（每月15日前）`
                 });
             }
@@ -261,6 +277,9 @@
                     if (left <= 5) {
                         reminders.push({
                             color: left <= 2 ? 'bg-danger' : 'bg-warning',
+                            title: '经营所得季度预缴',
+                            until: `${nextMonth} 月 15 日前`,
+                            daysText: `剩 ${left} 天`,
                             text: `经营所得季度预缴申报剩 ${left} 天（${nextMonth}月${quarterEndDay}日前）`
                         });
                     }
@@ -272,97 +291,55 @@
         if (reminders.length === 0) {
             reminders.push({
                 color: 'bg-blue-400',
+                title: '当前无紧急税务节点',
+                until: '适合规划年度税负 ✨',
                 text: '当前无紧急税务节点，是规划年度税负的好时机 ✨'
             });
         }
 
         // 限制最多3条
         const display = reminders.slice(0, 3);
-        container.innerHTML = display.map(r => `
-            <div class="flex items-start">
+        // (v1.139.0) 主次两级的渲染：**第一条若带倒计时**就升为主行 —— 节点名 + 大字天数 + 截止，
+        // 其余条目退为小字行；第一条没有倒计时（都还远）就全部小字，不让"没有急事"
+        // 也摆出一副大字报的架势。天数是这张卡唯一的数字，值得被放大。
+        const smallRow = r => `
+            <div class="hero-card__feel-row">
                 <span class="tax-reminder-dot ${r.color}"></span>
                 <span>${r.text}</span>
             </div>
-        `).join('');
-    }
-
-    // ====== 渲染：Mission Hero（阶段19-2）======
-    // 首屏那句话与那颗按钮由 home-mission.js 判定（首访 / 有历史 / 临近节点），这里只负责落 DOM。
-    // 依赖缺失（home-mission.js 没加载、或 DOM 里没有 Hero 容器）时**静默跳过**，不弹错、不改其余卡片。
-    function renderMission() {
-        const titleEl = document.getElementById('home-mission-title');
-        const subEl = document.getElementById('home-mission-subtitle');
-        if (!titleEl && !subEl) return;
-        const M = window.EuriskoHomeMission;
-        if (!M || typeof M.detectMission !== 'function') return;
-
-        const mission = M.detectMission({ history: readHistoryForMission() });
-        if (titleEl) titleEl.textContent = mission.title;
-        if (subEl) subEl.textContent = mission.subtitle;
-
-        const cta = document.getElementById('home-mission-cta');
-        const ctaText = document.getElementById('home-mission-cta-text');
-        if (ctaText) ctaText.textContent = mission.cta.text;
-        if (cta) {
-            cta.setAttribute('data-mission-action', mission.cta.action);
-            cta.setAttribute('data-mission-target', String(mission.cta.target || ''));
-        }
-
-        // 次要动作只在「有历史」态出现（换个方案对比 = 回到事件轴重新挑）
-        const alt = document.getElementById('home-mission-alt');
-        if (alt) {
-            if (mission.altCta) {
-                alt.textContent = mission.altCta.text + ' ›';
-                alt.setAttribute('data-mission-action', mission.altCta.action);
-                alt.setAttribute('data-mission-target', String(mission.altCta.target || ''));
-                alt.classList.remove('hidden');
-            } else {
-                alt.classList.add('hidden');
-            }
+        `;
+        const p = display[0];
+        if (p && p.daysText) {
+            container.innerHTML = `
+                <div class="hero-card__feel">
+                    <span class="tax-reminder-dot ${p.color}"></span>
+                    <div class="hero-card__feel-main">
+                        <div class="hero-card__feel-name">${p.title}</div>
+                        <div class="hero-card__feel-count">
+                            <strong class="hero-card__feel-days">${p.daysText}</strong>
+                            <span class="hero-card__feel-until">${p.until}</span>
+                        </div>
+                    </div>
+                </div>
+                ${display.slice(1).map(smallRow).join('')}
+            `;
+        } else {
+            container.innerHTML = display.map(smallRow).join('');
         }
     }
 
-    // Mission 要读历史：优先内存镜像，兜底 localStorage（与 renderRecentCalculations 同一口径）
-    function readHistoryForMission() {
-        if (typeof syncCalculationHistoryFromStorage === 'function') {
-            try { syncCalculationHistoryFromStorage(); } catch (e) { /* 测试环境可能没有，忽略 */ }
-        }
-        if (typeof calculationHistory !== 'undefined' && Array.isArray(calculationHistory)) {
-            return calculationHistory;
-        }
-        try {
-            const list = JSON.parse(localStorage.getItem('taxCalculationHistory') || '[]');
-            return Array.isArray(list) ? list : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    // Hero 的 CTA：只有两种动作 —— 滚到事件轴 / 打开上次那条记录
-    function setupMissionCta() {
-        const bind = function (el) {
-            if (!el) return;
-            el.addEventListener('click', function () {
-                const action = this.getAttribute('data-mission-action');
-                const target = this.getAttribute('data-mission-target');
-                if (action === 'scroll') {
-                    const anchor = document.getElementById(target || 'home-event-rail');
-                    if (anchor && typeof anchor.scrollIntoView === 'function') {
-                        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                    return;
-                }
-                if (action === 'open-last' && target && typeof viewHistoryRecord === 'function') {
-                    viewHistoryRecord(target);
-                }
-            });
-        };
-        bind(document.getElementById('home-mission-cta'));
-        bind(document.getElementById('home-mission-alt'));
-    }
+    // (v1.139.0) 原 renderMission / setupMissionCta / readHistoryForMission 一并删除：
+    // Hero 的三态文案（「你今年要交多少税？」/「距汇算还有 N 天」）与那颗「开始测算 / 继续上次测算」
+    // 按钮都撤了 —— Hero 现在装的是问候 + 今日税感 + 小贴士，三态判定的唯一消费者没了，
+    // 留着就是一段每次进首页都跑、却往不存在的 DOM 上写字的死逻辑（判空让它永远安静地跳过）。
+    // 三态判定本身（home-mission.js 的 detectMission）随它一起撤，见该文件的注释。
 
     // ====== 渲染：上轴 · 事件卡「我遇到了什么事」（阶段19-2）======
-    // 数据是生活语言（不发年终奖→bonus-tax），渲染成横向滑动卡片组；**任何断点都不折叠**。
+    // 数据是生活语言（不发年终奖→bonus-tax），铺成网格；整块**在任何断点都不折叠**
+    // —— 但列表尾部在手机端可以收起（默认只露 6 张），见 syncEventRailMore。
+    // 手机端两列 3 行：再往上放就要滚很久才够到展开按钮，不如先给一屏半。
+    const EVENT_RAIL_COLLAPSED = 6;
+
     function renderEventRail() {
         const rail = document.getElementById('home-event-rail');
         if (!rail) return;
@@ -386,6 +363,31 @@
                     this.getAttribute('data-decide') === '1');
             });
         });
+
+        syncEventRailMore(rail);
+    }
+
+    // 手机端「展开全部 / 收起」（v1.139.0）：卡片数超过一屏半才出现，
+    // 件数**现算**而不是写死 —— 改一次 eventCards 就得同步改文案的按钮，迟早说假话。
+    // 只切 class、不重建 DOM：重建会连带冲掉上面刚绑好的点击。
+    function syncEventRailMore(rail) {
+        const btn = document.getElementById('home-event-more');
+        if (!btn) return;
+        const total = rail.querySelectorAll('.event-card').length;
+        if (total <= EVENT_RAIL_COLLAPSED) {
+            btn.classList.remove('is-visible');
+            rail.classList.remove('is-collapsed');
+            return;
+        }
+        btn.classList.add('is-visible');
+        const text = document.getElementById('home-event-more-text');
+        if (text) text.textContent = '展开全部 ' + total + ' 件';
+        btn.addEventListener('click', function () {
+            const collapse = !rail.classList.contains('is-collapsed');   // 点一次翻一次
+            rail.classList.toggle('is-collapsed', collapse);
+            this.setAttribute('aria-expanded', collapse ? 'false' : 'true');
+            if (text) text.textContent = collapse ? ('展开全部 ' + total + ' 件') : '收起';
+        });
     }
 
     // 打开事件卡落到哪个工具：第 8 张（开店 / 私活）先问一句再进 —— 劳务报酬与经营所得的
@@ -408,6 +410,24 @@
         open(toolId);
     }
 
+    // 历史读取：优先内存镜像，兜底 localStorage（与 renderRecentCalculations 同一口径）。
+    // (v1.139.0) 原名 readHistoryForMission —— 它当时只为 Hero 的三态判定服务；
+    // 三态撤了之后剩下「我的税务资产 / 待办」在用它，名字里的 Mission 就成了误导，改成中性的。
+    function readHistoryForHome() {
+        if (typeof syncCalculationHistoryFromStorage === 'function') {
+            try { syncCalculationHistoryFromStorage(); } catch (e) { /* 测试环境可能没有，忽略 */ }
+        }
+        if (typeof calculationHistory !== 'undefined' && Array.isArray(calculationHistory)) {
+            return calculationHistory;
+        }
+        try {
+            const list = JSON.parse(localStorage.getItem('taxCalculationHistory') || '[]');
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
     // ====== 渲染：我的税务资产（阶段19-2）======
     // 只给回访用户看：待办与截止（税务日历 × 已保存测算）+ 今年税负概览（≥2 次测算才出现）。
     function renderAssets() {
@@ -417,7 +437,7 @@
         const M = window.EuriskoHomeMission;
         if (!M) return;
 
-        const history = readHistoryForMission();
+        const history = readHistoryForHome();
         const todos = M.buildTodos({ history });
         const overview = M.buildYearOverview(history);
         const yearEl = document.getElementById('home-assets-year');
@@ -429,10 +449,10 @@
             const days = t.daysLeft > 0 ? `剩 ${t.daysLeft} 天` : '今天截止';
             parts.push(`
                 <div class="flex items-center gap-2">
-                    <i class="fa fa-clock-o ${t.daysLeft <= 7 ? 'text-danger' : 'text-primary'}"></i>
+                    <i class="fa fa-clock-o ${t.daysLeft <= 7 ? 'tax-reminder-urgent' : 'text-primary'}"></i>
                     <span class="flex-1 truncate">${t.name}</span>
                     <span class="text-xs text-gray-500">${t.deadline}</span>
-                    <span class="text-xs ${t.daysLeft <= 7 ? 'text-danger' : 'text-gray-500'}">${days}</span>
+                    <span class="text-xs ${t.daysLeft <= 7 ? 'tax-reminder-urgent' : 'text-gray-500'}">${days}</span>
                 </div>
             `);
         });
@@ -530,7 +550,10 @@
             first: { key: first.key, label: first.label },
             cta: toolId
                 ? { action: 'tool', target: toolId, text: '去补填：' + first.label }
-                : { action: 'scroll', target: 'home-scenarios', text: '挑一个身份当默认视角' },
+                // v1.139.0：「我是谁」已撤出首页（身份改在登录弹窗与个人中心），
+                // 兜底 CTA 因此改指「我遇到了什么事」—— 身份不是"补填"的下一站，
+                // 认得自己遇到的事才是。
+                : { action: 'scroll', target: 'home-event-rail', text: '挑一件你遇到的事' },
             deductionMissed: c.missing.some(function (it) { return it.key === 'deductions'; })
         };
     }
@@ -982,7 +1005,7 @@
 
         container.innerHTML = items.map(item => {
             const daysText = item.daysLeft > 0 ? `剩 ${item.daysLeft} 天` : '今天截止';
-            const urgencyColor = item.daysLeft <= 7 ? 'text-danger' : (item.daysLeft <= 30 ? 'text-warning' : 'text-gray-500');
+            const urgencyColor = item.daysLeft <= 7 ? 'tax-reminder-urgent' : (item.daysLeft <= 30 ? 'tax-reminder-soon' : 'text-gray-500');
             return `
                 <div class="tax-reminder-item">
                     <span class="tax-reminder-dot ${item.color}"></span>
@@ -998,16 +1021,14 @@
     }
 
     // ====== 渲染：税务小贴士 ======
+    // (v1.139.0) 原先正文里带一颗黄色引号图标 —— 那是白卡时代的装饰；搬进 Hero 后
+    // 面板已有灯泡图标位，正文再挂一颗就成了同一句话两个图标（深底上黄引号还特别扎眼）。
+    // 纯文本就好，样式交给 .hero-card__panel-body。
     function renderTaxTip() {
         const container = document.getElementById('home-tip-content');
         if (!container) return;
         const tip = TAX_TIPS[currentTipIndex % TAX_TIPS.length];
-        container.innerHTML = `
-            <div class="flex items-start">
-                <i class="fa fa-quote-left text-yellow-400 mr-2 mt-0.5"></i>
-                <span class="flex-1">${tip}</span>
-            </div>
-        `;
+        container.textContent = tip;
     }
 
     // ====== 模式说明弹窗 ======
@@ -1133,17 +1154,15 @@
         HomePerf.measure('initHome → 渲染最近计算', renderRecentCalculations);
         HomePerf.measure('initHome → 渲染税务日历', renderTaxCalendar);
         HomePerf.measure('initHome → 渲染税务小贴士', renderTaxTip);
-        // 阶段19-2：首屏 Mission（三态判定）+ 上轴事件卡 + 我的税务资产
-        HomePerf.measure('initHome → 渲染 Mission Hero', renderMission);
+        // 阶段19-2：上轴事件卡 + 我的税务资产
         HomePerf.measure('initHome → 渲染事件卡上轴', renderEventRail);
         HomePerf.measure('initHome → 渲染我的税务资产', renderAssets);
         HomePerf.measure('initHome → 渲染漏填提醒', renderMissing);
         // 三段各自渲染时都会调 syncTodoCard，这里再兜一次：顺序依赖（例如截止段先跑、
         // 待办段后跑）不会让壳的显隐停在中间态
         syncTodoCard();
-        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 9 });
+        HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 8 });
 
-        setupMissionCta();
         setupMissingCta();
         setupModeCards();
         setupInteractions();
@@ -1155,15 +1174,15 @@
         }
     }
 
-    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近计算，还要刷新 Mission 与资产 ——
-    // 「首访 → 有历史」的切换就发生在保存之后，只刷最近计算会留下一个还在问「你今年要交多少税」的过期首屏。
+    // 保存计算后刷新首页（阶段19-2 扩展）：除了最近计算，还要刷新资产与待办。
+    // （v1.139.0：原先这里还刷 renderMission —— 首页那句「你今年要交多少税」要在保存后
+    //  从「首访」转成「有历史」。Hero 的三态文案撤了之后没有这个状态要转，那行跟着删。）
     // 阶段19-10a：这里原本还顺手刷一下首页「最近使用」卡（调的是 refreshRecentTools）。
     // 那个函数全仓**没有定义** —— typeof 判空让它永远安静地跳过，卡也因此从来不刷新。
     // 卡已随入口清理撤掉（同一份数据在工具页第一组），这段一并删，不留假接线。
     function refreshHomeRecent() {
         renderPlans();             // 存了方案 / 归档了台账，这两行要跟着变
         renderRecentCalculations();
-        renderMission();
         renderAssets();
         renderTaxCalendar();  // 归档/存方案不会改日期，但漏了它「接下来要办」的壳就不会重算
         renderMissing();   // 算完可能刚补上一项，这张卡的漏项要跟着变
@@ -1174,7 +1193,6 @@
     window.initHome = initHome;
     window.refreshHomeRecent = refreshHomeRecent; // 保存计算后可调用刷新
     window.renderEventRail = renderEventRail;
-    window.renderMission = renderMission;
     window.renderAssets = renderAssets;
     window.renderMissing = renderMissing;
     window.renderPlans = renderPlans;

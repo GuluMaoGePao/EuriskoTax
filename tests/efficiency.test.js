@@ -71,7 +71,8 @@ function setValue(key, value) {
 describe('阶段19-8 · 参数记忆', () => {
     test('第一次进工具：spec 默认值，没有记忆提示（不凭空变出一份"上次"）', () => {
         openVat();
-        expect(document.getElementById('qf-sales').value).toBe(String(fieldDefault('vat', 'sales')));
+        // 金额 0 渲染成空框（「默认没有」的呈现）：空与 0 是同一个数
+        expect(Number(document.getElementById('qf-sales').value || 0)).toBe(fieldDefault('vat', 'sales'));
         expect(document.getElementById('quick-memory-hint').classList.contains('hidden')).toBe(true);
     });
 
@@ -92,12 +93,14 @@ describe('阶段19-8 · 参数记忆', () => {
         setValue('sales', 20000);
         openVat();
         document.getElementById('quick-memory-clear').click();
-        expect(document.getElementById('qf-sales').value).toBe(String(fieldDefault('vat', 'sales')));
+        // 金额 0 渲染成空框（「默认没有」的呈现）：空与 0 是同一个数
+        expect(Number(document.getElementById('qf-sales').value || 0)).toBe(fieldDefault('vat', 'sales'));
         expect(document.getElementById('quick-memory-hint').classList.contains('hidden')).toBe(true);
         expect(MEM().get('vat')).toBeNull();
         // 再开一次也不该又冒出来
         openVat();
-        expect(document.getElementById('qf-sales').value).toBe(String(fieldDefault('vat', 'sales')));
+        // 金额 0 渲染成空框（「默认没有」的呈现）：空与 0 是同一个数
+        expect(Number(document.getElementById('qf-sales').value || 0)).toBe(fieldDefault('vat', 'sales'));
     });
 
     // 病根：用户点的是"看那一条记录"，不是"看我上次填的"。带进来的那份必须赢，

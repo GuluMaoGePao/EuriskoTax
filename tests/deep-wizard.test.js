@@ -224,12 +224,8 @@ describe('多步向导：第三个税种（企业所得税）', () => {
     });
 
     test('结果步算出的税与直接调 compute 一致', () => {
-        W().open('corporate-income-tax-deep', { fresh: true });
-        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
-            document.getElementById('dw-next').click();
-        }
-        const shown = document.getElementById('deep-wizard-page').textContent;
-        const direct = R().get('corporate-income-tax-deep').compute({
+        // 向导与直接 compute 吃同一份：金额预填归零后向导只读 default，不传就是空算一场
+        const input = {
             highTech: false, smeTech: false, industry: 'general', restricted: false,
             quarters: [
                 { staffBegin: 280, staffEnd: 280, assetsBegin: 3000, assetsEnd: 3000 },
@@ -240,7 +236,13 @@ describe('多步向导：第三个税种（企业所得税）', () => {
             revenue: 12000000, cost: 8800000,
             entertainment: 100000, advertising: 2000000, donation: 300000,
             rdExpense: 1000000, currentYear: 2026, losses: [{ year: 2019, amount: 1500000 }]
-        });
+        };
+        W().open('corporate-income-tax-deep', { fresh: true, values: input });
+        for (let i = 0; i < 8 && !document.getElementById('dw-result-primary'); i++) {
+            document.getElementById('dw-next').click();
+        }
+        const shown = document.getElementById('deep-wizard-page').textContent;
+        const direct = R().get('corporate-income-tax-deep').compute(input);
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });
 });
@@ -533,14 +535,15 @@ describe('多步向导：最后一个税种类别（残保金与工会经费）'
     });
 
     test('结果步与同源速算器一致（没有季节性用工与派遣时，月平均 = 常年人数）', () => {
-        W().open('disability-fund-deep', { fresh: true });
-        document.getElementById('dw-next').click();
-        document.getElementById('qf-regularCount').value = '80';
-        document.getElementById('qf-seasonalCount').value = '0';
-        document.getElementById('qf-dispatchCount').value = '0';
-        for (let i = 0; i < 6 && !document.getElementById('dw-result-primary'); i++) {
-            document.getElementById('dw-next').click();
-        }
+        // 残保金要看社平与年平均工资，两者都归零了 —— 只填人数算不出对照的那个数。
+        // 带 values 打开时渲染器直接落在结果步，所以这里不需要再点「下一步」。
+        W().open('disability-fund-deep', {
+            fresh: true,
+            values: {
+                socialAverage: 8000, avgAnnualWage: 120000,
+                regularCount: 80, seasonalCount: 0, dispatchCount: 0
+            }
+        });
         const shown = document.getElementById('deep-wizard-page').textContent;
         const direct = R().get('disability-fund').compute({
             variant: 'levy', headcount: 80, disabled: 0,

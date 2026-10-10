@@ -33,7 +33,7 @@ const W = () => window.EuriskoDeepWizard;
 function valuesOf(overrides) {
     const tool = R().get('reverse');
     const v = {};
-    tool.fields.forEach(function (f) { v[f.key] = f.default; });
+    tool.fields.forEach(function (f) { v[f.key] = (f.sample !== undefined ? f.sample : f.default); });
     return Object.assign(v, overrides || {});
 }
 
@@ -131,9 +131,14 @@ describe('反向倒算迁移：扣除项真的进了内核', () => {
     // 此时方程在下边界上就已经满足 —— 内核夹住它，给出「0 税、所需税前＝扣除合计」。
     // 这不是错误，但它意味着「所需税前收入」有个**下界**，写在这儿是提醒后来人别把夹界当 bug 改。
     test('到手目标低于扣除合计时，回落到「0 税」下界（所需税前＝扣除合计）', () => {
+        // 这一整套扣除（社保 + 房租）都是用户自己勾选填的，默认值归零后必须在这里写明，
+        // 否则「扣除合计」是空的，这条边界根本不会出现
         const out = compute({
             reverseType: 'monthly', monthlyNet: 12000, calcMode: 'balanced',
-            childrenInfantDeduction: 2000, elderlyDeduction: 3000
+            specialDeductionCheckbox: true,
+            pensionInsurance: 1000, medicalInsurance: 300, unemploymentInsurance: 50, housingFund: 1200,
+            specialAdditionalDeductionCheckbox: true,
+            childrenInfantDeduction: 2000, elderlyDeduction: 3000, rentDeduction: 1500
         });
         const dedTotal = out.rows.find((r) => r.label === '全年扣除合计').value;
         expect(dedTotal).toBeGreaterThan(12000 * 12);

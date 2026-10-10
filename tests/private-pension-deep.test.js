@@ -299,7 +299,11 @@ describe('走向导：由 spec 驱动', () => {
     });
 
     test('走完向导：主结果、免责声明、结果归属都在', () => {
-        W().open('private-pension-deep', { fresh: true });
+        // 带上示例值走：金额预填归零后，什么都不填只能走到「一项都没填」的空结果
+        W().open('private-pension-deep', {
+            fresh: true,
+            values: { selfMonthlyIncome: 10000, selfMonthlyInsurance: 1000, pensionSelf: 12000 }
+        });
         for (let i = 0; i < 10; i++) {
             const next = document.getElementById('dw-next');
             if (!next) break;
