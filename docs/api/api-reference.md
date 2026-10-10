@@ -856,7 +856,7 @@ curl -X POST https://euriskotax.com/api/auth/login \
 | `SMTP_SECURE` | 可选，`true/false`（缺省按端口推断） |
 | `SMTP_FROM_NAME` | 可选，发件显示名，默认 EuriskoTax |
 
-> ⚠️ 未配置 SMTP 时 send-code 返回失败，注册无法完成。生产环境务必在 Zeabur 面板配置。
+> ⚠️ 未配置 SMTP 时 send-code 返回失败，注册无法完成。生产环境务必在腾讯云服务器 `.env.shared` 配置。
 
 ### 8.3 可选变量
 
@@ -873,7 +873,7 @@ curl -X POST https://euriskotax.com/api/auth/login \
 
 ## 9. 附录：注册流程与邀请码
 
-1. **获取邀请码**：公测期间每码仅可注册一个账号。开发者通过 Zeabur 面板执行 `POST /api/invites`（带 `X-Admin-Token`）或本地 GUI「邀请码管理」一键生成后分发。
+1. **获取邀请码**：公测期间每码仅可注册一个账号。开发者通过本地 GUI「邀请码管理」（生产目标即腾讯云正式站）或直接调用 `POST /api/invites`（带 `X-Admin-Token`）生成后分发。
 2. **用户注册路径**：输入邮箱 → 点「发送验证码」（60s 冷却倒计时）→ 收到 6 位数字邮件 → 填入验证码 + 邀请码 + 用户名密码 → 注册成功 → 自动跳转登录。
 3. **兜底机制**：服务启动时若 `InviteCode` 表为空，自动批量生成 20 个并打印到启动日志（幂等，非空不生成），防止"无码可用"。
 4. 历史固定邀请码 `EURISKO2026BETA` 已废弃，不再接受。

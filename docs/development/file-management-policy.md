@@ -12,7 +12,7 @@ EuriskoTax/
 ├─ CHANGELOG.md                       ← 版本变更记录（仅根目录保留）
 ├─ index.html                         ← 前端入口
 ├─ package.json / package-lock.json   ← 依赖清单（含测试脚本）
-├─ Dockerfile                         ← Zeabur 生产部署入口（启动前 prisma migrate deploy）
+├─ Dockerfile                         ← 生产镜像入口（启动前 prisma migrate deploy；腾讯云部署走 ops-deploy.ps1）
 ├─ manifest.json / service-worker.js  ← PWA 应用清单与离线缓存（v1.4.0）
 ├─ .gitignore                         ← Git 忽略规则（路径变更必须同步改）
 │

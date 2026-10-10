@@ -11,6 +11,44 @@
 
 ---
 
+## [1.140.0] - 2026-10-10 - 运维口径收口：Zeabur 降级为测试环境，默认一律腾讯云
+
+正式公网是腾讯云（`https://euriskotax.com`），Zeabur（`euriskotax.zeabur.app`）降级为测试环境 ——
+但仓库里仍有一批脚本和文档把 Zeabur 当生产：发布流水线默认核对它、GUI 后台的「生产」请求打它、
+三个「打开线上」按钮开的是它，而它在本机还连不通（请求全是 `fetch failed`，表现为发布卡在第 4 步
+空转到 600s 才判失败）。这次把默认指向全部收回腾讯云。
+
+### 会误伤生产的三处
+
+| 位置 | 原行为 | 现在 |
+|---|---|---|
+| `tools/ops/ops-publish.ps1` | 默认 `BaseUrl` 是 zeabur，核对与生产内容播种都打测试环境 | 默认 `https://euriskotax.com`，要核对测试环境必须显式 `-BaseUrl` |
+| `tools/gui/gui-dev-console.ps1` | `-Target prod` 时 base 取 zeabur；三个「打开线上」按钮也开 zeabur | 一律正式域；令牌提示改指腾讯云 `.env.shared` 的实际路径 |
+| `tools/ops/clean-browser-cache.bat` | 回显并打开 zeabur 地址（这个链接是直接发给用户的） | 正式域 |
+
+### 发布文案改口：腾讯云不会由 push 自动构建
+
+`ops-publish.ps1` 原先写着「Zeabur 收到 push 后会重新构建（2~6 分钟）」，这在腾讯云上不成立 ——
+部署是**手动动作**（`ops-deploy.ps1 -SkipTest`：打包 → 上传 → 依赖与迁移 → pm2 重启 → 健康检查）。
+现在第 4 步只做核对，并明确提示部署要另跑；回滚路径从「Zeabur 控制台选上一个构建」改成
+`ops-deploy.ps1 -Rollback`（服务器 `releases` 保留最近 3 份）。
+
+### 口径类
+
+- 文档对外口径：`README.md`（生产环境表 + 部署章节）、`docs/README.md`、`docs/marketing/` 三份推广
+  物料、`docs/api/api-reference.md` 里的「在 Zeabur 面板配置」全部改成腾讯云服务器 `.env.shared`。
+- **地域订正**：此前几处写「腾讯云轻量（上海）」，实际**服务器在北京、备案主体在上海**，一并改正。
+- 历史文档**不改写事实**，只在关键处加状态标注：`lighthouse-deployment-guide.md` 标「切流已完成」、
+  `development-plan.md` 云平台章节标「2026-10-10 已切流」、`set-canonical-domain.ps1` 与
+  `swap-canonical-domain.js` 标为已完成的一次性工具（`-check` / `--check` 仍可当体检用）。
+- 两个 `.env.example` 的注释口径同步；`Dockerfile` / `deploy/lighthouse/` 注释去掉平台名。
+- `tests/copy-standard.test.js` 的域名白名单**保留**旧域（测试环境仍可能合法出现），注释写明原因。
+- 产品代码无改动（前端与后端本来就没有写死 Zeabur，CORS 是纯环境变量驱动）。
+
+### 验收
+
+- 单测 **121 套件 2267 例**全绿；`verify:local` **259/259**；线上指纹 **37 项**（部署后核对）。
+
 ## [1.139.0] - 2026-10-09 - 首页收两刀：「我是谁」撤出首页，Hero 与今日税感合一
 
 - **「我遇到了什么事」不再靠横滑看全**：9 张事件卡原来是手机端横向滑动（scroll-snap），

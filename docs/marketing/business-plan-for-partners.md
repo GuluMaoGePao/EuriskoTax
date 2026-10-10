@@ -345,8 +345,8 @@ EuriskoTax 是我们自建的**免费个税测算工具**，它的角色不是"�
 
 ## 附录 A：现状证据（可核验）
 
-- 线上地址：`https://euriskotax.zeabur.app`（HTTPS 已生效）
-- 运营管理台：`https://euriskotax.zeabur.app/admin.html`（粘贴管理员令牌后可见「线索」「兑换码」「税率」「社保基数」等 Tab）
+- 线上地址：`https://euriskotax.com`（HTTPS 已生效）
+- 运营管理台：`https://euriskotax.com/admin.html`（粘贴管理员令牌后可见「线索」「兑换码」「税率」「社保基数」等 Tab）
 - 已上线 SEO 落地页：`/seo/bonus-tax.html`、`/seo/salary-tax.html`、`/seo/annual-settlement.html`
 - 质量口径（截至 v1.17.0）：单测 28 套件 570 例全通过；发布门禁 `verify:local` 167/167 全绿
 

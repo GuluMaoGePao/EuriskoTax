@@ -2,7 +2,7 @@
 
 > 最后更新：2026-09-12（v1.1）
 > 配套文档：[开发工作流总览](development-workflow.md) / [CHANGELOG.md](../../CHANGELOG.md)
-> 生效范围：单人/小团队 + 生产环境（Zeabur 从 main 自动部署）场景
+> 生效范围：单人/小团队 + 生产环境（腾讯云：push 到 main 后手动跑 `ops-deploy.ps1` 部署）场景
 
 ---
 

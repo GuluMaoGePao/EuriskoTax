@@ -305,7 +305,7 @@ docs/
 
 | 类别 | 内容 | 说明 |
 |------|------|------|
-| 部署 | Zeabur 生产上线 + PostgreSQL + Dockerfile | 见 development-plan 阶段 5/6/7 |
+| 部署 | Zeabur 生产上线 + PostgreSQL + Dockerfile（🟡 历史：v1.4.0 当时；2026-10-10 起正式公网为腾讯云） | 见 development-plan 阶段 5/6/7 |
 | 认证 | 注册邮箱验证码 + 邀请码一机一码 | 前端 + 后端 + GUI 管理 |
 | PWA | manifest + service-worker v4 | 可安装、离线应用壳 |
 | 运营 | 反馈/统计概览/邀请码管理 API + 冷启动素材 | 见 marketing 与 api-reference |

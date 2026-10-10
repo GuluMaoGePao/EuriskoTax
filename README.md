@@ -12,7 +12,7 @@
 
 | 项 | 状态 |
 |---|---|
-| 生产环境 | ✅ Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，公网 **https://euriskotax.zeabur.app**（Dockerfile 构建部署，推 main 自动上线）；ICP 备案通过后迁腾讯云轻量（上海） |
+| 生产环境 | ✅ 腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，公网 **https://euriskotax.com**（`ops-deploy.ps1` 打包上传 + pm2 重启，手动部署）；Zeabur（`euriskotax.zeabur.app`）为测试环境 |
 | 版本 | CHANGELOG 最新 **1.80.0**（2026-09-20，阶段19-3：全站阴影收口到 `--sh-*` 令牌 + 焦点环统一）。逐版明细见 [CHANGELOG.md](CHANGELOG.md)；版本号**五处同步**：`package.json` / 关于弹窗 / `index.html` 的 `window.__APP_VERSION__` / `version.json` / CHANGELOG |
 | 免费/专业版 | ✅ 阶段10 已上线（v1.7.0）：计税能力永不锁定，登录仅解锁云端历史同步；运维后台（`admin.html`）可调用户权益 |
 | PWA | ✅ 可安装、离线可打开应用壳（网络优先瘦缓存，发版无需手动清缓存） |
@@ -28,14 +28,17 @@
 
 ## 快速启动
 
-### 生产部署（Zeabur，推荐对外使用）
+### 生产部署（腾讯云，对外正式环境）
 
-```text
-1. 推送 main 分支到 GitHub
-2. Zeabur 关联仓库自动构建 Dockerfile
-3. 构建完成自动执行 prisma migrate deploy（生产 PostgreSQL）
-4. 配置环境变量后访问公网地址
+正式公网是腾讯云轻量（上海），**push 不会自动上线**，部署是手动动作：
+
+```powershell
+powershell -File tools/ops/ops-deploy.ps1 -DryRun     # 先预览（打包 + 校验私钥/配置）
+powershell -File tools/ops/ops-deploy.ps1 -SkipTest   # 部署：打包 → 上传 → 依赖与迁移 → pm2 重启 → 健康检查
+powershell -File tools/ops/ops-check-prod.ps1         # 核对 37 项线上指纹
 ```
+
+Zeabur（`euriskotax.zeabur.app`）自 2026-10-10 起降级为**测试环境**，所有脚本默认指向腾讯云正式域。
 
 环境变量清单见 [docs/development/development-plan.md](docs/development/development-plan.md) 阶段 6/7。
 
@@ -99,7 +102,7 @@ EuriskoTax/
 ├── index.html          # 前端入口
 ├── service-worker.js   # PWA Service Worker
 ├── manifest.json       # PWA Manifest
-└── Dockerfile          # 生产部署（Zeabur）
+└── Dockerfile          # 生产镜像构建（腾讯云部署用）
 ```
 
 > 主项目代码、运维脚本、GUI 工具、测试代码、文档职责分离。详见 [docs/README.md](docs/README.md) 与 [tools/ops/README.md](tools/ops/README.md)。
@@ -108,7 +111,7 @@ EuriskoTax/
 
 ## 本地联调与守护（已非主要部署方式）
 
-> Trae 本地开发时代的分享/守护体系仍保留，用于快速发给好友体验，但**正式公测以 Zeabur 生产为准**。
+> Trae 本地开发时代的分享/守护体系仍保留，用于快速发给好友体验，但**正式公测以腾讯云生产环境为准**。
 
 | 工具 | 作用 |
 |------|------|
@@ -147,7 +150,7 @@ npm run verify:release      # 发版前自检：版本号五处 + 文档口径 v
 ## 安全说明
 
 - `tools/ops/notify.config.json`（SMTP 授权码）、`server/.env`（JWT 密钥）均已 `.gitignore`，不入库
-- 生产 `JWT_SECRET` / `DATABASE_URL` 通过 Zeabur 环境变量注入，启动时强校验，弱密钥拒绝启动
+- 生产 `JWT_SECRET` / `DATABASE_URL` 由腾讯云服务器 `/home/ubuntu/euriskotax/.env.shared` 注入（敏感值不经过本机），启动时强校验，弱密钥拒绝启动
 - 注册接口限流：登录 10 次/15 分、验证码 5 次/15 分/IP；验证码/邀请码存哈希、一次性使用
 - 源代码无硬编码敏感信息；本地开发密钥仅限本地
 

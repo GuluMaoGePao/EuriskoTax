@@ -102,7 +102,7 @@
 - 接口快照（含日粒度趋势）：
 
 ```powershell
-curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
+curl.exe -s https://euriskotax.com/api/stats/overview -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
 ```
 
 关注字段：`users.newToday`（发帖脉冲）、`calculations.byType`（comprehensive / business / classification / reverse → 决定下一个 SEO 页写哪个词）、`dailyTrend`（7 日留存趋势）。

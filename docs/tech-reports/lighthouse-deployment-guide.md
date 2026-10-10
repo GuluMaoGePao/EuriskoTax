@@ -2,6 +2,10 @@
 
 > 适用：腾讯云轻量应用服务器（Docker CE 镜像，上海），部署包 `deploy/lighthouse/`。
 > 背景：ICP 备案在腾讯云接入，备案要求域名解析指向境内服务器；Zeabur（东京）保留为过渡/预览环境。
+>
+> **状态（2026-10-10）：切流已完成** —— 腾讯云轻量即正式公网，Zeabur 降级为测试环境（不再下线，保留回滚与预览用途）。
+> 日常部署走 `tools/ops/ops-deploy.ps1`（部署目录 `/home/ubuntu/euriskotax`，pm2 进程 `euriskotax`，`releases` 保留 3 份，`-Rollback` 回滚）；
+> 下面第 1~4 节是迁移当时的记录，地域与目录以服务器实际为准。
 
 ## 0. 服务器与凭据
 

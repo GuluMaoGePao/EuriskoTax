@@ -21,7 +21,7 @@
 
 - **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
 - **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
-- **生产环境**：Zeabur（Tencent Tokyo）+ PostgreSQL + HTTPS，`https://euriskotax.zeabur.app`；ICP 备案通过后迁腾讯云轻量（上海），执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)
+- **生产环境**：腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起正式公网，部署走 `tools/ops/ops-deploy.ps1`，手动触发，push 不自动上线）；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境
 - **测试**：121 套件 2267 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
@@ -63,7 +63,7 @@ EuriskoTax/
 ├── index.html                         # 前端入口
 ├── service-worker.js                  # PWA Service Worker
 ├── manifest.json                      # PWA Manifest
-├── Dockerfile                         # Docker 镜像构建配置（Zeabur 生产部署）
+├── Dockerfile                         # Docker 镜像构建配置（腾讯云部署用，`deploy/lighthouse/` 走 compose）
 ├── package.json                       # npm 配置
 ├── README.md                          # 项目入口
 └── CHANGELOG.md                       # 变更记录
@@ -216,7 +216,7 @@ EuriskoTax/
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
 | [tech-reports/watchdog-deployment-guide.md](tech-reports/watchdog-deployment-guide.md) | 🟢 Watchdog 监控与邮件通知系统部署指南 v1.3（本地运维） | 2026-09-14 |
-| [tech-reports/lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md) | 🟢 腾讯云轻量服务器部署与迁移手册（Zeabur → 上海轻量；迁移包 `deploy/lighthouse/`，含数据迁移/证书/切换日流程/回滚/核对清单） | 2026-09-18 |
+| [tech-reports/lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md) | 🟢 腾讯云轻量服务器部署与迁移手册（Zeabur → 上海轻量，**2026-10-10 已切流完成**，现为正式公网；迁移包 `deploy/lighthouse/`，含数据迁移/证书/切换日流程/回滚/核对清单） | 2026-09-18 |
 | [tech-reports/watchdog-notification-and-event-log-spec.md](tech-reports/watchdog-notification-and-event-log-spec.md) | 🟢 守护脚本邮件通知与事件日志规范 v4.0（通知/日志唯一真源；§8 含 URL 邮件密集发送排查会话，OPEN） | 2026-09-14 |
 | [tech-reports/troubleshooting-sop-template.md](tech-reports/troubleshooting-sop-template.md) | 🟢 故障排查 SOP 标准模板 v1.0（复用模板） | 2026-09-14 |
 | [tech-reports/mock-client-concurrent-logging-retrospective.md](tech-reports/mock-client-concurrent-logging-retrospective.md) | 🟡 MockClient 并发日志乱序问题技术复盘 | 2026-09-14 |
@@ -246,7 +246,7 @@ EuriskoTax/
 
 ### 部署
 
-- **生产（Zeabur）**：推送 main 分支自动构建 `Dockerfile` → Prisma migrate deploy → 启动服务；详见 [开发计划 阶段 5/6/7](development/development-plan.md)；上线后自检跑 `tools/ops/ops-check-prod.ps1`（**37 项线上指纹**）。**迁移中（阶段16）**：ICP 备案通过后切至腾讯云轻量（上海），执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)
+- **生产（腾讯云轻量 · 上海）**：`tools/ops/ops-deploy.ps1` 打包上传 → 依赖安装 + Prisma migrate deploy → pm2 重启 → 健康检查；部署后自检跑 `tools/ops/ops-check-prod.ps1`（**37 项线上指纹**）。**push 不会自动上线**，部署是手动动作；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（阶段16 之前的旧生产）已降级为测试环境
 - **本地开发**：`npm run dev`（SQLite + 内网穿透 + watchdog，详见 [运维脚本目录](../tools/ops/README.md)）
 
 ### 故障排查

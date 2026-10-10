@@ -64,7 +64,7 @@
 ## 1. 完整工作流（一图流）
 
 ```
-       本地                                     线上（Zeabur）
+       本地                                     线上（腾讯云）
 ┌──────────────────────────┐   ops-publish     ┌──────────────────────────────┐
 │ ① 启动后端（GUI 启动管理）│                  │ GitHub main 收到 push        │
 │    首次 → 第一次用一键     │ ── 门禁不绿 ──✗──▶│   → Dockerfile 自动构建       │
@@ -156,7 +156,7 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
 
 | 顺序 | 手段 | 耗时 | 适用 |
 |------|------|------|------|
-| 1️⃣ 止血 | **Zeabur 控制台 → 服务 → 部署历史 → 选上一个正常构建 → 重新部署**（不改代码、不过门禁） | ~1 分钟 | 线上已经不可用，先把服务恢复 |
+| 1️⃣ 止血 | **`tools/ops/ops-deploy.ps1 -Rollback` 回滚到上一版本**（服务器保留最近 3 份 release，不改代码、不过门禁） | ~1 分钟 | 线上已经不可用，先把服务恢复 |
 | 2️⃣ 修根 | `git revert <坏 commit>`（或批量回退到锚点）→ 再次走「安全发布」 | ~8-10 分钟 | 确认问题提交后，把代码也退回正确状态 |
 
 ```powershell
@@ -168,7 +168,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 .\tools\ops\ops-publish.ps1 -CommitMsg "revert: 回退到 v1.10.0 稳定版（线上故障）"
 ```
 
-- 第 1️⃣ 步能否操作**以你 Zeabur 控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
+- 第 1️⃣ 步是脚本回滚（推荐），需要平台侧回滚时**以腾讯云控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
 - 回退同样受门禁保护：revert 后必须重新通过 165 项 + 37 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
 - 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
   `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
@@ -193,7 +193,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 | 跑完 `verify:pg` 后 `verify:local`/本地启动报 Client provider 不匹配 | 演练把 Prisma Client 生成成了 PostgreSQL 版本 | 脚本收尾会自动恢复 SQLite Client；若恢复失败（引擎被占用）手动执行 `cd server && npm run prisma:generate:dev` |
 | `git push` 超时 / Connection reset | 网络到 github.com 不通 | 发布脚本已自动重试 3 次；仍失败用 `-Proxy "http://127.0.0.1:7890"`（自己代理端口替换），先 `git ls-remote origin main` 测连通 |
 | 脚本 / GUI 里非交互调 `ops-publish.ps1`，报「无法处理对参数"PollMaxSeconds"的参数转换…转换为 System.Int32」 | 用 `Start-Process -ArgumentList` 裸传数组：PowerShell 只把数组元素按空格拼成一条命令行，**不会替带空格的元素补引号**，带空格的中文 `-CommitMsg` 因此被拆成多个参数，尾词按位置绑到后面的参数上 | 别裸传数组，二选一：① 整体给一条 `-Command`，引号自己写 —— `-ArgumentList "-NoProfile","-Command","& '<脚本绝对路径>' -CommitMsg 'feat: xxx'"`；② 当前会话直接 `& .\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"`（不必开新进程）。此错发生在**参数绑定阶段**，脚本随即退出，**不会 add / commit / push**，工作区保持原样，修好重跑即可 |
-| 发布 `[4/4]` 一直显示「仍在构建」直到超时 | Zeabur 构建慢，或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；真慢就 `-PollMaxSeconds 900` 再来一次 |
+| 发布 `[4/4]` 一直显示「仍在构建」直到超时 | 腾讯云**不会**由 push 自动构建 —— 多半是没跑 `ops-deploy.ps1`；或（历史问题）核对脚本本身有 bug（已修：补 BOM + 修引号转义） | 手动跑 `ops-check-prod.ps1` 看明细；确认真部署过了就 `-PollMaxSeconds 900` 再来一次 |
 | 改过 `tools/ops/*.ps1` 后脚本突然报「字符串缺少终止符」（报的行号还常常对不上、指向 `} else {`） | 文件被存成了 **UTF-8 无 BOM**：PS 5.1 对无 BOM 文件按 ANSI(GBK) 解码，中文字节被误解码后会把后面的引号一起吞掉，于是字符串没闭合 | 重存为「UTF-8 with BOM」（编辑器选带 BOM，或 `Set-Content -Encoding UTF8`）。自检：文件前三字节应为 `EF BB BF`；也可 `Get-Content -Raw <脚本>` 后交给 `[Parser]::ParseInput` 看有无 `$errs`。**这条现已由 `tests/ps1-encoding-guard.test.js` 自动守门**（随 `npm test` 跑，红灯会直接点名文件），实测 `ops-verify-pg.ps1`、`dev-account.ps1`、`gui-dev-console.ps1` 都栽在这个坑上 |
 | 线上老用户看到旧版 | 其浏览器内旧 SW 尚未更新（导航 network-first，一般刷新即新） | 先让用户刷新；仍旧则把 `https://<域名>/reset` 发给对方直接打开（302 → 独立清洗页，能穿透旧 SW 死锁，不必教开 F12）；也可让用户跑 `tools\ops\clean-browser-cache.bat` |
 | 某用户**每次**进站都闪一下 / 被重载一次 | 线上 `/version.json` 与 `index.html` 的 `__APP_VERSION__` 不一致（版本落点漏改） | 补齐五处版本号后重新发布；`ops-check-prod.ps1` 已能红灯拦下。快速自查：直接访问 `<域名>/version.json` 对比页面底部版本号 |

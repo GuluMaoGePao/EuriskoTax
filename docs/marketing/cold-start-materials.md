@@ -1,7 +1,7 @@
 # EuriskoTax 冷启动推广素材包
 
 > 更新日期：2026-09-14 ｜ 注册机制：邮箱验证码 + **一机一码邀请码**（`EURISKO-XXXX-XXXX`）
-> 产物地址：https://euriskotax.zeabur.app
+> 产物地址：https://euriskotax.com
 
 > 🚩 **发帖前必读**：本文件只提供文案。**发布前必须先过 [gtm-execution-plan.md](gtm-execution-plan.md) 的 Go/No-Go 检查表** —— P0 项「企业微信活码已配置」已于 2026-09-16 完成（`window.LEAD_CONFIG.wecomQrUrl` = `https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0`）；**发帖前仍必须确认 P0 #4「顾问值班人与响应时限」已定** —— 活码通了但没人接，比不投放更伤口碑。
 > 渠道调度（哪天发哪一篇、发完看什么数）见 [gtm-execution-plan.md](gtm-execution-plan.md) 的 90 天周节奏。
@@ -39,10 +39,10 @@
 > 所以做了个「反向倒算」功能：输入想到手的钱，直接倒推税前工资该谈多少。另外还有综合所得、经营所得、分类所得三类的计算，每次计算都带完整过程，不是黑盒。
 >
 > 完全免费无广告。感兴趣的可以试试，求轻拍：
-> https://euriskotax.zeabur.app
+> https://euriskotax.com
 > 注册需要专属邀请码，评论区留言或私信我领取（一机一码）
 >
-> 技术栈：Node.js + Express + Prisma + PostgreSQL，部署在 Zeabur。有 bug 直接评论区喊我，秒修💪
+> 技术栈：Node.js + Express + Prisma + PostgreSQL，部署在腾讯云。有 bug 直接评论区喊我，秒修💪
 
 ---
 
@@ -56,7 +56,7 @@
 
 > 之前跳槽谈 offer 的时候遇到一个问题：我想拿到手 25k/月，但不知道税前该报多少。社保公积金基数、专项附加扣除、累计预扣法交织在一起，手工根本算不清，网上现成的工具要么要下载 App，要么塞满广告。
 >
-> 所以自己写了一个：https://euriskotax.zeabur.app
+> 所以自己写了一个：https://euriskotax.com
 >
 > 目前支持四类计算：
 > - 综合所得（工资薪金 / 劳务报酬 / 稿酬 / 特许权使用费，累计预扣法）
@@ -66,7 +66,7 @@
 >
 > 计算结果附带完整过程，方便核对。
 >
-> 技术栈：Express + Prisma + PostgreSQL（Zeabur 托管），JWT 认证，前端原生 JS 没上框架。全栈一个人写的，代码量不大。
+> 技术栈：Express + Prisma + PostgreSQL（腾讯云托管），JWT 认证，前端原生 JS 没上框架。全栈一个人写的，代码量不大。
 >
 > 已知不足：移动端适配做过但没精细打磨；年终奖单独/并入计税、最优分配均已支持，欢迎重点试这块。
 >
@@ -96,7 +96,7 @@
 >
 > ------
 >
-> 如果不想手算，我做了一个免费的在线工具（无广告无 App 推广）：https://euriskotax.zeabur.app ，输入目标到手金额直接倒推税前工资，计算过程完整展示。注册需要专属邀请码，私信我领取（一机一码）。
+> 如果不想手算，我做了一个免费的在线工具（无广告无 App 推广）：https://euriskotax.com ，输入目标到手金额直接倒推税前工资，计算过程完整展示。注册需要专属邀请码，私信我领取（一机一码）。
 
 **注意**：知乎重内容轻推广，公式部分务必写完整，工具链接放最后，避免被折叠。
 
@@ -142,7 +142,7 @@
 用于微信/私信邀请 5-10 名种子用户：
 
 > 最近我做了一个个税计算的小工具，想请你帮忙体验下😊
-> 地址：https://euriskotax.zeabur.app
+> 地址：https://euriskotax.com
 > 注册需要邀请码，我发你一个专属的一机一码（一人一个，用完即废）
 >
 > 主要看三点：
@@ -160,19 +160,19 @@
 
 **用户侧入口**：登录后 → 个人中心 → 「意见反馈」卡片（Bug/建议分类 + 1-5 星评分 + 详细描述 + 最多 3 张截图）。反馈已落库（2026-09-07 起不再只写日志）。
 
-**管理侧查看（推荐）**：浏览器打开 `https://euriskotax.zeabur.app/admin.html` → 粘贴令牌（生产用 Zeabur 变量里的 `ADMIN_TOKEN_PROD`，勾选「在本机记住令牌」后免输）→ **「反馈」Tab**。可按状态（open / resolved / closed）与分类（bug / 建议 / 其他）筛选，点附图看大图，改状态后点「处理」即保存；列表为最近 200 条按提交时间倒序。同页还有「总览 / 用户 / 邀请码 / 兑换码 / 税率 / 社保基数」等 Tab：**用户** Tab 可搜索并授予限时专业版；**邀请码** Tab 管理注册邀请码；**兑换码** Tab 管理专业版付费兑换码（生成批次 / 作废 / 导出 CSV 对账，一码一用）；**税率** Tab 热改税制参数；**社保基数** Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（计算页已改为按全国口径提示，这里主要供人工核对当地口径与后续 SEO 落地页使用）。
+**管理侧查看（推荐）**：浏览器打开 `https://euriskotax.com/admin.html` → 粘贴令牌（生产用腾讯云服务器 `.env.shared` 里的 `ADMIN_TOKEN_PROD`，勾选「在本机记住令牌」后免输）→ **「反馈」Tab**。可按状态（open / resolved / closed）与分类（bug / 建议 / 其他）筛选，点附图看大图，改状态后点「处理」即保存；列表为最近 200 条按提交时间倒序。同页还有「总览 / 用户 / 邀请码 / 兑换码 / 税率 / 社保基数」等 Tab：**用户** Tab 可搜索并授予限时专业版；**邀请码** Tab 管理注册邀请码；**兑换码** Tab 管理专业版付费兑换码（生成批次 / 作废 / 导出 CSV 对账，一码一用）；**税率** Tab 热改税制参数；**社保基数** Tab 按城市维护社保/公积金缴费基数上下限与公积金可选比例（计算页已改为按全国口径提示，这里主要供人工核对当地口径与后续 SEO 落地页使用）。
 
-- 实时提醒：Zeabur 控制台 → 日志面板过滤 `[FEEDBACK]`
+- 实时提醒：服务器上 `pm2 logs euriskotax` 过滤 `[FEEDBACK]`
 - 命令行拉取（含提交人邮箱，便于回访送奶茶）：
   ```powershell
-  curl.exe -s "https://euriskotax.zeabur.app/api/feedback/admin?status=open" -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
+  curl.exe -s "https://euriskotax.com/api/feedback/admin?status=open" -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
   ```
 - 跟进采纳：`PATCH /api/feedback/admin/<id>`，body `{"status":"resolved"}`（或 `"closed"`）
 
 **增长数据观察**（发帖后每天看一次；计算统计为登录用户保存计算时的匿名聚合，仅含类型，不含任何输入数据）：
 
 ```powershell
-curl.exe -s https://euriskotax.zeabur.app/api/stats/overview -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
+curl.exe -s https://euriskotax.com/api/stats/overview -H "X-Admin-Token: <ADMIN_TOKEN_PROD>"
 ```
 
 > 注意：埋点与计算统计**只在登录用户点击「保存」时触发**，注册后只浏览不保存不会产生 `calculations` 数据——这是 `calculations` 长期为 0 的常见原因，不代表没人访问。
