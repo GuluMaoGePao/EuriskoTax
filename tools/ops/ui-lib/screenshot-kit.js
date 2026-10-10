@@ -198,16 +198,19 @@ const FREEZE_JS = `(function(){
         var c = document.querySelector('.page:not(.hidden)');
         if (c && c.parentElement && c.parentElement.scrollTop !== undefined) c.parentElement.scrollTop = 0;
     } catch (e) {}
-    // 5. 时间相关内容：占位写死。税感占位照抄真实渲染的「dot + 文本」结构，
-    //    不拍瘪卡片（首行取基线当时的内容，编号与天数不再随真实日期走）。
+    // 5. 时间相关内容：占位写死。税感占位照抄真实渲染的**主行**结构（v1.139.0 三版起
+    //    今日税感是主次两级：节点名 + 大字天数 + 截止），不拍瘪卡片
+    //    （首行取基线当时的内容，编号与天数不再随真实日期走）。
     try {
         var g = document.getElementById('home-greeting');
         if (g) g.textContent = '上午好 👋';
         var dt = document.getElementById('home-date-text');
-        if (dt) dt.textContent = '今天是 2026年9月20日 · 周日';
+        if (dt) dt.textContent = '9月20日 · 周日';
         var tf = document.getElementById('home-tax-feel-content');
-        if (tf) tf.innerHTML = '<div class="flex items-start"><span class="tax-reminder-dot bg-warning"></span>'
-            + '<span>经营所得减半优惠剩 467 天（至 2027.12.31）</span></div>';
+        if (tf) tf.innerHTML = '<div class="hero-card__feel"><span class="tax-reminder-dot bg-warning"></span>'
+            + '<div class="hero-card__feel-main"><div class="hero-card__feel-name">经营所得减半优惠</div>'
+            + '<div class="hero-card__feel-count"><strong class="hero-card__feel-days">剩 467 天</strong>'
+            + '<span class="hero-card__feel-until">至 2027.12.31</span></div></div></div>';
     } catch (e) {}
 
     // 7. 待办与税务日历里的「剩 N 天」（v1.137.0 补）。

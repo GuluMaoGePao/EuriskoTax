@@ -24,6 +24,11 @@
  *   比值会假性偏低，脚本单独标记为「待人工确认」，不混进确定失败项。
  *   **渐变是可以判定的**（v1.81.0 起）：取 linear-gradient 的所有色停点逐点算、取最差值，
  *   这是保守下界（真实插值不会比色停更极端），所以渐变项已并入确定失败项，不再丢给人工。
+ *   **色停必须压在渐变那一层自己的 background-color 上**（v1.139.0 修的一条假警报）：
+ *     Hero 那类「background-color 墨青 + repeating- 网格层」的写法，网格层的色停是
+ *     rgba(255,255,255,.05) —— 早先把它直接压到**画布白**，于是整段 Hero 的白字算出 1:1。
+ *     后果不是多几条红：同一轮里「我的」页身份卡 1.02:1 的真回归就混在这堆假阳性里。
+ *     repeating- 层实际只占 1px，按色停整块算是**偏严**的方向，没错，所以保留这个算法不改宽。
  *
  * 用法：
  *   node tools/ops/ui-contrast-audit.js                     # 浅色 + 深色，6 页 × 2 断点
@@ -178,26 +183,32 @@ const SCAN_JS = `(function(){
      *          调用方负责把它们压到渐变色停 / 画布上 —— 层级关系只有调用方知道该以谁为底。
      */
     function backdrop(el){
-        var chain = [], n = el, grad = null;
+        var chain = [], n = el, grad = null, gradBase = null;
         while (n && n.nodeType === 1) {
             var s = getComputedStyle(n);
             var bi = s.backgroundImage;
-            if (bi && bi !== 'none') { grad = bi; break; }   // 渐变在更外层且未被不透明色盖住 → 它参与背景
+            if (bi && bi !== 'none') {
+                grad = bi;
+                // 渐变是画在**该层自己的 background-color 之上**的（Mission Hero 就是这么写的：
+                // background-color 墨青 + 若干渐变层）。拿到它，后面算半透明色停才有正确的落脚点。
+                gradBase = parse(s.backgroundColor);
+                break;                                    // 渐变在更外层且未被不透明色盖住 → 它参与背景
+            }
             var c = parse(s.backgroundColor);
             if (c && c.a > 0) {
                 chain.push(c);
-                if (c.a >= 1) break;                          // 不透明 → 到此为止，下面的都看不见
+                if (c.a >= 1) break;                      // 不透明 → 到此为止，下面的都看不见
             }
             n = n.parentElement;
         }
-        if (!grad) return { kind:'solid', chain: chain, stops: [] };
-        if (grad.indexOf('url(') >= 0) return { kind:'image', chain: chain, stops: [] };
+        if (!grad) return { kind:'solid', chain: chain, stops: [], gradBase: null };
+        if (grad.indexOf('url(') >= 0) return { kind:'image', chain: chain, stops: [], gradBase: gradBase };
         var stops = [], re = /rgba?\\(([^)]+)\\)/g, m;
         while ((m = re.exec(grad))) {
             var sc = parse('rgba(' + m[1] + ')');
             if (sc) stops.push(sc);
         }
-        return { kind: stops.length ? 'gradient' : 'image', chain: chain, stops: stops };
+        return { kind: stops.length ? 'gradient' : 'image', chain: chain, stops: stops, gradBase: gradBase };
     }
     function pathOf(el){
         var parts = [], n = el, k = 0;
@@ -239,10 +250,15 @@ const SCAN_JS = `(function(){
         function rgbStr(c){ return 'rgb(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ')'; }
         var cr, bgi = false, bgShown;
         if (bd.kind === 'gradient') {
-            // 渐变：逐色停算背景（色停在外、半透明内层压在其上），取**最差**的那个
+            // 渐变：逐色停算背景（色停在外、半透明内层压在其上），取**最差**的那个。
+            // 色停的落脚点是**渐变所在的那一层自己的 background-color**（bd.gradBase），不是画布白：
+            // Hero 那种「墨青底 + repeating- 网格线」的写法，网格层的色停是 rgba(255,255,255,.05)，
+            // 压到画布白算出 1:1 的假警报（实际線宽 1px，绝大部分面积是墨青底）。
+            var underBase = (bd.gradBase && bd.gradBase.a > 0) ? bd.gradBase : CANVAS;
             cr = Infinity;
             for (var si = 0; si < bd.stops.length; si++) {
-                var base = bd.stops[si].a >= 1 ? bd.stops[si] : over(bd.stops[si], CANVAS);
+                var laid = over(bd.stops[si], underBase);      // 色停压到渐变自己的底上
+                var base = laid.a >= 1 ? laid : over(laid, CANVAS);   // 底本身也半透明时才兜画布
                 var sb = composite(bd.chain, base);
                 var f2 = over({ r:fgRaw.r, g:fgRaw.g, b:fgRaw.b, a:fgRaw.a * op }, sb);
                 var c2 = ratio(f2, sb);
