@@ -291,8 +291,14 @@
     // ====== 卡片渲染 ======
     // 角标只说用户听得懂的话：曾经用过「App 内可算 / 网页版 / 深度」这类内部术语，
     // 用户不知道什么是「深度」，也不知道为什么有的工具会跳走 —— 现在全部内置，角标即可省略。
-    function cardHtml(tool, isDeep) {
-        var badge = isDeep ? '<span class="tool-badge tool-badge-deep">多步骤</span>' : '';
+    // 第二参 hushBadge：在**完整测算组内部**时传 true —— 那里 21 张卡本身就是完整测算，
+    // 每张再挂一颗同义角标等于没写，只是白白占掉标题行最贵的那几十像素。
+    // 角标要出现在它有用的地方：**混合列表**（最近使用 / 搜索结果 / 为你推荐），
+    // 那里一行里混着两版，「增值税」与「增值税（进项逐笔）」需要当场认出谁是完整版。
+    // 文案沿用「多步骤」（docs/guides/deep-wizard-ui-spec.md §D6 的本期结论），这次改的是位置不是措辞。
+    function cardHtml(tool, hushBadge) {
+        var badge = (!hushBadge && tool.status === 'deep')
+            ? '<span class="tool-badge tool-badge-deep">多步骤</span>' : '';
         return '' +
             '<div class="tool-entry" data-tool-id="' + esc(tool.id) + '">' +
             '<div class="tool-entry-icon"><i class="fa ' + esc(tool.icon || 'fa-calculator') + '"></i></div>' +
@@ -307,15 +313,19 @@
 
     // opts.actionHtml：组内操作条（如「最近使用」的清空）。挂在 tool-group-body 里而不是组头上 ——
     // 组头本身是颗 <button>（可点、可键盘聚焦），往它里面塞按钮会变成嵌套 button，键盘与读屏都会错乱。
-    function groupSectionHtml(title, desc, tools, isDeep, opts) {
+    function groupSectionHtml(title, desc, tools, hushBadge, opts) {
         if (!tools.length) return '';
         opts = opts || {};
         var gid = opts.id || '';
+        // Anchor：锚点条靠 **DOM id** 跳，不用 data-group —— 完整测算的子小节与该组的速算器
+        // 用的是同一套场景分组（这是刻意的，见 tool-registry 的分组继承注释），
+        // 若两边都用 data-group="salary"，`querySelector('[data-group=salary]')` 会先撞到速算侧那一个。
+        var anchorId = 'gp-' + gid;
         // 搜索 / 按身份筛选时**一律展开**：这时候用户就是要看结果，折叠是纯粹的障碍。
         // 强制展开不写进记忆（否则搜一次就把所有组的默认状态改掉了）。
         var open = !!opts.forceOpen || isGroupOpen(gid, !!opts.defaultOpen);
         return '' +
-            '<div class="tool-group' + (open ? '' : ' is-collapsed') + '" data-group="' + esc(gid) + '">' +
+            '<div class="tool-group' + (open ? '' : ' is-collapsed') + '" id="' + esc(anchorId) + '" data-group="' + esc(gid) + '">' +
             '<button type="button" class="tool-group-head" data-group-toggle="' + esc(gid) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>' +
@@ -325,7 +335,7 @@
             '</button>' +
             '<div class="tool-group-body">' +
             (opts.actionHtml || '') +
-            '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, isDeep); }).join('') + '</div>' +
+            '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, hushBadge); }).join('') + '</div>' +
             '</div>' +
             '</div>';
     }
@@ -445,6 +455,9 @@
         set('toolbox-count-all', all + deep);
         set('toolbox-count-quick', all);
         set('toolbox-count-deep', deep);
+        // 首页搜索条那颗「41 个 ›」同理：原先写死在 index.html 里，加工具要记得回来改，
+        // 忘了就是给浏览者一个错的总数（这正是 SSR 落地页不会犯、动态 App 容易犯的错）。
+        set('home-search-count', (all + deep) + ' 个 ›');
         bar.querySelectorAll('.tool-type-chip').forEach(function (btn) {
             var on = btn.getAttribute('data-tool-type') === currentType;
             btn.classList.toggle('is-on', on);
@@ -472,21 +485,27 @@
     function renderAnchors() {
         var bar = document.getElementById('toolbox-anchors');
         if (!bar || !R()) return;
+        // chip 上存的是 **DOM id**（不是组 id）：完整测算的子小节与速算侧的组同名但不同节点，
+        // 按名字找会跳错地方。见 groupSectionHtml 里 anchorId 的注释。
+        var items;
         if (currentType === 'deep') {
-            // 只剩一组时不需要锚点：一行只有一个 chip，那是装饰不是跳读
-            bar.classList.add('hidden');
-            bar.innerHTML = '';
-            return;
+            // 「完整测算」视图：这原来是一行 hidden 了事（当时认为"只剩一组，不需要锚点"）。
+            // 但这一组恰是所有视图里**最长**的一屏（21 张卡），最需要跳读的正是这里 ——
+            // 卡片多了才该给锚点，卡片少的时候才不需要。现在锚点跳它的五个子节。
+            items = (R().groups() || []).map(function (g) {
+                return { id: 'deepsec-' + g.id, name: g.name };
+            });
+        } else {
+            items = (R().groups() || []).map(function (g) {
+                return { id: 'gp-' + g.id, name: g.name };
+            });
+            if (currentType !== 'quick') items.push({ id: 'toolbox-deep', name: '完整测算' });
         }
-        var groups = (R().groups() || []).map(function (g) {
-            return { id: g.id, name: g.name };
-        });
-        if (currentType !== 'quick') groups.push({ id: 'deep', name: '完整测算' });
-        if (currentScenario) groups.unshift({ id: 'scenario', name: '为你推荐' });
-        if (groups.length < 2) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+        if (currentScenario) items.unshift({ id: 'gp-scenario', name: '为你推荐' });
+        if (items.length < 2) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
 
         bar.classList.remove('hidden');
-        bar.innerHTML = groups.map(function (g) {
+        bar.innerHTML = items.map(function (g) {
             return '<button type="button" class="tool-anchor-chip" data-anchor="' + esc(g.id) + '">' + esc(g.name) + '</button>';
         }).join('');
         bindAnchors();   // 委托绑在条上、按 data-bound 幂等，重画不会丢也不会重复
@@ -500,12 +519,13 @@
             var btn = e.target.closest ? e.target.closest('.tool-anchor-chip') : null;
             if (!btn) return;
             var id = btn.getAttribute('data-anchor');
-            var target = document.querySelector('#toolbox-groups [data-group="' + id + '"]')
-                || document.getElementById('toolbox-deep');
+            var target = document.getElementById(id);
             if (target) {
                 // 目标组可能是折叠的：跳过去看到的是空组，等于没跳 —— 顺手展开
                 var collapsed = target.classList.contains('is-collapsed');
-                if (collapsed) { setGroupOpen(id, true); applyGroupOpen(target, true); }
+                // 折叠记忆按 **组 id** 记，不按锚点用的 DOM id —— 否则同一个组会有两个记忆键
+                var gid = target.getAttribute('data-group') || id;
+                if (collapsed) { setGroupOpen(gid, true); applyGroupOpen(target, true); }
                 if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
@@ -628,8 +648,18 @@
                 bindGroupToggles(deepBox);
                 deepBox.setAttribute('data-group-bound', '1');
             }
+            // 组描述里那句「用**上面的**速算器更快」在「完整测算」视图下是句假话 ——
+            // 那个视图里速算组整块不渲染，上面什么都没有，用户抬头找不到它。
+            // 一句话在两个视图里含义不同，就得跟着视图变，而不是写死在 HTML 里。
+            var deepDesc = document.getElementById('toolbox-deep-desc');
+            if (deepDesc) {
+                deepDesc.textContent = (currentType === 'deep')
+                    ? '按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，切回上面的「速算」'
+                    : '按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快';
+            }
         }
-        renderDeepEntries();
+        // 搜索时这一组只放命中的那几张（不传 = 全部 21 张）
+        renderDeepEntries(result.matched ? result.deep : (R().deep() || []));
         renderScenarioChip();
         renderTypeFilter();   // T1：三个视图的计数与选中态
         renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图下只有一组，不出条）
@@ -641,19 +671,43 @@
     // 旧页早已删净（openTool 一律按 W.has(tool) 进向导），于是这一组与其它组合并成一张表：
     // 同一种卡片、同一种排序、同一个 counts 来源 —— 21 个入口之间不再有「两种长相」。
     // 新增一个完整测算 = 在 tool-registry.js 加一条 spec，本文件与 index.html 都不用动。
-    function renderDeepEntries() {
+    // list：可选，传了就只渲染这一批（搜索用）。**此前这里恒为 R().deep()**，
+    // 于是搜「残保金」时这一组照样摊开 21 张卡，命中的那张埋在第 19 位 —— 等于没搜。
+    function renderDeepEntries(list) {
         var host = document.getElementById('toolbox-deep-extra');
         if (!host || !R()) return;
-        var list = R().deep() || [];
+        if (!list) list = R().deep() || [];
         if (!list.length) {
             host.innerHTML = '';
             host.classList.add('hidden');
             return;
         }
         host.classList.remove('hidden');
-        // 备注：cardHtml 的第二参是「是否多步骤」角标，这里恒 true；
-        // 名称 / 副标题 / 图标 / 微标签全部读注册表，不在这里逐个罗列。
-        host.innerHTML = list.map(function (t) { return cardHtml(t, true); }).join('');
+
+        // 子节用 **DOM id**（deepsec-<组>）而不是 data-group：它与速算侧共用同一套场景分组，
+        // 两边若都叫 data-group="salary"，锚点条的 querySelector 会永远撞上速算那一个。
+        function subsec(secId, title, tools) {
+            return '<div class="tool-subsec" id="' + esc(secId) + '">' +
+                '<div class="tool-subsec-head">' +
+                '<span class="tool-subsec-title">' + esc(title) + '</span>' +
+                '<span class="tool-subsec-count">' + tools.length + ' 个</span>' +
+                '</div>' +
+                '<div class="tool-grid-1">' +
+                tools.map(function (t) { return cardHtml(t, true); }).join('') +
+                '</div>' +
+                '</div>';
+        }
+
+        var html = (R().groups() || []).map(function (g) {
+            return subsec('deepsec-' + g.id, g.name,
+                list.filter(function (t) { return t.group === g.id; }));
+        }).join('');
+        // 兜底：忘了在 spec 上写 group 的完整测算仍要出场 —— 静默不显示是那种
+        // 「加了一个东西，上线前谁都没发现它不存在」的事故。
+        var rest = list.filter(function (t) { return !t.group; });
+        if (rest.length) html += subsec('deepsec-other', '其它', rest);
+
+        host.innerHTML = html;
         bindEntries(host);
     }
 

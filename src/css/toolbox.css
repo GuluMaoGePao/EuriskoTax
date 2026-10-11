@@ -163,6 +163,13 @@
     font-size: var(--fs-xs);
     color: var(--c-text-3);
 }
+/* 手机上标题与计数已经把这一行占满了，这句二三十字的说明会被挤成两到三行，
+   把每张卡的可见位置往下推 —— 它在窄屏里既不指路也不解释，只占位。 */
+@media (max-width: 640px) {
+    .tool-group-desc {
+        display: none;
+    }
+}
 
 .tool-grid-1 {
     display: grid;
@@ -180,6 +187,40 @@
     .tool-grid-1 {
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     }
+}
+
+/* ====== 完整测算组内的**子节**（按场景分，不是第二层折叠）======
+   21 张同款卡平铺时，"我要的那个"只能靠逐个读名字 —— 按场景分小节是为了给每张卡一个上下文。
+   刻意不做成可折叠的组：外层那一组已经能折叠，再套一层等于连点两次才见到工具；
+   子节也**不 sticky** —— 父组头已经吸顶了，两层吸顶会叠成一坨。所以它只有名字与计数，
+   往下靠一条虚线与卡片分界，视觉层级比组头低一档、比卡片高一档。 */
+.tool-subsecs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.tool-subsec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #e5e7eb;
+}
+.tool-subsec-title {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: var(--c-text-2);
+}
+.tool-subsec-count {
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+}
+.dark .tool-subsec-head {
+    border-bottom-color: #374151;
+}
+.dark .tool-subsec-title {
+    color: #d1d5db;
 }
 
 /* ====== 工具条目 ====== */
@@ -238,9 +279,14 @@
     font-size: var(--fs-xs);
     color: #6b7280;
     margin-top: 2px;
+    /* 单行截断 → 两行截断：完整测算改名后说明普遍变长（"上年度月平均定基数、公积金双上限
+       定免税、申报差额定价"），单行只露出前半句，读起来像一句没说完的话。
+       同一行卡片本来就是等高（grid），放开到两行不会让排版参差。 */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .tool-entry-arrow {

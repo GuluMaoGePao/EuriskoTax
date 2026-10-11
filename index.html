@@ -478,7 +478,9 @@
                 <button id="toolbox-search-entry" type="button" class="home-searchbar">
                     <i class="fa fa-search"></i>
                     <span>搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
-                    <span class="home-searchbar-count">41 个 ›</span>
+                    <!-- 数字由 renderTypeFilter 从注册表填（写死 41 会随工具增减过期）；
+                         HTML 里保留一个兜底值，JS 没跑到时也不至于显示 0 个。 -->
+                    <span id="home-search-count" class="home-searchbar-count">41 个 ›</span>
                 </button>
 
                 <!-- 卡片1：Hero（阶段19-2 的 Mission Hero，v1.139.0 与「今日税感 · 小贴士」合一）。
@@ -720,7 +722,9 @@
                         <i class="fa fa-list-ol tool-group-icon"></i>
                         <span class="tool-group-title">完整测算</span>
                         <span id="toolbox-deep-count" class="tool-group-count"></span>
-                        <span class="tool-group-desc">按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快</span>
+                        <!-- 这句描述在 JS 里跟着视图改写（renderToolbox）：「上面的速算器」那句
+                             在「完整测算」视图里指向不存在的东西，静态文案做不到这点。 -->
+                        <span id="toolbox-deep-desc" class="tool-group-desc"></span>
                     </button>
                     <div class="tool-group-body">
                     <!-- v1.142.0：入口只有一张表 —— 此前这里先摆 4 张写死的 mode-card
@@ -728,8 +732,11 @@
                          两套 markup、两种信息密度，看到的「完整测算」像两个入口拼起来的。
                          那 4 张卡是阶段17 迁移时的历史债：当时它们的整页还在、按钮不能重建；
                          页面早已删净（openTool 一律走 ISpec 向导），债到今天才还得上。 -->
-                    <!-- 21 个完整测算全部由 renderDeepEntries() 按注册表渲染，与其它组同款「工具条」卡片，
-                         新增一个税种只改 tool-registry.js，不必再回本文件手写一张卡。
+                    <!-- 21 个完整测算全部由 renderDeepEntries() 按注册表渲染，同款「工具条」卡片，
+                         并按 tool-registry 的 group 分成 5 个小节（复用上面那 5 个场景组的划分）：
+                         21 张同款卡平铺在一屏里没有次序可言，找某一个只能逐个读名字。
+                         新增一个税种只改 tool-registry.js —— spec 上有孪生速算器的自动继承它的组，
+                         没有孪生的那一批在 spec 上写 group；本文件不必再动。 -->
                          注册表现役清单（占位说法已从注释里删净，数字不写死）：
                          vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
                          + withholding-deep 劳务报酬预扣预缴 + bonus-tax-deep 年终奖择优
@@ -740,7 +747,7 @@
                          + donation 公益慈善捐赠扣除 + property-transfer 个人转让房屋
                          + non-resident 非居民 / 无住所。
                          各税种为什么必须自带 spec（速算器答不了的那层），写在 tool-registry.js 各自的注释里。 -->
-                    <div id="toolbox-deep-extra" class="tool-grid-1 hidden"></div>
+                    <div id="toolbox-deep-extra" class="tool-subsecs hidden"></div>
                     </div>
                 </div>
             </div>

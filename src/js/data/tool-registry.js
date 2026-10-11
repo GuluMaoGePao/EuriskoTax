@@ -382,7 +382,7 @@
             //   ② 年终奖计税方式对比（compare）—— 并入 vs 单独计税差出一档税，是这类测算里
             //      最常被问的一句「哪种更划算」。答一个数不够，得把两套账摆在一起。
             id: 'forward', name: '综合所得', subtitle: '工资 / 劳务 / 稿酬，四步出年度个税预算表',
-            icon: 'fa-calculator', status: 'deep', comparable: true,
+            icon: 'fa-calculator', status: 'deep', comparable: true, group: 'salary',
             nextTools: ['salary-tax', 'annual-settlement', 'special-deduction'],
             // 阶段19-12：挂上政策条目 —— 没挂的结果页出不了时效徽标，而它**不报错**（静默缺口）
             policyKey: 'comprehensive',
@@ -607,7 +607,7 @@
             // 现在由 deep-wizard-ui.js 按这份 spec 渲染，卡片点击即进向导。
             // 口径没动：compute 直接调 tax-calculator.js 抽出的 calculateBusinessTaxCore —— 与页面版同一份内核。
             id: 'business', name: '经营所得', subtitle: '一人多家怎么汇总，亏损能不能互抵',
-            icon: 'fa-briefcase', status: 'deep',
+            icon: 'fa-briefcase', status: 'deep', group: 'corp',
             nextTools: ['business-income', 'social-base', 'vat'],
             policyKey: 'business-income',
             // 结果步由渲染器自动追加（所有完整测算都有，「计算结果」不在此重复声明）。
@@ -929,7 +929,7 @@
             // 顺手补上的一件事：修缮费超过 800 元那部分**不是免税，是结转以后月份**，页面直接按 800
             // 截断却一句话没说 —— 用户填 1500 看到的是 800，会以为系统算错了。这次改到 hint / pitfalls 里讲清楚。
             id: 'classification', name: '分类所得', subtitle: '利息 / 租赁 / 转让 / 偶然所得，按次单独计税',
-            icon: 'fa-list-alt', status: 'deep',
+            icon: 'fa-list-alt', status: 'deep', group: 'special',
             nextTools: ['withholding', 'annual-settlement'],
             // 阶段19-12：政策库里**没有**分类所得条目，所以刻意不挂 policyKey。
             // 为凑齐徽标而编一条政策（文号与有效期会印进导出的「政策依据」）比不挂更糟：
@@ -3206,7 +3206,7 @@
             // 口径同源由 `donation-quick.js` + 单笔输入逐点对拍守护（见 tests/donation-deep.test.js）。
             id: 'donation', name: '公益慈善捐赠扣除',
             subtitle: '同一笔捐赠，先扣哪一项一年能差 3756 元',
-            icon: 'fa-heart', status: 'deep',
+            icon: 'fa-heart', status: 'deep', group: 'salary',
             nextTools: ['special-deduction', 'annual-settlement', 'business-income'],
             policyKey: 'donation',
             fields: [
@@ -3406,7 +3406,7 @@
             // 另一个决定：**不保留经营所得子模式**（incomeType 固定 comprehensive）——
             // 经营所得的反向需求由「经营所得」完整测算承接，两个入口算同一件事迟早互相打架。
             id: 'reverse', name: '反向倒算', subtitle: '给定目标税负或到手，反推税前收入',
-            icon: 'fa-refresh', status: 'deep', comparable: true,
+            icon: 'fa-refresh', status: 'deep', comparable: true, group: 'salary',
             nextTools: ['net-salary', 'salary-tax', 'employer-cost'],
             // 倒算的是工资薪金（综合所得），政策口径与正向那套同源
             policyKey: 'comprehensive',
@@ -5823,7 +5823,7 @@
             // propertyTransferRules），这里只负责收集与呈现 —— 与 17D-11 同一个约定：**不复制公式**。
             id: 'property-transfer', name: '卖房要交多少税',
             subtitle: '满五唯一免在哪、核定 1% 能不能选、换购能退多少',
-            icon: 'fa-home', status: 'deep', comparable: true,
+            icon: 'fa-home', status: 'deep', comparable: true, group: 'special',
             nextTools: ['classification', 'surtax-stamp'],
             policyKey: 'property-transfer',
             fields: [
@@ -6087,7 +6087,7 @@
             // 这里只负责收集与呈现 —— 与前三版同一个约定：**不复制税率、不复制公式**。
             id: 'non-resident', name: '非居民 / 无住所要缴多少税',
             subtitle: '90 天 · 183 天 · 满六年，这次问题不是扣多少',
-            icon: 'fa-passport', status: 'deep', comparable: true,
+            icon: 'fa-passport', status: 'deep', comparable: true, group: 'special',
             nextTools: ['expat', 'forward', 'withholding'],
             policyKey: 'non-resident',
             fields: [
@@ -7740,6 +7740,30 @@
         });
     })();
 
+    // ====== 完整测算的**分组与别名**：跟同名速算器走 ======
+    // 起因：完整测算一直没有 group 字段，21 张卡在组里平铺，唯一的「顺序」是注册表的声明顺序。
+    // 这里刻意**不为完整测算另发明一套分类**：全站只有一套「按人 / 按场景」的分组
+    // （salary / special / prefer / social / corp），速算器与完整测算共用 —— 「齿轮同理」。
+    // 用户不需要再学第二种分类法：他在速算侧认得的「工资与到手」，在完整测算里还是那一格。
+    //   · 有孪生速算器的（X-deep）：继承 X 的 group，不在注册表里抄第二遍（抄就会漂）。
+    //   · 没有孪生的 7 个（forward / business / classification / donation / reverse /
+    //     property-transfer / non-resident）：归组写在各自 spec 上，依据是该税种**由谁用**（见各条注释）。
+    // 别名同理：ALIASES 挂在速算器 id 上，`X-deep` 不继承就会出现「搜『五险一金』只出速算器、
+    // 完整测算那一张明明是同一件事却搜不到」—— 用户搜索时不区分两版，检索也不该区分。
+    (function () {
+        DEEP.forEach(function (t) {
+            var twinId = t.id.replace(/-deep$/, '');
+            var twin = twinId !== t.id ? get(twinId) : null;
+            if (!twin) return;
+            if (!t.group) t.group = twin.group;
+            if (ALIASES[twinId] && !ALIASES[t.id]) ALIASES[t.id] = ALIASES[twinId];
+        });
+    })();
+
+    function deepByGroup(groupId) {
+        return DEEP.filter(function (t) { return t.group === groupId; });
+    }
+
     // ====== 阶段19-7b：字段级分级（简明 / 完整视图的字段可见性）======
     // 分级收在这一张清单里，而不是散到 300 个字段上逐个打 `level`：
     //   一份清单能一眼看全「哪些参数算进阶」，散进字段定义里就再没人核对得过来 ——
@@ -7832,6 +7856,7 @@
         all: all,
         get: get,
         byGroup: byGroup,
+        deepByGroup: deepByGroup,
         byScenario: byScenario,
         search: search
     };
