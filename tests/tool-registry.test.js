@@ -436,18 +436,34 @@ describe('工具注册表：金额不预填（用户没输就是 0）', () => {
         return out;
     };
 
-    test('money 字段的 default 一律是 0（没有第二个例外）', () => {
+    // v1.142.0 例外：社保缴费基数（socialBase）。它不是「用户要不要填的数」——
+    // 勾了「专项扣除」却没有基数，下面四项月缴额就恒为 0，勾了等于没勾，
+    // 而这框又藏在勾选之下，用户不会发现自己是 0。给它一个数是为了让「勾 -> 有线可改」成立，
+    // 且那个数必然不是用户的参保地口径，框里有数正是要他改掉。范围只此一处：
+    // 新增例外必须在这里写出同样的理由 —— 这条断言的作用就是逼出这句话。
+    const PRESET_BASE = {
+        socialBase: '勾选了专项扣除就得有基数，否则月缴额恒为 0（勾了等于没勾）',
+        housingFundBase: '同上：0 基数的公积金算不出月缴额，勾了专项扣除却一项都扣不成'
+    };
+
+    test('money 字段的 default 一律是 0（例外见 PRESET_BASE）', () => {
         const bad = allFields()
             .filter((x) => x.field.type === 'money')
+            .filter((x) => !PRESET_BASE[x.field.key])
             .filter((x) => Number(x.field.default) !== 0)
             .map((x) => x.tool + '.' + x.field.key + ' = ' + x.field.default);
         expect(bad).toEqual([]);
+        // 例外本身要在：白名单空转（写了个没人用的例外）也要报错
+        Object.keys(PRESET_BASE).forEach((k) => {
+            expect(allFields().some((x) => x.field.key === k && Number(x.field.default) !== 0)).toBe(true);
+        });
     });
 
-    test('带了 sample 的字段：sample 是有效示例值，且 default 已归零', () => {
+    test('带了 sample 的字段：sample 是有效示例值，且 default 已归零（例外见 PRESET_BASE）', () => {
         const bad = allFields()
             .filter((x) => x.field.sample !== undefined)
             .filter((x) => !(Number(x.field.sample) > 0) || Number(x.field.default) !== 0)
+            .filter((x) => !PRESET_BASE[x.field.key])
             .map((x) => x.tool + '.' + x.field.key);
         expect(bad).toEqual([]);
     });
@@ -465,12 +481,18 @@ describe('工具注册表：金额不预填（用户没输就是 0）', () => {
     //
     // 例外是**口径类**：它问的不是「有没有」而是「怎么算」（同一笔年终奖并入还是单独计税、
     // 同月多笔合不合并、报价含不含税），默认开是产品给定的计入口径，不是替用户假设事实。
-    // 新增口径类必须把它加进白名单并写明理由 —— 这条断言的作用就是逼出这句话。
+    //
+    // v1.142.0 第二轮例外：specialDeductionCheckbox（专项扣除 / 三险一金）。
+    // 它不是"你有没有"的问题，是**绝大多数受雇情形的事实**：1.17 那四个页面天天挂着
+    // `<input type="checkbox" checked>`，spec 化之后被写成 false，等于让每个上班的人
+    // 进门先去找一颗框，否了两年社保。这也正是用户明确要回来的默认值。
+    // 新增例外必须在这里写出同样的理由 —— 这条断言的作用就是逼出这句话。
     test('声明类勾选默认不勾（有的话用户自己勾）', () => {
         const CALIBER = {
             bonusInclude: '年终奖并入综合所得计税（口径）',
             mergeByMonth: '同一个月内的多笔合并为「一次」（口径）',
-            taxIncluded: '金额为含税价（口径）'
+            taxIncluded: '金额为含税价（口径）',
+            specialDeductionCheckbox: '交社保公积金是受雇的常态，默认勾（1.17 页面即 checked）'
         };
         const bad = allFields()
             .filter((x) => x.field.type === 'switch' && x.field.default === true)

@@ -280,8 +280,14 @@ describe('正向计税走向导：forward 由 spec 驱动', () => {
     test('forward 被通用向导接管（不再是页面式）', () => {
         expect(W().has(R().get('forward'))).toBe(true);
         const steps = W().stepsOf(R().get('forward'));
-        expect(steps[0].title).toBe('计算参数');
+        // 步序 = 基本参数 → 收入明细 → 扣除项明细 → 计算结果（与 1.17 那页同一个顺序）。
+        // 「基本参数」必须在**最前面**：它定的是这一年的口径（工作几个月、去年预缴了多少），
+        // 录完收入再回头改它，前面那屏的数全部作废。所以这里钉的是"第一步是不是它"，
+        // 而不是又一个 x ∈ steps。
+        expect(steps[0].key).toBe('param');
+        expect(steps[0].title).toBe('基本参数');
         expect(steps[steps.length - 1].result).toBe(true);
+        expect(steps.map((s) => s.key)).toEqual(['param', 'income', 'deduction', '__result']);
         expect(R().get('forward').pageId).toBeUndefined();
     });
 
@@ -320,11 +326,17 @@ describe('正向计税走向导：forward 由 spec 驱动', () => {
 
     test('条件字段：住房方式切成房贷后，租金那一项消失', () => {
         W().open('forward', { fresh: true });
-        document.getElementById('dw-next').click();            // → 各项所得
-        document.getElementById('dw-next').click();            // → 扣除项明细
-        // 专项附加扣除是「我有没有这些支出」的声明，默认不勾；走了两步到扣除页才勾得上，
-        // 勾上之后下面那一片才展开
+        // 走到「扣除项明细」那一屏 —— 不写死点几次下一步：
+        // v1.142.0 起 advanced 步（计算参数）排在必填项之后，前进一步原先到这里、现在是收入页。
+        // 按「控件出现了没有」找路，步骤再调也不至于让这条守护假失败。
+        for (let i = 0; i < 10 && !document.getElementById('qf-specialAdditionalDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        // 专项附加扣除是「我有没有这些支出」的声明，默认不勾；勾上之后下面那一片才展开
         const sa = document.getElementById('qf-specialAdditionalDeductionCheckbox');
+        expect(sa).toBeTruthy();
         sa.checked = true;
         sa.dispatchEvent(new Event('change'));
         expect(document.getElementById('qf-rentDeduction')).toBeTruthy();

@@ -77,7 +77,6 @@ beforeEach(() => {
             <div id="toolbox-scenario-chip" class="hidden"></div>
             <div id="toolbox-groups"></div>
             <div id="toolbox-deep">
-                <div class="mode-card" id="forward-mode-card"><button id="forward-mode-btn"></button></div>
                 <div id="toolbox-deep-extra" class="hidden"></div>
             </div>
         </div>
@@ -98,7 +97,7 @@ beforeEach(() => {
             <button type="button" id="quick-basis-copy">复制政策文号</button>
         </details>
         <div id="quick-next" class="hidden"></div>
-        <a id="quick-seo-link"></a>
+        <button id="quick-rate-table"></button>
         <button id="quick-back-btn"></button>
         <div id="quick-result-bar" class="hidden">
             <span id="quick-result-bar-label"></span>
@@ -206,8 +205,8 @@ describe('工具页', () => {
     });
 
     // 反过来的那条：deep 命中时必须露出，否则用户搜到了税种却看不到它的完整测算入口。
-    // spec 驱动的 deep 是动态渲染进 #toolbox-deep-extra 的（不在 index.html 里写死），
-    // 这条用例同时守住「新增 deep 不需要改 HTML 就能被搜到」这件事。
+    // 21 个完整测算全部动态渲染进 #toolbox-deep-extra（不在 index.html 里写死），
+    // 这条用例同时守住「新增一个 deep 不需要改 HTML 就能被搜到」这件事。
     test('搜索命中完整测算时露出该组（残保金 → 残保金与工会经费）', () => {
         window.EuriskoToolbox.renderToolbox('残保金');
         expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(false);
@@ -500,12 +499,17 @@ describe('省钱卡', () => {
     });
 });
 
+// v1.142.0：原先这条断言的是「点 deep 工具最后点到 ${id}-mode-btn 那颗静态隐藏按钮」，
+// 那是 4 张写死 mode-card 时代的转发件。卡与按钮都删了，入口只剩一条路：进 ISpec 向导。
 describe('深度流程入口', () => {
-    test('点开深度工具走的是原有无素（与既有初始化逻辑同源）', () => {
-        const clicked = jest.fn();
-        document.getElementById('forward-mode-btn').addEventListener('click', clicked);
+    test('点开深度工具进通用向导（不再经过任何隐藏按钮的转发）', () => {
+        // 本文件不加载 deep-wizard-ui，用替身接住这次调用：入口要证明的是"该走这一条路"
+        const fake = { has: jest.fn(() => true), open: jest.fn(() => true) };
+        window.EuriskoDeepWizard = fake;
         window.EuriskoToolbox.openTool('forward');
-        expect(clicked).toHaveBeenCalled();
+        expect(fake.has).toHaveBeenCalled();
+        expect(fake.open).toHaveBeenCalledWith('forward', expect.anything());
+        delete window.EuriskoDeepWizard;
     });
 });
 
@@ -644,11 +648,13 @@ describe('阶段19-3：41 个入口全部可达', () => {
             .map((el) => el.getAttribute('data-tool-id')));
         quick.forEach((id) => expect(inGroups.has(id)).toBe(true));
 
-        // 完整测算有两种落点：静态 mode card（4 个）/ 动态渲染进 #toolbox-deep-extra
+        // v1.142.0：完整测算**只有一种落点** —— 与其它组同款的工具条卡片（动态渲染）。
+        // 此前 4 个（综合所得 / 经营所得 / 分类所得 / 反向倒算）是 index.html 里写死的静态卡，
+        // 两种 markup 混在一组里；现在统一了，也不再有"某几个必须靠隐藏按钮才点得开"。
         deep.forEach((id) => {
-            const byCard = !!document.getElementById(id + '-mode-card');
             const byEntry = !!document.querySelector('#toolbox-deep-extra [data-tool-id="' + id + '"]');
-            expect(byCard || byEntry).toBe(true);
+            expect(byEntry).toBe(true);
+            expect(document.getElementById(id + '-mode-card')).toBeNull();
         });
     });
 

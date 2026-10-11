@@ -62,7 +62,7 @@ beforeEach(() => {
         <div id="quick-result"></div>
         <div id="quick-pitfalls"></div>
         <div id="quick-next" class="hidden"></div>
-        <a id="quick-seo-link"></a>
+        <button id="quick-rate-table"></button>
         <details id="quick-policy-basis" class="hidden"><div id="quick-policy-basis-body"></div></details>
         <nav id="bottom-tabbar" class="hidden"></nav>
         <nav id="top-tabbar" class="hidden"></nav>

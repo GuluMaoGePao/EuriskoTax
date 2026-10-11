@@ -213,7 +213,7 @@ describe('结构与输入边界', () => {
         expect(out.extras).toHaveLength(3);
         expect(out.extras.map((e) => e.title)).toEqual([
             '三个所得项目：限额、可扣、各自省多少（按最优顺序）',
-            '六种扣除顺序对照（**顺序自行决定**，税不一样）',
+            '六种扣除顺序对照（顺序自行决定，税不一样）',
             '捐赠额怎么算出来的（99 号公告二）'
         ]);
         expect(tableOf(out, '捐赠额怎么算出来的')).toHaveLength(4);

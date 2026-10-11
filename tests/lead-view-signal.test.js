@@ -1,14 +1,17 @@
 /**
- * 线索质量分层信号（阶段19-7b②，v1.102.0）
+ * 线索质量分层信号（阶段19-7b②，v1.102.0 · v1.142.0 收敛）
  *
- * 这个信号是「白捡」的：用户选完整视图、或在简明视图下主动翻出「更多参数（可选）」去调，
- * 等于自己交代了需求深度 —— 不用多问一句、不用多采一项个人信息。
+ * 这个信号是「白捡」的：用户主动翻出「更多参数（可选）」去调，等于自己交代了需求深度 ——
+ * 不用多问一句、不用多采一项个人信息。
+ *
+ * v1.142.0：「简明 / 完整」视图取消之后，「我选了哪一档」不再是一个信号（两档不存在了），
+ * 只剩「我翻过参数没有」。viewSignals().mode 因此恒为空串 —— 留这组守卫的意义变成
+ * 「别再把一个已经删掉的概念偷偷接回来」。
  *
  * 要钉住的是**信号不被稀释**：
- *   ① 只有简明视图下的展开才算（完整视图下折叠块本来就是展开的，点一下不代表在找参数）；
- *   ② 只有「更多参数」这个块才算（推导链那些 details 不算，否则数字会被冲淡）；
- *   ③ 合上不算、重复展开累加、同一测算只归因一次；
- *   ④ 拿不到信号返回 null —— 没有信号就说没有，不猜一个「简明」出来充数。
+ *   ① 只有「更多参数」这个块才算（推导链那些 details 不算，否则数字会被冲淡）；
+ *   ② 合上不算、重复展开累加、同一测算只归因一次；
+ *   ③ 拿不到信号返回 null —— 没有信号就说没有，不猜一个 0 出来充数。
  *
  * 另外钉住前后端字段名：这条链路跨 4 个文件（渲染层 → 情境层 → 弹窗 payload → 后端列），
  * 任何一处改名都会**静默丢信号**（不报错，只是顾问再也看不到），所以用源码对拍兜住。
@@ -32,14 +35,12 @@ beforeAll(() => {
     loadSource('src/js/calculation/bonus-tax-quick.js');
     loadSource('src/js/calculation/annual-settlement-quick.js');
     loadSource('src/js/calculation/social-insurance-quick.js');
-    // 视图偏好必须排在 toolbox-ui / deep-wizard-ui 之前（index.html 里的顺序也是这样）
-    loadSource('src/js/ui/mode-pref.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/lead/lead-context.js');
 });
 
-const P = () => window.EuriskoModePref;
+const TB = () => window.EuriskoToolbox;
 
 // 造一个真实的「更多参数」折叠块：走渲染器的同一份 HTML，
 // 于是 data-tool-id 与监听认的 class 都是真的（不是测试里另写一份糊弄自己）
@@ -65,43 +66,33 @@ beforeEach(() => {
 });
 
 describe('19-7b② 进阶参数探索记录', () => {
-    test('简明视图下主动展开 → 计数，并记下是哪个测算', () => {
-        P().set(P().SIMPLE);
+    test('主动展开 → 计数，并记下是哪个测算', () => {
         toggleIt(block('annual-settlement-deep'), true);
-        const t = P().advancedTouched();
+        const t = TB().advancedTouched();
         expect(t.count).toBe(1);
         expect(t.tools).toEqual(['annual-settlement-deep']);
     });
 
-    test('完整视图下展开不计数：它本来就是展开的，点一下不代表在找参数', () => {
-        P().set(P().FULL);
-        toggleIt(block('annual-settlement-deep'), true);
-        expect(P().advancedTouched().count).toBe(0);
-    });
-
     test('合上不计数（只有「找参数」才是信号）', () => {
-        P().set(P().SIMPLE);
         const d = block('vat-deep');
         toggleIt(d, false);
-        expect(P().advancedTouched().count).toBe(0);
+        expect(TB().advancedTouched().count).toBe(0);
     });
 
     test('反复展开累加次数，同一测算只归因一次（分层看的是深度，不是点击量）', () => {
-        P().set(P().SIMPLE);
         const d = block('vat-deep');
         toggleIt(d, true);
         toggleIt(d, false);
         toggleIt(d, true);
-        const t = P().advancedTouched();
+        const t = TB().advancedTouched();
         expect(t.count).toBe(2);
         expect(t.tools).toEqual(['vat-deep']);
     });
 
     test('别的折叠块（推导链等）不算：算进去只会把信号冲淡', () => {
-        P().set(P().SIMPLE);
         document.body.innerHTML = '<details class="tool-formula-panel"><summary>查看计算过程</summary></details>';
         toggleIt(document.querySelector('details'), true);
-        expect(P().advancedTouched().count).toBe(0);
+        expect(TB().advancedTouched().count).toBe(0);
     });
 
     test('折叠块带 data-tool-id：否则只知道「有人调过参数」，不知道调的是哪个税', () => {
@@ -109,39 +100,35 @@ describe('19-7b② 进阶参数探索记录', () => {
         expect(d.getAttribute('data-tool-id')).toBe('bonus-tax-deep');
     });
 
-    test('reset 清空记录（用例之间不串味，重装的会话从 0 开始）', () => {
-        P().set(P().SIMPLE);
+    test('清掉存储即回到 0（用例之间不串味，重装的会话从 0 开始）', () => {
         toggleIt(block('vat-deep'), true);
-        expect(P().advancedTouched().count).toBe(1);
-        P().reset();
-        expect(P().advancedTouched()).toMatchObject({ count: 0, tools: [] });
+        expect(TB().advancedTouched().count).toBe(1);
+        localStorage.clear();
+        expect(TB().advancedTouched()).toMatchObject({ count: 0, tools: [] });
     });
 });
 
 describe('19-7b② 留资情境里的信号汇总', () => {
-    test('完整视图 → mode=full（ICP 信号本身就成立，与调没调过参数无关）', () => {
-        P().set(P().FULL);
-        expect(window.LeadContext.viewSignals()).toEqual({ mode: 'full', advancedTouched: 0 });
+    test('没翻过参数 → mode 为空串 / advancedTouched=0（视图取消后不再有模式可报）', () => {
+        expect(window.LeadContext.viewSignals()).toEqual({ mode: '', advancedTouched: 0 });
     });
 
-    test('简明视图 + 调过 2 次 → mode=simple / advancedTouched=2', () => {
-        P().set(P().SIMPLE);
+    test('调过 2 次 → advancedTouched=2 随线索上报', () => {
         const d = block('social-base-deep');
         toggleIt(d, true);
         toggleIt(d, true);
-        expect(window.LeadContext.viewSignals()).toEqual({ mode: 'simple', advancedTouched: 2 });
+        expect(window.LeadContext.viewSignals()).toEqual({ mode: '', advancedTouched: 2 });
     });
 
-    test('偏好模块不在时返回 null：没信号就说没信号，不猜一个「简明」出来充数', () => {
-        const saved = window.EuriskoModePref;
-        delete window.EuriskoModePref;
+    test('渲染层不在时返回 null：没信号就说没信号，不猜一个 0 出来充数', () => {
+        const saved = window.EuriskoToolbox;
+        delete window.EuriskoToolbox;
         expect(window.LeadContext.viewSignals()).toBeNull();
-        window.EuriskoModePref = saved;
+        window.EuriskoToolbox = saved;
     });
 
     test('信号不并进 current() 的情境文本（那是给用户看的，不能变成当着面给他打分）', () => {
-        P().set(P().FULL);
-        P().noteAdvancedOpen('x');
+        TB().noteAdvancedOpen('x');
         const text = window.LeadContext.current('forward');
         expect(text.indexOf('完整')).toBe(-1);
         expect(text.indexOf('进阶')).toBe(-1);

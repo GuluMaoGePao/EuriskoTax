@@ -29,7 +29,6 @@ beforeAll(() => {
     loadSource('src/js/calculation/bonus-tax-quick.js');
     loadSource('src/js/calculation/annual-settlement-quick.js');
     loadSource('src/js/calculation/social-insurance-quick.js');
-    loadSource('src/js/ui/mode-pref.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');
     loadSource('src/js/ui/deep-wizard-ui.js');
@@ -38,7 +37,6 @@ beforeAll(() => {
 const R = () => window.EuriskoToolRegistry;
 const TB = () => window.EuriskoToolbox;
 const W = () => window.EuriskoDeepWizard;
-const P = () => window.EuriskoModePref;
 
 // 打开某个完整测算并直达结果步（带 values = 「从历史记录看那一条」的同一条路径）
 function openResult(toolId) {
@@ -102,8 +100,7 @@ describe('19-12 政策时效：两类入口同一枚', () => {
         expect(document.getElementById('dw-policy-stamp').innerHTML).toContain(expected);
     });
 
-    test('简明视图下也显示：它是可信标记，不是参数（藏起来等于让用户不知道这次算有没有过期政策）', () => {
-        P().set(P().SIMPLE);
+    test('结果卡上就看得到：它是可信标记，不是参数（藏进"更多参数"等于让用户不知道这次算有没有过期政策）', () => {
         openResult('annual-settlement-deep');
         const stamp = document.getElementById('dw-policy-stamp');
         expect(stamp.innerHTML).toContain(TB().policyBadgeOf(R().get('annual-settlement-deep').policyKey));

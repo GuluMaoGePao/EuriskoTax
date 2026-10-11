@@ -75,7 +75,7 @@ beforeEach(() => {
         <div id="quick-result"></div>
         <div id="quick-pitfalls"></div>
         <div id="quick-next" class="hidden"></div>
-        <a id="quick-seo-link"></a>
+        <button id="quick-rate-table"></button>
         <details id="quick-policy-basis" class="hidden"><div id="quick-policy-basis-body"></div></details>
         <nav id="bottom-tabbar" class="hidden"></nav>
         <nav id="top-tabbar" class="hidden"></nav>
@@ -172,9 +172,18 @@ function valueOnScreen(key) {
 
 // 界面上那个主结果怎么显示，是 TB().fmtValue 说了算 —— 比对必须走同一个格式化，
 // 否则「12000」与「¥12,000.00」会被判成两个数
+// v1.142.0：画面的值不是"记录里那一份原样"，而是它经过 derive（社保基数 × 比例 → 月缴额）
+// 之后的那一份 —— 这条路径由向导在每次收值后跑（applyDerived）。这里算期望值时必须同口径，
+// 否则比的是两份不同的输入：socialBase 带上默认值后，derive 才会第一次真的影响结果。
+function settled(values, tool) {
+    let v = Object.assign({}, values);
+    if (typeof tool.derive === 'function') v = Object.assign(v, tool.derive(v) || {});
+    return v;
+}
+
 function primaryOf(tool, values) {
     try {
-        const out = tool.compute(values);
+        const out = tool.compute(settled(values, tool));
         if (!out || !out.primary) return null;
         return TB().fmtValue(out.primary.value, out.primary.kind);
     } catch (e) {

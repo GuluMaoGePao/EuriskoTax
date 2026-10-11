@@ -12,6 +12,8 @@
  *
  * @jest-environment jsdom
  */
+const fs = require('fs');
+const path = require('path');
 const { loadSource } = require('./helpers/load-source');
 
 beforeAll(() => {
@@ -74,6 +76,24 @@ describe('多步向导：spec 形状', () => {
         expect(W().fieldsOfStep(t, 'identity').map((f) => f.key))
             .toEqual(['variant', 'location', 'signedWhere']);
         expect(W().fieldsOfStep(t, 'policy').map((f) => f.key)).toEqual(['halve']);
+    });
+
+    // v1.142.0：步骤表曾被「简明」视图改写（advanced 步被合并成一步「补充参数（可选）」），
+    // 于是同一份测算有两套步骤条，用户认不出自己刚才填到哪一屏。视图取消之后还是出了第二版：
+    // 渲染器把 advanced 步一律甩到末尾 —— 「参数有默认值可后填」被当成了唯一标准，
+    // 结果综合所得一进门先被问「你一年挣多少」，而「工作几个月」被挪到最后才问。
+    // **位置本身也是语义**：开场第一问不能因为它有默认值就往后放。
+    // 现在唯一的规矩是：屏幕上的顺序 = spec 声明的顺序。
+    test('步骤表 = spec 声明的那一张（不再改写，也不再重排）', () => {
+        const t = R().get('forward');
+        const keys = W().stepsOf(t).map((s) => (s.result ? '__result' : s.key));
+        expect(keys).toEqual((t.steps || []).map((s) => s.key).concat(['__result']));
+        // step 级 advanced 已整体取消：它现在没有任何效果，留着只会让人以为步还能被藏起来
+        R().deep().concat(R().all()).forEach((tool) => {
+            expect((tool.steps || []).filter((s) => s.level === 'advanced')).toEqual([]);
+        });
+        // 两次调用必须给出同一张表（曾经"看当前 mode 才知道自己有几步"）
+        expect(W().stepsOf(t)).toEqual(W().stepsOf(t));
     });
 });
 
@@ -782,5 +802,596 @@ describe('多步向导：结果附加块（extras）', () => {
         expect(card.textContent).not.toContain('逐月预算表');
         expect(card.querySelector('table')).toBeFalsy();
         expect(document.getElementById('dw-result-primary')).toBeTruthy();
+    });
+});
+
+// v1.142.0 第三轮：四个老牌完整测算（综合所得 / 反向倒算 / 经营所得 / 分类所得）
+// 的内部结构回到 1.17 整页时代的形态。
+//
+// 为什么要钉这几条：spec 化之后，那些页面被压成「一串平铺的框」。一个总开关当时长成
+// 两件东西（标题一行 + 右边一颗「是 / 否」），而它管的那一片字段只是从屏幕上"出现"了 ——
+// 看不出归谁、也看不出勾与不勾差多少。用户的原话是「勾选显示有歧义」。
+// 1.17 里没有这个毛病：勾选框本身就是小节标题（「专项扣除」三个字直接跟着方框），
+// 它管的字段缩进挂在下面一块。下面三条钉的就是这个包含关系，以及"谁也没被吞掉"。
+describe('完整测算内部结构：勾选式小节（回到 1.17 的页面形态）', () => {
+    // 走到「扣除项明细」那一屏：不写死要点几次下一步 —— 按「那个控件出现了没有」找路
+    function openAtDeduction(toolId) {
+        W().open(toolId, { fresh: true });
+        for (let i = 0; i < 10 && !document.getElementById('qf-specialDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        return document.getElementById('qf-specialDeductionCheckbox');
+    }
+
+    // 勾上：必须**重画**（ Sadly 重画才能让受它管的一片出现在它下面）
+    function check(key) {
+        const el = document.getElementById('qf-' + key);
+        expect(el).toBeTruthy();
+        el.checked = true;
+        el.dispatchEvent(new Event('change'));
+        return document.getElementById('qf-' + key);
+    }
+
+    ['forward', 'reverse'].forEach((toolId) => {
+        test(toolId + '：勾选框自己就是小节标题，它管的字段挂在它下面一块', () => {
+            openAtDeduction(toolId);
+            check('specialDeductionCheckbox');
+
+            const cb = document.getElementById('qf-specialDeductionCheckbox');
+            // ① 它不再是「是 / 否」开关：小节标题（有文字）与方框同在一颗 label 上
+            expect(cb.closest('.dw-group-toggle')).toBeTruthy();
+            expect(cb.closest('.tool-switch')).toBeFalsy();
+
+            // ② 它管的那一片确实挂在它自己的 dw-group 下
+            const group = cb.closest('.dw-group');
+            expect(group).toBeTruthy();
+            const owned = group.querySelector('.dw-group-body');
+            ['socialBase', 'pensionInsurance', 'medicalInsurance', 'housingFund']
+                .forEach((k) => {
+                    const f = document.getElementById('qf-' + k);
+                    expect(f).toBeTruthy();
+                    expect(owned.contains(f)).toBe(true);   // 不是跟节点同级的第三第四层
+                });
+        });
+
+        test(toolId + '：归组不吞字段 —— 勾上之后该出现的框一个都不少', () => {
+            openAtDeduction(toolId);
+            check('specialDeductionCheckbox');
+            check('specialAdditionalDeductionCheckbox');
+
+            const tool = R().get(toolId);
+            const stepKey = 'deduction';
+            const missing = tool.fields
+                .filter((f) => (f.step || tool.steps[0].key) === stepKey)
+                .filter((f) => TB().visibleFields({ fields: [f] }, W().values()).length)
+                .map((f) => f.key)
+                .filter((k) => !document.getElementById('qf-' + k));
+            expect(missing).toEqual([]);
+        });
+    });
+
+    test('社保缴费基数框里有数可改（勾了专项扣除却给 0 = 勾了跟没勾一样）', () => {
+        openAtDeduction('forward');
+        check('specialDeductionCheckbox');
+        const el = document.getElementById('qf-socialBase');
+        expect(Number(el.value)).toBeGreaterThan(0);
+        // 养老/医疗/失业三个月缴额随之算出来了 —— 那一对一定挂在这个数上
+        ['pensionInsurance', 'medicalInsurance', 'unemploymentInsurance'].forEach((k) => {
+            expect(Number(document.getElementById('qf-' + k).value)).toBeGreaterThan(0);
+        });
+    });
+});
+
+// 并排（1.17 那四个页面里，一个卡片内部的框就是两个一行 `grid grid-cols-2 gap-3`）。
+// jsdom 不排版，算不出「两列到底有没有并起来」，所以这两条各钉一半：
+//   DOM 那一半钉**结构**（同一层的框是不是都落在同一块 grid 地里 —— 散在外面就永远并不起来）；
+//   CSS 那一半钉**规则**（宽屏两列 / 窄屏一列，改了这里的数字必须能看见别人也知道）。
+describe('完整测算内部结构：字段并排（1.17 那页的 grid 读法）', () => {
+    test('一屏的所有输入框都在同一块并排容器里', () => {
+        W().open('forward', { fresh: true });
+        const grid = document.querySelector('#deep-wizard-page .dw-field-grid');
+        expect(grid).toBeTruthy();
+        const outside = Array.from(document.querySelectorAll('#deep-wizard-page [id^="qf-"]'))
+            .map((el) => el.id)
+            .filter((id) => !grid.querySelector('#' + id));
+        expect(outside).toEqual([]);
+    });
+
+    test('占满行的三样东西是它的直接子元素（不然 grid-column 落不到它们头上）', () => {
+        W().open('forward', { fresh: true });
+        // 走到扣除项那一屏：勾选式小节与「更多参数」折叠块都在这屏
+        for (let i = 0; i < 10 && !document.getElementById('qf-specialDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        const grid = document.querySelector('#deep-wizard-page .dw-field-grid');
+        const kids = Array.from(grid.children);
+        expect(kids.some((k) => k.classList.contains('dw-group-head'))).toBe(true);
+        // 直接子元素只可能是这几种（多出一种 = 有人又包了一层，跨行规则会落空）
+        kids.forEach((k) => {
+            const known = k.classList.contains('dw-group') || k.classList.contains('dw-group-head')
+                || k.classList.contains('tool-field') || k.tagName === 'DETAILS';
+            expect(known).toBe(true);
+        });
+        expect(kids.filter((k) => k.tagName === 'DETAILS').length).toBeLessThanOrEqual(1);
+
+        // 勾上之后这一颗变成 dw-group（它管的那一片挂进来），仍然只有一层
+        const cb = document.getElementById('qf-specialDeductionCheckbox');
+        cb.checked = true;
+        cb.dispatchEvent(new Event('change'));
+        const after = Array.from(document.querySelector('#deep-wizard-page .dw-field-grid').children);
+        expect(after.some((k) => k.classList.contains('dw-group'))).toBe(true);
+    });
+
+    test('两列并排这件事写在 CSS 里：宽屏两列、手机一列', () => {
+        const css = fs.readFileSync(path.join(__dirname, '../src/css/toolbox.css'), 'utf8');
+        expect(css).toMatch(/\.dw-field-grid[\s\S]{0,120}?grid-template-columns:\s*repeat\(2/);
+        // 手机上仍然是一列 —— 375px 开两列，金额框连 5 位数都放不下
+        expect(css).toMatch(/max-width:\s*767\.98px[\s\S]{0,200}?\.dw-field-grid[\s\S]{0,120}?minmax\(0,\s*1fr\)/);
+    });
+
+    test('基数类字段自己占一行（它是底下那一组的来源，不该跟他们并排）', () => {
+        W().open('forward', { fresh: true });
+        for (let i = 0; i < 10 && !document.getElementById('qf-socialBase'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        ['socialBase', 'housingFundBase'].forEach((k) => {
+            const el = document.getElementById('qf-' + k);
+            expect(el).toBeTruthy();
+            expect(el.closest('.dw-field-wide')).toBeTruthy();
+        });
+        // 这就是为什么它要单独一行：这些字段都是它连带出来的
+        expect(document.getElementById('qf-pensionInsurance')).toBeTruthy();
+    });
+});
+
+// 任务①：勾选框统一成「方框在前 + 名字在后」，专项扣除默认勾上（1.17 那四个页面的样子）。
+// 三条各钉一半：**形态**（不许再出现替用户陈述结论的「否」）、**默认**、
+// **覆盖面**（20 个速算器与 21 个完整测算共用同一份 fieldHtml，不许有一处漏改）。
+describe('勾选框：方框在前 + 名字在后，专项扣除默认勾上', () => {
+    function atDeduction(toolId) {
+        W().open(toolId, { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('qf-specialDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        return document.getElementById('qf-specialDeductionCheckbox');
+    }
+
+    test('专项扣除默认勾上，它管的那一片默认就看得见', () => {
+        ['forward', 'reverse'].forEach((toolId) => {
+            const cb = atDeduction(toolId);
+            expect(cb).toBeTruthy();
+            expect(cb.checked).toBe(true);
+            // 默认看得见：进门不必先猜才能看到自己的社保
+            expect(document.getElementById('qf-socialBase')).toBeTruthy();
+            expect(document.getElementById('qf-pensionInsurance')).toBeTruthy();
+        });
+    });
+
+    test('标题式勾选里，方框在前、名字在后，且屏幕上没有「否」', () => {
+        const cb = atDeduction('forward');
+        const label = cb.closest('.dw-group-toggle');
+        expect(label).toBeTruthy();
+        const kids = Array.from(label.children);
+        expect(kids[0]).toBe(cb);                       // 方框是第一个
+        expect(kids[1].textContent.indexOf('专项扣除')).not.toBe(-1);   // 名字紧跟其后
+        const page = document.getElementById('deep-wizard-page');
+        expect(page.textContent.indexOf('否')).toBe(-1);
+    });
+
+    test('所有 switch 字段（速算器与完整测算共 41 个工具）都不再有「是 / 否」这颗伴生标记', () => {
+        let switches = 0;
+        R().all().concat(R().deep()).forEach((tool) => {
+            (tool.fields || []).filter((f) => f.type === 'switch').forEach((f) => {
+                switches += 1;
+                const host = document.createElement('div');
+                document.body.appendChild(host);
+                host.innerHTML = TB().fieldHtml(f, { [f.key]: false }, {});
+                // 未勾选时最容易被写成"否" —— 这正是用户截图里那个东西。
+                // 注意：这条要钉的是那颗**独立的伴生标记**（旧实现里一个 `<span>否</span>`），
+                // 不是"名字里恰好有个是/否字"（「是否为小微企业」这类名字本来就带这两字）。
+                expect(host.innerHTML).not.toMatch(/<span>(是|否)<\/span>/);
+                // 一颗 label 同时装下方框与名字（点文字也能勾）
+                const cb = host.querySelector('.tool-switch input[type="checkbox"]');
+                expect(cb).toBeTruthy();
+                expect(host.querySelector('.tool-switch span').textContent.length).toBeGreaterThan(0);
+            });
+        });
+        expect(switches).toBeGreaterThan(10);
+    });
+});
+
+// 底部实时预览条（1.17 的 calc-preview-bar）三个数必须**横排并列**。
+// v1.142 曾在这里栽过一次：tailwind.src.css 里规则齐全，但忘了跑 build:css，
+// 产物里没有 .calc-preview-grid → grid 不生效 → 三个数竖着叠成一摞。
+// 所以这里钉的是**构建产物**（用户真正加载的那份），不是源文件 —— 漏构建立刻红。
+// 专项附加扣除有**七项法定分类**。勾上之后底下十来个框平铺成一串时，用户看不出
+// "我这五个数分别属于哪一类"，更看不出还漏了哪一类没填 —— 七项里漏一项就是每月两千块。
+// 这里钉三件事：字段带上了分类、界面按分类分块、五类一块不落。
+describe('专项附加扣除按分类显示', () => {
+    const GROUPS = ['子女教育与婴幼儿照护', '继续教育', '大病医疗', '住房贷款利息 / 住房租金', '赡养老人'];
+
+    function openDeduction(toolId) {
+        W().open(toolId, { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('qf-specialAdditionalDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        const cb = document.getElementById('qf-specialAdditionalDeductionCheckbox');
+        if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+        return cb;
+    }
+
+    test('每个字段都带上了分类（漏一个就会掉出它的小节）', () => {
+        ['forward', 'reverse'].forEach((toolId) => {
+            const tool = R().get(toolId);
+            (tool.fields || []).forEach((f) => {
+                if (['childrenInfantCount', 'childrenInfantDeductionRate', 'childrenInfantDeduction',
+                    'elderlyType', 'elderlyDeduction', 'housingType', 'rentDeduction', 'housingLoanDeduction',
+                    'educationDegreeCheckbox', 'educationProfessionalCheckbox', 'educationDeduction',
+                    'medicalDeduction'].indexOf(f.key) === -1) return;
+                // 分类必须是五类之一：写错一个字，这个框就会自己单独成一块
+                expect(GROUPS.indexOf(f.group) !== -1 ? 'ok' : f.key + ' 缺 group').toBe('ok');
+            });
+        });
+    });
+
+    test('界面上按分类分块：五类一块不落，每块有自己的小标题', () => {
+        openDeduction('forward');
+        const host = document.getElementById('deep-wizard-page');
+        const titles = Array.from(host.querySelectorAll('.dw-subgroup-title')).map((x) => x.textContent.trim());
+        GROUPS.forEach((g) => expect(titles).toContain(g));
+        // 小标题底下确实装着框，不是空块
+        Array.from(host.querySelectorAll('.dw-subgroup')).forEach((sg) => {
+            expect(sg.querySelectorAll('.tool-field, .dw-group-head').length).toBeGreaterThan(0);
+        });
+    });
+
+    test('分类归组不吞字段：分块前后字段一个不少', () => {
+        openDeduction('forward');
+        const host = document.getElementById('deep-wizard-page');
+        const shown = Array.from(host.querySelectorAll('[id^="qf-"]')).map((x) => x.id.slice(3));
+        ['childrenInfantDeduction', 'elderlyDeduction', 'housingType', 'educationDeduction', 'medicalDeduction']
+            .forEach((k) => expect(shown).toContain(k));
+    });
+});
+
+// 扣除项里有一批是**算出来的**（社保月缴额 = 基数 × 比例；子女 = 人数 × 2000 × 比例；
+// 赡养 = 独生 3000 / 非独生 1500；继续教育 = 学历 400 × 月数 + 职业资格 3600）。
+// 用户不该对着它们拿计算器 —— 钉四件事：勾了就自己变、源字段一改就跟着变、
+// 界面上标得出来、手改了不被悄悄冲掉。
+describe('扣除项里自动算出的值', () => {
+    function toDeduction(toolId) {
+        W().open(toolId, { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('qf-specialAdditionalDeductionCheckbox'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        const cb = document.getElementById('qf-specialAdditionalDeductionCheckbox');
+        if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+        return cb;
+    }
+    function setVal(id, v) {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        el.value = String(v);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return el;
+    }
+
+    test('勾上学历继续教育，年度扣除额自己就算出来了（400 × 工作月数）', () => {
+        toDeduction('forward');
+        const before = Number(document.getElementById('qf-educationDeduction').value) || 0;
+        const deg = document.getElementById('qf-educationDegreeCheckbox');
+        deg.checked = true;
+        deg.dispatchEvent(new Event('change', { bubbles: true }));
+        const months = Number(W().values().workMonths) || 12;
+        expect(Number(document.getElementById('qf-educationDeduction').value)).toBe(400 * months);
+        expect(before).toBe(0);
+    });
+
+    test('再勾职业资格，3600 加进来', () => {
+        toDeduction('forward');
+        ['educationDegreeCheckbox', 'educationProfessionalCheckbox'].forEach((k) => {
+            const el = document.getElementById('qf-' + k);
+            el.checked = true;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        const months = Number(W().values().workMonths) || 12;
+        expect(Number(document.getElementById('qf-educationDeduction').value)).toBe(400 * months + 3600);
+    });
+
+    test('改人数 / 分摊比例，子女扣除额跟着变', () => {
+        toDeduction('forward');
+        setVal('qf-childrenInfantCount', 2);
+        setVal('qf-childrenInfantDeductionRate', 50);
+        expect(Number(document.getElementById('qf-childrenInfantDeduction').value)).toBe(2000 * 2 * 0.5);
+    });
+
+    test('选独生子女，赡养扣除额自动给 3000', () => {
+        toDeduction('forward');
+        setVal('qf-elderlyType', 'only');
+        expect(Number(document.getElementById('qf-elderlyDeduction').value)).toBe(3000);
+    });
+
+    // 「这栏要不要我填」这句话问号里的提示已经说了（「这一栏不用填：按…自动算出」），
+    // 界面上不能再挂一行同样的字 —— 那只是把一句话说两遍。
+    test('不在界面上重复挂「自动算出」标记：说明只留在问号的提示里', () => {
+        toDeduction('forward');
+        const host = document.getElementById('deep-wizard-page');
+        expect(host.querySelectorAll('.dw-derived, .dw-derived-tag').length).toBe(0);
+    });
+
+    // 工资条上常常只有「养老扣了 800」，没有缴费基数 —— 手改过的数不能再被悄悄冲回派生值
+    test('手改过的派生值不被冲掉：改了就是用户的数', () => {
+        toDeduction('forward');
+        setVal('qf-pensionInsurance', 800);
+        const next = document.getElementById('dw-next');
+        next.click();                                   // 切步会跑一次 collect + derive
+        const prev = Array.from(document.querySelectorAll('.dw-step-jump'));
+        if (prev.length) prev[prev.length - 1].click();
+        expect(Number(W().values().pensionInsurance)).toBe(800);
+    });
+});
+
+// 14 个主题是「同一件事的两版」。速算器 → 完整测算 那边早就有出口（速算器结果页行动条的
+// 「按年填全的完整版」），反过来一直缺 —— 用户进了按年填全的向导才发现自己只想估一个数，
+// 那时只能退出来重新找。钉四件事：有路、只在第一步、没有就不显示、点了真能过去。
+describe('完整测算 ↔ 速算版：双向可达', () => {
+    test('有对应速算器的完整测算：第一步给出「用速算版」这一行', () => {
+        W().open('bonus-tax-deep', { fresh: true });
+        const hint = document.querySelector('.dw-quick-hint');
+        expect(!!hint).toBe(true);
+        expect(hint.textContent).toContain('年终奖个税');
+    });
+
+    // 填到第二步再来这句话，等于劝人扔掉已经填好的东西
+    test('只在第一步出现：后面几步不再劝人重来', () => {
+        W().open('bonus-tax-deep', { fresh: true });
+        const next = document.getElementById('dw-next');
+        if (next) next.click();
+        expect(document.querySelector('.dw-quick-hint')).toBeNull();
+    });
+
+    test('没有对应速算器的完整测算不给这一行（不指过去一个不存在的工具）', () => {
+        W().open('classification', { fresh: true });
+        expect(document.querySelector('.dw-quick-hint')).toBeNull();
+    });
+
+    test('点这一行真的打开速算器，不是一句装饰', () => {
+        W().open('bonus-tax-deep', { fresh: true });
+        document.getElementById('dw-go-quick').click();
+        expect(window.showPage).toHaveBeenCalledWith('quick-calculator-page');
+    });
+
+    // 21 个完整测算的 nextTools 写了却从没渲染过 —— 填得最全的那批反而是唯一没有
+    // 「算完还能干什么」的入口。
+    test('结果页渲染「算完还能干什么」（nextTools 不再是死数据）', () => {
+        W().open('vat-deep', { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('dw-result-primary'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        expect(!!document.getElementById('dw-result-card')).toBe(true);
+        const box = document.getElementById('dw-next-tools');
+        expect(!!box).toBe(true);
+        expect(box.classList.contains('hidden')).toBe(false);
+        expect(box.querySelectorAll('.tool-next-item').length).toBeGreaterThan(0);
+    });
+});
+
+describe('底部预览条：三个数横排并列', () => {
+    test('构建产物里有三列 grid（漏 build:css 会竖排）', () => {
+        const css = fs.readFileSync(path.join(__dirname, '../src/css/tailwind.css'), 'utf8');
+        expect(css).toMatch(/\.calc-preview-grid\{[^}]*grid-template-columns:repeat\(3/);
+        // 源文件与产物同判：改源忘了构建，或构建把源丢了，都得有人叫
+        const src = fs.readFileSync(path.join(__dirname, '../src/css/tailwind.src.css'), 'utf8');
+        expect(src).toMatch(/\.calc-preview-grid\s*\{[^}]*grid-cols-3/);
+    });
+
+    test('渲染出的预览条用 calc-preview-grid，且每项是 label 上、值下', () => {
+        W().open('forward', { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('dw-preview-bar'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        const bar = document.getElementById('dw-preview-bar');
+        if (bar) {
+            expect(bar.querySelector('.calc-preview-grid')).toBeTruthy();
+            const items = bar.querySelectorAll('.calc-preview-item');
+            expect(items.length).toBe(3);
+            items.forEach((it) => {
+                expect(it.querySelector('.calc-preview-label')).toBeTruthy();
+                expect(it.querySelector('.calc-preview-value')).toBeTruthy();
+            });
+        }
+    });
+});
+
+// 字段说明 / 行说明收进「名词后面那颗问号」，点开才显示。
+// 585 条提示常驻时，一屏里三分之一是小字 —— 主次就这么没了（用户原话「看着很疲惫」）。
+// 这里钉三件事：**默认收起**、**点了真的开**、**开合状态写在 aria 上**（读屏与键盘也走同一条路）。
+describe('说明收进提示按钮：点开才显示', () => {
+    function fieldWithHint() {
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        host.innerHTML = TB().fieldHtml(
+            { key: 'hintProbe', label: '探测字段', type: 'money', hint: '这一段是解释' }, {}, {}
+        );
+        return host;
+    }
+
+    test('默认收起：说明在 DOM 里但 hidden，界面上只读到一颗问号', () => {
+        const host = fieldWithHint();
+        const panel = host.querySelector('.tool-field-hint');
+        expect(panel).toBeTruthy();
+        expect(panel.hidden).toBe(true);
+        const btn = host.querySelector('.tool-hint-btn');
+        expect(btn).toBeTruthy();
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
+        expect(btn.getAttribute('aria-controls')).toBe(panel.id);
+        // 按钮紧跟名字，但**不在 label 里** —— label 内的点击会激活关联控件，
+        // 搁进去等于"点看说明"顺手把开关拨了
+        expect(btn.closest('.tool-field-head')).toBeTruthy();
+        expect(btn.closest('label')).toBeNull();
+    });
+
+    test('点一下展开、再点收起（文档级委托：重画之后照样管用）', () => {
+        const host = fieldWithHint();
+        const btn = host.querySelector('.tool-hint-btn');
+        const panel = host.querySelector('.tool-field-hint');
+        btn.click();
+        expect(panel.hidden).toBe(false);
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        btn.click();
+        expect(panel.hidden).toBe(true);
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    test('没有说明的字段不长这颗按钮（不然满屏问号点了没东西）', () => {
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        host.innerHTML = TB().fieldHtml({ key: 'plain', label: '无说明字段', type: 'money' }, {}, {});
+        expect(host.querySelector('.tool-hint-btn')).toBeNull();
+        expect(host.querySelector('.tool-field-hint')).toBeNull();
+    });
+
+    test('结果行的说明同样收在按钮里（此前是 title 悬浮 —— 手机上没有 hover）', () => {
+        W().open('forward', { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('dw-result-card'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        const card = document.getElementById('dw-result-card');
+        // 综合所得的结果行里确实有带说明的（年终奖税额：并入 / 单独计税那一句）
+        const panel = card.querySelector('.dw-result-hint');
+        expect(panel).toBeTruthy();
+        expect(panel.hidden).toBe(true);
+        const btn = card.querySelector('.dw-result-row__label .tool-hint-btn');
+        expect(btn).toBeTruthy();
+        btn.click();
+        expect(panel.hidden).toBe(false);
+        // 说明挂在行的**后面**，不是塞进 label 里把值挤走
+        expect(panel.previousElementSibling.classList.contains('dw-result-row')).toBe(true);
+    });
+});
+
+// 界面是给人看的：两件事这里一并钉住 ——
+//   ① 屏幕上不许出现裸的 markdown 星号（spec 的提示是照 markdown 写的，
+//      按纯文本转义出去就是「再★减按 70%」这种给用户看的天书）；
+//   ② 结果页的默认形态：结论给一个主数字，明细先收着。
+describe('界面文案与结果页默认形态', () => {
+    function toResult(toolId) {
+        W().open(toolId, { fresh: true });
+        for (let i = 0; i < 12 && !document.getElementById('dw-result-card'); i++) {
+            const next = document.getElementById('dw-next');
+            if (!next) break;
+            next.click();
+        }
+        return document.getElementById('dw-result-card');
+    }
+
+    test('向导：走到每一屏都不出现 ** 号', () => {
+        ['forward', 'classification', 'business'].forEach((toolId) => {
+            W().open(toolId, { fresh: true });
+            for (let i = 0; i < 12; i++) {
+                const page = document.getElementById('deep-wizard-page');
+                expect(page.textContent.indexOf('**')).toBe(-1);
+                expect(page.innerHTML.indexOf('**')).toBe(-1);
+                const next = document.getElementById('dw-next');
+                if (!next) break;
+                next.click();
+            }
+        });
+    });
+
+    test('速算器那一侧：提示同样不露 ** 号，勾选框不再替用户写「是 / 否」', () => {
+        // 加粗要被渲染出来，不是把星号原样端到用户面前（spec 里一大批提示是照 markdown 写的）
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        host.innerHTML = TB().fieldHtml(
+            { key: 'starProbe', label: '探测字段', type: 'money', hint: '减除 20% 后**再减按 70%**' }, {}, {}
+        );
+        expect(host.innerHTML.indexOf('**')).toBe(-1);
+        expect(host.querySelector('.tool-field-hint strong')).toBeTruthy();
+
+        // 真 spec 里带加粗提示的字段（20 个工具里挑得出来）渲染后同样不许留星号
+        const tool = R().all().concat(R().deep())
+            .find((t) => (t.fields || []).some((f) => f.hint && f.hint.indexOf('**') !== -1));
+        expect(tool).toBeTruthy();
+        const host2 = document.createElement('div');
+        document.body.appendChild(host2);
+        tool.fields.forEach((f) => { host2.innerHTML += TB().fieldHtml(f, {}, {}); });
+        expect(host2.innerHTML.indexOf('**')).toBe(-1);
+
+        // 勾选框：不再替用户写一个「否」
+        const swTool = R().all().concat(R().deep())
+            .find((t) => (t.fields || []).some((f) => f.type === 'switch'));
+        const host3 = document.createElement('div');
+        document.body.appendChild(host3);
+        swTool.fields.filter((f) => f.type === 'switch').forEach((f) => {
+            host3.innerHTML = TB().fieldHtml(f, {}, {});
+            expect(host3.textContent.indexOf('否')).toBe(-1);
+            // 方框在前、名字在后：同一颗 label 同时含 input 与名字
+            const cb = host3.querySelector('#qf-' + f.key);
+            expect(cb).toBeTruthy();
+            const label = cb.closest('.tool-switch');
+            expect(label.tagName).toBe('LABEL');
+            expect(label.textContent.indexOf(f.label)).not.toBe(-1);
+        });
+    });
+
+    test('结果页：主数字独占一块 hero，明细默认收起', () => {
+        const card = toResult('forward');
+        expect(card).toBeTruthy();
+        expect(card.querySelector('.dw-result-hero #dw-result-primary')).toBeTruthy();
+        const details = card.querySelectorAll('details');
+        expect(details.length).toBeGreaterThan(0);
+        // 明细盒默认收起（这一屏的任务是给结论），推导链仍然展开 —— 核对不能顺手关掉
+        expect(card.querySelector('details.dw-detail-box').open).toBe(false);
+        expect(card.querySelectorAll('[data-dw-row]').length).toBeGreaterThan(0);
+    });
+
+    test('结果页：明细行按语义着色，不是二十个数一个颜色', () => {
+        const card = toResult('forward');
+        const tones = Array.from(card.querySelectorAll('.dw-result-row'))
+            .map((row) => (row.className.match(/dw-result-row--(\w+)/) || [])[1]);
+        expect(tones.length).toBeGreaterThan(1);
+        expect(tones).toContain('tax');
+    });
+
+    // 结论由三个数构成：主数字 + 要交多少税 + 真正到手多少。
+    // 只有主数字就得展开二十行才知道交了多少税 —— 那等于把结论也收起来了。
+    test('结果页：主数字下面还有两个关键数（税额 / 到手），且排成一行', () => {
+        const card = toResult('forward');
+        const facts = card.querySelectorAll('.dw-result-keyfacts .dw-result-keyfact');
+        expect(facts.length).toBeGreaterThanOrEqual(1);
+        expect(facts.length).toBeLessThanOrEqual(2);
+        facts.forEach((f) => {
+            expect(f.querySelector('.dw-result-keyfact__label').textContent.trim().length).toBeGreaterThan(0);
+            expect(f.querySelector('.dw-result-keyfact__value').textContent.trim().length).toBeGreaterThan(0);
+        });
+        // 关键数排在 hero 之后、明细之前（顺序错了就不是"摘要"，是又一组散数）
+        const order = Array.from(card.querySelectorAll('#dw-result-hero, .dw-result-keyfacts, .dw-detail-box'))
+            .map((n) => n.className.split(' ')[0]);
+        expect(order.indexOf('dw-result-keyfacts')).toBeGreaterThan(order.indexOf('dw-result-hero'));
+        expect(order.indexOf('dw-result-keyfacts')).toBeLessThan(order.indexOf('dw-detail-box'));
+
+        // 两格并排写在 CSS 里（手机上回一列）
+        const css = fs.readFileSync(path.join(__dirname, '../src/css/toolbox.css'), 'utf8');
+        expect(css).toMatch(/\.dw-result-keyfacts\s*\{[\s\S]{0,160}?grid-template-columns:\s*repeat\(2/);
     });
 });

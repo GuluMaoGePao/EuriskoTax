@@ -1,6 +1,6 @@
 // 主页（工作台）单元测试
 // 覆盖 home-ui.js 的渲染逻辑和事件绑定
-// 包含：问候语、今日税感、最近计算、税务日历、税务小贴士、模式卡片点击
+// 包含：问候语、今日税感、最近计算、税务日历、税务小贴士
 
 const { loadSource } = require('./helpers/load-source');
 
@@ -24,31 +24,9 @@ beforeEach(() => {
                 <!-- (v1.139.0) 原「卡片1：欢迎」删掉：问候语 / 日期 / 今日税感 / 小贴士
                      现在都在 Hero（#home-mission）里，这里再放一份就是重复 id ——
                      getElementById 只取第一个，测试会因此测到一份页面上并不存在的 DOM。 -->
-                <!-- 卡片2：模式选择 -->
-                <div class="home-card">
-                    <div class="home-card-header">
-                        <div class="home-card-title"><span>开始计算</span></div>
-                    </div>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div class="mode-card mode-card-primary" id="forward-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="forward"><i class="fa fa-info-circle"></i></button>
-                            <button id="forward-mode-btn" class="hidden"></button>
-                        </div>
-                        <div class="mode-card mode-card-accent" id="business-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="business"><i class="fa fa-info-circle"></i></button>
-                            <button id="business-mode-btn" class="hidden"></button>
-                        </div>
-                        <div class="mode-card mode-card-success" id="classification-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="classification"><i class="fa fa-info-circle"></i></button>
-                            <button id="classification-mode-btn" class="hidden"></button>
-                        </div>
-                        <div class="mode-card mode-card-secondary" id="reverse-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="reverse"><i class="fa fa-info-circle"></i></button>
-                            <button id="reverse-mode-btn" class="hidden"></button>
-                        </div>
-                    </div>
-                </div>
-                <!-- 卡片3：最近计算 -->
+                <!-- v1.142.0：原「卡片2：模式选择」（4 张写死的 mode-card）已随入口统一删除。
+                     找完整测算的路径是：底部「工具」→「完整测算」组 —— 与其它工具同一张列表。 -->
+                <!-- 最近计算 -->
                 <div class="home-card">
                     <div class="home-card-header">
                         <div class="home-card-title"><span>最近计算</span></div>
@@ -279,57 +257,11 @@ describe('主页 - 税务小贴士渲染', () => {
     });
 });
 
-// ====== 事件绑定：模式卡片点击 ======
-describe('主页 - 模式卡片事件绑定', () => {
-    test('点击综合所得卡片应触发 forward-mode-btn', () => {
-        const btn = document.getElementById('forward-mode-btn');
-        const clickSpy = jest.spyOn(btn, 'click');
-
-        document.getElementById('forward-mode-card').click();
-        expect(clickSpy).toHaveBeenCalled();
-    });
-
-    test('点击经营所得卡片应触发 business-mode-btn', () => {
-        const btn = document.getElementById('business-mode-btn');
-        const clickSpy = jest.spyOn(btn, 'click');
-
-        document.getElementById('business-mode-card').click();
-        expect(clickSpy).toHaveBeenCalled();
-    });
-
-    test('点击分类所得卡片应触发 classification-mode-btn', () => {
-        const btn = document.getElementById('classification-mode-btn');
-        const clickSpy = jest.spyOn(btn, 'click');
-
-        document.getElementById('classification-mode-card').click();
-        expect(clickSpy).toHaveBeenCalled();
-    });
-
-    test('点击反向倒算卡片应触发 reverse-mode-btn', () => {
-        const btn = document.getElementById('reverse-mode-btn');
-        const clickSpy = jest.spyOn(btn, 'click');
-
-        document.getElementById('reverse-mode-card').click();
-        expect(clickSpy).toHaveBeenCalled();
-    });
-
-    test('点击 info 按钮不应触发模式按钮 click', () => {
-        const btn = document.getElementById('forward-mode-btn');
-        const clickSpy = jest.spyOn(btn, 'click');
-
-        const infoBtn = document.querySelector('[data-mode-info="forward"]');
-        infoBtn.click();
-
-        expect(clickSpy).not.toHaveBeenCalled();
-    });
-
-    test('点击 info 按钮应调用 showAlert', () => {
-        const infoBtn = document.querySelector('[data-mode-info="forward"]');
-        infoBtn.click();
-
-        expect(global.showAlert).toHaveBeenCalled();
-    });
-});
+// ====== v1.142.0：原「模式卡片事件绑定」整组删除 ======
+// 那组测的是首页 4 张写死的 mode-card（综合所得 / 经营所得 / 分类所得 / 反向倒算）→
+// 卡里隐藏按钮的转发。卡已在 v1.139.0 撤出首页、v1.142.0 连同工具箱那份一起删除，
+// 入口统一走「工具 → 完整测算 → 同一张列表」。这里留一句给后来人：
+// 若哪天又要往首页钉一张测算卡，它的点击必须通向 openTool(id)，而不是某颗隐藏按钮。
 
 // ====== 事件绑定：其他交互 ======
 describe('主页 - 其他交互绑定', () => {

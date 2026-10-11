@@ -1,10 +1,10 @@
-// 首页「我是谁」= 设置默认视角（阶段19-2 遗留清偿③ · plan §3.3.4）
+// 首页「我是谁」= 设置默认视角（阶段19-2 遗留清偿③ · plan §3.3.4 · v1.142.0 收敛）
 // 钉的是三条最容易被人改回去的规矩：
 //   1. 身份**不是筛选** —— 点卡不跳页、不藏入口；「看这类工具」才跳，且其余入口照常在；
 //   2. 身份**不写计税档案** —— 档案 identity 是计税口径（3 个值），身份卡有 6 张，
 //      拿导航选择去改计税口径，将来算错没人查得到；
-//   3. 身份**不推翻用户的显式选择** —— 用户亲手切过视图之后，身份卡只记住标签，不再改密度。
-// 另外一条：plan 没给默认密度的身份（高管 / 股东）**不编**，只记标签。
+//   3. 身份**必须看得见** —— v1.142.0 之前它还兼带出「简明 / 完整」视图密度，那层取消后
+//      身份一度变成"选完什么都没发生"。现在它只做推荐排序，且要有落点可查可调。
 
 const { loadSource } = require('./helpers/load-source');
 
@@ -32,17 +32,14 @@ beforeEach(() => {
     window.showPage = global.showPage;
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/data/tax-profile.js');
-    loadSource('src/js/ui/mode-pref.js');
     loadSource('src/js/ui/identity-pref.js');
     loadSource('src/js/ui/toolbox-ui.js');
-    window.EuriskoModePref.reset();
     window.EuriskoIdentityPref.reset();
     global.showPage.mockClear();
 });
 
 afterEach(() => {
     delete global.window.EuriskoIdentityPref;
-    delete global.window.EuriskoModePref;
 });
 
 const P = () => window.EuriskoIdentityPref;
@@ -88,41 +85,88 @@ describe('身份视角偏好 · 存储', () => {
     });
 });
 
-// ====== 默认密度：带出，但不推翻用户 ======
-describe('身份视角 · 默认视图密度', () => {
-    test('plan 表给了的按表带出：老板 / 财务 → 完整；上班族 / 自由职业 / HR → 简明', () => {
-        expect(P().modeOf('owner')).toBe('full');
-        expect(P().modeOf('finance')).toBe('full');
-        expect(P().modeOf('employee')).toBe('simple');
-        expect(P().modeOf('freelance')).toBe('simple');
-        expect(P().modeOf('hr')).toBe('simple');
-    });
-
-    test('plan 没给答案的（高管 / 股东）不编：不登记，选它不动密度', () => {
-        expect(P().modeOf('executive')).toBe(null);
-        P().set('executive');
-        expect(window.EuriskoModePref.get()).toBe(window.EuriskoModePref.SIMPLE);
-    });
-
-    test('没切过视图时，选身份会带出该身份的默认密度', () => {
+// ====== v1.142.0：默认密度这一层已删除 ======
+// 身份曾经兼职「带出简明 / 完整」，而视图本身已经取消 —— 一个看不见的东西带不出来，
+// 于是身份在很长一段时间里等于「选完什么都没发生」。这里钉住的是**别把它接回来**：
+// 身份只剩推荐排序这一个可见效果（下面的用例守），不再有第二个模块被它改写。
+describe('身份视角 · 只剩推荐排序这一个效果', () => {
+    test('set / clear 都不再触碰任何"视图"产物（局部存储里只剩身份自身两个键）', () => {
         P().set('finance');
-        expect(window.EuriskoModePref.get()).toBe(window.EuriskoModePref.FULL);
-        expect(window.EuriskoModePref.isExplicit()).toBe(false);
+        const keys = Object.keys(localStorage).filter((k) => /eurisko/i.test(k)).sort();
+        expect(keys).toEqual(['euriskoPrefIdentity']);
+        P().save({ id: 'finance', title: '财务经理', company: '某公司' });
+        const keys2 = Object.keys(localStorage).filter((k) => /eurisko/i.test(k)).sort();
+        expect(keys2).toEqual(['euriskoIdentityProfile', 'euriskoPrefIdentity']);
+    });
+});
+
+// ====== v1.142.0：身份必须"选完就有动静" ======
+// 这些用例的存在理由：身份一度等于"存了一行字符串"。当时它唯一的动作是带出视图密度，
+// 而视图取消了以后，选完身份什么都看不见 —— 没人提，直到用户问「选我是谁有什么用」。
+// 所以下面每条断言的都是**屏幕上出现的东西**，不是又一处 localStorage 的读写。
+describe('身份视角 · 选完必须看得见', () => {
+    test('选过身份后，再打开工具页自动带出「为你推荐」组（不必再去点一次「看这类工具」）', () => {
+        P().set('employee');
+        window.EuriskoToolbox.renderToolbox('');
+        const html = document.getElementById('toolbox-groups').innerHTML;
+        expect(html).toContain('为你推荐');
+        // 并且标记芯片也不隐藏：用户看得见"这是按谁推荐的"
+        expect(document.getElementById('toolbox-scenario-chip').classList.contains('hidden')).toBe(false);
     });
 
-    test('用户亲手切过视图之后，身份不再改密度（只记住标签）', () => {
-        window.EuriskoModePref.set(window.EuriskoModePref.SIMPLE);   // 用户显式选简明
-        expect(window.EuriskoModePref.isExplicit()).toBe(true);
-        P().set('finance');                                          // 这个身份默认是完整
-        expect(P().get()).toBe('finance');
-        expect(window.EuriskoModePref.get()).toBe(window.EuriskoModePref.SIMPLE);
+    test('推荐组是**置顶**而不是只有它 —— 其余组照常渲染（身份不是筛选）', () => {
+        P().set('employee');
+        window.EuriskoToolbox.renderToolbox('');
+        const heads = Array.from(document.querySelectorAll('#toolbox-groups .tool-group'))
+            .map((g) => g.getAttribute('data-group'));
+        expect(heads[0]).toBe('scenario');
+        expect(heads.length).toBeGreaterThan(3);
+        expect(heads).toContain('salary');      // 与上班族推荐组无关的一组，照常在那
     });
 
-    test('取消默认**不动**已生效的密度（撤销身份 ≠ 撤销视图）', () => {
+    test('清掉推荐组（点 chip 的「清除」）后本次会话不再自动回来，但身份本身还在', () => {
         P().set('owner');
-        expect(window.EuriskoModePref.get()).toBe(window.EuriskoModePref.FULL);
-        P().clear();
-        expect(window.EuriskoModePref.get()).toBe(window.EuriskoModePref.FULL);
+        window.EuriskoToolbox.renderToolbox('');
+        document.getElementById('toolbox-scenario-clear').click();
+        expect(document.getElementById('toolbox-groups').innerHTML).not.toContain('为你推荐');
+        expect(P().get()).toBe('owner');            // 不改身份，只是这次不想被推荐
+        window.EuriskoToolbox.renderToolbox('');
+        expect(document.getElementById('toolbox-groups').innerHTML).not.toContain('为你推荐');
+    });
+
+    test('结果页「下一步」按身份排序：推荐的那一件排在前面，工具一个都没少', () => {
+        document.body.insertAdjacentHTML('beforeend', '<div id="quick-next" class="hidden"></div>');
+        // 挑一组「这个工具的下一步里有一部分属于某身份的推荐组、但不全属于」——
+        // 全属于（或全不属于）都证明不了排序发生过，所以这里按数据现挑，
+        // 不写死具体哪一 tool × 哪一身份：改注册表不会让这条守护静默失效。
+        const scenarios = window.EuriskoToolRegistry.scenarios();
+        let picked = null;
+        window.EuriskoToolRegistry.all().concat(window.EuriskoToolRegistry.deep()).some(function (t) {
+            if (!t.nextTools || t.nextTools.length < 2) return false;
+            return scenarios.some(function (s) {
+                const sg = window.EuriskoToolRegistry.byScenario(s.id).map((x) => x.id);
+                const hit = t.nextTools.filter((id) => sg.indexOf(id) >= 0);
+                if (hit.length && hit.length < t.nextTools.length) { picked = { tool: t, scen: s.id }; return true; }
+                return false;
+            });
+        });
+        expect(picked).toBeTruthy();
+        const tool = picked.tool;
+        const idsOf = () => Array.from(document.querySelectorAll('#quick-next .tool-next-item'))
+            .map((el) => el.getAttribute('data-tool-id'));
+
+        window.EuriskoToolbox.renderNextSteps(tool, {}, null);
+        const plain = idsOf();
+        expect(plain).toEqual(tool.nextTools);            // 没选身份时保持 spec 的原顺序
+
+        P().set(picked.scen);
+        window.EuriskoToolbox.renderNextSteps(tool, {}, null);
+        const sorted = idsOf();
+        expect(sorted.slice().sort()).toEqual(plain.slice().sort());   // 一件不多一件不少
+        // 推荐的必须整体排在**前面**（不是混排）：最后一件推荐的早于第一件非推荐的
+        const suggested = window.EuriskoToolRegistry.byScenario(picked.scen).map((t) => t.id);
+        const flags = sorted.map((id) => suggested.indexOf(id) >= 0);
+        expect(flags.lastIndexOf(true)).toBeLessThan(flags.indexOf(false));
     });
 });
 
@@ -167,7 +211,7 @@ describe('身份卡 · 设为默认视角', () => {
         cardOf('owner').querySelector('.scenario-pick').click();
         expect(note().classList.contains('hidden')).toBe(false);
         expect(note().textContent).toContain('个体户 / 小店');
-        expect(note().textContent).toContain('当前视图：完整');
+        expect(note().textContent).toContain('默认视角');
         // 入口总数从注册表算（20 速算 + 21 deep），不写死 41
         expect(note().textContent).toContain('共 41 个入口仍然都能用');
         note().querySelector('.identity-note-clear').click();
