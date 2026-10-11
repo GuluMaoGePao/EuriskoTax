@@ -79,7 +79,8 @@ EuriskoTax
 │   │   ├── prefer 税优与养老 ....... 3（个人养老金/税优健康险/企业年金）
 │   │   ├── social 社保与用工 ....... 3（社保公积金/企业用工成本/残保金）
 │   │   └── corp 企业与经营 ......... 4（增值税/企业所得税/附加税印花/个体经营所得）
-│   └── 【完整测算】19 个 ── status:deep，**全部 spec 驱动**（无独立页，共用 P15 `#deep-wizard-page`）
+│   └── 【完整测算】21 个 ── status:deep，**全部 spec 驱动**（无独立页，共用 P15 `#deep-wizard-page`）
+│       └ 工具页内按 5 个场景组分小节；19 个是旧口径（2026-09 前），当前 21 个
 │       ├── 17B 反向迁移回来的 4 个：business 经营所得（v1.46.0/v1.47.0）
 │       │   / reverse 反向倒算·谈薪（v1.48.0）/ forward 综合所得（v1.49.0，27 个字段三步）
 │       │   / classification 分类所得（**v1.50.0，最后一块**：四类所得 × repeater 动态增删条目）
@@ -128,8 +129,8 @@ EuriskoTax
      → 返回工具页（明确不回首页）
 
 【路径 B｜完整测算：值钱的深任务】
-工具页 → 「完整测算」组 → 20 个入口之一
-                          └ 全是 spec 驱动 21 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
+工具页 → 「完整测算」组 → 21 个入口之一（组内再分 5 个小节）
+                          └ 全是 spec 驱动的 21 张卡 → P15 通用向导（共用 1 个容器，内容按 spec 渲染）
        → 向导多步（按 spec 的 steps，①…④ 不等；v1.46.0 起页面式归零，常驻预览条随页面一并删除）
        → 结果区（推导链 / 明细 / 预算表 / 优化建议）
        → 保存 · 导出 PDF/Word · 留资引导（reverse 被硬排除）
@@ -221,17 +222,22 @@ EuriskoTax
 ```
 ┌─ tools-page ──────────────────────────────────────────────────────┐
 │ 搜索框 #toolbox-search 550（150ms 防抖）                          │
-│ 身份筛选 chip #toolbox-scenario-chip 552（清除 ›）                 │
-│ ─ #toolbox-groups 553 ← renderToolbox() 动态注入 ─────────────── │
-│   · 最近使用（有则显示，含「清空最近使用」#toolbox-recent-clear）   │
-│   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张工具卡    │
-│ ─ #toolbox-deep 558「完整测算」静态 4 张 mode-card ──────────────── │
-│   · forward 566 │ business 578 │ classification 590 │ reverse 602   │
-│ ─ #toolbox-deep-extra 618 ← 阶段17 spec 驱动入口（现 16 张：vat / cit / social / surtax-stamp│
-│   / fee + 反向迁移来的 business / reverse / forward / classification + 17D 的 withholding /  │
-│   bonus-tax / equity / severance / early-retirement / expat + donation / property-transfer） │
+│ 类型筛选 chip #toolbox-type-filter（全部 / 速算 / 完整测算，会话级，不落存储）  │
+│ 场景锚点 chip #toolbox-anchors（桌面 sticky；chip 存 **DOM id**，见下）    │
+│ 身份推荐 chip #toolbox-scenario-chip 552（清除 ›）                        │
+│ ─ #toolbox-groups 553 ← renderToolbox() 动态注入 ───────────────────── │
+│   · 最近使用（有则显示，含「清空最近使用」#toolbox-recent-clear）         │
+│   · 为你推荐（选过身份时置顶）                                          │
+│   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张速算器卡       │
+│ ─ #toolbox-deep「完整测算」← 21 张卡全部由 renderDeepEntries() 渲染 ── │
+│   · 组内再按同一套 5 个场景组分小节（.tool-subsec，id = deepsec-<组>）    │
+│   · X-deep 继承孪生速算器的 group 与别名；7 个单版在 spec 上写 group     │
+│   · 搜索时只渲染命中的卡，不再是"摊开 21 张自己找"                     │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+> v1.142.0 之前这里写的是「`#toolbox-deep` 静态 4 张 mode-card + `#toolbox-deep-extra` 动态 16 张」，
+> 那已是上一版删掉的东西：现在两张表合成一张，新增完整测算只改注册表。
 
 | 功能入口 | → 去向 | 实现 |
 |---|---|---|
@@ -477,7 +483,7 @@ EuriskoTax
 | **我的** | Tab「我的」、顶栏 `#profile-link`、首页「全部 ›」 |
 | **5 个 profile 子页** | `profile-page` 的 9 张卡发射 |
 | **通用速算器页** | 20 张工具卡（唯一入口 `toolbox-ui.js:309`） |
-| **4 个深度页** | 工具页 `#toolbox-deep` 的 4 张 mode-card、助手 `goBonusCalc`、数据管理恢复草稿 |
+| ~~4 个深度页~~ | **已失效**：v1.142.0 起 21 个完整测算全部走 P15 通用向导，`#toolbox-deep` 里不再有 mode-card（`goBonusCalc` 仍可用，落到向导） |
 | **9 个弹窗** | 见 §5 |
 | **站外** | SEO 落地页（页脚 `5416` / SEO 目录页）—— 速算页那颗外跳已改为**站内**税率表弹窗 |
 
