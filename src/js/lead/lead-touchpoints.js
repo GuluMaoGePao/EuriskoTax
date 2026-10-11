@@ -66,7 +66,7 @@
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex items-center gap-2 flex-wrap">' +
                         '<h3 class="font-bold text-gray-800 text-sm">算完先看这三项，参数别填错</h3>' +
-                        '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">' +
+                        '<span class="text-micro font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">' +
                             txt(LEAD.badge, '顾问协助') + '</span>' +
                     '</div>' +
                     '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">' +
@@ -79,7 +79,7 @@
                     '<div class="flex flex-wrap items-center gap-2 mt-3">' +
                         '<button type="button" class="lead-result-cta btn btn-primary text-xs px-4 py-2 rounded-lg"' +
                             ' data-source="' + source + '" data-type="' + type + '">' + txt(LEAD.cta, '找顾问协助 ›') + '</button>' +
-                        '<span class="text-[11px] text-gray-400">' +
+                        '<span class="text-xs text-gray-400">' +
                             txt(LEAD.trustLine, '不采集收入金额 · 测算结果仅供参考，不构成税务建议') + '</span>' +
                     '</div>' +
                 '</div>' +

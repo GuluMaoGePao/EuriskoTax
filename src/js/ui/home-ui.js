@@ -857,7 +857,7 @@
                     <i class="fa fa-inbox"></i>
                     <p>还没有计算记录</p>
                     <span class="empty-hint">
-                        <i class="fa fa-arrow-up text-[10px] mr-1"></i>从上方选择模式开始
+                        <i class="fa fa-arrow-up text-micro mr-1"></i>从上方选择模式开始
                     </span>
                 </div>
             `;

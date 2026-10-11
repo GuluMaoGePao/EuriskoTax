@@ -31,6 +31,12 @@
             }
             .btn {
                 @apply px-4 py-2 rounded-md font-medium transition-all-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
+                /* v1.141.0：.btn 此前**不带字号** —— 于是同一颗 .btn-primary 在留资弹窗里
+                   是 16px（继承 body）、在意见反馈里是 14px（那边额外写了 text-sm），
+                   而后台 admin.css 的 .btn 又一直是 14px。同一个 App 三种按钮字号。
+                   统一到正文档 14px（与 .input-field 同档）；要强调的按钮自己加 text-base。
+                   ⚠️ 触摸区由 padding / min-height 保证，不靠字号 —— 见 .input-field 那条。 */
+                font-size: var(--fs-sm, 14px);
             }
             .btn-primary {
                 @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
@@ -43,12 +49,22 @@
             }
             .input-field {
                 @apply w-full pr-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+                /* v1.141.0：输入框原先**不带字号**，继承 body 的 16px —— 比周围 14px 的
+                   正文大一档，用户读到的就是"输入框里的字过大"；而 .modal-form 里又被
+                   单独收口到 14px（v1.133.0），于是弹窗内外两档并存、新控件还得逐个补
+                   text-sm。这里一处收口：静态一律 14px，与正文 / 表单标签同档。
+                   iOS 的那条约束（聚焦字号 < 16px 会整页缩放）交给下面的聚焦态兜底。 */
+                font-size: var(--fs-sm, 14px);
             }
             .input-field.input-error {
                 @apply border-danger focus:ring-danger/50 focus:border-danger;
             }
             .label {
-                @apply block text-sm font-medium text-gray-700 mb-1;
+                /* v1.141.0：text-sm(14) → text-xs(12)。字段标签此前与**输入内容同字号**
+                   （输入框静态 14px），两者只靠颜色区分，读上去是同一层；
+                   而留资弹窗那套最考究的表单用的是 12px 标签 —— 同一个 App 两种标签字号。
+                   统一到 12px：比输入内容小一档，标签与内容的层级靠字号就能分开。 */
+                @apply block text-xs font-medium text-gray-700 mb-1;
             }
             .form-group {
                 @apply mb-4;
@@ -298,7 +314,12 @@
                 @apply scale-95;
             }
             .profile-sub-nav-title {
-                @apply absolute left-1/2 -translate-x-1/2 text-gray-700 font-semibold text-sm pointer-events-none;
+                /* v1.141.0：text-sm(14) → text-base(16)。这是二级页的**主标题**，
+                   但它原来和卡片正文同字号 —— 页面名叫不动，反倒是卡片里的 h3 顶着
+                   text-xl(20) 扮演标题，主次是倒的。现在：顶栏主标题 16 · 卡片标题 18 ·
+                   正文 14 · 说明 12，页面名与内容标题各就各位。
+                   ⚠️ 顶栏只有 44px 高，16 是它能容纳的上限，别再往上加。 */
+                @apply absolute left-1/2 -translate-x-1/2 text-gray-700 font-semibold text-base pointer-events-none;
                 max-width: 70%;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -664,7 +685,10 @@
 
             @media (max-width: 640px) {
                 .calc-preview-value { @apply text-xs; }
-                .calc-preview-label { @apply text-[10px]; }
+                /* v1.141.0：text-[10px] → text-micro(11)。10px 比全站最小档还小 ——
+                   手机上的预览标签是「下月应缴」这种要认的字，不该比徽章还小。
+                   （值仍是 14 → 12 的手机收缩档，但收缩的下限是 11，不是随手写 10。） */
+                .calc-preview-label { @apply text-micro; }
                 /* py-2 → py-1.5：预览条是常驻固定层，手机上每 2px 都是从表单里抢的 */
                 .calc-preview-grid { @apply py-1.5; }
             }
@@ -692,6 +716,14 @@
                 }
                 select.input-field {
                     min-height: 40px;
+                }
+                /* iOS Safari 对 font-size < 16px 的输入框会在聚焦时**整页缩放**（站内已有
+                   前例：.assistant-search 就是为它写的 16px）。静态字号已经统一到 14px，
+                   所以这里只在**聚焦这一刻**补回 16px —— 高度由上面的 min-height 钉住，
+                   不会抖；桌面不受影响（桌面没有这条缩放行为，也不该看到字号跳变）。 */
+                .input-field:focus,
+                textarea.input-field:focus {
+                    font-size: var(--fs-base, 16px);
                 }
                 /* 步骤数字加大触摸区 */
                 .step-number {

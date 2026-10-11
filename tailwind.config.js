@@ -76,6 +76,20 @@ module.exports = {
                     '-apple-system', 'BlinkMacSystemFont', 'Segoe UI',
                     'Helvetica Neue', 'Arial', 'sans-serif']
             },
+            // === 字号阶梯（v1.141.0）===
+            // 全站字号此前是「Tailwind 默认档 + 两处任意值」混着写：text-[11px] 54 处、
+            // text-[10px] 25 处、text-[15px] 2 处，同一个「次级说明」在相邻两个弹窗里
+            // 可能一个是 11px 一个是 12px。任意值的问题不是值本身，是**它绕过了阶梯** ——
+            // 下次调整 11→12 时，54 处里改漏 3 处就又是三种字号。
+            // 这里把规范里唯一缺的工具类补上（micro = 11px = tokens 的 --fs-micro，
+            // 即规范写明的**字号下限**），其余档位与 Tailwind 默认同值，不重复造：
+            //   micro 11（徽章 / 角标，下限）· xs 12（次级说明）· sm 14（正文 / 表单标签）
+            //   base 16（桌面正文；输入框**聚焦态**，防 iOS 缩放）· lg 18（弹窗标题）
+            // 带 fallback 的理由同上方 textColor：admin.html 不加载 tokens.css，
+            // 缺变量时退回 11px 而不是变成无效值（见 admin.src.css 的编译产物）。
+            fontSize: {
+                micro: 'var(--fs-micro, 11px)'
+            },
             boxShadow: {
                 'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'

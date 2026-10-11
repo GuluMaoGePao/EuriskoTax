@@ -606,10 +606,15 @@ describe('底栏避让 padding 的锚点', () => {
         expect(declarationsOnly).not.toMatch(/\.max-w-/);
     });
 
-    test('两个顶层页各自标出一个 data-page-container', () => {
-        ['mode-selection-page', 'tools-page'].forEach((id) => {
+    // v1.141.0：原本只守「两个顶层页」—— 那是当时首页与工具页标了锚点、「我的」页漏标
+    // （于是它的 pb-6 顶不住 52px 底栏，手机端最后一张卡被压住一截）。现在三页都标了，
+    // 断言跟着补齐，漏标第四页时这里会红。
+    // 窗口 600 → 1200：容器前面是几段"为什么这么写"的注释，长度会随版本增长；
+    // 它是切块用的尺子，不是约束 —— 给足余量，免得下次补一句注释就误判成没标锚点。
+    test('三个顶层页各自标出一个 data-page-container', () => {
+        ['mode-selection-page', 'tools-page', 'profile-page'].forEach((id) => {
             const fromPage = html.slice(html.indexOf(`id="${id}"`));
-            expect(fromPage.slice(0, 600)).toContain('data-page-container');
+            expect(fromPage.slice(0, 1200)).toContain('data-page-container');
         });
     });
 });

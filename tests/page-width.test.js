@@ -44,11 +44,16 @@ describe('顶层内页：同一条栅格', () => {
         });
     });
 
-    // 这条守的是「同是 max-w-5xl 却差 32px」：首页原先不带 px-4（左右内距靠父级
-    // .container 给），另两页自带 —— 桌面 1024 vs 992，手机 326 vs 358。
-    test('三个容器都自带 px-4（左右内距不许推给父级）', () => {
+    // 这条守的是「同是 max-w-5xl 却差 32px」：首页原先不带左右内距（靠父级 .container 给），
+    // 另两页自带 —— 桌面 1024 vs 992，手机 326 vs 358。
+    // v1.141.0：内距档位从 px-4(16) 提到 px-5 sm:px-6(20 / 24) —— 卡片到屏幕边缘
+    // 只有 32px，贴边发闷。断言跟着改成守**同一档**（px-5 + sm:px-6），不再钉死 16px：
+    // 这条测试守的是"三页不许各写一条栅格"，不是"内距必须是 16"。
+    test('三个容器自带同一档左右内距（px-5 sm:px-6）', () => {
         TOP_PAGES.forEach((id) => {
-            expect(containerClassOf(id)).toContain('px-4');
+            const cls = containerClassOf(id);
+            expect(cls).toContain('px-5');
+            expect(cls).toContain('sm:px-6');
         });
     });
 
@@ -72,11 +77,14 @@ describe('顶层内页：同一条栅格', () => {
 });
 
 describe('「我的」二级页：同宽 + 面包屑对齐', () => {
-    test('六个二级页容器同宽（max-w-3xl + px-4）', () => {
+    // v1.141.0：内距档位随顶层页一起提到 px-5 sm:px-6（二级页与顶层页共用同一条栅格，
+    // 只改顶层会让二级页反倒比它宽）。
+    test('六个二级页容器同宽（max-w-3xl + px-5 sm:px-6）', () => {
         SUB_PAGES.forEach((id) => {
             const cls = containerClassOf(id);
             expect(cls).toContain('max-w-3xl');
-            expect(cls).toContain('px-4');
+            expect(cls).toContain('px-5');
+            expect(cls).toContain('sm:px-6');
         });
     });
 

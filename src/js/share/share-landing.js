@@ -43,7 +43,7 @@
                     '<p class="text-xs text-gray-600 mt-1 leading-relaxed">填入收入和扣除，30 秒算出税后收入与汇算结论；数据只存在本机。</p>' +
                     '<div class="flex flex-wrap items-center gap-2 mt-3">' +
                         '<button type="button" id="share-landing-cta" class="btn btn-primary text-xs px-4 py-2 rounded-lg">算出我的结果</button>' +
-                        '<span class="text-[11px] text-gray-500">免费使用 · 不采集收入金额</span>' +
+                        '<span class="text-xs text-gray-500">免费使用 · 不采集收入金额</span>' +
                     '</div>' +
                 '</div>' +
                 '<button type="button" id="share-landing-close" aria-label="关闭" ' +

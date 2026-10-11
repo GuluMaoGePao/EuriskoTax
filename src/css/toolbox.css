@@ -21,7 +21,9 @@
     padding: 8px 12px 8px 34px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    font-size: 13px;
+    /* v1.141.0：13px → 14（--fs-sm）。13 是这个文件自己长出来的一档，全站没有它的位置：
+       正文与输入内容一律 14，说明一律 12。搜索框是**输入**，归到输入档。 */
+    font-size: var(--fs-sm);
     background: #f9fafb;
     outline: none;
     transition: border-color .2s, background .2s;
@@ -30,6 +32,14 @@
 .tool-search:focus {
     border-color: #1e40af;
     background: #fff;
+}
+
+/* 与 .input-field / .tool-input 同款（v1.141.0）：iOS Safari 对 font-size < 16px 的输入框
+   **聚焦时整页缩放**。搜工具是工具页唯一的手填入口，同样只在聚焦这一刻补回 16px。 */
+@media (max-width: 640px) {
+    .tool-search:focus {
+        font-size: 16px;
+    }
 }
 
 /* ====== T1（阶段20 P2）：类型筛选 chip ======
@@ -141,13 +151,16 @@
 }
 
 .tool-group-title {
-    font-size: 13px;
+    /* v1.141.0：13 → 14（--fs-sm）。组标题是**小节标题**（14 档），13 是不在阶梯上的私档。 */
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #1f2937;
 }
 
 .tool-group-desc {
-    font-size: 11px;
+    /* v1.141.0：11 → 12（--fs-xs）。11 是**装饰性下限**（徽章 / 角标），
+       「按年填全 · 出完整预算表…」是要读完的一句说明，归到次级说明档 12。 */
+    font-size: var(--fs-xs);
     color: var(--c-text-3);
 }
 
@@ -209,7 +222,8 @@
 }
 
 .tool-entry-title {
-    font-size: 13px;
+    /* v1.141.0：13 → 14。工具卡标题是**列表项标题**（14 档）。 */
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: #1f2937;
     display: flex;
@@ -219,7 +233,9 @@
 }
 
 .tool-entry-desc {
-    font-size: 11px;
+    /* v1.141.0：11 → 12。这一行是**说明**（工具干什么用），不是角标 —— 虽然单行省略，
+       它仍是要读的句子，11px 在中文小屏上会读漏。 */
+    font-size: var(--fs-xs);
     color: #6b7280;
     margin-top: 2px;
     overflow: hidden;
@@ -234,7 +250,9 @@
 
 /* ====== 徽标 ====== */
 .tool-badge {
-    font-size: 10px;
+    /* v1.141.0：10 → 11（--fs-micro）。徽章是全站最小的一档，但它的下限是 11 ——
+       10px 的中文角标在手机上已经不是"小"，是糊。 */
+    font-size: var(--fs-micro);
     line-height: 1.4;
     padding: 1px 6px;
     border-radius: 999px;
@@ -308,6 +326,15 @@
     transition: border-color .2s, box-shadow .2s;
 }
 
+/* 与 .input-field 同款（v1.141.0）：iOS Safari 对 font-size < 16px 的输入框会在聚焦时
+   **整页缩放**。工具页 / 批量页的输入框跟 .input-field 一样是静态 14px，所以这里同样
+   只在聚焦这一刻补回 16px —— 静态观感保持与正文同档，缩放交给按需触发。 */
+@media (max-width: 640px) {
+    .tool-input:focus {
+        font-size: 16px;
+    }
+}
+
 .tool-input:focus {
     border-color: #1e40af;
     /* 焦点环：取全站唯一的 --sh-focus。
@@ -330,13 +357,15 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    /* v1.141.0：13 → 14。开关旁边那句标签是正文，不是说明。 */
+    font-size: var(--fs-sm);
     color: #374151;
 }
 
 .tool-field-hint {
     margin-top: 4px;
-    font-size: 11px;
+    /* v1.141.0：11 → 12。字段提示是说明档 12，11 是徽章档。 */
+    font-size: var(--fs-xs);
     color: var(--c-text-3);
     line-height: 1.5;
 }
@@ -375,7 +404,8 @@
     gap: 12px;
     padding: 7px 0;
     border-bottom: 1px dashed #eef0f3;
-    font-size: 13px;
+    /* v1.141.0：13 → 14。结果行是**正文**（要读的数字与名目），不是说明。 */
+    font-size: var(--fs-sm);
 }
 
 .tool-result-row:last-child {
@@ -404,7 +434,9 @@
     padding: 10px 12px;
     border-radius: 8px;
     background: #f9fafb;
-    font-size: 11.5px;
+    /* v1.141.0：11.5 → 12（--fs-xs）。半像素档位是排版没被管过的痕迹：
+       结果备注是要读完的一段话，归到次级说明档 12，行高 1.7 保留。 */
+    font-size: var(--fs-xs);
     line-height: 1.7;
     color: #6b7280;
 }
@@ -483,7 +515,8 @@
 
 .tool-search-entry-text {
     flex: 1 1 auto;
-    font-size: 13px;
+    /* v1.141.0：13 → 14。首页那个「搜工具：…」入口里的提示字是输入框内容，归输入档 14。 */
+    font-size: var(--fs-sm);
     color: var(--c-text-3);
 }
 
@@ -540,13 +573,15 @@
 }
 
 .scenario-name {
-    font-size: 13px;
+    /* v1.141.0：13 → 14。场景卡名是列表项标题（14 档）。 */
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #1f2937;
 }
 
 .scenario-desc {
-    font-size: 11px;
+    /* v1.141.0：11 → 12。场景说明是一句话说明，不是角标。 */
+    font-size: var(--fs-xs);
     color: #6b7280;
     line-height: 1.4;
 }
@@ -601,7 +636,9 @@
     border-radius: 10px;
     background: #fff;
     cursor: pointer;
-    font-size: 12.5px;
+    /* v1.141.0：12.5 → 14。「算完还能干什么」的条目是**可点的正文**（按钮式列表项），
+       半像素档位不归任何一个档，这里归正文 14 —— 与 .tool-next-head(12) 拉开一档。 */
+    font-size: var(--fs-sm);
     color: #374151;
     text-align: left;
     transition: border-color .2s, box-shadow .2s;
@@ -634,7 +671,8 @@
     border-radius: 8px;
     background: #fff;
     color: #1e40af;
-    font-size: 12.5px;
+    /* v1.141.0：12.5 → 14。按钮文字一律 14（与 .btn 同档）。 */
+    font-size: var(--fs-sm);
     font-weight: 600;
     cursor: pointer;
     transition: background .2s;
@@ -705,7 +743,7 @@
    而这里原本写的是 `#tools-page .max-w-3xl` —— 加宽一落地，选择器立刻匹配不到任何元素，
    工具页最后一张卡片被底栏压住，且 jsdom 里看不出来（没有布局，测试照常全绿）。
    宽度是**会被反复调的排版决策**，不该拿它当结构锚点；[data-page-container] 只表达
-   「这是这一页的内容容器」，与宽度解耦。两个顶层页各自在本容器的第一个 div 上标了它。 */
+   「这是这一页的内容容器」，与宽度解耦。三个顶层页各自在本容器的第一个 div 上标了它。 */
 @media (max-width: 767px) {
     body.has-tabbar [data-page-container] {
         padding-bottom: calc(var(--tabbar-h-mobile) + var(--sp-3));

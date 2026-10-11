@@ -251,12 +251,12 @@ function renderOverview(d) {
     const maxUser = Math.max(1, ...trend.map((t) => t.newUsers || 0));
     $('#overview-trend').innerHTML = `<div class="flex items-end justify-between gap-2 pb-1">${trend.map((t) => `
         <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
-            <span class="text-[10px] text-gray-600">${esc(t.newUsers || 0)}</span>
+            <span class="text-micro text-gray-600">${esc(t.newUsers || 0)}</span>
             <div class="w-full max-w-[28px] rounded-t bg-green-400/80" style="height:${Math.max(3, Math.round((t.newUsers || 0) / maxUser * 64))}px"></div>
             <div class="w-full max-w-[28px] rounded-t bg-blue-500/80" style="height:${Math.max(3, Math.round((t.calculations || 0) / maxCalc * 64))}px"></div>
-            <span class="text-[10px] text-gray-500">${esc(String(t.date || '').slice(5))}</span>
+            <span class="text-micro text-gray-500">${esc(String(t.date || '').slice(5))}</span>
         </div>`).join('')}</div>
-        <div class="flex items-center justify-center gap-5 mt-3 text-[11px] text-gray-500">
+        <div class="flex items-center justify-center gap-5 mt-3 text-xs text-gray-500">
             <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500 mr-1 align-middle"></span>计算</span>
             <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-green-400 mr-1 align-middle"></span>注册</span>
         </div>`;
@@ -449,7 +449,7 @@ function renderUserDetail(panel, d) {
                     </div>
                     ${u.plan === 'pro' ? '<button data-act="revoke-pro" data-id="' + u.id + '" class="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"><i class="fa fa-undo mr-1"></i>回落基础版</button>' : ''}
                 </div>
-                <p class="text-[11px] text-gray-600 mt-3">对外授权请优先使用兑换码；「永久」仅用于内部决策（如种子贡献补偿）。</p>
+                <p class="text-xs text-gray-600 mt-3">对外授权请优先使用兑换码；「永久」仅用于内部决策（如种子贡献补偿）。</p>
             </div>
             <div class="space-y-4">
                 <div>
@@ -468,7 +468,7 @@ function renderUserDetail(panel, d) {
                         <div class="text-xs text-gray-600 mb-1.5">
                             <span class="text-gray-600">${fmtShort(c.updated_at)}</span>
                             <span class="px-1.5 py-0.5 rounded bg-gray-100 ml-1">${TYPE_META[c.type] || c.type}</span>
-                            <span class="text-gray-600 mono text-[11px] ml-1">#${c.id}</span>
+                            <span class="text-gray-600 mono text-xs ml-1">#${c.id}</span>
                         </div>`).join('') : '<p class="text-xs text-gray-600">暂无云端计算记录</p>'}
                 </div>
             </div>
@@ -507,8 +507,8 @@ function renderInvites(d) {
         ? avail.map((it) => `
             <div class="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-blue-200">
                 <span class="mono text-xs text-gray-800 flex-1 select-all">${esc(it.code)}</span>
-                <span class="text-[10px] text-gray-600 hidden sm:inline">${fmtShort(it.createdAt)}</span>
-                <button data-act="copy-code" data-code="${esc(it.code)}" class="text-[11px] text-blue-600 hover:text-blue-800 px-1.5 py-1 rounded"><i class="fa fa-copy"></i></button>
+                <span class="text-micro text-gray-600 hidden sm:inline">${fmtShort(it.createdAt)}</span>
+                <button data-act="copy-code" data-code="${esc(it.code)}" class="text-micro text-blue-600 hover:text-blue-800 px-1.5 py-1 rounded"><i class="fa fa-copy"></i></button>
             </div>`).join('')
         : '<p class="py-6 text-center text-gray-600 text-xs">暂无可用邀请码，点右上角「生成邀请码」创建</p>';
     const used = Array.isArray(d.used) ? d.used : [];
@@ -516,8 +516,8 @@ function renderInvites(d) {
         ? used.map((it) => `
             <div class="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-gray-50 border border-gray-100">
                 <span class="mono text-xs text-gray-500 flex-1 select-all">${esc(it.code)}</span>
-                <span class="text-[11px] text-gray-600">→ ${esc(it.usedBy)}</span>
-                <span class="text-[10px] text-gray-300">${fmtShort(it.usedAt)}</span>
+                <span class="text-xs text-gray-600">→ ${esc(it.usedBy)}</span>
+                <span class="text-micro text-gray-300">${fmtShort(it.usedAt)}</span>
             </div>`).join('')
         : '<p class="py-6 text-center text-gray-600 text-xs">暂无已使用的邀请码</p>';
 }
@@ -589,14 +589,14 @@ function renderProCodes(d) {
         const owner = it.usedByName
             ? `${esc(it.usedByName)} <span class="text-gray-600">#${it.usedBy}</span>`
             : (it.usedBy !== null && it.usedBy !== undefined ? `<span class="text-gray-600">#${it.usedBy}</span>` : '—');
-        const ownerMeta = it.usedAt ? `<div class="text-[10px] text-gray-300">${fmtShort(it.usedAt)}</div>` : '';
+        const ownerMeta = it.usedAt ? `<div class="text-micro text-gray-300">${fmtShort(it.usedAt)}</div>` : '';
         // 已兑换的码为收款凭证，不允许作废（后端亦会拒绝）
         const op = it.status === 'used'
             ? '<span class="text-xs text-gray-300">—</span>'
             : `<button data-act="toggle-procode" data-id="${it.id}" data-disabled="${it.disabled ? 'true' : 'false'}" class="px-2.5 py-1 rounded-lg text-xs ${it.disabled ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}"><i class="fa ${it.disabled ? 'fa-rotate-left' : 'fa-ban'} mr-1"></i>${it.disabled ? '恢复' : '作废'}</button>`;
         return `<tr class="hover:bg-gray-50">
             <td class="py-2 pr-3"><span class="mono text-xs text-gray-800 select-all">${esc(it.code)}</span>
-                <button data-act="copy-procode" data-code="${esc(it.code)}" class="text-[11px] text-blue-600 hover:text-blue-800 px-1 ml-1 rounded"><i class="fa fa-copy"></i></button></td>
+                <button data-act="copy-procode" data-code="${esc(it.code)}" class="text-xs text-blue-600 hover:text-blue-800 px-1 ml-1 rounded"><i class="fa fa-copy"></i></button></td>
             <td class="py-2 pr-3"><span class="text-xs border rounded-full px-2 py-0.5 ${meta.cls}">${meta.label}</span></td>
             <td class="py-2 pr-3 text-xs text-gray-600">${validity}</td>
             <td class="py-2 pr-3 text-xs text-gray-500">${it.batch ? esc(it.batch) : '—'}</td>
@@ -804,7 +804,7 @@ function renderContentList() {
             </div>
             <div class="text-sm font-medium text-gray-800 mb-1 break-words">${esc(head)}</div>
             <div class="text-xs text-gray-500 leading-relaxed mb-2 break-words">${esc(preview)}${String(raw).length > 120 ? '…' : ''}</div>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
                 <span><i class="fa fa-map-marker mr-1"></i>${esc(pls.join(' / ') || '未设置展示位')}</span>
                 <span>优先级 ${it.priority || 0}</span>
                 <span>上线 ${fmtShort(it.publish_at)}</span>
@@ -833,7 +833,7 @@ function contentField(label, inner, hint) {
     return `<div>
         <label class="block text-xs font-semibold text-gray-500 mb-1">${label}</label>
         ${inner}
-        ${hint ? `<p class="text-[11px] text-gray-600 mt-1">${hint}</p>` : ''}
+        ${hint ? `<p class="text-xs text-gray-600 mt-1">${hint}</p>` : ''}
     </div>`;
 }
 
@@ -1206,7 +1206,7 @@ function renderSupport() {
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="px-2 py-0.5 rounded-full border ${meta.cls} text-xs font-semibold">${meta.label}</span>
                     <span class="text-sm font-bold text-gray-800">${esc(it.title)}</span>
-                    ${it.priority ? `<span class="text-[10px] text-gray-600">优先级 ${it.priority}</span>` : ''}
+                    ${it.priority ? `<span class="text-micro text-gray-600">优先级 ${it.priority}</span>` : ''}
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
                     <button data-act="support-copy" data-key="${esc(it.script_id)}" class="px-2.5 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"><i class="fa fa-copy mr-1"></i>复制话术</button>
@@ -1237,7 +1237,7 @@ function openSupportEditor(id) {
     box.innerHTML = `
         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 class="text-sm font-bold text-gray-800">${item ? '编辑话术' : '新增话术'}</h3>
-            <span class="text-[11px] text-gray-600">话术中的 <span class="mono">{RESET_URL}</span> 会替换为当前站点的 /reset 短链</span>
+            <span class="text-xs text-gray-600">话术中的 <span class="mono">{RESET_URL}</span> 会替换为当前站点的 /reset 短链</span>
         </div>
         <div class="grid sm:grid-cols-2 gap-3 mb-3">
             <label class="block"><span class="text-xs text-gray-500">问题标题 *</span>
@@ -1404,7 +1404,7 @@ function trClassificationTable(cls) {
                 <tbody class="divide-y divide-gray-100">${rows}</tbody>
             </table>
         </div>
-        <p class="text-[11px] text-gray-600 mt-1">键（interest / rent / transfer / accidental）为计算逻辑引用标识，请勿修改。</p>
+        <p class="text-xs text-gray-600 mt-1">键（interest / rent / transfer / accidental）为计算逻辑引用标识，请勿修改。</p>
     </div>`;
 }
 
@@ -1417,7 +1417,7 @@ function taxRatesEditorHtml(model) {
     return `<div class="bg-white rounded-xl border border-gray-200 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h3 class="text-sm font-bold text-gray-800">编辑配置 <span class="text-xs font-normal text-gray-600">（${esc(model.sourceLabel || '')}）</span></h3>
-            <span class="text-[11px] text-gray-600">当前生效版本：${esc(model.sourceVersion || '—')}</span>
+            <span class="text-xs text-gray-600">当前生效版本：${esc(model.sourceVersion || '—')}</span>
         </div>
         <div class="grid sm:grid-cols-2 gap-3 mb-4">
             <label class="block"><span class="text-xs text-gray-500">版本号（留空自动生成 YYYY.MM.DD-N）</span>
@@ -1464,9 +1464,9 @@ function renderTaxRatesHistory() {
     box.innerHTML = items.length ? items.map((h) => `<div class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2">
         <div class="min-w-0">
             <div class="text-xs font-semibold text-gray-700">${esc(h.version)}
-                <span class="ml-1 text-[11px] ${h.status === 'published' ? 'text-green-600' : 'text-gray-600'}">${h.status === 'published' ? '生效中' : '历史'}</span>
+                <span class="ml-1 text-xs ${h.status === 'published' ? 'text-green-600' : 'text-gray-600'}">${h.status === 'published' ? '生效中' : '历史'}</span>
             </div>
-            <div class="text-[11px] text-gray-600 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
+            <div class="text-xs text-gray-600 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
         </div>
         <button data-act="taxrates-rollback" data-id="${h.id}" data-version="${esc(h.version)}" ${h.status === 'published' ? 'disabled' : ''}
             class="shrink-0 px-2.5 py-1.5 rounded-lg text-xs ${h.status === 'published' ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}">
@@ -1705,7 +1705,7 @@ function csCityRow(c, i) {
         <td class="px-2 py-2"><input data-cs="${i}|note" class="${CS_INPUT} w-40" value="${esc(c.note || '')}" placeholder="口径来源 / 备注"></td>
         <td class="px-2 py-2 text-right">
             ${isFallback
-        ? '<span class="text-[11px] text-gray-600 whitespace-nowrap">兜底城市</span>'
+        ? '<span class="text-xs text-gray-600 whitespace-nowrap">兜底城市</span>'
         : `<button data-act="citysocial-del" data-id="${i}" class="px-2 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 whitespace-nowrap"><i class="fa fa-trash-o"></i></button>`}
         </td>
     </tr>`;
@@ -1727,7 +1727,7 @@ function citySocialEditorHtml(model) {
     return `<div class="bg-white rounded-xl border border-gray-200 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h3 class="text-sm font-bold text-gray-800">编辑配置 <span class="text-xs font-normal text-gray-600">（${esc(model.sourceLabel || '')}）</span></h3>
-            <span class="text-[11px] text-gray-600">当前生效版本：${esc(model.sourceVersion || '—')}</span>
+            <span class="text-xs text-gray-600">当前生效版本：${esc(model.sourceVersion || '—')}</span>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <label class="block"><span class="text-xs text-gray-500">参数版本号（随配置下发，用于用户端展示）</span>
@@ -1762,7 +1762,7 @@ function citySocialEditorHtml(model) {
             </table>
         </div>
         <div class="flex items-center justify-between gap-2 mb-4">
-            <p class="text-[11px] text-gray-600">基数单位：元/月。上限留空=不设上限；公积金比例用英文逗号分隔（如 5,7）。</p>
+            <p class="text-xs text-gray-600">基数单位：元/月。上限留空=不设上限；公积金比例用英文逗号分隔（如 5,7）。</p>
             <button data-act="citysocial-add" class="bg-gray-100 text-gray-600 text-xs rounded-lg px-3 py-1.5 hover:bg-gray-200"><i class="fa fa-plus mr-1"></i>新增城市</button>
         </div>
         <div class="border-t border-gray-100 pt-4 mb-4">
@@ -1808,9 +1808,9 @@ function renderCitySocialHistory() {
     box.innerHTML = items.length ? items.map((h) => `<div class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2">
         <div class="min-w-0">
             <div class="text-xs font-semibold text-gray-700">${esc(h.version)}
-                <span class="ml-1 text-[11px] ${h.status === 'published' ? 'text-green-600' : 'text-gray-600'}">${h.status === 'published' ? '生效中' : '历史'}</span>
+                <span class="ml-1 text-xs ${h.status === 'published' ? 'text-green-600' : 'text-gray-600'}">${h.status === 'published' ? '生效中' : '历史'}</span>
             </div>
-            <div class="text-[11px] text-gray-600 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
+            <div class="text-xs text-gray-600 truncate">${esc(h.note || '—')} · ${fmtTime(h.publishedAt || h.createdAt)}</div>
         </div>
         <button data-act="citysocial-rollback" data-id="${h.id}" data-version="${esc(h.version)}" ${h.status === 'published' ? 'disabled' : ''}
             class="shrink-0 px-2.5 py-1.5 rounded-lg text-xs ${h.status === 'published' ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}">
@@ -2107,7 +2107,7 @@ function renderLeadFunnel(d) {
         <div class="bg-white rounded-xl border border-gray-200 p-5">
             <h3 class="text-sm font-bold text-gray-600 mb-3"><i class="fa fa-filter text-primary mr-2"></i>跟进漏斗</h3>
             ${bars}
-            <p class="text-[11px] text-gray-600 mt-2">已放弃 ${by.dropped || 0} 条（不计入漏斗）；「今日」按北京时间 UTC+8 边界统计。</p>
+            <p class="text-xs text-gray-600 mt-2">已放弃 ${by.dropped || 0} 条（不计入漏斗）；「今日」按北京时间 UTC+8 边界统计。</p>
         </div>`;
 }
 
@@ -2141,15 +2141,15 @@ function renderConversionFunnel(d) {
         const prevKey = i > 0 ? CONVERSION_STEPS[i - 1].key : null;
         const stepRate = prevKey ? percent(value, steps[prevKey] || 0) : null;
         const tail = i > 0
-            ? `<div class="text-[11px] text-gray-500 mt-1">较上一步 <span class="font-semibold">${fmt(stepRate)}</span></div>`
-            : '<div class="text-[11px] text-gray-600 mt-1">漏斗起点</div>';
+            ? `<div class="text-xs text-gray-500 mt-1">较上一步 <span class="font-semibold">${fmt(stepRate)}</span></div>`
+            : '<div class="text-xs text-gray-600 mt-1">漏斗起点</div>';
         return `<div class="flex-1 min-w-[118px] bg-gray-50 rounded-lg p-3">
             <div class="inline-flex items-center gap-1.5 text-xs font-medium ${s.cls} rounded-lg px-2 py-1">
                 <i class="fa ${s.icon}"></i>${s.label}
             </div>
             <div class="text-2xl font-bold text-gray-800 mt-2">${value}</div>
             ${tail}
-            <div class="text-[11px] text-gray-600">今日 ${today[s.key] || 0}</div>
+            <div class="text-xs text-gray-600">今日 ${today[s.key] || 0}</div>
         </div>`;
     }).join('<div class="self-center text-gray-300 px-0.5"><i class="fa fa-angle-right"></i></div>');
 
@@ -2162,7 +2162,7 @@ function renderConversionFunnel(d) {
             </span>
         </div>
         <div class="flex items-stretch gap-2 flex-wrap">${cells}</div>
-        <p class="text-[11px] text-gray-600 mt-3 leading-relaxed">
+        <p class="text-xs text-gray-600 mt-3 leading-relaxed">
             访问 / 测算 / 点击由埋点上报（<span class="mono">POST /api/stats/funnel</span>，公开端点：含游客、不落 IP 与设备标识）；
             提交线索直接统计 <span class="mono">Lead</span> 表，同一事实只存一处。
             北极星分母用「完成测算」而非「访问」—— 没算完的流量不构成线索机会，用访问当分母会虚高转化率、误导投放判断。
@@ -2191,11 +2191,11 @@ function renderLeadsTable() {
             ? it.city
             : regionParts.join(' · ');
         const cityLine = regionText
-            ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa fa-map-marker mr-1"></i>${esc(regionText)}</div>`
+            ? `<div class="text-xs text-gray-500 mt-0.5"><i class="fa fa-map-marker mr-1"></i>${esc(regionText)}</div>`
             : '';
         const userLine = it.user
-            ? `<div class="text-[11px] text-blue-500 mt-0.5"><i class="fa fa-user-o mr-1"></i>${esc(it.user.username)}（${esc(it.user.email || '')}｜${esc(it.user.plan || '')}）</div>`
-            : '<div class="text-[11px] text-gray-300 mt-0.5">游客留资</div>';
+            ? `<div class="text-xs text-blue-500 mt-0.5"><i class="fa fa-user-o mr-1"></i>${esc(it.user.username)}（${esc(it.user.email || '')}｜${esc(it.user.plan || '')}）</div>`
+            : '<div class="text-xs text-gray-300 mt-0.5">游客留资</div>';
         return `<tr class="align-top">
             <td class="px-3 py-3 text-xs text-gray-600">${it.id}</td>
             <td class="px-3 py-3">
@@ -2205,12 +2205,12 @@ function renderLeadsTable() {
                 ${userLine}
             </td>
             <td class="px-3 py-3 text-xs text-gray-600">${esc(it.company || '—')}
-                <div class="text-[11px] text-gray-600 mt-0.5">${esc(LEAD_ENTITY_LABEL[it.entity_type] || it.entity_type || '未说明')}</div></td>
+                <div class="text-xs text-gray-600 mt-0.5">${esc(LEAD_ENTITY_LABEL[it.entity_type] || it.entity_type || '未说明')}</div></td>
             <td class="px-3 py-3 text-xs text-gray-600">${esc(LEAD_NEED_LABEL[it.need] || it.need || '其他')}</td>
             <td class="px-3 py-3 text-xs">
                 <div class="text-gray-600">${esc(LEAD_SOURCE_LABEL[it.source] || it.source || '未知')}</div>
-                ${it.scene ? `<div class="text-[11px] text-gray-600 mt-0.5">${esc(it.scene)}</div>` : ''}
-                ${it.note ? `<div class="text-[11px] text-gray-500 mt-1 bg-gray-50 border border-gray-100 rounded px-2 py-1 max-w-[240px] whitespace-pre-wrap">${esc(it.note)}</div>` : ''}
+                ${it.scene ? `<div class="text-xs text-gray-600 mt-0.5">${esc(it.scene)}</div>` : ''}
+                ${it.note ? `<div class="text-xs text-gray-500 mt-1 bg-gray-50 border border-gray-100 rounded px-2 py-1 max-w-[240px] whitespace-pre-wrap">${esc(it.note)}</div>` : ''}
             </td>
             <td class="px-3 py-3">
                 <select data-lead-status="${it.id}" class="border rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${LEAD_STATUS_META[statusKey].cls}">${options}</select>

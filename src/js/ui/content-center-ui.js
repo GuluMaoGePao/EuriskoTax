@@ -67,7 +67,7 @@
         return '<div class="border border-gray-200 rounded-lg p-3.5 bg-gray-50/60">' +
             '<div class="flex items-start justify-between gap-2">' +
             '<h4 class="text-sm font-semibold text-gray-800 flex-1">' + esc(title) + '</h4>' +
-            (meta.length ? '<span class="text-[11px] text-gray-400 shrink-0">' + esc(meta.join(' · ')) + '</span>' : '') +
+            (meta.length ? '<span class="text-xs text-gray-400 shrink-0">' + esc(meta.join(' · ')) + '</span>' : '') +
             '</div>' +
             (item.summary && item.summary !== title ? '<p class="text-xs text-gray-600 mt-1.5 leading-relaxed">' + esc(item.summary) + '</p>' : '') +
             (item.body ? '<p class="text-xs text-gray-500 mt-1.5 leading-relaxed whitespace-pre-wrap">' + esc(item.body) + '</p>' : '') +

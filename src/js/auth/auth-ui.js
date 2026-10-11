@@ -878,7 +878,7 @@ const PROFILE_STATS_CONFIG = [
         id: 'profile-stats-calculations',
         icon: 'fa-calculator',
         label: '测算次数',
-        cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
+        cardClass: 'bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 border border-blue-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-blue-600 font-medium dark:text-blue-300',
         valueClass: 'text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-200',
@@ -888,7 +888,7 @@ const PROFILE_STATS_CONFIG = [
         id: 'profile-stats-scenarios',
         icon: 'fa-clone',
         label: '已存方案',
-        cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
+        cardClass: 'bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 border border-green-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-green-600 font-medium dark:text-green-300',
         valueClass: 'text-2xl sm:text-3xl font-bold text-green-800 dark:text-green-200',
@@ -898,7 +898,7 @@ const PROFILE_STATS_CONFIG = [
         id: 'profile-stats-kinds',
         icon: 'fa-sitemap',
         label: '覆盖税种',
-        cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
+        cardClass: 'bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 border border-purple-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-purple-600 font-medium dark:text-purple-300',
         valueClass: 'text-2xl sm:text-3xl font-bold text-purple-800 dark:text-purple-200',
@@ -908,7 +908,7 @@ const PROFILE_STATS_CONFIG = [
         id: 'profile-stats-last',
         icon: 'fa-clock-o',
         label: '上次测算',
-        cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
+        cardClass: 'bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-card px-4 sm:px-5 py-3 sm:py-4 border border-orange-200 dark:from-slate-800 dark:to-gray-800 dark:border-slate-700',
         iconBg: 'w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mr-3',
         labelClass: 'text-sm text-orange-600 font-medium dark:text-orange-300',
         valueClass: 'text-2xl sm:text-3xl font-bold text-orange-800 dark:text-orange-200',
@@ -955,7 +955,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-history',
         title: '计算历史',
         desc: '查看、复算与清理已保存的测算记录',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-history text-xl text-blue-600'
     },
     {
@@ -965,7 +965,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-file-text-o',
         title: '税务档案',
         desc: '保存常用扣除配置，测算时一键套用',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-file-text-o text-xl text-green-600'
     },
     {
@@ -976,7 +976,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-database',
         title: '数据管理',
         desc: '云端同步、数据导出与本地备份',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-database text-xl text-purple-600'
     },
     {
@@ -992,7 +992,7 @@ const PROFILE_CARDS_CONFIG = [
             const n = getMonthlyReminders();
             return n > 0 ? `本月 ${n} 项` : '';
         },
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar text-xl text-orange-600'
     },
     {
@@ -1011,7 +1011,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-id-card',
         title: '个人中心',
         desc: '账号资料、密码安全与版本权益',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-id-card text-xl text-blue-600'
     },
     {
@@ -1023,7 +1023,7 @@ const PROFILE_CARDS_CONFIG = [
         title: '财税服务',
         desc: '个税汇算测算与工具使用问题，留下联系方式由顾问协助',
         tag: '顾问协助',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-handshake-o text-xl text-blue-600'
     },
     {
@@ -1032,7 +1032,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-bullhorn',
         title: '公告与更新',
         desc: '政策要点、版本更新与运营活动',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-bullhorn text-xl text-amber-600'
     },
     {
@@ -1041,7 +1041,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-comments-o',
         title: '意见反馈',
         desc: '提交问题与建议，我们逐条跟进处理',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-rose-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-comments-o text-xl text-rose-600'
     },
     {
@@ -1050,7 +1050,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-question-circle',
         title: '使用帮助',
         desc: '功能说明与常见问题解答',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-question-circle text-xl text-gray-600'
     },
     {
@@ -1059,7 +1059,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-info-circle',
         title: '关于我们',
         desc: '版本信息、免责声明与联系方式',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-info-circle text-xl text-indigo-600'
     },
     {
@@ -1071,7 +1071,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-moon-o',
         title: '深色模式',
         desc: '切换深浅配色，选择会被记住',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-moon-o text-xl text-gray-600'
     },
     {
@@ -1083,7 +1083,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-building-o',
         title: '主体管理',
         desc: '给模板归类用的纳税实体；不建也不影响任何测算',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-building-o text-xl text-green-600'
     },
     {
@@ -1093,7 +1093,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-clone',
         title: '参数模板',
         desc: '某个工具的一套已填参数，进工具后一键带出',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-clone text-xl text-purple-600'
     },
     {
@@ -1106,7 +1106,7 @@ const PROFILE_CARDS_CONFIG = [
         icon: 'fa-calendar-check-o',
         title: '我的台账',
         desc: '按月归档的测算记录；重复的那件事可以从上个月带出来',
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-calendar-check-o text-xl text-blue-600'
     },
     {
@@ -1121,7 +1121,7 @@ const PROFILE_CARDS_CONFIG = [
         // 配色沿用已有档（teal / cyan 不在 tailwind 产物里，写了没样式），
         // 挑 rose 是因为它压在 rose-100 上仍过 3:1（图标不是纯装饰，旁边就是卡片标题）：
         // amber-600 / amber-100 实测只有 2.86:1，图标会糊在底色里。
-        iconWrapClass: 'w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center shrink-0',
+        iconWrapClass: 'w-10 h-10 rounded-lg bg-rose-100 flex items-center justify-center shrink-0',
         iconClass: 'fa fa-table text-xl text-rose-600'
     }
 ];
@@ -1211,16 +1211,19 @@ function renderProfileQuick() {
 // 所有类名均为完整静态字符串，避免动态拼接触发 Tailwind CDN 重扫导致卡顿。
 function profileCardHtml({ id, title, desc, tag, badge, iconWrapClass, iconClass }) {
     return `
-        <div class="bg-white rounded-lg shadow-card cursor-pointer profile-card-hover h-full" id="${id}">
-            <div class="p-4 sm:p-5 flex items-center gap-3.5 sm:gap-4">
+        <!-- v1.141.0 卡片规格统一：rounded-lg(8px) → rounded-xl(12px)，与全站卡片基准
+             .home-card / .mode-card 一致；内边距对齐 .home-card（px-4 sm:px-5 / py-3 sm:py-4），
+             图标与文字的间距 14px(gap-3.5) → 12px(gap-3)，与其他卡片同款。 -->
+        <div class="bg-white rounded-xl shadow-card cursor-pointer profile-card-hover h-full" id="${id}">
+            <div class="px-4 sm:px-5 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
                 <div class="${iconWrapClass}">
                     <i class="${iconClass}"></i>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <h3 class="font-semibold text-gray-800 text-[15px] leading-snug">${title}</h3>
-                        ${tag ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${tag}</span>` : ''}
-                        ${badge ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">${badge}</span>` : ''}
+                        <h3 class="font-semibold text-gray-800 text-sm leading-snug">${title}</h3>
+                        ${tag ? `<span class="text-micro font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${tag}</span>` : ''}
+                        ${badge ? `<span class="text-micro font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">${badge}</span>` : ''}
                     </div>
                     <p class="text-xs text-gray-500 mt-1 leading-relaxed">${desc}</p>
                 </div>
@@ -1253,10 +1256,10 @@ function renderProfileCards() {
         const cards = PROFILE_CARDS_CONFIG.filter((c) => c.group === group.key && !c.quick && !(guest && c.guestHidden));
         if (!cards.length) return '';
         const head = `
-            <div class="md:col-span-2 flex items-center gap-2 px-1 ${index === 0 ? '' : 'pt-3'}">
+            <div class="md:col-span-2 flex items-center gap-2 ${index === 0 ? '' : 'pt-3'}">
                 <span class="w-1 h-4 rounded-full bg-primary"></span>
                 <h4 class="text-sm font-bold text-gray-700">${group.title}</h4>
-                <span class="text-[11px] text-gray-400">${group.desc}</span>
+                <span class="text-xs text-gray-400">${group.desc}</span>
             </div>`;
         // badge 是渲染时算一次的（如税务日历的「本月 N 项」）：它随月份变，不随会话变，
         // 没必要为此把整张卡片改成每次进页面重渲染 —— renderProfileCards 只在首次进我的页时跑。
@@ -1554,7 +1557,10 @@ function renderTaxCalendar() {
     listEl.innerHTML = sortedEvents.map(event => `
         <div class="border border-gray-200 rounded-lg p-4 profile-card-hover">
             <div class="flex items-start justify-between mb-2">
-                <h4 class="font-semibold text-gray-800">${event.title}</h4>
+                <!-- v1.141.0：事件标题没写字号，继承 body 的 16px —— 它下面的「期间」是
+                     text-sm(14)、说明是 text-xs(12)，标题反倒压不住。归到 14（列表项标题档），
+                     层级靠字重与颜色分，不靠多出来的 2px。 -->
+                <h4 class="text-sm font-semibold text-gray-800">${event.title}</h4>
                 <span class="${event.badgeClass} px-2 py-0.5 rounded text-xs">
                     <i class="fa ${event.statusIcon} mr-1"></i>${event.statusText}
                 </span>
@@ -1827,16 +1833,21 @@ function renderHistoryItems(history, listElement) {
         const card = document.createElement('div');
         card.className = 'card profile-card-hover';
         card.innerHTML = `
+            <!-- v1.141.0：这条模板里四个文字**只有两个写了字号**，标题与金额都靠继承
+                 （body 16px）—— 于是「日期」和「删除」是 14、标题和金额是 16，
+                 同一张卡里两种正文，且金额比标题还抢。现在按四档归位：
+                 标题 14 medium（靠字重领先）· 日期 12 · 金额 14 bold（靠颜色与字重突出，
+                 不再靠多 2px）· 删除 12（次级操作，退回说明档）。 -->
             <div class="flex justify-between items-start">
                 <div>
-                    <div class="font-medium text-gray-800">${item.title || getCalculationTypeName(item.type)}</div>
-                    <div class="text-sm text-gray-500">${formatDate(item.date || item.created_at)}</div>
+                    <div class="text-sm font-medium text-gray-800">${item.title || getCalculationTypeName(item.type)}</div>
+                    <div class="text-xs text-gray-500">${formatDate(item.date || item.created_at)}</div>
                 </div>
                 <div class="text-right">
-                    <div class="font-bold text-primary">¥${formatAmount(tax)}</div>
+                    <div class="text-sm font-bold text-primary">¥${formatAmount(tax)}</div>
                 </div>
             </div>
-            <button onclick="deleteHistoryItem('${item.id}')" class="mt-3 text-sm text-danger hover:underline">删除</button>
+            <button onclick="deleteHistoryItem('${item.id}')" class="mt-3 text-xs text-danger hover:underline">删除</button>
         `;
         fragment.appendChild(card);
     });
@@ -1922,9 +1933,9 @@ function deleteHistoryItem(id) {
 // === 阶段10/11：账户分层（三档：基础版/体验版/专业版）徽标 + 云同步面板 ===
 // 顶栏 pill 三态样式（免费→素色、体验→紫色、专业→琥珀金）
 const TOPBAR_BADGE_CLASSES = {
-    free: 'inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-bold leading-none text-white/90',
-    trial: 'inline-flex items-center gap-1 rounded-full border border-violet-300 bg-violet-500 px-2 py-1 text-[10px] font-bold leading-none text-white',
-    pro: 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-400 px-2 py-1 text-[10px] font-bold leading-none text-amber-950'
+    free: 'inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2 py-1 text-micro font-bold leading-none text-white/90',
+    trial: 'inline-flex items-center gap-1 rounded-full border border-violet-300 bg-violet-500 px-2 py-1 text-micro font-bold leading-none text-white',
+    pro: 'inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-400 px-2 py-1 text-micro font-bold leading-none text-amber-950'
 };
 // 个人中心徽标落在蓝色渐变 banner 上，使用高亮 chips 保证可读
 const PROFILE_BADGE_CLASSES = {
@@ -2045,7 +2056,7 @@ function renderCloudSyncPanel() {
         if (!tierEl) return;
         tierEl.classList.remove('hidden');
         tierEl.textContent = label;
-        tierEl.className = 'ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold leading-none ' +
+        tierEl.className = 'ml-2 px-2 py-0.5 rounded-full text-micro font-bold leading-none ' +
             (key === 'trial' ? 'bg-violet-100 text-violet-700'
                 : key === 'pro' ? 'bg-amber-100 text-amber-700'
                 : 'bg-gray-100 text-gray-600');
@@ -2853,11 +2864,12 @@ const openModalSet = new Set();
 function openModal(modal) {
     if (!modal) return;
     modal.classList.remove('hidden');
-    // 弹窗若嵌套在隐藏容器（如登录页时 #app-container 为 hidden）内，
+    // v1.141.0：弹窗若嵌套在隐藏容器（如登录页时 #app-container 为 hidden）内，
     // fixed 定位会随祖先隐藏而不可见。打开前挂到 body 顶层，保证任何场景都能弹出。
-    if (modal.parentNode && modal.parentNode !== document.body) {
-        document.body.appendChild(modal);
-    }
+    // 同时**每次都挪到末尾**：所有弹窗共用同一个遮罩层级令牌，同级时 DOM 顺序决定谁在
+    // 上面 —— 不挪的话，alert / confirm 这类在 HTML 里排在前面的弹窗，一旦在后插入的
+    // 弹窗（留资 / 公告 / 身份）之上打开，就会被整块盖住（看得见遮罩、看不见内容）。
+    if (modal.parentNode) document.body.appendChild(modal);
     openModalSet.add(modal);
     document.body.style.overflow = 'hidden';
     setTimeout(() => {

@@ -355,15 +355,21 @@
 .profile-quick-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-2);
-    margin-bottom: var(--sp-3);
+    /* v1.141.0：gap 8 → 12、下间距 12 → 20。原来这两处都按"宫格内部"的尺度给，
+       但这一页其余各组（横幅 / 统计卡 / 列表）用的是 20px 组距、12px 卡距 ——
+       同一页里宫格单独一套 8/12，扫过去会觉得这一块贴得特别紧。 */
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
 }
 /* v1.139.0：第 5 格（个人中心）进宫格后不再写死 4 列 ——
    auto-fit 会把**空余的轨道折叠掉**，于是 5 张时五等分、游客态 4 张时四等分，
-   两种张数都铺满整行，不会留半行空白（写死 4 列时第 5 张会孤零零吊在第二行）。 */
+   两种张数都铺满整行，不会留半行空白（写死 4 列时第 5 张会孤零零吊在第二行）。
+   gap 在宽屏补到 16px：卡片变窄后 12px 的缝看着比手机档更挤（同样 12px，
+   占比随着卡片变窄而变大）。 */
 @media (min-width: 640px) {
     .profile-quick-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--sp-4);
     }
 }
 /* 手机 2 列时，张数为奇数则最后一张拉满整行 —— 3 行里的最后一行只站半格，
@@ -378,7 +384,10 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: var(--sp-3) var(--sp-2);
+    /* v1.141.0：padding 从「12 / 8」改成四边 12 —— 同一屏里功能卡与统计卡的横向内边距
+       都是 16px（px-4），宫格横 8px 显得比它们紧一圈；四边统一后宫格与下方列表
+       是同一套呼吸节奏（纵向内容少，12px 已经够透气）。 */
+    padding: var(--sp-3);
     background: #fff;
     border: 1px solid var(--c-border);
     border-radius: var(--r-card-sm);
@@ -934,7 +943,15 @@
 .profile-nudge-input {
     flex: 1 1 140px; min-width: 0; padding: 6px 10px;
     border-radius: var(--r-ctrl); border: 1px solid var(--c-border);
-    background: var(--c-surface-1); color: var(--c-text); font-size: var(--fs-xs);
+    /* v1.141.0：xs(12) → sm(14)。它是**输入框**，输入内容一律 14 —— 12 是说明档，
+       拿说明档的字号装用户填进去的字，等于把「北京」和旁边那行灰字摆在同一级。 */
+    background: var(--c-surface-1); color: var(--c-text); font-size: var(--fs-sm);
+}
+/* 与 .input-field / .tool-input / .tool-search 同款（v1.141.0）：iOS 聚焦 < 16px 会整页缩放 */
+@media (max-width: 640px) {
+    .profile-nudge-input:focus {
+        font-size: 16px;
+    }
 }
 .profile-nudge-skip {
     margin-top: 10px; padding: 0; border: 0; background: none;
@@ -1288,7 +1305,9 @@
 }
 .result-bars__note {
     margin-top: var(--sp-2);
-    font-size: var(--fs-micro);
+    /* v1.141.0：micro(11) → xs(12)。这张条下面那句是**说明**（为什么最长那根是 100%），
+       11px 是徽章档，读得懂但读不下去 —— 归到次级说明档 12。 */
+    font-size: var(--fs-xs);
     color: var(--c-text-3);
 }
 
@@ -1463,7 +1482,10 @@
     padding: 0; border: 0; background: none; color: var(--c-text-2);
     font-size: var(--fs-xs); cursor: pointer;
 }
-.entity-form-note { margin-top: 10px; font-size: var(--fs-micro); line-height: 1.7; color: var(--c-text-3); }
+/* v1.141.0：--fs-micro(11) → --fs-xs(12)。micro 是**装饰性下限**（徽章 / 角标 / 序号），
+   这一行是批量页的状态说明——「本批 32 行，一次最多 20 行」这种要读完才懂的句子，
+   11px 在中文小屏上不只是小，是会读漏。归到次级说明档 12。 */
+.entity-form-note { margin-top: 10px; font-size: var(--fs-xs); line-height: 1.7; color: var(--c-text-3); }
 .entity-form-note.is-error { color: var(--c-danger-text); }
 
 .tpl-row {
@@ -1967,6 +1989,40 @@
     overflow-y: auto;
 }
 
+/* ====== 协议正文排版（v1.141.0） ======
+   协议正文原先是「<p><strong>一、…</strong></p> + <p>1. …</p>」的纯段落流：章节标题
+   只是加粗的正文（读起来跟条款同重），编号是手敲在文本里的（复制出去断号、屏幕
+   阅读器读不出层级）。改成语义结构（章节标题 + <ol>）之后排版必须跟着补，否则
+   浏览器给 <ol> 的默认样式（40px 缩进、无条目间距）比改之前还难读。
+   只作用于 .policy-prose —— 其余弹窗的正文不受影响。 */
+.policy-prose h4 {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: #111827;
+    margin: 22px 0 8px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e7eb;
+}
+/* 第一章节头顶上就是弹窗头部的分隔线，再来一条就是双线 */
+.policy-prose h4:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+.policy-prose ol {
+    margin: 0 0 14px;
+    padding-left: 20px;
+    list-style: decimal;
+}
+.policy-prose ol li { margin-bottom: 7px; }
+.policy-prose p { margin-bottom: 10px; }
+.policy-prose p:last-child { margin-bottom: 0; }
+.policy-prose .policy-updated {
+    font-size: var(--fs-xs);
+    color: #6b7280;
+    margin-bottom: 18px;
+}
+
 /* ====== 表单型弹窗（v1.133.0）：留资 / 意见反馈 / 升级码 ======
    为什么要有这一类：宽度档位（--md，36rem）三年前就统一了，**宽度实测一致（547px）**，
    但打开起来仍不像一家 —— 差的是**内部度量**，不是外壳：
@@ -1984,9 +2040,9 @@
 @media (min-width: 640px) {
     .modal-form { padding: 20px 24px; }
 }
-/* .input-field 本身不带字号（继承 body 16px），在弹窗里偏大 —— 按容器收口，
-   新增控件自动生效，不用逐个补 text-sm（v1.128.0 起是 #lead-modal 一条，此处收编） */
-.modal-form .input-field { font-size: var(--fs-sm); }
+/* v1.141.0：这条收口上移到 .input-field 本体（tailwind.src.css）—— 弹窗内的控件与
+   登录 / 二级页表单里的控件应该是同一个字号，不该靠"容器撞上了才生效"。
+   留着这里只会让"哪个是准的"有两个答案：新增控件时到底要不要补 text-sm？不用补。 */
 
 /* 细滚动条（v1.131.0）：这套规格原先只挂在 .help-modal-scrollbar 上，只有「使用帮助」
    和「税率表」两个弹窗在用 —— 其余 12 个弹窗的滚动条是浏览器默认宽度，同一个站里
