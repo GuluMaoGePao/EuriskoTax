@@ -409,13 +409,10 @@
 
         // 入口总数从注册表算，不写死 41（加工具不用回来改这句话）
         var total = (R().all() || []).length + (R().deep() || []).length;
-        var p = modeLib();
-        var modeText = p ? '当前视图：' + esc(p.label(p.get())) : '';
 
         note.classList.remove('hidden');
         note.innerHTML =
             '<span class="identity-note-text">默认视角：<b>' + esc(scen.name) + '</b>' +
-            (modeText ? '（' + modeText + '）' : '') +
             ' · 共 ' + total + ' 个入口仍然都能用</span>' +
             '<button type="button" class="identity-note-clear">取消默认</button>';
 
@@ -528,16 +525,37 @@
         var clear = document.getElementById('toolbox-scenario-clear');
         if (clear) {
             clear.addEventListener('click', function () {
+                scenarioCleared = true;     // 本次会话不再自动带出（详见 recommendedScenario）
                 currentScenario = null;
                 renderToolbox(document.getElementById('toolbox-search') ? document.getElementById('toolbox-search').value : '');
             });
         }
     }
 
+    // 身份该推荐哪个组：身份 id 与 scenario id 同名（employee / freelance / owner / finance /
+    // executive / hr），所以不需要一张对照表 —— 对照表就是那种会漏 rev不成的地方。
+    // 会话里点过「清除」就尊重这一次的手势（scenarioCleared），但不写进存储：
+    // 「清除」是此刻的偏好，不是永久翻脸；下次进来仍按身份推荐，想彻底换就回身份卡改。
+    var scenarioCleared = false;
+
+    function recommendedScenario() {
+        if (scenarioCleared || !R()) return null;
+        var L = identityLib();
+        var id = L ? L.get() : '';
+        if (!id) return null;
+        var hit = (R().scenarios() || []).filter(function (s) { return s.id === id; })[0];
+        return hit ? hit.id : null;
+    }
+
     function renderToolbox(keyword, scenarioId) {
         var container = document.getElementById('toolbox-groups');
         if (!container || !R()) return;
+        // v1.142.0：不传 scenarioId 时（进工具页 / 重渲染）按**已选的身份**带出推荐组 ——
+        // 身份此前唯一的可见效果就是「点一次看这类工具」，选完人就没了影：
+        // 存了被称作 "EuriskoIdentityPref" 的一行字符串，屏幕上什么都没变。
+        // 「选了我是谁」这件事应该在下一次打开工具页时自动兑现。
         if (scenarioId !== undefined) currentScenario = scenarioId || null;
+        else currentScenario = recommendedScenario();
 
         var result = R().search(keyword);
         var html = '';
@@ -590,8 +608,8 @@
             });
         }
 
-        // 深度测算组是静态 HTML（4 张 mode card，带既有隐藏按钮与 info 按钮），
-        // 这里只控制显隐：搜索无命中时收起，避免与搜索结果互相干扰。
+        // 完整测算组：标题是静态 HTML（保持与其它组同样的折叠交互），内部的 21 张卡的列表由
+        // renderDeepEntries() 渲染。这里只控制该组的显隐：搜索无命中时收起，避免与结果互相干扰。
         // （原来还带「按身份筛选时收起」—— 身份不再是筛选，完整测算照样该在。）
         var deepBox = document.getElementById('toolbox-deep');
         if (deepBox) {
@@ -617,29 +635,30 @@
         renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图下只有一组，不出条）
     }
 
-    // ====== 完整测算：增量接线（为阶段17「deep 工具 > 4 个」铺路） ======
-    // 既有 4 张 mode-card 是静态 HTML，卡片内的隐藏按钮（${id}-mode-btn）在 app.js / home-ui.js
-    // 已被绑定了一整套页面初始化逻辑 —— 绝不能用 innerHTML 重建它们，否则事件会全部丢失。
-    // 因此这里**只对注册表中尚无静态卡片的 deep 工具做追加式渲染**：
-    //   现在 deep 恰好 4 个且全都有静态卡 → 动态区渲染 0 张且容器 hidden，所见与改动前完全一致；
-    //   阶段17 新增 deep 税种后 → 自动出现在「完整测算」组，不必再改 index.html。
+    // ====== 完整测算：入口（现与其它组同一张列表） ======
+    // v1.142.0 之前这里是「4 张写死的静态卡 + 其余动态追加」的模式（阶段17 迁移时的历史债）：
+    // 那 4 个税种的旧整页还活着时，卡里的隐藏按钮承担了一整套初始化，不能重建 DOM。
+    // 旧页早已删净（openTool 一律按 W.has(tool) 进向导），于是这一组与其它组合并成一张表：
+    // 同一种卡片、同一种排序、同一个 counts 来源 —— 21 个入口之间不再有「两种长相」。
+    // 新增一个完整测算 = 在 tool-registry.js 加一条 spec，本文件与 index.html 都不用动。
     function renderDeepEntries() {
         var host = document.getElementById('toolbox-deep-extra');
         if (!host || !R()) return;
-        var extra = (R().deep() || []).filter(function (t) {
-            return !document.getElementById(t.id + '-mode-card');
-        });
-        if (!extra.length) {
+        var list = R().deep() || [];
+        if (!list.length) {
             host.innerHTML = '';
             host.classList.add('hidden');
             return;
         }
         host.classList.remove('hidden');
-        host.innerHTML = extra.map(function (t) { return cardHtml(t, true); }).join('');
+        // 备注：cardHtml 的第二参是「是否多步骤」角标，这里恒 true；
+        // 名称 / 副标题 / 图标 / 微标签全部读注册表，不在这里逐个罗列。
+        host.innerHTML = list.map(function (t) { return cardHtml(t, true); }).join('');
         bindEntries(host);
     }
 
     function openScenario(id) {
+        scenarioCleared = false;    // 用户自己点了「看这类工具」—— 这次不必再替他清除
         currentScenario = id;
         showPageFn(TOOLS_PAGE);
         renderToolbox('', id);
@@ -653,15 +672,12 @@
         pushRecent(id);
 
         if (tool.status === 'deep') {
-            // 阶段17：spec 驱动的完整测算（没有独立页面）—— 交给通用向导按注册表渲染。
-            // 放在 mode-btn 分支**之前**（17B-1）：这类工具的入口就是 spec，不该再复用到页面式的
-            // mode-btn —— business 迁移后若仍走 business-mode-btn，卡片点下去会被带回旧页面。
-            // W.has 只对 spec 驱动的返回 true（其余 3 个 deep 有 pageId，不受影响）。
+            // 阶段17：spec 驱动的完整测算 —— 交给通用向导按注册表渲染。
+            // v1.142.0：原先上面还有一段「点 ${id}-mode-btn 的隐藏按钮」的旧深度流程兜底 ——
+            // 那是静态 mode-card 时代的转发件，卡与按钮都已删除（见 index.html 那一组），留着只会
+            // 让人以为入口还有第二条路。
             var W = window.EuriskoDeepWizard;
             if (W && W.has(tool) && W.open(tool.id, { values: opts.values })) return;
-            // 原有深度流程：复用工具页那张卡片里的隐藏按钮，保证与既有初始化逻辑完全一致
-            var btn = document.getElementById(tool.id + '-mode-btn');
-            if (btn) { btn.click(); return; }
             // 目标页面若尚未落地则**不跳转**：否则 showPage 会切到一个不存在的 DOM，留下白屏。
             if (tool.pageId && document.getElementById(tool.pageId)) showPageFn(tool.pageId);
             return;
@@ -678,8 +694,6 @@
     // ====== 通用速算器页 ======
     // 从历史记录打开时带进来的那一份输入（阶段18-2）：只服务于速算器这一页，换工具即作废
     var quickSeed = null;
-    // 阶段19-7：视图偏好变更时用来重画当前速算器表单（换工具时指向新那份 build）
-    var modeRebuild = null;
     // 阶段19-8：「清空」那一瞬间要按 spec 默认值重画，并**停掉一次记忆写入** ——
     // 否则重画触发的重算会立刻把默认值又记回去，等于清空了个寂寞（用户点一下，提示马上回来）。
     var memorySuppressed = false;
@@ -697,16 +711,11 @@
         });
     }
 
-    // ====== 阶段19-7：视图密度（简明 / 完整）======
-    // 模式只在这里读一次，渲染层不各自判断 localStorage —— 否则两份默认值迟早分家。
-    function modeLib() { return window.EuriskoModePref; }
-
-    // 偏好模块不在时按**完整**渲染：宁可多显示一组参数，也绝不在用户不知情时把它们收起来。
-    // （index.html 里 mode-pref.js 排在 toolbox-ui.js 之前，正常情况下它一定在。）
-    function isFullMode() {
-        var p = modeLib();
-        return !p || p.get() === p.FULL;
-    }
+    // ====== 进阶参数：折叠（不是另一套视图）======
+    // v1.142.0 之前这里读的是「简明 / 完整」视图密度偏好（mode-pref.js）：同一套测算分两种界面，
+    // 简明还会把 advanced 步**合并**成一步 —— 结果换一档就换了步数，用户在两个界面之间认不出
+    // 自己刚才在填哪一屏。而「速算 vs 完整测算」已经是第一层分野，二级页再分一层是重复心智。
+    // 现在只留一件事：**必填项直接铺，进阶参数收进「更多参数（可选）」**。
 
     // 未声明 level 的字段一律 basic（注册表是纯增量声明，存量 20 个速算器不必逐个改）
     function isAdvanced(f) { return f && f.level === 'advanced'; }
@@ -718,15 +727,15 @@
     }
 
     // advanced 字段**永远留在 DOM 里**（收进可展开的折叠块），从不 display:none：
-    // ① 简明视图下用户也能临时展开用一次，不必为了一个参数去改全局偏好；
-    // ② readValues 始终能读到它们，切换视图不会丢已填的值（三条守护测试之三）。
+    // ① 用户可以临时展开用一次，不必为「要不要看更多参数」先做一个全局选择；
+    // ② readValues 始终能读到它们，重画不会丢已填的值（折叠 ≠ 删除）。
+    // 折叠块**默认收起**：这一屏要先把必填项讲清楚，参数清单不是开场就得看见的东西。
     // renderFn 可选：完整测算向导有 repeater 字段，得用自己的渲染器（默认就是速算器这份 fieldHtml）
-    // toolId 可选：阶段19-7b② —— 折叠块带 data-tool-id，「调过哪个测算的进阶参数」才可归因
+    // toolId 可选：折叠块带 data-tool-id，「调过哪个测算的进阶参数」才可归因（线索质量分层）
     function advancedBlockHtml(fields, values, renderFn, toolId) {
         if (!fields.length) return '';
         var draw = typeof renderFn === 'function' ? renderFn : function (f) { return fieldHtml(f, values); };
-        var open = isFullMode() ? ' open' : '';
-        return '<details class="tool-advanced-block mt-3"' + open +
+        return '<details class="tool-advanced-block mt-3"' +
             ' data-tool-id="' + String(toolId || '').replace(/"/g, '') + '">' +
             '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
             '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span>' +
@@ -736,38 +745,43 @@
             '</details>';
     }
 
-    // 页头那颗 pill：就地切换、即时生效。两个分段都常驻，当前档高亮 ——
-    // 不做成「点一下切换」的单按钮：那样用户看不出下一次点击会发生什么。
-    function modePillHtml() {
-        var p = modeLib();
-        if (!p) return '';
-        var full = p.get() === p.FULL;
-        function seg(mode, label, on) {
-            return '<button type="button" class="mode-pill-seg' + (on ? ' is-on' : '') + '" data-mode="' + mode + '"' +
-                ' aria-pressed="' + (on ? 'true' : 'false') + '">' + label + '</button>';
+    // ====== 「主动翻过进阶参数」计数 ======
+    // 这个数不是偏好（不决定界面长什么样），只是一份行为记录：愿意翻出参数去调的人，
+    // 多数是财务 / HR / 企业主 —— 留资线索的质量分层看它（lead-context.viewSignals）。
+    // 存在这里而不是新建模块的原因：折叠块是**这份渲染器画出来的**，谁画谁记，换个渲染器不会漏。
+    var ADV_TOUCHED_KEY = 'euriskoAdvancedTouched';
+
+    function emptyTouched() { return { count: 0, tools: [], at: '' }; }
+
+    function readTouched() {
+        try {
+            var raw = JSON.parse(window.localStorage.getItem(ADV_TOUCHED_KEY) || '{}');
+            if (!raw || typeof raw !== 'object') return emptyTouched();
+            return {
+                count: Number(raw.count) > 0 ? Math.floor(Number(raw.count)) : 0,
+                tools: Array.isArray(raw.tools) ? raw.tools.filter(function (t) { return typeof t === 'string'; }) : [],
+                at: typeof raw.at === 'string' ? raw.at : ''
+            };
+        } catch (e) {
+            return emptyTouched();     // 存坏了就当没翻过，绝不让整页挂掉
         }
-        return '<div class="mode-pill" role="group" aria-label="视图密度" title="简明：只填必填项，直接出结论 ｜ 完整：可调全部参数，看逐项推导">' +
-            seg(p.SIMPLE, '简明', !full) + seg(p.FULL, '完整', full) +
-            '</div>';
     }
 
-    // onSwitch 留给需要「先收值再重画」的宿主（完整测算向导的 pill 就用它）
-    function renderModePillIn(hostId, onSwitch) {
-        var host = document.getElementById(hostId);
-        if (!host) return;
-        host.innerHTML = modePillHtml();
-        host.querySelectorAll('.mode-pill-seg').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var p = modeLib();
-                if (!p) return;
-                // 值不用重读：advanced 字段始终在 DOM 里，重画时会自己读一遍当前值
-                p.set(btn.getAttribute('data-mode') === p.FULL ? p.FULL : p.SIMPLE);
-                if (typeof onSwitch === 'function') onSwitch();
-            });
-        });
+    function writeTouched(v) {
+        try {
+            window.localStorage.setItem(ADV_TOUCHED_KEY, JSON.stringify(v));
+        } catch (e) { /* 隐私模式下只是这次没记上 */ }
     }
 
-    function renderModePill() { renderModePillIn('quick-mode-pill'); }
+    /** 上报：用户展开了「更多参数（可选）」。返回累计记录 { count, tools, at } */
+    function noteAdvancedOpen(toolId) {
+        var v = readTouched();
+        v.count += 1;
+        v.at = new Date().toISOString();
+        if (toolId && v.tools.indexOf(toolId) === -1) v.tools.push(toolId);
+        writeTouched(v);
+        return readTouched();
+    }
 
     // values 可选：给「回填一份已有输入」用（阶段18-2 从历史记录打开）。不传就是原行为 ——
     // 用 spec 声明的 default。deep-wizard-ui.js 复用这一个函数渲染字段，第二参缺省即不受影响。
@@ -778,7 +792,23 @@
     function fieldHtml(f, values, opts) {
         var cur = values && values[f.key] !== undefined ? values[f.key] : f.default;
         var id = 'qf-' + f.key;
-        var hint = f.hint ? '<div class="tool-field-hint">' + esc(f.hint) + '</div>' : '';
+        // v1.142.0 第四轮：hint 也走 escRich —— spec 里一大批提示是照 markdown 写的
+        // （「减除 20% 费用后**再减按 70%**」），按纯文本输出就是一对裸星号怼到用户眼前。
+        //
+        // v1.142.0 第六轮：**解释不再常驻**。585 条提示全铺在字段下面，一屏里有三分之一
+        // 是小字 —— 用户原话「一眼看上去没有主次、很疲惫」。现在名词后面只留一颗问号，
+        // 点开才展开那段说明：要的人点一下就有，不要的人眼前就只有字段本身。
+        // 用按钮 + aria-expanded（不是 title 悬浮提示）：手机上没有 hover，悬浮提示等于没有提示。
+        var hintId = id + '-hint';
+        var hintBtn = f.hint
+            ? '<button type="button" class="tool-hint-btn" data-hint-toggle="' + hintId + '"'
+                + ' aria-expanded="false" aria-controls="' + hintId + '"'
+                + ' aria-label="查看说明：' + esc(f.label) + '" title="查看说明">'
+                + '<i class="fa fa-question-circle" aria-hidden="true"></i></button>'
+            : '';
+        var hint = f.hint
+            ? '<div class="tool-field-hint" id="' + hintId + '" hidden>' + escRich(f.hint) + '</div>'
+            : '';
         var ekh = opts && opts.enterkeyhint ? ' enterkeyhint="' + esc(opts.enterkeyhint) + '"' : '';
         var input = '';
         if (f.type === 'select') {
@@ -786,7 +816,20 @@
                 return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(cur) ? ' selected' : '') + '>' + esc(o.label) + '</option>';
             }).join('') + '</select>';
         } else if (f.type === 'switch') {
-            input = '<label class="tool-switch"><input type="checkbox" id="' + id + '"' + (cur ? ' checked' : '') + '><span>' + (cur ? '是' : '否') + '</span></label>';
+            // v1.142.0 第四轮：勾选框在前、名字在后 —— 与 1.17 那四个页面同一种画法
+            // （`<input type="checkbox" checked>` 紧跟 `<span>专项扣除</span>`），也与多步向导
+            // 里那颗标题式勾选一致。
+            // 此前这里把名字摆在上一行、右边再放一颗「是 / 否」：同一件事占了屏幕两个地方，
+            // 而那个「否」是在替用户陈述结论 —— 取消勾选后旁边写着"否"，像自己选错了。
+            // 问号放在 label **外面**：label 内的点击会激活它关联的控件，
+            // 把按钮搁进去，用户点"看说明"就顺手把开关拨了一下 —— 那是最冤的一种误操作。
+            return '<div class="tool-field tool-field--switch">' +
+                '<div class="tool-field-head">' +
+                '<label class="tool-switch" for="' + id + '">' +
+                '<input type="checkbox" id="' + id + '" class="tool-switch-input"' + (cur ? ' checked' : '') + '>' +
+                '<span>' + escRich(f.label) + '</span>' +
+                '</label>' + hintBtn +
+                '</div>' + hint + '</div>';
         } else if (f.type === 'percent') {
             input = '<div class="tool-input-wrap"><input type="number" id="' + id + '" class="tool-input" value="' + esc(cur) + '" step="0.1" min="0" inputmode="decimal"' + ekh + '><span class="tool-input-unit">%</span></div>';
         } else {
@@ -798,7 +841,11 @@
                 (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>' +
                 '<span class="tool-input-unit">' + (f.type === 'money' ? '元' : '') + '</span></div>';
         }
-        return '<div class="tool-field"><label class="tool-label" for="' + id + '">' + esc(f.label) + '</label>' + input + hint + '</div>';
+        return '<div class="tool-field">' +
+            '<div class="tool-field-head">' +
+            '<label class="tool-label" for="' + id + '">' + esc(f.label) + '</label>' + hintBtn +
+            '</div>' +
+            input + hint + '</div>';
     }
 
     function readValues(tool) {
@@ -830,6 +877,16 @@
         var id = tool.id + '-deep';
         for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) return id;
         return '';
+    }
+
+    // 反向：完整测算 → 它的速算版。速算器那一侧早就通了（结果页行动条的
+    // 「按年填全的完整版」），反过来一直缺 —— 用户进了按年填全的向导才发现自己只想估一个数，
+    // 那时没有路回到浅版，只能退出来重新找。与 deepCounterpartOf 成对，别只长一边。
+    function quickCounterpartOf(tool) {
+        var id = String((tool && tool.id) || '').replace(/-deep$/, '');
+        if (!id || id === tool.id) return '';
+        var q = R() && R().get(id);
+        return (q && q.status !== 'deep') ? id : '';
     }
 
     function resultTextOf(tool, out) {
@@ -1594,8 +1651,9 @@
         var stepsHtml = '';
         if (out.steps && out.steps.length) {
             if (typeof renderFormulaStepsHtml === 'function') {
-                // 完整视图：推导链默认展开（简明视图保持折叠，结论先给用户）
-                stepsHtml = '<details class="mt-4 tool-formula-panel"' + (isFullMode() ? ' open' : '') + '>' +
+                // v1.142.0：推导链默认展开 —— 「每一步都可核对」是这类工具的立身之本，
+                // 折叠起来等于把"能核对"降级成"请相信我"。
+                stepsHtml = '<details class="mt-4 tool-formula-panel" open>' +
                     '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
                     '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
                     '<span class="text-xs text-gray-500">每一步都可核对</span>' +
@@ -1629,67 +1687,28 @@
         renderSavingNudge(tool, values);
         renderProfileNudge(tool, values);
         renderCompareNudge(tool, values, out);
-        renderModeHint(tool);
         return out;
-    }
-
-    // ====== 阶段19-7：算满 3 次才问一次的「要不要看更多参数」======
-    // 阈值定在 3 次：第 1 次就问是在教用户用产品（他连结果长什么样都还没看熟），
-    // 3 次说明他已经知道这里能算出什么，此时「还有参数可调」才是信息而不是打扰。
-    var MODE_HINT_KEY = 'euriskoPrefModeHint';
-    var MODE_HINT_TIMES = 3;
-
-    function calcCount() {
-        if (window.EuriskoLocalData && typeof window.EuriskoLocalData.getData === 'function') {
-            var h = window.EuriskoLocalData.getData('taxCalculationHistory');
-            if (Array.isArray(h)) return h.length;
-        }
-        try { return (JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []).length; }
-        catch (e) { return 0; }
-    }
-
-    function renderModeHint(tool) {
-        var box = document.getElementById('quick-mode-hint');
-        if (!box) return;
-        var dismissed = false;
-        try { dismissed = localStorage.getItem(MODE_HINT_KEY) === '1'; } catch (e) { /* ignore */ }
-        if (isFullMode() || dismissed || calcCount() < MODE_HINT_TIMES) {
-            box.classList.add('hidden'); box.innerHTML = ''; return;
-        }
-        box.classList.remove('hidden');
-        box.innerHTML = '' +
-            '<div class="p-4">' +
-            '<div class="flex items-start gap-2">' +
-            '<i class="fa fa-sliders text-primary mt-0.5"></i>' +
-            '<div class="flex-1">' +
-            '<div class="text-sm font-medium text-gray-800">还有参数可调</div>' +
-            '<div class="text-xs text-gray-500 mt-1">切到「完整」能看到' + esc(tool && tool.name || '') +
-            '的全部可调项与逐项推导 —— 计算口径不变，只是显示更多。</div>' +
-            '</div>' +
-            '</div>' +
-            '<div class="mt-3 flex items-center gap-2">' +
-            '<button type="button" id="mode-hint-switch" class="btn bg-primary text-white text-xs px-3 py-1.5">切换</button>' +
-            '<button type="button" id="mode-hint-dismiss" class="text-xs text-gray-500 px-2 py-1.5">不用了</button>' +
-            '</div>' +
-            '</div>';
-        var sw = document.getElementById('mode-hint-switch');
-        var no = document.getElementById('mode-hint-dismiss');
-        var p = modeLib();
-        if (sw && p) sw.addEventListener('click', function () { p.set(p.FULL); });
-        if (no) no.addEventListener('click', function () {
-            try { localStorage.setItem(MODE_HINT_KEY, '1'); } catch (e) { /* ignore */ }
-            box.classList.add('hidden'); box.innerHTML = '';
-        });
     }
 
     // ====== 结果页「下一步」======
     // 结果不该是终点：给出相关工具（互链），把一次测算接成一条动线。
     // 阶段19-4：保存 / 导出 / 复制 / 完整版这四个动作从这里搬到了常驻的 #quick-actions ——
     // 它们挂在"有没有相关工具"上是本末倒置（没有相关工具就一个出口都没有）。
-    function renderNextSteps(tool, values, out) {
-        var box = document.getElementById('quick-next');
+    // hostId：完整测算结果页复用同一份（此前 21 个 nextTools 在 deep 侧是**死数据** ——
+    // 数据写了、没人渲染）。两处各长一套推荐列表，"算完还能干什么"迟早分家。
+    function renderNextSteps(tool, values, out, hostId) {
+        var box = document.getElementById(hostId || 'quick-next');
         if (!box) return;
         var next = (tool.nextTools || []).map(function (id) { return R().get(id); }).filter(Boolean);
+        // v1.142.0：这一排原本只按 spec 里手写的顺序出来，跟「我是谁」没关系。
+        // 现在按身份排 —— 推荐组里的工具往前挪。它仍然是同一批工具、同样的入口，
+        // 换的只是顺序（身份决定谁能先出来，不决定谁能出来）。
+        var scen = recommendedScenario();
+        if (scen && next.length > 1) {
+            var suggested = (R().byScenario(scen) || []).map(function (t) { return t.id; });
+            var rank = function (t) { return suggested.indexOf(t.id) >= 0 ? 0 : 1; };
+            next.sort(function (a, b) { return rank(a) - rank(b); });
+        }
         if (!next.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
         box.classList.remove('hidden');
         box.innerHTML = '' +
@@ -1801,14 +1820,22 @@
         var badgeEl = document.getElementById('quick-policy-badge');
         var formEl = document.getElementById('quick-form');
         var pitEl = document.getElementById('quick-pitfalls');
-        var linkEl = document.getElementById('quick-seo-link');
+        var rateEl = document.getElementById('quick-rate-table');
 
         if (titleEl) titleEl.textContent = tool.name;
         if (subEl) subEl.textContent = tool.subtitle || '';
         // 时效徽标 + 政策版本一起出：这两件事是同一个问题的两半（这次算准不准、按哪年政策算的），
         // 分开摆就会有人只看到一半。
         if (badgeEl) badgeEl.innerHTML = policyBadgeOf(tool.policyKey) + policyVersionHtml();
-        if (linkEl) linkEl.href = (tool.seoPath || '/seo/index.html') + '?source=app_quick';
+        // 税率表走**站内弹窗**（tax-assistant-ui 暴露的 window.showRateTable）：
+        // 原本这里是跳该工具的 SEO 落地页，而 PWA standalone / 微信里 target=_blank
+        // 会跳出应用容器（v1.141.0 入口纪律）；算到一半查表更不该跳页 —— 跳了就丢已填内容。
+        // 用 onclick 而不是 addEventListener：这一页每次换工具都重画一次 DOM。
+        if (rateEl) {
+            rateEl.onclick = function () {
+                if (typeof window.showRateTable === 'function') window.showRateTable();
+            };
+        }
 
         // 换工具时先收掉上一份结果的吸底条与行动条：留着上一个工具的金额是最坏的一种"看起来成功"
         // 同时清掉"刚补完档案"的一次性状态 —— 它只对刚才那次补全负责，换工具就翻篇。
@@ -1909,11 +1936,8 @@
         // 不是页面自作主张，再弹一条提示是替用户复述他刚做的事。
         mountQuickTemplateBar(tool, function (values) { adoptValues(values); });
 
-        renderModePill();
         build();
         drawMemoryHint();
-        // 偏好一变就地重画：记住本次的 build，换工具时它自然指向新工具那份
-        modeRebuild = function () { build(); drawMemoryHint(); };
     }
 
     // 阶段19-9：速算器页那条「从模板填充」—— 没有模板就整条不出现（连折叠箭头都不留）。
@@ -2017,35 +2041,64 @@
         syncNav();
     }
 
-    // ====== 阶段19-7b②：记录「简明视图下主动展开进阶参数」======
+    // ====== 阶段19-7b②：记录「主动展开进阶参数」======
     // 用**捕获阶段**监听 document：toggle 事件不冒泡，而两处渲染器（速算器 / 完整测算向导）
     // 都是整块 innerHTML 重画，逐个 details 去绑会被下次重渲染冲掉，绑在祖先上才一劳永逸。
-    // 只报「展开」、不报「合上」；到底计不计由 mode-pref 按当前视图判断（完整视图下展开是默认态）。
+    // 只报「展开」、不报「合上」：合上是一次收拾动作，翻出来才是"想要更多参数"的信号。
     function bindAdvancedSignal() {
         document.addEventListener('toggle', function (e) {
             var node = e.target;
             if (!node || String(node.tagName).toUpperCase() !== 'DETAILS') return;
             if (!node.classList || !node.classList.contains('tool-advanced-block')) return;
             if (!node.open) return;
-            var p = window.EuriskoModePref;
-            if (!p || typeof p.noteAdvancedOpen !== 'function') return;
-            p.noteAdvancedOpen(node.getAttribute('data-tool-id') || '');
+            noteAdvancedOpen(node.getAttribute('data-tool-id') || '');
         }, true);
+    }
+
+    // ====== v1.142.0 第六轮：字段说明改成「点问号才展开」======
+    // 同一个理由：**文档级委托**。速算器与完整测算向导都是整块 innerHTML 重画
+    // （填一个字段就重画一次可见性），逐个按钮去绑会被下一次重渲染冲掉 —— 与上面
+    // bindAdvancedSignal 同一个坑、同一个解法。
+    // 展开态写在 DOM 上（hidden 属性 + aria-expanded），重画后回到收起：
+    // 这是有意的 —— 重画意味着字段集变了，留着上一份的展开态才是错的。
+    function bindHintToggles() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('.tool-hint-btn') : null;
+            if (!btn) return;
+            var panel = document.getElementById(btn.getAttribute('data-hint-toggle'));
+            if (!panel) return;              // 不静默吞掉：拿不到面板说明 id 约定坏了，得看得见
+            var open = panel.hidden;
+            panel.hidden = !open;
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.classList.toggle('is-on', open);
+        });
     }
 
     // ====== 初始化 ======
     function init() {
         bindAdvancedSignal();
+        bindHintToggles();
         renderScenarios();
         renderToolbox('');
         bindTypeFilter();   // T1
         bindAnchors();      // T3
 
+        // v1.142.0：改身份的工具页要立刻跟着变 —— 身份的使用场合多半是「刚改完身份，看看给我推荐了什么」。
+        // 不做这条订阅，改完身份只能自己退到工具页再回来（= 没什么人会发现它生效了）。
+        var L = identityLib();
+        if (L && typeof L.onChange === 'function') {
+            L.onChange(function () {
+                scenarioCleared = false;
+                var kw = document.getElementById('toolbox-search');
+                renderToolbox(kw ? kw.value : '');
+            });
+        }
+
         // 首页搜索入口：进入工具页并聚焦搜索框（41 个工具时，搜索比浏览快）
         var entry = document.getElementById('toolbox-search-entry');
         if (entry) {
             entry.addEventListener('click', function () {
-                // 从搜索入口进工具页 = 重新找工具，清掉上一次的身份筛选
+                // 从搜索入口进工具页 = 重新找工具，清掉上一次的身份推荐
                 currentScenario = null;
                 renderToolbox('');
                 showPageFn(TOOLS_PAGE);
@@ -2085,18 +2138,6 @@
         }
     }
 
-    // 阶段19-7：偏好一变就地重画两处 pill 与当前速算器表单。
-    // 订阅挂在模块上、只挂一次 —— 挂进 renderQuickPage 里的话，每渲染一个工具就多一个监听。
-    if (modeLib() && typeof modeLib().onChange === 'function') {
-        modeLib().onChange(function () {
-            renderModePillIn('quick-mode-pill');
-            renderModePillIn('settings-mode-pill');
-            if (modeRebuild) modeRebuild();
-        });
-    }
-    // 账户设置页那颗是静态 HTML 里的容器，进页面前先画一次（之后由订阅跟上）
-    renderModePillIn('settings-mode-pill');
-
     window.EuriskoToolbox = {
         init: init,
         // 阶段17 17A-5：字段渲染 / 读值 / 条件显隐是速算器与多步向导的**公共部分**。
@@ -2105,13 +2146,13 @@
         fieldHtml: fieldHtml,
         readValues: readValues,
         visibleFields: visibleFields,
-        // 阶段19-7：视图密度 —— 两块 UI（pill 与「更多参数」折叠块）由速算器出，
-        // deep 向导复用同一份（两份措辞分家只是时间问题，不给自己这个机会）。
-        modePillHtml: modePillHtml,
-        renderModePillIn: renderModePillIn,
+        // 进阶参数折叠块：速算器出这一份，deep 向导复用同一份
+        // （两份措辞分家只是时间问题，不给自己这个机会）。
         advancedBlockHtml: advancedBlockHtml,
         partitionFields: partitionFields,
-        isFullMode: isFullMode,
+        // 「主动翻过进阶参数」的行为记录，lead-context.viewSignals 读它做线索质量分层
+        noteAdvancedOpen: noteAdvancedOpen,
+        advancedTouched: readTouched,
         fmtValue: fmtValue,
         // v1.110.0：金额 / 百分比 / 易错口径的格式与渲染真源在页面这一侧，速算器 PDF 与
         // 精装报告都到这里来取 —— 报告是要给老板看的，金额口径与页面分家就是自相矛盾。
@@ -2132,6 +2173,8 @@
         renderResultBar: renderResultBar,
         hideResultExtras: hideResultExtras,
         deepCounterpartOf: deepCounterpartOf,
+        quickCounterpartOf: quickCounterpartOf,
+        renderNextSteps: renderNextSteps,
         resultTextOf: resultTextOf,
         // 阶段19-8：效率层 —— 复制（明文 / 表格）由速算器出，deep 向导复用同一份
         // （两处各写一种表格形状，"粘进 Excel 列对齐"就没法只验一次）。
@@ -2155,7 +2198,10 @@
         // 政策依据：暴露给单测，好断言「不外跳」这类肉眼难守的约束
         policyBasisOf: policyBasisOf,
         policyBasisText: policyBasisText,
-        renderPolicyBasis: renderPolicyBasis
+        renderPolicyBasis: renderPolicyBasis,
+        // v1.142.0：结果页「下一步」的顺序也按身份排。暴露给单测的理由与上面同类 ——
+        // 排序是**看不见地**：工具一个都没少，只是谁在前谁在后，肉眼扫一眼不会觉得它坏了。
+        renderNextSteps: renderNextSteps
     };
 
     if (document.readyState === 'loading') {

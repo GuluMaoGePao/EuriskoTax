@@ -124,11 +124,13 @@
             '</div>';
         }).join('');
 
-        // 默认展开、可收起：折叠的本意是别占地方，藏起来（默认收起）则是把信息拿走
-        return '<details class="result-bars-box mt-4" open>' +
+        // v1.142.0 第四轮：默认状态由宿主决定（多步向导传 collapsed —— 结果页先给结论；
+        // 速算器那一屏本来就短，保持展开）。折叠的本意是别占地方，藏起来则是把信息拿走，
+        // 所以两边都保留"点开就能看见"，差的只是进来那一刻收着还是开着。
+        return '<details class="result-bars-box mt-4"' + (opts && opts.collapsed ? '' : ' open') + '>' +
             '<summary class="result-bars__summary">' +
                 '<span><i class="fa fa-bar-chart mr-2"></i>各项数额</span>' +
-                '<span class="result-bars__hint">可收起</span>' +
+                '<span class="result-bars__hint">' + (opts && opts.collapsed ? '展开对照' : '可收起') + '</span>' +
             '</summary>' +
             '<div class="result-bars mt-3">' + rows + '</div>' +
             '<p class="result-bars__note">条形只比大小（最长一项 = 100%），各项之间不构成加减关系'

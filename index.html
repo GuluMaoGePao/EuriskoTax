@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.141.0';
+        window.__APP_VERSION__ = '1.142.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -609,7 +609,7 @@
                      ① 首次登录后的弹窗（#identity-modal，选完点「下一步」即关，手机全屏）；
                      ② 个人中心（常驻显示 + 随时修改），「我的」页顶部另给一张身份卡（#profile-identity-card）
                         做一眼可见的入口。
-                     撤的理由：身份改的是**默认视角**，不改任何入口的可达性（41 个入口照旧全开）。
+                     撤的理由：身份改的是**谁排在前面**，不改任何入口的可达性（41 个入口照旧全开）。
                      把它摆在首页第 5 张卡上，用户一打开先被问"你是谁"，而答案对他接下来要做的事
                      没有影响 —— 首页是动作页，不是问卷。
                      ⚠️ #home-scenarios / #home-identity-note 两个 id 随卡一起删：
@@ -711,8 +711,9 @@
 
                 <!-- 完整测算：按年填全、出完整预算表（保存/导出已不是它的专利，全都支持），排在最后 -->
                 <!-- 阶段19-3：与上面 5 个场景组一样默认折叠、点标题展开并记住状态。
-                     折叠只加 class（applyGroupOpen），内层的 4 张 mode card 与它们的隐藏按钮由
-                     app.js / home-ui.js 初始化 —— 任何时候都不要用 innerHTML 重建这一块。 -->
+                     v1.142.0：这一组与其它组一样由 renderDeepEntries() 渲染（卡片也是同一款「工具条」），
+                     里面不再有写死的静态卡与隐藏按钮，重画不会丢事件 —— 唯一的约束变成
+                     「新增一个完整测算改注册表，不动本文件」。 -->
                 <div id="toolbox-deep" class="tool-group is-collapsed" data-group="deep">
                     <button type="button" class="tool-group-head" data-group-toggle="deep" aria-expanded="false">
                         <i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>
@@ -722,119 +723,24 @@
                         <span class="tool-group-desc">按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快</span>
                     </button>
                     <div class="tool-group-body">
-                    <div id="deep-mode-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <!-- 综合所得 -->
-                        <div class="mode-card mode-card-primary" id="forward-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="forward" title="了解更多">
-                                <i class="fa fa-info-circle text-xs"></i>
-                            </button>
-                            <div class="mode-card-icon mode-card-icon-primary">
-                                <i class="fa fa-calculator"></i>
-                            </div>
-                            <div class="mode-card-title">综合所得</div>
-                            <div class="mode-card-subtitle">工资/劳务/稿酬</div>
-                            <button id="forward-mode-btn" class="hidden"></button>
-                        </div>
-                        <!-- 经营所得 -->
-                        <div class="mode-card mode-card-accent" id="business-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="business" title="了解更多">
-                                <i class="fa fa-info-circle text-xs"></i>
-                            </button>
-                            <div class="mode-card-icon mode-card-icon-accent">
-                                <i class="fa fa-briefcase"></i>
-                            </div>
-                            <div class="mode-card-title">经营所得</div>
-                            <div class="mode-card-subtitle">个体/独资企业</div>
-                            <button id="business-mode-btn" class="hidden"></button>
-                        </div>
-                        <!-- 分类所得 -->
-                        <div class="mode-card mode-card-success" id="classification-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="classification" title="了解更多">
-                                <i class="fa fa-info-circle text-xs"></i>
-                            </button>
-                            <div class="mode-card-icon mode-card-icon-success">
-                                <i class="fa fa-list-alt"></i>
-                            </div>
-                            <div class="mode-card-title">分类所得</div>
-                            <div class="mode-card-subtitle">利息/租赁/转让</div>
-                            <button id="classification-mode-btn" class="hidden"></button>
-                        </div>
-                        <!-- 反向倒算 -->
-                        <div class="mode-card mode-card-secondary" id="reverse-mode-card">
-                            <button class="mode-card-info-btn" data-mode-info="reverse" title="了解更多">
-                                <i class="fa fa-info-circle text-xs"></i>
-                            </button>
-                            <div class="mode-card-icon mode-card-icon-secondary">
-                                <i class="fa fa-refresh"></i>
-                            </div>
-                            <div class="mode-card-title">反向倒算</div>
-                            <div class="mode-card-subtitle">按目标反推</div>
-                            <button id="reverse-mode-btn" class="hidden"></button>
-                        </div>
-                    </div>
-                    <!-- 阶段17「通用多步测算向导」接线位：
-                         注册表中「尚无静态卡片」的 deep 工具由 renderDeepEntries() 动态追加至此。
-                         原有 4 个页面式 deep 各有静态卡，v1.46.0 → v1.50.0 四次迁移后**页面式已归零**
-                         （business / reverse / forward / classification 各留一张卡作为首页与工具箱的入口），
-                         故这里渲染的是**阶段17 的 spec 驱动 deep**（现 21 个：
+                    <!-- v1.142.0：入口只有一张表 —— 此前这里先摆 4 张写死的 mode-card
+                         （综合所得 / 经营所得 / 分类所得 / 反向倒算），其余 17 个再动态追加到下面一行，
+                         两套 markup、两种信息密度，看到的「完整测算」像两个入口拼起来的。
+                         那 4 张卡是阶段17 迁移时的历史债：当时它们的整页还在、按钮不能重建；
+                         页面早已删净（openTool 一律走 ISpec 向导），债到今天才还得上。 -->
+                    <!-- 21 个完整测算全部由 renderDeepEntries() 按注册表渲染，与其它组同款「工具条」卡片，
+                         新增一个税种只改 tool-registry.js，不必再回本文件手写一张卡。
+                         注册表现役清单（占位说法已从注释里删净，数字不写死）：
                          vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
-                         + 17D-1 withholding-deep 劳务报酬预扣预缴 + 17D-2 bonus-tax-deep 年终奖择优
-                         + 17D-3 equity-deep 股权激励 + 17D-4 severance-deep 离职补偿
-                         + 17D-5 early-retirement-deep 提前退休 / 内退
-                         + 17D-6 expat-deep 外籍津补贴免税
-                         + 17D-7 annual-settlement-deep 年度汇算清缴（个税场景 11/16）
-                         + 17D-8 special-deduction-deep 专项附加扣除（个税场景 12/16）
-                         + 17D-9 private-pension-deep 个人养老金与税优三件套（个税场景 13/16）
-                         + 17D-10 donation 公益慈善捐赠扣除（个税场景 14/16，第一个没有同名速算器的完整测算）
-                         + 17D-12 property-transfer 个人转让房屋（个税场景 15/16，20% 比例税率的那一档）
-                         + 17D-13 non-resident 非居民 / 无住所（个税场景 16/16，第三个没有同名速算器的完整测算）；
-                         其中 vat-deep（17C-1 纵深 v1.58.0）、cit-deep（17C-2 纵深 v1.59.0）、
-                         social-base-deep（17C-3 纵深 v1.60.0）、disability-fund-deep（17C-5 纵深 v1.61.0）、
-                         surtax-stamp-deep（17C-4 纵深 v1.62.0）已改为**自带 spec**：前者速算器只认一个
-                         inputTax 标量，而「这笔进项能不能抵」恰恰是增值税最贵的一类错误；cit-deep 三门槛
-                         看的是全年季度平均值、加计扣除能整档掉到 5%、亏损还会过期作废；social-base-deep
-                         把「税前月薪」直接当缴费基数，而法定是本人上年度月平均工资；disability-fund-deep
-                         把「在职职工人数」当成常年正式在册，而法定是上年月平均（含季节性用工折算与劳务派遣），
-                         且招残疾人 vs 缴残保金是「要不要招一个人」的定价；surtax-stamp-deep 只有一个
-                         「实际缴纳的增值税」框，而留抵退税**要扣**、即征即退**不扣**、进口**不附征**
-                         三处方向不同，印花税也远不止「一张凭证一个税目一个金额」；
-                         annual-settlement-deep（17D-7 纵深 v1.63.0）速算器只认「一处任职、全年 12 个月、
-                         只有工资」这一种人生，而汇算的减除费用是**年定额 6 万、不按任职月数折算**，
-                         劳务 / 稿酬按**收入额**并入，大病医疗**只能在汇算时扣**；
-                         special-deduction-deep（17D-8 纵深 v1.64.0）速算器收的是**一个**「扣除前全年应纳税
-                         所得额」，于是「夫妻之间怎么分摊最省」（实测差 4656 元）、「按实际符合条件的月份
-                         累计」、「逐项边际节税」这三层它一个都答不了；
-                         private-pension-deep（17D-9 纵深 v1.65.0）三个速算器各算各的（12000 / 2400 / 个人
-                         4%），但三项**扣的是同一份应纳税所得额** —— 叠加会跨档（实测差 974 元）、年金
-                         4% 的基数是**上年度月平均工资**且封顶社平 3 倍、领取环节三件套各不相同；
-                         donation（17D-10 纵深 v1.66.0）捐赠不是一个所得项目，而是**横跨综合 / 经营 /
-                         分类三个所得项目**的一项扣除 —— 20 个速算器里没有一个能算，而最贵的一层是
-                         「先扣哪一项」：顺序自行决定，实测同一笔 5 万捐赠省 8000 还是 4244，差 3756 元；
-                         另外股权 / 房产的捐赠额按**财产原值**而不是市值；
-                         business（17D-11 纵深 v1.67.0）原来只认「一家个体户、成本费用逐项扣」，而
-                         **一人兴办两家以上企业必须汇总定档**（分别申报实测少交 28250）、**年度经营
-                         亏损不能跨企业弥补**（误按互抵实测少算 70000）、**投资者的工资不得税前扣除**
-                         —— 这三层它一层都没碰；
-                         property-transfer（17D-12 纵深 v1.68.0）卖房的税既不是工资也不是经营所得，
-                         而是**财产转让所得**（20% 比例税率）：应纳税所得额 = 转让收入 − 房屋原值 −
-                         转让环节税金 − 合理费用，装修费还有**原值比例上限**（原值 200 万、装修发票
-                         30 万只能扣 20 万，多缴 2 万）；**核定 1% 不是可选项**（查账 80 万 vs 核定
-                         5 万，差 75 万）；满五唯一的「唯一」是**同一省 / 自治区 / 直辖市范围内**
-                         夫妻唯一一套，不是全国唯一；受赠 / 继承的房屋原值取**原捐赠人 / 被继承人**
-                         的取得成本（误按受赠时评估价算差 68 万）；换购退税退的是**已缴**个税
-                         （财政部 税务总局 住房城乡建设部公告 2026 年第 3 号，至 2027-12-31），
-                         按新购 ÷ 转让金额的比例退）；
-                         non-resident（17D-13 纵深 v1.69.0）即便同属个税，「月薪 + 五险一金 + 专项附加」
-                         那五个框默认这位是**中国税收居民**，而这一类人进门要解决的第一个问题根本不是
-                         「扣多少」，而是「**这笔钱要不要在中国缴**」：≤ 90 天只对「境内工作 + 境内
-                         雇主支付或者负担」的重叠部分计税、90~183 天境内工作期间的**不论谁支付**都要缴、
-                         满 183 天但不满六年时境外支付的境外所得免税、连续满六年且无单次离境超过
-                         30 天的才全球征税（同一批工资实测 **0 / 26620 / 53080 / 73080**）；收入额要
-                         先按三个公式过一道乘法，非居民再按**按月换算后的月度税率表逐月单独计税**
-                         （同一笔 24 万年薪均匀发 19080、集中到一个月发 44280），数月奖金单独 ÷ 6
-                         定档且不减费用 —— 错把它并入发放当月会算出 89580，虚增 **62960**）；
-                         新增税种无需再改本文件。 -->
-                    <div id="toolbox-deep-extra" class="tool-grid-1 mt-3 hidden"></div>
+                         + withholding-deep 劳务报酬预扣预缴 + bonus-tax-deep 年终奖择优
+                         + equity-deep 股权激励 + severance-deep 离职补偿
+                         + early-retirement-deep 提前退休 / 内退 + expat-deep 外籍津补贴免税
+                         + annual-settlement-deep 年度汇算清缴 + special-deduction-deep 专项附加扣除
+                         + private-pension-deep 个人养老金与税优三件套
+                         + donation 公益慈善捐赠扣除 + property-transfer 个人转让房屋
+                         + non-resident 非居民 / 无住所。
+                         各税种为什么必须自带 spec（速算器答不了的那层），写在 tool-registry.js 各自的注释里。 -->
+                    <div id="toolbox-deep-extra" class="tool-grid-1 hidden"></div>
                     </div>
                 </div>
             </div>
@@ -862,9 +768,9 @@
                             <h2 id="quick-title" class="text-lg font-bold"></h2>
                             <p id="quick-subtitle" class="text-xs text-gray-500 mt-0.5"></p>
                         </div>
-                        <!-- 阶段19-7：视图密度开关（简明 / 完整），就地切换、即时生效、记住偏好。
-                             内容由 toolbox-ui.js 按 window.EuriskoModePref 渲染（游客也可用）。 -->
-                        <div id="quick-mode-pill" class="flex-shrink-0"></div>
+                        <!-- v1.142.0：原先这里是一颗「简明 / 完整」视图密度 pill。撤掉之后没了
+                             二级心智：想要更多参数，都在表单内的「更多参数（可选）」里，
+                             不用先去挑一个"我是什么水平"。 -->
                     </div>
                     <!-- 阶段19-12：政策时效 + 版本独占一行。挤在标题行里，手机宽度下会把
                          「月薪个税」压成一字一行（基线 quick-375 抓到的真回归）——
@@ -927,9 +833,8 @@
                      没有「上次」就不显示 —— 摆个比不出来的对比卡，等于骗用户这里有过结论。 -->
                 <div id="quick-compare-nudge" class="home-card mt-3 hidden"></div>
 
-                <!-- 视图密度轻提示（阶段19-7）：只在简明视图、算满 3 次时问一次。
-                     不放在结果页最上面 —— 用户是来看结果的，不是来看产品教他开功能的。 -->
-                <div id="quick-mode-hint" class="home-card mt-3 hidden"></div>
+                <!-- v1.142.0：原先这里是「算满 3 次问一次要不要切完整视图」的轻提示卡。
+                     它推销的是一个已经不存在的开关 —— 删掉的不是一张卡，是那道题。 -->
 
                 <!-- 易错口径 -->
                 <div id="quick-pitfalls" class="home-card mt-3 tool-pitfall"></div>
@@ -955,8 +860,17 @@
                 <!-- 算完还能干什么：相关工具（结果页不该是终点） -->
                 <div id="quick-next" class="home-card mt-3 hidden"></div>
 
+                <!-- v1.142.x：这里原先是一颗外跳链接「查看完整说明与静态税率表 →」
+                     （href = 该工具的 seoPath，target=_blank）。v1.141.0 定的**入口纪律**
+                     写得很清楚：PWA（display: standalone）与微信内置浏览器里 target=_blank
+                     会**跳出应用容器**、另开系统窗口，用户看到的是「点一下，App 没了」——
+                     那轮只改了「关于」里的两条协议，漏了这一条。
+                     现在改站内：税率表用 tax-assistant-ui 的 showRateTable 弹窗
+                     （判据①：算到一半查表，跳页就把已填的内容丢了）；「完整说明」不再外跳 ——
+                     说明 App 内本来就有（易错口径 + 政策依据 + 每个框的问号提示），
+                     没必要把人送到落地页上去读。 -->
                 <div class="mt-3 mb-6 text-xs text-center">
-                    <a id="quick-seo-link" href="/seo/index.html" target="_blank" rel="noopener" class="text-primary hover:underline">查看完整说明与静态税率表 →</a>
+                    <button type="button" id="quick-rate-table" class="text-primary hover:underline">查看税率表 →</button>
                 </div>
                 </div>
                 </div>
@@ -1787,7 +1701,7 @@
                     <div class="border-t border-gray-200 pt-4">
                         <p class="text-sm font-semibold text-gray-800 mb-3 text-center">🧭 怎么用</p>
                         <ol class="space-y-2 text-xs text-gray-600">
-                            <li class="flex gap-2"><span class="text-primary font-semibold">1</span><span>选一个贴近您的身份（上班族 / 自由职业 / 个体户 / 企业财务 / 高管股东 / HR），它只改默认视角，不限制您能用什么。</span></li>
+                            <li class="flex gap-2"><span class="text-primary font-semibold">1</span><span>选一个贴近您的身份（上班族 / 自由职业 / 个体户 / 企业财务 / 高管股东 / HR），它决定哪组工具排在「为你推荐」，不限制您能用什么。</span></li>
                             <li class="flex gap-2"><span class="text-primary font-semibold">2</span><span>填收入、扣除、专项附加与社保基数；常用参数可存成税务档案与主体模板，下次一键填充，中途离开还会自动存草稿。</span></li>
                             <li class="flex gap-2"><span class="text-primary font-semibold">3</span><span>看结果与要点：把不同方案存下来并排对比、存进「计算历史」，需要时可导出 PDF / Word 报告或生成分享图。</span></li>
                         </ol>
@@ -1813,7 +1727,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.141.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.142.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1862,7 +1776,7 @@
                 </button>
             </div>
             <div class="modal-body p-5">
-                <p class="text-sm text-gray-600 mb-4">选一个最贴近你的身份，测算会默认按这个场景给参数。不选也照常用全部入口 —— 身份只改默认视角，不限制你能用什么。</p>
+                <p class="text-sm text-gray-600 mb-4">选一个最贴近你的身份，工具页会把它相关的那组工具排在「为你推荐」、结果里的下一步也照这个顺序 —— 其余入口一个不少。不选也照常用全部工具。</p>
                 <div id="identity-modal-list" class="identity-pick-grid">
                     <!-- 由 identity-onboarding.js 按 tool-registry.js 的 scenarios 渲染 -->
                 </div>
@@ -2230,11 +2144,10 @@
     <script src="src/js/calculation/vat-quick.js"></script>
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>
-    <!-- 阶段19-7：视图密度偏好（简明 / 完整）—— 必须排在 toolbox-ui.js 与 deep-wizard-ui.js 之前
-         （两个渲染器在渲染时就读它，晚加载会出现「首屏按简明渲染、切一次才对」） -->
-    <script src="src/js/ui/mode-pref.js"></script>
-    <!-- 阶段19-2 遗留清偿③：身份视角偏好（「我是谁」那 6 张卡选的是默认视角，不是筛选）——
-         必须在 toolbox-ui.js 之前（卡片渲染时读它），且在 mode-pref.js 之后（要调 applyDefault）。 -->
+    <!-- v1.142.0：原先排在这里的 mode-pref.js（简明 / 完整视图密度）已随那个概念一并删除。
+         进阶参数折叠与「主动翻过参数」的行为计数落在 toolbox-ui.js —— 谁画折叠块谁记。 -->
+    <!-- 身份视角偏好（「我是谁」那 6 张卡选的是推荐排序，不是筛选）——
+         必须在 toolbox-ui.js 之前（工具页渲染推荐组时读它）。 -->
     <script src="src/js/ui/identity-pref.js"></script>
     <!-- v1.139.0：「我是谁」弹窗与两处身份卡（我的页 / 个人中心）。
          必须排在 identity-pref.js 之后（读写入口在它身上）、tool-registry.js 之后（6 张身份卡的数据源）。
@@ -2451,7 +2364,7 @@
                                  等于看不见（对比度审计在 dark/profile 抓到的）。改用自定义类钉住深色，
                                  见 ui-redesign.css 的 .profile-identity__title / __sub。 -->
                             <h3 id="profile-identity-title" class="profile-identity__title font-semibold text-sm leading-snug">我是谁</h3>
-                            <p id="profile-identity-sub" class="profile-identity__sub text-xs mt-1 leading-relaxed">选一个最贴近你的身份，也可以只填职务与公司名称</p>
+                            <p id="profile-identity-sub" class="profile-identity__sub text-xs mt-1 leading-relaxed">选一个最贴近你的身份，相关的工具会排在前面；也可以只填职务与公司名称</p>
                         </div>
                         <i class="fa fa-chevron-right text-gray-300 flex-shrink-0"></i>
                     </div>
@@ -2547,7 +2460,10 @@
             <!-- 我的身份（v1.139.0）：身份撤出首页后的**常驻位置** —— 显示 + 随时修改。
                  排在账号信息之前：身份是每次测算都用得着的偏好，账号资料是一次性的设置。
                  点「修改身份」开的是与首次登录同一个弹窗（#identity-modal）——
-                 一个目的地只有一条路径，不再写第二份表单。 -->
+                 一个目的地只有一条路径，不再写第二份表单。
+                 v1.142.0：副标题从「只影响默认视角」改成这句话 —— 原先那句说的东西
+                 用户看不见（默认视角当时等于视图密度，而那层已取消），问「选它有什么用」
+                 是必然。现在身份的效果说得出来：工具页把你那组排在前面、结果里的下一步同理。 -->
             <div class="card mb-5">
                 <div class="flex items-center gap-3 mb-4">
                     <div class="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
@@ -2555,7 +2471,7 @@
                     </div>
                     <div>
                         <h3 class="text-lg font-bold text-gray-800">我的身份</h3>
-                        <p class="text-xs text-gray-500">只影响默认视角与称呼，不影响任何计算口径</p>
+                        <p class="text-xs text-gray-500">决定工具页「为你推荐」那组排在最前面，不改任何计算口径</p>
                     </div>
                 </div>
                 <div id="identity-settings-summary" class="identity-settings"></div>
@@ -2608,21 +2524,9 @@
                 </div>
             </div>
 
-            <!-- 视图密度（阶段19-7）：与速算器 / 完整测算页右上角那颗是同一个开关、同一份偏好。
-                 放在设置页而不是塞进我的页卡片流 —— 它是一次性的偏好，不是日常入口。 -->
-            <div class="card mb-5">
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
-                        <i class="fa fa-sliders"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-800">视图密度</h3>
-                        <p class="text-xs text-gray-500">只影响显示多少参数，不影响计算口径与可用工具</p>
-                    </div>
-                </div>
-                <div id="settings-mode-pill" class="flex items-center gap-2"></div>
-                <p class="text-xs text-gray-500 mt-2">简明：只填必填项、直接出结论 ｜ 完整：可调全部参数、看逐项推导。任意测算页右上角也能就地切换。</p>
-            </div>
+            <!-- v1.142.0：原先这里是一张「视图密度（简明 / 完整）」设置卡。
+                 那一档取消了 —— 参数多寡由每张表单里的「更多参数（可选）」自己管，
+                 不必先去设置页挑一个全局档位。同一块位置改放「我是谁」（见上一张卡）。 -->
 
             <!-- 账号安全：修改密码 -->
             <div class="card mb-5">

@@ -55,16 +55,16 @@
             declared = toNumber(input.equityMarketValue);
             amount = toNumber(input.equityCost);
             label = '捐赠股权';
-            note = '按持有股权的**财产原值**确定 —— 不是市值（99 号公告二（二））';
+            note = '按持有股权的财产原值确定 —— 不是市值（99 号公告二（二））';
         } else if (kind === 'house') {
             declared = toNumber(input.houseMarketValue);
             amount = toNumber(input.houseCost);
             label = '捐赠房产';
-            note = '按持有房产的**财产原值**确定 —— 不是市值（99 号公告二（二））';
+            note = '按持有房产的财产原值确定 —— 不是市值（99 号公告二（二））';
         } else if (kind === 'other') {
             declared = amount = toNumber(input.otherMarketValue);
             label = '其他非货币性资产';
-            note = '按非货币性资产的**市场价格**确定（99 号公告二（三））';
+            note = '按非货币性资产的市场价格确定（99 号公告二（三））';
         } else {
             declared = amount = toNumber(input.cashAmount);
             label = '货币捐赠';
@@ -109,7 +109,7 @@
                 key: 'classification', label: '分类所得（当月）', type: 'classification',
                 taxable: cls, monthly: true, clsType: input.classificationType || 'accidental',
                 limit: cls * ratio, blocked: false,
-                blockNote: '分类所得按**当月**应纳税所得额算限额，且在分类所得中扣除的不再调整到其他所得'
+                blockNote: '分类所得按当月应纳税所得额算限额，且在分类所得中扣除的不再调整到其他所得'
             }
         ];
     }
@@ -245,7 +245,7 @@
             notes.push('经营所得为核定征收：不扣除公益捐赠（六（四））');
         }
         if (input.residency === 'non-resident') {
-            notes.push('非居民个人：按捐赠**当月**应纳税所得额的 30% 扣除，扣不完的可以在经营所得中继续扣除（七）');
+            notes.push('非居民个人：按捐赠当月应纳税所得额的 30% 扣除，扣不完的可以在经营所得中继续扣除（七）');
         }
         if (String(input.employerCount) === '2') {
             notes.push('两处以上工资薪金：只能选择其中一处扣除，选择后当年不得变更（四（一））');
@@ -256,7 +256,7 @@
         }
         if (best.unused > 0) {
             notes.push('超出全部所得项目限额的 ' + Math.round(best.unused)
-                + ' 元，个人**不结转以后年度**（企业可结转 3 年）');
+                + ' 元，个人不结转以后年度（企业可结转 3 年）');
         }
 
         return {

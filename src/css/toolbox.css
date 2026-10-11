@@ -310,6 +310,20 @@
     margin-bottom: 4px;
 }
 
+/* 名字与那颗问号同一行。名字是块级（它要独占一行），所以问号得有个容器跟着它站。 */
+.tool-field-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.tool-field-head .tool-label {
+    margin-bottom: 0;
+    min-width: 0;
+}
+
 .tool-input-wrap {
     position: relative;
 }
@@ -353,6 +367,18 @@
     pointer-events: none;
 }
 
+/* 勾选框在前、名字在后（1.17 那四个页面就是这一颗） */
+.tool-field--switch {
+    padding-top: 2px;
+}
+
+.tool-switch-input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--c-brand);
+}
+
 .tool-switch {
     display: inline-flex;
     align-items: center;
@@ -362,13 +388,59 @@
     color: #374151;
 }
 
+/* 名词后面那颗问号：解释收在里面，点开才出现。
+   它小、淡、不抢 —— 要说明的人点一下就有，不要的人眼前只有字段本身。 */
+.tool-hint-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--c-text-3);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    /* 垂直：字号 13 的小圆点摆在 12px 的 label 旁边，不调就会往下坠几个像素 */
+    vertical-align: -2px;
+}
+
+.tool-hint-btn:hover,
+.tool-hint-btn:focus-visible {
+    color: var(--c-brand);
+    background: rgba(37, 99, 235, 0.10);
+}
+
+/* 展开态：给一颗实心底，用户回头能看出"这段是我点开的" */
+.tool-hint-btn.is-on {
+    color: var(--c-brand);
+    background: rgba(37, 99, 235, 0.14);
+}
+
 .tool-field-hint {
     margin-top: 4px;
     /* v1.141.0：11 → 12。字段提示是说明档 12，11 是徽章档。 */
     font-size: var(--fs-xs);
     color: var(--c-text-3);
     line-height: 1.5;
+    /* 提示里的「计算公式：…」自带一个换行（说明一段、公式一段，别糊成一坨）——
+       没有这条，\n 会被 HTML 折成一个空格，等于白加。 */
+    white-space: pre-line;
 }
+
+/* 收起靠 hidden 属性（语义与可访问性都归它管）；这里只保证样式层不会有人把它显示回来 */
+.tool-field-hint[hidden] {
+    display: none;
+}
+
+.dark .tool-hint-btn { color: #9ca3af; }
+.dark .tool-hint-btn:hover,
+.dark .tool-hint-btn:focus-visible { color: #93c5fd; background: rgba(96, 165, 250, 0.16); }
+.dark .tool-hint-btn.is-on { color: #93c5fd; background: rgba(96, 165, 250, 0.20); }
 
 /* ====== 结果区 ====== */
 .tool-result-primary {
@@ -929,4 +1001,365 @@
 
 .dark .bottom-tab.active {
     color: #60a5fa;
+}
+
+/* ====== 勾选式小节（v1.142.0：完整测算内部结构回到 1.17 的页面形态）======
+   一个勾选框管一片字段：它没有单独的标题行 —— 方框右边那行字就是小节名，
+   由它控制的字段缩进挂在下面一块。看得出「这些数归这个勾」，也看得出勾与不勾差多少。
+   此前勾选项是「标题一行 + 右侧是/否开关」两件东西并列，它管的字段与它同级平铺，
+   于是「勾了会发生什么」只能靠猜。 */
+.dw-group {
+    margin-top: 14px;
+}
+
+.dw-group-head {
+    margin-bottom: 6px;
+}
+
+.dw-group-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.dw-group-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--c-brand);
+}
+
+.dw-group-name {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+/* ====== 同一层的字段并排（v1.142.0：回到 1.17 页面里 `grid-cols-2` 的读法）======
+   1.17 那四个页面里，一个卡片内部的框就是**两个一行**（`<div class="grid grid-cols-2 gap-3">`）：
+   养老金额挨着养老比例、房贷额挨着年限 —— 眼睛对着看就能核。spec 化之后全部被拉成一列，
+   于是「两个相关的数对着看」这个最基本的核对动作做不成：它们隔着六行各自在屏幕左边缘，
+   用户只能凭记忆比。
+   
+   窄屏（手机）必须回到一列：375px 上开两列，一个金额框会被压到连 5 位数都放不整齐。 */
+.dw-field-grid,
+.dw-group-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    /* start：**不拉平**同一行里两格的高度 —— 一格的 hint 多一行时，拉平会让它右边的框
+       跟着往下顶，视觉上就串了行（框和它的名字还是对的，但读起来像「这个挂在上一个下面」） */
+    align-items: start;
+}
+
+/* 缩进 + 左侧竖线：包含关系靠位置表达，不靠再加一层边框把它框成第二张卡片 */
+.dw-group-body {
+    margin: 6px 0 0 24px;
+    padding: 10px 0 0 12px;
+    border-left: 2px solid var(--c-border);
+}
+
+/* 这四样各自占满一行：勾选式小节（它自己下面会再开一排）、还没勾的那颗独立勾选框
+   （同样是标题式，占半格会让右边空出一块，看着像漏了一半）、可增删的列表、进阶参数折叠块 */
+.dw-field-grid > .dw-group,
+.dw-field-grid > .dw-group-head,
+.dw-field-grid > [data-dw-repeater],
+.dw-field-grid > details,
+.dw-group-body > .dw-group-head,
+.dw-group-body > [data-dw-repeater],
+/* 「社保缴费基数」这类：它是下面一整组的来源，跟自己产出的东西并排会说错关系 */
+.dw-field-wide {
+    grid-column: 1 / -1;
+}
+
+/* ====== 完整测算第一步：回速算版的一行 ======
+   速算器 → 完整测算 在速算器结果页有按钮（「按年填全的完整版」），反过来原本没有路。
+   做成一行小字而不是卡片：它不是这一屏的主角，且只在第一步出现 ——
+   填到后面再来这句话，等于劝人扔掉已经填好的东西。 */
+.dw-quick-hint {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+}
+
+.dw-quick-hint button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--c-brand);
+}
+
+.dw-quick-hint button:hover {
+    text-decoration: underline;
+}
+
+/* ====== 一组里再分类（专项附加扣除的七项）======
+   勾上「专项附加扣除」之后底下是五类十来个框。它们平铺成一串时，用户看不出
+   "我这五个数分别属于哪一类"，更看不出还漏了哪一类没填 —— 七项里漏一项，
+   差额就是每月两千块。分类靠一条小标题隔开，比靠边框更有用：边框会把它变成
+   第二张卡片，而它只是同一张卡片里的一个段落。 */
+.dw-subgroup {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+}
+
+.dw-subgroup:first-child {
+    margin-top: 0;
+}
+
+.dw-subgroup-title {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--c-text-2);
+    padding: 2px 0 6px;
+    border-top: 1px dashed var(--c-border);
+}
+
+.dw-subgroup:first-child .dw-subgroup-title {
+    border-top: 0;
+}
+
+/* 分类底下仍是两列（与 dw-group-body 同一条读法）：金额挨着它自己的比例 */
+.dw-subgroup-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    align-items: start;
+}
+
+@media (max-width: 767.98px) {
+    .dw-subgroup-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.dark .dw-subgroup-title {
+    color: #d1d5db;
+    border-top-color: #374151;
+}
+
+/* 最后一行不留空尾巴 —— 组与组之间的留白由 dw-group 自己给，这里不要再加一层 */
+.dw-group-body > .tool-field:last-child,
+.dw-group-body > [data-dw-repeater]:last-child {
+    margin-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+    .dw-field-grid,
+    .dw-group-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* 手机上再缩进 24px 就把输入框挤没了，收到一半 */
+    .dw-group-body {
+        margin-left: 12px;
+        padding-left: 10px;
+    }
+}
+
+.dark .dw-group-body {
+    border-left-color: #374151;
+}
+
+.dark .dw-group-name {
+    color: #e5e7eb;
+}
+
+/* ====== 结果页：主次（v1.142.0 第四轮）======
+   此前结果页从主数字到第二十行明细是同一个蓝色同一个字号，二十多个数没有落点 ——
+   用户原话「一眼看上去都是一个颜色的数据，没有主次，看起来会很疲惫」。
+   这里按三级给：结论（hero）独占一块底色、明细按语义着色（税 = 红 / 扣除 = 中性 /
+   到手 = 绿 / 其余中性），格子统一右对齐 + 等宽数字，让一列的数能被扫而不是被读。 */
+.dw-result-hero {
+    margin: 4px 0 2px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.04));
+    border: 1px solid rgba(37, 99, 235, 0.22);
+}
+
+.dw-result-hero__label {
+    font-size: var(--fs-sm);
+    color: var(--c-text-3);
+}
+
+.dw-result-hero__value {
+    margin-top: 4px;
+    font-size: 30px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--c-brand);
+    font-variant-numeric: tabular-nums;
+}
+
+.dark .dw-result-hero {
+    background: rgba(37, 99, 235, 0.14);
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.dark .dw-result-hero__value {
+    color: #93c5fd;
+}
+
+/* 主数字下面那两个关键数（要交多少税 / 真正到手多少）：
+   结论由这三个数构成，只有主数字就得展开才知道交了多少税。
+   两格并排 —— 与字段区同一种读法；手机上回一列。 */
+.dw-result-keyfacts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dw-result-keyfact {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px solid var(--c-border);
+}
+
+.dw-result-keyfact__label {
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+}
+
+.dw-result-keyfact__value {
+    margin-top: 2px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 语义色：与明细行同一套（toneOf），两处颜色必须一致，不然同一个数在两个地方两种脸色 */
+.dw-result-keyfact.dw-result-row--tax .dw-result-keyfact__value { color: #dc2626; }
+.dw-result-keyfact.dw-result-row--net .dw-result-keyfact__value { color: #059669; }
+
+.dark .dw-result-keyfact {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .dw-result-keyfact__label { color: #9ca3af; }
+.dark .dw-result-keyfact__value { color: #e5e7eb; }
+.dark .dw-result-keyfact.dw-result-row--tax .dw-result-keyfact__value { color: #f87171; }
+.dark .dw-result-keyfact.dw-result-row--net .dw-result-keyfact__value { color: #34d399; }
+
+@media (max-width: 767.98px) {
+    .dw-result-keyfacts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 明细默认收起的就是这一块：结论先给，核对按需 */
+.dw-detail-box {
+    margin-top: 14px;
+}
+
+.dw-detail-box__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px solid var(--c-border);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.dw-detail-box__summary::-webkit-details-marker {
+    display: none;
+}
+
+.dw-detail-box__hint {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--c-text-3);
+}
+
+.dark .dw-detail-box__summary {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dw-result-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.dw-result-row:last-child {
+    border-bottom: 0;
+}
+
+.dw-result-row__label {
+    font-size: var(--fs-sm);
+    color: var(--c-text-3);
+}
+
+.dw-result-row__value {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* 语义色只给三类字眼命中的行（见 deep-wizard-ui 的 toneOf）：其余保持中性，
+   免得全页花花绿绿又回到"一个颜色"的另一头 —— 那头的疲惫叫找不着重点。 */
+.dw-result-row--tax .dw-result-row__value { color: #dc2626; }
+.dw-result-row--net .dw-result-row__value { color: #059669; }
+.dw-result-row--deduct .dw-result-row__label { color: var(--c-text-3); }
+.dw-result-row--deduct .dw-result-row__value { color: #374151; font-weight: 500; }
+
+.dark .dw-result-row { border-bottom-color: #374151; }
+.dark .dw-result-row__label { color: #9ca3af; }
+.dark .dw-result-row__value { color: #e5e7eb; }
+.dark .dw-result-row--tax .dw-result-row__value { color: #f87171; }
+.dark .dw-result-row--net .dw-result-row__value { color: #34d399; }
+.dark .dw-result-row--deduct .dw-result-row__value { color: #d1d5db; }
+
+/* 结果行的说明面板（点行名后面那颗问号展开）：浅底一块，不带边框 ——
+   行本身已有分隔线，再给面板加一条就是双线。 */
+.dw-result-hint {
+    margin: -2px 0 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    color: var(--c-text-3);
+    /* 同上：公式另起一行 */
+    white-space: pre-line;
+}
+
+.dw-result-hint[hidden] {
+    display: none;
+}
+
+.dark .dw-result-hint {
+    background: #1f2937;
+    color: #9ca3af;
+}
+
+.dw-result-note {
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    color: var(--c-text-3);
+}
+
+.dark .dw-result-note {
+    color: #9ca3af;
 }

@@ -221,7 +221,7 @@
                 limit: hp.annualLimit, contribution: premium, deductible: hp.deductible,
                 overLimit: hp.overLimit, addBack: 0,
                 note: '保费 ' + Math.round(premium) + ' 元，年限额 ' + hp.annualLimit + ' 元（' + hp.monthlyLimit + ' 元/月）',
-                withdrawNote: '保险赔款**免征**个税，无领取环节税'
+                withdrawNote: '保险赔款免征个税，无领取环节税'
             });
         }
 
@@ -249,7 +249,7 @@
                 annualEmployer: ac.annualEmployer,
                 note: '基数 ' + Math.round(base) + ' 元/月（上年度月平均工资，封顶社平 3 倍 '
                     + Math.round(baseCap) + '）× ' + (personalRate * 100).toFixed(1) + '% × 12',
-                withdrawNote: '领取时按**月度**税率表单独计税（不并入综合所得）'
+                withdrawNote: '领取时按月度税率表单独计税（不并入综合所得）'
             });
         }
 

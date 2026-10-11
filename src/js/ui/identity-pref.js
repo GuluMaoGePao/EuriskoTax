@@ -1,24 +1,19 @@
 /**
- * 身份视角偏好（阶段19-2 遗留清偿③）
+ * 身份视角偏好（阶段19-2 遗留清偿③ · v1.142.0 重写）
  *
- * plan §3.3.4 的原话：身份卡「作用是设置默认视图，**不是筛选工具**」——
- * 41 个入口永远都能进，身份只改默认的视图密度与推荐排序。
- * 但落地时这张卡做的是 `openScenario()`：跳到工具页后**只渲染那一个推荐组**，
- * 其余 36 个入口当场消失。那不是"挑身份"，是筛选，且违反 §3.9 的硬边界。
- * 所以这一版把两件事拆开：记住身份（这里）→ 卡片主行为改为"设为默认视角"（toolbox-ui.js）。
+ * 身份卡回答的是「我是谁」→ 于是推荐的那一组排在工具页最上面。三条边界先写在这里：
+ *   1. **只管推荐排序，不管工具可达性**。41 个入口永远都能进 —— 身份不是筛选。
+ *      卡首发那版做成 openScenario()：跳工具页后只渲染那一个推荐组，其余 36 个当场消失，
+ *      那是筛选，违反 §3.9 的硬边界；现在只是把一个组挪到最前面。
+ *   2. **必须看得见**。v1.142.0 之前身份还兼着带出「简明 / 完整」视图密度 —— 那层已经砍掉了
+ *      （见 toolbox-ui 的「进阶参数：折叠」注释），于是身份一度等于「选完什么都没发生」。
+ *      教训写在这：一个偏好如果不落在用户看得见的地方，它就只是本地存储里的一行字符串。
+ *   3. **不改计税口径**。这个偏好**绝不写进税务档案**（tax-profile 的 identity）——
+ *      档案那一项是计税口径（企业员工 / 个体户 / 自由职业，三个值），身份卡有 6 张，
+ *      值域对不上：选了「HR / 薪酬」往档案里写什么？写了就是拿导航选择去改计税口径，
+ *      将来算错没人查得到。两条线各管一件事。
  *
- * 三条边界（改之前先看这里）：
- *   1. **只管视图，不管计税**。这个偏好**绝不写进税务档案**（tax-profile 的 identity）——
- *      档案里那一项是计税口径（企业员工 / 个体户 / 自由职业，三个值），
- *      身份卡有 6 张（含财务 / HR / 高管），值域对不上：选了「HR / 薪酬」往档案里写什么？
- *      写了就是拿一个导航选择去改计税口径，将来算错没人查得到。两条线各管一件事。
- *   2. **不替用户推翻显式选择**。身份可以带出该身份的默认密度（老板 → 完整、上班族 → 简明），
- *      但用户自己切过视图之后就只听用户的 —— 走 mode-pref 的 `applyDefault()`，
- *      它只在「用户从未显式设过」时才写。
- *   3. **plan 没给答案的就不编**。表格里没有「高管 / 股东」的默认密度，那就**不登记** ——
- *      选它只记住身份标签，不动密度，界面上也不显示那句"当前视图"（不显示取不到的东西）。
- *
- * 游客可用（与 mode-pref 同一口径：偏好不是登录后才有的特权）。
+ * 游客可用：推荐排序不是登录后才有的特权。
  */
 (function () {
     'use strict';
@@ -31,16 +26,10 @@
     // 收益（少一个键）远小于代价（兼容分支散在读取处）。两条线各存各的：身份 id / 身份详情。
     var PROFILE_KEY = 'euriskoIdentityProfile';
 
-    // 默认视图密度：依据是 plan §3.3.4 身份卡表格（上班族 / 自由职业 / HR 简明；
-    // 老板个体户 / 企业财务 完整）。executive 与 agent 未登记 —— 见文件头第 3 条。
-    var DEFAULT_MODE_OF = {
-        employee: 'simple',
-        freelance: 'simple',
-        hr: 'simple',
-        owner: 'full',
-        finance: 'full'
-    };
-
+    // v1.142.0：**删掉了「默认视图密度」这层**。此前身份卡的作用是「带出简明 / 完整」，
+    // 而视图切换本身已经被砍掉（见 toolbox-ui 那一段注释）—— 一个看不见的东西带不出来，
+    // 于是身份在很长一段时间里等于"选完什么都没发生"。
+    // 现在身份只做一件看得见的事：**决定哪个推荐组排在前面**（toolbox-ui / 结果页的下一步）。
     var subs = [];
 
     function read() {
@@ -93,36 +82,17 @@
         });
     }
 
-    function modePref() { return window.EuriskoModePref; }
-
-    /** 该身份的默认密度；plan 没登记的返回 null（调用方据此决定显不显示那句话） */
-    function modeOf(id) {
-        var m = DEFAULT_MODE_OF[id];
-        return m === 'full' || m === 'simple' ? m : null;
-    }
-
-    // 带出默认密度：只有用户**没自己切过**视图时才写（mode-pref.applyDefault 内部判断）。
-    // 反过来不做 —— 身份不该推翻用户已经表达过的选择。
-    function applyDefaultMode(id) {
-        var p = modePref();
-        var m = modeOf(id);
-        if (!p || !m || typeof p.applyDefault !== 'function') return;
-        p.applyDefault(m);
-    }
-
     var api = {
-        DEFAULT_MODE_OF: DEFAULT_MODE_OF,
         get: function () { return read(); },
-        /** 设为默认视角（重复点同一张 = 幂等，不再广播） */
+        /** 设为默认视角：工具页的推荐组跟着换到这一身份（重复点同一张 = 幂等，不再广播） */
         set: function (id) {
             id = id || '';
             var prev = read();
             write(id);
-            applyDefaultMode(id);
             if (id !== prev) emit(id);
             return id;
         },
-        /** 取消默认：只清身份，**不动**已生效的视图密度（撤销身份不等于撤销视图） */
+        /** 取消默认：只清身份，其余入口不受影响（身份不是筛选，清掉也不是"少了一半工具"） */
         clear: function () {
             var prev = read();
             if (!prev) return '';
@@ -145,10 +115,7 @@
             var prevId = read();
             var p = readProfile();
             var nextId = typeof o.id === 'string' ? o.id : prevId;
-            if (nextId !== prevId) {
-                write(nextId);
-                applyDefaultMode(nextId);   // 与 set 同一条规矩：不推翻用户显式切过的视图
-            }
+            if (nextId !== prevId) write(nextId);
             writeProfile({
                 title: typeof o.title === 'string' ? o.title : p.title,
                 company: typeof o.company === 'string' ? o.company : p.company,
@@ -164,7 +131,6 @@
             if (p.onboarded) return;
             writeProfile({ title: p.title, company: p.company, onboarded: true });
         },
-        modeOf: modeOf,
         onChange: function (cb) {
             if (typeof cb !== 'function') return function () {};
             subs.push(cb);

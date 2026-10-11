@@ -27,7 +27,8 @@
         ? window.CopyStandard.DISCLAIMER.result
         : '') || '测算结果依据您填写的数据与现行政策估算，仅供参考，不构成税务建议；正式申报请以主管税务机关核定为准。';
 
-    var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null, compareKey: null };
+    // touched：用户亲手改过的派生值键（详见 applyDerived）
+    var state = { toolId: null, stepIndex: 0, values: {}, lastResult: null, compareKey: null, touched: {} };
 
     function R() { return window.EuriskoToolRegistry; }
     function TB() { return window.EuriskoToolbox; }
@@ -70,19 +71,10 @@
         return !!tool && tool.status === 'deep' && !tool.pageId;
     }
 
-    // ====== 阶段19-7：视图密度（简明 / 完整）======
-    // 与速算器共用同一份偏好（window.EuriskoModePref），只读、不自己存一份 —— 两份默认值必然分家。
-    var ADV_STEP = '__advanced';
-
-    function modeLib() { return window.EuriskoModePref; }
-
-    // 偏好模块不在时（index.html 脚本顺序排错 / 只用渲染器的老测试）按**完整**渲染：
-    // 宁可多显示一步，也绝不在用户不知情时把参数收起来 —— 藏参数是这个特性唯一不可逆的风险。
-    function isFullMode() {
-        var p = modeLib();
-        return !p || p.get() === p.FULL;
-    }
-
+    // ====== 进阶参数：步内折叠 ======
+    // 只管**字段**（level:'advanced' 的字段收进「更多参数（可选）」），不再管步骤 ——
+    // v1.142.0 之前它还会把 advanced 的整步甩到末尾，那是简明视图时代的规矩；
+    // 现在步骤表就是 spec 声明的那一张（详见 stepsOf 那条注释）。
     function isAdvanced(x) { return !!x && x.level === 'advanced'; }
 
     function stepKeyOfField(tool, f) {
@@ -90,31 +82,21 @@
         return f.step || first;
     }
 
-    // full 参数化：切换视图时要能拿到**切换前**那份步骤表（否则收值会收错一步）
-    function stepsOfWith(tool, full) {
+    // v1.142.0（第二轮）：**渲染器不再重排步骤**，spec 里怎么声明就怎么排。
+    //
+    // 「把 advanced 甩到最后」是简明视图时代的遗迹：换一档录取密度就换一套步骤条，
+    // 用户在两屏之间认不出自己填到哪。而 1.17 那四个页面从头到尾只有一个顺序 ——
+    // 基本参数 → 收入明细 → 扣除项明细 → 计算结果，那正是"先定口径、再录数、后扣除"的讲解顺序。
+    // 参数一眼看不是"少填的那一档"，它是开工前要先定下的口径（工作几个月、去年预缴了多少），
+    // 放在最前面才答得出来；等收入都录完了再回头问"总共工作几个月"就已经晚了 ——
+    // 工作月数变了，前面录的那些数全要重算一遍。
+    function stepsOf(tool) {
         var list = (tool.steps || [{ key: 'main', title: '填写数据', why: '' }]).slice();
-        // 简明视图：advanced 步**合并**成一步，而不是删掉 —— 删掉等于把这些参数藏起来，
-        // 用户既看不见也改不了；合并后它们仍以 spec 的 default 参与计算（口径不变）。
-        if (!full && list.some(isAdvanced)) {
-            list = list.filter(function (s) { return !isAdvanced(s); }).concat([{
-                key: ADV_STEP, title: '补充参数（可选）',
-                why: '不填也能算：以下参数按默认值参与测算，改了才用你的数'
-            }]);
-        }
         // 结果步由渲染器统一追加 —— 每个完整测算都有，不该在每个 spec 里重复声明
-        list.push({ key: '__result', title: '计算结果', result: true });
-        return list;
+        return list.concat([{ key: '__result', title: '计算结果', result: true }]);
     }
 
-    function stepsOf(tool) { return stepsOfWith(tool, isFullMode()); }
-
     function fieldsOfStep(tool, stepKey) {
-        if (stepKey === ADV_STEP) {
-            var advKeys = (tool.steps || []).filter(isAdvanced).map(function (s) { return s.key; });
-            return (tool.fields || []).filter(function (f) {
-                return advKeys.indexOf(stepKeyOfField(tool, f)) !== -1;
-            });
-        }
         return (tool.fields || []).filter(function (f) {
             return stepKeyOfField(tool, f) === stepKey;
         });
@@ -138,11 +120,103 @@
         return TB().visibleFields({ fields: fields }, values);
     }
 
+    // ====== 实时预览条（v1.142.0 补回来的东西）======
+    // 这套向导一度**没有**它：填到第 4 步才知道自己在算多少钱。而 1.17 时代那 4 个整页顶上挂着
+    // calc-preview-bar（收入 / 扣除 / 税），边填边变 —— 「计算流程看得见」就是靠它。
+    // 这里用通用做法重做：**金额行由渲染器自己挑**，不要求第 22 个 spec 再声明一遍取哪几项。
+    //   主指标（primary）排最后（它是这一屏的结论），前面最多补两项原料口径。
+    // 挑不到就少显示一项 —— 半个数 deny 用户去核对，不如不显示。
+    function previewPicks(tool) {
+        var out = null;
+        try {
+            out = tool.compute(state.values);
+        } catch (e) {
+            return [];                      // 填到一半就抛错是常态：那就是"还没算出来"
+        }
+        if (!out) return [];
+        var rows = out.rows || [];
+        var moneyRows = rows.filter(function (r) {
+            return r && (r.kind === 'currency' || r.kind === 'money') && isFinite(Number(r.value));
+        });
+        function pick(re, exclude) {
+            for (var i = 0; i < moneyRows.length; i++) {
+                var r = moneyRows[i];
+                if (!re.test(r.label)) continue;
+                if (exclude && exclude.test(r.label)) continue;
+                return r;
+            }
+            return null;
+        }
+        var lead = [];
+        // 「收入」与「扣除」是全套税的通用原料口径；应纳税所得额看着像收入，实则是半成品，排掉
+        var income = pick(/收入/, /应纳税所得|不含税销售额/) || pick(/销售额/);
+        var deduction = pick(/扣除/);
+        if (income) lead.push(income);
+        if (deduction && (!income || deduction.label !== income.label)) lead.push(deduction);
+
+        var main = null;
+        if (out.primary && isFinite(Number(out.primary.value))) main = out.primary;
+        else main = pick(/税额|应纳|应纳税/) || moneyRows[moneyRows.length - 1] || null;
+        if (!main) return [];               // 一个数都还没出来时不占这一行
+        return lead.concat([main]).slice(0, 3);
+    }
+
+    // 金额格式化：页面上的金额差一位小数就是一份对不上的账，这里不自带实现，
+    // 一律引用速算器那一侧的通用入口 TB().fmtValue。
+    function fmt(value, kind) { return TB().fmtValue(value, kind); }
+
+    // 预览条复用既有的 .calc-preview-bar（1.17 那 4 个整页用的就是这一条，它是**吸底**的），
+    // 而 `.has-preview-bar .step-content { pb-20 }` 早就给它留好了位置 —— 不另造一套样式。
+    // 三档语义色沿用既有令牌（income 蓝 / deduction 橙 / tax 红），因为这三个数就是这样排的。
+    function pickClass(i, n, r) {
+        // 主指标永远是最后一个：它就是这一屏要回答的那个数
+        if (i === n - 1) return 'calc-preview-value calc-preview-tax';
+        return r.label.indexOf('扣除') !== -1
+            ? 'calc-preview-value calc-preview-deduction'
+            : 'calc-preview-value calc-preview-income';
+    }
+
+    function previewGridHtml(tool) {
+        var picks = previewPicks(tool);
+        if (!picks.length) return '';
+        var cols = 'grid-template-columns: repeat(' + picks.length + ', minmax(0, 1fr));';
+        return '<div class="calc-preview-grid" style="' + cols + '">' +
+            picks.map(function (r, i) {
+                return '<div class="calc-preview-item">' +
+                    '<div class="calc-preview-label">' + esc(r.label) + '</div>' +
+                    '<div class="' + pickClass(i, picks.length, r) + '">' + esc(fmt(r.value, r.kind)) + '</div>' +
+                    '</div>';
+            }).join('') + '</div>';
+    }
+
+    function previewBarHtml(tool, steps) {
+        // 结果步不显示：那一屏自己就是完整的数（老 CSS 里的 is-result-step 也是这个意思）
+        if (steps[state.stepIndex] && steps[state.stepIndex].result) return '';
+        return '<div id="dw-preview-bar" class="calc-preview-bar">' +
+            '<div class="max-w-5xl mx-auto">' + previewGridHtml(tool) + '</div></div>';
+    }
+
+    // 输入过程中只刷新**这一条**（不整屏重画 —— 重画会把正在输入的光标甩掉）
+    function refreshPreviewBar(tool) {
+        var host = document.getElementById('dw-preview-bar');
+        if (!host) return;             // 在结果步（没有这一条）时输入事件照旧来了：直接走人
+        var grid = host.querySelector('.calc-preview-grid');
+        var html = previewGridHtml(tool);
+        if (!html) { host.classList.add('is-result-step'); return; }
+        host.classList.remove('is-result-step');
+        if (grid) grid.outerHTML = html;
+        else host.querySelector('.max-w-5xl').innerHTML = html;
+    }
+
     function headerHtml(tool, steps) {
         var ind = steps.map(function (s, i) {
             var on = i === state.stepIndex ? ' active' : '';
+            // 步骤条本身可跳（data-dw-step）：完整测算动辄 4~5 屏，"回顾上一步改个数"不该
+            // 只能一步步倒回去 —— 绑事件见 bindStepJump（整块 innerHTML 每次重画，委托到 #dw-body）
             return (i ? '<div class="step-line"></div>' : '') +
-                '<div class="step"><div class="step-number' + on + '">' + (i + 1) + '</div>' +
+                '<div class="step dw-step-jump" data-dw-step="' + i + '" role="button" tabindex="0"' +
+                ' title="' + esc(s.title) + '">' +
+                '<div class="step-number' + on + '">' + (i + 1) + '</div>' +
                 '<div class="step-title' + on + '">' + esc(s.title) + '</div></div>';
         }).join('');
         return '<div class="calc-sticky-header"><div class="max-w-5xl mx-auto">' +
@@ -155,8 +229,6 @@
                         '</div>' +
                     '</div>' +
                     '<div class="flex items-center space-x-1">' +
-                        // 阶段19-7：视图密度 pill（与速算器同一颗、同一份措辞，内容在 bind() 里填）
-                        '<div id="dw-mode-pill"></div>' +
                         '<button id="dw-reset" class="calc-action-btn" title="重置"><i class="fa fa-refresh"></i></button>' +
                     '</div>' +
                 '</div>' +
@@ -542,12 +614,59 @@
         // 会被所有 spec 工具复用）。所以这次把「结果属于谁」写进 data-tool-id、把「每一行是什么」
         // 写进 data-dw-row：留资归因 / 分享卡 / 埋点都靠这两个锚点认人，避免把增值税的测算
         // 归成因经营所得算过 —— 那是会写进线索表的数据质量问题。
-        var rows = (view.rows || []).map(function (r) {
-            return '<div class="flex items-center justify-between py-2 border-b border-gray-100" data-dw-row="' + esc(r.label) + '">' +
-                '<span class="text-sm text-gray-600">' + esc(r.label) +
-                (r.hint ? '<i class="fa fa-question-circle ml-1 text-gray-500" title="' + esc(r.hint) + '"></i>' : '') +
-                '</span>' +
-                '<span class="font-medium">' + esc(TB().fmtValue(r.value, r.kind)) + '</span></div>';
+        // v1.142.0 第四轮：① 每一行按语义着色（此前一律 `<span class="text-primary">`，
+        // 二十多个数字一个颜色，眼睛没有任何落点 —— 用户原话「看起来会很疲惫」）；
+        // ② 整体默认收起：结论先看一个主数字，要看分项再展开。
+        // 语义只认三类字眼（税 / 扣除 / 其余），命中不到一律中性 —— 不猜剩下的半句。
+        function toneOf(label) {
+            var s = String(label || '');
+            if (/税额|应纳|应补|应退|实缴|税负|已预缴/.test(s)) return 'tax';
+            if (/扣除|减除|费用|免税/.test(s)) return 'deduct';
+            if (/税后|到手|实发|净收入/.test(s)) return 'net';
+            return 'plain';
+        }
+        // v1.142.0 第五轮：主数字下面补两个**关键数**（要交多少税 / 真正到手多少）。
+        // 只有主数字时，用户看完「税后年收入 42 万」还得展开二十行才知道交了多少税 ——
+        // 结论其实由三个数构成，全收起来等于把"结论"也给收了。
+        // 只取两类各一项、取不到就少给：这是摘要不是明细，铺开就又变回一片数字。
+        function keyFactsHtml() {
+            var list = view.rows || [];
+            function first(tone) {
+                for (var i = 0; i < list.length; i++) {
+                    if (toneOf(list[i].label) === tone) return list[i];
+                }
+                return null;
+            }
+            var picks = [first('tax'), first('net')].filter(Boolean);
+            if (!picks.length) return '';
+            return '<div class="dw-result-keyfacts">' + picks.map(function (r) {
+                // 不挂 data-dw-row：那是**明细行**的取数锚点（分享图 / 留资归因按它认行），
+                // 摘要再挂一个同名锚点，取数就会先撞上这一块 —— 两处值虽然相同，
+                // 但"同一个行名有两个元素"迟早会把别人绕进去。
+                return '<div class="dw-result-keyfact dw-result-row--' + toneOf(r.label) + '">' +
+                    '<div class="dw-result-keyfact__label">' + richEsc(r.label) + '</div>' +
+                    '<div class="dw-result-keyfact__value">' + esc(TB().fmtValue(r.value, r.kind)) + '</div>' +
+                    '</div>';
+            }).join('') + '</div>';
+        }
+
+        // 行说明与字段说明同一颗按钮（.tool-hint-btn，委托在 toolbox-ui 的 bindHintToggles）：
+        // 此前它是 title 悬浮提示 —— 手机上没有 hover，等于这一行的解释根本不存在。
+        // 面板挂在行的**后面**（不是行内）：行本身是 label 左 / 值右的 flex，塞进去会把值挤走。
+        var rows = (view.rows || []).map(function (r, i) {
+            var hid = 'dw-row-hint-' + i;
+            var btn = r.hint
+                ? '<button type="button" class="tool-hint-btn" data-hint-toggle="' + hid + '"'
+                    + ' aria-expanded="false" aria-controls="' + hid + '"'
+                    + ' aria-label="查看说明：' + esc(r.label) + '" title="查看说明">'
+                    + '<i class="fa fa-question-circle" aria-hidden="true"></i></button>'
+                : '';
+            var panel = r.hint
+                ? '<div class="dw-result-hint" id="' + hid + '" hidden>' + richEsc(r.hint) + '</div>'
+                : '';
+            return '<div class="dw-result-row dw-result-row--' + toneOf(r.label) + '" data-dw-row="' + esc(r.label) + '">' +
+                '<span class="dw-result-row__label">' + richEsc(r.label) + btn + '</span>' +
+                '<span class="dw-result-row__value">' + esc(TB().fmtValue(r.value, r.kind)) + '</span></div>' + panel;
         }).join('');
 
         // 阶段19-4 顺延（v1.99.0）：结果可视化 —— 各项数额条。与速算器共用 result-bars.js
@@ -555,7 +674,8 @@
         // 取的是 view（界面上正在显示的这份），与明细 / 保存同源，不会再算一遍。
         var barsBlock = '';
         if (window.EuriskoResultBars && typeof window.EuriskoResultBars.html === 'function') {
-            barsBlock = window.EuriskoResultBars.html(view);
+            // collapsed：结果页一进来不要铺一片条形 —— 主数字说完结论，要对照再展开
+            barsBlock = window.EuriskoResultBars.html(view, { collapsed: true });
         } else {
             // 不静默吞掉（前车之鉴：auth-ui.js 死选择器靠 ?. 抹错而多年未发现）
             console.warn('[deep-wizard] EuriskoResultBars 未加载（result-bars.js），各项数额条被跳过');
@@ -567,8 +687,9 @@
         var stepsHtml = '';
         if (view.steps && view.steps.length) {
             if (typeof renderFormulaStepsHtml === 'function') {
-                // 完整视图：推导链默认展开（简明视图保持折叠 —— 先给结论，想核对再展开）
-                stepsHtml = '<details id="dw-formula-panel" class="mt-4"' + (isFullMode() ? ' open' : '') + '>' +
+                // v1.142.0：推导链默认展开 —— 「每一步都可核对」是完整测算立身之本，
+                // 收起来等于把"能核对"降级成"请相信我"。
+                stepsHtml = '<details id="dw-formula-panel" class="mt-4" open>' +
                     '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800">' +
                     '<span><i class="fa fa-calculator mr-2"></i>查看计算过程</span>' +
                     '<span class="text-xs text-gray-500">每一步都可核对</span>' +
@@ -586,13 +707,27 @@
                 '<div class="dw-policy-stamp mb-2" id="dw-policy-stamp">' + policyStampHtml() + '</div>' +
                 // 阶段18-3：主结果的**含义**（如「应纳个人所得税」）此前只能靠第一个 .text-sm 去猜，
                 // 分享图取数时没有锚点可用。给它一个 id，通用取数就能照抄真实口径，而不是写死文案。
-                '<div class="text-sm text-gray-600" id="dw-result-primary-label">' + esc(view.primary.label) + '</div>' +
-                '<div class="text-3xl font-bold text-primary my-2" id="dw-result-primary">' + esc(TB().fmtValue(view.primary.value, view.primary.kind)) + '</div>' +
+                //
+                // v1.142.0 第四轮：主数字独占一块 hero —— 此前它与下面那二十来行明细
+                // 字号相同、颜色相同，用户一眼看不出「哪个才是答案」。
+                '<div class="dw-result-hero" id="dw-result-hero">' +
+                    '<div class="dw-result-hero__label" id="dw-result-primary-label">' + richEsc(view.primary.label) + '</div>' +
+                    '<div class="dw-result-hero__value" id="dw-result-primary">' + esc(TB().fmtValue(view.primary.value, view.primary.kind)) + '</div>' +
+                '</div>' +
+                keyFactsHtml() +
                 (view.compare ? compareHtml(view.compare) : '') +
                 // 条形排在明细之前：先看各项的相对大小，再逐行核对 —— 两张图同一份 view
                 barsBlock +
-                '<div class="mt-4">' + rows + '</div>' +
-                (view.note ? '<p class="text-sm text-gray-600 mt-4">' + esc(view.note) + '</p>' : '') +
+                // 明细默认收起（用户要求）：这一屏的任务是给结论，二十来行数字铺开只会把结论埋掉。
+                // 它仍然可展开 —— 核对从来不是"藏起来"，是"先不给"。
+                (rows ? '<details class="dw-detail-box mt-4">' +
+                    '<summary class="dw-detail-box__summary">' +
+                        '<span><i class="fa fa-list-ul mr-2"></i>计算明细（' + view.rows.length + ' 项）</span>' +
+                        '<span class="dw-detail-box__hint">展开核对</span>' +
+                    '</summary>' +
+                    '<div class="dw-result-rows mt-2">' + rows + '</div>' +
+                '</details>' : '') +
+                (view.note ? '<p class="dw-result-note mt-4">' + richEsc(view.note) + '</p>' : '') +
                 stepsHtml +
                 extrasHtml(view.extras) +
                 // 免责声明：与存量 4 页同一句话、同样就地展示（不藏在页脚）
@@ -630,6 +765,12 @@
                 // 阶段19-5b：税务档案引导卡的宿主位。与速算器共用同一份渲染（toolbox-ui），
                 // 不在这里抄第二份 —— 两处各长一套的话，「暂不」只在一处生效这种错迟早出现。
                 '<div id="dw-profile-nudge" class="mt-6 hidden"></div>' +
+                // 21 个完整测算的 nextTools 此前是**死数据**：数据写了、deep 这一侧从没渲染，
+                // 于是「算完还能干什么」只有速算器有出口，填得更全的那 21 个反而没有。
+                // 复用 toolbox-ui 那一份渲染（两处各长一套，推荐迟早分家）。
+                // 宿主不叫 dw-next —— 那是导航区「下一步」按钮的 id（navHtml），撞名会让
+                // getElementById 在两步之间拿到不同的东西。
+                '<div id="dw-next-tools" class="mt-6 hidden"></div>' +
                 '<div class="mt-6"><button id="dw-prev" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">' +
                 '<i class="fa fa-arrow-left mr-2"></i>返回上一步</button></div>' +
             '</div>';
@@ -758,8 +899,109 @@
     // 阶段19-8：向导里的回车是「下一步」，所以键盘上那颗键要显示成"下一步"而不是默认符号。
     // 速算器那边是"看结果"（go），这里是"下一步"（next）—— 语义由各自的宿主决定，
     // fieldHtml 只负责把它写进控件，不猜用户要什么。
+    //
+    // v1.142.0 第四轮：wide 的字段自己占一行（见 toolbox.css 的 .dw-field-wide）——
+    // 「社保缴费基数」后面跟着的是四个险种金额与比例，它跟它们并排就等于说"它也是险种之一"，
+    // 而它是它们共同的来源。
     function drawField(f) {
-        return f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f, state.values, { enterkeyhint: 'next' });
+        var html = f.type === 'repeater' ? repeaterHtml(f) : TB().fieldHtml(f, state.values, { enterkeyhint: 'next' });
+        return f.wide ? '<div class="dw-field-wide">' + html + '</div>' : html;
+    }
+
+    // ====== 勾选式小节（v1.142.0 第二轮：回到 1.17 的页面结构）======
+    //
+    // 上一版的一个开关长成两件东西（标题一行 + 右边一颗「是 / 否」），而它管的那一片字段只是
+    // 从屏幕上"出现"了 —— 看不出属于谁，也看不出勾与不勾的差别有多大。这正是用户说的
+    // 「勾选显示有歧义」。
+    //
+    // 1.17 的四个页面里它没有这个毛病：勾选框自己就是小节的标题（「专项扣除」三个字直接跟着
+    // 方框），它管的字段缩进挂在下面一块。一个动作、一块地方、看得见包含关系。
+    //
+    // 归属关系**不另写一张表**：a 字段的 when 指向谁，它就是谁的 —— 与渲染条件同一份事实，
+    // 不会出现"表上写着归它、界面上却没跟着显隐"这种两处说法打架的错。
+    // 牵头的不必是勾选框（「住房扣除方式」是个下拉，下面挂租金还是房贷由它说了算），
+    // 所以这里一律按 when 归组，只有勾选框换标题式画法，下拉保持它本来的样子。
+    function groupTree(fields) {
+        var known = {};
+        var kids = {};
+        var roots = [];
+        fields.forEach(function (f) { known[f.key] = true; });
+        fields.forEach(function (f) {
+            var owner = (f.when && f.when.key) || '';
+            // 认不到爹的（when 指向别的步的字段）按顶层平铺 —— 宁多勿丢，绝不静默吞掉一个框
+            if (owner && known[owner] && owner !== f.key) (kids[owner] = kids[owner] || []).push(f);
+            else roots.push(f);
+        });
+        function node(f) {
+            var own = kids[f.key] || [];
+            return own.length ? { head: f, members: own.map(node) } : f;
+        }
+        return roots.map(node);
+    }
+
+    // 标题式勾选（1.17 的 `<label class="inline-flex items-center">` + 方框 + 名字）
+    function switchHeadHtml(f) {
+        var id = 'qf-' + f.key;
+        var cur = !!state.values[f.key];
+        return '<div class="dw-group-head">' +
+            '<label class="dw-group-toggle" for="' + id + '">' +
+            '<input type="checkbox" id="' + id + '" class="dw-group-checkbox"' + (cur ? ' checked' : '') + '>' +
+            '<span class="dw-group-name">' + richEsc(f.label) + '</span>' +
+            '</label>' +
+            (f.hint ? '<div class="tool-field-hint">' + richEsc(f.hint) + '</div>' : '') +
+            '</div>';
+    }
+
+    // 勾选框**一律**标题式（方框 + 名字），哪怕它眼下管不到任何字段：
+    // ① 同一屏里一半是「☐ 专项附加扣除」一半是「享受…… 是/否」，两颗一样的东西长得不一样，
+    //    用户会先怀疑自己点错了地方 —— 这正是「勾选显示有歧义」的另一种形态；
+    // ② 它管的那一片是**勾上才出现**的，没勾时最需要它像个标题那样立着，而不是塌成一个开关。
+    // 一组里再分类：专项附加扣除底下有七项法定分类（子女教育 / 继续教育 / 大病医疗 /
+    // 住房 / 赡养老人），平铺成一串时用户看不出"我这五个数分别属于哪一类"，
+    // 更看不出还漏了哪一类没填。spec 里给字段打个 group，这里按它归成小节。
+    // 没有 group 的照旧平铺（分组是加分项，不是必须项）。
+    function groupNameOf(n) {
+        return (n && (n.head ? n.head.group : n.group)) || '';
+    }
+
+    // parentGroup：父节点自己的分类。子层与父同属一类时**不再分块** —— 否则
+    // 「住房扣除方式 → 住房租金」会在住房这一块里再套一块同名的，看着像漏了一次归并。
+    function drawMembers(list, parentGroup) {
+        var byGroup = {};
+        var order = [];
+        list.forEach(function (n) {
+            var g = groupNameOf(n);
+            if (!g || g === parentGroup) return;
+            if (!byGroup[g]) { byGroup[g] = []; order.push(g); }
+            byGroup[g].push(n);
+        });
+        if (!order.length) return list.map(function (n) { return drawNode(n, parentGroup); }).join('');
+        var done = {};
+        var html = '';
+        list.forEach(function (n) {
+            var g = groupNameOf(n);
+            if (!g || g === parentGroup) { html += drawNode(n, g || parentGroup); return; }
+            if (done[g]) return;                 // 整组在它第一次出现的位置一次画完
+            done[g] = true;
+            html += '<div class="dw-subgroup">' +
+                '<div class="dw-subgroup-title">' + esc(g) + '</div>' +
+                '<div class="dw-subgroup-body">' +
+                byGroup[g].map(function (m) { return drawNode(m, g); }).join('') +
+                '</div>' +
+                '</div>';
+        });
+        return html;
+    }
+
+    function drawNode(n, parentGroup) {
+        if (!n || !n.head) return n && n.type === 'switch' ? switchHeadHtml(n) : drawField(n);
+        var own = groupNameOf(n) || parentGroup;
+        var members = drawMembers(n.members || [], own);
+        if (!members) return n.head.type === 'switch' ? switchHeadHtml(n.head) : drawField(n.head);
+        return '<div class="dw-group">' +
+            (n.head.type === 'switch' ? switchHeadHtml(n.head) : drawField(n.head)) +
+            '<div class="dw-group-body">' + members + '</div>' +
+            '</div>';
     }
 
     // 步内 advanced 字段一样只折叠、不隐藏：与速算器共用同一个块和同一份措辞（不写第二套）
@@ -769,7 +1011,7 @@
         if (tb && typeof tb.advancedBlockHtml === 'function') {
             return tb.advancedBlockHtml(fields, state.values, drawField, state.toolId);
         }
-        return '<details class="tool-advanced-block mt-3"' + (isFullMode() ? ' open' : '') +
+        return '<details class="tool-advanced-block mt-3"' +
             ' data-tool-id="' + String(state.toolId || '').replace(/"/g, '') + '">' +
             '<summary class="flex items-center justify-between cursor-pointer select-none px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700">' +
             '<span><i class="fa fa-sliders mr-2"></i>更多参数（可选）</span></summary>' +
@@ -780,16 +1022,19 @@
         var fs = visibleIn(tool, fieldsOfStep(tool, step.key), state.values);
         var adv = fs.filter(isAdvanced);
         var basic = fs.filter(function (f) { return !isAdvanced(f); });
-        var inputs = basic.map(drawField).join('') + advancedBlock(adv);
+        // 按 when 归成「勾选 + 它管的一片」再画（详见 groupTree 的注释）
+        var inputs = groupTree(basic).map(drawNode).join('') + advancedBlock(adv);
         // 阶段19-9：模板条只给第一步。走到第二步说明人已经开始填了，
         // 那时候它唯一的作用是把注意力从当前步挪走。
         var first = stepsOf(tool)[0];
         var isFirst = !!first && first.key === step.key;
         return '<div class="card">' +
-            '<h3 class="text-lg font-bold text-primary mb-4">' + esc(step.title) + '</h3>' +
-            (step.why ? '<p class="text-sm text-gray-600 mb-4">' + esc(step.why) + '</p>' : '') +
+            '<h3 class="text-lg font-bold text-primary mb-4">' + richEsc(step.title) + '</h3>' +
+            (step.why ? '<p class="text-sm text-gray-600 mb-4">' + richEsc(step.why) + '</p>' : '') +
             (isFirst ? '<div id="dw-template-bar" class="hidden"></div>' : '') +
-            inputs + navHtml(stepsOf(tool)) +
+            // 同一层里两个框一行（详见 toolbox.css 的 .dw-field-grid）：这是 1.17 那四个页面的读法
+            '<div class="dw-field-grid">' + inputs + '</div>' +
+            navHtml(stepsOf(tool)) +
             '</div>';
     }
 
@@ -806,10 +1051,42 @@
         });
     }
 
+    // 反向互链：速算器 → 完整测算 那边早就有（速算器结果页行动条的「按年填全的完整版」），
+    // 反过来一直缺 —— 用户进了按年填全的向导才发现自己只想估一个数，那时只能退出来重新找。
+    // **只在第一步出现**：填到后面再来这句话，等于劝人扔掉已经填好的东西。
+    // 组描述里那句「用上面的速算器更快」是泛指，这一行给的是**具体且可点**的那一个。
+    function quickHintHtml(tool) {
+        if (state.stepIndex !== 0) return '';
+        var qid = (TB() && typeof TB().quickCounterpartOf === 'function') ? TB().quickCounterpartOf(tool) : '';
+        var q = qid ? R().get(qid) : null;
+        if (!q) return '';
+        return '<div class="dw-quick-hint">只想快速估一个数？' +
+            '<button type="button" id="dw-go-quick" data-quick-id="' + esc(qid) + '">用「' +
+            esc(q.name) + '」速算版<i class="fa fa-angle-right"></i></button></div>';
+    }
+
     function paneHtml(tool, steps) {
         var step = steps[state.stepIndex];
         var body = step.result ? resultHtml(tool) : inputHtml(tool, step);
-        return '<div class="step-content max-w-5xl mx-auto"><div class="step-pane active">' + body + '</div></div>';
+        return '<div class="step-content max-w-5xl mx-auto"><div class="step-pane active">' +
+            quickHintHtml(tool) + body + '</div></div>';
+    }
+
+    // 用 onclick 而不是 addEventListener：render 每次都换 innerHTML，加上去会一层层叠。
+    function bindQuickHint() {
+        var el = document.getElementById('dw-go-quick');
+        if (!el || !TB()) return;
+        el.onclick = function () { TB().openTool(this.getAttribute('data-quick-id')); };
+    }
+
+    function mountNextSteps(tool, steps) {
+        var box = document.getElementById('dw-next-tools');
+        if (!box) return;
+        var step = steps[state.stepIndex];
+        if (!step || !step.result) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        if (TB() && typeof TB().renderNextSteps === 'function') {
+            TB().renderNextSteps(tool, null, state.lastResult, 'dw-next-tools');
+        }
     }
 
     function render() {
@@ -821,7 +1098,10 @@
         // 采纳联动结果再渲染：这里**只能算不能收**（collect 会按「当前步」整表读 DOM，
         // 而此刻 DOM 还是上一步的样子，会在渲染前把当前步的值冲回默认）。
         applyDerived(tool);
-        host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps);
+        // 预览条排在 pane **之后**：它是吸底的（sticky bottom-0），顺序上要么在内容流最后、
+        // 要么被 sticky 顶上去遮住底部的「下一步」。`.has-preview-bar .step-content`
+        // 那条 pb-20 正是留给它的，不需要额外避让。
+        host.innerHTML = headerHtml(tool, steps) + paneHtml(tool, steps) + previewBarHtml(tool, steps);
         // 回车推进只绑一次（host 长期存在，每次 render 只换 innerHTML）
         bindEnterNext(host);
         bind(tool, steps);
@@ -829,13 +1109,13 @@
         mountSavingNudge(tool);
         mountProfileNudge(tool);
         mountTemplateBar(tool);
+        bindQuickHint();
+        mountNextSteps(tool, steps);
         // fieldHtml 写的是字段的 default（它是速算器与向导共用、只认 schema）。
         // 分步向导每次只渲染当前步，若不回填，用户「上一步 → 下一步」就会被打回默认值 ——
         // 这类丢值肉眼很难发现（值还在内存里、只是没显示出来），所以在这里统一回填。
         applyValues(state.values);
         renderWarnings(tool);
-        // 简明 ↔ 完整会改变步数：记下「此刻是否停在结果步」，切换后好把用户放回结果步
-        state.atResult = !!(steps[state.stepIndex] && steps[state.stepIndex].result);
     }
 
     // 方案对比卡（v1.51.0 起）：取数与 compute 同源。
@@ -890,7 +1170,6 @@
             },
             onStep: function (index) {
                 state.stepIndex = Math.max(0, Math.min(steps.length - 1, index));
-                state.atResult = !!(steps[state.stepIndex] && steps[state.stepIndex].result);
                 saveDraft();
                 render();
             }
@@ -918,13 +1197,11 @@
 
     // 只把**当前步**的字段写回 state.values：分步渲染时其他步的字段不在 DOM 里，
     // 若按整表覆盖，readValues 会把缺失项填回 default —— 切一次步骤，前面填的值全丢。
-    // stepKey 可选：切换视图时由调用方指定「屏幕上刚才显示的是哪一步」（此时模式已变，
-    // 光看 state.stepIndex 会指向新步骤表里的另一步，收值就收错了）
+    // stepKey 可选：跳步时由调用方指定「屏幕上刚才显示的是哪一步」（此时 state.stepIndex
+    // 已经指向另一屏，收值就会收错一屏）
     function collect(tool, stepKey) {
         var dom = TB().readValues(tool);
-        // 注意：stepKey 可能是**切换前**那一步 —— 它在新的步骤表里已经不存在了（被合并进
-        // 「补充参数」），所以不能拿 stepKey 去 stepsOf() 里找（找不到就会静默不收值 = 丢数据）。
-        // fieldsOfStep 是按 spec 归组的，与当前视图无关，这里直接用它。
+        // fieldsOfStep 按 spec 归组，与当前显示哪一步无关，指定 key 就能稳定收那一组。
         var step = stepKey ? { key: stepKey } : stepsOf(tool)[state.stepIndex];
         if (!step) return;
         fieldsOfStep(tool, step.key).forEach(function (f) {
@@ -954,6 +1231,10 @@
     // 「社保缴费基数 × 缴费比例 → 每月扣缴额」就是典型：用户手里有的是基数，不是月缴额，
     // 这类联动要是每个迁移都丢一次，17B 后面三个页面的迁移会一路丢下去。
     // 交给渲染器承担，spec 只声明规则：derive(values) 回写派生值，warnings(values) 给字段提示。
+    // touched：用户**亲手改过**的派生值。社保那几个金额框最典型 —— 工资条上写的是
+    // 「养老扣了 800」，用户手里根本没有缴费基数，只能直接填金额；而每次收值 derive 都会
+    // 把它冲回「基数 × 比例」，改了等于没改。所以手改过的键，derive 不再覆盖，
+    // 直到用户去动它的来源字段（那时才该重新自动算，见 bindDerivedSources 里的清空）。
     function applyDerived(tool) {
         if (typeof tool.derive !== 'function') return false;
         var patched;
@@ -961,12 +1242,17 @@
         catch (e) { return false; }
         var changed = false;
         Object.keys(patched).forEach(function (k) {
+            if (state.touched[k]) return;            // 手改优先
             if (state.values[k] === patched[k]) return;
             state.values[k] = patched[k];
             changed = true;
         });
         return changed;
     }
+
+    // 派生字段**不另挂标记**：它在问号里的提示已经写了「这一栏不用填：按…自动算出」，
+    // 界面上再来一行只是把同一句话再说一遍。字段的 derived 只当行为开关 ——
+    // 决定哪些键享受「手改不被冲」的待遇（见 applyDerived / bindDerivedTargets）。
 
     function renderWarnings(tool) {
         if (typeof tool.warnings !== 'function') return;
@@ -1001,6 +1287,7 @@
             // 注意别在这里再判 changed：derive 已经挂在 collect 里跑过了，第二次调用必然返回 false，
             // 一判就把「派生值回写到界面」这一步跳过了（DOM 不更新，只有内存变了）
             el.addEventListener('input', function () {
+                state.touched = {};                 // 动了输入源：自动值该重新生效了
                 collect(tool);
                 applyValues(state.values, el);      // 跳过正在输入的框，别抢光标
                 renderWarnings(tool);
@@ -1010,10 +1297,24 @@
                 // 先把它归一到**这个险种自己的默认比例**再收值。否则 readValues 会把空串读成 0，
                 // derive 就按 0% 算 —— 用户留了个空框，看到的却是 0 元，会被当成算错了。
                 if (meta && meta.type === 'percent' && !isRateOk(el.value)) el.value = meta.default;
+                state.touched = {};                 // 同上：勾选 / 选定身份这类动作更要立刻重算
                 collect(tool);
                 applyValues(state.values);
                 renderWarnings(tool);
             });
+        });
+    }
+
+    // 派生值本身被手改时记一笔：之后 derive 不再覆盖它，直到用户去动它的来源字段。
+    // 没有这一笔，「养老扣了 800，我就填 800」这种填法会在切步时悄无声息地被冲掉。
+    function bindDerivedTargets(tool, step) {
+        if (typeof tool.derive !== 'function' || !step || step.result) return;
+        (tool.fields || []).forEach(function (f) {
+            if (!f.derived) return;
+            var el = document.getElementById('qf-' + f.key);
+            if (!el) return;
+            el.addEventListener('input', function () { state.touched[f.key] = true; });
+            el.addEventListener('change', function () { state.touched[f.key] = true; });
         });
     }
 
@@ -1112,24 +1413,6 @@
             showPageFn('tools-page');
         });
 
-        // 阶段19-7：视图密度 pill —— 切换后就地重画。先收值再切：
-        // 当前步填的东西此刻只在 DOM 里，不收就会在重画时被 default 盖掉。
-        var pill = document.getElementById('dw-mode-pill');
-        if (pill) {
-            var tb = TB();
-            if (tb && typeof tb.modePillHtml === 'function') {
-                pill.innerHTML = tb.modePillHtml();
-                pill.querySelectorAll('.mode-pill-seg').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        var p = modeLib();
-                        if (!p) return;
-                        collect(tool);
-                        p.set(btn.getAttribute('data-mode') === p.FULL ? p.FULL : p.SIMPLE);
-                    });
-                });
-            }
-        }
-
         var reset = document.getElementById('dw-reset');
         if (reset) reset.addEventListener('click', function () {
             state.values = defaultsOf(tool);
@@ -1180,6 +1463,8 @@
         // 条件字段（when）所依赖的控件变化后重渲染当前步，让该出现 / 该隐藏的字段立刻跟上
         var step = steps[state.stepIndex];
         if (step && !step.result) {
+            bindStepJump(tool, steps);
+            bindLivePreview(tool, steps);
             fieldsOfStep(tool, step.key).forEach(function (f) {
                 if (f.type === 'repeater') { bindRepeater(tool, f); return; }
                 if (!f.when) return;
@@ -1189,6 +1474,48 @@
             });
         }
         bindDerivedSources(tool, step);
+        bindDerivedTargets(tool, step);
+        }
+
+    // 步骤条可跳：逐个 .step 去绑会被下一次重画冲掉（整块 innerHTML 每次重画），委托到页面容器。
+    // 跳之前**必须收值**：此刻屏幕上的东西还只在 DOM 里，不收就丢。
+    // 往前跳不拦（值还不够时预览条会显示"算不出来"，不会报错）；结果步也允许直接跳 ——
+    // 那等于"我想看看现在算出来是多少"，而读数本来就不该设门槛。
+    function bindStepJump(tool, steps) {
+        var host = document.getElementById(PAGE_ID);
+        if (!host || host.getAttribute('data-dw-jump') === '1') return;
+        host.setAttribute('data-dw-jump', '1');
+        host.addEventListener('click', function (e) {
+            var el = e.target.closest ? e.target.closest('.dw-step-jump') : null;
+            if (!el) return;
+            var i = Number(el.getAttribute('data-dw-step'));
+            if (!isFinite(i) || i === state.stepIndex) return;
+            collect(tool);
+            state.stepIndex = Math.max(0, Math.min(steps.length - 1, i));
+            saveDraft();
+            render();
+        });
+    }
+
+    // 输入过程中刷新预览条：debounce 到手停下来再算（每次按键都跑一遍完整测算没意义，
+    // 而测算里有些是有反算迭代的）。这里**不**重画整屏 —— 重画会把光标从输入框里踢出去。
+    function bindLivePreview(tool, steps) {
+        var host = document.getElementById(PAGE_ID);
+        if (!host || host.getAttribute('data-dw-live') === '1') return;
+        host.setAttribute('data-dw-live', '1');
+        var timer = null;
+        function tick() {
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                if (!state.toolId) return;
+                var t = R() && R().get(state.toolId);
+                if (!t) return;
+                collect(t);
+                refreshPreviewBar(t);
+            }, 220);
+        }
+        host.addEventListener('input', tick);
+        host.addEventListener('change', tick);
     }
 
     function open(toolId, opts) {
@@ -1221,22 +1548,6 @@
         return true;
     }
 
-    // 阶段19-7：偏好一变就地重画（向导没开时 state.toolId 为空，直接跳过）
-    if (modeLib() && typeof modeLib().onChange === 'function') {
-        modeLib().onChange(function (mode, prev) {
-            if (!state.toolId) return;
-            var tool = R() && R().get(state.toolId);
-            if (!tool) return;
-            // 先收值再重画：当前步填的东西此刻只在 DOM 里，不收就会被 default 盖掉（切换 = 丢数据）。
-            // 用 prev 那份步骤表定位「刚才显示的是哪一步」—— 模式已经切了，stepIndex 已指向别处。
-            var prevSteps = stepsOfWith(tool, prev === modeLib().FULL);
-            var prevStep = prevSteps[Math.min(state.stepIndex, prevSteps.length - 1)];
-            if (prevStep && !prevStep.result) collect(tool, prevStep.key);
-            // 简明 → 完整会凭空多出几步：原本在看结果的，切换后仍应看结果，而不是被挤回中间某步
-            if (state.atResult) state.stepIndex = stepsOf(tool).length - 1;
-            render();
-        });
-    }
 
     window.EuriskoDeepWizard = {
         open: open,

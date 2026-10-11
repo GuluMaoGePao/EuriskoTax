@@ -145,7 +145,7 @@
         out.sixYearsMet = prev >= (r.sixYears || 6) && absence <= (r.singleTripMaxAbsence || 30);
         out.worldwide = out.sixYearsMet;
         if (out.sixYearsMet) out.reasons.push('已连续满六年且无单次离境超过 ' + (r.singleTripMaxAbsence || 30) + ' 天 → 境内境外全部所得都要缴');
-        else out.reasons.push('享受实施条例第四条优惠：境外所得中**由境外单位或者个人支付**的部分免税');
+        else out.reasons.push('享受实施条例第四条优惠：境外所得中由境外单位或者个人支付的部分免税');
         return out;
     }
 
@@ -192,19 +192,19 @@
                 out.amount = total * payRatio * dayRatio;
                 out.formula = '公式一';
                 out.label = '当月境内外工资 × 境内支付占比 × 境内工作天数占比';
-                out.note = '仅就归属于境内工作期间**并由境内雇主支付或者负担**的部分计税（35 号第二条（一）1）';
+                out.note = '仅就归属于境内工作期间并由境内雇主支付或者负担的部分计税（35 号第二条（一）1）';
             }
         } else if (s.tier === 'mid') {
             if (isExec) {
                 out.amount = total * (1 - overseasPayRatio * overseasDayRatio);
                 out.formula = '公式三';
                 out.label = '当月境内外工资 ×〔1 − 境外支付占比 × 境外工作天数占比〕';
-                out.note = '除归属于境外工作期间**且**不是由境内雇主支付或者负担的部分外，都要缴（35 号第二条（三）2）';
+                out.note = '除归属于境外工作期间且不是由境内雇主支付或者负担的部分外，都要缴（35 号第二条（三）2）';
             } else {
                 out.amount = total * dayRatio;
                 out.formula = '公式二';
                 out.label = '当月境内外工资 × 境内工作天数占比';
-                out.note = '归属于境内工作期间的工资薪金**不论由谁支付**都要缴（35 号第二条（一）2）';
+                out.note = '归属于境内工作期间的工资薪金不论由谁支付都要缴（35 号第二条（一）2）';
             }
         } else if (six.sixYearsMet) {
             out.amount = total;
@@ -239,7 +239,7 @@
             noDeduction: true,
             oncePerYear: true,
             note: '〔（数月奖金收入额 ÷ ' + spread + '）× 税率 − 速算扣除数〕× ' + spread
-                + ' —— 不与当月工资合并、**不减除 5000 元**，一个公历年度内每人只能适用一次（35 号第三条（二）2）'
+                + ' —— 不与当月工资合并、不减除 5000 元，一个公历年度内每人只能适用一次（35 号第三条（二）2）'
         };
     }
 

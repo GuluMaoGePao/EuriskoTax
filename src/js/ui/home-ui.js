@@ -82,42 +82,6 @@
         }
     ];
 
-    // ====== 数据：模式说明（info 按钮） ======
-    const MODE_INFO = {
-        forward: {
-            title: '综合所得计税',
-            icon: 'fa-calculator',
-            color: 'primary',
-            description: '工资薪金、劳务报酬、稿酬、特许权使用费合并计税，适用3%-45%七级超额累进税率。',
-            suitable: '大多数个人用户（上班族、自由职业者等）',
-            features: ['支持完整收入明细（工资/劳务/稿酬/特许权）', '年终奖单独计税或并入综合所得', '完整专项扣除与专项附加扣除', '生成标准化年度个税预算表']
-        },
-        business: {
-            title: '经营所得计税',
-            icon: 'fa-briefcase',
-            color: 'accent',
-            description: '个体工商户、个人独资企业、合伙企业生产经营所得，适用5%-35%五级超额累进税率。',
-            suitable: '个体工商户、个人独资企业、合伙企业自然人合伙人',
-            features: ['支持成本、费用、损失扣除', '享受减半征收优惠（≤200万部分）', '可选"是否有综合所得"避免重复扣除', '生成经营所得年度预算表']
-        },
-        classification: {
-            title: '分类所得计税',
-            icon: 'fa-list-alt',
-            color: 'success',
-            description: '利息股息红利、财产租赁、财产转让、偶然所得，统一适用20%比例税率。',
-            suitable: '有投资收益、租金收入、资产转让、中奖等收入的用户',
-            features: ['利息/股息/红利：全额计税', '财产租赁：≤4000减800，>4000减20%', '财产转让：减除财产原值和合理费用', '偶然所得：全额计税']
-        },
-        reverse: {
-            title: '反向倒算',
-            icon: 'fa-refresh',
-            color: 'secondary',
-            description: '给定目标（税率/月度税后/目标税额），反推所需的税前收入，支持保守/均衡/进取三档模式。',
-            suitable: '财务人员、薪酬规划、薪资谈判参考',
-            features: ['按目标税率倒算：了解税率档位对应的收入区间', '按月度税后倒算：设定到手目标反推税前', '按目标税额倒算：设定纳税目标反推收入', '三种模式对比：保守/均衡/进取']
-        }
-    };
-
     // ====== 数据：税务小贴士（配置化） ======
     const TAX_TIPS = [
         '年终奖可以选择"单独计税"或"并入综合所得计税"，两者税负可能不同，建议都测算一次取较低者。',
@@ -1031,82 +995,6 @@
         container.textContent = tip;
     }
 
-    // ====== 模式说明弹窗 ======
-    function showModeInfo(mode) {
-        const info = MODE_INFO[mode];
-        if (!info) return;
-
-        // 兜底：浏览器 alert
-        if (typeof showAlert !== 'function') {
-            const featuresStr = info.features.map(f => `• ${f}`).join('\n');
-            alert(`${info.title}\n\n${info.description}\n\n适用人群：${info.suitable}\n\n功能特点：\n${featuresStr}`);
-            return;
-        }
-
-        // 用 showAlert 打开模态框（占位消息），随后用 innerHTML 注入富文本
-        showAlert(info.description, 'info');
-
-        const titleEl = document.getElementById('alert-modal-title');
-        const msgEl = document.getElementById('alert-modal-message');
-        if (titleEl) titleEl.textContent = info.title;
-        if (msgEl) {
-            const featuresHtml = info.features.map(f =>
-                `<li class="flex items-start mb-1.5"><i class="fa fa-check-circle text-success mt-0.5 mr-2 text-xs"></i><span>${f}</span></li>`
-            ).join('');
-            msgEl.innerHTML = `
-                <div class="text-left">
-                    <div class="flex items-center mb-3">
-                        <div class="tip-icon-wrapper w-10 h-10 rounded-lg flex items-center justify-center mr-3">
-                            <i class="tip-icon fa ${info.icon}"></i>
-                        </div>
-                        <span class="text-base font-bold text-gray-800">${info.title}</span>
-                    </div>
-                    <p class="text-sm text-gray-600 mb-3 leading-relaxed">${info.description}</p>
-                    <div class="bg-gray-50 rounded-lg p-3 mb-3">
-                        <div class="text-xs text-gray-500 mb-1">适用人群</div>
-                        <div class="text-sm text-gray-700">${info.suitable}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-500 mb-2">功能特点</div>
-                        <ul class="text-sm text-gray-700">${featuresHtml}</ul>
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    // ====== 绑定模式卡片点击 ======
-    function setupModeCards() {
-        const cardBtnMap = {
-            'forward-mode-card': 'forward-mode-btn',
-            'business-mode-card': 'business-mode-btn',
-            'classification-mode-card': 'classification-mode-btn',
-            'reverse-mode-card': 'reverse-mode-btn'
-        };
-
-        Object.entries(cardBtnMap).forEach(([cardId, btnId]) => {
-            const card = document.getElementById(cardId);
-            if (!card) return;
-            card.addEventListener('click', function (e) {
-                // 如果点击的是 info 按钮，则不触发导航
-                if (e.target.closest('.mode-card-info-btn')) {
-                    return;
-                }
-                const btn = document.getElementById(btnId);
-                if (btn) btn.click();
-            });
-        });
-
-        // info 按钮
-        document.querySelectorAll('.mode-card-info-btn').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const mode = this.getAttribute('data-mode-info');
-                showModeInfo(mode);
-            });
-        });
-    }
-
     // ====== 绑定其他交互 ======
     function setupInteractions() {
         // 换一条小贴士
@@ -1164,7 +1052,6 @@
         HomePerf.log('initHome → 渲染总耗时', performance.now() - renderStart, { steps: 8 });
 
         setupMissingCta();
-        setupModeCards();
         setupInteractions();
 
         // 档案在别处被补了一项，首页这张卡要跟着少一项 —— 否则还挂着已经补上的项，等于骗人

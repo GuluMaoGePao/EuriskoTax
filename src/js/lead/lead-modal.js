@@ -362,9 +362,8 @@
             need: val('lead-need') || 'other',
             source: state.source,
             scene: state.scene,
-            // 阶段19-7b②：视图密度与「简明视图下主动展开进阶参数」次数随线索一起上报，
-            // 顾问据此排跟进优先级（完整视图 / 调过进阶参数 = 更接近成交）。
-            // 取不到就留空：老会话没记录过就是没信号，不猜一个「简明」出来充数。
+            // 阶段19-7b②：「主动展开过进阶参数」的次数随线索一起上报（视图偏好已随 v1.142.0 取消，
+            // viewMode 恒为空 —— 顾问排优先级看的是"他调过参数没有"，不是"他选了哪一档界面"）。
             viewMode: signals ? signals.mode : '',
             advancedTouched: signals ? signals.advancedTouched : 0,
             note: val('lead-note').trim(),

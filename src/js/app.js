@@ -1,49 +1,10 @@
 // 页面加载完成后绑定事件
 window.addEventListener('DOMContentLoaded', function() {
-    // 模式选择按钮
-    document.getElementById('forward-mode-btn').addEventListener('click', function() {
-        console.log('%c[EuriskoTax] MODE → 选择"综合所得计税"模式', 'color: #1e40af; font-weight: bold;');
-        // 阶段17 17B-3（v1.49.0）：综合所得已迁到 spec 驱动的向导，旧整页（约 970 行）删掉了。
-        // 按钮本身保留，理由与 business / reverse 两处一样：首页卡片（home-ui 的 cardBtnMap）
-        // 与工具箱的兜底路径最后都会点到它 —— 删掉按钮，两处的点击就掉进空白。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('forward')) return;
-        showAlert('综合所得测算暂不可用，请刷新页面后重试。');
-    });
-
-    document.getElementById('business-mode-btn').addEventListener('click', function() {
-        console.log('%c[EuriskoTax] MODE → 选择"经营所得计税"模式', 'color: #1e40af; font-weight: bold;');
-        // 阶段17 17B-1：经营所得已迁到 spec 驱动的向导，17B-2（v1.47.0）把旧页面整页删掉了。
-        // 按钮本身保留：首页卡片（home-ui 的 cardBtnMap）与工具箱兜底都还会点它，点击即进向导。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('business')) return;
-        showAlert('经营所得测算暂不可用，请刷新页面后重试。');
-    });
-
-    document.getElementById('classification-mode-btn').addEventListener('click', function() {
-        console.log('%c[EuriskoTax] MODE → 选择"分类所得计税"模式', 'color: #1e40af; font-weight: bold;');
-        // 阶段17 17B-4（v1.50.0）：分类所得也迁到了 spec 驱动的向导，旧整页删掉了。
-        // 按钮本身保留：首页静态卡片的点击最终落到它身上（工具箱会先按 data-tool-id 走向导），
-        // 删掉按钮反而会让两处的点击进入空白。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('classification')) return;
-        showAlert('分类所得测算暂不可用，请刷新页面后重试。');
-    });
-
-    document.getElementById('reverse-mode-btn').addEventListener('click', function() {
-        console.log('%c[EuriskoTax] MODE → 选择"反向倒算"模式', 'color: #1e40af; font-weight: bold;');
-        // 阶段17 17B-2（v1.48.0）：反向倒算已迁到 spec 驱动的向导，旧整页删掉了。
-        // 按钮本身保留：首页静态卡片的点击最终落到它身上（工具箱会先按 data-tool-id 走向导），
-        // 删掉按钮反而会让两处的点击进入空白。
-        var W = window.EuriskoDeepWizard;
-        if (W && W.open('reverse')) return;
-        showAlert('反向倒算测算暂不可用，请刷新页面后重试。');
-    });
-    // 17B-4（v1.50.0）：原先这里还绑着 `back-to-mode-selection-classification` —— 它长在被删掉的
-    // 分类所得页面里。页面没了还留一句 getElementById().addEventListener，DOMContentLoaded 里
-    // 会在这一行抛 TypeError，**后面所有的初始化（登录态、历史记录）全跟着不执行** ——
-    // 这类「删页面留下的空指针」比少一个按钮严重得多：界面看着正常，功能静默全残。
-    // 返回动作由向导自己的 dw-back 承担（工具栏那套通用返回也是同一条路）。
+    // 17B-4（v1.50.0）：原先这里绑着 forward / business / classification / reverse 四颗
+    // `${id}-mode-btn`（那 4 张 mode-card 里的隐藏按钮）。旧整页删掉之后按钮只是转发到向导，
+    // v1.142.0 连卡一起删了：工具箱的完整测算组与其它组一样由注册表渲染。
+    // 同步这里必须删除绑定 —— 留一句 getElementById(...).addEventListener 会在 DOMContentLoaded
+    // 里抛 TypeError，后面的登录态 / 历史记录初始化静默全残（17B-4 与 R2 两处已经踩过两次）。
 
     // R2（阶段20 P0）：顶栏 #help-btn 已随 DOM 一起删除，绑定必须同步删 ——
     // 留一句 getElementById('help-btn').addEventListener 会在 DOMContentLoaded 里抛 TypeError，

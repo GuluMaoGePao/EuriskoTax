@@ -187,18 +187,20 @@
         return parts.join(' · ');
     }
 
-    // 阶段19-7b②（v1.102.0）：视图密度 + 「简明视图下主动展开过进阶参数」的次数。
-    // 这两个数**不描述算了什么**（那是 current() 的职责），只描述**这个人想要多细** ——
-    // 选完整视图、或在简明视图下翻出进阶参数去调的人，多数是财务 / HR / 企业主（ICP ★★★）。
-    // 刻意不并进 current() 的文本：那段话是给用户看的「参考您的测算」，
-    // 混进行为标记，就成了当着用户的面给他打分。
-    // 拿不到（模块未加载）返回 null —— 没信号就说没信号，不猜一个「简明」出来充数。
+    // 阶段19-7b②（v1.102.0）+ v1.142.0：随线索上报的行为信号。
+    // 「主动翻出「更多参数（可选）」去调」等于用户自己交代了需求深度 ——
+    // 不用多问一句、不用多采一项个人信息。
+    // v1.142.0 撤掉了「简明 / 完整」视图切换，所以这里不再有 mode 可报：同一份表单、
+    // 同一套步骤条，本来就不该有两份界面可以选。mode 字段保留并恒为空串 ——
+    // 后端列（view_mode）与 CSV 表头那一列的定义不在本次改动范围内，
+    // 留空就是「没有视图信号」，比往里硬塞一个值诚实。
+    // 拿不到（渲染层未加载）返回 null —— 没信号就说没信号，不猜一个 0 出来充数。
     function viewSignals() {
-        var p = window.EuriskoModePref;
-        if (!p || typeof p.get !== 'function') return null;
-        var touched = (typeof p.advancedTouched === 'function') ? p.advancedTouched() : null;
+        var tb = window.EuriskoToolbox;
+        if (!tb || typeof tb.advancedTouched !== 'function') return null;
+        var touched = tb.advancedTouched();
         return {
-            mode: p.get() === p.FULL ? 'full' : 'simple',
+            mode: '',
             advancedTouched: Number(touched && touched.count) || 0
         };
     }

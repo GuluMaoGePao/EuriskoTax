@@ -217,6 +217,13 @@
     // 排在工具页最后，不与其他组混排 —— 混排会让同组出现两个「算工资」的入口，用户更懵。
     // 阶段16：保存历史与导出 PDF 已下放到 20 个速算器，所以这一组不再拿「可保存 / 可导出」当卖点，
     // 也就不该再叫「深度测算」—— 那是按实现形态起的名字，用户心里没有「深度」这回事。
+    // 命名规则：完整测算**不许与速算器同名**。
+    //   14 个主题是「同一件事的两版」，此前两侧名字完全一样（专项附加扣除 / 社保公积金 /
+    //   增值税 / 企业所得税 …）。在工具页里它们分属不同组、组标题还能区分，但名字会**脱离
+    //   卡片单独出现** —— 搜索结果两行重名、历史记录一行「增值税」、分享卡一个标题，
+    //   那时没有任何上下文告诉用户这是哪一版。所以完整版的名字带一个括号里的**短口径词**，
+    //   回答「它和速算版差在哪」：增值税（进项逐笔）、专项附加扣除（全年核定）。
+    //   长说明仍然交给 subtitle —— 括号里只放定位用的短词，不把 subtitle 复述一遍。
     var DEEP_GROUP = {
         id: 'deep', name: '完整测算', icon: 'fa-list-ol',
         desc: '按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快'
@@ -228,6 +235,12 @@
     // 「便利输入」不在 spec 里就没人登记它，删完才发现算不了了。规矩抽在这里，两边共用一份；
     // **动作仍在渲染器**：deep-wizard-ui.js 的 applyDerived / bindDerivedSources / renderWarnings。
     var INSURANCE_DERIVE_FROM = ['socialBase', 'housingFundBase', 'pensionRate', 'medicalRate', 'unemploymentRate', 'housingFundRate'];
+
+    // 专项附加这一批同样有联动，却一直只登记了社保那一份（deriveFrom 只写了 INSURANCE_DERIVE_FROM），
+    // 结果就是「勾了学历继续教育、底下的年度扣除额不动」—— 值要切到下一步 collect 才顺带算出来，
+    // 用户当场看不出来它是自动算的。源字段登记齐全，接线才有东西可接。
+    var ADDITIONAL_DERIVE_FROM = ['childrenInfantCount', 'childrenInfantDeductionRate',
+        'elderlyType', 'educationDegreeCheckbox', 'educationProfessionalCheckbox', 'workMonths'];
 
     function insuranceDerive(v) {
         // 清空 / 越界时回落的是**该险种自己的常用比例**，不是统一的 5%
@@ -377,79 +390,94 @@
                 { key: 'workMonths', step: 'param', label: '年工作总月数', type: 'select', default: 12,
                     options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
                 { key: 'prepaidTax', step: 'param', label: '全年已预缴税额', type: 'money', default: 0,
-                    hint: '填 0 或不填＝按累计预扣法自动推演工资部分的预缴 + 劳务 / 稿酬 / 特许权的预扣' },
+                    hint: '填 0 或不填：工资部分按累计预扣法自动推演，再加上劳务 / 稿酬 / 特许权的预扣' },
 
                 { key: 'monthlySalaryIncome', step: 'income', label: '月工资薪金收入', type: 'money', default: 0, sample: 30000 },
                 { key: 'annualLaborIncome', step: 'income', label: '劳务报酬（元/年）', type: 'money', default: 0,
                     hint: '减除 20% 费用后计入收入额' },
                 { key: 'annualAuthorIncome', step: 'income', label: '稿酬所得（元/年）', type: 'money', default: 0,
-                    hint: '减除 20% 费用后**再减按 70%** 计入收入额' },
+                    hint: '减除 20% 费用后再减按 70% 计入收入额' },
                 { key: 'annualRoyaltyIncome', step: 'income', label: '特许权使用费（元/年）', type: 'money', default: 0,
                     hint: '减除 20% 费用后计入收入额' },
                 { key: 'bonusIncome', step: 'income', label: '年终奖（元/年）', type: 'money', default: 0 },
                 { key: 'bonusInclude', step: 'income', label: '年终奖并入综合所得计税', type: 'switch', default: true,
-                    hint: '取消勾选＝按全年一次性奖金单独计税；填了年终奖时结果区会给两种口径的对比' },
+                    hint: '取消勾选：年终奖按全年一次性奖金单独计税。填了年终奖，结果区会给两种口径的对比' },
 
-                { key: 'specialDeductionCheckbox', step: 'deduction', label: '享受专项扣除（社保 / 公积金）', type: 'switch', default: false },
+                // v1.142.0 第四轮：**默认勾上** —— 1.17 那页里它就是 `<input ... checked>`：
+                // 交社保是多数人的常态，让所有人进门先去找这颗框，等于把少数人的情形当成默认。
+                { key: 'specialDeductionCheckbox', step: 'deduction', label: '专项扣除（社保 / 公积金）', type: 'switch', default: true },
                 // v1.47.0 删经营所得页面时丢过一次同样的东西（只在 app.js + helper-functions.js 的私有函数里，
                 // 页面一删就跟着没了），最后是 verify:local 变红才暴露 —— 这次先补再删。
-                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 0, sample: 7546,
+                //
+                // v1.142.0 第三轮：下面这批字段的**排序**回到 1.17 页面的读法 ——
+                // 「一个险种的月缴额挨着它自己的缴费比例」（养老金额 → 养老比例 → 医疗金额 → 医疗比例 …），
+                // 而不是「先把四个比例摆一排、再把四个金额摆一排」。用户勾这个框的时候心里有的是
+                // 缴费基数与"我这个险种每月扣了多少"，那两个数必须挨着才能核对；
+                // 隔着六行去找，等于没给核对的路。
+                //
+                // 社保基数给 7546（页面时代沿用下来的口径）：勾了「专项扣除」却不给基数，
+                // 月缴额就是 0 —— 勾了和没勾一个样，那才是把用户带沟里。它必然是错的（每个人的
+                // 参保地不同），框里有个数就是要用户改它；这也是 money 一律归零那条出口列的例外之一。
+                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 7546, sample: 7546,
+                    wide: true,
                     when: { key: 'specialDeductionCheckbox', in: [true] },
-                    hint: '填了就由它和下面三项比例算月缴额（月缴额以基数为准）；不填则自己填月缴额' },
+                    hint: '由它和下面的比例算月缴额（每月扣多少以基数为准）；不是你参保地的数就改掉它' },
+                { key: 'pensionInsurance', step: 'deduction', derived: true, label: '养老保险金（元/月）', type: 'money', default: 0, sample: 603.68,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的养老保险：进你自己的养老账户，退休后按月领养老金；单位缴的那部分进统筹基金，不在这里填。\n按「社保缴费基数 × 养老比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'pensionRate', step: 'deduction', label: '养老缴费比例', type: 'percent', default: 8,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'medicalInsurance', step: 'deduction', derived: true, label: '医疗保险金（元/月）', type: 'money', default: 0, sample: 150.92,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的医疗保险：用于住院与门诊报销，其中一部分划进你自己的医保个人账户（工伤与生育保险个人不缴）。\n按「社保缴费基数 × 医疗比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'medicalRate', step: 'deduction', label: '医疗缴费比例', type: 'percent', default: 2,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'unemploymentInsurance', step: 'deduction', derived: true, label: '失业保险金（元/月）', type: 'money', default: 0, sample: 37.73,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的失业保险：非本人意愿中断就业、且缴满一年的，可按月领失业金。\n按「社保缴费基数 × 失业比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'unemploymentRate', step: 'deduction', label: '失业缴费比例', type: 'percent', default: 0.5,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
-                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 0, sample: 7546,
+                // 与社保同理：勾了专项扣除就该有一份算得出钱的公积金 —— 给 0 就是给用户一个算不出数的空趟
+                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 7546, sample: 7546,
+                    wide: true,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'housingFund', step: 'deduction', derived: true, label: '住房公积金（元/月）', type: 'money', default: 0, sample: 377.3,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '住房公积金：个人缴的与单位缴的都进你自己的公积金账户，买房、租房、翻建可按规定提取。\n按「公积金缴费基数 × 公积金比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'housingFundRate', step: 'deduction', label: '公积金缴费比例', type: 'percent', default: 5,
                     when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '各地 5%~12% 不同，按参保地口径填' },
-                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, sample: 603.68,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 养老比例' },
-                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, sample: 150.92,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 医疗比例' },
-                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, sample: 37.73,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 失业比例' },
-                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0, sample: 377.3,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 公积金缴费基数 × 公积金比例' },
 
-                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '享受专项附加扣除', type: 'switch', default: false },
-                { key: 'childrenInfantCount', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（人数）', type: 'number', default: 0, min: 0,
+                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '专项附加扣除', type: 'switch', default: false },
+                { key: 'childrenInfantCount', group: '子女教育与婴幼儿照护', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（人数）', type: 'number', default: 0, min: 0,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'childrenInfantDeductionRate', step: 'deduction', label: '扣除分摊比例', type: 'percent', default: 100,
+                { key: 'childrenInfantDeductionRate', group: '子女教育与婴幼儿照护', step: 'deduction', label: '扣除分摊比例', type: 'percent', default: 100,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
                     hint: '父母双方各扣 50% 时填 50；全额扣除填 100' },
-                { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 婴幼儿照护（元/月）', type: 'money', default: 0,
-                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '＝ 人数 × 2000 元/月 × 分摊比例' },
-                { key: 'elderlyType', step: 'deduction', label: '赡养老人', type: 'select', default: 'none', options: [
+                { key: 'childrenInfantDeduction', group: '子女教育与婴幼儿照护', step: 'deduction', derived: true, label: '子女教育 / 婴幼儿照护（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '子女教育 / 3 岁以下婴幼儿照护：每个子女每月 2000 元，父母可以一方扣全额、也可以双方各扣一半。\n这一栏不用填：按「人数 × 2000 元/月 × 分摊比例」自动算出，改上面的输入即可。' },
+                { key: 'elderlyType', group: '赡养老人', step: 'deduction', label: '赡养老人', type: 'select', default: 'none', options: [
                     { value: 'none', label: '不适用' },
                     { value: 'only', label: '独生子女（3000 元/月）' },
                     { value: 'non-only', label: '非独生子女（分摊，上限 1500 元/月）' }
                 ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人扣除额（元/月）', type: 'money', default: 0,
-                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '由上面的身份自动生成；非独生子女按实际分摊额改' },
-                { key: 'housingType', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
+                { key: 'elderlyDeduction', group: '赡养老人', step: 'deduction', derived: true, label: '赡养老人扣除额（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '不用填：选了独生子女是 3000 元/月，非独生子女按政策上限自动给 1500 元/月。\n非独生子女如果分摊协议约定的份额低于 1500，直接在这里改成协议的那个数' },
+                { key: 'housingType', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
                     { value: 'rent', label: '住房租金' },
                     { value: 'loan', label: '住房贷款利息' }
-                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息**只能二选一**' },
-                { key: 'rentDeduction', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 0, sample: 1500,
+                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息只能二选一' },
+                { key: 'rentDeduction', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 0, sample: 1500,
                     when: { key: 'housingType', in: ['rent'] } },
-                { key: 'housingLoanDeduction', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 0, sample: 1000,
+                { key: 'housingLoanDeduction', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 0, sample: 1000,
                     when: { key: 'housingType', in: ['loan'] } },
-                { key: 'educationDegreeCheckbox', step: 'deduction', label: '学历继续教育（400 元/月）', type: 'switch', default: false,
+                { key: 'educationDegreeCheckbox', group: '继续教育', step: 'deduction', label: '学历继续教育（400 元/月）', type: 'switch', default: false,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'educationProfessionalCheckbox', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
+                { key: 'educationProfessionalCheckbox', group: '继续教育', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'educationDeduction', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0,
+                { key: 'educationDeduction', group: '继续教育', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0, derived: true,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
-                    hint: '＝ 学历 400 元/月 × 工作月数 ＋ 职业资格 3600 元/年（勾选时）' },
-                { key: 'medicalDeduction', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
+                    hint: '继续教育：学历（学位）继续教育每月扣 400 元，同一学历最长扣 48 个月；取得职业资格证书的当年一次性扣 3600 元。\n这一栏不用填：勾了上面哪一项，就按「学历 400 元/月 × 工作月数 + 职业资格 3600 元/年」自动算出来' },
+                { key: 'medicalDeduction', group: '大病医疗', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
                     hint: '只扣超过 1.5 万的部分、限额 8 万；且只在年度汇算扣，不进月度' },
 
-                { key: 'otherDeductionCheckbox', step: 'deduction', label: '有其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
+                { key: 'otherDeductionCheckbox', step: 'deduction', label: '其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
                 { key: 'pensionDeductionCheckbox', step: 'deduction', label: '商业健康险', type: 'switch', default: false,
                     when: { key: 'otherDeductionCheckbox', in: [true] } },
                 { key: 'pensionDeduction', step: 'deduction', label: '商业健康险（元/月）', type: 'money', default: 0,
@@ -475,19 +503,22 @@
             // 与 reverse 逐项对齐（同一套键、同一套 when）：两份 spec 共用下面这一对钩子才不会各自漂移。
             // derive 里装了两批联动 —— 社保那份（基数 × 比例，见 INSURANCE_DERIVE_FROM）
             // 与专项附加这份（人数 × 2000 × 比例 / 赡养老人身份 / 继续教育勾选，见 forwardDerive）。
-            deriveFrom: INSURANCE_DERIVE_FROM,
+            deriveFrom: INSURANCE_DERIVE_FROM.concat(ADDITIONAL_DERIVE_FROM),
             derive: forwardDerive,
             warnings: socialBaseWarnings,
+            // v1.142.0 第三轮：标题与步序照着 1.17 那页定 —— 基本参数 → 收入明细 → 扣除项明细 → 计算结果。
+            // 「基本参数」（工作几个月、去年预缴了多少）必须先问：它定的是这一年的口径，
+            // 录完收入再回头改工作月数，前面那屏的数全部作废。
             steps: [
-                { key: 'param', title: '计算参数', why: '工作月数决定全年减除与累计预扣的基数；留空预缴额＝按累计预扣法自动推演', level: 'advanced' },
-                { key: 'income', title: '各项所得录入', why: '四类所得计入综合所得的口径不同（劳务打八折、稿酬再减按七成），先录准' },
+                { key: 'param', title: '基本参数', why: '先把这一年的口径定下来：工作几个月决定累计预扣法的档位起算；已预缴额留空：由系统按月推演' },
+                { key: 'income', title: '收入明细', why: '四类所得计入综合所得的口径不同（劳务打八折、稿酬再减按七成），按笔录准' },
                 { key: 'deduction', title: '扣除项明细', why: '扣除项直接决定应纳税所得额 —— 少填一项，等于自认为要多缴一份税' }
             ],
             pitfalls: [
-                '住房租金与住房贷款利息**只能二选一**，同时享受会被税务机关驳回',
-                '大病医疗只扣**超过 1.5 万**的部分、限额 8 万，且只在年度汇算扣 —— 月度预算表里看不到它',
+                '住房租金与住房贷款利息只能二选一，同时享受会被税务机关驳回',
+                '大病医疗只扣超过 1.5 万的部分、限额 8 万，且只在年度汇算扣 —— 月度预算表里看不到它',
                 '公益性捐赠扣除限额为应纳税所得额的 30%，超出部分当年不能扣（可结转三年）',
-                '劳务 / 稿酬 / 特许权使用费是**按次预扣**（20%~40%），年度汇算才并入综合所得按超额累进重算',
+                '劳务 / 稿酬 / 特许权使用费是按次预扣（20%~40%），年度汇算才并入综合所得按超额累进重算',
                 '月度预算表按累计预扣法算：同样的年收入，一次性发放与逐月发放，每月到手并不一样'
             ],
             // 方案对比的取数钩子（v1.51.0）：与 compute **同一个** forwardCalc，不是第二份映射。
@@ -597,7 +628,7 @@
                 { key: 'entityType', step: 'entity', label: '企业类型', type: 'select', default: 'individual',
                     options: [{ value: 'individual', label: '个体工商户' }, { value: 'sole', label: '个人独资企业' },
                         { value: 'partnership', label: '合伙企业（按分配比例）' }],
-                    hint: '合伙企业以**每一个合伙人**为纳税人：按合伙协议约定的分配比例确定应纳税所得额，没约定的按合伙人数量平均（第五条）' },
+                    hint: '合伙企业以每一个合伙人为纳税人：按合伙协议约定的分配比例确定应纳税所得额，没约定的按合伙人数量平均（依据：财税〔2000〕91号 第五条）' },
                 { key: 'partnershipRatio', step: 'entity', label: '你在该合伙企业的分配比例（%）', type: 'percent', default: 50,
                     when: { key: 'entityType', in: ['partnership'] },
                     hint: '合伙协议约定优先；没有约定的按合伙人数量平均计算（财税〔2000〕91号 第五条）' },
@@ -610,18 +641,18 @@
                 { key: 'halve', step: 'entity', label: '享受“不超过 200 万部分减半征收”', type: 'switch', default: false,
                     hint: '财政部 税务总局公告 2023 年第 12 号，执行至 2027-12-31' },
                 { key: 'hasOtherEntities', step: 'entity', label: '你今年还有别的个体户 / 个独 / 合伙份额', type: 'switch', default: false,
-                    hint: '一人兴办两家以上企业（含参与兴办），年度终了必须**汇总**所有企业的应纳税所得额确定税率（第十二条）' },
+                    hint: '一人兴办两家以上企业（含参与兴办），年度终了必须汇总所有企业的应纳税所得额确定税率（依据：财税〔2000〕91号 第十二条）' },
                 { key: 'otherEntities', step: 'entity', label: '其他企业（亏损填负数）', type: 'repeater',
                     when: { key: 'hasOtherEntities', in: [true] }, addLabel: '添加一家企业',
                     default: [{ taxable: 800000 }, { taxable: -400000 }],
                     itemFields: [
                         { key: 'taxable', label: '该企业年度应纳税所得额（元，亏损填负数）', type: 'money', default: 0 }
                     ],
-                    hint: '亏损企业的亏损**不能跨企业弥补**，只能留在本企业用以后年度所得逐年弥补（最长 5 年）' },
+                    hint: '亏损企业的亏损不能跨企业弥补，只能留在本企业用以后年度所得逐年弥补（最长 5 年）' },
                 { key: 'ownerDeductionAt', step: 'entity', label: '投资者本人 6 万费用扣除在哪家扣', type: 'select', default: 'self',
                     when: { key: 'hasOtherEntities', in: [true] },
                     options: [{ value: 'self', label: '扣在本企业' }, { value: 'other', label: '已在其他企业扣过' }],
-                    hint: '只能选**其中一家**企业的所得中扣除，不能每家都扣一次（第十三条）' },
+                    hint: '只能选其中一家企业的所得中扣除，不能每家都扣一次（依据：财税〔2000〕91号 第十三条）' },
                 { key: 'income', step: 'income', label: '年度经营收入总额', type: 'money', default: 0, sample: 600000 },
                 { key: 'cost', step: 'income', label: '年度成本', type: 'money', default: 0, sample: 350000 },
                 { key: 'expenses', step: 'income', label: '年度费用', type: 'money', default: 0, sample: 50000 },
@@ -630,22 +661,24 @@
                 { key: 'otherExpenses', step: 'income', label: '其他支出', type: 'money', default: 0 },
                 { key: 'previousLosses', step: 'income', label: '以前年度亏损弥补', type: 'money', default: 0, hint: '亏损可向以后年度结转，最长 5 年' },
                 { key: 'ownerSalary', step: 'income', label: '给投资者本人（业主）发的工资（已计入成本费用）', type: 'money', default: 0, sample: 120000, min: 0,
-                    hint: '投资者的工资**不得在税前扣除** —— 已列支的要调增回来（财税〔2000〕91号 第六条（一））' },
+                    hint: '投资者的工资不得在税前扣除 —— 已列支的要调增回来（财税〔2000〕91号 第六条（一））' },
                 { key: 'hasComprehensiveIncome', step: 'deduction', label: '本年度有综合所得（工资薪金等）', type: 'switch', default: false, hint: '有综合所得时，基本减除与社保公积金在综合所得里扣，经营所得不再扣' },
                 { key: 'workMonths', step: 'deduction', label: '年工作总月数', type: 'select', default: 12, options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + '个月' }; }) },
                 // 下面 6 项是**便利输入**：用户手里有的是社保缴费基数，不是「每月扣了多少养老金」。
                 // 页面版由 index.html 的输入框 + app.js/helper-functions.js 的私有联动提供，
                 // 迁移到 spec 后改由向导的 derive / warnings 两个通用钩子承担（见文件内 derive 注释）。
-                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 0, hint: '填了就由它和下面三项比例算月缴额（月缴额以基数为准）；不填则自己填月缴额' },
-                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 0 },
+                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 7546, wide: true,
+                    hint: '由它和下面的比例算月缴额（每月扣多少以基数为准）；不是你参保地的数就改掉它' },
+                // 排序同 forward：每一险种的月缴额挨着它自己的比例 —— 方便勾完之后逐个核
+                { key: 'pensionInsurance', step: 'deduction', derived: true, label: '养老保险金（元/月）', type: 'money', default: 0, hint: '个人缴的养老保险：进你自己的养老账户，退休后按月领养老金；单位缴的那部分进统筹基金，不在这里填。\n按「社保缴费基数 × 养老比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改 × 年工作月数' },
                 { key: 'pensionRate', step: 'deduction', label: '养老缴费比例', type: 'percent', default: 8 },
+                { key: 'medicalInsurance', step: 'deduction', derived: true, label: '医疗保险金（元/月）', type: 'money', default: 0, hint: '个人缴的医疗保险：用于住院与门诊报销，其中一部分划进你自己的医保个人账户（工伤与生育保险个人不缴）。\n按「社保缴费基数 × 医疗比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'medicalRate', step: 'deduction', label: '医疗缴费比例', type: 'percent', default: 2 },
+                { key: 'unemploymentInsurance', step: 'deduction', derived: true, label: '失业保险金（元/月）', type: 'money', default: 0, hint: '个人缴的失业保险：非本人意愿中断就业、且缴满一年的，可按月领失业金。\n按「社保缴费基数 × 失业比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'unemploymentRate', step: 'deduction', label: '失业缴费比例', type: 'percent', default: 0.5 },
+                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 7546, wide: true },
+                { key: 'housingFund', step: 'deduction', derived: true, label: '住房公积金（元/月）', type: 'money', default: 0, hint: '住房公积金：个人缴的与单位缴的都进你自己的公积金账户，买房、租房、翻建可按规定提取。\n按「公积金缴费基数 × 公积金比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'housingFundRate', step: 'deduction', label: '公积金缴费比例', type: 'percent', default: 5, hint: '各地 5%~12% 不同，按参保地口径填' },
-                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 养老比例，按年工作月数折算为年度' },
-                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 医疗比例' },
-                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, hint: '＝ 社保缴费基数 × 失业比例' },
-                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0, hint: '＝ 公积金缴费基数 × 公积金比例' },
                 { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护', type: 'money', default: 0 },
                 { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人', type: 'money', default: 0 },
                 { key: 'housingDeduction', step: 'deduction', label: '住房贷款利息 / 住房租金', type: 'money', default: 0 },
@@ -654,7 +687,7 @@
                 { key: 'pensionDeduction', step: 'deduction', label: '商业健康险 / 税延养老保险', type: 'money', default: 0 },
                 { key: 'enterpriseAnnuity', step: 'deduction', label: '企业年金', type: 'money', default: 0 },
                 { key: 'insuranceDeduction', step: 'deduction', label: '其他商业保险', type: 'money', default: 0 },
-                { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠', type: 'money', default: 0, hint: '扣除限额＝应纳税所得额 × 30%' },
+                { key: 'charitableDonation', step: 'deduction', label: '公益性捐赠', type: 'money', default: 0, hint: '公益捐赠的税前扣除限额：一般捐赠不超过应纳税所得额的 30%（另有规定的可全额扣除）。\n计算公式：扣除限额 = 应纳税所得额 × 30%' },
                 { key: 'prepaidTax', step: 'deduction', label: '已预缴税额', type: 'money', default: 0 }
             ],
             // 「基数 × 比例 → 月缴额」：三个钩子抽到文件顶部（INSURANCE_DERIVE_FROM / insuranceDerive /
@@ -666,17 +699,17 @@
             steps: [
                 { key: 'entity', title: '身份与征收方式', why: '先定两件事：是不是合伙企业（按分配比例归属）、还有没有别的企业（有就必须汇总定档）' },
                 { key: 'income', title: '经营收入与成本', why: '经营所得按年计税：收入总额减成本、费用、税金与损失，才是经营利润；给业主发的工资要调增回来' },
-                { key: 'deduction', title: '扣除项明细', why: '先确认有没有综合所得 —— 它决定 6 万减除与社保公积金在哪边扣，两边不能重复扣', level: 'advanced' }
+                { key: 'deduction', title: '扣除项明细', why: '先确认有没有综合所得 —— 它决定 6 万减除与社保公积金在哪边扣，两边不能重复扣' }
             ],
             pitfalls: [
-                '**一人兴办两家以上企业（含参与兴办）必须汇总**：年度终了汇总所有企业的应纳税所得额，据此确定适用税率（财税〔2000〕91号 第十二条）。分别各自申报会把速算扣除数扣两次、档位还偏低 —— 实测少交 **28250 元**',
-                '**年度经营亏损不能跨企业弥补**（第十四条第二款）：亏损企业当年计 0，亏损留在本企业用以后年度所得逐年弥补、**最长 5 年**。误按「盈利 50 万 − 亏损 20 万 = 30 万」互抵，实测少算 **70000 元**',
-                '**投资者的工资不得在税前扣除**（第六条（一））：给业主本人发的工资已计入成本费用的，汇算时一律调增；投资者本人的费用扣除（6 万）**只能选择在其中一家企业**扣除，不能每家都扣一次（第十三条）',
-                '**合伙企业按分配比例**归属到每个合伙人，协议没约定的按合伙人数量平均（第五条）—— 不是谁拿了多少就算多少',
-                '**减半减的是「不超过 200 万那部分对应的税额」**，不是全额应纳税额打五折：应纳税所得额 ≤ 200 万时两种算法恰好相等，所以这个坑只在**超过 200 万**时才现形 —— 恰恰是数字最大的那批人（300 万时差 **175000 元**）',
-                '**核定征收不是「少交税」的代名词**：按「收入 × 应税所得率」计税，成本费用再多也不看，投资者 6 万费用与专项附加同样不能扣，核定期间的亏损也不得弥补 —— 实际利润率低于应税所得率 + 6 万 ÷ 年收入时，核定反而多交',
-                '有综合所得时，基本减除费用与社保公积金**只能在综合所得里扣一次**，经营所得不再扣；大病医疗只扣**超过 1.5 万**的部分、限额 8 万；公益性捐赠限额为应纳税所得额的 30%',
-                '减半政策执行至 **2027-12-31**；经营所得按年计算、分月或分季预缴，**年度终了后 3 个月内**汇算清缴，多退少补（第十七条）'
+                '一人兴办两家以上企业（含参与兴办）必须汇总：年度终了汇总所有企业的应纳税所得额，据此确定适用税率（财税〔2000〕91号 第十二条）。分别各自申报会把速算扣除数扣两次、档位还偏低 —— 实测少交 28250 元',
+                '年度经营亏损不能跨企业弥补（第十四条第二款）：亏损企业当年计 0，亏损留在本企业用以后年度所得逐年弥补、最长 5 年。误按「盈利 50 万 − 亏损 20 万 = 30 万」互抵，实测少算 70000 元',
+                '投资者的工资不得在税前扣除：给业主本人发的工资已计入成本费用的，汇算时一律调增（依据：财税〔2000〕91号 第六条（一））。投资者本人的费用扣除（6 万）只能选择在其中一家企业扣除，不能每家都扣一次（第十三条）',
+                '合伙企业按分配比例归属到每个合伙人，协议没约定的按合伙人数量平均 —— 不是谁拿了多少就算多少（依据：财税〔2000〕91号 第五条）',
+                '减半减的是「不超过 200 万那部分对应的税额」，不是全额应纳税额打五折：应纳税所得额 ≤ 200 万时两种算法恰好相等，所以这个坑只在超过 200 万时才现形 —— 恰恰是数字最大的那批人（300 万时差 175000 元）',
+                '核定征收不是「少交税」的代名词：按「收入 × 应税所得率」计税，成本费用再多也不看，投资者 6 万费用与专项附加同样不能扣，核定期间的亏损也不得弥补 —— 实际利润率低于应税所得率 + 6 万 ÷ 年收入时，核定反而多交',
+                '有综合所得时，基本减除费用与社保公积金只能在综合所得里扣一次，经营所得不再扣；大病医疗只扣超过 1.5 万的部分、限额 8 万；公益性捐赠限额为应纳税所得额的 30%',
+                '减半政策执行至 2027-12-31；经营所得按年计算、分月或分季预缴，年度终了后 3 个月内汇算清缴，多退少补（第十七条）'
             ],
             compute: function (v) {
                 if (typeof calculateBusinessTaxCore !== 'function') return null;
@@ -725,10 +758,10 @@
 
                 var rows = [
                     { label: '本企业应纳税所得额', value: ownTaxable, kind: 'money',
-                        hint: isAssessed ? '核定征收：收入 × 应税所得率，不扣成本费用' : '已调增投资者工资、并按分配比例归属后的所得' },
+                        hint: isAssessed ? '核定征收：核定征收下，应纳税所得额按「收入 × 应税所得率」算，不再扣成本费用费用' : '已调增投资者工资、并按分配比例归属后的所得' },
                     { label: '汇总应纳税所得额', value: m.aggregateTaxable, kind: 'money',
                         hint: others.length ? '各企业相加，亏损企业当年计 0（不能跨企业弥补）' : '只有这一家企业，汇总数等于本企业数' },
-                    { label: '适用税率', value: bracket.rate, kind: 'percent', hint: '按**汇总**数定档，不是各家各查一次' },
+                    { label: '适用税率', value: bracket.rate, kind: 'percent', hint: '按汇总数定档，不是各家各查一次' },
                     { label: '速算扣除数', value: bracket.deduction, kind: 'money' },
                     { label: '减半征收减免', value: halved.halve, kind: 'money', hint: '年应纳税所得额 200 万以内的部分减半（2023 年第 12 号，至 2027-12-31）' },
                     { label: '应纳个人所得税', value: halved.tax, kind: 'money' }
@@ -774,8 +807,10 @@
                 });
                 extras.push({
                     title: '减半到底减的是什么（三种算法对照）',
-                    note: '正确：减免 = min(应纳税所得额, 200 万) 那部分**对应的税额** × 50%；'
-                        + '「应纳税额打五折」只在 ≤ 200 万时恰好相等，超过 200 万就开始少算',
+                    // 「正确：…」是自己人对账的口吻，用户看到只会想"那我该按哪个填"；
+                    // 改成陈述句 + 一句"什么时候两种算法相等"，把结论与边界一起给。
+                    note: '减免额 = 200 万以内那部分所得对应的税额 × 50% —— 不是把全部应纳税额打五折。'
+                        + '应纳税所得额 ≤ 200 万时两种算法恰好相等，超过 200 万就开始少算',
                     table: {
                         head: ['应纳税所得额', '减半前税额', '减免额', '正确税额', '误：税额打五折', '误：所得额打五折'],
                         rows: halveRows
@@ -822,10 +857,10 @@
                 }
 
                 var note = '本企业应纳税所得额 ' + Math.round(ownTaxable) + ' 元'
-                    + (others.length ? '，加上其他企业后**汇总 ' + Math.round(m.aggregateTaxable) + ' 元**定档'
+                    + (others.length ? '，加上其他企业后汇总 ' + Math.round(m.aggregateTaxable) + ' 元定档'
                         + '（适用税率 ' + Math.round(bracket.rate * 100) + '%）' : '')
-                    + '，减半减免 ' + Math.round(halved.halve) + ' 元，全年应纳个人所得税 **'
-                    + Math.round(halved.tax) + ' 元**。';
+                    + '，减半减免 ' + Math.round(halved.halve) + ' 元，全年应纳个人所得税 '
+                    + Math.round(halved.tax) + ' 元。';
                 if (m.separateGap > 0.01) note += ' 按各家分别申报会少交 ' + Math.round(m.separateGap) + ' 元（漏报）；';
                 if (m.nettingGap > 0.01) note += ' 把亏损拿去互抵会少算 ' + Math.round(m.nettingGap) + ' 元（不能跨企业弥补）；';
                 if (isAssessed) note += ' 核定征收按「收入 × 应税所得率」计税，成本费用、投资者 6 万与专项附加一律不扣；';
@@ -839,7 +874,7 @@
                         { label: '应纳税所得额', value: ownTaxable, format: 'money', note: '核定不扣成本费用' }
                     ] : [
                         { label: '经营利润（收入 − 成本费用损失）', value: core.incomeDetails.businessProfit, format: 'money' },
-                        { label: '加：投资者工资调增', value: ownerSalary, format: 'money', note: '投资者的工资不得税前扣除（第六条（一））' },
+                        { label: '加：投资者工资调增', value: ownerSalary, format: 'money', note: '投资者的工资不得税前扣除（依据：财税〔2000〕91号 第六条（一））' },
                         { label: '减：以前年度亏损', value: Number(v.previousLosses) || 0, format: 'money' },
                         { label: shareRatio < 1 ? '× 合伙分配比例' : '投资者份额', value: shareRatio < 1 ? shareRatio : 1,
                             format: shareRatio < 1 ? 'percent' : 'text' },
@@ -919,7 +954,7 @@
                             hint: '租赁过程中缴纳的税金、教育费附加等；不计修缮费' },
                         { key: 'rentRepair', label: '修缮费用（元）', type: 'money', default: 0, min: 0,
                             when: { key: 'type', in: ['rent'] },
-                            hint: '每月最多扣 800 元，当月扣不完的**结转以后月份**，不是作废' },
+                            hint: '每月最多扣 800 元，当月扣不完的结转以后月份，不是作废' },
                         { key: 'transferOriginal', label: '财产原值（元）', type: 'money', default: 0, min: 0,
                             when: { key: 'type', in: ['transfer'] },
                             hint: '取得该项财产时实际支付的成交价及相关税费' },
@@ -929,14 +964,14 @@
                     ] }
             ],
             steps: [
-                { key: 'income', title: '所得条目', why: '分类所得**按次（或按项）单独计税**：同一种类型的每一笔要分开录，各自扣除、各自适用税率' }
+                { key: 'income', title: '所得条目', why: '分类所得按次（或按项）单独计税：同一种类型的每一笔要分开录，各自扣除、各自适用税率' }
             ],
             pitfalls: [
-                '利息、股息、红利所得与偶然所得**不减除任何费用**，全额按 20% 计税',
-                '财产租赁所得：月收入 ≤ 4000 元减除费用 800 元，> 4000 元减除 20%；修缮费每月最多扣 800 元，超出的部分**结转以后月份**',
-                '财产转让所得＝转让收入 − 财产原值 − 合理费用，**原值与费用要留好凭证**，没有凭证就等于全额计税',
+                '利息、股息、红利所得与偶然所得不减除任何费用，全额按 20% 计税',
+                '财产租赁所得：月收入 ≤ 4000 元减除费用 800 元，> 4000 元减除 20%；修缮费每月最多扣 800 元，超出的部分结转以后月份',
+                '财产转让所得 = 转让收入 − 财产原值 − 合理费用，原值与费用要留好凭证，没有凭证就等于全额计税',
                 '偶然所得中的福利彩票单笔 1 万元以下免税、有奖发票单张 800 元以下免税 —— 本表按全额计税，符合条件时需自行扣除',
-                '分类所得**不并入综合所得、也不做年度汇算**，在这里缴完就是终局，多缴不退'
+                '分类所得不并入综合所得、也不做年度汇算，在这里缴完就是终局，多缴不退'
             ],
             compute: function (v) {
                 if (typeof calculateSingleClassificationTax !== 'function') return null;
@@ -1004,7 +1039,7 @@
                         { label: '应纳税额合计', value: results.totalTax, kind: 'money' },
                         { label: '实际税负率', value: results.totalIncome > 0 ? results.totalTax / results.totalIncome : 0, kind: 'percent' }
                     ],
-                    note: '同一类型的所得**每一笔单独计税**：比如两套房子的租金要按两套出租房产分别算收入与费用减除，不能合起来享受一次 800 元。',
+                    note: '同一类型的所得每一笔单独计税：比如两套房子的租金要按两套出租房产分别算收入与费用减除，不能合起来享受一次 800 元。',
                     steps: (typeof buildClassificationFormulaSteps === 'function') ? buildClassificationFormulaSteps(results) : [],
                     extras: extras
                 };
@@ -1035,7 +1070,7 @@
                     hint: '三类所得的预扣率表不同：劳务报酬是 20%/30%/40% 三级超额累进，稿酬与特许权一律 20%' },
 
                 { key: 'mergeByMonth', step: 'payout', label: '同一个月内的多笔合并为「一次」', type: 'switch', default: true,
-                    hint: '法定口径：属于同一项目连续性收入的，以**一个月内**取得的收入为一次。关掉则逐笔单独预扣（不同支付方各自预扣的情形）' },
+                    hint: '法定口径：属于同一项目连续性收入的，以一个月内取得的收入为一次。关掉则逐笔单独预扣（不同支付方各自预扣的情形）' },
                 { key: 'payments', step: 'payout', label: '发放明细', type: 'repeater',
                     addLabel: '添加一笔收入',
                     hint: '每一笔填取得的月份与金额；金额 ≤ 0 的条目不参与预扣',
@@ -1051,14 +1086,14 @@
             ],
             steps: [
                 { key: 'type', title: '所得类型', why: '三类所得的预扣率表与收入额折算比例都不同 —— 先定类型，后面的每一步才有对应的口径' },
-                { key: 'payout', title: '发放明细', why: '预扣是**按次**的：一次收入扣一次费用、用一次预扣率表。同一笔钱分几次发，扣出来的税并不一样' },
+                { key: 'payout', title: '发放明细', why: '预扣是按次的：一次收入扣一次费用、用一次预扣率表。同一笔钱分几次发，扣出来的税并不一样' },
                 { key: 'settle', title: '汇算口径', why: '预扣不是终局 —— 次年并入综合所得按七级年度税率重算，多退少补。要算补退多少，得知道你其余的综合所得落在哪一档' }
             ],
             pitfalls: [
-                '「一次」不是按笔算的：同一项目连续性收入以**一个月内**取得的收入为一次 —— 分着算能多扣一次 800 元、多用一次低档税率，合起来才是法定口径',
-                '费用扣除是**分档**的：≤4000 元减 800，>4000 元减 20%；稿酬在扣除后**再减按 70%**（实际按收入的 56% 并入）',
-                '预扣率最高 40% 只是**预扣**：次年并入综合所得按七级年度税率重算，全年只有这笔收入的人通常能退一笔',
-                '不同支付方各自预扣，**同一个月也不要合并** —— 关掉上面的合并开关，或分开测算两次',
+                '「一次」不是按笔算的：同一项目连续性收入以一个月内取得的收入为一次 —— 分着算能多扣一次 800 元、多用一次低档税率，合起来才是法定口径',
+                '费用扣除是分档的：≤4000 元减 800，>4000 元减 20%；稿酬在扣除后再减按 70%（实际按收入的 56% 并入）',
+                '预扣率最高 40% 只是预扣：次年并入综合所得按七级年度税率重算，全年只有这笔收入的人通常能退一笔',
+                '不同支付方各自预扣，同一个月也不要合并 —— 关掉上面的合并开关，或分开测算两次',
                 '汇算差额按「其他综合所得应纳税所得额」算增量：那一栏填 0 就表示全年只有这笔收入，实际有工资一定要填，否则会低估税负'
             ],
             compute: function (v) {
@@ -1145,11 +1180,11 @@
                         { label: '并入综合所得的收入额', value: incomeTotal, kind: 'money',
                             hint: '劳务报酬 / 特许权按收入的 80%，稿酬按 56%' },
                         { label: '汇算后的增量税负', value: settled, kind: 'money',
-                            hint: '（其他综合所得 + 收入额）的年度税额 − 其他综合所得的年度税额' },
-                        { label: '汇算差额', value: gap, kind: 'money', hint: '正数 = 预扣少于汇算应付' },
+                            hint: '股权激励单独计税与并入综合所得的差额：把这笔收入额加进去算出的年度税额，减去不加这笔的年度税额' },
+                        { label: '汇算差额', value: gap, kind: 'money', hint: '正数 = 预扣少于汇算应付，也就是要补税' },
                         { label: '汇算方向', value: direction, kind: 'text' }
                     ],
-                    note: '预扣是**按次**的（每次扣一次费用、用一次预扣率），汇算是**按年**的（收入额并入综合所得适用七级年度税率）。两者之差就是次年补税或退税的来源。',
+                    note: '预扣是按次的（每次扣一次费用、用一次预扣率），汇算是按年的（收入额并入综合所得适用七级年度税率）。两者之差就是次年补税或退税的来源。',
                     extras: [{
                         title: '逐次预扣预缴明细',
                         note: '每一次各自减除费用、各自查预扣率表 —— 同一笔钱分几次发，扣出来的税不一样',
@@ -1192,14 +1227,14 @@
                     hint: '总额不变、只换名目发放（谈 offer / 年底定包的情形）。已经发完的年终奖改不了分配，只能两套口径二选一' }
             ],
             steps: [
-                { key: 'base', title: '全年口径', why: '年终奖并入还是单独更省，取决于你**其余综合所得落在哪一档** —— 没有这一档，两套口径无从比较' },
+                { key: 'base', title: '全年口径', why: '年终奖并入还是单独更省，取决于你其余综合所得落在哪一档 —— 没有这一档，两套口径无从比较' },
                 { key: 'bonus', title: '年终奖', why: '单独计税按「奖金 ÷ 12」定档、再全额乘税率：发 36000 与发 36001 之间差两千多，中间那一段是雷区' },
-                { key: 'split', title: '分配方式', why: '如果这笔钱本就可以在工资与年终奖之间切分，那么最省的点通常既不是全并入也不是全单独', level: 'advanced' }
+                { key: 'split', title: '分配方式', why: '如果这笔钱本就可以在工资与年终奖之间切分，那么最省的点通常既不是全并入也不是全单独' }
             ],
             pitfalls: [
-                '单独计税按「奖金 ÷ 12」定档、再全额乘税率，所以**临界点附近多发 1 元可能到手更少**：36000 / 144000 / 300000 / 420000 / 660000 / 960000 之后各有一段雷区，本工具给出每段的出口金额',
+                '单独计税按「奖金 ÷ 12」定档、再全额乘税率，所以临界点附近多发 1 元可能到手更少：36000 / 144000 / 300000 / 420000 / 660000 / 960000 之后各有一段雷区，本工具给出每段的出口金额',
                 '「并入更省」不是绝对的：它取决于你其余综合所得落在哪一档 —— 全年没什么其他收入时并入通常更省，中高收入单独计税通常更省',
-                '最优分配只在**你能决定发放名目**时成立：已经发完的年终奖改不了口径，只能在两套算法里二选一',
+                '最优分配只在你能决定发放名目时成立：已经发完的年终奖改不了口径，只能在两套算法里二选一',
                 '一年只能用一次单独计税；同一个月内分两笔发也不改变这一点（那是两笔奖金，不是两次优惠）',
                 '单独计税政策执行至 2027-12-31（以注册表状态为准）；之后只能并入综合所得',
                 '本工具按「工资与年终奖总额不变」求最优，未考虑社保 / 公积金缴费基数随工资变动带来的影响'
@@ -1293,7 +1328,7 @@
                 var rows = [
                     { label: '单独计税：综合所得部分', value: T(other), kind: 'money' },
                     { label: '单独计税：年终奖税额', value: bonusTax, kind: 'money',
-                        hint: '奖金 ÷ 12 定档，再全额乘税率减速算扣除' },
+                        hint: '年终奖单独计税的算法：先拿奖金除以 12，去年度税率表里定档；再用奖金全额乘税率、减速算扣除数' },
                     { label: '单独计税：全年个税合计', value: sep, kind: 'money' },
                     { label: '并入综合所得：全年个税合计', value: inc, kind: 'money',
                         hint: '奖金全额计入综合所得，与其余所得合并找档' },
@@ -1322,7 +1357,7 @@
                     + '并入则把奖金全额加进综合所得重新找档。择优结论取决于你其余综合所得的档位，'
                     + '所以上面那一栏填得越准，结论越可信。';
                 if (inDanger) {
-                    note = '⚠️ 当前年终奖落在**雷区**：' + inDanger.edge + ' ~ ' + Math.ceil(inDanger.escape)
+                    note = '⚠️ 当前年终奖落在雷区：' + inDanger.edge + ' ~ ' + Math.ceil(inDanger.escape)
                         + ' 元这段里，多发不如少发（多发 1 元就要多缴 ' + Math.round(inDanger.jump)
                         + ' 元）。要么就定在 ' + inDanger.edge + ' 元，要么发到 ' + Math.ceil(inDanger.escape) + ' 元以上。';
                 }
@@ -1405,11 +1440,11 @@
             policyKey: 'equity-incentive',
             fields: [
                 { key: 'otherTaxable', step: 'base', label: '全年其他综合所得的应纳税所得额（元）', type: 'money', default: 0, sample: 60000,
-                    hint: '工资薪金等已减 6 万基本减除、三险一金与专项附加扣除后的余额；股权激励**不并入**这一栏，只用于对照「如果并入会怎样」' },
+                    hint: '工资薪金等已减 6 万基本减除、三险一金与专项附加扣除后的余额；股权激励不并入这一栏，只用于对照「如果并入会怎样」' },
 
                 { key: 'grants', step: 'grants', label: '本年取得的股权激励批次', type: 'repeater',
                     addLabel: '添加一批行权 / 解禁',
-                    hint: '同一纳税年度内的所有批次都要列上 —— 法定口径是**合并成一个基数**一次性定档；收入 ≤ 0 的批次不产生税额',
+                    hint: '同一纳税年度内的所有批次都要列上 —— 法定口径是合并成一个基数一次性定档；收入 ≤ 0 的批次不产生税额',
                     default: [{ month: 3, type: 'option', qty: 10000, price: 20, cost: 10, grantPrice: 15 }],
                     itemFields: [
                         { key: 'month', label: '取得月份', type: 'select', default: 3,
@@ -1437,16 +1472,16 @@
                     hint: '期权行权窗口、解禁节奏可自选的情形；已经行权完的批次改不了年度' }
             ],
             steps: [
-                { key: 'base', title: '全年口径', why: '股权激励是**全额单独适用**年度税率表、不并入综合所得 —— 这一栏只用来给出「如果并入会怎样」的对照' },
-                { key: 'grants', title: '激励批次', why: '一个纳税年度内两次以上股权激励必须**合并**计税：合并后一次性定档，而不是每批各自从低档起算' },
+                { key: 'base', title: '全年口径', why: '股权激励是全额单独适用年度税率表、不并入综合所得 —— 这一栏只用来给出「如果并入会怎样」的对照' },
+                { key: 'grants', title: '激励批次', why: '一个纳税年度内两次以上股权激励必须合并计税：合并后一次性定档，而不是每批各自从低档起算' },
                 { key: 'option', title: '递延与行权安排', why: '非上市公司可递延到转让时按 20% 计税；行权窗口还能自选时，把批次分到两个纳税年度会各自定档' }
             ],
             pitfalls: [
-                '一个纳税年度内取得两次以上股权激励必须**合并计算**：合并后的收入一次性定档，按每批各自定档会**少算税**，汇算时要补（并可能加收滞纳金）',
-                '现行政策是**不并入**综合所得、全额单独适用年度税率表，且**不减除任何费用** —— 6 万元基本减除与专项附加扣除都用不上，所以不能拿它跟「同等金额的工资」直接比税率',
-                '与年终奖不同：这里适用的是**超额累进的年度税率表**，不存在「多发 1 元到手反而变少」的雷区 —— 年终奖那种雷区来自「÷ 12 定档、全额乘税率」的月度换算表',
-                '非上市公司符合条件的股票期权 / 限制性股票 / 股权奖励可**递延**至转让时按「财产转让所得」20% 计税；递延与单独计税只能二选一，股价涨幅越大递延越不划算',
-                '合并只在**同一个纳税年度内**成立 —— 跨年度行权会各自定档，这是唯一合法的降档路径，但需要行权时点本身可以自己安排',
+                '一个纳税年度内取得两次以上股权激励必须合并计算：合并后的收入一次性定档，按每批各自定档会少算税，汇算时要补（并可能加收滞纳金）',
+                '现行政策是不并入综合所得、全额单独适用年度税率表，且不减除任何费用 —— 6 万元基本减除与专项附加扣除都用不上，所以不能拿它跟「同等金额的工资」直接比税率',
+                '与年终奖不同：这里适用的是超额累进的年度税率表，不存在「多发 1 元到手反而变少」的雷区 —— 年终奖那种雷区来自「÷ 12 定档、全额乘税率」的月度换算表',
+                '非上市公司符合条件的股票期权 / 限制性股票 / 股权奖励可递延至转让时按「财产转让所得」20% 计税；递延与单独计税只能二选一，股价涨幅越大递延越不划算',
+                '合并只在同一个纳税年度内成立 —— 跨年度行权会各自定档，这是唯一合法的降档路径，但需要行权时点本身可以自己安排',
                 '单独计税政策执行至 2027-12-31（以注册表状态为准）；之后按现行口径将并入综合所得'
             ],
             compute: function (v) {
@@ -1521,9 +1556,9 @@
 
                 var rows = [
                     { label: '股权激励收入合计（合并基数）', value: total, kind: 'money',
-                        hint: '全年各批次的收入额合计，不减除任何费用' },
+                        hint: '股权激励全年的收入额：各批次的收入额相加，不减除任何费用' },
                     { label: '合并后适用税率', value: br ? br.rate : 0, kind: 'percent',
-                        hint: '全额单独适用年度综合所得税率表（不 ÷ 12、不做月度换算）' },
+                        hint: '离职补偿金里超过免税额的那部分：全额单独适用年度综合所得税率表，既不除以 12，也不做月度换算' },
                     { label: '现行：股权激励应纳个税', value: sep, kind: 'money' },
                     { label: '其他综合所得应纳税额', value: otherTax, kind: 'money' },
                     { label: '现行：全年个税合计', value: nowTotal, kind: 'money' },
@@ -1548,12 +1583,12 @@
                     rows.push({ label: '相对全部在当年可省', value: sep - bestSplit.tax, kind: 'money' });
                 }
 
-                var note = '现行口径：全年各批次**合并**成一个基数、全额单独适用年度税率表，'
-                    + '不并入综合所得也不减除任何费用。年度表是超额累进的，所以这里**没有**年终奖那种'
+                var note = '现行口径：全年各批次合并成一个基数、全额单独适用年度税率表，'
+                    + '不并入综合所得也不减除任何费用。年度表是超额累进的，所以这里没有年终奖那种'
                     + '「多发 1 元到手反而变少」的雷区 —— 多发只会多交一点，不会倒挂。';
                 if (underpay > 0.005) {
-                    note = '⚠️ 如果按每一批各自定档预扣，全年会**少算 ' + Math.round(underpay)
-                        + ' 元**：法定口径是把全年各批次合并后一次性定档（' + Math.round(total)
+                    note = '⚠️ 如果按每一批各自定档预扣，全年会少算 ' + Math.round(underpay)
+                        + ' 元：法定口径是把全年各批次合并后一次性定档（' + Math.round(total)
                         + ' 元 → 税率 ' + Math.round((br ? br.rate : 0) * 100) + '%），'
                         + '不是每批各从低档起算。这个差额年度汇算时要补，并可能加收滞纳金。';
                 }
@@ -1617,7 +1652,7 @@
 
                 return {
                     primary: { label: '现行：全年个税合计', value: nowTotal, kind: 'money',
-                        hint: '股权激励单独计税 + 其他综合所得' },
+                        hint: '两种口径相加：股权激励单独计税的税额 + 其他综合所得的税额' },
                     rows: rows,
                     note: note,
                     extras: extras
@@ -1647,13 +1682,13 @@
             // 口径仍然同源：免税额度、法定上限、税额全部走 `EuriskoSeveranceQuick`，
             // 并入综合所得的部分走内核 `calculateTaxByTaxableIncome` 的**增量**；
             // 单笔输入与速算器逐点相等，由 tests/severance-deep.test.js 钉住。
-            id: 'severance-deep', name: '离职补偿金', subtitle: '逐笔分类计税，并核算法定应得',
+            id: 'severance-deep', name: '离职补偿金（逐笔分类）', subtitle: '逐笔分类计税，并核算法定应得',
             icon: 'fa-sign-out', status: 'deep',
             nextTools: ['severance', 'annual-settlement', 'early-retirement'],
             policyKey: 'severance',
             fields: [
                 { key: 'avgWage', step: 'basis', label: '当地上年职工年平均工资（元/年）', type: 'money', default: 0, sample: 120000,
-                    hint: '免税额度 = 该数 × 3；各地人社部门每年公布，口径是**年平均工资**' },
+                    hint: '离职补偿金的免税额度：当地上年职工年平均工资 3 倍以内的部分免征个税，超过的部分单独计税。这个数各地人社部门每年公布，口径是年平均工资。\n计算公式：免税额度 = 当地上年职工年平均工资 × 3' },
                 { key: 'monthlyWage', step: 'basis', label: '离职前 12 个月月平均工资（元）', type: 'money', default: 0, sample: 15000 },
                 { key: 'years', step: 'basis', label: '本单位工作年限（整年）', type: 'number', default: 8, min: 0 },
                 { key: 'extraMonths', step: 'basis', label: '不足一年的月数', type: 'number', default: 0, min: 0,
@@ -1661,7 +1696,7 @@
 
                 { key: 'items', step: 'package', label: '离职补偿包的构成（逐笔）', type: 'repeater',
                     addLabel: '添加一笔',
-                    hint: '**不同款项的税务处理不一样**：只有经济补偿金与医疗 / 生活补助费能享受免税额度，'
+                    hint: '不同款项的税务处理不一样：只有经济补偿金与医疗 / 生活补助费能享受免税额度，'
                         + '代通知金、竞业限制补偿、未休年休假折算都不能 —— 分开填才不会算错',
                     default: [{ kind: 'economic', amount: 120000 }, { kind: 'noncompete', amount: 60000 }],
                     itemFields: [
@@ -1679,28 +1714,28 @@
                     ] },
 
                 { key: 'socialDeduction', step: 'option', label: '从补偿款中代扣的社保公积金（元）', type: 'money', default: 0,
-                    hint: '财税〔2001〕157 号第二条：领取补偿时按国家规定比例**实际缴纳**的住房公积金、'
+                    hint: '财税〔2001〕157 号第二条：领取补偿时按国家规定比例实际缴纳的住房公积金、'
                         + '医疗 / 养老 / 失业保险费，可以在计征时扣除' },
                 { key: 'otherTaxable', step: 'option', label: '当年其他综合所得的应纳税所得额（元）', type: 'money', default: 0, sample: 60000,
                     hint: '工资薪金等已减 6 万基本减除与各项扣除后的余额；只影响「并入综合所得」的那些款项' },
                 { key: 'installments', step: 'option', label: '补偿是分次 / 跨年支付的', type: 'switch', default: false,
-                    hint: '免税额度是按「一次性补偿收入」整体给**一次**的，分几次支付也不能重复扣' },
+                    hint: '免税额度是按「一次性补偿收入」整体给一次的，分几次支付也不能重复扣' },
                 { key: 'times', step: 'option', label: '分几次支付', type: 'number', default: 2, min: 1,
                     when: { key: 'installments', in: [true] } }
             ],
             steps: [
-                { key: 'basis', title: '当地口径与年限', why: '免税额度是**当地上年职工年平均工资 × 3** —— 不是月工资 × 3，也不是全国一个数；年限决定法定应得几个月' },
-                { key: 'package', title: '补偿构成', why: '补偿包往往是多笔构成的，而**只有**经济补偿金与医疗 / 生活补助费属于「一次性补偿收入」、能享受免税额度' },
+                { key: 'basis', title: '当地口径与年限', why: '免税额度是当地上年职工年平均工资 × 3 —— 不是月工资 × 3，也不是全国一个数；年限决定法定应得几个月' },
+                { key: 'package', title: '补偿构成', why: '补偿包往往是多笔构成的，而只有经济补偿金与医疗 / 生活补助费属于「一次性补偿收入」、能享受免税额度' },
                 { key: 'option', title: '扣除与对照', why: '补偿款里代扣的社保公积金可以在计征时扣除；并入综合所得的那部分要按你当年的档位算增量' }
             ],
             pitfalls: [
-                '免税额度是**当地上年职工年平均工资 × 3**，不是「离职前月工资 × 3」，也不是全国一个数',
-                '只有**解除劳动关系取得的一次性补偿收入**才享受免税：竞业限制补偿、未休年休假折算、代通知金、股权激励结算都**不属于**，把它们算进补偿包就会少算税',
-                '破产企业职工取得的一次性安置费**全额免税**，不受 3 倍限制（财税〔2001〕157 号第三条）',
-                '领取补偿时按国家规定比例**实际缴纳**的住房公积金、医疗 / 养老 / 失业保险费，可以在计征时扣除 —— 速算器没有这一栏，会多算税',
-                '免税额度按「一次性补偿收入」整体给**一次** —— 分次支付、跨年支付都不能重复扣（每扣一次就少算一份税）',
-                '超过免税额度部分**不并入**当年综合所得，单独适用年度税率表、不减除任何费用、也**不做按工作年限平均**（国税发〔1999〕178 号的平均法已停止执行）',
-                '月工资超过社平 3 倍时，经济补偿受「3 倍 × 12 年」双封顶，封顶值**恰好等于免税额度** —— 按法定上限足额支付的经济补偿一分钱税都不用交'
+                '免税额度是当地上年职工年平均工资 × 3，不是「离职前月工资 × 3」，也不是全国一个数',
+                '只有解除劳动关系取得的一次性补偿收入才享受免税：竞业限制补偿、未休年休假折算、代通知金、股权激励结算都不属于，把它们算进补偿包就会少算税',
+                '破产企业职工取得的一次性安置费全额免税，不受 3 倍限制（财税〔2001〕157 号第三条）',
+                '领取补偿时按国家规定比例实际缴纳的住房公积金、医疗 / 养老 / 失业保险费，可以在计征时扣除 —— 速算器没有这一栏，会多算税',
+                '免税额度按「一次性补偿收入」整体给一次 —— 分次支付、跨年支付都不能重复扣（每扣一次就少算一份税）',
+                '超过免税额度部分不并入当年综合所得，单独适用年度税率表、不减除任何费用、也不做按工作年限平均（国税发〔1999〕178 号的平均法已停止执行）',
+                '月工资超过社平 3 倍时，经济补偿受「3 倍 × 12 年」双封顶，封顶值恰好等于免税额度 —— 按法定上限足额支付的经济补偿一分钱税都不用交'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSeveranceQuick;
@@ -1837,20 +1872,20 @@
                 }
 
                 var note = '免税额度 = 当地上年职工年平均工资 × ' + mult + '（' + Math.round(r.exemptCap)
-                    + ' 元）。一次性补偿收入在该额度以内免税，超出部分**不并入**当年综合所得、'
+                    + ' 元）。一次性补偿收入在该额度以内免税，超出部分不并入当年综合所得、'
                     + '单独适用年度税率表，不减除任何费用，也不做按工作年限平均。';
                 if (mergePart > 0 && naiveGap > 0.005) {
-                    note = '⚠️ 补偿包里有 ' + Math.round(mergePart) + ' 元**不属于**解除劳动关系的一次性补偿收入'
+                    note = '⚠️ 补偿包里有 ' + Math.round(mergePart) + ' 元不属于解除劳动关系的一次性补偿收入'
                         + '（代通知金 / 竞业限制补偿 / 未休年休假折算等），不能享受免税额度。'
-                        + '若把它们一并填进「经济补偿金」，会**少算 ' + Math.round(naiveGap) + ' 元**税。';
+                        + '若把它们一并填进「经济补偿金」，会少算 ' + Math.round(naiveGap) + ' 元税。';
                 }
                 if (wageCapped) {
                     note += ' 你填的月工资已超过社平月工资 ' + capM + ' 倍，经济补偿受「' + capM + ' 倍 × ' + capY
-                        + ' 年」双封顶，封顶值 ' + Math.round(legalDue) + ' 元**恰好等于免税额度** —— '
+                        + ' 年」双封顶，封顶值 ' + Math.round(legalDue) + ' 元恰好等于免税额度 —— '
                         + '按法定上限足额支付的经济补偿一分钱税都不用交。';
                 }
                 if (!wageCapped && months > 0) {
-                    note += ' 你填的月工资未超社平 ' + capM + ' 倍，经济补偿的年限**不封顶**（按 ' + months
+                    note += ' 你填的月工资未超社平 ' + capM + ' 倍，经济补偿的年限不封顶（按 ' + months
                         + ' 个月计付）；速算器口径无条件按 ' + capY + ' 年封顶，长工龄时会低估法定应得。';
                 }
                 if (dueGap > 0.005) {
@@ -1872,7 +1907,7 @@
 
                 return {
                     primary: { label: '离职补偿应纳个税', value: totalTax, kind: 'money',
-                        hint: '一次性补偿单独计税 + 并入部分的增量税' },
+                        hint: '两种口径相加：一次性补偿单独计税的税额 + 并入综合所得后多出来的那部分税' },
                     rows: rows,
                     note: note,
                     extras: [{
@@ -1921,7 +1956,7 @@
             // 口径仍同源：两种情形一律走 `EuriskoEarlyRetirementQuick`；横向对照里的「离职补偿口径」
             // 走 `EuriskoSeveranceQuick`（复刻 17D-4 那条「法定上限恰好等于免税额度」的恒等式，
             // 让 legalCap 不额外截断）；单笔输入与速算器逐点相等，由 tests/early-retirement-deep.test.js 钉住。
-            id: 'early-retirement-deep', name: '提前退休 / 内退', subtitle: '按法定年数分摊，并查临界区',
+            id: 'early-retirement-deep', name: '提前退休 / 内退（分摊计税）', subtitle: '按法定年数分摊，并查临界区',
             icon: 'fa-hourglass-half', status: 'deep',
             nextTools: ['early-retirement', 'severance', 'annual-settlement'],
             policyKey: 'early-retirement',
@@ -1931,9 +1966,9 @@
                         { value: 'internal', label: '内部退养（平均只为定档）' }],
                     hint: '两者口径完全不同：一个按年度表真分摊，一个按月度表定档后对全额计税' },
                 { key: 'age', step: 'basis', label: '办理手续时的年龄（岁，可含小数）', type: 'number', default: 53, min: 0,
-                    hint: '52.5 = 52 岁 6 个月' },
+                    hint: '52.5 表示 52 岁 6 个月' },
                 { key: 'legalAge', step: 'basis', label: '本人法定退休年龄（岁）', type: 'number', default: 60, min: 0,
-                    hint: '2025-01-01 起实施渐进式延迟法定退休年龄，**不再是固定的 60/55/50** —— 填本人的实际法定退休年龄' },
+                    hint: '2025-01-01 起实施渐进式延迟法定退休年龄，不再是固定的 60/55/50 —— 填本人的实际法定退休年龄' },
 
                 { key: 'subsidy', step: 'income', label: '一次性补贴收入（元）', type: 'money', default: 0, sample: 560000,
                     when: { key: 'variant', in: ['early'] } },
@@ -1941,29 +1976,29 @@
                     when: { key: 'variant', in: ['internal'] } },
                 { key: 'monthlySalary', step: 'income', label: '领取当月工资薪金（元/月）', type: 'money', default: 0, sample: 6000,
                     when: { key: 'variant', in: ['internal'] },
-                    hint: '内退一次性收入与领取当月工资**合并**计税；这个数也用于后面三口径的横向对照' },
+                    hint: '内退一次性收入与领取当月工资合并计税；这个数也用于后面三口径的横向对照' },
 
                 { key: 'otherTaxable', step: 'option', label: '当年其他综合所得的应纳税所得额（元）', type: 'money', default: 0, sample: 60000,
-                    hint: '提前退休的一次性补贴**不并入**当年综合所得 —— 填它只为量化「若并入」会多交多少' },
+                    hint: '提前退休的一次性补贴不并入当年综合所得 —— 填它只为量化「若并入」会多交多少' },
                 { key: 'claimedYears', step: 'option', label: '你原以为可以分摊几年', type: 'number', default: 10, min: 0,
                     when: { key: 'variant', in: ['early'] },
-                    hint: '分摊年数按**法定实际年度数**算，不能自己选 —— 填一个不同的数看看会差多少' },
+                    hint: '分摊年数按法定实际年度数算，不能自己选 —— 填一个不同的数看看会差多少' },
                 { key: 'avgWage', step: 'option', label: '当地上年职工年平均工资（元/年）', type: 'money', default: 0, sample: 120000,
-                    hint: '只用于与「离职补偿」口径做横向对照：那个口径的免税额度 = 该数 × 3' }
+                    hint: '只用于与「离职补偿」口径做横向对照：\n计算公式：免税额度 = 当地上年职工年平均工资 × 3' }
             ],
             steps: [
-                { key: 'basis', title: '情形与时间点', why: '分摊年数 / 所属月份数是**法定的**（法定退休年龄 − 办理时年龄），不是想填几年就几年' },
-                { key: 'income', title: '一次性收入', why: '提前退休按年度表真分摊；内退与领取当月工资合并、按月度表定档后对**全额**计税' },
+                { key: 'basis', title: '情形与时间点', why: '分摊年数 / 所属月份数是法定的（法定退休年龄 − 办理时年龄），不是想填几年就几年' },
+                { key: 'income', title: '一次性收入', why: '提前退休按年度表真分摊；内退与领取当月工资合并、按月度表定档后对全额计税' },
                 { key: 'option', title: '对照', why: '三种「一次性收入」的免税逻辑完全不同，横向一比就知道自己属于哪一种、差多少钱' }
             ],
             pitfalls: [
-                '提前退休是**真分摊**（÷ 实际年数后按年减 6 万、算完乘回年数）；内部退养的「平均」**只用来定档**，税基仍是当月工资 + 一次性收入**全额**',
-                '分摊的年数 / 月份数是**办理手续至法定离退休年龄的实际期间**，不是想分几年就几年 —— 多填年数能少交税，但那是错的',
-                '免税额度三种三种都不同：提前退休 = **6 万 × 分摊年数**（随年数线性增长）、离职补偿 = **社平年工资 × 3**（固定）、内部退养 = **没有免税额度**（只减一次 5000）',
-                '提前退休用**年度**税率表、内部退养用**月度**税率表（与年终奖同一张），两者不是一回事',
-                '内部退养有**临界区**：定档基数跨档时税基是全额 —— 多发 1 元可能多交上万元税；提前退休用连续的年度累进表，**没有**雷区',
+                '提前退休是真分摊（÷ 实际年数后按年减 6 万、算完乘回年数）；内部退养的「平均」只用来定档，税基仍是当月工资 + 一次性收入全额',
+                '分摊的年数 / 月份数是办理手续至法定离退休年龄的实际期间，不是想分几年就几年 —— 多填年数能少交税，但那是错的',
+                '免税额度三种三种都不同：提前退休 = 6 万 × 分摊年数（随年数线性增长）、离职补偿 = 社平年工资 × 3（固定）、内部退养 = 没有免税额度（只减一次 5000）',
+                '提前退休用年度税率表、内部退养用月度税率表（与年终奖同一张），两者不是一回事',
+                '内部退养有临界区：定档基数跨档时税基是全额 —— 多发 1 元可能多交上万元税；提前退休用连续的年度累进表，没有雷区',
                 '2025-01-01 起实施渐进式延迟法定退休年龄，法定退休年龄不再是固定的 60 / 55 / 50 —— 必须填本人的实际法定退休年龄',
-                '提前退休的一次性补贴**不并入**当年综合所得、单独计税；内部退养是与领取**当月**工资合并按月度表计税，两者都不参与年度汇算'
+                '提前退休的一次性补贴不并入当年综合所得、单独计税；内部退养是与领取当月工资合并按月度表计税，两者都不参与年度汇算'
             ],
             compute: function (v) {
                 var Q = window.EuriskoEarlyRetirementQuick;
@@ -2009,11 +2044,11 @@
                         { value: annualDed * years, kind: 'money' }, '6 万 × 分摊年数，年度表，乘回年数'],
                     ['内部退养（平均只为定档）',
                         { value: Q.internalOf({ lumpSum: amount, months: months, monthlySalary: salary }).tax, kind: 'money' },
-                        '无（只减一次 5000）', '月均定档 + **全额**计税，月度表']
+                        '无（只减一次 5000）', '月均定档 + 全额计税，月度表']
                 ];
                 if (sevTax !== null) {
                     compareRows.push(['离职补偿（3 倍社平免税）', { value: sevTax, kind: 'money' },
-                        { value: avgWage * 3, kind: 'money' }, '超额部分单独适用年度表，**不做分摊**']);
+                        { value: avgWage * 3, kind: 'money' }, '超额部分单独适用年度表，不做分摊']);
                 }
 
                 var rows, note, primary;
@@ -2027,7 +2062,7 @@
                     var claimedGap = e.tax - claimedTax;            // 正数 = 自行填的年数会少算
 
                     primary = { label: '一次性补贴应纳个税', value: e.tax, kind: 'money',
-                        hint: '分摊后每年税额 × 法定的实际年度数' };
+                        hint: '提前退休的算法：先按年分摊算出每年的税额，再乘上法定的实际年度数' };
                     rows = [
                         { label: '一次性补贴收入', value: amount, kind: 'money' },
                         { label: '分摊年度数（法定实际年度数）', value: years, kind: 'text',
@@ -2041,23 +2076,23 @@
                         { label: '税后到手', value: amount - e.tax, kind: 'money' },
                         { label: '实际税负率', value: amount > 0 ? e.tax / amount : 0, kind: 'percent' },
                         { label: '免税额度（6 万 × 分摊年数）', value: exemptCap, kind: 'money',
-                            hint: '随提前的年数**线性增长** —— 与离职补偿的固定额度不同' },
+                            hint: '随提前的年数线性增长 —— 与离职补偿的固定额度不同' },
                         { label: '若不分摊（错误算法）', value: e.naiveTax, kind: 'money' },
                         { label: '分摊省下的税', value: e.spreadSaving, kind: 'money' },
                         { label: '若并入当年综合所得（错误口径）', value: mergedTax, kind: 'money' },
                         { label: '并入会多交', value: mergedTax - e.tax, kind: 'money' },
                         { label: '若按你填的 ' + claimed + ' 年分摊', value: claimedTax, kind: 'money' },
                         { label: '自行填年数的差额', value: claimedGap, kind: 'money',
-                            hint: '正数 = 你填的年数会少算税（多填年数确实能少交，但年数是法定的）' }
+                            hint: '正数说明你填的年数比法定的多：多填年数确实能少交税，但年数是法定的，不是自己能选的' }
                     ];
 
                     note = '提前退休：一次性补贴 ÷ 实际年度数（法定退休 ' + legalAge + ' 岁 − 办理时 ' + age
-                        + ' 岁 = ' + years + ' 年）= 每年 ' + Math.round(e.perYear) + ' 元，减 6 万后按**年度**'
-                        + '综合所得税率表计税，再乘回年数；**不并入**当年综合所得。'
-                        + '分摊后每年减 6 万，等价于**免税额度 = 6 万 × ' + years + ' = '
-                        + Math.round(exemptCap) + ' 元** —— 与离职补偿的「社平年工资 × 3」不同，这个额度随提前的年数线性增长。';
+                        + ' 岁 = ' + years + ' 年）= 每年 ' + Math.round(e.perYear) + ' 元，减 6 万后按年度'
+                        + '综合所得税率表计税，再乘回年数；不并入当年综合所得。'
+                        + '分摊后每年减 6 万，等价于免税额度 = 6 万 × ' + years + ' = '
+                        + Math.round(exemptCap) + ' 元 —— 与离职补偿的「社平年工资 × 3」不同，这个额度随提前的年数线性增长。';
                     if (Math.abs(claimed - years) > 1e-9 && claimed > 0) {
-                        note += ' 分摊年数是**法定实际年度数**，不能自己选：你填的 ' + claimed + ' 年算出 '
+                        note += ' 分摊年数是法定实际年度数，不能自己选：你填的 ' + claimed + ' 年算出 '
                             + Math.round(claimedTax) + ' 元，比法定口径' + (claimedGap > 0 ? '少算 ' : '多算 ')
                             + Math.abs(Math.round(claimedGap)) + ' 元。';
                     }
@@ -2095,7 +2130,7 @@
                         { label: '定档基数（月均 + 当月工资 − 5000）', value: i.base, kind: 'money' },
                         { label: '适用税率', value: i.rate, kind: 'percent' },
                         { label: '计税基数（全额不摊）', value: i.taxable, kind: 'money',
-                            hint: '当月工资 + 一次性收入 − 5000' },
+                            hint: '内部退养当月的计税基数：当月工资加上一次性收入，再减 5000 元的月减除费用' },
                         { label: '应纳个税', value: i.tax, kind: 'money' },
                         { label: '税后到手', value: amount - i.tax, kind: 'money' },
                         { label: '实际税负率', value: amount > 0 ? i.tax / amount : 0, kind: 'percent' },
@@ -2105,7 +2140,7 @@
                     ];
 
                     note = '内部退养：一次性收入与领取当月工资合并，先按月均额（÷ 所属月份数 ' + months
-                        + '）确定税率档，再对**全额**计税 —— 平均只为定档，不是分摊；它**没有免税额度**，'
+                        + '）确定税率档，再对全额计税 —— 平均只为定档，不是分摊；它没有免税额度，'
                         + '整个一次性收入只减一次 5000 元。';
                     if (hit) {
                         note = '⚠️ 你填的一次性收入刚跨过 ' + Math.round(hit.at) + ' 元的定档临界点：'
@@ -2122,7 +2157,7 @@
                 if (variant === 'internal') {
                     extras.push({
                         title: '内部退养的临界区（该定在多少）',
-                        note: '定档基数每跨一档，税额就按**全额**跳一次 —— 提前退休用连续的年度表，没有这个雷区',
+                        note: '定档基数每跨一档，税额就按全额跳一次 —— 提前退休用连续的年度表，没有这个雷区',
                         table: {
                             head: ['月度档上限', '一次性收入临界', '多发 1 元多交', '建议定在'],
                             rows: cliffs
@@ -2154,17 +2189,17 @@
             // 口径仍同源：两条路径一律走 `EuriskoExpatAllowanceQuick`（税率表与到期日取注册表声明的常量）；
             // 专项附加扣除那一侧走 `EuriskoSpecialDeductionQuick`（七项标准取自 specialDeductionRules）；
             // 单笔输入与速算器逐点相等，由 tests/expat-deep.test.js 钉住。
-            id: 'expat-deep', name: '外籍津补贴免税', subtitle: '逐项核定可免金额，再二选一',
+            id: 'expat-deep', name: '外籍津补贴免税（逐项核定）', subtitle: '逐项核定可免金额，再二选一',
             icon: 'fa-globe', status: 'deep',
             nextTools: ['expat', 'special-deduction', 'annual-settlement'],
             policyKey: 'expat-allowance',
             fields: [
                 { key: 'taxableBefore', step: 'basis', label: '扣除前全年应纳税所得额（元）', type: 'money', default: 0, sample: 300000,
-                    hint: '已减 6 万基本减除与三险一金、但**还没扣**津补贴免税 / 专项附加扣除之前的余额' },
+                    hint: '已减 6 万基本减除与三险一金、但还没扣津补贴免税 / 专项附加扣除之前的余额' },
 
                 { key: 'items', step: 'allowance', label: '津补贴逐项（按类别与取得形式填）', type: 'repeater',
                     addLabel: '添加一项津补贴',
-                    hint: '**只有八类项目、且以非现金或实报实销形式取得的**才能免 —— 逐项填才知道真正能免多少',
+                    hint: '只有八类项目、且以非现金或实报实销形式取得的才能免 —— 逐项填才知道真正能免多少',
                     default: [
                         { kind: 'housing', amount: 60000, form: 'reimburse', times: 0 },
                         { kind: 'home', amount: 40000, form: 'reimburse', times: 4 },
@@ -2199,18 +2234,18 @@
                     hint: '大病医疗超起扣线的据实部分（限额 8 万）、学历继续教育 400 元/月、职业资格 3600 元/年' }
             ],
             steps: [
-                { key: 'basis', title: '税基', why: '两条路径降的是**同一个**应纳税所得额 —— 所以只需比金额，不用比税率' },
+                { key: 'basis', title: '税基', why: '两条路径降的是同一个应纳税所得额 —— 所以只需比金额，不用比税率' },
                 { key: 'allowance', title: '津补贴逐项', why: '只有八类、且非现金或实报实销的才能免；探亲费每年还不超过 2 次' },
                 { key: 'special', title: '专项附加扣除对照', why: '二选一的另一条路：把它的法定金额也算准，才知道该选哪条' }
             ],
             pitfalls: [
-                '**现金发放的补贴不能免**：住房 / 伙食 / 搬迁 / 洗衣费必须**以非现金形式或实报实销形式**取得 —— 随工资发的现金住房补贴不在免税范围内',
-                '**八类之外一律不免**：车辆补贴与司机费用、俱乐部会员费、税务平衡款、超标准部分……都不在名单里',
-                '探亲费**每年不超过 2 次**，超出次数对应的部分不免；探亲费、语言训练费、子女教育费还须**经税务机关审核批准为合理的部分**',
-                '津补贴免税与专项附加扣除**二选一、不可叠加**，且**一经选择在一个纳税年度内不得变更** —— 必须年初就选对，年中不能改',
-                '两条路径降的是同一个应纳税所得额，T(x) − T(x − a) 随 a 单调不减 —— **金额大的那条一定更省**，不用比税率',
-                '政策**执行至 2027-12-31**：2027 是最后一个可选年度，2028 年起津补贴全额并入工资薪金计税',
-                '适用于**符合居民个人条件的外籍个人**（含港澳台居民）—— 非居民个人走的是另一套（按月单独计税）'
+                '现金发放的补贴不能免：住房 / 伙食 / 搬迁 / 洗衣费必须以非现金形式或实报实销形式取得 —— 随工资发的现金住房补贴不在免税范围内',
+                '八类之外一律不免：车辆补贴与司机费用、俱乐部会员费、税务平衡款、超标准部分……都不在名单里',
+                '探亲费每年不超过 2 次，超出次数对应的部分不免；探亲费、语言训练费、子女教育费还须经税务机关审核批准为合理的部分',
+                '津补贴免税与专项附加扣除二选一、不可叠加，且一经选择在一个纳税年度内不得变更 —— 必须年初就选对，年中不能改',
+                '两条路径降的是同一个应纳税所得额，T(x) − T(x − a) 随 a 单调不减 —— 金额大的那条一定更省，不用比税率',
+                '政策执行至 2027-12-31：2027 是最后一个可选年度，2028 年起津补贴全额并入工资薪金计税',
+                '适用于符合居民个人条件的外籍个人（含港澳台居民）—— 非居民个人走的是另一套（按月单独计税）'
             ],
             compute: function (v) {
                 var Q = window.EuriskoExpatAllowanceQuick;
@@ -2315,14 +2350,14 @@
                     { label: '核减：现金发放', value: cutCash, kind: 'money' },
                     { label: '核减：探亲超过 2 次', value: cutTimes, kind: 'money' },
                     { label: '专项附加扣除合计（法定）', value: specialTotal, kind: 'money',
-                        hint: '由 special-deduction-quick 按七项标准算出' },
+                        hint: '专项附加扣除的年度数：由七项标准逐项算出后相加' },
                     { label: '建议', value: betterText, kind: 'text' },
                     { label: '选津补贴免税可省', value: cmp.allowance.saved, kind: 'money' },
                     { label: '选专项附加扣除可省', value: cmp.special.saved, kind: 'money' },
                     { label: '两者差额', value: cmp.diff, kind: 'money' },
                     { label: '月均差额', value: cmp.monthlyDiff, kind: 'money' },
                     { label: '若误以为可叠加（错误口径）', value: stackedSaved, kind: 'money',
-                        hint: '两条路是**互斥**的，一起扣在多年前是常见的错法' },
+                        hint: '两条路是互斥的，一起扣在多年前是常见的错法' },
                     { label: '叠加口径少算的税', value: stackedSaved - bestSaved, kind: 'money' },
                     { label: '若按填进来的金额全免（速算器口径）', value: naive.allowance.saved, kind: 'money',
                         hint: '速算器只有一个「合计」框，会把它当成全部可免' },
@@ -2336,8 +2371,8 @@
                         hint: '剩余不足一年时，当年这一次选择更要一次选对' });
                 }
 
-                var note = '两条路径降的是**同一个**应纳税所得额（' + Math.round(taxableBefore)
-                    + ' 元），所以 T(x) − T(x − a) 随金额单调不减 —— **金额大的那条一定更省**，'
+                var note = '两条路径降的是同一个应纳税所得额（' + Math.round(taxableBefore)
+                    + ' 元），所以 T(x) − T(x − a) 随金额单调不减 —— 金额大的那条一定更省，'
                     + '不用比税率。真正的工作量在核定金额：填进来的 ' + Math.round(claimed)
                     + ' 元里，核定后可免 ' + Math.round(exempt) + ' 元（'
                     + (cutList > 0 ? '八类之外核减 ' + Math.round(cutList) + '、' : '')
@@ -2346,9 +2381,9 @@
                     + '），专项附加扣除 ' + Math.round(specialTotal) + ' 元 —— 建议' + betterText + '。';
                 if (naive.allowance.saved - cmp.allowance.saved > 0) {
                     note += ' 速算器只有一个「合计」框，会把它当成全部可免，'
-                        + '那样会**少算税 ' + Math.round(naive.allowance.saved - cmp.allowance.saved) + ' 元**。';
+                        + '那样会少算税 ' + Math.round(naive.allowance.saved - cmp.allowance.saved) + ' 元。';
                 }
-                note += ' 两条路**互斥**：若误以为可叠加，能省 ' + Math.round(stackedSaved)
+                note += ' 两条路互斥：若误以为可叠加，能省 ' + Math.round(stackedSaved)
                     + ' 元 —— 比正确口径多 ' + Math.round(stackedSaved - bestSaved) + ' 元，那是拿不到的。';
                 if (daysLeft !== null && daysLeft >= 0) {
                     note += ' 政策' + rules.expiresOn + '到期（还剩 ' + daysLeft + ' 天），'
@@ -2398,14 +2433,14 @@
             // （它自己又调 withholding-quick 的收入额与预扣率、bonus-quick 的单独计税、
             //   special-deduction 常量里的大病医疗限额）—— 单段 12 个月、无劳务稿酬、无大病、
             //   无年终奖时与速算器 settlementOf 逐点相等，由 tests/annual-settlement-deep.test.js 钉住。
-            id: 'annual-settlement-deep', name: '年度汇算清缴', subtitle: '多段任职 + 劳务稿酬并入 → 退补与免办判定',
+            id: 'annual-settlement-deep', name: '年度汇算清缴（多段并入）', subtitle: '多段任职 + 劳务稿酬并入 → 退补与免办判定',
             icon: 'fa-balance-scale', status: 'deep',
             nextTools: ['annual-settlement', 'salary-tax', 'withholding', 'bonus-tax'],
             policyKey: 'settlement',
             fields: [
                 { key: 'jobs', step: 'income', label: '任职段（多处任职 / 年中跳槽各填一段）', type: 'repeater',
                     addLabel: '添加一段任职',
-                    hint: '每一段**独立**按累计预扣法预扣：新单位不掌握上一家的累计，从 0 重新开始 —— 这就是跳槽后要补税的根源',
+                    hint: '每一段独立按累计预扣法预扣：新单位不掌握上一家的累计，从 0 重新开始 —— 这就是跳槽后要补税的根源',
                     default: [{ monthlyIncome: 15000, months: 12, monthlyInsurance: 1500, monthlySpecial: 1000 }],
                     itemFields: [
                         { key: 'monthlyIncome', label: '税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0 },
@@ -2414,21 +2449,21 @@
                         { key: 'monthlySpecial', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000, min: 0 }
                     ] },
                 { key: 'labor', step: 'income', label: '全年劳务报酬（含税）', type: 'money', default: 0, min: 0,
-                    hint: '汇算按**收入额 80%** 并入；预扣阶段最高却按 40% 扣 —— 差额就是退税的来源' },
+                    hint: '汇算按收入额 80% 并入；预扣阶段最高却按 40% 扣 —— 差额就是退税的来源' },
                 { key: 'author', step: 'income', label: '全年稿酬（含税）', type: 'money', default: 0, min: 0,
-                    hint: '汇算按**收入额 56%** 并入（减除 20% 费用后再减按 70%）' },
+                    hint: '汇算按收入额 56% 并入（减除 20% 费用后再减按 70%）' },
                 { key: 'royalty', step: 'income', label: '全年特许权使用费（含税）', type: 'money', default: 0, min: 0,
-                    hint: '汇算按**收入额 80%** 并入' },
+                    hint: '汇算按收入额 80% 并入' },
 
                 { key: 'specialOverride', step: 'deduction', label: '专项附加扣除怎么取', type: 'select', default: 'auto',
                     options: [{ value: 'auto', label: '按各任职段申报的合计' },
                         { value: 'manual', label: '我要另填全年实际享受的金额' }],
-                    hint: '多处任职时，同一个项目（比如子女教育）在两家都申报了也**只能扣一份** —— 那种情况选第二项' },
+                    hint: '多处任职时，同一个项目（比如子女教育）在两家都申报了也只能扣一份 —— 那种情况选第二项' },
                 { key: 'annualSpecial', step: 'deduction', label: '全年专项附加扣除（元）', type: 'money', default: 0, sample: 24000, min: 0,
                     when: { key: 'specialOverride', in: ['manual'] },
-                    hint: '七项合计的**全年**数：子女教育 2000 元/月 · 婴幼儿照护 2000 元/月 · 赡养老人 3000 元/月 ……' },
+                    hint: '七项合计的全年数：子女教育 2000 元/月 · 婴幼儿照护 2000 元/月 · 赡养老人 3000 元/月 ……' },
                 { key: 'medicalSelfPay', step: 'deduction', label: '大病医疗：医保目录内个人自付累计（元）', type: 'money', default: 0, min: 0,
-                    hint: '**只能在年度汇算时扣**：超过 1.5 万元的部分才可扣，年度限额 8 万元 —— 平时预扣一分钱也扣不到' },
+                    hint: '只能在年度汇算时扣：超过 1.5 万元的部分才可扣，年度限额 8 万元 —— 平时预扣一分钱也扣不到' },
                 { key: 'otherDeduction', step: 'deduction', label: '其他扣除（元/年）', type: 'money', default: 0, min: 0,
                     hint: '个人养老金（≤12000）、企业年金 / 职业年金、税优健康险（≤2400）、商业养老保险等' },
 
@@ -2442,19 +2477,19 @@
                     hint: '填 0 则按累计预扣法自动推演；想更准就照个税 App「已申报税额合计」填（不含年终奖单独计税那部分）' }
             ],
             steps: [
-                { key: 'income', title: '全年综合所得', why: '汇算的范围只有**四项**（工资薪金 / 劳务报酬 / 稿酬 / 特许权使用费）：年终奖单独计税、股权激励、离职补偿、经营所得与分类所得都不参与' },
-                { key: 'deduction', title: '全年扣除', why: '汇算的减除费用是**年定额 6 万**，不按任职月数折算；大病医疗还只能在这里扣' },
-                { key: 'bonus', title: '年终奖口径', why: '同一个人在「单独计税」与「并入综合所得」下全年税额可以差几千元，汇算时还能改一次', level: 'advanced' },
+                { key: 'income', title: '全年综合所得', why: '汇算的范围只有四项（工资薪金 / 劳务报酬 / 稿酬 / 特许权使用费）：年终奖单独计税、股权激励、离职补偿、经营所得与分类所得都不参与' },
+                { key: 'deduction', title: '全年扣除', why: '汇算的减除费用是年定额 6 万，不按任职月数折算；大病医疗还只能在这里扣' },
+                { key: 'bonus', title: '年终奖口径', why: '同一个人在「单独计税」与「并入综合所得」下全年税额可以差几千元，汇算时还能改一次' },
                 { key: 'prepaid', title: '已预缴', why: '应退 / 应补 = 全年应纳税额 − 全年已预缴 —— 这一道减法就是汇算的全部' }
             ],
             pitfalls: [
-                '基本减除费用在汇算时是**年定额 6 万元，不按任职月数折算** —— 年中入职 / 离职的人照样扣满 6 万，速算器那种「5000 × 月数」是预扣口径，会把退税算成 0',
-                '劳务报酬 / 稿酬 / 特许权使用费并入汇算时按**收入额**（劳务、特许权 80%，稿酬 56%），预扣阶段劳务最高却按 **40%** 扣 —— 这是「一年没怎么交税却被扣了一大笔」最常见的原因',
-                '**大病医疗只能在汇算时扣除**：医保目录内个人自付累计超 1.5 万的部分才可扣，限额 8 万；不办汇算就等于放弃这笔扣除',
-                '已依法预缴且**需补税**，但年度综合所得收入 ≤ **12 万元**、或补税金额 ≤ **400 元**的，**无需办理**汇算；退税是权利不是义务 —— 不办理视为放弃退税，不加收滞纳金',
-                '补税逾期要按日加收**万分之五**滞纳金（年化 18.25%），并可能在纳税记录中留下不良记录',
-                '**年终奖单独计税与并入综合所得二选一**：收入低、扣除大的人并入往往更省（甚至全退），高收入的人通常单独计税更省 —— 汇算时还能改一次',
-                '住房贷款利息与住房租金**同一年度只能二选一**；专项附加扣除忘了在 12 月确认次年信息，只是当月到手变少，**汇算时补扣不会少扣税**'
+                '基本减除费用在汇算时是年定额 6 万元，不按任职月数折算 —— 年中入职 / 离职的人照样扣满 6 万，速算器那种「5000 × 月数」是预扣口径，会把退税算成 0',
+                '劳务报酬 / 稿酬 / 特许权使用费并入汇算时按收入额（劳务、特许权 80%，稿酬 56%），预扣阶段劳务最高却按 40% 扣 —— 这是「一年没怎么交税却被扣了一大笔」最常见的原因',
+                '大病医疗只能在汇算时扣除：医保目录内个人自付累计超 1.5 万的部分才可扣，限额 8 万；不办汇算就等于放弃这笔扣除',
+                '已依法预缴且需补税，但年度综合所得收入 ≤ 12 万元、或补税金额 ≤ 400 元的，无需办理汇算；退税是权利不是义务 —— 不办理视为放弃退税，不加收滞纳金',
+                '补税逾期要按日加收万分之五滞纳金（年化 18.25%），并可能在纳税记录中留下不良记录',
+                '年终奖单独计税与并入综合所得二选一：收入低、扣除大的人并入往往更省（甚至全退），高收入的人通常单独计税更省 —— 汇算时还能改一次',
+                '住房贷款利息与住房租金同一年度只能二选一；专项附加扣除忘了在 12 月确认次年信息，只是当月到手变少，汇算时补扣不会少扣税'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSettlementQuick;
@@ -2490,7 +2525,7 @@
 
                 var rows = [
                     { label: '汇算收入额合计', value: r.incomeAmountTotal, kind: 'money',
-                        hint: '工资薪金全额 + 劳务/稿酬/特许权的**收入额**（80% / 56%）' },
+                        hint: '综合所得的收入额：工资薪金按全额，劳务报酬与特许权使用费按 80% 折算、稿酬按 56% 折算' },
                     { label: '减除费用', value: r.basicDeduction, kind: 'money', hint: '年定额 6 万元，不按任职月数折算' },
                     { label: '专项扣除（五险一金）', value: r.insuranceTotal, kind: 'money' },
                     { label: '专项附加扣除', value: r.specialTotal, kind: 'money',
@@ -2503,12 +2538,12 @@
                     { label: '全年已预缴', value: r.prepaidTax, kind: 'money',
                         hint: r.providedPrepaid ? '使用你填写的值' : '按累计预扣法推演（看个税 App「已申报税额」更准）' },
                     { label: '应退 / 应补', value: (r.diff < 0 ? '退税 ' : (r.diff > 0 ? '补税 ' : '')) + Math.round(abs) + ' 元', kind: 'text',
-                        hint: '应退 / 应补 = 全年应纳税额 − 全年已预缴（负数为退税）' },
+                        hint: '汇算的结论就是这一个数：正数是要补的税，负数是能退的税。\n计算公式：应退 / 应补 = 全年应纳税额 − 全年已预缴' },
                     { label: '要不要办理', value: ex.reason, kind: 'text' }
                 ];
                 if (late) {
                     rows.push({ label: '若逾期 30 天办理', value: late.fee, kind: 'money',
-                        hint: '滞纳金按日万分之五（年化 18.25%）= 补税额 × 0.05% × 天数' });
+                        hint: '少缴的税每天加收万分之五的滞纳金（折成年化 18.25%），从滞纳税款那天起按天算。\n计算公式：滞纳金 = 补税额 × 0.05% × 天数' });
                 }
                 rows.push({ label: '速算器口径算出的退补', value: r.naive.diff, kind: 'money',
                     hint: '速算器按「5000 × 任职月数」当减除费用，且没有劳务 / 稿酬 / 大病这几个框' });
@@ -2581,11 +2616,11 @@
                     + ' + 专项附加 ' + Math.round(r.specialTotal)
                     + (r.otherDeduction > 0 ? ' + 其他扣除 ' + Math.round(r.otherDeduction) : '')
                     + '），全年应纳税额 ' + Math.round(r.annualTax) + ' 元、已预缴 ' + Math.round(r.prepaidTax)
-                    + ' 元 → ' + (r.diff < 0 ? '**应退 ' + Math.round(abs) + ' 元**' : (r.diff > 0 ? '**应补 ' + Math.round(abs) + ' 元**' : '不补不退'))
+                    + ' 元 → ' + (r.diff < 0 ? '**应退 ' + Math.round(abs) + ' 元' : (r.diff > 0 ? '**应补 ' + Math.round(abs) + ' 元' : '不补不退'))
                     + '。' + ex.reason + '。';
                 if (Math.abs(r.naiveGap) >= 1) {
                     note += ' 速算器按「5000 × 任职月数」当减除费用、且没有劳务 / 稿酬 / 大病这几个框，'
-                        + '它会算出 ' + Math.round(r.naive.diff) + ' 元 —— **差 ' + Math.round(Math.abs(r.naiveGap)) + ' 元**。';
+                        + '它会算出 ' + Math.round(r.naive.diff) + ' 元 —— 差 ' + Math.round(Math.abs(r.naiveGap)) + ' 元。';
                 }
                 if (r.bonus > 0) {
                     note += ' 年终奖' + (r.bonusBetter === 'merged' ? '**并入综合所得**更省' : (r.bonusBetter === 'separate' ? '**单独计税**更省' : '两种口径相同'))
@@ -2649,16 +2684,16 @@
             // 口径同源：一切计算走 special-deduction-quick 新增的 fullOf（它自己又读
             // specialDeductionRules 的七项标准、走内核 calculateTaxByTaxableIncome 计税），
             // 单人 + 满 12 个月时与 annualOf / savingOf 逐点相等，由测试钉住。
-            id: 'special-deduction-deep', name: '专项附加扣除', subtitle: '七项逐项核定 + 夫妻间怎么分摊最省',
+            id: 'special-deduction-deep', name: '专项附加扣除（全年核定）', subtitle: '七项逐项核定 + 夫妻间怎么分摊最省',
             icon: 'fa-child', status: 'deep',
             nextTools: ['special-deduction', 'annual-settlement', 'salary-tax', 'private-pension'],
             policyKey: 'special-deduction',
             fields: [
                 { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0,
-                    hint: '扣除只抵**本人**的应纳税所得额，所以夫妻两人的收入都要填，才能算出「给谁更省」' },
+                    hint: '扣除只抵本人的应纳税所得额，所以夫妻两人的收入都要填，才能算出「给谁更省」' },
                 { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
                 { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0,
-                    hint: '个人养老金（≤12000）/ 企业年金 / 税优健康险（≤2400）等 —— 它们与专项附加扣除**叠加**享受' },
+                    hint: '个人养老金（≤12000）/ 企业年金 / 税优健康险（≤2400）等 —— 它们与专项附加扣除叠加享受' },
                 { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
                     hint: '填 0 表示按单身（或配偶无综合所得）计算' },
                 { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
@@ -2667,11 +2702,11 @@
                 { key: 'children', step: 'children', label: '子女教育：符合条件的子女个数', type: 'number', default: 1, min: 0,
                     hint: '每个子女 2000 元/月；3 岁至全日制学历教育结束' },
                 { key: 'childMonths', step: 'children', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
-                    hint: '**按实际符合条件的月份累计** —— 年中满 3 岁、年中入学都不是满 12 个月' },
+                    hint: '按实际符合条件的月份累计 —— 年中满 3 岁、年中入学都不是满 12 个月' },
                 { key: 'childShare', step: 'children', label: '由谁扣除', type: 'select', default: 'auto',
                     options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人 100%' },
                         { value: 'spouse', label: '配偶 100%' }, { value: 'split', label: '双方各 50%' }],
-                    hint: '《暂行办法》只给这两个选项（100% 一方 或 各 50%），**选定后一个纳税年度内不得变更**' },
+                    hint: '《暂行办法》只给这两个选项（100% 一方 或 各 50%），选定后一个纳税年度内不得变更' },
                 { key: 'infants', step: 'children', label: '3 岁以下婴幼儿个数', type: 'number', default: 0, min: 0,
                     hint: '每个婴幼儿 2000 元/月（2023 年起由 1000 提高至 2000）' },
                 { key: 'infantMonths', step: 'children', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12 },
@@ -2682,10 +2717,10 @@
                 { key: 'housing', step: 'housing', label: '住房', type: 'select', default: 'none',
                     options: [{ value: 'none', label: '不适用' }, { value: 'loan', label: '住房贷款利息（1000 元/月）' },
                         { value: 'rent', label: '住房租金（按城市档）' }],
-                    hint: '**房贷利息与住房租金同一纳税年度只能二选一**，不可叠加' },
+                    hint: '房贷利息与住房租金同一纳税年度只能二选一，不可叠加' },
                 { key: 'loanMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
                     when: { key: 'housing', in: ['loan'] },
-                    hint: '1000 元/月；**同一住房贷款累计不超过 240 个月**，且一生只能享受一次首套' },
+                    hint: '1000 元/月；同一住房贷款累计不超过 240 个月，且一生只能享受一次首套' },
                 { key: 'loanShare', step: 'housing', label: '由谁扣除', type: 'select', default: 'auto',
                     when: { key: 'housing', in: ['loan'] },
                     options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人 100%' },
@@ -2695,43 +2730,43 @@
                     options: [{ value: '1', label: '直辖市 / 省会等（1500 元/月）' },
                         { value: '2', label: '市辖区户籍人口 >100 万（1100 元/月）' },
                         { value: '3', label: '其他（800 元/月）' }],
-                    hint: '由**签订租赁住房合同的承租人**扣除；配偶在主要工作城市有自有住房的，视同本人有房' },
+                    hint: '由签订租赁住房合同的承租人扣除；配偶在主要工作城市有自有住房的，视同本人有房' },
                 { key: 'rentMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
                     when: { key: 'housing', in: ['rent'] } },
                 { key: 'elderly', step: 'housing', label: '赡养老人', type: 'select', default: 'none',
                     options: [{ value: 'none', label: '不适用' }, { value: 'only', label: '独生子女（3000 元/月）' },
                         { value: 'shared', label: '非独生子女（与兄弟姐妹分摊）' }],
-                    hint: '被赡养人年满 60 岁；**本人与配偶各自赡养各自的父母**，所以这一项不存在「给谁扣」的问题' },
+                    hint: '被赡养人年满 60 岁；本人与配偶各自赡养各自的父母，所以这一项不存在「给谁扣」的问题' },
                 { key: 'elderlyMonths', step: 'housing', label: '本年享受月数', type: 'number', default: 12, min: 0, max: 12,
                     hint: '老人年中满 60 岁，就只从满 60 岁的那个月算起' },
                 { key: 'elderlyMonthly', step: 'housing', label: '分摊月扣除额（元/月）', type: 'money', default: 0, sample: 1500, min: 0,
                     when: { key: 'elderly', in: ['shared'] },
-                    hint: '兄弟姐妹分摊每月 3000 元的额度，**每人不超过 1500 元/月**；可平均分摊 / 约定分摊 / 指定分摊（指定分摊优先），需签书面协议' },
+                    hint: '兄弟姐妹分摊每月 3000 元的额度，每人不超过 1500 元/月；可平均分摊 / 约定分摊 / 指定分摊（指定分摊优先），需签书面协议' },
 
                 { key: 'degreeMonths', step: 'other', label: '学历（学位）继续教育（月）', type: 'number', default: 0, min: 0, max: 12,
-                    hint: '400 元/月，**同一学历最长 48 个月**；本科及以下可选择由父母按子女教育（2000 元/月）扣除 —— 二选一' },
+                    hint: '400 元/月，同一学历最长 48 个月；本科及以下可选择由父母按子女教育（2000 元/月）扣除 —— 二选一' },
                 { key: 'certCount', step: 'other', label: '职业资格证书（本）', type: 'number', default: 0, min: 0,
-                    hint: '取得相关证书的**当年**一次性扣 3600 元；与学历继续教育可以同时享受' },
+                    hint: '取得相关证书的当年一次性扣 3600 元；与学历继续教育可以同时享受' },
                 { key: 'medicalSelfPaid', step: 'other', label: '大病医疗：医保目录内个人自付累计（元）', type: 'money', default: 0, min: 0,
-                    hint: '超 1.5 万元的部分才可扣、限额 8 万元，**只能在年度汇算时办**；本人 / 配偶 / 未成年子女的都算' },
+                    hint: '超 1.5 万元的部分才可扣、限额 8 万元，只能在年度汇算时办；本人 / 配偶 / 未成年子女的都算' },
                 { key: 'medicalShare', step: 'other', label: '由谁扣除', type: 'select', default: 'auto',
                     options: [{ value: 'auto', label: '自动：谁省得多就给谁' }, { value: 'self', label: '本人' },
                         { value: 'spouse', label: '配偶' }] }
             ],
             steps: [
-                { key: 'income', title: '两个人的收入基础', why: '扣除抵的是**各自**的应纳税所得额 —— 不知道两人的税率，就谈不上「给谁更省」' },
+                { key: 'income', title: '两个人的收入基础', why: '扣除抵的是各自的应纳税所得额 —— 不知道两人的税率，就谈不上「给谁更省」' },
                 { key: 'children', title: '子女与婴幼儿', why: '这两项是唯一允许在夫妻之间选 100% 或各 50% 的，也是最常被随手填给自己的' },
-                { key: 'housing', title: '住房与赡养老人', why: '房贷利息与住房租金**二选一**；赡养老人非独生子女分摊**每人不超过 1500 元/月**' },
+                { key: 'housing', title: '住房与赡养老人', why: '房贷利息与住房租金二选一；赡养老人非独生子女分摊每人不超过 1500 元/月' },
                 { key: 'other', title: '继续教育与大病医疗', why: '学历继续教育按月累计且有 48 个月上限；职业资格只在取得当年；大病医疗只能汇算时扣' }
             ],
             pitfalls: [
-                '**夫妻之间怎么分摊最省**：扣除抵的是**各自**的应纳税所得额，放在税率高的一方身上省得多 —— 实测夫月薪 6000（3% 档）、妻月薪 3 万（20% 档），子女教育 2.4 万全给夫只省 144 元、给妻省 **4800 元**，差 4656 元',
-                '扣除抵的是**应纳税所得额**不是税额，「扣除额 × 税率」在跨档时必然**高估**；扣除额超过本人应纳税所得额的部分**用不上**（落到 3% 档的人扣再多也只省 3%）',
-                '**按实际符合条件的月份累计**：孩子年中满 3 岁、老人年中满 60 岁、年中毕业、贷款年中还清都不是满 12 个月 —— 按 12 个月满算会高估扣除',
-                '**赡养老人非独生子女每人不超过 1500 元/月**（兄弟姐妹分摊每月 3000 元的额度）；可平均分摊 / 约定分摊 / 指定分摊，**指定分摊优先**，需签订书面分摊协议',
-                '**住房贷款利息与住房租金同一纳税年度只能二选一**；房贷累计不超过 240 个月且只能享受一次首套；租金由**签订租赁合同的承租人**扣除，配偶在同一城市有自住房的视同有房',
-                '学历继续教育 400 元/月、同一学历最长 **48 个月**；**本科及以下可以选择由父母按子女教育 2000 元/月扣除**，两者二选一；职业资格继续教育在**取得证书当年**一次性 3600 元',
-                '每年 12 月要确认次年信息；**忘了确认只是当月到手变少，汇算时补扣不会少扣税** —— 这不是损失，别为此慌'
+                '夫妻之间怎么分摊最省：扣除抵的是各自的应纳税所得额，放在税率高的一方身上省得多 —— 实测夫月薪 6000（3% 档）、妻月薪 3 万（20% 档），子女教育 2.4 万全给夫只省 144 元、给妻省 4800 元，差 4656 元',
+                '扣除抵的是应纳税所得额不是税额，「扣除额 × 税率」在跨档时必然高估；扣除额超过本人应纳税所得额的部分用不上（落到 3% 档的人扣再多也只省 3%）',
+                '按实际符合条件的月份累计：孩子年中满 3 岁、老人年中满 60 岁、年中毕业、贷款年中还清都不是满 12 个月 —— 按 12 个月满算会高估扣除',
+                '赡养老人非独生子女每人不超过 1500 元/月（兄弟姐妹分摊每月 3000 元的额度）；可平均分摊 / 约定分摊 / 指定分摊，指定分摊优先，需签订书面分摊协议',
+                '住房贷款利息与住房租金同一纳税年度只能二选一；房贷累计不超过 240 个月且只能享受一次首套；租金由签订租赁合同的承租人扣除，配偶在同一城市有自住房的视同有房',
+                '学历继续教育 400 元/月、同一学历最长 48 个月；本科及以下可以选择由父母按子女教育 2000 元/月扣除，两者二选一；职业资格继续教育在取得证书当年一次性 3600 元',
+                '每年 12 月要确认次年信息；忘了确认只是当月到手变少，汇算时补扣不会少扣税 —— 这不是损失，别为此慌'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSpecialDeductionQuick;
@@ -2769,7 +2804,7 @@
 
                 var rows = [
                     { label: '七项年度扣除合计', value: r.totalAnnual, kind: 'money',
-                        hint: '按月标准 × 实际享受月数 × 分摊比例核定' },
+                        hint: '专项附加扣除的年度数：按「月标准 × 当年实际享受的月数 × 分摊比例」核定' },
                     { label: '落在本人身上', value: best.deductionSelf, kind: 'money' }
                 ];
                 if (r.hasSpouse) rows.push({ label: '落在配偶身上', value: best.deductionSpouse, kind: 'money' });
@@ -2799,12 +2834,12 @@
                 }
                 if (wasted >= 1) {
                     rows.push({ label: '扣除没用上的部分', value: wasted, kind: 'money',
-                        hint: '扣除额超过本人（或配偶）应纳税所得额的部分**不产生节税**，换个分摊对象就能用上' });
+                        hint: '扣除额超过本人（或配偶）应纳税所得额的部分不产生节税，换个分摊对象就能用上' });
                 }
                 if (r.housingCompare) {
                     var hc = r.housingCompare;
                     rows.push({ label: '住房二选一的另一个口径', value: hc.chosen === 'loan' ? hc.rent : hc.loan, kind: 'money',
-                        hint: '房贷利息与住房租金**同一年度只能二选一**：另一个口径按你选的城市档估算，仅供判断' });
+                        hint: '房贷利息与住房租金同一年度只能二选一：另一个口径按你选的城市档估算，仅供判断' });
                 }
 
                 var extras = [{
@@ -2818,7 +2853,7 @@
                     }
                 }, {
                     title: '分摊方案对照（家庭全年个税）',
-                    note: '扣除抵的是**各自**的应纳税所得额 —— 同一笔扣除放在不同人身上，省下的税可以差一个数量级',
+                    note: '扣除抵的是各自的应纳税所得额 —— 同一笔扣除放在不同人身上，省下的税可以差一个数量级',
                     table: {
                         head: ['方案', '本人扣除', '配偶扣除', '家庭全年个税', '少交'],
                         rows: r.plans.slice().sort(function (a, b) { return a.totalTax - b.totalTax; }).slice(0, 4).map(function (p) {
@@ -2842,7 +2877,7 @@
                     var hc2 = r.housingCompare;
                     extras.push({
                         title: '住房贷款利息 vs 住房租金（年度只能二选一）',
-                        note: '两者**不可叠加**；租金通常更高，但要求你在主要工作城市没有自有住房',
+                        note: '两者不可叠加；租金通常更高，但要求你在主要工作城市没有自有住房',
                         table: {
                             head: ['口径', '年扣除额'],
                             rows: [['住房贷款利息（1000 元/月）', money(hc2.loan)],
@@ -2854,13 +2889,13 @@
 
                 var note = '七项核定合计 ' + Math.round(r.totalAnnual) + ' 元（本人 ' + Math.round(best.deductionSelf)
                     + (r.hasSpouse ? ' + 配偶 ' + Math.round(best.deductionSpouse) : '')
-                    + '），家庭全年个税 ' + Math.round(best.totalTax) + ' 元，比不享受时少交 **'
-                    + Math.round(r.saving) + ' 元**。';
+                    + '），家庭全年个税 ' + Math.round(best.totalTax) + ' 元，比不享受时少交 '
+                    + Math.round(r.saving) + ' 元。';
                 if (r.hasSpouse && Math.abs(r.splitGain) >= 1) {
                     note += ' 其中「怎么分」值 ' + Math.round(r.splitGain) + ' 元 —— 全填在自己名下的话要多交这么多。';
                 }
                 if (wasted >= 1) {
-                    note += ' 另有 ' + Math.round(wasted) + ' 元扣除**用不上**（超过本人应纳税所得额的部分不产生节税）。';
+                    note += ' 另有 ' + Math.round(wasted) + ' 元扣除用不上（超过本人应纳税所得额的部分不产生节税）。';
                 }
                 if (r.housingCompare) {
                     note += ' 房贷利息与住房租金只能二选一（本例差额 ' + Math.round(r.housingCompare.gap) + ' 元）。';
@@ -2924,58 +2959,58 @@
             policyKey: 'private-pension',
             fields: [
                 { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0,
-                    hint: '三项税优扣的都是**同一个**应纳税所得额，所以它必须由收入推出来，而不是让你自己填一个数' },
+                    hint: '三项税优扣的都是同一个应纳税所得额，所以它必须由收入推出来，而不是让你自己填一个数' },
                 { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
                 { key: 'selfSpecialDeduction', step: 'income', label: '本人专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
-                    hint: '12000 是**每个人**的额度，不是一家人的 —— 填了配偶才能算出「家里的钱该给谁缴」' },
+                    hint: '12000 是每个人的额度，不是一家人的 —— 填了配偶才能算出「家里的钱该给谁缴」' },
                 { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseSpecialDeduction', step: 'income', label: '配偶专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseOtherDeduction', step: 'income', label: '配偶其他扣除（元/年）', type: 'money', default: 0, min: 0 },
 
                 { key: 'pensionSelf', step: 'pension', label: '个人养老金：今年缴费额（元）', type: 'money', default: 0, sample: 12000, min: 0,
-                    hint: '上限 **12000 元/年**，超额部分当年不可扣、**也不能结转到以后年度**' },
+                    hint: '上限 12000 元/年，超额部分当年不可扣、也不能结转到以后年度' },
                 { key: 'years', step: 'pension', label: '预计缴费年数', type: 'number', default: 10, min: 1 },
                 // 19-7b：这里原先末尾还写了 `step: 0.1`（想当输入框步长）—— 它把前面的 `step:'pension'`
                 // 覆盖掉了，字段因此不属于任何一步，界面上永远看不到、只能按 1.5 参与计算。
                 // 渲染器不读字段级步长（数字框统一 inputmode=decimal），所以那个 0.1 直接删。
                 { key: 'growthMultiple', step: 'pension', label: '预期领取额是累计缴费的几倍', type: 'number', default: 1.5, min: 1,
-                    hint: '领取环节的 3% 是**按领取额全额**计的（本金 + 收益一起计） —— 填 1 表示只回本金，1.5 表示连本带收益领 1.5 倍' },
+                    hint: '领取环节的 3% 是按领取额全额计的（本金 + 收益一起计） —— 填 1 表示只回本金，1.5 表示连本带收益领 1.5 倍' },
 
                 { key: 'healthPremium', step: 'other', label: '税优健康险：今年保费（元）', type: 'money', default: 0, sample: 2400, min: 0,
-                    hint: '限额 **2400 元/年**（200 元/月），须是带「税优识别码」的合规产品；**赔付环节免税**' },
+                    hint: '限额 2400 元/年（200 元/月），须是带「税优识别码」的合规产品；赔付环节免税' },
                 { key: 'joinAnnuity', step: 'other', label: '是否参加企业 / 职业年金', type: 'select', default: 'no',
                     options: [{ value: 'no', label: '不参加' }, { value: 'yes', label: '参加' }] },
                 { key: 'annuityPrevMonthlyWage', step: 'other', label: '本人上年度月平均工资（元）', type: 'money', default: 0, sample: 15000, min: 0,
                     when: { key: 'joinAnnuity', in: ['yes'] },
-                    hint: '年金 4% 的基数**不是当月工资**：是本人**上年度月平均工资**，含奖金津贴 —— 与社保缴费基数同一个口径' },
+                    hint: '年金 4% 的基数不是当月工资：是本人上年度月平均工资，含奖金津贴 —— 与社保缴费基数同一个口径' },
                 { key: 'annuitySocialAverage', step: 'other', label: '当地上年度职工月平均工资（元）', type: 'money', default: 0, sample: 8000, min: 0,
                     when: { key: 'joinAnnuity', in: ['yes'] },
-                    hint: '基数封顶：超过社平 **300%** 的部分不计入缴费基数' },
+                    hint: '基数封顶：超过社平 300% 的部分不计入缴费基数' },
                 { key: 'personalRate', step: 'other', label: '个人缴费比例（%）', type: 'percent', default: 4, min: 0,
                     when: { key: 'joinAnnuity', in: ['yes'] },
-                    hint: '不超过 **4%** 的部分当期从应纳税所得额中扣除；**超过 4% 的部分要并入工资计税**' },
+                    hint: '不超过 4% 的部分当期从应纳税所得额中扣除；超过 4% 的部分要并入工资计税' },
                 { key: 'employerRate', step: 'other', label: '单位缴费比例（%）', type: 'percent', default: 8, min: 0,
                     when: { key: 'joinAnnuity', in: ['yes'] },
-                    hint: '单位缴费是**递延**不是免税 —— 计入个人账户时暂不纳税，领取时照样要交' },
+                    hint: '单位缴费是递延不是免税 —— 计入个人账户时暂不纳税，领取时照样要交' },
                 { key: 'monthlyWithdraw', step: 'other', label: '预计月领取额（元）', type: 'money', default: 0, sample: 2000, min: 0,
                     when: { key: 'joinAnnuity', in: ['yes'] },
-                    hint: '年金领取按**月度**税率表单独计税，不并入综合所得、不参与汇算' }
+                    hint: '年金领取按月度税率表单独计税，不并入综合所得、不参与汇算' }
             ],
             steps: [
                 { key: 'income', title: '两个人的应纳税所得额', why: '三项税优扣的都是同一个数，先把它从收入里推出来 —— 也才能算「家里的钱该给谁缴」' },
-                { key: 'pension', title: '个人养老金', why: '12000 的额度、领取时 3% 的税 —— 后者按**领取额全额**计，本金和收益一起算' },
-                { key: 'other', title: '税优健康险与企业年金', why: '健康险 2400 且赔付免税；年金 4% 的基数是**上年度月平均工资**且封顶社平 3 倍，超 4% 还要并回工资' }
+                { key: 'pension', title: '个人养老金', why: '12000 的额度、领取时 3% 的税 —— 后者按领取额全额计，本金和收益一起算' },
+                { key: 'other', title: '税优健康险与企业年金', why: '健康险 2400 且赔付免税；年金 4% 的基数是上年度月平均工资且封顶社平 3 倍，超 4% 还要并回工资' }
             ],
             pitfalls: [
-                '**三项扣的是同一份应纳税所得额，叠加会跨档**：各自单独省之和 ≠ 合起来省。实测月薪 1 万（扣除前 4.8 万）+ 三件套满额 2.59 万：单独之和 2592、合并 **1617.6**，差 974',
-                '**年金 4% 的基数不是月薪**：是本人**上年度月平均工资**（含奖金），且超过当地社平 **300%** 的部分不计入。月薪 1.5 万 + 年终奖 12 万 → 上年月均 2.5 万、社平 8000 → 基数封顶 2.4 万，年免税 **11520** 而不是按月薪算的 7200',
-                '个人缴费**超过 4% 的部分要并入工资计税**（税后扣缴、照常进账户），不是「多缴多免税」',
-                '**领取环节三件套各不相同**：个人养老金按**领取额全额 × 3%**（本金 + 收益一起计）、年金按月领走**月度**税率表、税优健康险**赔付免税**',
-                '**3% 税率档的人缴个人养老金净收益为 0**（现在省 3%、将来领取得缴 3%），账户一旦有收益就是净亏 —— 实测领 1.8 万（1.5 倍）缴 540 > 省 360',
-                '12000 是**每个人**的额度（夫妻各自 12000），且**当年有效、不结转**；当年忘了缴不能补到次年',
-                '当年没扣也不用慌：个人养老金可以在**次年汇算时**填报扣除（3 月 1 日 — 6 月 30 日），税额一样不少'
+                '三项扣的是同一份应纳税所得额，叠加会跨档：各自单独省之和 ≠ 合起来省。实测月薪 1 万（扣除前 4.8 万）+ 三件套满额 2.59 万：单独之和 2592、合并 1617.6，差 974',
+                '年金 4% 的基数不是月薪：是本人上年度月平均工资（含奖金），且超过当地社平 300% 的部分不计入。月薪 1.5 万 + 年终奖 12 万 → 上年月均 2.5 万、社平 8000 → 基数封顶 2.4 万，年免税 11520 而不是按月薪算的 7200',
+                '个人缴费超过 4% 的部分要并入工资计税（税后扣缴、照常进账户），不是「多缴多免税」',
+                '领取环节三件套各不相同：个人养老金按领取额全额 × 3%（本金 + 收益一起计）、年金按月领走月度税率表、税优健康险赔付免税',
+                '3% 税率档的人缴个人养老金净收益为 0（现在省 3%、将来领取得缴 3%），账户一旦有收益就是净亏 —— 实测领 1.8 万（1.5 倍）缴 540 > 省 360',
+                '12000 是每个人的额度（夫妻各自 12000），且当年有效、不结转；当年忘了缴不能补到次年',
+                '当年没扣也不用慌：个人养老金可以在次年汇算时填报扣除（3 月 1 日 — 6 月 30 日），税额一样不少'
             ],
             compute: function (v) {
                 var Q = window.EuriskoPrivatePensionQuick;
@@ -3023,7 +3058,7 @@
                     { label: '三项各自单算之和', value: r.separateSum, kind: 'money',
                         hint: '三个速算器各算各的口径 —— 叠加跨档时它必然高估' },
                     { label: '叠加跨档的差额', value: r.stackingGap, kind: 'money',
-                        hint: '单独之和 − 合并实际：差额越大说明跨档越多' }
+                        hint: '单独计税与合并计税分别算出的税额之差：差额越大，说明跨的税率档越多' }
                 ];
                 if (r.totalAddBack > 0) {
                     rows.push({ label: '年金超 4% 并入工资', value: r.totalAddBack, kind: 'money',
@@ -3032,7 +3067,7 @@
                 var annuityItem = r.items.filter(function (it) { return it.key === 'annuity'; })[0];
                 if (annuityItem) {
                     rows.push({ label: '年金缴费基数（月）', value: annuityItem.base, kind: 'money',
-                        hint: '上年度月平均工资，封顶社平 3 倍 = ' + Math.round(annuityItem.baseCap) + ' 元'
+                        hint: '上年度月平均工资，最高按社平工资 3 倍封顶 = ' + Math.round(annuityItem.baseCap) + ' 元'
                             + (annuityItem.baseCapped ? '（已封顶）' : '') });
                 }
                 if (r.items.some(function (it) { return it.key === 'pension'; })) {
@@ -3062,7 +3097,7 @@
                     }
                 }, {
                     title: '叠加 vs 各自单算（跨档时两者不等）',
-                    note: '三项扣的是**同一个**应纳税所得额 —— 合成一笔之后可能掉到更低的档上',
+                    note: '三项扣的是同一个应纳税所得额 —— 合成一笔之后可能掉到更低的档上',
                     table: {
                         head: ['项目', '可扣除', '单独算', '合并后的实际贡献'],
                         rows: r.marginal.map(function (m) {
@@ -3093,7 +3128,7 @@
                 if (r.hasSpouse && r.plans.length > 1) {
                     extras.push({
                         title: '家里的 12000 该给谁缴（每人各 12000，本人只能扣本人的）',
-                        note: '个人养老金**不能由配偶代扣** —— 所以「谁缴」决定「省多少」，放在税率高的一方身上才省得多',
+                        note: '个人养老金不能由配偶代扣 —— 所以「谁缴」决定「省多少」，放在税率高的一方身上才省得多',
                         table: {
                             head: ['投法', '本人缴', '配偶缴', '家庭全年个税', '少交'],
                             rows: r.plans.map(function (p) {
@@ -3103,18 +3138,18 @@
                     });
                 }
 
-                var note = '三项合计可扣 ' + Math.round(r.totalDeductible) + ' 元，今年少交 **'
-                    + Math.round(r.savingCombined) + ' 元**（三个速算器各算各的会给出 ' + Math.round(r.separateSum)
+                var note = '三项合计可扣 ' + Math.round(r.totalDeductible) + ' 元，今年少交 '
+                    + Math.round(r.savingCombined) + ' 元（三个速算器各算各的会给出 ' + Math.round(r.separateSum)
                     + ' 元，叠加跨档差 ' + Math.round(r.stackingGap) + ' 元）。';
                 if (r.items.some(function (it) { return it.key === 'pension'; })) {
                     note += ' 养老金 ' + r.years + ' 年累计节税 ' + Math.round(r.pensionSavedYears)
                         + ' 元，领取时（按 ' + r.multiple + ' 倍估算）交 ' + Math.round(r.pensionWithdrawTax)
-                        + ' 元，净优惠 **' + Math.round(r.pensionNetBenefit) + ' 元**';
+                        + ' 元，净优惠 ' + Math.round(r.pensionNetBenefit) + ' 元';
                     if (!r.worthIt) note += '（当前税率 ≤ 3%，这个数随账户收益增大而转负）';
                     note += '。';
                 }
                 if (r.hasSpouse && r.plans.length > 1) {
-                    note += ' 家里的额度给 **' + (r.bestPlan.key === 'both' ? '两个人各缴满' : (r.bestPlan.key === 'spouse' ? '配偶' : '本人'))
+                    note += ' 家里的额度给 ' + (r.bestPlan.key === 'both' ? '两个人各缴满' : (r.bestPlan.key === 'spouse' ? '配偶' : '本人'))
                         + '** 最省。';
                 }
 
@@ -3142,7 +3177,7 @@
                         { label: '净优惠', value: r.pensionNetBenefit, format: 'money' },
                         { label: '划算的领取额上限', value: r.breakEvenWithdraw, format: 'money' }
                     ] : [{ label: '未填个人养老金', value: 0, format: 'money' }],
-                    footnote: '个人养老金按领取额**全额** 3%（本金 + 收益一起计）；年金按月领走月度税率表；税优健康险赔付免税。'
+                    footnote: '个人养老金按领取额全额 3%（本金 + 收益一起计）；年金按月领走月度税率表；税优健康险赔付免税。'
                 }];
 
                 return {
@@ -3178,7 +3213,7 @@
                 { key: 'donateKind', step: 'donate', label: '捐赠什么', type: 'select', default: 'cash',
                     options: [{ value: 'cash', label: '货币' }, { value: 'equity', label: '股权' },
                         { value: 'house', label: '房产' }, { value: 'other', label: '其他非货币性资产' }],
-                    hint: '捐赠额**不是**你想捐的那个数：股权与房产按**财产原值**，其他非货币性资产按市场价格' },
+                    hint: '捐赠额不是你想捐的那个数：股权与房产按财产原值，其他非货币性资产按市场价格' },
                 { key: 'cashAmount', step: 'donate', label: '实际捐赠金额（元）', type: 'money', default: 0, sample: 50000, min: 0,
                     when: { key: 'donateKind', in: ['cash'] }, hint: '货币性资产按实际捐赠金额确定' },
                 { key: 'equityCost', step: 'donate', label: '股权的财产原值（元）', type: 'money', default: 0, sample: 1000000, min: 0,
@@ -3193,47 +3228,47 @@
                     when: { key: 'donateKind', in: ['other'] } },
                 { key: 'fullDeduction', step: 'donate', label: '是否属于国务院规定的全额扣除情形', type: 'select', default: 'no',
                     options: [{ value: 'no', label: '按 30% 限额扣除' }, { value: 'yes', label: '可全额税前扣除' }],
-                    hint: '同时发生按 30% 扣除与全额扣除的，**扣除次序自行选择**' },
+                    hint: '同时发生按 30% 扣除与全额扣除的，扣除次序自行选择' },
 
                 { key: 'comprehensiveTaxable', step: 'income', label: '综合所得应纳税所得额（元，捐赠前）', type: 'money', default: 0, sample: 36000, min: 0,
-                    hint: '限额按**应纳税所得额**算，不是收入 —— 已扣完 6 万与五险一金、专项附加之后的那个数' },
+                    hint: '限额按应纳税所得额算，不是收入 —— 已扣完 6 万与五险一金、专项附加之后的那个数' },
                 { key: 'comprehensiveBasis', step: 'income', label: '上面这个数是', type: 'select', default: 'year',
                     options: [{ value: 'year', label: '全年（居民个人）' }, { value: 'month', label: '当月（非居民个人）' }] },
                 { key: 'businessTaxable', step: 'income', label: '经营所得应纳税所得额（元，捐赠前）', type: 'money', default: 0, sample: 300000, min: 0,
                     hint: '个体户 / 个人独资 / 合伙企业的自然人合伙人填这一栏' },
                 { key: 'businessVerified', step: 'income', label: '经营所得是否核定征收', type: 'select', default: 'no',
                     options: [{ value: 'no', label: '查账征收' }, { value: 'yes', label: '核定征收' }],
-                    hint: '核定征收的经营所得**不扣除**公益捐赠（99 号公告六（四））' },
+                    hint: '核定征收的经营所得不扣除公益捐赠（99 号公告六（四））' },
                 { key: 'classificationTaxable', step: 'income', label: '当月分类所得应纳税所得额（元）', type: 'money', default: 0, sample: 100000, min: 0,
-                    hint: '财产租赁 / 财产转让 / 利息股息红利 / 偶然所得 —— 限额按**当月**算，不是全年' },
+                    hint: '财产租赁 / 财产转让 / 利息股息红利 / 偶然所得 —— 限额按当月算，不是全年' },
                 { key: 'classificationType', step: 'income', label: '分类所得项目', type: 'select', default: 'accidental',
                     options: [{ value: 'accidental', label: '偶然所得' }, { value: 'transfer', label: '财产转让所得' },
                         { value: 'rent', label: '财产租赁所得' }, { value: 'interest', label: '利息、股息、红利所得' }] },
 
                 { key: 'residency', step: 'special', label: '纳税人身份', type: 'select', default: 'resident',
                     options: [{ value: 'resident', label: '居民个人' }, { value: 'non-resident', label: '非居民个人' }],
-                    hint: '非居民按捐赠**当月**应纳税所得额的 30% 扣除，扣不完的可以在经营所得中继续扣除' },
+                    hint: '非居民按捐赠当月应纳税所得额的 30% 扣除，扣不完的可以在经营所得中继续扣除' },
                 { key: 'employerCount', step: 'special', label: '工资薪金任职单位数', type: 'select', default: '1',
                     options: [{ value: '1', label: '一处' }, { value: '2', label: '两处以上' }],
-                    hint: '两处以上取得工资薪金的，只能选择其中一处扣除，**选择后当年不得变更**' },
+                    hint: '两处以上取得工资薪金的，只能选择其中一处扣除，选择后当年不得变更' },
                 { key: 'hasReceipt', step: 'special', label: '是否已取得捐赠票据', type: 'select', default: 'yes',
                     options: [{ value: 'yes', label: '已取得' }, { value: 'no', label: '尚未取得（先凭银行支付凭证）' }],
-                    hint: '未取得的可先凭银行支付凭证扣除，须在捐赠之日起 **90 日**内补充提供票据；票据留存 5 年' }
+                    hint: '未取得的可先凭银行支付凭证扣除，须在捐赠之日起 90 日内补充提供票据；票据留存 5 年' }
             ],
             steps: [
-                { key: 'donate', title: '这笔捐赠按多少算', why: '捐赠额不是票面那个数 —— 股权与房产按**财产原值**，其他非货币性资产按市场价格' },
-                { key: 'income', title: '三个所得项目各能扣多少', why: '限额是各项目**应纳税所得额**的 30%，且分类所得按**当月** —— 三项各自的额度决定了顺序怎么排' },
+                { key: 'donate', title: '这笔捐赠按多少算', why: '捐赠额不是票面那个数 —— 股权与房产按财产原值，其他非货币性资产按市场价格' },
+                { key: 'income', title: '三个所得项目各能扣多少', why: '限额是各项目应纳税所得额的 30%，且分类所得按当月 —— 三项各自的额度决定了顺序怎么排' },
                 { key: 'special', title: '身份与票据', why: '非居民按当月、两处工资只能选一处、票据 90 日内补齐 —— 这三条决定了扣得到扣不到' }
             ],
             pitfalls: [
-                '**同一笔捐赠，先扣哪一项税不一样**：扣除顺序由纳税人自行决定（99 号公告三（三））。实测 5 万捐赠：先扣分类（20%）→ 经营 → 综合省 **8000**，先扣综合（3% 档）→ 经营 → 分类只省 **4244** —— **差 3756 元**',
-                '**捐赠额不是票面那个数**：货币按实际捐赠额，但**股权、房产按财产原值**（不是市值），其他非货币性资产按市场价格（二）。房产市值 500 万、原值 200 万 → 捐赠额是 **200 万**',
-                '**限额 = 应纳税所得额 × 30%**，不是收入的 30%；且分类所得按**当月**应纳税所得额算（三（二））',
-                '**一个项目扣不完的可以在其他项目继续扣**（三（一））—— 不是作废；但超出全部项目限额之和的部分，个人**不结转以后年度**（企业捐赠可结转 3 年，这是最常被混用的两条）',
-                '**已在分类所得中扣除的捐赠，不再调整到其他所得**（五）—— 所以顺序选错没法回头改',
-                '**核定征收的经营所得不扣捐赠**（六（四））；合伙 / 个人独资企业按**分配比例**归属到每个投资者（六（二））；两处以上工资薪金**只能选一处扣除、当年不得变更**（四（一））',
-                '**劳务报酬 / 稿酬 / 特许权使用费预扣预缴时不扣捐赠**，统一在汇算清缴时扣除（四（二））；全年一次性奖金、股权激励单独计税的，捐赠扣除**比照分类所得**处理（四（三））',
-                '分类所得当月应扣未扣的可**追补扣除**、未取得票据的可先凭银行支付凭证扣除 —— 两个期限都是 **90 日**；捐赠票据留存 **5 年**（五、九、十）'
+                '同一笔捐赠，先扣哪一项税不一样：扣除顺序由纳税人自行决定（99 号公告三（三））。实测 5 万捐赠：先扣分类（20%）→ 经营 → 综合省 8000，先扣综合（3% 档）→ 经营 → 分类只省 4244 —— 差 3756 元',
+                '捐赠额不是票面那个数：货币按实际捐赠额，但股权、房产按财产原值（不是市值），其他非货币性资产按市场价格（二）。房产市值 500 万、原值 200 万 → 捐赠额是 200 万',
+                '限额 = 应纳税所得额 × 30%，不是收入的 30%；且分类所得按当月应纳税所得额算（三（二））',
+                '一个项目扣不完的可以在其他项目继续扣（三（一））—— 不是作废；但超出全部项目限额之和的部分，个人不结转以后年度（企业捐赠可结转 3 年，这是最常被混用的两条）',
+                '已在分类所得中扣除的捐赠，不再调整到其他所得（五）—— 所以顺序选错没法回头改',
+                '核定征收的经营所得不扣捐赠（六（四））；合伙 / 个人独资企业按分配比例归属到每个投资者（六（二））；两处以上工资薪金只能选一处扣除、当年不得变更（四（一））',
+                '劳务报酬 / 稿酬 / 特许权使用费预扣预缴时不扣捐赠，统一在汇算清缴时扣除（四（二））；全年一次性奖金、股权激励单独计税的，捐赠扣除比照分类所得处理（四（三））',
+                '分类所得当月应扣未扣的可追补扣除、未取得票据的可先凭银行支付凭证扣除 —— 两个期限都是 90 日；捐赠票据留存 5 年（五、九、十）'
             ],
             compute: function (v) {
                 var Q = window.EuriskoDonationQuick;
@@ -3265,7 +3300,7 @@
                 var rows = [
                     { label: '核定后的捐赠额', value: r.amount, kind: 'money', hint: r.declared.note },
                     { label: '扣除限额合计', value: r.limitSum, kind: 'money',
-                        hint: '三个项目各按应纳税所得额 × ' + Math.round(r.limitRatio * 100) + '%' },
+                        hint: '三个项目各自按应纳税所得额 × ' + Math.round(r.limitRatio * 100) + '%' },
                     { label: '实际可扣除', value: r.deductibleTotal, kind: 'money' },
                     { label: '最优扣除顺序', value: r.best.label, kind: 'text' },
                     { label: '按最优顺序少交', value: r.best.saving, kind: 'money' },
@@ -3273,7 +3308,7 @@
                         hint: r.worst.label + ' —— 顺序选错就少省这么多' },
                     { label: '顺序选错的差额', value: r.orderGap, kind: 'money' },
                     { label: '扣不完的部分', value: r.unused, kind: 'money',
-                        hint: '超出全部项目限额之和：个人**不结转以后年度**（企业可结转 3 年）' }
+                        hint: '超出全部项目限额之和：个人不结转以后年度（企业可结转 3 年）' }
                 ];
                 if (r.declared.gap > 0) {
                     rows.push({ label: '与票面市值的差', value: r.declared.gap, kind: 'money',
@@ -3282,8 +3317,8 @@
 
                 var extras = [{
                     title: '三个所得项目：限额、可扣、各自省多少（按最优顺序）',
-                    note: '限额 = 该项目**应纳税所得额** × ' + Math.round(r.limitRatio * 100)
-                        + '%；分类所得按**当月**',
+                    note: '限额 = 该项目应纳税所得额 × ' + Math.round(r.limitRatio * 100)
+                        + '%；分类所得按当月',
                     table: {
                         head: ['所得项目', '应纳税所得额', '扣除限额', '实际可扣', '扣除后', '少交'],
                         rows: r.best.per.map(function (p) {
@@ -3293,7 +3328,7 @@
                             money(r.limitSum), money(r.deductibleTotal), '—', money(r.best.saving)]])
                     }
                 }, {
-                    title: '六种扣除顺序对照（**顺序自行决定**，税不一样）',
+                    title: '六种扣除顺序对照（顺序自行决定，税不一样）',
                     note: '一个项目扣不完的可以继续在下一个项目扣（三（一））；已在分类所得扣除的不再调整到其他所得（五）',
                     table: {
                         head: ['扣除顺序', '可扣合计', '少交个税', '比最优少省'],
@@ -3309,9 +3344,9 @@
                         head: ['捐赠形式', '捐赠额按什么确定', '本次金额'],
                         rows: [
                             ['货币性资产', '实际捐赠金额', money(r.declared.kind === 'cash' ? r.amount : 0)],
-                            ['股权', '持有股权的**财产原值**', money(r.declared.kind === 'equity' ? r.amount : 0)],
-                            ['房产', '持有房产的**财产原值**', money(r.declared.kind === 'house' ? r.amount : 0)],
-                            ['其他非货币性资产', '非货币性资产的**市场价格**', money(r.declared.kind === 'other' ? r.amount : 0)]
+                            ['股权', '持有股权的财产原值', money(r.declared.kind === 'equity' ? r.amount : 0)],
+                            ['房产', '持有房产的财产原值', money(r.declared.kind === 'house' ? r.amount : 0)],
+                            ['其他非货币性资产', '非货币性资产的市场价格', money(r.declared.kind === 'other' ? r.amount : 0)]
                         ]
                     }
                 }];
@@ -3319,9 +3354,9 @@
                 var note = '这笔捐赠核定为 ' + Math.round(r.amount) + ' 元，'
                     + (r.unused > 0 ? '只能扣 ' + Math.round(r.deductibleTotal) + ' 元（超出限额的 '
                         + Math.round(r.unused) + ' 元不结转以后年度）' : '限额内可全额扣除')
-                    + '，按最优顺序今年少交 **' + Math.round(r.best.saving) + ' 元**；'
+                    + '，按最优顺序今年少交 ' + Math.round(r.best.saving) + ' 元；'
                     + '顺序换成 ' + r.worst.label + ' 只省 ' + Math.round(r.worst.saving)
-                    + ' 元 —— **差 ' + Math.round(r.orderGap) + ' 元**。';
+                    + ' 元 —— 差 ' + Math.round(r.orderGap) + ' 元。';
                 if (r.notes.length) note += ' ' + r.notes.join('；') + '。';
 
                 var steps = [{
@@ -3330,7 +3365,7 @@
                         { label: r.declared.kindLabel, value: r.declared.declared, format: 'money' },
                         { label: '核定后的捐赠额', value: r.amount, format: 'money', note: r.declared.note }
                     ],
-                    footnote: '货币按实际捐赠额；股权、房产按**财产原值**；其他非货币性资产按市场价格（99 号公告二）。'
+                    footnote: '货币按实际捐赠额；股权、房产按财产原值；其他非货币性资产按市场价格（99 号公告二）。'
                 }, {
                     title: '② 三个所得项目的限额与分配',
                     rows: r.best.per.map(function (p) {
@@ -3409,57 +3444,67 @@
 
                 // ---- 第三步：扣除项明细 ----
                 // 两级勾选沿用页面版：「专项扣除」「专项附加扣除」「其他扣除」三个总开关各管一片，
+                // 总开关默认勾上（交社保是常态，见 forward 那份注释）。
                 // 总开关不勾，下面的月缴额 / 分项一律不计 —— 这是页面上最容易踩、且看不出来的坑。
-                { key: 'specialDeductionCheckbox', step: 'deduction', label: '缴纳社保与公积金（专项扣除）', type: 'switch', default: false },
+                { key: 'specialDeductionCheckbox', step: 'deduction', label: '专项扣除（社保 / 公积金）', type: 'switch', default: true },
                 // 「基数 × 比例 → 月缴额」这组便利输入：17B-2 删页面前特意捞回来的。
                 // v1.47.0 删经营所得页面时丢过一次同样的东西（只在 app.js + helper-functions.js 的私有函数里，
                 // 页面一删就跟着没了），最后是 verify:local 变红才暴露 —— 这次先补再删。
-                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 0, sample: 7546,
+                // 排序同 forward：每一险种的金额挨着它自己的比例（详见 forward 那份注释）。
+                { key: 'socialBase', step: 'deduction', label: '社保缴费基数（元/月）', type: 'money', default: 7546, sample: 7546,
+                    wide: true,
                     when: { key: 'specialDeductionCheckbox', in: [true] },
-                    hint: '填了就由它和下面三项比例算月缴额（月缴额以基数为准）；不填则自己填月缴额' },
+                    hint: '由它和下面的比例算月缴额（每月扣多少以基数为准）；不是你参保地的数就改掉它' },
+                { key: 'pensionInsurance', step: 'deduction', derived: true, label: '养老保险金（元/月）', type: 'money', default: 0, sample: 603.68,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的养老保险：进你自己的养老账户，退休后按月领养老金；单位缴的那部分进统筹基金，不在这里填。\n按「社保缴费基数 × 养老比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'pensionRate', step: 'deduction', label: '养老缴费比例', type: 'percent', default: 8,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'medicalInsurance', step: 'deduction', derived: true, label: '医疗保险金（元/月）', type: 'money', default: 0, sample: 150.92,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的医疗保险：用于住院与门诊报销，其中一部分划进你自己的医保个人账户（工伤与生育保险个人不缴）。\n按「社保缴费基数 × 医疗比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'medicalRate', step: 'deduction', label: '医疗缴费比例', type: 'percent', default: 2,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'unemploymentInsurance', step: 'deduction', derived: true, label: '失业保险金（元/月）', type: 'money', default: 0, sample: 37.73,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '个人缴的失业保险：非本人意愿中断就业、且缴满一年的，可按月领失业金。\n按「社保缴费基数 × 失业比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'unemploymentRate', step: 'deduction', label: '失业缴费比例', type: 'percent', default: 0.5,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
-                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 0, sample: 7546,
+                // 与社保同理：勾了专项扣除就该有一份算得出钱的公积金 —— 给 0 就是给用户一个算不出数的空趟
+                { key: 'housingFundBase', step: 'deduction', label: '公积金缴费基数（元/月）', type: 'money', default: 7546, sample: 7546,
+                    wide: true,
                     when: { key: 'specialDeductionCheckbox', in: [true] } },
+                { key: 'housingFund', step: 'deduction', derived: true, label: '住房公积金（元/月）', type: 'money', default: 0, sample: 377.3,
+                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '住房公积金：个人缴的与单位缴的都进你自己的公积金账户，买房、租房、翻建可按规定提取。\n按「公积金缴费基数 × 公积金比例」自动算出；工资条上只有扣款金额的，也可以直接在这里改' },
                 { key: 'housingFundRate', step: 'deduction', label: '公积金缴费比例', type: 'percent', default: 5,
                     when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '各地 5%~12% 不同，按参保地口径填' },
 
-                { key: 'pensionInsurance', step: 'deduction', label: '养老保险金（元/月）', type: 'money', default: 0, sample: 603.68,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 养老比例' },
-                { key: 'medicalInsurance', step: 'deduction', label: '医疗保险金（元/月）', type: 'money', default: 0, sample: 150.92,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 医疗比例' },
-                { key: 'unemploymentInsurance', step: 'deduction', label: '失业保险金（元/月）', type: 'money', default: 0, sample: 37.73,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 社保缴费基数 × 失业比例' },
-                { key: 'housingFund', step: 'deduction', label: '住房公积金（元/月）', type: 'money', default: 0, sample: 377.3,
-                    when: { key: 'specialDeductionCheckbox', in: [true] }, hint: '＝ 公积金缴费基数 × 公积金比例' },
-
-                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '享受专项附加扣除', type: 'switch', default: false },
-                { key: 'childrenInfantDeduction', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（元/月）', type: 'money', default: 0,
-                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'elderlyDeduction', step: 'deduction', label: '赡养老人（元/月）', type: 'money', default: 0,
-                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'housingType', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
+                { key: 'specialAdditionalDeductionCheckbox', step: 'deduction', label: '专项附加扣除', type: 'switch', default: false },
+                { key: 'childrenInfantDeduction', group: '子女教育与婴幼儿照护', step: 'deduction', label: '子女教育 / 3 岁以下婴幼儿照护（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '每个子女每月 2000 元：父母一方全额扣的填 2000，双方各扣一半的填 1000。'
+                        + '这里填你实际享受的月扣除额' },
+                { key: 'elderlyDeduction', group: '赡养老人', step: 'deduction', label: '赡养老人（元/月）', type: 'money', default: 0,
+                    when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
+                    hint: '独生子女每月 3000；非独生子女按分摊协议，最多 1500。'
+                        + '这里填你实际享受的月扣除额' },
+                { key: 'housingType', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房扣除方式', type: 'select', default: 'rent', options: [
                     { value: 'rent', label: '住房租金' },
                     { value: 'loan', label: '住房贷款利息' }
-                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息**只能二选一**' },
-                { key: 'rentDeduction', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 0, sample: 1500,
+                ], when: { key: 'specialAdditionalDeductionCheckbox', in: [true] }, hint: '租金与房贷利息只能二选一' },
+                { key: 'rentDeduction', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房租金（元/月）', type: 'money', default: 0, sample: 1500,
                     when: { key: 'housingType', in: ['rent'] } },
-                { key: 'housingLoanDeduction', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 0, sample: 1000,
+                { key: 'housingLoanDeduction', group: '住房贷款利息 / 住房租金', step: 'deduction', label: '住房贷款利息（元/月）', type: 'money', default: 0, sample: 1000,
                     when: { key: 'housingType', in: ['loan'] } },
-                { key: 'educationDeduction', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0,
+                { key: 'educationDeduction', group: '继续教育', step: 'deduction', label: '继续教育（元/年）', type: 'money', default: 0,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
-                    hint: '学历继续教育按定额扣；职业资格另勾下面那一项' },
-                { key: 'educationProfessionalCheckbox', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
+                    hint: '学历（学位）继续教育每月 400 元（同一学历最长 48 个月），'
+                        + '取得职业资格证书的当年一次性 3600 元。这里填全年合计；'
+                        + '职业资格那一项勾下面的框' },
+                { key: 'educationProfessionalCheckbox', group: '继续教育', step: 'deduction', label: '职业资格继续教育（3600 元/年，一次性扣）', type: 'switch', default: false,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] } },
-                { key: 'medicalDeduction', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
+                { key: 'medicalDeduction', group: '大病医疗', step: 'deduction', label: '大病医疗自付部分（元/年）', type: 'money', default: 0,
                     when: { key: 'specialAdditionalDeductionCheckbox', in: [true] },
                     hint: '只扣超过 1.5 万的部分、限额 8 万；且只在年度汇算扣，不进月度' },
 
-                { key: 'otherDeductionCheckbox', step: 'deduction', label: '有其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
+                { key: 'otherDeductionCheckbox', step: 'deduction', label: '其他扣除（年金 / 商业健康险等）', type: 'switch', default: false },
                 { key: 'pensionDeductionCheckbox', step: 'deduction', label: '商业健康险', type: 'switch', default: false,
                     when: { key: 'otherDeductionCheckbox', in: [true] } },
                 { key: 'pensionDeduction', step: 'deduction', label: '商业健康险（元/月）', type: 'money', default: 0,
@@ -3494,10 +3539,10 @@
                 { key: 'deduction', title: '扣除项明细', why: '扣除项直接决定「到同样的手需要多少税前」：漏一项，就得多发一份税' }
             ],
             pitfalls: [
-                '同一个税负率对应的是**一段收入区间**（税率档位），不是唯一解 —— 保守落在档位下限、激进用到上限',
-                '住房租金与住房贷款利息**只能二选一**，同时享受会被税务机关驳回',
+                '同一个税负率对应的是一段收入区间（税率档位），不是唯一解 —— 保守落在档位下限、激进用到上限',
+                '住房租金与住房贷款利息只能二选一，同时享受会被税务机关驳回',
                 '含年终奖时它按全年一次性奖金单独计税，与并入综合所得的口径不同：反推前先确认发放方式',
-                '大病医疗只在**年度汇算**扣（超过 1.5 万的部分、限额 8 万），不进月度'
+                '大病医疗只在年度汇算扣（超过 1.5 万的部分、限额 8 万），不进月度'
             ],
             compute: function (v) {
                 if (typeof calculateReverseTaxCore !== 'function') return null;
@@ -3617,7 +3662,7 @@
             // 口径仍同源：价税分离、免征判定、销项进项一律走 `EuriskoVatQuick`；
             // 附加税走 `EuriskoSurtaxStampQuick`（税率取 surtaxRules）；
             // 单笔输入与速算器逐点相等，由 tests/vat-deep.test.js 钉住。
-            id: 'vat-deep', name: '增值税', subtitle: '逐笔核定进项能不能抵，再比计税方法',
+            id: 'vat-deep', name: '增值税（进项逐笔）', subtitle: '逐笔核定进项能不能抵，再比计税方法',
             icon: 'fa-shopping-cart', status: 'deep', comparable: true,
             nextTools: ['vat', 'surtax-stamp', 'corporate-income-tax', 'business-income'],
             policyKey: 'vat-small-scale',
@@ -3630,7 +3675,7 @@
                     when: { key: 'taxpayer', in: ['general'] } },
                 { key: 'simplifiedCase', step: 'identity', label: '是否符合法定简易计税情形', type: 'select', default: 'none',
                     options: vatSimplifiedOptions(), when: { key: 'taxpayer', in: ['general'] },
-                    hint: '一般纳税人**不是想选就能选简易**：只有法定情形才可以，且一经选择 36 个月内不得变更' },
+                    hint: '一般纳税人不是想选就能选简易：只有法定情形才可以，且一经选择 36 个月内不得变更' },
 
                 { key: 'sales', step: 'sales', label: '本期销售额', type: 'money', default: 0, sample: 1130000 },
                 { key: 'taxIncluded', step: 'sales', label: '销售额为含税价', type: 'switch', default: false },
@@ -3647,7 +3692,7 @@
 
                 { key: 'inputs', step: 'input', label: '进项税额逐笔（按凭证与用途核定）', type: 'repeater',
                     addLabel: '添加一笔进项',
-                    hint: '小规模**不得抵扣进项** —— 这里填的是你**若登记为一般纳税人**能抵多少，用来判断要不要转',
+                    hint: '小规模不得抵扣进项 —— 这里填的是你若登记为一般纳税人能抵多少，用来判断要不要转',
                     default: [
                         { voucher: 'special', usage: 'business', amount: 80000 },
                         { voucher: 'normal', usage: 'business', amount: 12000 },
@@ -3663,7 +3708,7 @@
                     when: { key: 'taxpayer', in: ['general'] }, hint: vatApportionNote() },
 
                 { key: 'annualSales', step: 'compare', label: '连续 12 个月累计应征增值税销售额（元）', type: 'money', default: 0, sample: 4800000,
-                    hint: '超过 500 万须**强制登记**为一般纳税人；登记后原则上不得转回小规模' },
+                    hint: '超过 500 万须强制登记为一般纳税人；登记后原则上不得转回小规模' },
                 { key: 'location', step: 'compare', label: '城建税：纳税人所在地', type: 'select', default: 'urban',
                     options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' },
                         { value: 'other', label: '不在市区、县城、镇（1%）' }] },
@@ -3674,18 +3719,18 @@
                 { key: 'identity', title: '纳税人身份与计税方法', why: '决定用哪套算法：小规模按「不含税销售额 × 征收率」，一般纳税人按「销项 − 进项」' },
                 { key: 'sales', title: '本期销售额', why: '增值税是价外税 —— 先确认是不是含税价；免税与简易项目要单列，它们决定共同进项要分摊转出多少' },
                 { key: 'input', title: '进项逐笔核定', why: '两道闸门：先看过没过「有没有合规扣税凭证」，再看过没过「用于什么用途」—— 两道都过才能抵' },
-                { key: 'compare', title: '计税方法对照与附加税', why: '附加税跟着**实缴增值税**走，所以真正要对比的是「增值税 + 附加」的合计', level: 'advanced' }
+                { key: 'compare', title: '计税方法对照与附加税', why: '附加税跟着实缴增值税走，所以真正要对比的是「增值税 + 附加」的合计' }
             ],
             pitfalls: [
-                '**普票不是扣税凭证**：增值税普通发票、收据、白条一律不得抵扣 —— 最常见的一笔「以为能抵」',
-                '**拿到专票也不一定可抵**：用于免征 / 简易计税项目、集体福利与个人消费、餐饮 / 居民日常 / 娱乐 / 贷款服务、非正常损失的进项一律不得抵扣',
-                '分不清用途的共同进项（房租、水电、办公用品）要按免税与简易项目销售额占比**分摊转出**',
-                '一般纳税人**不是想选简易就能选简易**：只有法定情形才可以，且**一经选择 36 个月内不得变更**',
-                '一般计税更省的前提是进项占比高于**临界增值率**（税率 − 征收率）：13% → 10%、9% → 6%、**6% → 仅 3%**',
-                '小规模「季 30 万」是**临界点不是起征点**：超过即**全额**计税，且开具专票的部分不免税',
-                '小规模纳税人**不得抵扣进项**；一般纳税人抵不完的留抵下期继续抵扣，**不倒欠**',
-                '连续 12 个月累计销售额超过 **500 万**须强制登记为一般纳税人，登记后**原则上不得转回小规模** —— 这笔账要在登记前算',
-                '附加税以**实际缴纳的增值税**为计税依据（市区合计 12%），所以省下的增值税还能再省 12% 的附加'
+                '普票不是扣税凭证：增值税普通发票、收据、白条一律不得抵扣 —— 最常见的一笔「以为能抵」',
+                '拿到专票也不一定可抵：用于免征 / 简易计税项目、集体福利与个人消费、餐饮 / 居民日常 / 娱乐 / 贷款服务、非正常损失的进项一律不得抵扣',
+                '分不清用途的共同进项（房租、水电、办公用品）要按免税与简易项目销售额占比分摊转出',
+                '一般纳税人不是想选简易就能选简易：只有法定情形才可以，且一经选择 36 个月内不得变更',
+                '一般计税更省的前提是进项占比高于临界增值率（税率 − 征收率）：13% → 10%、9% → 6%、6% → 仅 3%',
+                '小规模「季 30 万」是临界点不是起征点：超过即全额计税，且开具专票的部分不免税',
+                '小规模纳税人不得抵扣进项；一般纳税人抵不完的留抵下期继续抵扣，不倒欠',
+                '连续 12 个月累计销售额超过 500 万须强制登记为一般纳税人，登记后原则上不得转回小规模 —— 这笔账要在登记前算',
+                '附加税以实际缴纳的增值税为计税依据（市区合计 12%），所以省下的增值税还能再省 12% 的附加'
             ],
             compute: function (v) {
                 var Q = window.EuriskoVatQuick;
@@ -3835,17 +3880,17 @@
                         + (cutVoucher > 0 ? '凭证不合规核减 ' + Math.round(cutVoucher) + '、' : '')
                         + (cutUsage > 0 ? '用途不得抵扣核减 ' + Math.round(cutUsage) + '、' : '')
                         + (apportionedOut > 0 ? '共同进项分摊转出 ' + Math.round(apportionedOut) + '、' : '')
-                        + '），速算器把它当成全部可抵，会**少算税 ' + Math.round(understated) + ' 元**。';
+                        + '），速算器把它当成全部可抵，会少算税 ' + Math.round(understated) + ' 元。';
                     note += ' 一般计税 ' + Math.round(tax) + ' 元 vs 简易计税 ' + Math.round(simplifiedTax)
                         + ' 元（' + Math.round(compareRate * 100) + '%）：' + methodText
                         + '。临界增值率 ' + Math.round(methodBreakEven * 1000) / 10 + '%，你当前 '
                         + Math.round(inputRatio * 1000) / 10 + '% —— '
                         + (inputRatio < methodBreakEven ? '低于临界，进项再少就该走简易' : '高于临界，一般计税更划算')
-                        + (eligible ? '' : '（但**不符合法定简易情形**，实际只能一般计税）') + '。';
+                        + (eligible ? '' : '（但不符合法定简易情形，实际只能一般计税）') + '。';
                 } else {
                     note += ' 小规模按不含税销售额 × 现行 ' + Math.round(reducedRate * 100)
-                        + '% 计税，不得抵扣进项；免征额度按**全部不含税销售额**判断、含本数，'
-                        + '超过即**全额**计税（不是只对超出部分）。';
+                        + '% 计税，不得抵扣进项；免征额度按全部不含税销售额判断、含本数，'
+                        + '超过即全额计税（不是只对超出部分）。';
                     if (small && small.exempt) {
                         note += ' 当前未超额度，但再超 1 分钱就要全额计税（¥'
                             + Number(small.cliffTax).toFixed(2) + '）—— 临界点附近应把开票与收入确认时点往后挪一个纳税期。';
@@ -3857,9 +3902,9 @@
                         + ' 元：同一笔业务走小规模是 ' + Math.round(smallTax) + ' 元、走一般纳税人是 '
                         + Math.round(generalHypo) + ' 元 —— ' + (identityBetter === 'small' ? '小规模更省' : '一般纳税人更省')
                         + '（临界增值率 ' + Math.round(identityBreakEven * 1000) / 10
-                        + '%）。登记为一般纳税人**原则上不可逆**，这笔账要在登记前算。';
+                        + '%）。登记为一般纳税人原则上不可逆，这笔账要在登记前算。';
                 } else {
-                    note += ' ⚠️ 年累计已超 ' + Math.round(cap) + ' 元，须**强制登记**为一般纳税人。';
+                    note += ' ⚠️ 年累计已超 ' + Math.round(cap) + ' 元，须强制登记为一般纳税人。';
                 }
 
                 var extras = [{
@@ -3870,7 +3915,7 @@
                 if (surtax) {
                     extras.push({
                         title: '随增值税附征的附加税',
-                        note: '计税依据是**实际缴纳的增值税**（' + Math.round(tax) + ' 元），随增值税同增同减',
+                        note: '计税依据是实际缴纳的增值税（' + Math.round(tax) + ' 元），随增值税同增同减',
                         table: {
                             head: ['项目', '金额'], rows: [
                                 ['城市维护建设税（' + surtax.locationLabel + ' ' + Math.round(surtax.cityRate * 100) + '%）',
@@ -3936,7 +3981,7 @@
                             { label: small.exempt ? '未超额度 → 免征（普票部分）' : '已超额度 → 全额计税',
                                 value: small.exempt ? 0 : 1, format: 'money' }
                         ],
-                        footnote: '这是**临界点不是起征点**：超过即全额计税'
+                        footnote: '这是临界点不是起征点：超过即全额计税'
                     });
                     steps.push({
                         title: '应纳增值税',
@@ -3958,7 +4003,7 @@
                         { label: '地方教育附加（2%）', value: surtax ? surtax.localEducationTax : 0, format: 'money' },
                         { label: '合计', value: surtaxTotal, format: 'money' }
                     ],
-                    footnote: '计税依据是**实际缴纳的增值税** —— 随增值税同增同减'
+                    footnote: '计税依据是实际缴纳的增值税 —— 随增值税同增同减'
                 });
 
                 return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
@@ -3998,16 +4043,16 @@
             // 口径仍同源：企业所得税税额、小微三门槛、孰优、临界点一律走 `EuriskoCorporateQuick`；
             // 三大扣除限额走 `deductionLimitOf`；季度平均值 / 加计扣除 / 亏损台账走新增的三个
             // quick 函数（同样读 tax-constants，运营改数字后前台同口径生效）。
-            id: 'corporate-income-tax-deep', name: '企业所得税',
+            id: 'corporate-income-tax-deep', name: '企业所得税（全年汇算）',
             subtitle: '季度平均定身份、加计扣除定档、亏损台账定可抵',
             icon: 'fa-bank', status: 'deep',
             nextTools: ['corporate-income-tax', 'vat', 'surtax-stamp', 'business-income'],
             policyKey: 'corporate-small-low-profit',
             fields: [
                 { key: 'highTech', step: 'identity', label: '高新技术企业', type: 'switch', default: false,
-                    hint: '减按 15% 计税；与小微 5% 不叠加，按税额孰优' },
+                    hint: '减按 15% 计税；与小微 5% 不叠加，哪个算出来的税低就用哪个' },
                 { key: 'smeTech', step: 'identity', label: '科技型中小企业', type: 'switch', default: false,
-                    hint: '**不减税率**，但当年度具备资格可把亏损结转年限由 5 年延长至 10 年' },
+                    hint: '不减税率，但当年度具备资格可把亏损结转年限由 5 年延长至 10 年' },
                 { key: 'industry', step: 'identity', label: '所属行业', type: 'select', default: 'general',
                     options: citIndustryOptions() },
                 { key: 'restricted', step: 'identity', label: '属于国家限制/禁止行业', type: 'switch', default: false,
@@ -4033,9 +4078,9 @@
                 { key: 'entertainment', step: 'profit', label: '业务招待费', type: 'money', default: 0, sample: 100000,
                     hint: '只能扣发生额的 60%，且不超过收入的 5‰（两个上限都要过）' },
                 { key: 'advertising', step: 'profit', label: '广告费与业务宣传费', type: 'money', default: 0, sample: 2000000,
-                    hint: '不超过收入 15% 的部分可扣，超出**结转以后年度**（无年限）' },
+                    hint: '不超过收入 15% 的部分可扣，超出结转以后年度（无年限）' },
                 { key: 'donation', step: 'profit', label: '公益性捐赠支出', type: 'money', default: 0, sample: 300000,
-                    hint: '不超过年度利润总额 12% 的部分可扣，超出只**结转三年**，第四年作废' },
+                    hint: '不超过年度利润总额 12% 的部分可扣，超出只结转三年，第四年作废' },
 
                 { key: 'rdExpense', step: 'deduction', label: '可归集的研发费用', type: 'money', default: 0, sample: 1000000,
                     hint: '负面清单行业不得加计扣除；加计扣除直接减少应纳税所得额，够得着 300 万会整档掉到 5%' },
@@ -4049,22 +4094,22 @@
                     ] }
             ],
             steps: [
-                { key: 'identity', title: '企业身份与资质', why: '高新 15% 与小微 5% 不叠加、按税额孰优；科技型中小企业不减税率但延长亏损结转；负面清单行业不得加计扣除' },
-                { key: 'scale', title: '从业人数与资产总额', why: '小微门槛看的是**全年季度平均值**，不是期末数 —— 期末突击裁员不改变这个数' },
-                { key: 'profit', title: '收入成本与纳税调整', why: '企业所得税算的是**利润**不是收入：超限额的招待费、广宣费、捐赠要**调增**回利润' },
+                { key: 'identity', title: '企业身份与资质', why: '高新 15% 与小微 5% 不叠加，哪个算出来的税低就用哪个；科技型中小企业不减税率但延长亏损结转；负面清单行业不得加计扣除' },
+                { key: 'scale', title: '从业人数与资产总额', why: '小微门槛看的是全年季度平均值，不是期末数 —— 期末突击裁员不改变这个数' },
+                { key: 'profit', title: '收入成本与纳税调整', why: '企业所得税算的是利润不是收入：超限额的招待费、广宣费、捐赠要调增回利润' },
                 { key: 'deduction', title: '研发加计扣除与亏损弥补', why: '加计扣除能把应纳税所得额压回 300 万门槛内（整档掉到 5%）；亏损会过期，先填哪一年才知道还能不能抵' }
             ],
             pitfalls: [
-                '从业人数与资产总额按**全年季度平均值**判定（四个季度平均值的平均），**不是期末数** —— 12 月 31 日裁员到 300 人以下不改变判定结果',
-                '研发费用加计扣除直接减少应纳税所得额，够得着 300 万门槛时会**整档从 25% 掉回 5%**，边际收益是**跳变**的',
+                '从业人数与资产总额按全年季度平均值判定（四个季度平均值的平均），不是期末数 —— 12 月 31 日裁员到 300 人以下不改变判定结果',
+                '研发费用加计扣除直接减少应纳税所得额，够得着 300 万门槛时会整档从 25% 掉回 5%，边际收益是跳变的',
                 '已经稳在 5% 档的小微企业，100 万研发加计只省 5 万税；25% 档的企业省 25 万 —— 值不值得做归集，取决于离 300 万门槛多远',
-                '负面清单行业（烟草、住宿餐饮、批发零售、房地产、租赁商务服务、娱乐）**一律不得**加计扣除',
-                '以前年度亏损**会过期作废**：一般企业 5 年，当年具备高新 / 科技型中小企业资格的延长至 10 年',
-                '**科技型中小企业不减税率**（那是高新 15% 的事），它只把亏损结转年限从 5 年延长到 10 年',
-                '小微实际税负 **5% 是乘出来的**（减按 25% 计入 × 20% 税率）',
-                '三个门槛是「**且**」的关系且是**临界点**：300 万交 15 万，300.0001 万交约 75 万 —— 多 1 元利润多缴约 60 万税',
-                '纳税调整是**调增不是扣减**：超限额的业务招待费、广宣费、公益性捐赠要加回利润',
-                '广宣费超限额部分**无限期结转**，公益性捐赠超限额部分只**结转三年**（第四年作废）—— 两者不一样'
+                '负面清单行业（烟草、住宿餐饮、批发零售、房地产、租赁商务服务、娱乐）一律不得加计扣除',
+                '以前年度亏损会过期作废：一般企业 5 年，当年具备高新 / 科技型中小企业资格的延长至 10 年',
+                '科技型中小企业不减税率（那是高新 15% 的事），它只把亏损结转年限从 5 年延长到 10 年',
+                '小微实际税负 5% 是乘出来的（减按 25% 计入 × 20% 税率）',
+                '三个门槛是「且」的关系且是临界点：300 万交 15 万，300.0001 万交约 75 万 —— 多 1 元利润多缴约 60 万税',
+                '纳税调整是调增不是扣减：超限额的业务招待费、广宣费、公益性捐赠要加回利润',
+                '广宣费超限额部分无限期结转，公益性捐赠超限额部分只结转三年（第四年作废）—— 两者不一样'
             ],
             compute: function (v) {
                 var C = window.EuriskoCorporateQuick;
@@ -4138,7 +4183,7 @@
                     { label: '资产总额（全年季度平均值）', value: assets, kind: 'money' },
                     { label: '会计利润（收入 − 成本费用）', value: adjust.profit, kind: 'money' },
                     { label: '业务招待费调增', value: adjust.entertainment.addBack, kind: 'money',
-                        hint: '发生额 60% 与收入 5‰ 孰低后的差额' },
+                        hint: '发生额的 60% 与收入的 5‰，取小的那个；超出的部分要调增回来' },
                     { label: '广宣费调增', value: adjust.advertising.addBack, kind: 'money',
                         hint: '超收入 15% 的部分，结转以后年度' },
                     { label: '公益性捐赠调增', value: adjust.donation.addBack, kind: 'money',
@@ -4152,7 +4197,7 @@
                             ? '取得高新技术 / 科技型中小企业资格可延长至 10 年，能救回 ' + Math.round(carry.rescuable) + ' 元'
                             : '超过结转年限仍未弥补完的部分，不再抵税' },
                     { label: '应纳税所得额', value: r.taxable, kind: 'money' },
-                    { label: '适用身份', value: regimeText, kind: 'text', hint: '按税额孰优选取；小微与高新不叠加' },
+                    { label: '适用身份', value: regimeText, kind: 'text', hint: '哪个算出来的税低就用哪个；小微与高新不叠加' },
                     { label: '实际税负率', value: r.effectiveRate, kind: 'percent' },
                     { label: '若不做研发费用归集（无加计扣除）', value: rNoRd.tax, kind: 'money',
                         hint: '所得额 ' + Math.round(noRd) + ' 元 → '
@@ -4174,34 +4219,34 @@
                     });
                 }
 
-                var note = '从业人数与资产总额按**全年季度平均值**判定：'
+                var note = '从业人数与资产总额按全年季度平均值判定：'
                     + staffAvg.quarters.map(function (x) { return Math.round(x); }).join(' / ')
                     + ' → 平均 ' + Math.round(staff * 100) / 100 + ' 人（期末 '
-                    + Math.round(staffAvg.yearEnd) + ' 人**不作数**）。';
+                    + Math.round(staffAvg.yearEnd) + ' 人不作数）。';
                 note += ' 会计利润 ' + Math.round(profit) + ' 元，三大限额调增 '
                     + Math.round(adjust.totalAddBack) + ' 元 → ' + Math.round(afterAdjust) + ' 元。';
                 if (rd.superDeduction > 0) {
                     note += ' 研发加计扣除 ' + Math.round(rd.superDeduction) + ' 元后为 '
                         + Math.round(afterRd) + ' 元';
                 } else if (rd.excluded) {
-                    note += ' ⚠️ ' + rd.excludedLabel + '属于负面清单行业，**不得**加计扣除';
+                    note += ' ⚠️ ' + rd.excludedLabel + '属于负面清单行业，不得加计扣除';
                 }
                 if (carry.total > 0) note += '，再弥补亏损 ' + Math.round(carry.total) + ' 元';
-                note += ' → **应纳税所得额 ' + Math.round(taxable) + ' 元**，按' + regimeText + '，应纳 **'
-                    + Math.round(r.tax) + ' 元**。';
+                note += ' → 应纳税所得额 ' + Math.round(taxable) + ' 元，按' + regimeText + '，应纳 '
+                    + Math.round(r.tax) + ' 元。';
                 if (rdSaving > 0) {
                     note += ' 加计扣除省下 ' + Math.round(rdSaving) + ' 元'
                         + (regimeChanged
                             ? ' —— 而且不只是「少交一点」：它把应纳税所得额压回 ' + Math.round(taxableCap)
-                                + ' 元门槛以内，**整档从 ' + Math.round((rNoRd.effectiveRate || 0.25) * 100)
-                                + '% 掉到 ' + Math.round((r.effectiveRate || 0) * 100) + '%**'
+                                + ' 元门槛以内，整档从 ' + Math.round((rNoRd.effectiveRate || 0.25) * 100)
+                                + '% 掉到 ' + Math.round((r.effectiveRate || 0) * 100) + '%'
                             : '（一直在同一档，加计的边际收益就是这一档的税率）') + '。';
                 }
                 if (carry.expired > 0) {
-                    note += ' ⚠️ 有 ' + Math.round(carry.expired) + ' 元亏损**已过弥补期作废**'
+                    note += ' ⚠️ 有 ' + Math.round(carry.expired) + ' 元亏损已过弥补期作废'
                         + (carry.rescuable > 0 && !extended
                             ? '：取得高新技术企业或科技型中小企业资格可延长至 10 年，能救回 '
-                                + Math.round(carry.rescuable) + ' 元（科技型中小企业**不减税率**，只延长年限）'
+                                + Math.round(carry.rescuable) + ' 元（科技型中小企业不减税率，只延长年限）'
                             : '，超过结转年限未弥补完的部分不再抵税') + '。';
                 }
                 if (r.taxable > taxableCap && r.regime === 'general') {
@@ -4228,7 +4273,7 @@
                 }, {
                     title: '以前年度亏损弥补台账',
                     note: '一般企业结转 ' + carry.years + ' 年' + (carry.extended ? '（已延长至 ' + carry.extendedYears + ' 年）' : '')
-                        + '；先到期的先弥补，超期**作废**',
+                        + '；先到期的先弥补，超期作废',
                     table: {
                         head: ['亏损年度', '亏损额', '5 年到期年度', '延长后到期', '本次可抵', '结论'],
                         rows: carry.rows.length ? carry.rows.map(function (x) {
@@ -4241,7 +4286,7 @@
                     }
                 }, {
                     title: '三大扣除限额',
-                    note: '纳税调整是**调增**不是扣减 —— 超限额的部分要加回利润',
+                    note: '纳税调整是调增不是扣减 —— 超限额的部分要加回利润',
                     table: {
                         head: ['项目', '发生额', '扣除上限', '可扣除', '调增', '结转'],
                         rows: [
@@ -4282,7 +4327,7 @@
                         { label: '公益性捐赠调增', value: adjust.donation.addBack, format: 'money' },
                         { label: '调增后所得额', value: afterAdjust, format: 'money' }
                     ],
-                    footnote: '超限额的部分是**加回**利润，不是从利润里扣'
+                    footnote: '超限额的部分是加回利润，不是从利润里扣'
                 }, {
                     title: '研发费用加计扣除',
                     rows: [
@@ -4301,16 +4346,16 @@
                         { label: '已过弥补期作废', value: carry.expired, format: 'money' },
                         { label: '应纳税所得额', value: taxable, format: 'money' }
                     ],
-                    footnote: carry.expired > 0 ? '超期未弥补完的亏损**作废**，不再抵税' : '先到期的先弥补'
+                    footnote: carry.expired > 0 ? '超期未弥补完的亏损作废，不再抵税' : '先到期的先弥补'
                 }, {
-                    title: '适用税率与税额（孰优）',
+                    title: '适用税率与税额（哪个低用哪个）',
                     rows: [
                         { label: '一般企业 25%', value: r.statutoryTax, format: 'money' },
                         { label: '小型微利 5%（减按 25% 计入 × 20%）', value: r.smallTax === null ? 0 : r.smallTax, format: 'money' },
                         { label: '高新技术企业 15%', value: r.highTechTax === null ? 0 : r.highTechTax, format: 'money' },
                         { label: '应纳企业所得税', value: r.tax, format: 'money' }
                     ],
-                    footnote: '小微与高新不叠加，按税额孰优；小微三条件是「且」的关系'
+                    footnote: '小微与高新不叠加，哪个算出来的税低就用哪个；小微三个条件是「且」的关系'
                 }];
 
                 return { primary: primary, rows: rows, note: note, extras: extras, steps: steps };
@@ -4355,7 +4400,7 @@
             // 口径仍同源：基数上下限、五项费率、公积金免税额、累计预扣一律走
             // `EuriskoSocialQuick`（新增 wageBaseOf / housingTaxFreeOf / flexibleOf /
             // complianceGapOf 四个可复用函数，同样读 tax-constants）。
-            id: 'social-base-deep', name: '社保公积金',
+            id: 'social-base-deep', name: '社保公积金（全年基数）',
             subtitle: '上年度月平均定基数、公积金双上限定免税、申报差额定价',
             icon: 'fa-users', status: 'deep',
             nextTools: ['social-base', 'employer-cost', 'net-salary', 'salary-tax'],
@@ -4372,7 +4417,7 @@
                     when: { key: 'identity', in: ['employee'] } },
                 { key: 'annualBonus', step: 'base', label: '全年奖金（年终奖 / 季度奖 / 绩效奖）', type: 'money', default: 0, sample: 120000,
                     when: { key: 'identity', in: ['employee'] },
-                    hint: '奖金属于**工资总额**，要计入缴费基数口径 —— 速算器只按「税前月薪」算，这里补上' },
+                    hint: '奖金属于工资总额，要计入缴费基数口径 —— 速算器只按「税前月薪」算，这里补上' },
                 { key: 'monthlyAllowance', step: 'base', label: '月津贴补贴', type: 'money', default: 0,
                     when: { key: 'identity', in: ['employee'] } },
                 { key: 'monthlyOvertime', step: 'base', label: '月加班工资', type: 'money', default: 0,
@@ -4380,7 +4425,7 @@
                 { key: 'paidMonths', step: 'base', label: '上年度实际计薪月数', type: 'select', default: 12,
                     when: { key: 'identity', in: ['employee'] },
                     options: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(function (m) { return { value: m, label: m + ' 个月' }; }),
-                    hint: '上年度工作不满 12 个月的按**实际月数**平均（年中入职 / 新参加工作从起薪之月起）' },
+                    hint: '上年度工作不满 12 个月的按实际月数平均（年中入职 / 新参加工作从起薪之月起）' },
 
                 // 灵活就业：基数在 60%~300% 之间**自选**
                 { key: 'level', step: 'base', label: '缴费档次（社平工资的百分比）', type: 'select', default: 0.6,
@@ -4397,32 +4442,32 @@
                         { value: 'separate', label: '单独填写（部分地区上下限另行公布）' }] },
                 { key: 'housingBase', step: 'detail', label: '公积金缴存基数（元/月）', type: 'money', default: 0, sample: 30000,
                     when: { key: 'housingBaseMode', in: ['separate'] },
-                    hint: '超过社平 3 倍的部分，对应缴存额**不免个税**，要并入工资计税' },
+                    hint: '超过社平 3 倍的部分，对应缴存额不免个税，要并入工资计税' },
                 { key: 'specialMonthly', step: 'detail', label: '专项附加扣除（月）', type: 'money', default: 0,
                     when: { key: 'identity', in: ['employee'] } },
                 { key: 'declaredBase', step: 'detail', label: '单位实际申报的缴费基数', type: 'money', default: 0, sample: 4800,
                     when: { key: 'identity', in: ['employee'] },
-                    hint: '填 0 表示按上面核定的基数足额申报；低于实际基数即**未足额缴纳**' },
+                    hint: '填 0 表示按上面核定的基数足额申报；低于实际基数即未足额缴纳' },
                 { key: 'auditYears', step: 'detail', label: '假设被追溯的年数', type: 'number', default: 1, min: 1,
                     when: { key: 'identity', in: ['employee'] } }
             ],
             steps: [
-                { key: 'identity', title: '参保身份与社平工资', why: '单位职工与灵活就业是**两套制度**：前者单位与个人分担、有公积金，后者只能缴养老与医疗且**全部个人承担**，基数还是自选的' },
-                { key: 'base', title: '缴费基数核定', why: '单位职工的基数是**本人上年度月平均工资**（含奖金、津贴、加班），不是本月工资；基数一年一调，不是每月跟着工资变' },
-                { key: 'detail', title: '缴纳比例与申报基数', why: '公积金只有「比例 ≤12% 且基数 ≤ 社平 3 倍」的部分免征个税；申报基数低于实际基数要补缴并加收滞纳金', level: 'advanced' }
+                { key: 'identity', title: '参保身份与社平工资', why: '单位职工与灵活就业是两套制度：前者单位与个人分担、有公积金，后者只能缴养老与医疗且全部个人承担，基数还是自选的' },
+                { key: 'base', title: '缴费基数核定', why: '单位职工的基数是本人上年度月平均工资（含奖金、津贴、加班），不是本月工资；基数一年一调，不是每月跟着工资变' },
+                { key: 'detail', title: '缴纳比例与申报基数', why: '公积金只有「比例 ≤12% 且基数 ≤ 社平 3 倍」的部分免征个税；申报基数低于实际基数要补缴并加收滞纳金' }
             ],
             pitfalls: [
-                '缴费基数是**本人上年度月平均工资**，**不是本月工资** —— 奖金、津贴补贴、加班工资都属于工资总额，都要进基数口径',
-                '缴了 1 万月薪 + 12 万年终奖的人，法定基数是 **2 万**不是 1 万：个人侧一年差 **2.7 万**、单位侧差 **4.74 万**',
-                '基数**一年一调**（多数地区每年 7 月随上年度社平工资公布调整），不是每月跟着工资变',
-                '公积金免税的两个上限是「**且**」的关系：比例 ≤12% **且** 基数 ≤ 社平 3 倍，超出部分**并入工资计税**',
-                '公积金基数可与社保基数**不同**（部分地区上下限另行公布），超速算器没有这一栏，填不了',
-                '按最低基数申报是**未足额缴纳**：补缴 + 按日万分之五滞纳金（年化 **18.25%**）+ 欠缴数额 **1~3 倍**罚款',
-                '灵活就业养老按 **20%** 缴且**全部个人承担**，其中只有 **8% 进个人账户**、12% 进统筹',
-                '灵活就业的基数在社平 **60%~300% 之间自选**，与单位职工「按实际工资定」根本不同',
-                '**统筹部分不退还**：断缴、身故、出国定居只退还个人账户（8%）那一部分',
+                '缴费基数是本人上年度月平均工资，不是本月工资 —— 奖金、津贴补贴、加班工资都属于工资总额，都要进基数口径',
+                '缴了 1 万月薪 + 12 万年终奖的人，法定基数是 2 万不是 1 万：个人侧一年差 2.7 万、单位侧差 4.74 万',
+                '基数一年一调（多数地区每年 7 月随上年度社平工资公布调整），不是每月跟着工资变',
+                '公积金免税的两个上限是「且」的关系：比例 ≤12% 且 基数 ≤ 社平 3 倍，超出部分并入工资计税',
+                '公积金基数可与社保基数不同（部分地区上下限另行公布），超速算器没有这一栏，填不了',
+                '按最低基数申报是未足额缴纳：补缴 + 按日万分之五滞纳金（年化 18.25%）+ 欠缴数额 1~3 倍罚款',
+                '灵活就业养老按 20% 缴且全部个人承担，其中只有 8% 进个人账户、12% 进统筹',
+                '灵活就业的基数在社平 60%~300% 之间自选，与单位职工「按实际工资定」根本不同',
+                '统筹部分不退还：断缴、身故、出国定居只退还个人账户（8%）那一部分',
                 '工伤、生育个人不缴（生育已并入医保），算到手时扣掉就多扣了',
-                '缴费基数仍受 **60% 保底 / 300% 封顶**约束：工资 3000 按下限缴、工资 5 万只按 3 倍封顶数缴'
+                '缴费基数仍受 60% 保底 / 300% 封顶约束：工资 3000 按下限缴、工资 5 万只按 3 倍封顶数缴'
             ],
             compute: function (v) {
                 var S = window.EuriskoSocialQuick;
@@ -4440,11 +4485,11 @@
                         { label: '缴费基数（自选档次）', value: f.base, kind: 'money',
                             hint: '社平 ' + yuan(socialAverage) + ' × ' + Math.round(f.level * 100) + '%' },
                         { label: '养老保险（个人 / 月，20%）', value: f.pensionMonthly, kind: 'money',
-                            hint: '**全部个人承担**：单位职工是单位 16% + 个人 8%，灵活就业是 20% 一人出' },
+                            hint: '全部个人承担：单位职工是单位 16% + 个人 8%，灵活就业是 20% 一人出' },
                         { label: '其中：记入个人账户（8%）', value: f.personalAccountMonthly, kind: 'money',
                             hint: '这一部分才是「自己的」' },
                         { label: '其中：记入统筹基金（12%）', value: f.poolMonthly, kind: 'money',
-                            hint: '**不退还**：断缴、身故、出国定居都拿不回来' },
+                            hint: '不退还：断缴、身故、出国定居都拿不回来' },
                         { label: '职工医疗保险（个人 / 月）', value: f.medicalMonthly, kind: 'money',
                             hint: f.withMedical ? '比例 ' + pct(f.medicalRate) + '，由统筹地区确定' : '未勾选，不计入' },
                         { label: '月缴合计', value: f.monthlyTotal, kind: 'money' },
@@ -4465,7 +4510,7 @@
                             { label: '自选档次', value: Math.round(f.level * 100) + '%', format: 'text' },
                             { label: '缴费基数', value: f.base, format: 'money' }
                         ],
-                        footnote: '单位职工是「按本人上年度月平均工资定」，灵活就业是**自选** —— 这是两套制度最根本的差别'
+                        footnote: '单位职工是「按本人上年度月平均工资定」，灵活就业是自选 —— 这是两套制度最根本的差别'
                     }, {
                         title: '养老保险 20% 的拆分',
                         rows: [
@@ -4480,13 +4525,13 @@
                     var noteF = '灵活就业在当地社平 ' + yuan(socialAverage) + ' 元的 '
                         + Math.round(f.level * 100) + '% 档（基数 ' + yuan(f.base) + ' 元/月）参保：'
                         + '养老保险按 ' + pct(f.pensionRate) + ' 缴、' + yuan(f.pensionMonthly)
-                        + ' 元/月，**全部个人承担**（单位职工是单位 16% + 个人 8%）。'
+                        + ' 元/月，全部个人承担（单位职工是单位 16% + 个人 8%）。'
                         + '其中只有 ' + pct(f.personalAccountRate) + '（' + yuan(f.personalAccountMonthly)
                         + ' 元/月）进个人账户，剩下 ' + pct(f.poolRate) + '（' + yuan(f.poolMonthly)
-                        + ' 元/月）进统筹基金 —— **统筹部分不退还**。'
+                        + ' 元/月）进统筹基金 —— 统筹部分不退还。'
                         + (f.withMedical ? ' 加职工医保 ' + yuan(f.medicalMonthly) + ' 元/月，' : '')
-                        + '月缴合计 **' + yuan(f.monthlyTotal) + ' 元**、年缴 **' + yuan(f.annualTotal)
-                        + ' 元**，其中全年只有 **' + yuan(f.annualPersonalAccount) + ' 元**是自己的。';
+                        + '月缴合计 ' + yuan(f.monthlyTotal) + ' 元、年缴 ' + yuan(f.annualTotal)
+                        + ' 元，其中全年只有 ' + yuan(f.annualPersonalAccount) + ' 元是自己的。';
 
                     return {
                         primary: { label: '灵活就业月缴合计', value: f.monthlyTotal, kind: 'money',
@@ -4535,7 +4580,7 @@
                             + ' + 加班 ' + yuan(wb.monthlyOvertime) + '）× ' + wb.months + ' 个月 + 奖金 '
                             + yuan(wb.annualBonus) },
                     { label: '上年度月平均工资', value: wb.monthlyAverage, kind: 'money',
-                        hint: '工资总额 ÷ 实际计薪月数 ' + wb.months + ' 个月' },
+                        hint: '在职职工年平均工资：上年工资总额除以实际计薪月数 ' + wb.months + ' 个月' },
                     { label: '速算器口径（只按本月固定工资）', value: wb.naiveBase, kind: 'money',
                         hint: wb.gap > 0
                             ? '⚠️ 少算 ' + yuan(wb.gap) + ' 元基数 —— 速算器的字段就叫「税前月薪」，直接拿它当基数'
@@ -4568,8 +4613,8 @@
                 rows.push({ label: '到手（第 1 月）', value: n.net1, kind: 'money' });
                 rows.push({ label: '到手（第 12 月）', value: n.net12, kind: 'money',
                     hint: '累计预扣逐级跳档，比第 1 月少 ' + yuan(n.net1 - n.net12) + ' 元是正常结果' });
-                rows.push({ label: '全年个人缴纳', value: yr(s.personalTotal), kind: 'money', hint: '月缴 × 12' });
-                rows.push({ label: '全年单位缴纳', value: yr(s.employerTotal), kind: 'money', hint: '月缴 × 12' });
+                rows.push({ label: '全年个人缴纳', value: yr(s.personalTotal), kind: 'money', hint: '全年数：把月缴额乘 12 个月。\n计算公式：全年缴纳 = 月缴 × 12' });
+                rows.push({ label: '全年单位缴纳', value: yr(s.employerTotal), kind: 'money', hint: '全年数：把月缴额乘 12 个月。\n计算公式：全年缴纳 = 月缴 × 12' });
                 rows.push({ label: '全年个税', value: n.annualTax, kind: 'money' });
                 rows.push({ label: '员工全年到手', value: n.annualNet, kind: 'money' });
                 rows.push({ label: '企业全年用工成本（1 人）', value: yr(s.wage + s.employerTotal), kind: 'money' });
@@ -4585,29 +4630,29 @@
                         hint: '年化 ' + pct(comp.lateFeeDailyRate * 365) + '，按平均欠缴 ' + (comp.years / 2) + ' 年估算' });
                     rows.push({ label: '罚款（1 ~ 3 倍）', value: comp.penaltyMin + ' ~ ' + comp.penaltyMax, kind: 'text' });
                     rows.push({ label: '合计代价', value: comp.totalMin + ' ~ ' + comp.totalMax, kind: 'text',
-                        hint: '补缴 + 滞纳金 + 罚款；' + socialNote('compliance') });
+                        hint: '要补的三笔：税款、滞纳金、罚款' + socialNote('compliance') });
                 }
 
-                var note = '缴费基数是**本人上年度月平均工资**：上年度工资总额 ' + yuan(wb.annualTotal)
+                var note = '缴费基数是本人上年度月平均工资：上年度工资总额 ' + yuan(wb.annualTotal)
                     + ' 元 ÷ ' + wb.months + ' 个月 = ' + yuan(wb.monthlyAverage) + ' 元/月'
                     + (wb.clamped === 'below' ? '（低于社平 60%，按下限 ' + yuan(wb.base) + ' 元保底）'
                         : wb.clamped === 'above' ? '（高于社平 300%，按上限 ' + yuan(wb.base) + ' 元封顶）' : '')
-                    + ' → **缴费基数 ' + yuan(wb.base) + ' 元**。';
+                    + ' → 缴费基数 ' + yuan(wb.base) + ' 元。';
                 if (wb.gap > 0) {
-                    note += ' ⚠️ 速算器只按「税前月薪」算会得 ' + yuan(wb.naiveBase) + ' 元，**少算 '
-                        + yuan(wb.gap) + ' 元基数** —— 奖金、津贴、加班都属于工资总额，都要进这个口径。';
+                    note += ' ⚠️ 速算器只按「税前月薪」算会得 ' + yuan(wb.naiveBase) + ' 元，少算 '
+                        + yuan(wb.gap) + ' 元基数 —— 奖金、津贴、加班都属于工资总额，都要进这个口径。';
                 }
                 note += ' 公积金：基数 ' + yuan(hf.housingBase) + ' 元 × ' + pct(hf.housingRate) + ' = '
                     + yuan(hf.personal) + ' 元/月，其中免税 ' + yuan(hf.taxFree) + ' 元'
-                    + (hf.taxable > 0 ? '，**超标 ' + yuan(hf.taxable) + ' 元要并入工资计税**（基数超社平 3 倍）' : '')
+                    + (hf.taxable > 0 ? '，超标 ' + yuan(hf.taxable) + ' 元要并入工资计税（基数超社平 3 倍）' : '')
                     + '。';
-                note += ' 个人五险一金 **' + yuan(s.personalTotal) + ' 元/月**，单位 **'
-                    + yuan(s.employerTotal) + ' 元/月**。';
+                note += ' 个人五险一金 ' + yuan(s.personalTotal) + ' 元/月，单位 '
+                    + yuan(s.employerTotal) + ' 元/月。';
                 if (!comp.compliant) {
                     note += ' ⚠️ 单位按 ' + yuan(comp.declaredBase) + ' 元申报（比核定基数低 '
                         + yuan(comp.gapBase) + ' 元）：一年少缴 ' + yuan(comp.annualGap) + ' 元，追溯 '
-                        + comp.years + ' 年的代价是 **' + yuan(comp.totalMin) + ' ~ ' + yuan(comp.totalMax)
-                        + ' 元**（补缴 + 滞纳金 + 1~3 倍罚款）。';
+                        + comp.years + ' 年的代价是 ' + yuan(comp.totalMin) + ' ~ ' + yuan(comp.totalMax)
+                        + ' 元（补缴 + 滞纳金 + 1~3 倍罚款）。';
                 }
 
                 var extras = [{
@@ -4665,7 +4710,7 @@
                     title: '本人上年度月平均工资 → 缴费基数',
                     rows: [
                         { label: '上年度工资总额', value: wb.annualTotal, format: 'money',
-                            note: '（月工资 + 津贴补贴 + 加班工资）× 计薪月数 + 全年奖金' },
+                            note: '工资总额（税前、含代扣的个人社保公积金）：按（月工资 + 津贴补贴 + 加班工资）× 计薪月数 + 全年奖金 计算' },
                         { label: '实际计薪月数', value: wb.months, format: 'text' },
                         { label: '上年度月平均工资', value: wb.monthlyAverage, format: 'money' },
                         { label: '速算器口径（只按本月工资）', value: wb.naiveBase, format: 'money' },
@@ -4693,7 +4738,7 @@
                         { label: '免税部分', value: hf.taxFree, format: 'money' },
                         { label: '超标并入工资计税', value: hf.taxable, format: 'money' }
                     ],
-                    footnote: '比例 ≤12% **且** 基数 ≤ 社平 3 倍，两个条件都满足才免征个税'
+                    footnote: '比例 ≤12% 且 基数 ≤ 社平 3 倍，两个条件都满足才免征个税'
                 }, {
                     title: '申报基数差额与代价',
                     rows: [
@@ -4756,7 +4801,7 @@
             //
             // 口径仍同源：三处调整、多税目从高、先贴 5 元、账簿增加额一律走 `EuriskoSurtaxQuick`
             // （新增 surtaxBaseOf / stampMixedOf / stampSettlementOf / accountBookOf 四个可复用函数）。
-            id: 'surtax-stamp-deep', name: '附加税与印花税',
+            id: 'surtax-stamp-deep', name: '附加税与印花税（逐笔核定）',
             subtitle: '实缴增值税的三处调整、多税目从高、账簿只对增加额',
             icon: 'fa-tags', status: 'deep',
             nextTools: ['surtax-stamp', 'vat', 'corporate-income-tax', 'business-income'],
@@ -4768,11 +4813,11 @@
                         { value: 'surtaxSmall', label: '附加税（小规模纳税人）' },
                         { value: 'stamp', label: '印花税' }
                     ],
-                    hint: '附加税跟着**实际缴纳的增值税**走、印花税跟着**凭证金额**走 —— 两个基数不是一个口径，先定算哪一项' },
+                    hint: '附加税跟着实际缴纳的增值税走、印花税跟着凭证金额走 —— 两个基数不是一个口径，先定算哪一项' },
                 { key: 'location', step: 'identity', label: '纳税人所在地', type: 'select', default: 'urban',
                     options: [{ value: 'urban', label: '市区（城建税 7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }],
                     when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] },
-                    hint: '三档按**所在地**划分，不是按企业规模' },
+                    hint: '三档按所在地划分，不是按企业规模' },
                 { key: 'signedWhere', step: 'identity', label: '凭证书立地', type: 'select', default: 'domestic',
                     options: [{ value: 'domestic', label: '境内书立' }, { value: 'overseas', label: '境外书立、境内使用' }],
                     when: { key: 'variant', in: ['stamp'] },
@@ -4783,16 +4828,16 @@
                     when: { key: 'variant', in: ['surtaxGeneral'] }, hint: surtaxNote('base') },
                 { key: 'quarterlySales', step: 'basis', label: '本季度销售额', type: 'money', default: 0, sample: 280000,
                     when: { key: 'variant', in: ['surtaxSmall'] },
-                    hint: '季度销售额 ≤ 30 万（月 10 万）**免征增值税 → 附加税跟着免**；超过后按 1% 征收率缴增值税' },
+                    hint: '季度销售额 ≤ 30 万（月 10 万）免征增值税 → 附加税跟着免；超过后按 1% 征收率缴增值税' },
                 { key: 'creditRefund', step: 'basis', label: '本期收到的增值税期末留抵退税', type: 'money', default: 0, sample: 30000,
                     when: { key: 'variant', in: ['surtaxGeneral'] },
-                    hint: surtaxNote('credit') + ' —— **要扣**' },
+                    hint: surtaxNote('credit') + ' —— 要扣' },
                 { key: 'instantRefund', step: 'basis', label: '本期收到的即征即退 / 先征后返退税', type: 'money', default: 0,
                     when: { key: 'variant', in: ['surtaxGeneral'] },
-                    hint: surtaxNote('instant') + ' —— **不扣**，与留抵退税方向相反' },
+                    hint: surtaxNote('instant') + ' —— 不扣，与留抵退税方向相反' },
                 { key: 'importVat', step: 'basis', label: '进口环节 / 代扣代缴的增值税', type: 'money', default: 0,
                     when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] },
-                    hint: surtaxNote('importVat') + ' —— **不附征**' },
+                    hint: surtaxNote('importVat') + ' —— 不附征' },
                 { key: 'consumption', step: 'basis', label: '实际缴纳的消费税', type: 'money', default: 0,
                     when: { key: 'variant', in: ['surtaxGeneral', 'surtaxSmall'] } },
 
@@ -4823,7 +4868,7 @@
                     when: { key: 'stampMode', in: ['mixed'] }, hint: stampNote('mixed') },
                 { key: 'settledAmount', step: 'basis', label: '实际结算金额', type: 'money', default: 0, sample: 10000000,
                     when: { key: 'stampMode', in: ['undetermined'] },
-                    hint: '签订时金额未列明的先按 **5 元**贴花，结算时按实际金额计税、**多退少补**' },
+                    hint: '签订时金额未列明的先按 5 元贴花，结算时按实际金额计税、多退少补' },
                 { key: 'prevCapital', step: 'basis', label: '上年末实收资本（股本）+ 资本公积', type: 'money', default: 0, sample: 5000000,
                     when: { key: 'stampMode', in: ['capital'] } },
                 { key: 'currCapital', step: 'basis', label: '本年末实收资本（股本）+ 资本公积', type: 'money', default: 0, sample: 8000000,
@@ -4833,22 +4878,22 @@
                     hint: surtaxNote('halveExpiry') }
             ],
             steps: [
-                { key: 'identity', title: '算哪一项与所在地', why: '附加税跟着**实际缴纳的增值税**走、印花税跟着**凭证金额**走；城建税三档按**所在地**划分，不是按企业规模' },
-                { key: 'basis', title: '实缴增值税的三处调整 / 凭证金额与税目', why: '留抵退税**要扣**、即征即退**不扣**、进口代扣代缴**不附征** —— 三处方向不同；印花税同一凭证多税目未分别列明要**从高**' },
+                { key: 'identity', title: '算哪一项与所在地', why: '附加税跟着实际缴纳的增值税走、印花税跟着凭证金额走；城建税三档按所在地划分，不是按企业规模' },
+                { key: 'basis', title: '实缴增值税的三处调整 / 凭证金额与税目', why: '留抵退税要扣、即征即退不扣、进口代扣代缴不附征 —— 三处方向不同；印花税同一凭证多税目未分别列明要从高' },
                 { key: 'policy', title: '减半与到期对照', why: '“六税两费”减半执行至 2027-12-31，做三年预算不能只按减半后的数估' }
             ],
             pitfalls: [
-                '附加税的计税依据是**依法实际缴纳**的增值税 + 消费税，不是申报表的应纳数，更不是销售额',
-                '**留抵退税要扣**、**即征即退不扣**（已缴的附加税也不退还）—— 同样是退税，处理方向相反',
-                '进口货物或境外单位向境内销售劳务、服务、无形资产缴纳的增值税**不征收**城建税，不要把它算进计税依据',
-                '小规模纳税人季度销售额 ≤ 30 万（月 10 万）**免征增值税 → 附加税跟着免**，且是整段跳变不是渐进',
-                '同一凭证载有两个以上税目：**未分别列明金额的从高适用**税率 —— 合同里多写几行金额就能省下这笔钱',
-                '印花税计税依据**不含单独列明的增值税**；没列明的按合同全额计征',
-                '营业账簿只对**增加部分**计税，不是每年按实收资本 + 资本公积总额重贴一遍（误算会多缴）',
-                '签订时**金额未列明**的先按 **5 元**贴花，结算时按实际金额**多退少补** —— 不是「等结算完再贴」',
-                '**境外书立、境内使用**的应税凭证同样要贴花，不是「国外签的合同就不用贴」',
-                '证券交易印花税**不享受**六税两费减半，且**只对出让方**征收',
-                '“六税两费”减半执行至 **2027-12-31**，到期后若无延续文件恢复按法定税率全额征收'
+                '附加税的计税依据是依法实际缴纳的增值税 + 消费税，不是申报表的应纳数，更不是销售额',
+                '留抵退税要扣、即征即退不扣（已缴的附加税也不退还）—— 同样是退税，处理方向相反',
+                '进口货物或境外单位向境内销售劳务、服务、无形资产缴纳的增值税不征收城建税，不要把它算进计税依据',
+                '小规模纳税人季度销售额 ≤ 30 万（月 10 万）免征增值税 → 附加税跟着免，且是整段跳变不是渐进',
+                '同一凭证载有两个以上税目：未分别列明金额的从高适用税率 —— 合同里多写几行金额就能省下这笔钱',
+                '印花税计税依据不含单独列明的增值税；没列明的按合同全额计征',
+                '营业账簿只对增加部分计税，不是每年按实收资本 + 资本公积总额重贴一遍（误算会多缴）',
+                '签订时金额未列明的先按 5 元贴花，结算时按实际金额多退少补 —— 不是「等结算完再贴」',
+                '境外书立、境内使用的应税凭证同样要贴花，不是「国外签的合同就不用贴」',
+                '证券交易印花税不享受六税两费减半，且只对出让方征收',
+                '“六税两费”减半执行至 2027-12-31，到期后若无延续文件恢复按法定税率全额征收'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSurtaxQuick;
@@ -4871,7 +4916,7 @@
                         var ab = Q.accountBookOf({ prevCapital: v.prevCapital, currCapital: v.currCapital, halve: halve });
                         return {
                             primary: { label: '应纳印花税（营业账簿）', value: ab.tax, kind: 'money',
-                                hint: '实收资本（股本）+ 资本公积**增加额** ' + yuan(ab.increment) + ' 元 × ' + ab.rateText },
+                                hint: '营业账簿印花税的计税依据：实收资本（股本）与资本公积的增加额（只对增加的部分计税） ' + yuan(ab.increment) + ' 元 × ' + ab.rateText },
                             rows: overseasRow.concat([
                                 { label: '上年末实收资本（股本）+ 资本公积', value: ab.prevCapital, kind: 'money' },
                                 { label: '本年末实收资本（股本）+ 资本公积', value: ab.currCapital, kind: 'money' },
@@ -4881,16 +4926,16 @@
                                 { label: '法定税额（未减半）', value: ab.statutoryTax, kind: 'money' },
                                 { label: '减半优惠', value: Math.max(ab.statutoryTax - ab.tax, 0), kind: 'money' },
                                 { label: '若误按本年末全额贴（错）', value: ab.fullTax, kind: 'money',
-                                    hint: ab.gap > 0 ? '⚠️ **多缴 ' + yuan(ab.gap) + ' 元** —— 账簿只对增加部分计税' : '与按增加额一致' }
+                                    hint: ab.gap > 0 ? '⚠️ 多缴 ' + yuan(ab.gap) + ' 元 —— 账簿只对增加部分计税' : '与按增加额一致' }
                             ]),
-                            note: '营业账簿按实收资本（股本）、资本公积**合计金额的增加部分**计税：'
-                                + yuan(ab.currCapital) + ' − ' + yuan(ab.prevCapital) + ' = **' + yuan(ab.increment)
-                                + ' 元** × ' + ab.rateText + ' = ' + yuan(ab.tax) + ' 元'
+                            note: '营业账簿按实收资本（股本）、资本公积合计金额的增加部分计税：'
+                                + yuan(ab.currCapital) + ' − ' + yuan(ab.prevCapital) + ' = ' + yuan(ab.increment)
+                                + ' 元 × ' + ab.rateText + ' = ' + yuan(ab.tax) + ' 元'
                                 + (halve ? '（减半后）' : '（未享受减半）')
                                 + '。不是每年按总额重贴一遍 —— 误按 ' + yuan(ab.currCapital)
                                 + ' 元全额贴是 ' + yuan(ab.fullTax) + ' 元，'
-                                + (ab.gap > 0 ? '**多缴 ' + yuan(ab.gap) + ' 元**' : '两者一致')
-                                + (ab.decreased ? '。注意：本年末**低于**上年末，增加额为 0，本年无需贴花（减少不退税）' : '')
+                                + (ab.gap > 0 ? '**多缴 ' + yuan(ab.gap) + ' 元' : '两者一致')
+                                + (ab.decreased ? '。注意：本年末低于上年末，增加额为 0，本年无需贴花（减少不退税）' : '')
                                 + '。',
                             extras: [{
                                 title: '营业账簿：按增加额 vs 按总额（误算会多缴）',
@@ -4947,12 +4992,12 @@
                                     hint: st.topUp > 0 ? '结算金额大于已贴部分，需补缴' : st.topUp < 0 ? '可申请退还 ' + yuan(st.refundable) + ' 元' : '刚好' },
                                 { label: '法定税额（未减半）', value: s0.statutoryTax, kind: 'money' }
                             ]),
-                            note: '签订时金额未列明的应税凭证，先按 **' + yuan(st.prepaid) + ' 元**贴花，'
-                                + '以后结算时再按实际金额计税、**多退少补**。本次实际结算 '
+                            note: '签订时金额未列明的应税凭证，先按 ' + yuan(st.prepaid) + ' 元贴花，'
+                                + '以后结算时再按实际金额计税、多退少补。本次实际结算 '
                                 + yuan(st.settledAmount) + ' 元（' + s0.name + ' ' + s0.rateText + '）'
                                 + ' → 应纳税额 ' + yuan(st.tax) + ' 元，'
-                                + (st.topUp > 0 ? '**应补 ' + yuan(st.topUp) + ' 元**'
-                                    : st.topUp < 0 ? '**可申请退还 ' + yuan(st.refundable) + ' 元**' : '不需补退')
+                                + (st.topUp > 0 ? '**应补 ' + yuan(st.topUp) + ' 元'
+                                    : st.topUp < 0 ? '**可申请退还 ' + yuan(st.refundable) + ' 元' : '不需补退')
                                 + '。注意：签的时候就该贴那 5 元，等结算完才贴，中间这段时间属于未按规定贴花。',
                             extras: [{
                                 title: '未列明金额：先贴 5 元，结算多退少补',
@@ -4999,13 +5044,13 @@
                         var f2 = mx.second;
                         return {
                             primary: { label: '应纳印花税（同一凭证多税目）', value: mx.tax, kind: 'money',
-                                hint: mx.separatelyStated ? '分别列明金额，分别适用税率' : '未分别列明金额，**从高**适用 ' + mx.higherRateText },
+                                hint: mx.separatelyStated ? '分别列明金额，分别适用税率' : '未分别列明金额，从高适用 ' + mx.higherRateText },
                             rows: overseasRow.concat([
                                 { label: '税目一', value: f1.name + '（' + f1.rateText + '）', kind: 'text' },
                                 { label: '税目一计税金额', value: f1.base, kind: 'money' },
                                 { label: '税目二', value: f2.name + '（' + f2.rateText + '）', kind: 'text' },
                                 { label: '税目二计税金额', value: f2.base, kind: 'money' },
-                                { label: '是否分别列明金额', value: mx.separatelyStated ? '是（分别适用税率）' : '否（**从高适用**）', kind: 'text' },
+                                { label: '是否分别列明金额', value: mx.separatelyStated ? '是（分别适用税率）' : '否（从高适用）', kind: 'text' },
                                 { label: '分别列明时应纳', value: mx.separated, kind: 'money' },
                                 { label: '未分别列明时（从高 ' + mx.higherRateText + '）', value: mx.merged, kind: 'money',
                                     hint: '合并金额 ' + yuan(mx.mergedAmount) + ' 元 × ' + mx.higherRateText },
@@ -5017,10 +5062,10 @@
                                 + (mx.separatelyStated
                                     ? '**分别列明金额**的分别适用税率 —— ' + f1.name + ' ' + yuan(f1.base) + ' 元 × '
                                         + f1.rateText + ' + ' + f2.name + ' ' + yuan(f2.base) + ' 元 × ' + f2.rateText
-                                        + ' = **' + yuan(mx.separated) + ' 元**'
+                                        + ' = ' + yuan(mx.separated) + ' 元'
                                     : '**未分别列明金额**的**从高适用**税率 —— 合并 ' + yuan(mx.mergedAmount)
-                                        + ' 元 × ' + mx.higherRateText + '（' + mx.higherName + '）= **' + yuan(mx.merged) + ' 元**')
-                                + '。两种写法差 **' + yuan(mx.gap) + ' 元**'
+                                        + ' 元 × ' + mx.higherRateText + '（' + mx.higherName + '）= ' + yuan(mx.merged) + ' 元')
+                                + '。两种写法差 ' + yuan(mx.gap) + ' 元'
                                 + (mx.gap > 0 ? ' —— 这一行金额写不写清楚，直接决定缴多少。' : '。')
                                 + '另：计税依据不含单独列明的增值税。',
                             extras: [{
@@ -5081,9 +5126,9 @@
                         note: s.name + '按应税凭证所列金额 ' + yuan(s.amount) + ' 元'
                             + (s.vat > 0 ? '（扣除单独列明的增值税 ' + yuan(s.vat) + ' 元）' : '')
                             + '计税 = ' + yuan(s.base) + ' 元 × ' + s.rateText
-                            + ' = **' + yuan(s.tax) + ' 元**'
-                            + (halve && !s.halveApplicable ? '（证券交易印花税**不享受**六税两费减半）' : '')
-                            + '。若这份凭证还载有其他税目事项，未分别列明金额的会**从高适用**税率；'
+                            + ' = ' + yuan(s.tax) + ' 元'
+                            + (halve && !s.halveApplicable ? '（证券交易印花税不享受六税两费减半）' : '')
+                            + '。若这份凭证还载有其他税目事项，未分别列明金额的会从高适用税率；'
                             + '签订时金额未列明的先按 5 元贴花、结算时多退少补。',
                         extras: [{
                             title: '六税两费减半范围（证券交易不在内）',
@@ -5105,7 +5150,7 @@
                                     ['同一凭证两个以上税目（分别列明）', '分别适用各自税率'],
                                     ['同一凭证两个以上税目（未分别列明）', '**从高适用**税率'],
                                     ['签订时金额未列明', '先按 5 元贴花，结算时多退少补'],
-                                    ['营业账簿', '只对**增加部分**计税（0.25‰）']
+                                    ['营业账簿', '只对增加部分计税（0.25‰）']
                                 ]
                             }
                         }],
@@ -5154,7 +5199,7 @@
                 ];
                 if (isSmall) {
                     rows.push({ label: '本季度销售额', value: b.quarterlySales, kind: 'money',
-                        hint: b.smallExempt ? '≤ 30 万，免征增值税 → **附加税跟着免**' : '> 30 万，按 1% 征收率缴增值税' });
+                        hint: b.smallExempt ? '≤ 30 万，免征增值税 → 附加税跟着免' : '> 30 万，按 1% 征收率缴增值税' });
                     rows.push({ label: '实际缴纳的增值税（1% 征收率）', value: b.smallVat, kind: 'money' });
                 } else {
                     rows.push({ label: '申报期实际缴纳的增值税（境内）', value: b.vatPayable, kind: 'money' });
@@ -5180,7 +5225,7 @@
                     hint: surtaxNote('halveExpiry') });
                 if (b.instantRefund > 0) {
                     rows.push({ label: '本期即征即退 / 先征后返退税', value: b.instantRefund, kind: 'money',
-                        hint: surtaxNote('instant') + ' —— **不扣**，与留抵退税方向相反' });
+                        hint: surtaxNote('instant') + ' —— 不扣，与留抵退税方向相反' });
                 }
                 if (b.importVat > 0) {
                     rows.push({ label: '进口环节 / 代扣代缴的增值税', value: b.importVat, kind: 'money',
@@ -5189,22 +5234,22 @@
                 rows.push({ label: '按错误口径（含进口、不扣留抵退税）应缴', value: rNaive.total, kind: 'money',
                     hint: rNaive.total !== r.total ? '差 ' + yuan(rNaive.total - r.total) + ' 元' : '与法定口径一致' });
 
-                var note = '附加税以**依法实际缴纳**的增值税、消费税为计税依据：'
+                var note = '附加税以依法实际缴纳的增值税、消费税为计税依据：'
                     + (isSmall
                         ? '本季度销售额 ' + yuan(b.quarterlySales) + ' 元'
-                            + (b.smallExempt ? ' ≤ 30 万，**免征增值税 → 附加税跟着免**' : ' > 30 万，按 1% 征收率缴增值税 ' + yuan(b.smallVat) + ' 元')
+                            + (b.smallExempt ? ' ≤ 30 万，免征增值税 → 附加税跟着免' : ' > 30 万，按 1% 征收率缴增值税 ' + yuan(b.smallVat) + ' 元')
                         : '境内实际缴纳增值税 ' + yuan(b.vatPayable) + ' 元'
                             + (b.deductedCredit > 0 ? ' − 留抵退税 ' + yuan(b.deductedCredit) + ' 元' : ''))
                     + (b.consumption > 0 ? ' + 消费税 ' + yuan(b.consumption) + ' 元' : '')
-                    + ' = **' + yuan(b.base) + ' 元**'
-                    + (b.instantRefund > 0 ? '（即征即退 ' + yuan(b.instantRefund) + ' 元**不扣**）' : '')
-                    + (b.importVat > 0 ? '；进口 / 代扣代缴的 ' + yuan(b.importVat) + ' 元**不附征**' : '')
+                    + ' = ' + yuan(b.base) + ' 元'
+                    + (b.instantRefund > 0 ? '（即征即退 ' + yuan(b.instantRefund) + ' 元不扣）' : '')
+                    + (b.importVat > 0 ? '；进口 / 代扣代缴的 ' + yuan(b.importVat) + ' 元不附征' : '')
                     + '。' + r.locationLabel + '：城建税 ' + pct(r.cityRate) + ' + 教育费附加 3% + 地方教育附加 2%'
                     + ' = ' + pct(r.statutoryRate)
                     + (halve ? '，六税两费减半后 ' + pct(r.effectiveRate) : '')
-                    + ' → **' + yuan(r.total) + ' 元**'
+                    + ' → ' + yuan(r.total) + ' 元'
                     + (b.gap > 0 ? '。若误按申报表应纳数 ' + yuan(b.naiveBase) + ' 元算，会缴 ' + yuan(rNaive.total)
-                        + ' 元，**多缴 ' + yuan(rNaive.total - r.total) + ' 元**' : '')
+                        + ' 元，多缴 ' + yuan(rNaive.total - r.total) + ' 元' : '')
                     + '。另：减半执行至 2027-12-31，到期后按 ' + yuan(rFull.total) + ' 元征收。';
 
                 var compareRows = Object.keys(r.compare).map(function (k) {
@@ -5237,7 +5282,7 @@
                         }
                     }, {
                         title: '三档所在地的综合负担率（城建税按所在地，不按企业规模）',
-                        note: '市区 7% + 教育费附加 3% + 地方教育附加 2% = 12%；县城、镇 10%；其他 6%',
+                        note: '城建税及两项附加按纳税人所在地分档：市区 7% + 教育费附加 3% + 地方教育附加 2% = 12%；县城、镇 10%；其他 6%',
                         table: {
                             head: ['所在地', '法定综合负担率', halve ? '减半后' : '实际执行', '应缴附加税费'],
                             rows: compareRows
@@ -5291,7 +5336,7 @@
                             { label: '教育费附加', value: r.educationTax, format: 'money' },
                             { label: '地方教育附加', value: r.localEducationTax, format: 'money' }
                         ],
-                        footnote: '三档按**纳税人所在地**划分（市区 7% / 县城、镇 5% / 其他 1%），不是按企业规模'
+                        footnote: '三档按纳税人所在地划分（市区 7% / 县城、镇 5% / 其他 1%），不是按企业规模'
                     }, {
                         title: '④ 六税两费减半与到期对照',
                         rows: [
@@ -5353,7 +5398,7 @@
             // 口径仍同源：人数折算、招人对照、工资总额口径一律走 `EuriskoDisabilityFundQuick`
             // （新增 headcountOf / exemptPlanOf / hireCompareOf / unionBaseOf 四个可复用函数），
             // 单位社保公积金费率读 `socialInsuranceRules`（与 17C-3 同一个源）。
-            id: 'disability-fund-deep', name: '残保金与工会经费',
+            id: 'disability-fund-deep', name: '残保金与工会经费（按年申报）',
             subtitle: '上年月平均定人数、招人成本定价、工资总额两头都不夹',
             icon: 'fa-wheelchair', status: 'deep',
             nextTools: ['disability-fund', 'employer-cost', 'social-base', 'corporate-income-tax'],
@@ -5362,7 +5407,7 @@
                 { key: 'variant', step: 'target', label: '算哪一项', type: 'select', default: 'levy',
                     options: [{ value: 'levy', label: '残疾人就业保障金' }, { value: 'union', label: '工会经费' }] },
                 { key: 'socialAverage', step: 'target', label: '当地社平工资（月）', type: 'money', default: 0, sample: 8000,
-                    hint: '残保金：年平均工资按社平 **2 倍**封顶（不是社保那个 300%）；工会经费：用于对照社保缴费基数' },
+                    hint: '残保金：年平均工资按社平 2 倍封顶（不是社保那个 300%）；工会经费：用于对照社保缴费基数' },
 
                 // 残保金：上年月平均在职职工人数（不是年末在册）
                 { key: 'regularCount', step: 'base', label: '常年用工人数（全年在岗）', type: 'number', default: 25, min: 0,
@@ -5377,7 +5422,7 @@
                     when: { key: 'variant', in: ['levy'] } },
                 { key: 'dispatchHere', step: 'base', label: '派遣用工由本单位计入', type: 'switch', default: false,
                     when: { key: 'variant', in: ['levy'] },
-                    hint: '由派遣单位与用工单位**协商计入一方**，不得重复计算 —— 这一项能把人数整段降下来' },
+                    hint: '由派遣单位与用工单位协商计入一方，不得重复计算 —— 这一项能把人数整段降下来' },
 
                 // 工会经费：全年工资总额（国家统计局口径，无保底无封顶）
                 { key: 'monthlyWage', step: 'base', label: '月固定工资', type: 'money', default: 0, sample: 30000,
@@ -5393,7 +5438,7 @@
 
                 { key: 'avgAnnualWage', step: 'detail', label: '上年在职职工年平均工资', type: 'money', default: 0, sample: 120000,
                     when: { key: 'variant', in: ['levy'] },
-                    hint: feeNote('wageCap') + '；口径按国家统计局《工资总额组成的规定》：**含奖金、津贴、加班**' },
+                    hint: feeNote('wageCap') + '；口径按国家统计局《工资总额组成的规定》：含奖金、津贴、加班' },
                 { key: 'disabled', step: 'detail', label: '已安排残疾人数', type: 'number', default: 0, min: 0,
                     when: { key: 'variant', in: ['levy'] } },
                 { key: 'hireAnnualWage', step: 'detail', label: '拟招岗位年薪', type: 'money', default: 0, sample: 120000,
@@ -5406,23 +5451,23 @@
                     hint: feeNote('unionDeduction') + '；填 0 表示按法定 2% 拨缴' }
             ],
             steps: [
-                { key: 'target', title: '算哪一项与社平工资', why: '残保金看**上年在职职工人数**、工会经费看**全年工资总额** —— 两个基数不是一个口径，先定算哪一项' },
-                { key: 'base', title: '上年月平均在职人数 / 全年工资总额', why: '残保金的在职人数是**上年各月之和 ÷ 12**（季节性用工折算、派遣择一计入），不是年末在册；工会经费的工资总额**没有 60% 保底与 300% 封顶**' },
-                { key: 'detail', title: '分档减缴与招人定价 / 拨缴与扣除', why: '「招几个才免征」取决于人数（100 人是第二个临界点）；招残疾人 vs 缴残保金是**定价**问题，两种情形要分开答；工会经费**计提 ≠ 扣除**' }
+                { key: 'target', title: '算哪一项与社平工资', why: '残保金看上年在职职工人数、工会经费看全年工资总额 —— 两个基数不是一个口径，先定算哪一项' },
+                { key: 'base', title: '上年月平均在职人数 / 全年工资总额', why: '残保金的在职人数是上年各月之和 ÷ 12（季节性用工折算、派遣择一计入），不是年末在册；工会经费的工资总额没有 60% 保底与 300% 封顶' },
+                { key: 'detail', title: '分档减缴与招人定价 / 拨缴与扣除', why: '「招几个才免征」取决于人数（100 人是第二个临界点）；招残疾人 vs 缴残保金是定价问题，两种情形要分开答；工会经费计提 ≠ 扣除' }
             ],
             pitfalls: [
-                '在职职工人数是**上年各月在职人数之和 ÷ 12**，不是年末在册 —— 常年 25 人看着免征，法定月平均 **45 人** → 一年 **7.29 万**',
-                '季节性用工要**折算年平均人数**（人数 × 月数 ÷ 12），劳务派遣由派遣单位与用工单位**协商计入一方**、不得重复',
-                '这个「年度平均」与 17C-2 企业所得税的从业人数**公式不同**：cit 是（季初 + 季末）÷ 2 再 ÷ 4，残保金是各月之和 ÷ 12',
-                '**100 人是第二个临界点**：1 名残疾人达到 1.5% 需要 ≤ **66 人**、达到 1% 需要 ≤ **100 人**，101 人以上招 1 个人连减半档都够不着',
-                '**先安排第一个残疾人的减缴效果远高于后续**：分档减缴是边际递减的（100 人公司第 1 人省 13.2 万、第 2 人只省 3 万；45 人公司第 1 人省 7.29 万、第 2 人一分钱都省不了）',
-                '**岗位本来就要招人** → 招残疾人净省全额残保金；**专为省残保金增设岗位** → 净亏（雇一个人要付 1.395 倍工资）',
-                '专门招一个人是否划算，看拟招岗位年薪 ≤ 残保金减少额 ÷ 1.395 —— 100 人公司的盈亏平衡年薪是 **9.46 万**',
-                '工会经费的基数是**工资总额**，与社保缴费基数**两个方向都不同**：月薪 3 万社保封顶 2.4 万、月薪 3000 社保保底 4800',
-                '工会经费**计提 ≠ 扣除**：企税扣除要凭《工会经费收入专用收据》，超提部分不得扣除',
-                '未建立工会的按工资总额 2% 收**建会筹备金**，且**全额上缴**（没有 60% 留存）',
-                '现行分档减缴与 30 人以下暂免**均执行至 2027-12-31**，到期恢复按 100% 征收 —— 做三年预算别只按 90% 估',
-                '计费工资按当地社平 **2 倍**封顶（不是社保的 3 倍），两条封顶线不是一起停的'
+                '在职职工人数是上年各月在职人数之和 ÷ 12，不是年末在册 —— 常年 25 人看着免征，法定月平均 45 人 → 一年 7.29 万',
+                '季节性用工要折算年平均人数（人数 × 月数 ÷ 12），劳务派遣由派遣单位与用工单位协商计入一方、不得重复',
+                '这个「年度平均」与 17C-2 企业所得税的从业人数公式不同：cit 是（季初 + 季末）÷ 2 再 ÷ 4，残保金是各月之和 ÷ 12',
+                '100 人是第二个临界点：1 名残疾人达到 1.5% 需要 ≤ 66 人、达到 1% 需要 ≤ 100 人，101 人以上招 1 个人连减半档都够不着',
+                '先安排第一个残疾人的减缴效果远高于后续：分档减缴是边际递减的（100 人公司第 1 人省 13.2 万、第 2 人只省 3 万；45 人公司第 1 人省 7.29 万、第 2 人一分钱都省不了）',
+                '岗位本来就要招人 → 招残疾人净省全额残保金；专为省残保金增设岗位 → 净亏（雇一个人要付 1.395 倍工资）',
+                '专门招一个人是否划算，看拟招岗位年薪 ≤ 残保金减少额 ÷ 1.395 —— 100 人公司的盈亏平衡年薪是 9.46 万',
+                '工会经费的基数是工资总额，与社保缴费基数两个方向都不同：月薪 3 万社保封顶 2.4 万、月薪 3000 社保保底 4800',
+                '工会经费计提 ≠ 扣除：企税扣除要凭《工会经费收入专用收据》，超提部分不得扣除',
+                '未建立工会的按工资总额 2% 收建会筹备金，且全额上缴（没有 60% 留存）',
+                '现行分档减缴与 30 人以下暂免均执行至 2027-12-31，到期恢复按 100% 征收 —— 做三年预算别只按 90% 估',
+                '计费工资按当地社平 2 倍封顶（不是社保的 3 倍），两条封顶线不是一起停的'
             ],
             compute: function (v) {
                 var Q = window.EuriskoDisabilityFundQuick;
@@ -5442,20 +5487,20 @@
                     var rowsU = [
                         { label: '全年工资总额（国家统计局口径）', value: ub.wageTotal, kind: 'money',
                             hint: '（月工资 ' + yuan(v.monthlyWage) + ' + 津贴 ' + yuan(v.monthlyAllowance) + '）× '
-                                + months + ' 个月 + 奖金 ' + yuan(v.annualBonus) + '；**没有 60% 保底与 300% 封顶**' },
+                                + months + ' 个月 + 奖金 ' + yuan(v.annualBonus) + '；没有 60% 保底与 300% 封顶' },
                         { label: '社保缴费基数口径（同一批人，年）', value: ub.socialAnnual, kind: 'money',
                             hint: '月薪 ' + yuan(v.monthlyWage) + ' → 社保基数 ' + yuan(ub.socialMonthlyBase)
                                 + ' 元/月（60% 保底 / 300% 封顶）' },
                         { label: '两个口径的差额', value: ub.gapAnnual, kind: 'money',
-                            hint: ub.gapAnnual > 0 ? '⚠️ 工资总额**高于**社保基数（社保被封顶，工会经费没有）'
-                                : ub.gapAnnual < 0 ? '⚠️ 工资总额**低于**社保基数（社保被保底，工会经费没有）'
+                            hint: ub.gapAnnual > 0 ? '⚠️ 工资总额高于社保基数（社保被封顶，工会经费没有）'
+                                : ub.gapAnnual < 0 ? '⚠️ 工资总额低于社保基数（社保被保底，工会经费没有）'
                                     : '两个口径一致' },
                         { label: '工会经费（工资总额 × 2%）', value: ub.feeOnWage, kind: 'money' },
                         { label: '若误按社保基数估（错）', value: ub.feeOnSocialBase, kind: 'money',
-                            hint: '差 ' + yuan(ub.feeGap) + ' 元 —— 拿社保基数估工会经费**两头都会估错**' },
+                            hint: '差 ' + yuan(ub.feeGap) + ' 元 —— 拿社保基数估工会经费两头都会估错' },
                         { label: '月均计提', value: u.fee / 12, kind: 'money', hint: '按 12 个月均摊，便于做月度预算' },
                         { label: '上缴上级工会', value: u.remitted, kind: 'money',
-                            hint: u.hasUnion ? '建会：40% 上缴、60% 留存' : '⚠️ 未建会：建会筹备金**全额上缴**' },
+                            hint: u.hasUnion ? '建会：40% 上缴、60% 留存' : '⚠️ 未建会：建会筹备金全额上缴' },
                         { label: '本单位留存', value: u.retained, kind: 'money' },
                         { label: '企业所得税扣除限额', value: u.limit, kind: 'money',
                             hint: '不超过工资薪金总额 2%' },
@@ -5466,14 +5511,14 @@
                             hint: u.overDeduction > 0 ? '⚠️ 多提的部分企税不得扣除' : '未超限额' }
                     ];
 
-                    var noteU = '工会经费按**全年工资总额** ' + yuan(ub.wageTotal) + ' 元的 '
+                    var noteU = '工会经费按全年工资总额 ' + yuan(ub.wageTotal) + ' 元的 '
                         + pct(u.rate) + ' 计提 = ' + yuan(u.fee) + ' 元'
                         + (u.hasUnion ? '（40% 上缴 ' + yuan(u.remitted) + ' 元、60% 留存 ' + yuan(u.retained) + ' 元）'
-                            : '（未建会：建会筹备金 **全额上缴** ' + yuan(u.remitted) + ' 元）')
-                        + '。这个基数与社保缴费基数**两个方向都不同**：社保有 60% 保底与 300% 封顶，'
+                            : '（未建会：建会筹备金 全额上缴 ' + yuan(u.remitted) + ' 元）')
+                        + '。这个基数与社保缴费基数两个方向都不同：社保有 60% 保底与 300% 封顶，'
                         + '工资总额两头都不夹 —— 同一批人按社保基数是 ' + yuan(ub.socialAnnual)
                         + ' 元，按工资总额是 ' + yuan(ub.wageTotal) + ' 元，'
-                        + (ub.feeGap > 0 ? '**少估 ' + yuan(ub.feeGap) + ' 元**' : ub.feeGap < 0 ? '**多估 ' + yuan(-ub.feeGap) + ' 元**' : '两者一致')
+                        + (ub.feeGap > 0 ? '**少估 ' + yuan(ub.feeGap) + ' 元' : ub.feeGap < 0 ? '**多估 ' + yuan(-ub.feeGap) + ' 元' : '两者一致')
                         + '。企税扣除要凭《工会经费收入专用收据》'
                         + (u.overDeduction > 0 ? '，本次超提 ' + yuan(u.overDeduction) + ' 元不得扣除' : '，本次可全额扣除')
                         + '。';
@@ -5589,7 +5634,7 @@
                         hint: h.exempt ? '在职 ' + h.monthlyAverage + ' 人 ≤ 30，暂免征收' : '在职 ' + h.monthlyAverage + ' 人 > 30，全额计算' },
                     { label: '按速算器口径（' + h.naive + ' 人）是否免征', value: h.naiveExempt ? '是（免征）' : '否', kind: 'text',
                         hint: h.naiveExempt && !h.exempt ? '⚠️ 这是错的结果：按 ' + h.naive + ' 人免征，按法定 '
-                            + h.monthlyAverage + ' 人**不免征**' : '' },
+                            + h.monthlyAverage + ' 人不免征' : '' },
                     { label: '少算人数导致的差额', value: r.payable - naive.payable, kind: 'money',
                         hint: '法定 ' + yuan(r.payable) + ' − 速算器口径 ' + yuan(naive.payable) },
                     { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text',
@@ -5628,23 +5673,23 @@
                     });
                 }
 
-                var note = '在职职工人数是**上年各月在职人数之和 ÷ 12**：常年 ' + h.regularCount
+                var note = '在职职工人数是上年各月在职人数之和 ÷ 12：常年 ' + h.regularCount
                     + ' 人 + 季节性折算 ' + h.seasonalEquivalent + ' 人 + 派遣计入 '
-                    + h.dispatchEquivalent + ' 人 = **' + h.monthlyAverage + ' 人**'
+                    + h.dispatchEquivalent + ' 人 = ' + h.monthlyAverage + ' 人'
                     + (h.gap > 0 ? '（速算器那一个「在职职工人数」通常被填成常年 ' + h.naive
-                        + ' 人，**少算 ' + h.gap + ' 人**）' : '')
+                        + ' 人，少算 ' + h.gap + ' 人）' : '')
                     + '。应安排 ' + r.required.toFixed(2) + ' 人，缺口 ' + r.gap.toFixed(2) + ' 人，'
                     + '计费工资 ' + yuan(r.avgWageUsed) + ' 元'
                     + (r.capped ? '（社平 2 倍封顶）' : '')
                     + ' → 应缴费额 ' + yuan(r.base) + ' 元 × ' + pct(r.multiplier)
-                    + '（' + r.tier.label + '）= **' + yuan(r.payable) + ' 元**'
-                    + (h.gap > 0 ? '，而按 ' + h.naive + ' 人算是 ' + yuan(naive.payable) + ' 元，**差 ' + yuan(r.payable - naive.payable) + ' 元**' : '')
-                    + '。再招 1 名残疾人可省 **' + yuan(cmp.saving) + ' 元**'
+                    + '（' + r.tier.label + '）= ' + yuan(r.payable) + ' 元'
+                    + (h.gap > 0 ? '，而按 ' + h.naive + ' 人算是 ' + yuan(naive.payable) + ' 元，差 ' + yuan(r.payable - naive.payable) + ' 元' : '')
+                    + '。再招 1 名残疾人可省 ' + yuan(cmp.saving) + ' 元'
                     + (cmp.netReplace > 0 ? '（岗位本来就要招人 → 净省这个数）' : '')
                     + '；但专为省残保金增设岗位要付 ' + yuan(cmp.hireCost) + ' 元，'
                     + (cmp.worthIt ? '划算' : '**不划算**')
                     + '（盈亏平衡年薪 ' + yuan(cmp.breakEvenWage) + ' 元）。'
-                    + '另：现行减缴与 30 人免征均至 2027-12-31，到期后按 **' + yuan(expired) + ' 元**征收。';
+                    + '另：现行减缴与 30 人免征均至 2027-12-31，到期后按 ' + yuan(expired) + ' 元征收。';
 
                 return {
                     primary: { label: '应缴残疾人就业保障金', value: r.payable, kind: 'money',
@@ -5784,21 +5829,21 @@
             fields: [
                 { key: 'usage', step: 'property', label: '转让的是', type: 'select', default: 'residence',
                     options: [{ value: 'residence', label: '住房（住宅）' }, { value: 'nonresidence', label: '非住房（商铺 / 写字楼等）' }],
-                    hint: '满五唯一免征与换购退税**只适用于住房**（国税发〔2007〕33 号二）' },
+                    hint: '满五唯一免征与换购退税只适用于住房（国税发〔2007〕33 号二）' },
                 { key: 'acquireType', step: 'property', label: '房子是怎么取得的', type: 'select', default: 'purchase',
                     options: [{ value: 'purchase', label: '自己买的' }, { value: 'gift', label: '受赠取得' },
                         { value: 'inherit', label: '继承取得' }],
-                    hint: '受赠 / 继承的房屋再转让：房屋原值是**原捐赠人 / 被继承人**的实际购置成本，不是 0（财税〔2009〕78 号五）' },
+                    hint: '受赠 / 继承的房屋再转让：房屋原值是原捐赠人 / 被继承人的实际购置成本，不是 0（财税〔2009〕78 号五）' },
                 { key: 'salePrice', step: 'property', label: '转让收入（实际成交价，元）', type: 'money', default: 0, sample: 5000000,
                     hint: '按实际成交价；网签价明显偏低又无正当理由的，税务机关可核定' },
                 { key: 'originalValue', step: 'property', label: '房屋原值（元）', type: 'money', default: 0, sample: 3000000,
                     when: { key: 'acquireType', in: ['purchase', 'inherit'] },
-                    hint: '实际支付的购房价款 + 缴纳的契税、土地出让金等（108 号二）；继承的填**被继承人**的取得成本' },
+                    hint: '房屋原值：实际支付的购房价款，加上缴纳的契税、土地出让金等（依据：108 号二）；继承取得的，填被继承人当初的取得成本' },
                 { key: 'donorCost', step: 'property', label: '原捐赠人取得该房屋的实际购置成本（元）', type: 'money', default: 0, sample: 600000,
                     when: { key: 'acquireType', in: ['gift'] },
                     hint: '不是受赠时的评估价，也不是 0 —— 父亲 60 万买的房受赠后卖 500 万，原值是 60 万（财税〔2009〕78 号五）' },
                 { key: 'hasValueProof', step: 'property', label: '能提供完整、准确的房屋原值凭证', type: 'switch', default: false,
-                    hint: '关掉就是「原值凭证不全」：由税务机关按转让收入 1%~3% **核定**征收，装修费、贷款利息等扣除项都不再看（108 号三）' },
+                    hint: '关掉就是「原值凭证不全」：由税务机关按转让收入 1%~3% 核定征收，装修费、贷款利息等扣除项都不再看（108 号三）' },
                 { key: 'assessRate', step: 'property', label: '核定征收率（%）', type: 'percent', default: 1,
                     when: { key: 'hasValueProof', in: [false] },
                     hint: '法定区间 1%~3%，具体由各省局 / 市局确定（如海南为 2%）—— 不是纳税人可以挑的' },
@@ -5806,10 +5851,10 @@
                     options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30].map(function (y) {
                         return { value: y, label: y + ' 年' };
                     }),
-                    hint: '起算点：房屋产权证注明的时间与契税完税凭证注明的时间**孰先**（财税字〔1999〕278 号）' },
+                    hint: '起算点：房屋产权证与契税完税凭证，哪个注明的时间早就从哪天算（依据：财税字〔1999〕278 号）' },
                 { key: 'isOnlyHome', step: 'property', label: '本次出售的住房是家庭唯一生活用房', type: 'switch', default: false,
                     when: { key: 'usage', in: ['residence'] },
-                    hint: '「唯一」是**同一省 / 自治区 / 直辖市范围内**（有配偶的为夫妻双方）只有这一套住房 —— 不是全国唯一、也不是同城唯一' },
+                    hint: '「唯一」是同一省 / 自治区 / 直辖市范围内（有配偶的为夫妻双方）只有这一套住房 —— 不是全国唯一、也不是同城唯一' },
                 { key: 'vatAndSurcharge', step: 'cost', label: '转让过程中缴纳的税金（元）', type: 'money', default: 0,
                     hint: '增值税及附加、土地增值税等；住房满 2 年免征增值税时填 0（108 号一（三））' },
                 { key: 'houseType', step: 'cost', label: '房屋性质', type: 'select', default: 'commercial',
@@ -5818,13 +5863,13 @@
                         { value: 'public', label: '已购公有住房 / 经济适用房' }],
                     hint: '决定装修费的扣除上限比例：商品房 10%、公有住房 / 经济适用房 15%' },
                 { key: 'decoration', step: 'cost', label: '住房装修费用（元）', type: 'money', default: 0, sample: 300000,
-                    hint: '须有税务统一发票、发票付款人与产权人一致；超过原值比例上限的部分**不能扣**（108 号二（一）1）' },
+                    hint: '须有税务统一发票、发票付款人与产权人一致；超过原值比例上限的部分不能扣（108 号二（一）1）' },
                 { key: 'loanInterest', step: 'cost', label: '住房贷款利息（元）', type: 'money', default: 0,
                     hint: '凭贷款利息支出凭证按实际发生额扣除' },
                 { key: 'otherFees', step: 'cost', label: '手续费、公证费等其他合理费用（元）', type: 'money', default: 0, sample: 20000 },
                 { key: 'repurchase', step: 'repurchase', label: '出售住房后 1 年内有重新购房', type: 'switch', default: false,
                     when: { key: 'usage', in: ['residence'] },
-                    hint: '财政部 税务总局 住房城乡建设部公告 2026 年第 3 号：退的是**已缴**个税，不是补贴' },
+                    hint: '财政部 税务总局 住房城乡建设部公告 2026 年第 3 号：退的是已缴个税，不是补贴' },
                 { key: 'sameCity', step: 'repurchase', label: '新购住房与现住房在同一城市', type: 'switch', default: false,
                     when: { key: 'repurchase', in: [true] },
                     hint: '同一直辖市、副省级城市、地级市所辖的全部行政区划范围' },
@@ -5832,7 +5877,7 @@
                     when: { key: 'repurchase', in: [true] } },
                 { key: 'repurchasePrice', step: 'repurchase', label: '新购住房金额（元）', type: 'money', default: 0, sample: 4000000,
                     when: { key: 'repurchase', in: [true] },
-                    hint: '新购金额 ≥ 现住房转让金额 → **全额退还**已缴个税；< 则按新购 ÷ 转让金额的比例退还' }
+                    hint: '换购退税：新购金额不低于现住房转让金额的，全额退还已缴个税；低于的，按「新购 ÷ 转让金额」的比例退' }
             ],
             steps: [
                 { key: 'property', title: '房子与产权', why: '先定三件事：住房还是非住房、怎么取得的（受赠 / 继承的原值另有规定）、满五年是不是家庭唯一' },
@@ -5840,14 +5885,14 @@
                 { key: 'repurchase', title: '卖后换购', why: '出售住房后 1 年内在同城重新购房的，按新购金额占转让金额的比例退还已缴个税' }
             ],
             pitfalls: [
-                '**应纳税所得额不是「售价 − 买价」**：转让收入 − 房屋原值 − 转让过程中缴纳的税金 − 合理费用（国税发〔2006〕108 号一）。装修费有**原值比例上限** —— 商品房及其他住房 10%、已购公有住房 / 经济适用房 15%：原值 200 万、装修发票 30 万只能扣 20 万，多缴 **2 万**',
-                '**核定 1% 不是可选项**：能提供完整、准确的房屋原值凭证的**必须查账**，只有凭证不全时才由税务机关按转让收入 1%~3% 核定（具体征收率由省局 / 市局确定）。售价 500 万、原值 100 万：查账 80 万、核定 5 万，差 **75 万** —— 恰恰是差额大的那批人最想选、也最没有选择权',
-                '**满五唯一的「唯一」不是全国唯一、也不是同城唯一**：是**同一省、自治区、直辖市范围内**纳税人（有配偶的为夫妻双方）仅拥有一套住房；自用 5 年以上的起算点是房屋产权证注明时间与契税完税凭证注明时间**孰先**（财税字〔1999〕278 号四）',
-                '**受赠 / 继承的房屋再转让**，原值不是 0、也不是受赠时的评估价，而是**原捐赠人 / 被继承人**取得该房屋的实际购置成本（财税〔2009〕78 号五）：父亲 60 万买的房子受赠后卖 500 万，正确税额 88 万；误按受赠时评估价 400 万算只有 20 万 —— 差 **68 万**',
-                '**换购退税退的是已缴个税，不是补贴**（财政部 税务总局 住房城乡建设部公告 **2026 年第 3 号**，执行至 **2027-12-31**）：出售住房后 **1 年内**在**同城**重新购房、且售房人为新购住房产权人或之一，新购金额 ≥ 转让金额**全额退**，< 则按新购 ÷ 转让金额的比例退。卖 500 万缴 33.6 万：买 400 万退 **26.88 万**、买 600 万全退 **33.6 万**',
-                '**已经满五唯一的人换购退不到钱**：已缴个税本来就是 0，退税额 = 0 × 比例 = 0。别把「卖了再买能退税」当成年年可吃的红利 —— 它只在**你真的缴了税**时才有意义',
-                '**非住房（商铺、写字楼）不适用**满五唯一免征，**也不适用**换购住房退税（国税发〔2007〕33 号二），装修费也不受住房那档比例上限约束',
-                '装修费须凭**税务统一发票**、且发票付款人与产权人一致；住房贷款利息凭贷款利息支出凭证按实际发生额扣除；转让收入按**实际成交价**，网签价明显偏低又无正当理由的，税务机关有权核定'
+                '应纳税所得额不是「售价 − 买价」：转让收入 − 房屋原值 − 转让过程中缴纳的税金 − 合理费用（国税发〔2006〕108 号一）。装修费有原值比例上限 —— 商品房及其他住房 10%、已购公有住房 / 经济适用房 15%：原值 200 万、装修发票 30 万只能扣 20 万，多缴 2 万',
+                '核定 1% 不是可选项：能提供完整、准确的房屋原值凭证的必须查账，只有凭证不全时才由税务机关按转让收入 1%~3% 核定（具体征收率由省局 / 市局确定）。售价 500 万、原值 100 万：查账 80 万、核定 5 万，差 75 万 —— 恰恰是差额大的那批人最想选、也最没有选择权',
+                '满五唯一的「唯一」不是全国唯一、也不是同城唯一：是同一省、自治区、直辖市范围内纳税人（有配偶的为夫妻双方）仅拥有一套住房；自用 5 年以上的起算点：房屋产权证与契税完税凭证，哪个注明的时间早就从哪天算（依据：财税字〔1999〕278 号四）',
+                '受赠 / 继承的房屋再转让，原值不是 0、也不是受赠时的评估价，而是原捐赠人 / 被继承人取得该房屋的实际购置成本（财税〔2009〕78 号五）：父亲 60 万买的房子受赠后卖 500 万，正确税额 88 万；误按受赠时评估价 400 万算只有 20 万 —— 差 68 万',
+                '换购退税退的是已缴个税，不是补贴（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号，执行至 2027-12-31）：出售住房后 1 年内在同城重新购房、且售房人为新购住房产权人或之一，新购金额 ≥ 转让金额全额退，< 则按新购 ÷ 转让金额的比例退。卖 500 万缴 33.6 万：买 400 万退 26.88 万、买 600 万全退 33.6 万',
+                '已经满五唯一的人换购退不到钱：已缴个税本来就是 0，退税额 = 0 × 比例 = 0。别把「卖了再买能退税」当成年年可吃的红利 —— 它只在你真的缴了税时才有意义',
+                '非住房（商铺、写字楼）不适用满五唯一免征，也不适用换购住房退税（国税发〔2007〕33 号二），装修费也不受住房那档比例上限约束',
+                '装修费须凭税务统一发票、且发票付款人与产权人一致；住房贷款利息凭贷款利息支出凭证按实际发生额扣除；转让收入按实际成交价，网签价明显偏低又无正当理由的，税务机关有权核定'
             ],
             compare: [
                 '查账 vs 核定：有原值凭证必须查账，核定 1%~3% 只是凭证不全时的替代 —— 「哪个省选哪个」不成立',
@@ -5918,7 +5963,7 @@
                     }
                 }, {
                     title: '满五唯一的三种边界（同一省 / 自治区 / 直辖市范围内）',
-                    note: '免征条件：自用 ' + ex.needYears + ' 年以上 **且** 是家庭唯一生活用房；自用年限起算点按'
+                    note: '免征条件：自用 ' + ex.needYears + ' 年以上 且 是家庭唯一生活用房；自用年限起算点按'
                         + ex.startRule,
                     table: {
                         head: ['情形', '是否免征', '个税'],
@@ -5940,7 +5985,7 @@
                     });
                     extras.push({
                         title: '卖后 1 年换购：买多少退多少（2026 年第 3 号，至 2027-12-31）',
-                        note: '退的是**已缴**个税：新购金额 ≥ 转让金额全额退，不足则按新购 ÷ 转让金额的比例退；'
+                        note: '退的是已缴个税：新购金额 ≥ 转让金额全额退，不足则按新购 ÷ 转让金额的比例退；'
                             + '满五唯一免征的（已缴为 0）退不到钱',
                         table: { head: ['情形', '新购金额', '退还比例', '退还个税', '实际净缴'], rows: rpRows }
                     });
@@ -5948,23 +5993,23 @@
 
                 var note = '转让收入 ' + Math.round(s.price) + ' 元';
                 if (isAssess) {
-                    note += '，原值凭证不全按 ' + Math.round(s.assessRate * 100) + '% 核定，应纳税额 **'
-                        + Math.round(s.tax) + ' 元**';
+                    note += '，原值凭证不全按 ' + Math.round(s.assessRate * 100) + '% 核定，应纳税额 '
+                        + Math.round(s.tax) + ' 元';
                 } else {
                     note += '，减除房屋原值 ' + Math.round(s.basis.value) + ' 元、转让环节税金 '
                         + Math.round(s.taxPaidInTransfer) + ' 元、合理费用 '
                         + Math.round(s.decoration.allowed + s.loanInterest + s.otherFees) + ' 元后，应纳税所得额 '
-                        + Math.round(s.taxable) + ' 元，按 20% 计税 **' + Math.round(s.taxBeforeExempt) + ' 元**';
+                        + Math.round(s.taxable) + ' 元，按 20% 计税 ' + Math.round(s.taxBeforeExempt) + ' 元';
                 }
                 if (s.decoration.disallowed > 0.01) {
                     note += '；装修费有 ' + Math.round(s.decoration.disallowed) + ' 元超过原值 '
                         + Math.round(s.decoration.capRatio * 100) + '% 的上限不能扣（多缴 '
                         + Math.round(s.decoration.disallowed * s.rate) + ' 元）';
                 }
-                if (s.exemptEligible) note += '；符合满五唯一 → **免征**';
+                if (s.exemptEligible) note += '；符合满五唯一 → 免征';
                 if (s.refund.applied && s.refund.refund > 0.01) {
-                    note += '；换购退税 ' + Math.round(s.refund.refund) + ' 元后实际净缴 **'
-                        + Math.round(s.netTax) + ' 元**';
+                    note += '；换购退税 ' + Math.round(s.refund.refund) + ' 元后实际净缴 '
+                        + Math.round(s.netTax) + ' 元';
                 }
 
                 var steps = [{
@@ -5996,7 +6041,7 @@
                             note: '同一省 / 自治区 / 直辖市范围内（有配偶的为夫妻双方）' },
                         { label: '免征后应纳税额', value: s.exemptTax, format: 'money' }
                     ],
-                    footnote: '自用 5 年以上 **且** 是家庭唯一生活用房才免征；自用年限按房屋产权证注明时间与契税完税凭证注明时间孰先起算'
+                    footnote: '自用 5 年以上 且 是家庭唯一生活用房才免征；自用年限从房屋产权证与契税完税凭证里注明时间更早的那个起算'
                 }, {
                     title: '③ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）',
                     rows: [
@@ -6049,26 +6094,26 @@
                 { key: 'role', step: 'residence', label: '在境内单位的职务', type: 'select', default: 'staff',
                     options: [{ value: 'staff', label: '普通 / 中层员工' },
                         { value: 'executive', label: '董事、监事或高层管理人员' }],
-                    hint: '担任境内居民企业董事、监事、高层管理职务的个人，**无论是否在境内履行职务**，'
+                    hint: '担任境内居民企业董事、监事、高层管理职务的个人，无论是否在境内履行职务，'
                         + '由该境内企业支付或者负担的报酬一律属于境内所得（35 号第一条（三））' },
                 { key: 'stayFullDays', step: 'residence', label: '本纳税年度内在境内累计居住天数', type: 'number',
                     default: 120,
-                    hint: '在中国境内停留的**当天满 24 小时**才算一天；不足 24 小时的不计入居住天数'
+                    hint: '在中国境内停留的当天满 24 小时才算一天；不足 24 小时的不计入居住天数'
                         + '（作为工作天数时可按半天算，两个口径不同）' },
                 { key: 'fullYearsBefore', step: 'residence', label: '此前连续住满 183 天的年度数', type: 'select',
                     default: 5,
                     options: [0, 1, 2, 3, 4, 5, 6].map(function (y) {
                         return { value: y, label: y === 6 ? '6 年及以上' : y + ' 年' };
                     }),
-                    hint: '满 183 天 **且** 此前六年每年都住满 183 天 **且** 没有任何一年单次离境超过 30 天'
+                    hint: '满 183 天 且 此前六年每年都住满 183 天 且 没有任何一年单次离境超过 30 天'
                         + ' → 境内境外全部所得都要缴（财政部 税务总局公告 2019 年第 34 号一）' },
                 { key: 'maxSingleAbsence', step: 'residence', label: '此前六年中任一年度的单次最长离境天数',
                     type: 'number', default: 0,
-                    hint: '六年判定只看**有没有任何一年单次离境超过 30 天** —— 不再有「累计离境 90 天作废」'
+                    hint: '六年判定只看有没有任何一年单次离境超过 30 天 —— 不再有「累计离境 90 天作废」'
                         + '那条老规则（财税字〔1995〕98 号已随 2019 年新法废止）' },
                 { key: 'monthlyTotal', step: 'income', label: '当月境内外工资薪金总额（元）', type: 'money',
                     default: 0, sample: 30000,
-                    hint: '工资薪金所属的工作期间**横跨境内境外**时，境内外支付都要算进来，'
+                    hint: '工资薪金所属的工作期间横跨境内境外时，境内外支付都要算进来，'
                         + '再按比例切出境内所得' },
                 { key: 'monthlyPaidDomestic', step: 'income', label: '其中由境内雇主支付或者负担的部分（元）',
                     type: 'money', default: 0, sample: 15000,
@@ -6076,14 +6121,14 @@
                 { key: 'calendarDays', step: 'income', label: '当月工资薪金所属工作期间的公历天数',
                     type: 'number', default: 30 },
                 { key: 'domesticWorkDays', step: 'income', label: '其中境内工作天数', type: 'number', default: 20,
-                    hint: '在境内、境外单位同时任职（或仅在境外单位任职）的，境内停留当天**不足 24 小时的按半天**'
+                    hint: '在境内、境外单位同时任职（或仅在境外单位任职）的，境内停留当天不足 24 小时的按半天'
                         + '计入境内工作天数（35 号第一条（一））' },
                 { key: 'months', step: 'income', label: '本年在境内任职领取工资的月数', type: 'select', default: 12,
                     options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (m) {
                         return { value: m, label: m + ' 个月' };
                     }) },
                 { key: 'bonus', step: 'bonus', label: '一次性取得的数月奖金（元）', type: 'money', default: 0, sample: 120000,
-                    hint: '非居民一个月内取得数月奖金：单独、**不与当月工资合并**、按 6 个月分摊且'
+                    hint: '非居民一个月内取得数月奖金：单独、不与当月工资合并、按 6 个月分摊且'
                         + '**不减除费用**计税（公式五），一个公历年度内每人只能适用一次' }
             ],
             steps: [
@@ -6092,14 +6137,14 @@
                 { key: 'bonus', title: '数月奖金', why: '单独按 6 个月分摊计税，不并入当月工资、也不减除费用' }
             ],
             pitfalls: [
-                '**先问要不要缴，再问扣多少**：同样是每月 3 万全部由境外母公司支付 —— 年内累计居住 60 天的适用公式一，只对「境内工作 + 境内雇主支付或者负担」两者重叠的那部分计税（本例交集为空 → **0 元**）；住到 120 天就换成公式二，境内工作期间的工资**不论由谁支付**都要缴（**26620 元**）',
-                '**六年不是自然年，是被「单次离境超过 30 天」打断的**：同样住满 200 天且此前已连续六年，一次性离境 40 天就把六年清掉 —— 73080 元退回到 **53080 元**，差 **20000 元**；34 号只认「单次」，老黄历里那句「累计离境 90 天作废」（财税字〔1995〕98 号）已随 2019 年新法废止',
-                '**收入额是不等于工资总额的**：公式一 = 当月境内外工资 × 境内支付占比 × 境内工作天数占比（例如 3 万 × 50% × 20/30 = **1 万**）；公式二去掉支付占比；公式三只对「境外工作且境外支付」的那部分做扣除 —— 三个公式随居住天数切换，不能记一个用到底',
-                '**非居民按月换算后的综合所得税率表逐月单独计税**（当月收入额 − 5000 → 月度税率表），不像居民那样按年累计合并：**同一笔 24 万年薪，均匀发放与全压到最后一个月发放相差 25200 元**（19080 vs 44280），而居民按年累计的那张年度表**根本不看发放节奏**，两种算法差出来的钱没有任何补偿',
-                '**数月奖金单独按 6 个月分摊、不减除费用、一年只能用一次**（公式五）：默认口径下法定 26620 元，而最常见的错误算法「奖金并入发放当月」会算出 **89580 元** —— 虚增 **62960 元**，原因就是把 12 万一把推进月度税率的 45% 那一档',
-                '**数月奖金分摊不是居民的「全年一次性奖金 ÷ 12」**：居民是把奖金 ÷ 12 定档后「全额 × 税率 − 速算扣除数」，速算扣除数只扣一次、也不另行减除费用；非居民是 ÷ **6** 定档、**不减除** 5000 元、且一个公历年度内对同一人**只能用一次** —— 两张口诀长得像，结果未必相同，不能互相套',
-                '**高管（董事、监事、高层管理职务）不适用「按天数分摊」的待遇**：≤90 天档里普通员工的公式一是「支付占比 × 天数占比」两道相乘，高管只看第一道 —— 由境内居民企业支付或者负担的报酬**全额计入**，不再切天数；90~183 天档里高管也改用公式三（35 号第二条（三））',
-                '**非居民不享受专项附加扣除、不办理年度汇算**：子女教育 / 房贷利息 / 赡养老人只属于居民个人综合所得；此外居住天数按「当天满 24 小时」计、而工作天数在同时对境外任职时可按**半天**计 —— 两个口径规则不同，混着用会在 90 天 / 183 天的临界点上出错'
+                '先问要不要缴，再问扣多少：同样是每月 3 万全部由境外母公司支付 —— 年内累计居住 60 天的适用公式一，只对「境内工作 + 境内雇主支付或者负担」两者重叠的那部分计税（本例交集为空 → 0 元）；住到 120 天就换成公式二，境内工作期间的工资不论由谁支付都要缴（26620 元）',
+                '六年不是自然年，是被「单次离境超过 30 天」打断的：同样住满 200 天且此前已连续六年，一次性离境 40 天就把六年清掉 —— 73080 元退回到 53080 元，差 20000 元；34 号只认「单次」，老黄历里那句「累计离境 90 天作废」（财税字〔1995〕98 号）已随 2019 年新法废止',
+                '收入额是不等于工资总额的：公式一 = 当月境内外工资 × 境内支付占比 × 境内工作天数占比（例如 3 万 × 50% × 20/30 = 1 万）；公式二去掉支付占比；公式三只对「境外工作且境外支付」的那部分做扣除 —— 三个公式随居住天数切换，不能记一个用到底',
+                '非居民按月换算后的综合所得税率表逐月单独计税（当月收入额 − 5000 → 月度税率表），不像居民那样按年累计合并：同一笔 24 万年薪，均匀发放与全压到最后一个月发放相差 25200 元（19080 vs 44280），而居民按年累计的那张年度表根本不看发放节奏，两种算法差出来的钱没有任何补偿',
+                '数月奖金单独按 6 个月分摊、不减除费用、一年只能用一次（公式五）：默认口径下法定 26620 元，而最常见的错误算法「奖金并入发放当月」会算出 89580 元 —— 虚增 62960 元，原因就是把 12 万一把推进月度税率的 45% 那一档',
+                '数月奖金分摊不是居民的「全年一次性奖金 ÷ 12」：居民是把奖金 ÷ 12 定档后「全额 × 税率 − 速算扣除数」，速算扣除数只扣一次、也不另行减除费用；非居民是 ÷ 6 定档、不减除 5000 元、且一个公历年度内对同一人只能用一次 —— 两张口诀长得像，结果未必相同，不能互相套',
+                '高管（董事、监事、高层管理职务）不适用「按天数分摊」的待遇：≤90 天档里普通员工的公式一是「支付占比 × 天数占比」两道相乘，高管只看第一道 —— 由境内居民企业支付或者负担的报酬全额计入，不再切天数；90~183 天档里高管也改用公式三（35 号第二条（三））',
+                '非居民不享受专项附加扣除、不办理年度汇算：子女教育 / 房贷利息 / 赡养老人只属于居民个人综合所得；此外居住天数按「当天满 24 小时」计、而工作天数在同时对境外任职时可按半天计 —— 两个口径规则不同，混着用会在 90 天 / 183 天的临界点上出错'
             ],
             compare: [
                 '四档纳税义务：≤90 天 / 90~183 天 / 满183天不满六年 / 满六年 —— 同一批收入实测 6220 / 26620 / 53080 / 73080',
@@ -6133,7 +6178,7 @@
 
                 var rows = [
                     { label: '本纳税年度境内累计居住天数', value: s.status.days + ' 天', kind: 'text',
-                        hint: '在中国境内停留的当天**满 24 小时**才算一天' },
+                        hint: '在中国境内停留的当天满 24 小时才算一天' },
                     { label: '身份判定', value: s.status.tierLabel, kind: 'text',
                         hint: '一个纳税年度内累计居住是否满 183 天（个税法第一条）' }
                 ];
@@ -6150,7 +6195,7 @@
                 if (input.monthlyPaidDomestic > 0 || ic.ratio < 1) {
                     rows.push({ label: '留在征税范围外（由所得来源地规则切出去）', value: input.monthlyTotal
                         - ic.amount, kind: 'money',
-                        hint: '这一档里不用在中国的部分，不是「扣除」而是**本来就不在征税范围**' });
+                        hint: '这一档里不用在中国的部分，不是「扣除」而是本来就不在征税范围' });
                 }
                 if (!s.status.isResident) {
                     rows.push({ label: '月度税率', value: sal.rate, kind: 'percent',
@@ -6227,7 +6272,7 @@
                 }
                 note += '，工资薪金 ' + Math.round(sal.tax) + ' 元';
                 if (input.bonus > 0) note += '，数月奖金 ' + Math.round(s.bonus.tax) + ' 元';
-                note += '，合计 **' + Math.round(s.tax) + ' 元**';
+                note += '，合计 ' + Math.round(s.tax) + ' 元';
                 if (input.bonus > 0 && Math.abs(s.naiveGap) > 0.01) {
                     note += '；奖金并入发放当月的错法会算出 ' + Math.round(s.naive) + ' 元（多 '
                         + Math.round(s.naiveGap) + ' 元）';
@@ -6349,11 +6394,11 @@
                 { key: 'monthlyIncome', label: '税前月薪', type: 'money', default: 0, sample: 15000, hint: '税前工资（含岗位工资、绩效等固定发放部分）' },
                 { key: 'months', label: '计算月数', type: 'number', default: 12, min: 1, max: 12 },
                 { key: 'monthlyInsurance', label: '五险一金（个人 / 月）', type: 'money', default: 0, sample: 1500, hint: '个人缴纳部分；工伤与生育个人不缴' },
-                { key: 'monthlySpecialAdditional', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000, hint: '七项合计的月均额，每年 12 月需确认' }
+                { key: 'monthlySpecialAdditional', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000, hint: '专项附加扣除七项合计的月均额（每年 12 月要确认次年的信息）' }
             ],
             pitfalls: [
-                '到手逐月变少**不是算错**：累计预扣使适用档位逐月爬升（年初低档、年末高档）',
-                '月薪个税是**预扣预缴**，不是最终税负 —— 次年 3~6 月汇算才多退少补'
+                '到手逐月变少不是算错：累计预扣使适用档位逐月爬升（年初低档、年末高档）',
+                '月薪个税是预扣预缴，不是最终税负 —— 次年 3~6 月汇算才多退少补'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSalaryQuick;
@@ -6430,7 +6475,7 @@
                 { key: 'specialMonthly', label: '专项附加扣除（月）', type: 'money', default: 0 }
             ],
             pitfalls: [
-                '倒算**不能除以到手率**：到手率不是常数，甚至不单调（五险一金按社平 3 倍封顶后不再增加）',
+                '倒算不能除以到手率：到手率不是常数，甚至不单调（五险一金按社平 3 倍封顶后不再增加）',
                 '「每月到手 X」有两种口径，全年平均与首月相差可达数百元',
                 '涨薪 1000 元 ≠ 到手多 1000 元（边际到手率约 65%~70%）'
             ],
@@ -6475,7 +6520,7 @@
                 { key: 'annualTaxable', label: '全年其他应纳税所得额', type: 'money', default: 0, hint: '填 0 则只看单独计税；填了才能比较「并入综合所得」' }
             ],
             pitfalls: [
-                '存在**临界点**：多发 1 元可能跳档，到手反而更少（本工具给出跳档位置）',
+                '存在临界点：多发 1 元可能跳档，到手反而更少（本工具给出跳档位置）',
                 '单独计税政策执行至 2027-12-31（以注册表状态为准）'
             ],
             compute: function (v) {
@@ -6517,9 +6562,9 @@
                 { key: 'medicalSelfPaid', label: '大病医疗自付累计', type: 'money', default: 0, hint: '医保目录内个人自付，超 1.5 万部分据实扣、限额 8 万' }
             ],
             pitfalls: [
-                '扣除额 × 税率 **不等于** 少交的税：跨档时只有部分扣除额落在高档（本工具给出「朴素估算」与差额）',
-                '房贷利息与住房租金**只能二选一**，赡养老人与子女教育按分摊协议执行',
-                '大病医疗只能在**年度汇算**时扣除，平时预扣不体现'
+                '扣除额 × 税率 不等于 少交的税：跨档时只有部分扣除额落在高档（本工具给出「朴素估算」与差额）',
+                '房贷利息与住房租金只能二选一，赡养老人与子女教育按分摊协议执行',
+                '大病医疗只能在年度汇算时扣除，平时预扣不体现'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSpecialDeductionQuick;
@@ -6582,8 +6627,8 @@
                 { key: 'prepaidTax', label: '全年已预缴个税', type: 'money', default: 0, hint: '填 0 则按累计预扣法自动推演；填实际值更准（看个税 App 已申报税额）' }
             ],
             pitfalls: [
-                '结果**正数 = 应补税、负数 = 应退税**，符号别看反',
-                '多处任职 / 年中跳槽会在各单位**重复扣 6 万**基本减除费用，汇算时合并后通常要补税',
+                '结果正数 = 应补税、负数 = 应退税，符号别看反',
+                '多处任职 / 年中跳槽会在各单位重复扣 6 万基本减除费用，汇算时合并后通常要补税',
                 '年终奖若已按单独计税申报，汇算时仍可选择并入（本工具不含这一层比较）'
             ],
             compute: function (v) {
@@ -6596,7 +6641,7 @@
                     primary: { label: refund ? '应退个税' : '应补个税', value: Math.abs(r.diff), kind: 'money' },
                     rows: [
                         { label: '全年收入', value: r.annualIncome, kind: 'money' },
-                        { label: '全年扣除合计', value: r.annualDeduction, kind: 'money', hint: '6 万基本减除 + 五险一金 + 专项附加扣除' },
+                        { label: '全年扣除合计', value: r.annualDeduction, kind: 'money', hint: '年度汇算能扣的三类：6 万元基本减除费用、五险一金、专项附加扣除' },
                         { label: '全年应纳税所得额', value: r.annualTaxable, kind: 'money' },
                         { label: '全年应纳税额', value: r.annualTax, kind: 'money' },
                         { label: '已预缴税额', value: r.prepaidTax, kind: 'money', hint: r.providedPrepaid ? '使用你填写的值' : '按累计预扣法推演' },
@@ -6619,9 +6664,9 @@
                 { key: 'marginalRate', label: '你全年综合所得边际税率（%）', type: 'percent', default: 20, hint: '用于估算汇算时的税负差，10/20/25/30/35/45 选最接近的一档' }
             ],
             pitfalls: [
-                '费用扣除是**分档**的：≤4000 元减 800，>4000 元减 20%，不是统一减 20%',
-                '稿酬在费用扣除后**再打七折**（实际按收入的 56% 计入），税负明显低于劳务报酬',
-                '预扣率最高 40% 是**预扣**，次年并入综合所得汇算，多退少补'
+                '费用扣除是分档的：≤4000 元减 800，>4000 元减 20%，不是统一减 20%',
+                '稿酬在费用扣除后再打七折（实际按收入的 56% 计入），税负明显低于劳务报酬',
+                '预扣率最高 40% 是预扣，次年并入综合所得汇算，多退少补'
             ],
             compute: function (v) {
                 var Q = window.EuriskoWithholdingQuick;
@@ -6634,7 +6679,7 @@
                         { label: '费用扣除后应纳税所得额', value: r.taxable, kind: 'money', hint: '≤4000 减 800；>4000 按 80%' },
                         { label: '并入综合所得的收入额', value: r.income, kind: 'money', hint: '劳务/特许权 80%，稿酬 56%' },
                         { label: '汇算时估算税负', value: r.settled, kind: 'money' },
-                        { label: '汇算差额', value: r.gap, kind: 'money', hint: '正数 = 预扣少于应付' },
+                        { label: '汇算差额', value: r.gap, kind: 'money', hint: '正数表示预扣的比应缴的少，也就是还要补税' },
                         { label: '汇算方向', value: r.direction, kind: 'text' }
                     ],
                     note: '预扣环节按次、按三档预扣率表计算；次年并入综合所得适用七级年度税率，「汇算差额」为正即需补税。'
@@ -6656,9 +6701,9 @@
                 { key: 'otherTaxable', label: '全年其他综合所得应纳税所得额', type: 'money', default: 0, hint: '已扣完各项扣除的金额，用于比较「并入」' }
             ],
             pitfalls: [
-                '现行政策是**单独计税、不并入**综合所得，且**不减除任何费用**（不是减 6 万后再算）',
+                '现行政策是单独计税、不并入综合所得，且不减除任何费用（不是减 6 万后再算）',
                 '「并入」那一列是政策 2027-12-31 到期后的对照值，不是现在能选的',
-                '一年内多次行权必须**合并**计算，分开算会低估税率'
+                '一年内多次行权必须合并计算，分开算会低估税率'
             ],
             compute: function (v) {
                 var Q = window.EuriskoEquityQuick;
@@ -6689,17 +6734,17 @@
             policyKey: 'severance',
             nextTools: ['early-retirement', 'annual-settlement', 'social-base'],
             fields: [
-                { key: 'economic', label: '经济补偿金', type: 'money', default: 0, sample: 300000, hint: '按工作年限 × 月工资计算的部分' },
+                { key: 'economic', label: '经济补偿金', type: 'money', default: 0, sample: 300000, hint: '经济补偿金里按「工作年限 × 月工资」算的那部分（另有社平 3 倍与 12 年两道封顶）' },
                 { key: 'other', label: '其他一次性补助', type: 'money', default: 0, hint: '医疗补助费、生活补助费等' },
-                { key: 'avgWage', label: '当地上年职工年平均工资', type: 'money', default: 0, sample: 120000, hint: '免税额度 = 该数 × 3' },
+                { key: 'avgWage', label: '当地上年职工年平均工资', type: 'money', default: 0, sample: 120000, hint: '离职补偿金的免税额度：当地上年职工年平均工资 3 倍以内的部分免征个税，超过的部分单独计税。\n计算公式：免税额度 = 当地上年职工年平均工资 × 3' },
                 { key: 'monthlyWage', label: '离职前月平均工资', type: 'money', default: 0, sample: 15000, hint: '用于校验是否超过法定经济补偿上限' },
                 { key: 'years', label: '本单位工作年限', type: 'number', default: 8, min: 0 },
                 { key: 'otherTaxable', label: '当年其他综合所得应纳税所得额', type: 'money', default: 0 }
             ],
             pitfalls: [
-                '免税额度是**当地上年职工年平均工资 × 3**，不是「月工资 × 3」，也不是全国一个数',
-                '超过法定标准（工资超社平 3 倍 / 年限超 12 年）的部分**不能享受免税**',
-                '离职补偿**不并入**综合所得，单独计税、且**不做按年限平均**'
+                '免税额度是当地上年职工年平均工资 × 3，不是「月工资 × 3」，也不是全国一个数',
+                '超过法定标准（工资超社平 3 倍 / 年限超 12 年）的部分不能享受免税',
+                '离职补偿不并入综合所得，单独计税、且不做按年限平均'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSeveranceQuick;
@@ -6741,9 +6786,9 @@
                 { key: 'monthlySalary', label: '领取当月工资薪金', type: 'money', default: 0, sample: 6000, when: { key: 'variant', in: ['internal'] }, hint: '内退一次性收入与当月工资合并计税' }
             ],
             pitfalls: [
-                '提前退休是**真分摊**：收入 ÷ 实际年数后按年计税，再乘回年数',
-                '内部退养**不是真分摊**：月均额只用来**定税率档**，计税基数仍是全额',
-                '两种情形都**没有**免税额度（与离职补偿的社平 3 倍不同）'
+                '提前退休是真分摊：收入 ÷ 实际年数后按年计税，再乘回年数',
+                '内部退养不是真分摊：月均额只用来定税率档，计税基数仍是全额',
+                '两种情形都没有免税额度（与离职补偿的社平 3 倍不同）'
             ],
             compute: function (v) {
                 var Q = window.EuriskoEarlyRetirementQuick;
@@ -6771,11 +6816,11 @@
                         { label: '月均额（仅用于定档）', value: i.monthly, kind: 'money' },
                         { label: '定档基数（月均 + 当月工资 − 5000）', value: i.base, kind: 'money' },
                         { label: '适用税率', value: i.rate, kind: 'percent' },
-                        { label: '计税基数（全额不摊）', value: i.taxable, kind: 'money', hint: '当月工资 + 一次性收入 − 5000' },
+                        { label: '计税基数（全额不摊）', value: i.taxable, kind: 'money', hint: '内部退养当月的计税基数：当月工资加上一次性收入，再减 5000 元的月减除费用' },
                         { label: '若误按「月均 × 月数」算', value: i.naiveTax, kind: 'money' },
                         { label: '少算的税额', value: i.naiveGap, kind: 'money' }
                     ],
-                    note: '内部退养：一次性收入与领取当月工资合并，先按月均额（÷ 所属月份数）确定税率档，再对**全额**计税 —— 平均只为定档，不是分摊。'
+                    note: '内部退养：一次性收入与领取当月工资合并，先按月均额（÷ 所属月份数）确定税率档，再对全额计税 —— 平均只为定档，不是分摊。'
                 };
             }
         },
@@ -6790,8 +6835,8 @@
                 { key: 'specialAnnual', label: '全年专项附加扣除合计', type: 'money', default: 0, sample: 36000, hint: '若改为享受专项附加扣除，可扣这么多' }
             ],
             pitfalls: [
-                '两条路径**二选一、不可叠加**，且**一年内不得变更**',
-                '免税的津补贴必须是**实报实销或限额内**的八类项目，现金补贴并不都能免',
+                '两条路径二选一、不可叠加，且一年内不得变更',
+                '免税的津补贴必须是实报实销或限额内的八类项目，现金补贴并不都能免',
                 '政策执行至 2027-12-31，到期后只能走专项附加扣除（本工具给出到期后的对照）'
             ],
             compute: function (v) {
@@ -6833,8 +6878,8 @@
                 { key: 'withdrawTotal', label: '预计领取总额', type: 'money', default: 0, hint: '填 0 则按「只回本金」估算' }
             ],
             pitfalls: [
-                '领取时按 **3% 单独计税**（不并入综合所得）—— 所以只有当前税率 > 3% 才划算',
-                '3% 税率档的人**净优惠为 0**，别被「每年省 360 元」的说法误导',
+                '领取时按 3% 单独计税（不并入综合所得）—— 所以只有当前税率 > 3% 才划算',
+                '3% 税率档的人净优惠为 0，别被「每年省 360 元」的说法误导',
                 '缴费环节扣除、投资环节免税、领取环节 3%，三段口径要分开看'
             ],
             compute: function (v) {
@@ -6873,9 +6918,9 @@
                 { key: 'taxableBefore', label: '扣除前全年应纳税所得额', type: 'money', default: 0, sample: 200000 }
             ],
             pitfalls: [
-                '限额是 **2400 元/年**不是 12000 元，节税上限 = 2400 × 45% = **1080 元/年**',
+                '限额是 2400 元/年不是 12000 元，节税上限 = 2400 × 45% = 1080 元/年',
                 '必须是带「税优识别码」的合规产品，普通商业健康险不能扣',
-                '与个人养老金不同：赔付环节**完全免税**，没有 3% 的领取税'
+                '与个人养老金不同：赔付环节完全免税，没有 3% 的领取税'
             ],
             compute: function (v) {
                 var Q = window.EuriskoHealthInsuranceQuick;
@@ -6909,8 +6954,8 @@
                 { key: 'monthlyWithdraw', label: '预计月领取额', type: 'money', default: 0, sample: 2000 }
             ],
             pitfalls: [
-                '个人缴费 **≤4%** 的部分当期免税，超过部分要并入工资计税',
-                '单位缴费是**递延**不是免税：领取时按「月度税率表」全额计税（不并入综合所得）',
+                '个人缴费 ≤4% 的部分当期免税，超过部分要并入工资计税',
+                '单位缴费是递延不是免税：领取时按「月度税率表」全额计税（不并入综合所得）',
                 '年度税率高于领取时的月度税率才划算，否则是「先免后补」'
             ],
             compute: function (v) {
@@ -6962,14 +7007,14 @@
                 { key: 'specialMonthly', step: 'detail', label: '专项附加扣除（月）', type: 'money', default: 0 }
             ],
             steps: [
-                { key: 'base', title: '核定缴费基数', why: '缴费基数**不是工资**：低于当地社平 60% 按下限保底、高于 300% 按上限封顶 —— 基数错一格，后面每一项都跟着错' },
-                { key: 'detail', title: '缴纳比例与扣除', why: '工伤、生育**个人不缴**；公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税，超出部分要并回工资计税' }
+                { key: 'base', title: '核定缴费基数', why: '缴费基数不是工资：低于当地社平 60% 按下限保底、高于 300% 按上限封顶 —— 基数错一格，后面每一项都跟着错' },
+                { key: 'detail', title: '缴纳比例与扣除', why: '工伤、生育个人不缴；公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税，超出部分要并回工资计税' }
             ],
             pitfalls: [
-                '缴费基数**不是工资**：低于社平 60% 保底、高于 300% 封顶',
+                '缴费基数不是工资：低于社平 60% 保底、高于 300% 封顶',
                 '工伤、生育个人不缴（生育已并入医保），算到手时扣掉就多扣了',
                 '公积金只有「比例 ≤ 12% 且基数 ≤ 社平 3 倍」的部分免征个税',
-                '到手工资**逐月变少**是累计预扣的正常结果（跳档后税率变高），不是算错'
+                '到手工资逐月变少是累计预扣的正常结果（跳档后税率变高），不是算错'
             ],
             compute: function (v) {
                 var S = window.EuriskoSocialQuick;
@@ -7023,15 +7068,15 @@
                 });
                 rows.push({ label: '公积金超标部分（并入工资计税）', value: s.housingTaxable, kind: 'money' });
                 // ④ 全年汇总：社保是按年看的支出，年度口径才是 HR 真正要拿走的那一版。
-                rows.push({ label: '全年个人缴纳', value: year(s.personalTotal), kind: 'money', hint: '月缴 × 12' });
-                rows.push({ label: '全年单位缴纳', value: year(s.employerTotal), kind: 'money', hint: '月缴 × 12' });
-                rows.push({ label: '全年个税', value: n.annualTax, kind: 'money', hint: '累计预扣，逐月相加而非「单月 × 12」' });
+                rows.push({ label: '全年个人缴纳', value: year(s.personalTotal), kind: 'money', hint: '全年数：把月缴额乘 12 个月。\n计算公式：全年缴纳 = 月缴 × 12' });
+                rows.push({ label: '全年单位缴纳', value: year(s.employerTotal), kind: 'money', hint: '全年数：把月缴额乘 12 个月。\n计算公式：全年缴纳 = 月缴 × 12' });
+                rows.push({ label: '全年个税', value: n.annualTax, kind: 'money', hint: '工资个税是累计预扣：逐月累计相加来算，不是拿某一个月的税额乘 12' });
                 rows.push({ label: '员工全年到手', value: n.annualNet, kind: 'money' });
                 rows.push({
                     label: '企业全年用工成本（1 人）',
                     value: year(s.wage + s.employerTotal),
                     kind: 'money',
-                    hint: '税前工资 + 单位五险一金；多人再乘人数'
+                    hint: '用工成本：税前工资加上单位为你缴的五险一金；多个人再乘人数'
                 });
                 return {
                     primary: { label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' },
@@ -7056,8 +7101,8 @@
                 { key: 'headcount', label: '人数', type: 'number', default: 1, min: 1, when: { key: 'variant', in: ['cost'] } }
             ],
             pitfalls: [
-                '成本倍数**不是常数 1.395**：工资低时因 60% 保底而更高，工资高时因 300% 封顶而更低',
-                '涨薪 1000 元，企业多花的**不止** 1395 元，员工到手也**拿不到** 1000 元',
+                '成本倍数不是常数 1.395：工资低时因 60% 保底而更高，工资高时因 300% 封顶而更低',
+                '涨薪 1000 元，企业多花的不止 1395 元，员工到手也拿不到 1000 元',
                 '「税楔」= 企业花掉但员工没拿到手的差额，是谈薪时最有说服力的一组数'
             ],
             compute: function (v) {
@@ -7142,14 +7187,14 @@
                 { key: 'hasUnion', step: 'exempt', label: '已建立工会组织', type: 'switch', default: false, when: { key: 'variant', in: ['union'] }, hint: '建会：40% 上缴、60% 留存；未建会：全额上缴' }
             ],
             steps: [
-                { key: 'scale', title: '人数与工资总额', why: '残保金看**上年在职职工人数**（30 人是临界点，31 人按全部 31 人算），工会经费看**全年工资总额** —— 两个数不是同一个口径，先把规模定下来' },
-                { key: 'exempt', title: '分档减缴与封顶', why: '实际安排比例决定**分档减缴**（≥1.5% 免征、≥1% 减半、<1% 按 90%）；计费工资按当地社平 **2 倍**封顶 —— 不是社保那个 300%' }
+                { key: 'scale', title: '人数与工资总额', why: '残保金看上年在职职工人数（30 人是临界点，31 人按全部 31 人算），工会经费看全年工资总额 —— 两个数不是同一个口径，先把规模定下来' },
+                { key: 'exempt', title: '分档减缴与封顶', why: '实际安排比例决定分档减缴（≥1.5% 免征、≥1% 减半、<1% 按 90%）；计费工资按当地社平 2 倍封顶 —— 不是社保那个 300%' }
             ],
             pitfalls: [
-                '**30 人是临界点不是起征点**：31 人按全部 31 人算，不是只对超出的 1 人算',
+                '30 人是临界点不是起征点：31 人按全部 31 人算，不是只对超出的 1 人算',
                 '应安排人数按 1.5% 计算可能是小数（31 人 → 0.465 人），不要四舍五入',
-                '计费工资按当地社平 **2 倍**封顶（不是社保的 3 倍）',
-                '**先安排第一个残疾人的减缴效果远高于后续**：分档减缴是边际递减的，招到第 3 个人时可能一分钱都省不了'
+                '计费工资按当地社平 2 倍封顶（不是社保的 3 倍）',
+                '先安排第一个残疾人的减缴效果远高于后续：分档减缴是边际递减的，招到第 3 个人时可能一分钱都省不了'
             ],
             compute: function (v) {
                 var Q = window.EuriskoDisabilityFundQuick;
@@ -7179,7 +7224,7 @@
                 };
                 var r = Q.levyOf(levyInput);
                 var rows = [
-                    { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text', hint: '人数 × 1.5%，保留小数' },
+                    { label: '应安排残疾人数', value: r.required.toFixed(2) + ' 人', kind: 'text', hint: '应安排的残疾人数：在职职工人数乘 1.5%（不足 1 人的按比例保留小数）' },
                     { label: '缺口人数', value: r.gap.toFixed(2) + ' 人', kind: 'text' },
                     { label: '实际安排比例', value: r.arrangedRatio, kind: 'percent' },
                     { label: '计费工资（社平 2 倍封顶）', value: r.avgWageUsed, kind: 'money', hint: r.capped ? '已封顶，上限 ' + Math.round(r.wageCap) + ' 元/年' : '未触及封顶' },
@@ -7248,9 +7293,9 @@
                 { key: 'data', title: '本期数据', why: '增值税按纳税期申报；先确认金额是否为含税价 —— 价外税必须价税分离后再计税' }
             ],
             pitfalls: [
-                '增值税是**价外税**：含税价必须先分离，直接「含税价 × 税率」会多算',
-                '小规模「季 30 万」是**临界点不是起征点**：超过即全额计税，且专票不免税',
-                '小规模适用简易计税、**不得抵扣进项**；一般纳税人抵不完的留抵下期、不倒欠'
+                '增值税是价外税：含税价必须先分离，直接「含税价 × 税率」会多算',
+                '小规模「季 30 万」是临界点不是起征点：超过即全额计税，且专票不免税',
+                '小规模适用简易计税、不得抵扣进项；一般纳税人抵不完的留抵下期、不倒欠'
             ],
             compute: function (v) {
                 var Q = window.EuriskoVatQuick;
@@ -7267,7 +7312,7 @@
                             { label: '法定 3% 对照', value: r.statutoryTax, kind: 'money' },
                             { label: '临界提示：再超 1 分即全额计税', value: r.cliffTax, kind: 'money', hint: '免征状态下再多 1 分钱的税额' }
                         ],
-                        note: '免征额度按**全部不含税销售额**判断、含本数；超过即按全额计税，不是只对超出部分计税。',
+                        note: '免征额度按全部不含税销售额判断、含本数；超过即按全额计税，不是只对超出部分计税。',
                         // 推导链（台账 C 同一套 step schema，由 utils.js 的 renderFormulaStepsHtml 渲染）：
                         // 小规模最容易错的一步就是「拿含税价和 30 万比」，所以第一步必须是价税分离。
                         steps: [
@@ -7281,7 +7326,7 @@
                                 totalLabel: '用于比较免征额度的销售额',
                                 totalValue: r.exclusive,
                                 format: 'money',
-                                footnote: '免征额度比的是**不含税**销售额；直接拿含税价和 30 万比，会把本该免征的算成应税。'
+                                footnote: '免征额度比的是不含税销售额；直接拿含税价和 30 万比，会把本该免征的算成应税。'
                             },
                             {
                                 title: '② 与免征额度比较：' + (r.exempt ? '未超过 → 普票部分免征' : '已超过 → 全额计税'),
@@ -7344,7 +7389,7 @@
                                 totalLabel: '应纳增值税（销项 − 进项）',
                                 totalValue: g.tax,
                                 format: 'money',
-                                footnote: '进项大于销项时留抵下期继续抵扣，**不倒欠**；简易计税 3% 对照为 ¥' + Number(g.simplifiedTax).toFixed(2) + '。'
+                                footnote: '进项大于销项时留抵下期继续抵扣，不倒欠；简易计税 3% 对照为 ¥' + Number(g.simplifiedTax).toFixed(2) + '。'
                             }
                         ]
                     };
@@ -7400,14 +7445,14 @@
                 { key: 'previousLoss', step: 'profit', label: '可弥补以前年度亏损', type: 'money', default: 0, when: { key: 'mode', in: ['adjust'] } }
             ],
             steps: [
-                { key: 'identity', title: '企业身份与规模', why: '小微三个条件是「且」的关系（应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万）且非限制/禁止行业；高新 15% 与小微 5% 不叠加，按税额孰优' },
-                { key: 'profit', title: '利润与纳税调整', why: '企业所得税算的是**利润**不是收入：会计利润还要把超限额的业务招待费、广宣费、公益性捐赠**调增**回来，才是申报表上的应纳税所得额' }
+                { key: 'identity', title: '企业身份与规模', why: '小微三个条件是「且」的关系（应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万）且非限制/禁止行业；高新 15% 与小微 5% 不叠加，哪个算出来的税低就用哪个' },
+                { key: 'profit', title: '利润与纳税调整', why: '企业所得税算的是利润不是收入：会计利润还要把超限额的业务招待费、广宣费、公益性捐赠调增回来，才是申报表上的应纳税所得额' }
             ],
             pitfalls: [
-                '小微实际税负 **5% 是乘出来的**（减按 25% 计入 × 20% 税率）',
-                '三个门槛是「**且**」的关系且是**临界点**：300 万交 15 万，301 万交 75.25 万 —— 多 1 万利润多缴 60.25 万税',
-                '高新 15% 与小微 5% **不叠加**，按孰优',
-                '纳税调整是**调增不是扣减**：超限额的业务招待费、广宣费、公益性捐赠要加回利润，直接按会计利润申报会少缴'
+                '小微实际税负 5% 是乘出来的（减按 25% 计入 × 20% 税率）',
+                '三个门槛是「且」的关系且是临界点：300 万交 15 万，301 万交 75.25 万 —— 多 1 万利润多缴 60.25 万税',
+                '高新 15% 与小微 5% 不叠加，哪个算出来的税低就用哪个',
+                '纳税调整是调增不是扣减：超限额的业务招待费、广宣费、公益性捐赠要加回利润，直接按会计利润申报会少缴'
             ],
             compute: function (v) {
                 var C = window.EuriskoCorporateQuick;
@@ -7440,14 +7485,14 @@
                     // 调整明细放在最前面：用户先看到「我的会计利润怎么变成应纳税所得额的」，
                     // 再看适用哪一档税率 —— 顺序反了会让人以为调增是税率的一部分。
                     rows.push({ label: '会计利润（收入 − 成本费用）', value: adjust.profit, kind: 'money' });
-                    rows.push({ label: '业务招待费调增', value: adjust.entertainment.addBack, kind: 'money', hint: '发生额 60% 与收入 5‰ 孰低后的差额' });
+                    rows.push({ label: '业务招待费调增', value: adjust.entertainment.addBack, kind: 'money', hint: '发生额的 60% 与收入的 5‰，取小的那个；超出的部分要调增回来' });
                     rows.push({ label: '广宣费调增', value: adjust.advertising.addBack, kind: 'money', hint: '超收入 15% 的部分，结转以后年度' });
                     rows.push({ label: '公益性捐赠调增', value: adjust.donation.addBack, kind: 'money', hint: '超利润总额 12% 的部分，结转三年' });
                     rows.push({ label: '纳税调增合计', value: adjust.totalAddBack, kind: 'money' });
                     rows.push({ label: '弥补以前年度亏损', value: Math.min(Number(v.previousLoss) || 0, adjust.adjustedProfit), kind: 'money' });
                 }
                 rows.push({ label: '应纳税所得额', value: r.taxable, kind: 'money' });
-                rows.push({ label: '适用身份', value: regimeText, kind: 'text', hint: '按税额孰优选取；小微与高新不叠加' });
+                rows.push({ label: '适用身份', value: regimeText, kind: 'text', hint: '哪个算出来的税低就用哪个；小微与高新不叠加' });
                 rows.push({ label: '实际税负率', value: r.effectiveRate, kind: 'percent' });
                 rows.push({ label: '按法定 25% 对照', value: r.statutoryTax, kind: 'money' });
                 rows.push({ label: '优惠减免', value: r.saving, kind: 'money' });
@@ -7465,7 +7510,7 @@
                     primary: { label: '应纳企业所得税', value: r.tax, kind: 'money' },
                     rows: rows,
                     note: adjust
-                        ? '应纳税所得额 = 会计利润 + 纳税调增 − 可弥补亏损；三大限额（招待费 60% 与 5‰ 孰低、广宣费 15%、捐赠 12%）以注册表状态为准。'
+                        ? '应纳税所得额 = 会计利润 + 纳税调增 − 可弥补亏损；三大限额（招待费按「发生额 60% 与收入 5‰ 取小」、广宣费 15%、捐赠 12%）以注册表状态为准。'
                         : '小微优惠需同时满足：年应纳税所得额 ≤ 300 万、从业人数 ≤ 300 人、资产总额 ≤ 5000 万，且从事国家非限制和禁止行业（至 2027-12-31，以注册表状态为准）。'
                 };
             }
@@ -7482,7 +7527,7 @@
             fields: [
                 { key: 'variant', step: 'identity', label: '算哪一项', type: 'select', default: 'surtax', options: [{ value: 'surtax', label: '附加税（城建 + 教育费附加）' }, { value: 'stamp', label: '印花税' }] },
                 { key: 'location', step: 'basis', label: '所在地', type: 'select', default: 'urban', options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }], when: { key: 'variant', in: ['surtax'] } },
-                { key: 'vat', step: 'basis', label: '实际缴纳的增值税', type: 'money', default: 0, sample: 100000, when: { key: 'variant', in: ['surtax'] }, hint: '计税依据是**实缴**税额，不是销售额 —— 增值税为零时附加税也为零' },
+                { key: 'vat', step: 'basis', label: '实际缴纳的增值税', type: 'money', default: 0, sample: 100000, when: { key: 'variant', in: ['surtax'] }, hint: '计税依据是实缴税额，不是销售额 —— 增值税为零时附加税也为零' },
                 { key: 'consumption', step: 'basis', label: '实际缴纳的消费税', type: 'money', default: 0, when: { key: 'variant', in: ['surtax'] } },
                 { key: 'item', step: 'basis', label: '税目', type: 'select', default: 'sale', options: [
                     { value: 'sale', label: '买卖合同（万分之三）' },
@@ -7512,9 +7557,9 @@
                 { key: 'basis', title: '计税依据', why: '这一步反复核对的依据：附加税看实际缴纳的增值税与消费税，印花税看凭证金额且不含单独列明的增值税' }
             ],
             pitfalls: [
-                '附加税的计税依据是**实际缴纳的增值税 + 消费税**，不是销售额，也不是申报表的应纳数',
-                '印花税计税依据**不含单独列明的增值税**；未分别列明的，从高适用税率',
-                '证券交易印花税**不享受**六税两费减半（且仅对卖方征收）'
+                '附加税的计税依据是实际缴纳的增值税 + 消费税，不是销售额，也不是申报表的应纳数',
+                '印花税计税依据不含单独列明的增值税；未分别列明的，从高适用税率',
+                '证券交易印花税不享受六税两费减半（且仅对卖方征收）'
             ],
             compute: function (v) {
                 var Q = window.EuriskoSurtaxQuick;
@@ -7568,8 +7613,8 @@
                 { key: 'halve', label: '享受经营所得减半', type: 'switch', default: false, hint: '应纳税所得额 ≤ 200 万的部分减半（至 2027-12-31）' }
             ],
             pitfalls: [
-                '经营所得用的是**五级**税率表（5%~35%），不是工资那张七级表',
-                '核定征收**不扣成本、不扣 6 万、不扣专项附加**，利润薄时反而比查账交得多',
+                '经营所得用的是五级税率表（5%~35%），不是工资那张七级表',
+                '核定征收不扣成本、不扣 6 万、不扣专项附加，利润薄时反而比查账交得多',
                 '减半只减「应纳税所得额 ≤ 200 万那部分对应的税额」，不是全额减半'
             ],
             compute: function (v) {
@@ -7590,8 +7635,8 @@
                     rows: [
                         { label: '核定征收税额', value: r.assessed.tax, kind: 'money' },
                         { label: '查账征收税额', value: r.audited.tax, kind: 'money' },
-                        { label: '两者差额', value: r.diff, kind: 'money', hint: '正数 = 查账更省' },
-                        { label: '核定应纳税所得额', value: r.assessed.taxable, kind: 'money', hint: '收入 × 应税所得率，不扣成本' },
+                        { label: '两者差额', value: r.diff, kind: 'money', hint: '正数表示查账征收比核定征收更省税' },
+                        { label: '核定应纳税所得额', value: r.assessed.taxable, kind: 'money', hint: '核定征收下，应纳税所得额按「收入 × 应税所得率」算，不再扣成本费用' },
                         { label: '查账应纳税所得额', value: r.audited.taxable, kind: 'money' },
                         { label: '查账利润（收入 − 成本）', value: r.audited.profit, kind: 'money' },
                         { label: '业主费用扣除', value: r.audited.investorDeduction, kind: 'money' },
@@ -7701,31 +7746,18 @@
     //   这与「按名字认人的表，每加一种形态就漏一批」是同一个病，同一剂药（按 id 认，不按位置认）。
     //
     // 判定标准只有一条：**不填也能算出结果**（有 default 兜底）、填了更准的，才标 advanced。
-    // 据此三条硬边界：
+    // 据此两条硬边界：
     //   ① 主输入不标（月工资 / 收入总额 / 成本 / 各类金额）—— 藏起来不叫简洁，叫算不出来；
     //   ② 决定「这次算什么」的分支不标（身份 / 情形 / 征收方式 / 是否并入 / 是否享受）：
-    //      藏了等于悄悄换掉工具语义，用户会以为自己算的是另一件事；
-    //   ③ 整步都是可选的 → 标**步级**（简明下合并成一步「补充参数（可选）」）；
-    //      步内只剩一部分可选 → 标字段级（收进「⚙ 更多参数（可选）」折叠块）。
-    //      两者**不叠加**：同一个字段既在 advanced 步里又自带 level，会折出两层折叠。
+    //      藏了等于悄悄换掉工具语义，用户会以为自己算的是另一件事。
+    //
+    // v1.142.0 第三轮：**步级 advanced 整档取消** —— 原先它把整步收起并挪到最后。
+    // 而位置本身也是语义：开场第一问不能因为它有默认值就往后放 —— 综合所得的「工作几个月」
+    // 被挪到最后时，用户已经把收入录完，回头改月数等于把前面那一屏重录一遍。
+    // 步该排在哪个位置，今后由 spec 的声明顺序说了算（见 deep-wizard-ui 的 stepsOf），
+    // 只有**步内**的可选字段仍收进「更多参数（可选）」。
     //
     // 速算器一个都不标（沿用 19-7a 的口径）：它们只有 2~5 个字段且全部必填。
-    // 19-7a 已在 6 个高频 spec 的 steps 上写了步级 level，那 6 处保持原样，这里不重复声明。
-    var ADVANCED_STEPS = {
-        // 津补贴免税之外的专项附加扣除：expat 的主线是八类津补贴，这一整步都是「另外还能扣多少」
-        'expat-deep': ['special'],
-        // 汇算的四项可选扣除（大病医疗 / 其他扣除 / 专项附加怎么取）与已预缴，全有兜底
-        'annual-settlement-deep': ['deduction', 'prepaid'],
-        // 学历继续教育 / 职业资格 / 大病医疗：绝大多数人这几项是 0
-        'special-deduction-deep': ['other'],
-        // 是否高新 / 科技型中小 / 限制行业（三个都有「否」兜底）与研发加计、亏损台账
-        'corporate-income-tax-deep': ['identity', 'deduction'],
-        // 六税两费减半：政策开关，默认享受
-        'surtax-stamp-deep': ['policy'],
-        // 数月奖金：非居民当月没有这笔就不填，默认 0 也不影响工资部分
-        'non-resident': ['bonus']
-    };
-
     var ADVANCED_FIELDS = {
         // 全年其他综合所得：填 0 表示全年只有这一笔（预扣口径不需要它）
         'withholding-deep': ['otherTaxable'],
@@ -7756,20 +7788,12 @@
             'businessTaxable', 'businessVerified', 'classificationTaxable', 'classificationType',
             'employerCount', 'hasReceipt'
         ],
-        // 谈薪倒算：扣除明细一整片都是「不填按 0」，主目标与口径选择保留在明面
-        'reverse': [
-            'workMonths', 'bonusIncome', 'bonusInclude',
-            'socialBase', 'pensionRate', 'medicalRate', 'unemploymentRate',
-            'housingFundBase', 'housingFundRate',
-            'pensionInsurance', 'medicalInsurance', 'unemploymentInsurance', 'housingFund',
-            'childrenInfantDeduction', 'elderlyDeduction', 'housingType', 'rentDeduction', 'housingLoanDeduction',
-            'educationDeduction', 'educationProfessionalCheckbox', 'medicalDeduction',
-            'otherDeductionCheckbox', 'pensionDeductionCheckbox', 'pensionDeduction',
-            'enterpriseAnnuityCheckbox', 'enterpriseAnnuity',
-            'insuranceOtherDeductionCheckbox', 'insuranceOtherDeduction',
-            'taxDeferredPensionCheckbox', 'taxDeferredPension',
-            'charitableDonationCheckbox', 'charitableDonation'
-        ],
+        // v1.142.0 第三轮：reverse（反向倒算）整条**删除出这份名单**。
+        // 它原先在名单里的理由成立过（「不填按 0」= 可后填），但判定标准第 ② 条当时也适用：
+        // 这一批字段就是「扣除项明细」那一屏的**全部内容**，全折起来之后那一屏只剩两颗勾选框，
+        // 用户得先展开一层才看得见自己要填什么 —— 谈薪场景下他要核的恰恰是这几个数
+        // （社保到底扣多少、有没有专项附加），藏起来等于把这一屏的存在意义收掉了。
+        // 这也是 1.17 那页的原样：扣除明细一整屏平铺，没有第二层。
         // 简易计税的法定情形、小规模纳税期与专票销售额、免税与简易项目、共同进项分摊
         'vat-deep': ['simplifiedCase', 'period', 'specialInvoice', 'exemptSales', 'simplifiedSales', 'unallocatedInput'],
         // 三项限额扣除（招待费 / 广告费 / 捐赠）：不填按 0，填了才做限额调整
@@ -7791,13 +7815,6 @@
     };
 
     (function applyAdvancedLevels() {
-        Object.keys(ADVANCED_STEPS).forEach(function (id) {
-            var t = get(id);
-            if (!t || !t.steps) return;
-            t.steps.forEach(function (s) {
-                if (ADVANCED_STEPS[id].indexOf(s.key) >= 0) s.level = 'advanced';
-            });
-        });
         Object.keys(ADVANCED_FIELDS).forEach(function (id) {
             var t = get(id);
             if (!t || !t.fields) return;

@@ -58,14 +58,14 @@
             return {
                 value: donor,
                 label: '原捐赠人取得该房屋的实际购置成本',
-                note: '受赠取得的房屋再转让：房屋原值是**原捐赠人**的实际购置成本（财税〔2009〕78 号五）—— 不是 0，也不是受赠时的评估价'
+                note: '受赠取得的房屋再转让：房屋原值是原捐赠人的实际购置成本（财税〔2009〕78 号五）—— 不是 0，也不是受赠时的评估价'
             };
         }
         if (input.acquireType === 'inherit') {
             return {
                 value: own,
                 label: '被继承人取得该房屋的实际购置成本',
-                note: '继承取得的房屋再转让：房屋原值按**被继承人**取得该房屋的实际购置成本确定'
+                note: '继承取得的房屋再转让：房屋原值按被继承人取得该房屋的实际购置成本确定'
             };
         }
         return {
@@ -140,7 +140,7 @@
             rows: rows, cheapest: cheapest, verify: rows[0],
             gap: Math.max(0, rows[0].tax - cheapest.tax),
             range: r.assessRange,
-            note: '有完整原值凭证的**必须查账**，核定只是凭证不全时的替代 —— 「哪个省选哪个」不成立'
+            note: '有完整原值凭证的必须查账，核定只是凭证不全时的替代 —— 「哪个省选哪个」不成立'
         };
     }
 
@@ -159,7 +159,7 @@
         var refund = taxPaidIIT * ratio;
         var reasons = [];
         if (!isResidence(input)) {
-            reasons.push('换购退税只适用于**住房**，转让非住房不在政策范围内（国税发〔2007〕33 号二）');
+            reasons.push('换购退税只适用于住房，转让非住房不在政策范围内（国税发〔2007〕33 号二）');
         }
         if (isResidence(input) && input.repurchase) {
             if (!input.sameCity) reasons.push('新购住房与现住房不在同一城市（同一直辖市、副省级城市、地级市所辖全部行政区划）');

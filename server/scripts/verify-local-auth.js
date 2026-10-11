@@ -559,6 +559,11 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const helperFnJs = await request(PORT, 'GET', '/src/js/calculation/helper-functions.js');
         const toolRegJs = await request(PORT, 'GET', '/src/js/data/tool-registry.js');
         const wizardJs = await request(PORT, 'GET', '/src/js/ui/deep-wizard-ui.js');
+        // v1.142.0：完整测算的入口接线从 app.js 那 4 颗隐藏按钮（`${id}-mode-btn`）迁到了工具箱
+        // 的 openTool（4 张静态卡也一并删了）。下面那条 `homeAppJs.includes('EuriskoDeepWizard')`
+        // 因此不再成立 —— 它不是这条红线的意图：**"点了能不能真的进向导"**才是。接线在哪儿守哪儿，
+        // 于是改在这里加载工具箱渲染器来验。断言放宽（换对象）必须写明理由，否则就是放水。
+        const toolboxUiJs = await request(PORT, 'GET', '/src/js/ui/toolbox-ui.js');
         // v1.47.0 / v1.48.0 删掉经营所得页与反向倒算页之后，这里从「两页面版 + 经营所得向导 spec」
         // 缩到「只剩正向一个页面版 + 两个向导 spec（business / reverse）」；
         // v1.49.0（17B-3）把正向页也删了 —— 从此**三个已迁移的工具**（business / reverse /
@@ -612,7 +617,10 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && wizardJs.raw.includes('function bindDerivedSources')
             && wizardJs.raw.includes('function renderWarnings')
             && homeAppJs.status === 200 && !homeAppJs.raw.includes('business-social-security-base')
-            && homeAppJs.raw.includes('EuriskoDeepWizard')
+            // v1.142.0：入口改由工具箱统一接线（不再经过 app.js 的隐藏按钮）——
+            // 21 个完整测算点下去都走 openTool → EuriskoDeepWizard.has/open 这一条
+            && toolboxUiJs.status === 200 && toolboxUiJs.raw.includes('window.EuriskoDeepWizard')
+            && toolboxUiJs.raw.includes('W.open(tool.id')
             && helperFnJs.status === 200 && !helperFnJs.raw.includes('function calculateBusinessInsurance')
             && !helperFnJs.raw.includes('function calculateReverseSocialSecurity'),
             `HTTP ${toolRegJs.status}/${wizardJs.status}`);
@@ -1488,12 +1496,13 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             indexPage.status === 200 && toolCards === 20 && indexPage.raw.includes('"numberOfItems": 20'),
             `HTTP ${indexPage.status}, cards=${toolCards}`);
         const appHome = await request(PORT, 'GET', '/');
-        // v1.123.0：主应用每页常驻页尾删除（页尾时代它带着 ?source=app_footer 参数的
-        // 「测算工具总目录」链接），落点改为首页 quick-seo-link。门禁守的是
-        // 「App 内到落地页总目录的**通路**存在」，不再死盯页尾参数 —— 否则页尾一删，
-        // 通路明明还在，门禁却永远红。
-        record('App 首页有落地页总目录通路（防 App 内无通路）',
-            appHome.status === 200 && appHome.raw.includes('href="/seo/index.html"'),
+        // v1.142.x：这里原先守「App 内有到落地页目录的**外跳**通路」（页尾删掉后落点改到
+        // 速算器页底部的 quick-seo-link）。而 v1.141.0 的入口纪律禁止这种 target=_blank：
+        // PWA standalone / 微信内置浏览器里会**跳出应用容器**。现在那颗链接换成站内税率表
+        // 弹窗，门禁跟着守**站内**这条通路 —— 落地页是站外引流用的，App 内用户不需要回去；
+        // 落地页之间是不是孤岛，由上面 orphanPages 那条守着。
+        record('App 内有税率表通路（站内弹窗，不外跳）',
+            appHome.status === 200 && appHome.raw.includes('id="quick-rate-table"'),
             `HTTP ${appHome.status}`);
     } catch (e) {
         record('前端资源冒烟', false, e.message);
