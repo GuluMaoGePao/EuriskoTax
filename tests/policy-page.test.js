@@ -14,6 +14,14 @@
  *
  * 代价：正文存在两份（页面 + 弹窗）。这份测试就是为这个代价兜底的 ——
  * 逐字比对两份正文，改一边忘另一边直接红。
+ *
+ * v1.141.0 补一条**入口**纪律（判据①的口径收紧）：
+ *   页面是「被分享 / 被打印 / 被 URL 直达」的**终点**，不是 App 的导航节点。
+ *   之前「关于」里那两条协议是 `href="xxx.html" target="_blank"` —— 在 PWA
+ *   （manifest 的 display: standalone）与微信内置浏览器里，target=_blank 会**跳出
+ *   应用容器**、另开一个系统窗口，用户看到的是「点一下隐私政策，App 没了」；而页面顶部
+ *   又有一条「← 返回 EuriskoTax」把人送回 App，于是形成 App → 页面 → App 的环。
+ *   现在：入口一律走 openPolicyModal 弹层，页面不再反向导航回 App。
  */
 const fs = require('fs');
 const path = require('path');
@@ -94,9 +102,18 @@ describe('协议有独立页面（可分享 / 可打印 / 静态可访问）', (
         expect(read('agreement.html')).toContain('href="privacy.html"');
         expect(read('privacy.html')).toContain('href="agreement.html"');
     });
+
+    // v1.141.0：页面顶部原本有一条「← 返回 EuriskoTax」。它是**回 App 的入口**，
+    // 与 App 里的协议弹窗结成回路（App → 页面 → App → 页面…），PWA 里每绕一圈就多一个
+    // 系统窗口。协议页只做「分享 / 打印 / URL 直达」，回 App 交给浏览器返回键。
+    test('协议页面不留回 App 的入口（不结 页面 → App 的环）', () => {
+        PAIRS.forEach(({ page }) => {
+            expect(read(page)).not.toMatch(/href="[^"]*index\.html"/);
+        });
+    });
 });
 
-describe('入口分工：表单内用弹窗，纯阅读走页面', () => {
+describe('入口纪律：App 内一律弹窗，页面只当终点', () => {
     // 注册表单勾选行 / 登录·注册 Tab 下的同意行 / 留资同意行 —— 这些地方跳走会丢已填内容
     const FORM_ENTRIES = [
         'register-agree',      // 注册表单勾选
@@ -121,17 +138,24 @@ describe('入口分工：表单内用弹窗，纯阅读走页面', () => {
         expect(FORM_ENTRIES.length).toBe(3);
     });
 
-    test('「关于」里的协议走页面（纯阅读，没有要保的表单）', () => {
+    test('「关于」里的协议走弹窗（target=_blank 会在 PWA / 微信里跳出容器）', () => {
         const at = HTML.indexOf('id="about-modal"');
         // 切到下一个弹窗为止：窗口给大了会串进后面弹窗里的 openPolicyModal
         const next = HTML.indexOf('id="lead-modal"');
         const block = HTML.slice(at, next > at ? next : at + 3000);
-        expect(block).toContain('href="agreement.html"');
-        expect(block).toContain('href="privacy.html"');
-        expect(block).not.toContain('openPolicyModal');
+        expect(block).toContain("openPolicyModal(event, 'user-agreement-modal')");
+        expect(block).toContain("openPolicyModal(event, 'privacy-policy-modal')");
+        // 协议正文是页内阅读：不许再有「点了就另开一个系统窗口」的直链
+        expect(block).not.toMatch(/href="(agreement|privacy)\.html"/);
     });
 
-    test('弹窗底部给出去页面的路（不把要分享/打印的人锁在弹窗里）', () => {
+    // v1.141.0：这条原本是**正向**断言（"弹窗底部必须给出去页面的路"），现在反过来 ——
+    // 那条「在页面打开（可分享 / 打印）↗」是一条**从弹窗往外跳**的入口：在 PWA
+    // （display: standalone）与微信内置浏览器里，它会跳出应用容器、另开一个系统窗口，
+    // 用户看到的是「点一下协议，App 没了」。协议正文在弹窗内已完整可读（可滚动、能翻到
+    // 最后一节），"可分享 / 可打印"由独立页面自己的 URL 承担（被分享方直达、搜索引擎可收），
+    // 不需要 App 内再留一颗外跳按钮。
+    test('协议弹窗不再给出外跳入口（App 内读协议不出容器）', () => {
         PAIRS.forEach(({ modal, page }) => {
             const at = HTML.indexOf(`id="${modal}"`);
             // 两个协议弹窗紧挨着：窗口切到下一个弹窗为止，免得串味
@@ -139,8 +163,56 @@ describe('入口分工：表单内用弹窗，纯阅读走页面', () => {
                 ? HTML.indexOf('id="privacy-policy-modal"')
                 : HTML.indexOf('id="about-modal"');
             const block = HTML.slice(at, next > at ? next : at + 3000);
-            expect(block).toContain(`href="${page}"`);
+            expect(block).not.toContain(`href="${page}"`);
+            expect(block).not.toMatch(/target="_blank"/);
         });
+    });
+});
+
+describe('协议弹窗在 App 内叠开（v1.141.0）', () => {
+    // 协议弹窗的控制函数是 index.html 里的**内联脚本**（不依赖任何外部 JS 的加载时序），
+    // 所以这里把那一段原样切出来 eval —— 跑的就是真机上跑的那一份，不是重写的等价物。
+
+    // 叠开的两件事必须同时成立：
+    //   ① 层级：协议弹窗在 HTML 里排在「关于」之前，同级 z-index 下**后插入者盖住先插入者**；
+    //      不做处理的话，从「关于」点开协议 = 看见遮罩、看不见正文。
+    //   ② 背景锁：关掉协议时「关于」还开着，此时解锁 body 滚动 = 弹窗在、背景却在滚。
+    const START = HTML.indexOf('var _policyEscHandler');
+    const END = HTML.indexOf('// ===== 通用弹窗自包含兜底', START);
+    const POLICY_JS = HTML.slice(START, END);
+
+    function mountStack() {
+        (0, eval)(POLICY_JS);
+        // 复刻真机的 DOM 顺序：协议弹窗在前，「关于」是被后插入的那个
+        document.body.innerHTML =
+            '<div id="privacy-policy-modal" class="modal-mask hidden opacity-0"><div class="modal-shell"></div></div>' +
+            '<div id="about-modal" class="modal-mask"><div class="modal-shell"></div></div>';
+        document.body.style.overflow = 'hidden'; // 「关于」打开时已经锁了背景
+    }
+
+    test('内联脚本切得出来（协议弹窗仍自带控制函数，不依赖外部模块）', () => {
+        expect(START).toBeGreaterThan(-1);
+        expect(POLICY_JS).toContain('function openPolicyModal');
+        expect(POLICY_JS).toContain('function closePolicyModal');
+    });
+
+    test('从「关于」里打开协议：协议被提到 body 末尾（不被后插入的「关于」盖住）', () => {
+        mountStack();
+        openPolicyModal(new Event('click'), 'privacy-policy-modal');
+        const kids = Array.from(document.body.children);
+        expect(kids[kids.length - 1].id).toBe('privacy-policy-modal');
+        expect(document.getElementById('privacy-policy-modal').classList.contains('hidden')).toBe(false);
+    });
+
+    test('关掉协议时「关于」还开着：背景滚动锁保持（两层都关才解锁）', () => {
+        mountStack();
+        openPolicyModal(new Event('click'), 'privacy-policy-modal');
+        closePolicyModal('privacy-policy-modal');
+        expect(document.body.style.overflow).toBe('hidden');
+
+        document.getElementById('about-modal').classList.add('hidden');
+        closePolicyModal('privacy-policy-modal');
+        expect(document.body.style.overflow).toBe('');
     });
 });
 

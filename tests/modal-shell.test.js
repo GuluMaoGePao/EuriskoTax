@@ -17,6 +17,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 const HTML = read('index.html');
 const CSS = read('src/css/ui-redesign.css');
+// v1.141.0：控件类（.input-field / .btn / .label）在**组件层**收口字号，不在弹窗样式层，
+// 所以查控件字号必须读这一份 —— 只读 ui-redesign.css 会查到空串。
+const APP_CSS = read('src/css/tailwind.src.css');
 const TOKENS = read('src/css/tokens.css');
 // 4 处 JS 动态生成的弹窗模板
 const JS_TPL = [
@@ -176,8 +179,13 @@ describe('遮罩层：底色与层级走令牌', () => {
 
     // 15 = 此前 14 处 + v1.139.0「我是谁」身份弹窗
     test('15 处背景层都换成 modal-mask', () => {
-        const all = [HTML, ...JS_TPL.map(read)].join('\n');
-        expect((all.match(/modal-mask/g) || []).length).toBe(15);
+        // v1.141.0：只数**真正挂在元素上**的那一次（HTML 的 class 属性 / JS 的 className
+        // 赋值）。注释里提一句、或选择器里用到（closePolicyModal 的「还有别的弹窗开着吗」
+        // 就是这么查的）都不算 —— 否则每解释一遍这个类名，数字就得跟着改一次，
+        // 而它能守的东西（有没有漏改的遮罩层）一点没变。
+        const inHtml = (HTML.match(/class="[^"]*modal-mask/g) || []).length;
+        const inJs = (JS_TPL.map(read).join('\n').match(/className\s*=\s*'modal-mask/g) || []).length;
+        expect(inHtml + inJs).toBe(15);
     });
 });
 
@@ -219,6 +227,33 @@ describe('滚动条粗细统一', () => {
         expect(start).toBeGreaterThan(-1);
         const block = CSS.slice(start, CSS.indexOf('.modal-body::-webkit-scrollbar-track'));
         expect(block).toContain('width: 6px');
+    });
+});
+
+// v1.141.0：所有弹窗共用同一个遮罩层级令牌，**同级 z-index 下 DOM 顺序决定谁在上面**。
+// alert / confirm 在 HTML 里排在留资、公告、身份弹窗之前 —— 不挪的话，在留资之上弹一句
+// 校验提示，用户看到的是遮罩、看不到那句话（真机表现：点了提交，毫无反应）。
+describe('叠开时后打开的必须在最上层', () => {
+    // index.html 内联的通用弹窗兜底（auth-ui 加载前就管用），原样切出来 eval
+    const GS = HTML.indexOf('var _genericModalStack');
+    const GENERIC_JS = HTML.slice(GS, HTML.indexOf('</script>', GS));
+
+    test('在留资弹窗之上打开 alert：alert 被挪到 body 末尾', () => {
+        (0, eval)(GENERIC_JS);
+        document.body.innerHTML =
+            '<div id="alert-modal" class="modal-mask hidden"><div class="modal-shell"></div></div>' +
+            '<div id="lead-modal" class="modal-mask"><div class="modal-shell"></div></div>';
+        openModal(document.getElementById('alert-modal'));
+        const kids = Array.from(document.body.children);
+        expect(kids[kids.length - 1].id).toBe('alert-modal');
+    });
+
+    // 两份实现（index.html 内联兜底 + auth-ui 加载后覆盖的那个）必须同口径，
+    // 否则「脚本加载完成后弹窗层级变了」这种只在真机偶现的事根本没法查。
+    test('auth-ui 那份 openModal 与内联兜底同口径（都是无条件挪到末尾）', () => {
+        const src = read('src/js/auth/auth-ui.js');
+        expect(src).toContain('if (modal.parentNode) document.body.appendChild(modal);');
+        expect(src).not.toContain('parentNode !== document.body');
     });
 });
 
@@ -311,11 +346,20 @@ describe('表单型弹窗（意见反馈 / 留资 / 升级码）：宽度与内�
         });
     });
 
-    test('.modal-form 收口了控件字号，且旧的那条 #lead-modal 规则已收编', () => {
-        const start = CSS.indexOf('.modal-form {');
+    // v1.141.0：这条从「.modal-form 收口」改成「.input-field 自己收口」。
+    // 原先的收口挂在 .modal-form 上，于是**只有弹窗内的控件是 14px**，登录页与二级页
+    // 表单里的同一颗 .input-field 仍继承 body 的 16px —— 弹窗内外两个字号，新增控件时
+    // 还得逐个补 text-sm。上移到 .input-field 本体后，"该多大"只有一个答案。
+    // 断言跟着改成守两件事：① 控件类自己声明字号；② 不再有容器级的第二处口径。
+    test('.input-field 自己收口了控件字号，不再靠容器给', () => {
+        const start = APP_CSS.indexOf('.input-field {');
         expect(start).toBeGreaterThan(-1);
-        expect(CSS).toContain('.modal-form .input-field');
-        // 收编前是 #lead-modal .input-field —— 只有留资生效，新增表单弹窗吃不到
-        expect(CSS).not.toMatch(/#lead-modal \.input-field/);
+        // 取到块尾，不按字符数切 —— 声明前面有一段"为什么这么写"的注释，
+        // 下次补一句就会把 font-size 挤出定长窗口（假失败，不是真回归）。
+        const block = APP_CSS.slice(start, APP_CSS.indexOf('}', start));
+        expect(block).toMatch(/font-size:\s*var\(--fs-sm/);
+        // 收编前是 #lead-modal .input-field（只有留资生效），再之前是 .modal-form 的容器级收口
+        expect(APP_CSS).not.toMatch(/#lead-modal \.input-field/);
+        expect(CSS).not.toMatch(/\.modal-form\s+\.input-field\s*\{[^}]*font-size/);
     });
 });

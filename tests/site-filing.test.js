@@ -84,7 +84,10 @@ describe('备案位落点：App 内没有每页页尾，弹窗是唯一落点', 
     test('「关于我们」弹窗内有备案容器（App 内用户够得着的唯一落点）', () => {
         const start = INDEX.indexOf('id="about-modal"');
         expect(start).toBeGreaterThan(-1);
-        const block = INDEX.slice(start, start + 6000).split('<!-- 阶段11')[0];
+        // 窗口 6000 → 9000（v1.141.0）：「关于」里补了「能算什么 / 怎么用」两段，备案位
+        // 被推到 6600+ 字符处。守的是**备案容器仍在这个弹窗内**（不落去别处），
+        // 窗口只是切块用的尺子 —— 内容变长就把尺子放长，别反过来把备案号挤走。
+        const block = INDEX.slice(start, start + 9000).split('<!-- 阶段11')[0];
         expect(block).toContain('id="site-filing"');
     });
 
