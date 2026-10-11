@@ -103,6 +103,25 @@ describe('工具注册表：数量与分组', () => {
         // 在这里会直接把「售价」当「所得」（口径同源改由 property-transfer-quick.js + 逐点对拍守护）
     });
 
+    // 工具页的完整测算组按同一套场景分组（salary / special / prefer / social / corp）分小节渲染，
+    // 分组由 X-deep 从速算器继承、没有孪生的那 7 个写在 spec 上。**漏写 group 的那一张不会报错**，
+    // 它只会沉到兜底小节里 —— 所以这里逐个钉住，别等它沉下去才发现"加的那个工具没出现在它该在的地方"。
+    test('每个完整测算都归了组（工具页按场景分小节，漏写会沉底）', () => {
+        const groupIds = R().groups().map((g) => g.id);
+        R().deep().forEach((t) => {
+            expect(groupIds).toContain(t.group);
+        });
+    });
+
+    // 用户搜索时**不区分两版**：他打的是自己脑子里的词，不是我们的 ids 后缀。
+    // ALIASES 挂在速算器 id 上，X-deep 若不继承，搜「五险一金」就只出速算器那一张 ——
+    // 明明两版是同一件事，检索却只在其中一版里找，等于替用户决定了他要用哪个。
+    test('X-deep 继承同名速算器的别名（这几个词只写在速算器上）', () => {
+        expect(R().search('五险一金').deep.map((t) => t.id)).toContain('social-base-deep');
+        expect(R().search('跳槽').deep.map((t) => t.id)).toContain('annual-settlement-deep');
+        expect(R().search('工会经费').deep.map((t) => t.id)).toContain('disability-fund-deep');
+    });
+
     // 用测试钉住 17A-5 的硬约束：spec 驱动的完整测算**不许**自带一份 fields / compute，
     // 必须与同口径速算器是**同一个对象引用**（toBe 而非 toEqual）。
     // 复制一份就会出现「同一个增值税、速算器与完整测算算出两个数」的口径漂移，

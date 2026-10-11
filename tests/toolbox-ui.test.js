@@ -174,15 +174,51 @@ describe('工具页', () => {
     });
 
     // ====== T3（阶段20 P2）：场景锚点条 ======
-    test('锚点条按当前视图生成（默认 5 组 + 完整测算）', () => {
+    // chip 上存的是 **DOM id** 而不是组名：完整测算的子小节与速算侧的组同名却是两个节点，
+    // 按名字找会跳错地方（这是真实发生过的：两边都叫 salary，锚点永远跳到速算那一组）。
+    test('锚点条按当前视图生成（默认 5 组 + 完整测算，值是 DOM id）', () => {
         const chips = Array.from(document.querySelectorAll('#toolbox-anchors .tool-anchor-chip'));
         expect(chips.length).toBe(6);
-        expect(chips[chips.length - 1].getAttribute('data-anchor')).toBe('deep');
+        expect(chips[chips.length - 1].getAttribute('data-anchor')).toBe('toolbox-deep');
+        // 每颗 chip 都必须指向一个真实存在的节点 —— 否则点了没反应，而它看起来完全正常
+        chips.forEach((chip) => {
+            expect(document.getElementById(chip.getAttribute('data-anchor'))).not.toBeNull();
+        });
     });
 
-    test('只剩一组时锚点条不出（一行一个 chip 是装饰，不是跳读）', () => {
+    // 这条原先断言的是「deep 视图下锚点条收起（只剩一组时一行一个 chip 是装饰）」。
+    // 反过来才对：那一屏是所有视图里**最长**的一屏（21 张卡），最需要跳读的正是这里；
+    // 子小节把它切成 5 段之后，锚点条在这里有了落点。
+    test('完整测算视图下锚点跳它的 5 个子节（不是收起）', () => {
         clickType('deep');
-        expect(document.getElementById('toolbox-anchors').classList.contains('hidden')).toBe(true);
+        const bar = document.getElementById('toolbox-anchors');
+        expect(bar.classList.contains('hidden')).toBe(false);
+        const chips = Array.from(bar.querySelectorAll('.tool-anchor-chip'));
+        expect(chips.length).toBe(5);
+        chips.forEach((chip) => {
+            const target = document.getElementById(chip.getAttribute('data-anchor'));
+            expect(target).not.toBeNull();
+            expect(target.classList.contains('tool-subsec')).toBe(true);
+        });
+    });
+
+    // 此前 renderDeepEntries 恒为「全部 21 张」，搜索只控制这一组的显隐：搜「残保金」照样摊开 21 张，
+    // 命中的那张埋在第 19 位。搜到一个东西却要用户自己在 21 张里找它，等于没搜。
+    test('搜索时完整测算组只留命中的卡（不再摊开全部 21 张）', () => {
+        window.EuriskoToolbox.renderToolbox('残保金');
+        const ids = Array.from(document.querySelectorAll('#toolbox-deep [data-tool-id]'))
+            .map((el) => el.getAttribute('data-tool-id'));
+        expect(ids).toContain('disability-fund-deep');
+        expect(ids.length).toBeLessThan(window.EuriskoToolRegistry.deep().length);
+    });
+
+    // 21 张卡按 5 个场景分小节，不是一张平表 —— 反过来钉：分完之后一张都没少。
+    test('完整测算分组后一张都不少（21 个分布在 5 个子节里）', () => {
+        window.EuriskoToolbox.renderToolbox('');
+        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
+        expect(subsections.length).toBe(5);
+        const total = subsections.reduce((sum, sec) => sum + sec.querySelectorAll('.tool-entry').length, 0);
+        expect(total).toBe(window.EuriskoToolRegistry.deep().length);
     });
 
     test('搜索能过滤到唯一工具', () => {
