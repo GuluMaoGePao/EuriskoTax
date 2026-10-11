@@ -478,9 +478,10 @@
                 <button id="toolbox-search-entry" type="button" class="home-searchbar">
                     <i class="fa fa-search"></i>
                     <span>搜工具：年终奖 / 增值税 / 社保 / 残保金…</span>
-                    <!-- 数字由 renderTypeFilter 从注册表填（写死 41 会随工具增减过期）；
-                         HTML 里保留一个兜底值，JS 没跑到时也不至于显示 0 个。 -->
-                    <span id="home-search-count" class="home-searchbar-count">41 个 ›</span>
+                    <!-- 右侧不放「41 个 ›」计数：这个数字要么写死（工具增减就过期）、要么动态维护
+                         （为一句装饰文案常驻一次渲染），而它不帮用户做任何决定 —— 搜索条自身
+                         的举例已经说明这里能搜到什么。CSS 里 .home-searchbar-count 保留不删：
+                         纯样式规则，将来要放任何右侧元素还用得上。 -->
                 </button>
 
                 <!-- 卡片1：Hero（阶段19-2 的 Mission Hero，v1.139.0 与「今日税感 · 小贴士」合一）。
@@ -736,8 +737,8 @@
                          并按 tool-registry 的 group 分成 5 个小节（复用上面那 5 个场景组的划分）：
                          21 张同款卡平铺在一屏里没有次序可言，找某一个只能逐个读名字。
                          新增一个税种只改 tool-registry.js —— spec 上有孪生速算器的自动继承它的组，
-                         没有孪生的那一批在 spec 上写 group；本文件不必再动。 -->
-                         注册表现役清单（占位说法已从注释里删净，数字不写死）：
+                         没有孪生的那一批在 spec 上写 group；本文件不必再动。
+                         注册表现役清单（数字不写死，加一个税种这里自动跟上）：
                          vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
                          + withholding-deep 劳务报酬预扣预缴 + bonus-tax-deep 年终奖择优
                          + equity-deep 股权激励 + severance-deep 离职补偿

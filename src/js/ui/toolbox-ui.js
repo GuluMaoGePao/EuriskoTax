@@ -455,9 +455,8 @@
         set('toolbox-count-all', all + deep);
         set('toolbox-count-quick', all);
         set('toolbox-count-deep', deep);
-        // 首页搜索条那颗「41 个 ›」同理：原先写死在 index.html 里，加工具要记得回来改，
-        // 忘了就是给浏览者一个错的总数（这正是 SSR 落地页不会犯、动态 App 容易犯的错）。
-        set('home-search-count', (all + deep) + ' 个 ›');
+        // 首页搜索条不放计数（用户拍板删掉）：数字要么写死要么动态维护，而它不帮用户做任何决定。
+        // 原先为它加的 set('home-search-count', …) 一并删除 —— DOM 里已经没有那个节点了。
         bar.querySelectorAll('.tool-type-chip').forEach(function (btn) {
             var on = btn.getAttribute('data-tool-type') === currentType;
             btn.classList.toggle('is-on', on);
