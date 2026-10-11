@@ -481,6 +481,10 @@
     }
 
     // ---- T3（阶段20 P2）：场景锚点 chip 条（桌面跳读用，手机由 CSS 隐藏）----
+    // 这一轮 renderDeepEntries 真正画出来的子节 id（见那里的注释）。锚点条必须按**实际存在**
+    // 的节点列 chip：搜索命中 1 张时另外四个子节不渲染，chip 若照旧列五个，点下去没有任何反应。
+    var deepSecIds = [];
+
     function renderAnchors() {
         var bar = document.getElementById('toolbox-anchors');
         if (!bar || !R()) return;
@@ -491,7 +495,9 @@
             // 「完整测算」视图：这原来是一行 hidden 了事（当时认为"只剩一组，不需要锚点"）。
             // 但这一组恰是所有视图里**最长**的一屏（21 张卡），最需要跳读的正是这里 ——
             // 卡片多了才该给锚点，卡片少的时候才不需要。现在锚点跳它的五个子节。
-            items = (R().groups() || []).map(function (g) {
+            items = (R().groups() || []).filter(function (g) {
+                return deepSecIds.indexOf('deepsec-' + g.id) >= 0;
+            }).map(function (g) {
                 return { id: 'deepsec-' + g.id, name: g.name };
             });
         } else {
@@ -661,7 +667,7 @@
         renderDeepEntries(result.matched ? result.deep : (R().deep() || []));
         renderScenarioChip();
         renderTypeFilter();   // T1：三个视图的计数与选中态
-        renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图下只有一组，不出条）
+        renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图跳它自己的五个子节）
     }
 
     // ====== 完整测算：入口（现与其它组同一张列表） ======
@@ -697,9 +703,15 @@
                 '</div>';
         }
 
+        // 空子节不渲染：搜「残保金」只命中 1 张，五个场景子节若照旧全画，页面就是
+        // 「1 张卡 + 4 个写着 0 个的标题」—— 搜索是为了缩小范围，不是为了看一份空目录。
+        // 顺带把这一轮**真正画出来**的子节 id 记进 deepSecIds，锚点条按它列 chip。
+        deepSecIds = [];
         var html = (R().groups() || []).map(function (g) {
-            return subsec('deepsec-' + g.id, g.name,
-                list.filter(function (t) { return t.group === g.id; }));
+            var tools = list.filter(function (t) { return t.group === g.id; });
+            if (!tools.length) return '';
+            deepSecIds.push('deepsec-' + g.id);
+            return subsec('deepsec-' + g.id, g.name, tools);
         }).join('');
         // 兜底：忘了在 spec 上写 group 的完整测算仍要出场 —— 静默不显示是那种
         // 「加了一个东西，上线前谁都没发现它不存在」的事故。

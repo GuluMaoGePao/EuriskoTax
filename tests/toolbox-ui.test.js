@@ -221,6 +221,34 @@ describe('工具页', () => {
         expect(total).toBe(window.EuriskoToolRegistry.deep().length);
     });
 
+    // 搜索命中 1 张时，另外四个子节必须**整节不出现**：五个场景各画一个标题、其中四个写着
+    // 「0 个」，用户搜出一个东西，看到的却是一份空目录 —— 搜索是为了缩小范围，不是为了看目录。
+    test('搜索命中后不渲染空子节（不再出现写着「0 个」的标题）', () => {
+        window.EuriskoToolbox.renderToolbox('残保金');
+        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
+        expect(subsections.length).toBe(1);
+        expect(subsections[0].querySelectorAll('.tool-entry').length).toBeGreaterThan(0);
+        const counts = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec-count'))
+            .map((el) => el.textContent.trim());
+        expect(counts.some((c) => c.indexOf('0 个') === 0)).toBe(false);
+    });
+
+    // 锚点条按**这一轮真画出来的**子节列 chip：搜索后只剩一个子节，其余 chip 指向不存在的 id，
+    // 点下去毫无反应 ——「看起来有、点了没有」比干脆没有更糟。
+    test('完整测算视图下搜索后锚点条只列命中的子节（没有空跳的 chip）', () => {
+        clickType('deep');
+        window.EuriskoToolbox.renderToolbox('扣除');
+        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
+        expect(subsections.length).toBeGreaterThan(1);   // 这条要的是「命中多个子节」的情形
+        const chips = Array.from(document.querySelectorAll('#toolbox-anchors .tool-anchor-chip'));
+        expect(chips.length).toBe(subsections.length);
+        chips.forEach((chip) => {
+            const target = document.getElementById(chip.getAttribute('data-anchor'));
+            expect(target).not.toBeNull();
+            expect(target.classList.contains('tool-subsec')).toBe(true);
+        });
+    });
+
     test('搜索能过滤到唯一工具', () => {
         window.EuriskoToolbox.renderToolbox('增值税');
         const entries = document.querySelectorAll('#toolbox-groups .tool-entry');
