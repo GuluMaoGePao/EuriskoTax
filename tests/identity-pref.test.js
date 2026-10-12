@@ -1,10 +1,12 @@
-// 首页「我是谁」= 设置默认视角（阶段19-2 遗留清偿③ · plan §3.3.4 · v1.142.0 收敛）
+// 首页「我是谁」= 设置默认视角（阶段19-2 遗留清偿③ · plan §3.3.4 · v1.142.0 收敛 · v1.143.0 改写落点）
 // 钉的是三条最容易被人改回去的规矩：
-//   1. 身份**不是筛选** —— 点卡不跳页、不藏入口；「看这类工具」才跳，且其余入口照常在；
+//   1. 身份**不是筛选** —— 点卡不跳页、不藏入口；「看这类工具」才跳。
+//      v1.143.0 起推荐从「置顶一组」变成「一条默认分类」：进工具页先落在「为你推荐」那一屏，
+//      其余 41 个入口在别的分类里一个不少 —— 可达性没变，变的是不必先从 41 项里挑。
 //   2. 身份**不写计税档案** —— 档案 identity 是计税口径（3 个值），身份卡有 6 张，
 //      拿导航选择去改计税口径，将来算错没人查得到；
 //   3. 身份**必须看得见** —— v1.142.0 之前它还兼带出「简明 / 完整」视图密度，那层取消后
-//      身份一度变成"选完什么都没发生"。现在它只做推荐排序，且要有落点可查可调。
+//      身份一度变成"选完什么都没发生"。现在它决定默认落在哪一类，且有 chip 可查可调。
 
 const { loadSource } = require('./helpers/load-source');
 
@@ -16,9 +18,9 @@ const FIXTURE = `
     <div id="home-identity-note" class="identity-note hidden"></div>
     <div id="tools-page" class="page hidden">
         <input id="toolbox-search" />
+        <div id="toolbox-categories"></div>
         <div id="toolbox-scenario-chip" class="hidden"></div>
         <div id="toolbox-groups"></div>
-        <div id="toolbox-deep"><div id="toolbox-deep-extra" class="hidden"></div></div>
     </div>
 `;
 
@@ -114,14 +116,21 @@ describe('身份视角 · 选完必须看得见', () => {
         expect(document.getElementById('toolbox-scenario-chip').classList.contains('hidden')).toBe(false);
     });
 
-    test('推荐组是**置顶**而不是只有它 —— 其余组照常渲染（身份不是筛选）', () => {
+    // v1.143.0：推荐从「置顶一组」改为「默认一屏」。可达性的判据随之变化 ——
+    // 不再是"推荐组下面还挂着别的组"，而是"切到别的分类，41 个入口一个不少"。
+    // 这两件事不等价，但**守的东西是同一个**：身份决定先看什么，不决定能看什么。
+    test('推荐是默认一屏，其余入口在别的分类里照样在（身份不是筛选）', () => {
         P().set('employee');
         window.EuriskoToolbox.renderToolbox('');
+        expect(document.getElementById('gp-scenario')).not.toBeNull();
+
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="all"]').click();
         const heads = Array.from(document.querySelectorAll('#toolbox-groups .tool-group'))
             .map((g) => g.getAttribute('data-group'));
-        expect(heads[0]).toBe('scenario');
         expect(heads.length).toBeGreaterThan(3);
-        expect(heads).toContain('salary');      // 与上班族推荐组无关的一组，照常在那
+        expect(heads).toContain('salary');      // 与上班族推荐无关的分类，照常在那
+        expect(document.querySelectorAll('#toolbox-groups .tool-entry').length)
+            .toBeGreaterThan(5);
     });
 
     test('清掉推荐组（点 chip 的「清除」）后本次会话不再自动回来，但身份本身还在', () => {
@@ -219,15 +228,19 @@ describe('身份卡 · 设为默认视角', () => {
         expect(note().classList.contains('hidden')).toBe(true);
     });
 
-    test('「看这类工具 ›」才跳工具页：推荐组置顶，其余入口照常在', () => {
+    test('「看这类工具 ›」才跳工具页：落在推荐那一屏，其余入口换分类就能到', () => {
         draw();
         cardOf('employee').querySelector('.scenario-tools').click();
         expect(global.showPage).toHaveBeenCalled();
         const ids = Array.from(document.querySelectorAll('#toolbox-groups .tool-entry'))
             .map((el) => el.getAttribute('data-tool-id'));
         expect(ids).toContain('salary-tax');   // 推荐的
-        expect(ids).toContain('vat');          // 不属于上班族，但仍能进 —— 身份不是筛选
-        expect(ids.length).toBeGreaterThan(5);
+
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="all"]').click();
+        const allIds = Array.from(document.querySelectorAll('#toolbox-groups .tool-entry'))
+            .map((el) => el.getAttribute('data-tool-id'));
+        expect(allIds).toContain('vat');       // 不属于上班族，但仍然能进 —— 身份不是筛选
+        expect(allIds.length).toBeGreaterThan(5);
     });
 
     test('点「看这类工具」不会顺手把身份设成默认（两个动作各管一件事）', () => {

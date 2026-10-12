@@ -68,17 +68,9 @@ beforeEach(() => {
         <div id="mode-selection-page" class="page active"></div>
         <div id="tools-page" class="page hidden">
             <input id="toolbox-search" />
-            <div id="toolbox-type-filter">
-                <button type="button" class="tool-type-chip is-on" data-tool-type="all">全部 <span id="toolbox-count-all"></span></button>
-                <button type="button" class="tool-type-chip" data-tool-type="quick">速算 <span id="toolbox-count-quick"></span></button>
-                <button type="button" class="tool-type-chip" data-tool-type="deep">完整测算 <span id="toolbox-count-deep"></span></button>
-            </div>
-            <div id="toolbox-anchors"></div>
+            <div id="toolbox-categories"></div>
             <div id="toolbox-scenario-chip" class="hidden"></div>
             <div id="toolbox-groups"></div>
-            <div id="toolbox-deep">
-                <div id="toolbox-deep-extra" class="hidden"></div>
-            </div>
         </div>
         <div id="quick-calculator-page" class="page hidden"></div>
         <div id="profile-page" class="page hidden"></div>
@@ -119,141 +111,144 @@ beforeEach(() => {
     // 阶段19-8：参数记忆同样跨用例持久化 —— 不清的话，上一个用例填过的值会被当成
     // 「上次输入」带进下一个用例，断言默认值的地方会莫名变红
     if (window.EuriskoParamMemory) window.EuriskoParamMemory.clearAll();
-    // 显式传 null：清掉上一个用例可能设置的身份筛选，保证每个用例都从完整工具页开始
+    // 显式传 null：这是「外部导航」，会一并清掉上一个用例手选的分类（见 renderToolbox 注释），
+    // 保证每个用例都从默认视图开始 —— 否则上一条点了「企业与经营」，下一条只剩那 10 个入口。
     window.EuriskoToolbox.renderToolbox('', null);
-    // 类型筛选（阶段20 P2 T1）是**模块级会话状态**：不重置会跨用例污染 ——
-    // 上一条选了「完整测算」，下一条看到的就只剩完整测算，一堆断言跟着红。
-    // 生产环境这个状态是会话级的（不写 localStorage，刷新即回到「全部」），测试里手动点回来。
-    const allChip = document.querySelector('#toolbox-type-filter .tool-type-chip[data-tool-type="all"]');
-    if (allChip) allChip.click();
 });
 
 describe('工具页', () => {
-    test('默认渲染 20 个速算器入口，并给出 5 个分组标题', () => {
-        expect(document.querySelectorAll('#toolbox-groups .tool-entry')).toHaveLength(20);
-        expect(document.querySelectorAll('#toolbox-groups .tool-group')).toHaveLength(5);
+    const REG = () => window.EuriskoToolRegistry;
+    const entries = () => Array.from(document.querySelectorAll('#toolbox-groups .tool-entry'));
+    const catChips = () => Array.from(document.querySelectorAll('#toolbox-categories .tool-cat-chip'));
+    const clickCat = (id) => document.querySelector(`#toolbox-categories .tool-cat-chip[data-cat="${id}"]`).click();
+
+    // 默认（无身份、无历史）落在「全部」：五个场景段依次排开，41 个入口一次看全 ——
+    // 新人要能一眼看全，入口总数也必须在这一屏上数得出来。
+    test('默认渲染 41 个入口，分 5 个场景段', () => {
+        expect(entries()).toHaveLength(REG().all().length + REG().deep().length);
+        const groups = Array.from(document.querySelectorAll('#toolbox-groups .tool-group'));
+        expect(groups).toHaveLength(5);
     });
 
-    // ====== T1（阶段20 P2）：类型筛选（全部 / 速算 / 完整测算 三个互斥视图）======
-    const clickType = (t) => document.querySelector(`#toolbox-type-filter .tool-type-chip[data-tool-type="${t}"]`).click();
-    const quickEntries = () => document.querySelectorAll('#toolbox-groups .tool-entry');
-    const deepBox = () => document.getElementById('toolbox-deep');
-
-    test('计数从注册表算：全部 41 / 速算 20 / 完整测算 21（加工具不用回来改数字）', () => {
-        const reg = window.EuriskoToolRegistry;
-        expect(document.getElementById('toolbox-count-all').textContent).toBe(String(reg.all().length + reg.deep().length));
-        expect(document.getElementById('toolbox-count-quick').textContent).toBe(String(reg.all().length));
-        expect(document.getElementById('toolbox-count-deep').textContent).toBe(String(reg.deep().length));
-    });
-
-    test('选「速算」：速算器照常，完整测算整块收起', () => {
-        clickType('quick');
-        expect(quickEntries()).toHaveLength(20);
-        expect(deepBox().classList.contains('hidden')).toBe(true);
-    });
-
-    test('选「完整测算」：速算器组不渲染，完整测算组可见且默认展开', () => {
-        clickType('deep');
-        expect(quickEntries()).toHaveLength(0);
-        expect(deepBox().classList.contains('hidden')).toBe(false);
-        // 它是这个视图里唯一的一组：默认收起 = 整个视图是空的
-        expect(deepBox().classList.contains('is-collapsed')).toBe(false);
-    });
-
-    test('切回「全部」：41 个入口仍然都在（筛选是视图，不是删入口）', () => {
-        clickType('deep');
-        clickType('all');
-        expect(quickEntries()).toHaveLength(20);
-        expect(deepBox().classList.contains('hidden')).toBe(false);
-    });
-
-    test('筛选是会话级的：不写 localStorage（下次进来停在子视图会被当成列表坏了）', () => {
-        clickType('quick');
-        const keys = Object.keys(localStorage);
-        expect(keys.some((k) => /type|filter/i.test(k))).toBe(false);
-    });
-
-    // ====== T3（阶段20 P2）：场景锚点条 ======
-    // chip 上存的是 **DOM id** 而不是组名：完整测算的子小节与速算侧的组同名却是两个节点，
-    // 按名字找会跳错地方（这是真实发生过的：两边都叫 salary，锚点永远跳到速算那一组）。
-    test('锚点条按当前视图生成（默认 5 组 + 完整测算，值是 DOM id）', () => {
-        const chips = Array.from(document.querySelectorAll('#toolbox-anchors .tool-anchor-chip'));
+    // ====== 分类选择器（v1.143.0，取代原先三套导航）======
+    test('分类条：5 个场景 + 全部，计数从注册表算（加工具不用回来改数字）', () => {
+        const chips = catChips();
         expect(chips.length).toBe(6);
-        expect(chips[chips.length - 1].getAttribute('data-anchor')).toBe('toolbox-deep');
-        // 每颗 chip 都必须指向一个真实存在的节点 —— 否则点了没反应，而它看起来完全正常
         chips.forEach((chip) => {
-            expect(document.getElementById(chip.getAttribute('data-anchor'))).not.toBeNull();
+            const id = chip.getAttribute('data-cat');
+            const expectCount = id === 'all'
+                ? REG().all().length + REG().deep().length
+                : REG().byGroup(id).length + REG().deepByGroup(id).length;
+            expect(chip.querySelector('.tool-cat-count').textContent).toBe(String(expectCount));
         });
+        // 「全部」永远是最后一颗，且它的数 = 其余五颗之和
+        expect(chips[chips.length - 1].getAttribute('data-cat')).toBe('all');
+        const sum = chips.slice(0, -1).reduce((s, c) => s + Number(c.querySelector('.tool-cat-count').textContent), 0);
+        expect(sum).toBe(REG().all().length + REG().deep().length);
     });
 
-    // 这条原先断言的是「deep 视图下锚点条收起（只剩一组时一行一个 chip 是装饰）」。
-    // 反过来才对：那一屏是所有视图里**最长**的一屏（21 张卡），最需要跳读的正是这里；
-    // 子小节把它切成 5 段之后，锚点条在这里有了落点。
-    test('完整测算视图下锚点跳它的 5 个子节（不是收起）', () => {
-        clickType('deep');
-        const bar = document.getElementById('toolbox-anchors');
-        expect(bar.classList.contains('hidden')).toBe(false);
-        const chips = Array.from(bar.querySelectorAll('.tool-anchor-chip'));
-        expect(chips.length).toBe(5);
-        chips.forEach((chip) => {
-            const target = document.getElementById(chip.getAttribute('data-anchor'));
-            expect(target).not.toBeNull();
-            expect(target.classList.contains('tool-subsec')).toBe(true);
-        });
+    test('选一个分类：内容区只出那一类（速算与该类完整测算同屏）', () => {
+        clickCat('salary');
+        const ids = entries().map((el) => el.getAttribute('data-tool-id'));
+        // 只在「工资与到手」里，不会混进增值税那类
+        expect(ids).toContain('salary-tax');
+        expect(ids).toContain('forward');           // 这一类的完整测算同屏出现
+        expect(ids).not.toContain('vat');
+        expect(ids).not.toContain('vat-deep');
+        // 这一屏里的卡数必须与那颗 chip 上写的数一致 —— 数字对不上是最难自查的那类错
+        const salaryChip = catChips().filter((c) => c.getAttribute('data-cat') === 'salary')[0];
+        expect(ids.length).toBe(Number(salaryChip.querySelector('.tool-cat-count').textContent));
     });
 
-    // 此前 renderDeepEntries 恒为「全部 21 张」，搜索只控制这一组的显隐：搜「残保金」照样摊开 21 张，
-    // 命中的那张埋在第 19 位。搜到一个东西却要用户自己在 21 张里找它，等于没搜。
-    test('搜索时完整测算组只留命中的卡（不再摊开全部 21 张）', () => {
-        window.EuriskoToolbox.renderToolbox('残保金');
-        const ids = Array.from(document.querySelectorAll('#toolbox-deep [data-tool-id]'))
-            .map((el) => el.getAttribute('data-tool-id'));
-        expect(ids).toContain('disability-fund-deep');
-        expect(ids.length).toBeLessThan(window.EuriskoToolRegistry.deep().length);
+    // 同一场景的两版**同屏**是这次的重点：此前「速算 / 完整测算」是两个互斥世界，
+    // 想要明细必须先知道有另一个视图存在。现在它是同一屏里的两档。
+    test('同一分类下「估个数」与「要明细」两档并排给出', () => {
+        clickCat('corp');
+        const secs = Array.from(document.querySelectorAll('#toolbox-groups .tool-subsec'));
+        expect(secs.length).toBe(2);
+        expect(secs[0].getAttribute('data-subsec')).toBe('quick');
+        expect(secs[1].getAttribute('data-subsec')).toBe('deep');
+        expect(secs[1].querySelectorAll('.tool-entry').length).toBeGreaterThan(0);
     });
 
-    // 21 张卡按 5 个场景分小节，不是一张平表 —— 反过来钉：分完之后一张都没少。
-    test('完整测算分组后一张都不少（21 个分布在 5 个子节里）', () => {
+    // 可达性铁律：切换分类是视图，不是删入口 —— 回到「全部」时 41 个一个不少。
+    test('切回「全部」：41 个入口仍然都在（分类是视图，不是删入口）', () => {
+        clickCat('corp');
+        expect(entries().length).toBeLessThan(REG().all().length + REG().deep().length);
+        clickCat('all');
+        expect(entries()).toHaveLength(REG().all().length + REG().deep().length);
+    });
+
+    test('分类是会话级的：不写 localStorage（下次进来停在某类里会被当成列表坏了）', () => {
+        clickCat('corp');
+        const keys = Object.keys(localStorage);
+        expect(keys.some((k) => /cat|category|type|filter/i.test(k))).toBe(false);
+    });
+
+    // 默认落点：有身份 → 为你推荐；有历史 → 最近；都没有 → 全部。
+    // 复访用户多半是「上次那个再算一遍」或「我是财务，看看我的」，别让他每次都从 41 项总目录开始。
+    test('有历史：默认停在「最近」（不用自己先点一次）', () => {
+        localStorage.setItem('euriskoToolRecent', JSON.stringify(['vat', 'bonus-tax']));
         window.EuriskoToolbox.renderToolbox('');
-        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
-        expect(subsections.length).toBe(5);
-        const total = subsections.reduce((sum, sec) => sum + sec.querySelectorAll('.tool-entry').length, 0);
-        expect(total).toBe(window.EuriskoToolRegistry.deep().length);
+        const on = catChips().filter((c) => c.classList.contains('is-on'));
+        expect(on).toHaveLength(1);
+        expect(on[0].getAttribute('data-cat')).toBe('recent');
+        expect(entries()).toHaveLength(2);
     });
 
-    // 搜索命中 1 张时，另外四个子节必须**整节不出现**：五个场景各画一个标题、其中四个写着
-    // 「0 个」，用户搜出一个东西，看到的却是一份空目录 —— 搜索是为了缩小范围，不是为了看目录。
-    test('搜索命中后不渲染空子节（不再出现写着「0 个」的标题）', () => {
+    test('默认视图可被清掉：手点了别的分类就不再被自动改回来', () => {
+        localStorage.setItem('euriskoToolRecent', JSON.stringify(['vat']));
+        window.EuriskoToolbox.renderToolbox('');
+        clickCat('social');
+        window.EuriskoToolbox.renderToolbox('');     // 模拟刷新外的重渲染
+        const on = catChips().filter((c) => c.classList.contains('is-on'));
+        expect(on[0].getAttribute('data-cat')).toBe('social');
+    });
+
+    // 此前 search 只控制那一组整块的显隐，21 张卡照样摊开，命中的那张埋在第 19 位 —— 等于没搜。
+    test('搜索时只留命中的卡，并跨类把他那一类的两版一起给出', () => {
         window.EuriskoToolbox.renderToolbox('残保金');
-        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
-        expect(subsections.length).toBe(1);
-        expect(subsections[0].querySelectorAll('.tool-entry').length).toBeGreaterThan(0);
-        const counts = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec-count'))
+        const ids = entries().map((el) => el.getAttribute('data-tool-id'));
+        expect(ids).toContain('disability-fund');
+        expect(ids).toContain('disability-fund-deep');   // 同一件事的两版同屏
+        expect(ids.length).toBeLessThan(REG().all().length + REG().deep().length);
+    });
+
+    test('搜索时不出现空段也不出现空档（没有「0 个」的标题）', () => {
+        window.EuriskoToolbox.renderToolbox('残保金');
+        const counts = Array.from(document.querySelectorAll('.tool-group-count, .tool-subsec-count'))
             .map((el) => el.textContent.trim());
         expect(counts.some((c) => c.indexOf('0 个') === 0)).toBe(false);
     });
 
-    // 锚点条按**这一轮真画出来的**子节列 chip：搜索后只剩一个子节，其余 chip 指向不存在的 id，
-    // 点下去毫无反应 ——「看起来有、点了没有」比干脆没有更糟。
-    test('完整测算视图下搜索后锚点条只列命中的子节（没有空跳的 chip）', () => {
-        clickType('deep');
-        window.EuriskoToolbox.renderToolbox('扣除');
-        const subsections = Array.from(document.querySelectorAll('#toolbox-deep-extra .tool-subsec'));
-        expect(subsections.length).toBeGreaterThan(1);   // 这条要的是「命中多个子节」的情形
-        const chips = Array.from(document.querySelectorAll('#toolbox-anchors .tool-anchor-chip'));
-        expect(chips.length).toBe(subsections.length);
-        chips.forEach((chip) => {
-            const target = document.getElementById(chip.getAttribute('data-anchor'));
-            expect(target).not.toBeNull();
-            expect(target.classList.contains('tool-subsec')).toBe(true);
-        });
+    // 搜索横跨分类，这时候「属于哪一类」不再是分组依据 ——
+    // 留着一条分类条会让人疑心是不是还得再点一下。
+    test('搜索时分类条收起（换「全部」回来即可）', () => {
+        window.EuriskoToolbox.renderToolbox('增值税');
+        expect(document.getElementById('toolbox-categories').classList.contains('hidden')).toBe(true);
+        window.EuriskoToolbox.renderToolbox('');
+        expect(document.getElementById('toolbox-categories').classList.contains('hidden')).toBe(false);
     });
 
-    test('搜索能过滤到唯一工具', () => {
+    // 21 张完整测算分布在 5 个场景里 —— 反过来钉：分完之后一张都没少。
+    test('完整测算按场景并入各分类后一张都不少', () => {
+        let total = 0;
+        REG().groups().forEach((g) => { total += REG().deepByGroup(g.id).length; });
+        expect(total).toBe(REG().deep().length);
+        window.EuriskoToolbox.renderToolbox('');
+        const deepIds = Array.from(document.querySelectorAll('#toolbox-groups [data-subsec="deep"] .tool-entry'))
+            .map((el) => el.getAttribute('data-tool-id'));
+        expect(deepIds.length).toBe(REG().deep().length);
+    });
+
+    // 「唯一命中」这个词必须重新界定：deep 与它的速算版现在是同屏的两档，
+    // 搜「增值税」就该把 vat 与 vat-deep 一起给出来 —— 只给一张反而是藏了另一版。
+    test('搜索能过滤到一小撮（不再摊开 41 个）', () => {
         window.EuriskoToolbox.renderToolbox('增值税');
-        const entries = document.querySelectorAll('#toolbox-groups .tool-entry');
-        expect(entries).toHaveLength(1);
-        expect(entries[0].getAttribute('data-tool-id')).toBe('vat');
+        const ids = entries().map((el) => el.getAttribute('data-tool-id'));
+        expect(ids).toContain('vat');
+        expect(ids.length).toBeLessThan(6);
+        expect(ids).not.toContain('salary-tax');   // 不相干的类别不会被带进来
     });
 
     test('搜索别名也能命中（用户不会打政策术语）', () => {
@@ -262,21 +257,18 @@ describe('工具页', () => {
         expect(ids).toContain('net-salary');
     });
 
-    // 注意关键词：17C-5 之后「残保金」已有自己的完整测算，会命中 deep 组，不能再用它测「无命中」。
-    test('搜索无命中时收起完整测算组（不把无关入口留在结果里）', () => {
+    // 注意关键词：17C-5 之后「残保金」已有自己的完整测算，会命中两版，不能再用它测「无命中」。
+    test('搜索无命中时给出空态，而不是把无关的 41 个留在下面', () => {
         window.EuriskoToolbox.renderToolbox('房产税');
-        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(true);
+        expect(document.querySelector('#toolbox-groups .tool-empty')).not.toBeNull();
+        expect(entries()).toHaveLength(0);
     });
 
-    // 反过来的那条：deep 命中时必须露出，否则用户搜到了税种却看不到它的完整测算入口。
-    // 21 个完整测算全部动态渲染进 #toolbox-deep-extra（不在 index.html 里写死），
-    // 这条用例同时守住「新增一个 deep 不需要改 HTML 就能被搜到」这件事。
-    test('搜索命中完整测算时露出该组（残保金 → 残保金与工会经费）', () => {
+    // 21 个完整测算不是写在 HTML 里的静态卡，而是由注册表渲染出来的 ——
+    // 这条守住「新增一个 deep 只改注册表就能被搜到」，而不是还要回来改页面。
+    test('新增完整测算不必改 HTML：命中的 deep 由注册表渲染出来', () => {
         window.EuriskoToolbox.renderToolbox('残保金');
-        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(false);
-        const ids = Array.from(document.querySelectorAll('#toolbox-deep [data-tool-id]'))
-            .map((el) => el.getAttribute('data-tool-id'));
-        expect(ids).toContain('disability-fund-deep');
+        expect(document.querySelector('#toolbox-groups [data-tool-id="disability-fund-deep"]')).not.toBeNull();
     });
 });
 
@@ -291,23 +283,25 @@ describe('首页「我是谁」场景入口', () => {
     // 19-2 遗留清偿③：这条原来叫「按身份筛选：只出该身份的工具」，断言的是 **ids 恰好 5 个** ——
     // 那正是 plan §3.3.4 明令禁止的形态：身份只该决定谁排在前面，不该把其余入口藏起来。
     // 现在钉的是**可达性**：推荐组置顶且展开，其余入口一个不少。
-    test('按身份挑工具：推荐组置顶展开，其余入口照常可用（身份是导航，不是筛选）', () => {
+    test('按身份挑工具：推荐成一屏，其余入口照常可用（身份是导航，不是筛选）', () => {
         window.EuriskoToolbox.openScenario('employee');
-        const scenario = document.querySelector('#toolbox-groups [data-group="scenario"]');
+        const scenario = document.getElementById('gp-scenario');
         expect(scenario).not.toBeNull();
-        expect(scenario.classList.contains('is-collapsed')).toBe(false);
+        expect(scenario.querySelectorAll('.tool-entry').length).toBeGreaterThan(0);
 
         const ids = Array.from(document.querySelectorAll('#toolbox-groups .tool-entry')).map((el) => el.getAttribute('data-tool-id'));
-        expect(ids).toContain('salary-tax');   // 推荐的（上班族组）
+        expect(ids).toContain('salary-tax');   // 推荐的（上班族）
         expect(ids).toContain('bonus-tax');
-        expect(ids).toContain('vat');          // 不属于这个身份，但仍然要能进 —— 身份不限制可达性
-        expect(ids.length).toBeGreaterThan(5);
 
         const chip = document.getElementById('toolbox-scenario-chip');
         expect(chip.classList.contains('hidden')).toBe(false);
         expect(chip.textContent).toContain('按身份推荐');   // 措辞跟着行为改：推荐，不是筛选
-        // 完整测算组也不再因为"挑了身份"被收起
-        expect(document.getElementById('toolbox-deep').classList.contains('hidden')).toBe(false);
+
+        // 身份不限制可达性：切到「全部」，不属于这个身份的入口照样在
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="all"]').click();
+        const allIds = Array.from(document.querySelectorAll('#toolbox-groups .tool-entry')).map((el) => el.getAttribute('data-tool-id'));
+        expect(allIds).toContain('vat');
+        expect(allIds.length).toBeGreaterThan(5);
     });
 });
 
@@ -712,74 +706,58 @@ describe('阶段19-3：41 个入口全部可达', () => {
             .map((el) => el.getAttribute('data-tool-id')));
         quick.forEach((id) => expect(inGroups.has(id)).toBe(true));
 
-        // v1.142.0：完整测算**只有一种落点** —— 与其它组同款的工具条卡片（动态渲染）。
+        // v1.142.0 起：完整测算**只有一种落点** —— 与其它组同款的工具条卡片（动态渲染）。
         // 此前 4 个（综合所得 / 经营所得 / 分类所得 / 反向倒算）是 index.html 里写死的静态卡，
         // 两种 markup 混在一组里；现在统一了，也不再有"某几个必须靠隐藏按钮才点得开"。
         deep.forEach((id) => {
-            const byEntry = !!document.querySelector('#toolbox-deep-extra [data-tool-id="' + id + '"]');
-            expect(byEntry).toBe(true);
+            expect(document.querySelector('#toolbox-groups [data-tool-id="' + id + '"]')).not.toBeNull();
             expect(document.getElementById(id + '-mode-card')).toBeNull();
         });
     });
 
-    test('折叠不删 DOM：入口始终在文档里（降载不能降掉可达性）', () => {
-        expect(document.querySelectorAll('#toolbox-groups .tool-entry')).toHaveLength(20);
-        expect(document.querySelectorAll('#toolbox-groups .tool-group.is-collapsed')).toHaveLength(5);
+    // 「折叠不删 DOM」那条随折叠机制一起删了 —— 它钉的是"降载不能把入口变成不可达"，
+    // 而现在**没有任何东西把入口收起来**：每一类躺在哪条 chip 后面都是静态可查的，
+    // 可达性改由「切回全部 41 个都在」那条守住（在同一个 describe 里）。
+    test('41 个入口一次渲染在同一块内容区里（不再分散在两块容器）', () => {
+        const R = window.EuriskoToolRegistry;
+        expect(document.querySelectorAll('#toolbox-groups .tool-entry'))
+            .toHaveLength(R.all().length + R.deep().length);
+        // 完整测算不再另有归宿：工具页里除了内容区没有第二个装工具卡的容器
+        expect(document.getElementById('toolbox-deep')).toBeNull();
+        expect(document.querySelectorAll('.tool-entry')).toHaveLength(document.querySelectorAll('#toolbox-groups .tool-entry').length);
     });
 });
 
-describe('阶段19-3：场景组折叠与记忆', () => {
+describe('分类状态（v1.143.0，取代「场景组折叠与记忆」）', () => {
+    // 这一段原先钉的是折叠与它的 localStorage 记忆 —— 那套机制随 v1.143.0 删除，
+    // 一并替换的是它当初要解决的问题：41 个入口一次铺开太长。现在由分类承担，
+    // 于是这里改钉「分类的尾巴有多短」：**状态全是会话级的，一个键都不往 localStorage 里写**。
     beforeEach(() => {
-        localStorage.removeItem('euriskoToolGroupOpen');
         window.EuriskoToolbox.renderToolbox('', null);
     });
 
-    test('默认折叠 5 个场景组（41 个入口不该一次全铺开）', () => {
-        const groups = document.querySelectorAll('#toolbox-groups .tool-group');
-        expect(groups).toHaveLength(5);
-        Array.from(groups).forEach((g) => expect(g.classList.contains('is-collapsed')).toBe(true));
-        // 折叠时组头要写明里面有几个，否则用户不知道该不该展开
-        expect(document.querySelector('#toolbox-groups .tool-group-count').textContent).toMatch(/\d+ 个/);
-    });
-
-    test('点组头展开，并记住展开状态（下次进来还是展开的）', () => {
-        const head = document.querySelector('#toolbox-groups [data-group-toggle="salary"]');
-        head.click();
-        expect(document.getElementById('toolbox-groups').querySelector('[data-group="salary"]')
-            .classList.contains('is-collapsed')).toBe(false);
-        expect(head.getAttribute('aria-expanded')).toBe('true');
-        expect(JSON.parse(localStorage.getItem('euriskoToolGroupOpen') || '{}').salary).toBe(true);
-
-        // 重新渲染 = 下次进页面：记忆生效
-        window.EuriskoToolbox.renderToolbox('', null);
-        expect(document.querySelector('#toolbox-groups [data-group="salary"]')
-            .classList.contains('is-collapsed')).toBe(false);
-        // 没点过的组仍然折叠
-        expect(document.querySelector('#toolbox-groups [data-group="corp"]')
-            .classList.contains('is-collapsed')).toBe(true);
-    });
-
-    test('再点一次收起，记忆随之改回', () => {
-        const head = document.querySelector('#toolbox-groups [data-group-toggle="salary"]');
-        head.click();
-        document.querySelector('#toolbox-groups [data-group-toggle="salary"]').click();
-        expect(JSON.parse(localStorage.getItem('euriskoToolGroupOpen') || '{}').salary).toBe(false);
-    });
-
-    // 搜索时折叠毫无意义：用户就是要看结果 —— 且强制展开**不写进记忆**，
-    // 否则搜一次就把所有组的默认状态改掉了。
-    test('搜索态强制展开，且不污染记忆', () => {
-        window.EuriskoToolbox.renderToolbox('增值税');
-        const groups = document.querySelectorAll('#toolbox-groups .tool-group');
-        expect(groups.length).toBeGreaterThan(0);
-        Array.from(groups).forEach((g) => expect(g.classList.contains('is-collapsed')).toBe(false));
+    test('点分类不落任何存储键（刷新即回到默认，不会停在某类里被当成列表坏了）', () => {
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="corp"]').click();
         expect(localStorage.getItem('euriskoToolGroupOpen')).toBeNull();
+        const keys = Object.keys(localStorage);
+        expect(keys.some((k) => /cat|category|type|filter|groupOpen/i.test(k))).toBe(false);
     });
 
-    test('按身份筛选同样展开（挑完身份还要再点开一层，等于没筛）', () => {
-        window.EuriskoToolbox.openScenario('employee');
-        expect(document.querySelector('#toolbox-groups [data-group="scenario"]')
-            .classList.contains('is-collapsed')).toBe(false);
+    test('重渲染保留手选的分类（自己在看的那一类不会被偷偷切走）', () => {
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="corp"]').click();
+        window.EuriskoToolbox.renderToolbox('');
+        const on = Array.from(document.querySelectorAll('#toolbox-categories .tool-cat-chip.is-on'));
+        expect(on).toHaveLength(1);
+        expect(on[0].getAttribute('data-cat')).toBe('corp');
+    });
+
+    // 外部导航（清身份 / 点身份卡）要重新接管分类：否则改了身份的人会觉得开关没生效。
+    test('清掉身份后再进来：分类重算（有历史就回「最近」）', () => {
+        localStorage.setItem('euriskoToolRecent', JSON.stringify(['vat']));
+        document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="corp"]').click();
+        window.EuriskoToolbox.renderToolbox('', null);
+        const on = Array.from(document.querySelectorAll('#toolbox-categories .tool-cat-chip.is-on'));
+        expect(on[0].getAttribute('data-cat')).toBe('recent');
     });
 });
 
