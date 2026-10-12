@@ -22,7 +22,7 @@
 - **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
 - **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
 - **生产环境**：腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起正式公网，部署走 `tools/ops/ops-deploy.ps1`，手动触发，push 不自动上线）；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境
-- **测试**：123 套件 2339 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **测试**：123 套件 2337 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **259/259** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
   - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）
@@ -190,6 +190,7 @@ EuriskoTax/
 | [guides/gui-button-reference.md](guides/gui-button-reference.md) | 🟢 GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-09-14 |
 | [guides/coding-rules-reference.md](guides/coding-rules-reference.md) | 🟢 **编码约定速查**：作用域（不用 IIFE）/ 加载顺序 / 不静默吞错 / 接线契约测试 / 重构「零功能变化」怎么证明 / 命名允许名单 —— **每条均标注出处** | 2026-09-18 |
 | [guides/support-playbook.md](guides/support-playbook.md) | 🟢 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-19 |
+| [guides/user-journey-and-platform-role.md](guides/user-journey-and-platform-role.md) | 🟢 **用户、路径与平台角色**：六类常态 persona + 事件轴 · 每条路径「入口→想算什么→怎么算→得到什么→然后呢」· 平台三条边界（不代账/不代办/不对咨询结论负责）· 三层变现（服务转介为主、ProCode 为辅）· ICP/公安备案现状与四条合规硬门槛 · 最后是「这些约束规定了页面长什么样」 | 2026-10-12 |
 
 ### 项目报告
 

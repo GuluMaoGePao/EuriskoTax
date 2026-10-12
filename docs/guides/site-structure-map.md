@@ -221,30 +221,30 @@ EuriskoTax
 
 ```
 ┌─ tools-page ──────────────────────────────────────────────────────┐
-│ 搜索框 #toolbox-search 550（150ms 防抖）                          │
-│ 类型筛选 chip #toolbox-type-filter（全部 / 速算 / 完整测算，会话级，不落存储）  │
-│ 场景锚点 chip #toolbox-anchors（桌面 sticky；chip 存 **DOM id**，见下）    │
-│ 身份推荐 chip #toolbox-scenario-chip 552（清除 ›）                        │
-│ ─ #toolbox-groups 553 ← renderToolbox() 动态注入 ───────────────────── │
-│   · 最近使用（有则显示，含「清空最近使用」#toolbox-recent-clear）         │
-│   · 为你推荐（选过身份时置顶）                                          │
-│   · 5 个场景组（salary/special/prefer/social/corp）→ 20 张速算器卡       │
-│ ─ #toolbox-deep「完整测算」← 21 张卡全部由 renderDeepEntries() 渲染 ── │
-│   · 组内再按同一套 5 个场景组分小节（.tool-subsec，id = deepsec-<组>）    │
-│   · X-deep 继承孪生速算器的 group 与别名；7 个单版在 spec 上写 group     │
-│   · 搜索时只渲染命中的卡，不再是"摊开 21 张自己找"                     │
+│ 搜索框 #toolbox-search（150ms 防抖）                              │
+│ 分类选择器 #toolbox-categories（**唯一**的分类入口，会话级，不落存储）│
+│   · 全部 41 / 最近 / 为你推荐 / 工资与到手 / 一次性收入 / 税优养老  │
+│     / 社保用工 / 企业与经营 —— 计数由注册表算，chosen 后内容区只出那一屏 │
+│   · 有结果时才让位给搜索结果；有词无果时留着当退路                  │
+│ 身份推荐 chip #toolbox-scenario-chip（清除 ›）                    │
+│ ─ #toolbox-groups ← renderToolbox() 动态注入（唯一装卡片的容器）── │
+│   · 场景段 .tool-group = 场景标题 + 「估个数」/「要明细与预算表」两档 │
+│   · 速算器与该类完整测算**同屏**（不再各占一个视图）                │
+│   · 「全部」= 五个场景段依次排开（41 个入口一次看全）               │
+│   · 搜索：跨类按场景分段，命中的两版挨着给出；无结果时空态带「看看全部」│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-> v1.142.0 之前这里写的是「`#toolbox-deep` 静态 4 张 mode-card + `#toolbox-deep-extra` 动态 16 张」，
-> 那已是上一版删掉的东西：现在两张表合成一张，新增完整测算只改注册表。
+> **v1.143.0 重写**：此前这一页有三套导航在讲同一件事 —— 类型筛选（全部/速算/完整测算）、
+> 内容几乎相同的场景锚点条、五个可折叠的组头。现在合成一条分类选择器：卡片不再折叠，
+> 完整测算并入各自场景（`#toolbox-deep` 那个静态组壳随之删除），工具页只有一个装卡片的容器。
+> 更早的形态（`#toolbox-deep` 静态 4 张 mode-card + 动态 16 张）在 v1.142.0 已经删掉了。
 
 | 功能入口 | → 去向 | 实现 |
 |---|---|---|
-| 工具卡 `.tool-entry` | `openTool(id)` → **通用速算器页** | `toolbox-ui.js:291-310` |
-| 4 张 mode-card | 触发隐藏 `${id}-mode-btn` → 打开 P15 通用向导（`goToStep` 已于 v1.49.0 删除） | `home-ui.js:511-540`、`app.js:4-33` |
-| `.mode-card-info-btn` | `showModeInfo()`（**不导航**） | `home-ui.js:533-539` |
-| 搜索框 | 重渲染分组；有命中时收起 deep 组 | `toolbox-ui.js:639` / `277` |
+| 工具卡 `.tool-entry` | `openTool(id)` → 通用速算器页 / ISpec 向导 | `toolbox-ui.js` `openTool()` |
+| 分类 chip `.tool-cat-chip` | 切换当前分类并重渲染内容区 | `bindCategories()` |
+| 搜索框 | 跨类搜索；无结果时空态给「看看全部 N 个」 | `contentHtml()` / `emptyHtml()` |
 
 ---
 
