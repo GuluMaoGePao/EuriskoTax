@@ -230,6 +230,21 @@ describe('工具页', () => {
         expect(document.getElementById('toolbox-categories').classList.contains('hidden')).toBe(false);
     });
 
+    // chip 位是这一行里最贵的资源：名字在这里压短，全名留给 title 与读屏。
+    // 这条钉的是「压短了但没丢」—— 谁把 chip 文案改回全名，八个长名又会撑出一屏看不见尾，
+    // 正是这次「导航看不全」的病因，而且它在 jsdom 里不会报错，只能靠这条拦下来。
+    test('chip 用短名、全名留给 title 与读屏（信息没丢，只是换了位置）', () => {
+        const chips = catChips();
+        REG().groups().forEach((g) => {
+            const chip = chips.filter((c) => c.getAttribute('data-cat') === g.id)[0];
+            expect(chip).toBeDefined();
+            const shown = chip.textContent.replace(/\d+$/, '').trim();
+            expect(shown.length).toBeLessThan(g.name.length);
+            expect(chip.getAttribute('title')).toBe(g.name);
+            expect(chip.getAttribute('aria-label')).toContain(g.name);
+        });
+    });
+
     // 21 张完整测算分布在 5 个场景里 —— 反过来钉：分完之后一张都没少。
     test('完整测算按场景并入各分类后一张都不少', () => {
         let total = 0;

@@ -441,21 +441,32 @@
         return 'all';
     }
 
+    // chip 上用的是**短名**：横向空间是一行里最贵的资源，而 chip 是给人扫的、不是给人读的。
+    // 全名留在段标题（内容区）、title 与 aria-label 上 —— 那个位置有整行的宽度，不需要省。
+    // 漏配的组退回全名：宁可这一颗长一点，也不要出现一颗没有名字的 chip。
+    var CAT_SHORT = {
+        'salary': '工资',            // 工资与到手
+        'special': '一次性所得',     // 一次性收入与特殊所得
+        'prefer': '税优养老',        // 税优与养老
+        'social': '社保用工',        // 社保与用工
+        'corp': '企业经营'           // 企业与经营
+    };
+
     // chip 列表：计数一律从注册表算（加工具不用回来改数字）。
     // 「最近 / 为你推荐」没有历史或没有身份时整条不出现 —— 空chip 是「这里应该有东西但今天没有」，
     // 会让人以为加载失败了。
     function categoryItems() {
         var items = [];
         if (currentScenario) {
-            items.push({ id: 'scenario', name: '为你推荐', count: (R().byScenario(currentScenario) || []).length });
+            items.push({ id: 'scenario', short: '推荐', name: '为你推荐', count: (R().byScenario(currentScenario) || []).length });
         }
         var recent = recentTools();
-        if (recent.length) items.push({ id: 'recent', name: '最近', count: recent.length });
+        if (recent.length) items.push({ id: 'recent', short: '最近', name: '最近使用', count: recent.length });
         (R().groups() || []).forEach(function (g) {
             var n = R().byGroup(g.id).length + R().deepByGroup(g.id).length;
-            if (n) items.push({ id: g.id, name: g.name, count: n });
+            if (n) items.push({ id: g.id, short: CAT_SHORT[g.id] || g.name, name: g.name, count: n });
         });
-        items.push({ id: 'all', name: '全部', count: (R().all() || []).length + (R().deep() || []).length });
+        items.push({ id: 'all', short: '全部', name: '全部（不分场景）', count: (R().all() || []).length + (R().deep() || []).length });
         return items;
     }
 
@@ -471,9 +482,12 @@
         bar.classList.remove('hidden');
         bar.innerHTML = items.map(function (it) {
             var on = it.id === currentCategory;
+            // 短名给人扫，全名给 title 与读屏 —— 名字被压短了，但信息没有丢，只是换了个位置。
             return '<button type="button" class="tool-cat-chip' + (on ? ' is-on' : '') + '"' +
-                ' data-cat="' + esc(it.id) + '" role="tab" aria-selected="' + (on ? 'true' : 'false') + '">' +
-                esc(it.name) + '<span class="tool-cat-count">' + it.count + '</span></button>';
+                ' data-cat="' + esc(it.id) + '" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"' +
+                ' aria-label="' + esc(it.name + '（' + it.count + ' 个）') + '"' +
+                ' title="' + esc(it.name) + '">' +
+                esc(it.short) + '<span class="tool-cat-count">' + it.count + '</span></button>';
         }).join('');
         bindCategories();   // 委托绑在条上、按 data-bound 幂等
     }
