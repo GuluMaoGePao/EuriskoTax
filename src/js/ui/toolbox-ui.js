@@ -204,53 +204,6 @@
         } catch (e) { return []; }
     }
 
-    // ====== 分组展开状态（阶段19-3：场景组默认折叠 + 记忆）======
-    // 41 个入口一次全铺开，等于没有目录。折叠**只加 class 不重建 DOM** —— 入口始终在文档里
-    // （可达性不受影响），重建则会把「最近使用」这类动态区已经绑好的事件一起冲掉。
-    var GROUP_OPEN_KEY = 'euriskoToolGroupOpen';
-
-    function readGroupOpen() {
-        try { return JSON.parse(localStorage.getItem(GROUP_OPEN_KEY) || '{}') || {}; } catch (e) { return {}; }
-    }
-
-    // 记忆优先；没记过的按 defaultOpen（场景组默认折叠，「最近使用」默认展开 —— 它只有几条，
-    // 是回访用户的快捷通道，收起来等于把这层价值也收掉了）。
-    function isGroupOpen(id, defaultOpen) {
-        if (!id) return !!defaultOpen;
-        var m = readGroupOpen();
-        if (Object.prototype.hasOwnProperty.call(m, id)) return m[id] === true;
-        return !!defaultOpen;
-    }
-
-    function setGroupOpen(id, open) {
-        if (!id) return;
-        try {
-            var m = readGroupOpen();
-            m[id] = !!open;
-            localStorage.setItem(GROUP_OPEN_KEY, JSON.stringify(m));
-        } catch (e) { /* 隐私模式忽略 */ }
-    }
-
-    function applyGroupOpen(groupEl, open) {
-        if (!groupEl) return;
-        if (open) groupEl.classList.remove('is-collapsed');
-        else groupEl.classList.add('is-collapsed');
-        var head = groupEl.querySelector ? groupEl.querySelector('[data-group-toggle]') : null;
-        if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-
-    function bindGroupToggles(scope) {
-        if (!scope || !scope.querySelectorAll) return;
-        scope.querySelectorAll('[data-group-toggle]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var group = btn.closest ? btn.closest('.tool-group') : btn.parentNode;
-                var open = group ? group.classList.contains('is-collapsed') : false;
-                setGroupOpen(btn.getAttribute('data-group-toggle'), open);
-                applyGroupOpen(group, open);
-            });
-        });
-    }
-
     // ====== 卡片状态微标签（阶段19-3）======
     // 判据全部来自真源，这里不猜：算过读 taxCalculationHistory（与首页「最近计算」同一份），
     // 热门 / 可对比读注册表标记（tool.hot / tool.comparable）。
@@ -311,33 +264,67 @@
             '</div>';
     }
 
-    // opts.actionHtml：组内操作条（如「最近使用」的清空）。挂在 tool-group-body 里而不是组头上 ——
-    // 组头本身是颗 <button>（可点、可键盘聚焦），往它里面塞按钮会变成嵌套 button，键盘与读屏都会错乱。
-    function groupSectionHtml(title, desc, tools, hushBadge, opts) {
+    // 同一件事的两个深度，在一个场景里并排给出来（原来是「速算视图 / 完整测算视图」两个互斥世界，
+    // 于是「我要明细」这件事必须先知道有另一个视图存在）。现在它是同一个分类下的两档：
+    // 先估个数，不够再往下一档 —— 代价写在 note 里，选之前就知道要填多少。
+    // 措辞刻意不写时间点（「1 分钟」那种承诺做不到就是假话，见 copy-standard.js:116 的 sla 黑名单）。
+    var QUICK_SUBSEC = { id: 'quick', title: '估个数', note: '填三五个框，先看一个结果' };
+    var DEEP_SUBSEC = { id: 'deep', title: '要明细与预算表', note: '按年填全，出完整预算表与逐项明细' };
+
+    // 区：场景段内的一档。空的那一档整块不渲染 —— 只有 5 个速算、没有完整测算的那一类，
+    // 底下再挂一条「0 个 · 要明细与预算表」等于给一句话配了个空标题。
+    function subsecHtml(secId, meta, tools, hushBadge) {
+        if (!tools.length) return '';
+        return '' +
+            '<div class="tool-subsec" id="' + esc(secId) + '" data-subsec="' + esc(meta.id) + '">' +
+            '<div class="tool-subsec-head">' +
+            '<span class="tool-subsec-title">' + esc(meta.title) + '</span>' +
+            '<span class="tool-subsec-count">' + tools.length + ' 个</span>' +
+            '<span class="tool-subsec-note">' + esc(meta.note) + '</span>' +
+            '</div>' +
+            '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, hushBadge); }).join('') + '</div>' +
+            '</div>';
+    }
+
+    // 场景段：一个场景 = 一个标题 + 两档工具。取代原先「可折叠的组」——
+    // 折叠把 41 个入口藏在一摞标题后面（没展开的组对浏览者等于不存在），而它当初要解决的
+    // 「一屏太长」问题，现在由分类选择器承担：不选「全部」就不会一次看到 41 个。
+    // 组头不再是 <button>：没有折叠可点了，做成按钮等于给屏幕阅读器一个假的可操作承诺。
+    function groupBlockHtml(g, quickList, deepList, actionHtml) {
+        var count = (quickList || []).length + (deepList || []).length;
+        if (!count) return '';
+        return '' +
+            '<section class="tool-group" id="gp-' + esc(g.id) + '" data-group="' + esc(g.id) + '">' +
+            '<div class="tool-group-head">' +
+            '<span class="tool-group-title">' + esc(g.name) + '</span>' +
+            '<span class="tool-group-count">' + count + ' 个</span>' +
+            (g.desc ? '<span class="tool-group-desc">' + esc(g.desc) + '</span>' : '') +
+            '</div>' +
+            '<div class="tool-group-body">' +
+            (actionHtml || '') +
+            subsecHtml('gp-' + g.id + '-quick', QUICK_SUBSEC, quickList || [], false) +
+            subsecHtml('gp-' + g.id + '-deep', DEEP_SUBSEC, deepList || [], true) +
+            '</div>' +
+            '</section>';
+    }
+
+    // 混合列表（最近使用 / 为你推荐 / 搜索结果）：不按场景分 —— 这批卡的共同点不是场景，
+    // 而是「和你刚才那件事有关」。命中的可能横跨三个组，再按场景切会把一次搜索拆成五个结果块。
+    function flatSectionHtml(title, desc, tools, opts) {
         if (!tools.length) return '';
         opts = opts || {};
-        var gid = opts.id || '';
-        // Anchor：锚点条靠 **DOM id** 跳，不用 data-group —— 完整测算的子小节与该组的速算器
-        // 用的是同一套场景分组（这是刻意的，见 tool-registry 的分组继承注释），
-        // 若两边都用 data-group="salary"，`querySelector('[data-group=salary]')` 会先撞到速算侧那一个。
-        var anchorId = 'gp-' + gid;
-        // 搜索 / 按身份筛选时**一律展开**：这时候用户就是要看结果，折叠是纯粹的障碍。
-        // 强制展开不写进记忆（否则搜一次就把所有组的默认状态改掉了）。
-        var open = !!opts.forceOpen || isGroupOpen(gid, !!opts.defaultOpen);
         return '' +
-            '<div class="tool-group' + (open ? '' : ' is-collapsed') + '" id="' + esc(anchorId) + '" data-group="' + esc(gid) + '">' +
-            '<button type="button" class="tool-group-head" data-group-toggle="' + esc(gid) + '"' +
-            ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
-            '<i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>' +
+            '<section class="tool-group" id="' + esc(opts.id || '') + '">' +
+            '<div class="tool-group-head">' +
             '<span class="tool-group-title">' + esc(title) + '</span>' +
             '<span class="tool-group-count">' + tools.length + ' 个</span>' +
             (desc ? '<span class="tool-group-desc">' + esc(desc) + '</span>' : '') +
-            '</button>' +
+            '</div>' +
             '<div class="tool-group-body">' +
             (opts.actionHtml || '') +
-            '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, hushBadge); }).join('') + '</div>' +
+            '<div class="tool-grid-1">' + tools.map(function (t) { return cardHtml(t, false); }).join('') + '</div>' +
             '</div>' +
-            '</div>';
+            '</section>';
     }
 
     function bindEntries(scope) {
@@ -436,103 +423,72 @@
         }
     }
 
-    // ====== 工具页 ======
-    // ---- T1（阶段20 P2）：类型筛选 ----
-    // 三个视图互斥：all（现状）/ quick（只要速算器）/ deep（只要完整测算）。
-    // 会话级变量，不落 localStorage —— 下次进来停在「完整测算」会被当成列表坏了（plan §5.2）。
-    var currentType = 'all';
+    // ====== 工具页：分类选择器（一条 chip 承载原先三套导航）======
+    // currentCategory 取值：'all' / 某个场景组 id / 'recent' / 'scenario'。
+    // **会话级、不落 localStorage**：下次进来停在某个分类里会被当成列表坏了（plan §5.2 同型理由），
+    // 但「我这次点开的」要一直有效到离开，所以是变量不是常量。
+    var currentCategory = '';
+    // false = 还没被用户点过，每渲染都按默认规则重新决定；true = 用户自己选了，不再自动改。
+    var categoryPicked = false;
 
-    function renderTypeFilter() {
-        var bar = document.getElementById('toolbox-type-filter');
-        if (!bar || !R()) return;
-        var all = (R().all() || []).length;
-        var deep = (R().deep() || []).length;
-        var set = function (id, n) {
-            var el = document.getElementById(id);
-            if (el) el.textContent = n;
-        };
-        // 计数从注册表算，不写死 41/20/21 —— 加工具不用回来改这句话
-        set('toolbox-count-all', all + deep);
-        set('toolbox-count-quick', all);
-        set('toolbox-count-deep', deep);
-        // 首页搜索条不放计数（用户拍板删掉）：数字要么写死要么动态维护，而它不帮用户做任何决定。
-        // 原先为它加的 set('home-search-count', …) 一并删除 —— DOM 里已经没有那个节点了。
-        bar.querySelectorAll('.tool-type-chip').forEach(function (btn) {
-            var on = btn.getAttribute('data-tool-type') === currentType;
-            btn.classList.toggle('is-on', on);
-            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-        // 每次渲染都顺手补一次绑定（函数内部按 data-bound 幂等）：
-        // 页面初始化时工具页还没进过，而测试环境是直接调 renderToolbox 的
-        bindTypeFilter();
+    // 默认落在哪一类：**有身份 → 为你推荐；有历史 → 最近；都没有 → 全部**。
+    // 这个顺序的依据是 §2 的路径：复访用户多半是「上次那个再算一遍」或「我是财务，看看我的」，
+    // 让他进来先在正确的一屏上，比先给他一张 41 项的总目录有用。
+    // 「全部」永远留在最后一个 chip 上 —— 新人仍要能一眼看全，入口总数也在 chip 上数得出来。
+    function defaultCategory() {
+        if (currentScenario) return 'scenario';
+        if (recentTools().length) return 'recent';
+        return 'all';
     }
 
-    function bindTypeFilter() {
-        var bar = document.getElementById('toolbox-type-filter');
-        if (!bar || bar.getAttribute('data-bound') === '1') return;
-        bar.setAttribute('data-bound', '1');
-        bar.addEventListener('click', function (e) {
-            var btn = e.target.closest ? e.target.closest('.tool-type-chip') : null;
-            if (!btn) return;
-            currentType = btn.getAttribute('data-tool-type') || 'all';
-            var kw = document.getElementById('toolbox-search');
-            renderToolbox(kw ? kw.value : '');
-        });
-    }
-
-    // ---- T3（阶段20 P2）：场景锚点 chip 条（桌面跳读用，手机由 CSS 隐藏）----
-    // 这一轮 renderDeepEntries 真正画出来的子节 id（见那里的注释）。锚点条必须按**实际存在**
-    // 的节点列 chip：搜索命中 1 张时另外四个子节不渲染，chip 若照旧列五个，点下去没有任何反应。
-    var deepSecIds = [];
-
-    function renderAnchors() {
-        var bar = document.getElementById('toolbox-anchors');
-        if (!bar || !R()) return;
-        // chip 上存的是 **DOM id**（不是组 id）：完整测算的子小节与速算侧的组同名但不同节点，
-        // 按名字找会跳错地方。见 groupSectionHtml 里 anchorId 的注释。
-        var items;
-        if (currentType === 'deep') {
-            // 「完整测算」视图：这原来是一行 hidden 了事（当时认为"只剩一组，不需要锚点"）。
-            // 但这一组恰是所有视图里**最长**的一屏（21 张卡），最需要跳读的正是这里 ——
-            // 卡片多了才该给锚点，卡片少的时候才不需要。现在锚点跳它的五个子节。
-            items = (R().groups() || []).filter(function (g) {
-                return deepSecIds.indexOf('deepsec-' + g.id) >= 0;
-            }).map(function (g) {
-                return { id: 'deepsec-' + g.id, name: g.name };
-            });
-        } else {
-            items = (R().groups() || []).map(function (g) {
-                return { id: 'gp-' + g.id, name: g.name };
-            });
-            if (currentType !== 'quick') items.push({ id: 'toolbox-deep', name: '完整测算' });
+    // chip 列表：计数一律从注册表算（加工具不用回来改数字）。
+    // 「最近 / 为你推荐」没有历史或没有身份时整条不出现 —— 空chip 是「这里应该有东西但今天没有」，
+    // 会让人以为加载失败了。
+    function categoryItems() {
+        var items = [];
+        if (currentScenario) {
+            items.push({ id: 'scenario', name: '为你推荐', count: (R().byScenario(currentScenario) || []).length });
         }
-        if (currentScenario) items.unshift({ id: 'gp-scenario', name: '为你推荐' });
+        var recent = recentTools();
+        if (recent.length) items.push({ id: 'recent', name: '最近', count: recent.length });
+        (R().groups() || []).forEach(function (g) {
+            var n = R().byGroup(g.id).length + R().deepByGroup(g.id).length;
+            if (n) items.push({ id: g.id, name: g.name, count: n });
+        });
+        items.push({ id: 'all', name: '全部', count: (R().all() || []).length + (R().deep() || []).length });
+        return items;
+    }
+
+    function renderCategories(searching) {
+        var bar = document.getElementById('toolbox-categories');
+        if (!bar || !R()) return;
+        // 搜索时收起整条：一次搜索可能横跨五个分类，这时候 chip 上的「属于哪一类」不再是
+        // 用户脑里的分组依据（他要的是「哪些工具匹配这个词」），留着只会让人疑心是不是该再点一下。
+        if (searching) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+        var items = categoryItems();
         if (items.length < 2) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
 
         bar.classList.remove('hidden');
-        bar.innerHTML = items.map(function (g) {
-            return '<button type="button" class="tool-anchor-chip" data-anchor="' + esc(g.id) + '">' + esc(g.name) + '</button>';
+        bar.innerHTML = items.map(function (it) {
+            var on = it.id === currentCategory;
+            return '<button type="button" class="tool-cat-chip' + (on ? ' is-on' : '') + '"' +
+                ' data-cat="' + esc(it.id) + '" role="tab" aria-selected="' + (on ? 'true' : 'false') + '">' +
+                esc(it.name) + '<span class="tool-cat-count">' + it.count + '</span></button>';
         }).join('');
-        bindAnchors();   // 委托绑在条上、按 data-bound 幂等，重画不会丢也不会重复
+        bindCategories();   // 委托绑在条上、按 data-bound 幂等
     }
 
-    function bindAnchors() {
-        var bar = document.getElementById('toolbox-anchors');
+    function bindCategories() {
+        var bar = document.getElementById('toolbox-categories');
         if (!bar || bar.getAttribute('data-bound') === '1') return;
         bar.setAttribute('data-bound', '1');
         bar.addEventListener('click', function (e) {
-            var btn = e.target.closest ? e.target.closest('.tool-anchor-chip') : null;
+            var btn = e.target.closest ? e.target.closest('.tool-cat-chip') : null;
             if (!btn) return;
-            var id = btn.getAttribute('data-anchor');
-            var target = document.getElementById(id);
-            if (target) {
-                // 目标组可能是折叠的：跳过去看到的是空组，等于没跳 —— 顺手展开
-                var collapsed = target.classList.contains('is-collapsed');
-                // 折叠记忆按 **组 id** 记，不按锚点用的 DOM id —— 否则同一个组会有两个记忆键
-                var gid = target.getAttribute('data-group') || id;
-                if (collapsed) { setGroupOpen(gid, true); applyGroupOpen(target, true); }
-                if (target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            currentCategory = btn.getAttribute('data-cat') || 'all';
+            categoryPicked = true;              // 手选优先：不再被默认规则覆盖
+            var kw = document.getElementById('toolbox-search');
+            renderToolbox(kw ? kw.value : '');
         });
     }
 
@@ -575,156 +531,137 @@
     function renderToolbox(keyword, scenarioId) {
         var container = document.getElementById('toolbox-groups');
         if (!container || !R()) return;
-        // v1.142.0：不传 scenarioId 时（进工具页 / 重渲染）按**已选的身份**带出推荐组 ——
-        // 身份此前唯一的可见效果就是「点一次看这类工具」，选完人就没了影：
-        // 存了被称作 "EuriskoIdentityPref" 的一行字符串，屏幕上什么都没变。
-        // 「选了我是谁」这件事应该在下一次打开工具页时自动兑现。
-        if (scenarioId !== undefined) currentScenario = scenarioId || null;
-        else currentScenario = recommendedScenario();
+        // 第二参 !== undefined 表示**外部发起的导航**（点身份卡 / 清掉身份 / 测试基线），
+        // 这一趟连带重算默认分类；不传则是自身重渲染（搜索、清空最近、身份回调），
+        // 尊重用户手选的分类 —— 否则改个身份就把人从正在看的那一类里踢出去。
+        if (scenarioId !== undefined) {
+            currentScenario = scenarioId || null;
+            categoryPicked = false;
+        } else {
+            currentScenario = recommendedScenario();
+        }
 
-        var result = R().search(keyword);
-        var html = '';
         // 微标签读的是历史：每次重渲染都重新取一次，否则刚算完的那一条不显示「今天算过」
         refreshFlags();
-        var forceOpen = !!currentScenario || !!result.matched;
-        // T1：选了「完整测算」时不渲染速算器组（互斥视图），选「速算」时反过来（见下面 deepBox 的 hidden）
-        var showQuick = currentType !== 'deep';
+        // 没被手选过 → 每次渲染都重算默认分类：身份可能在别处刚被改掉（init 里的 onChange 订阅），
+        // 也可能因为「清空最近使用」而失效，握住旧值就会停在空屏上。
+        if (!categoryPicked) currentCategory = defaultCategory();
 
-        // 按身份挑工具 = **推荐组置顶**，其余分组照常渲染（19-2 遗留清偿③）：
-        // 原实现走的是 else-if，等于只渲染推荐组 —— 其余 36 个入口当场消失，那是筛选，
-        // 违反 §3.9「身份绝不影响可用工具范围」。现在身份只决定谁排在前面。
-        if (currentScenario) {
-            var scen = R().scenarios().filter(function (s) { return s.id === currentScenario; })[0];
-            if (scen) html += groupSectionHtml('为你推荐（' + scen.name + '）', scen.desc, R().byScenario(currentScenario), false,
-                { id: 'scenario', forceOpen: forceOpen, defaultOpen: true });
-        }
-        if (result.matched) {
-            if (showQuick) {
-                R().groups().forEach(function (g) {
-                    var tools = (result.tools || []).filter(function (t) { return t.group === g.id; });
-                    html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
-                });
-            }
-        } else if (showQuick) {
-            // 「清空」跟着这组走（阶段19-10a）：原本它长在首页那张同名卡上，卡撤了以后
-            // 这里是唯一的清空入口 —— 不补回来的话，列表只能靠新的使用记录挤掉旧的。
-            var recent = recentTools();
-            if (recent.length) html += groupSectionHtml('最近使用', '', recent, false,
-                { id: 'recent', forceOpen: forceOpen, defaultOpen: true,
-                    actionHtml: '<div class="tool-group-actions">' +
-                        '<button type="button" id="toolbox-recent-clear" class="tool-group-action">清空最近使用</button>' +
-                        '</div>' });
-            R().groups().forEach(function (g) {
-                var tools = R().byGroup(g.id);
-                html += groupSectionHtml(g.name, g.desc, tools, false, { id: g.id, forceOpen: forceOpen });
-            });
-        }
-
-        container.innerHTML = html || '<div class="tool-empty">没有匹配的工具，试试「年终奖」「增值税」「社保」</div>';
+        var result = R().search(keyword);
+        var html = contentHtml(result);
+        container.innerHTML = html || emptyHtml();
         bindEntries(container);
-        bindGroupToggles(container);
-
-        // 每次重渲染都是新 DOM，清空按钮也跟着重建 —— 在这里绑而不是 init 里绑一次。
-        var clearRecent = document.getElementById('toolbox-recent-clear');
-        if (clearRecent) {
-            clearRecent.addEventListener('click', function () {
-                try { localStorage.removeItem(RECENT_KEY); } catch (e) { /* 隐私模式忽略 */ }
-                renderToolbox(keyword || '');
-            });
-        }
-
-        // 完整测算组：标题是静态 HTML（保持与其它组同样的折叠交互），内部的 21 张卡的列表由
-        // renderDeepEntries() 渲染。这里只控制该组的显隐：搜索无命中时收起，避免与结果互相干扰。
-        // （原来还带「按身份筛选时收起」—— 身份不再是筛选，完整测算照样该在。）
-        var deepBox = document.getElementById('toolbox-deep');
-        if (deepBox) {
-            // T1 反向：选「速算」时整块完整测算不出现（同一份互斥，不是"排在最后"）
-            var hideDeep = (currentType === 'quick')
-                || (result.matched && (!result.deep || result.deep.length === 0));
-            if (hideDeep) deepBox.classList.add('hidden');
-            else deepBox.classList.remove('hidden');
-            // 完整测算组是静态 HTML（4 张 mode card 的事件在别处绑定），这里只补折叠与计数，
-            // 绝不重建它的 DOM —— 重建会让那 4 颗隐藏按钮的初始化逻辑全部失效。
-            // 「完整测算」视图下它就是页面上唯一的一组，默认收起等于整个视图是空的
-            applyGroupOpen(deepBox, forceOpen || currentType === 'deep' || isGroupOpen('deep', false));
-            var deepCount = document.getElementById('toolbox-deep-count');
-            if (deepCount) deepCount.textContent = (R().deep() || []).length + ' 个';
-            if (deepBox.getAttribute('data-group-bound') !== '1') {
-                bindGroupToggles(deepBox);
-                deepBox.setAttribute('data-group-bound', '1');
-            }
-            // 组描述里那句「用**上面的**速算器更快」在「完整测算」视图下是句假话 ——
-            // 那个视图里速算组整块不渲染，上面什么都没有，用户抬头找不到它。
-            // 一句话在两个视图里含义不同，就得跟着视图变，而不是写死在 HTML 里。
-            var deepDesc = document.getElementById('toolbox-deep-desc');
-            if (deepDesc) {
-                deepDesc.textContent = (currentType === 'deep')
-                    ? '按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，切回上面的「速算」'
-                    : '按年填全 · 出完整预算表与逐项明细 —— 只想知道一个数，用上面的速算器更快';
-            }
-        }
-        // 搜索时这一组只放命中的那几张（不传 = 全部 21 张）
-        renderDeepEntries(result.matched ? result.deep : (R().deep() || []));
+        bindRecentClear(keyword);
+        bindSearchReset();
+        // 只有**真的列出搜索结果**时，分类条才让位给结果；有词无果时把它留给用户当退路。
+        // 两个条件都不能省：search 的 matched 说的是「输了词」而不是「有结果」，
+        // 只看它就走进死胡同；只看 html 又会因为「非搜索态本来就有内容」把条常年藏起来。
+        renderCategories(!!result.matched && !!html);
         renderScenarioChip();
-        renderTypeFilter();   // T1：三个视图的计数与选中态
-        renderAnchors();      // T3：锚点条跟着当前视图（「完整测算」视图跳它自己的五个子节）
     }
 
-    // ====== 完整测算：入口（现与其它组同一张列表） ======
-    // v1.142.0 之前这里是「4 张写死的静态卡 + 其余动态追加」的模式（阶段17 迁移时的历史债）：
-    // 那 4 个税种的旧整页还活着时，卡里的隐藏按钮承担了一整套初始化，不能重建 DOM。
-    // 旧页早已删净（openTool 一律按 W.has(tool) 进向导），于是这一组与其它组合并成一张表：
-    // 同一种卡片、同一种排序、同一个 counts 来源 —— 21 个入口之间不再有「两种长相」。
-    // 新增一个完整测算 = 在 tool-registry.js 加一条 spec，本文件与 index.html 都不用动。
-    // list：可选，传了就只渲染这一批（搜索用）。**此前这里恒为 R().deep()**，
-    // 于是搜「残保金」时这一组照样摊开 21 张卡，命中的那张埋在第 19 位 —— 等于没搜。
-    function renderDeepEntries(list) {
-        var host = document.getElementById('toolbox-deep-extra');
-        if (!host || !R()) return;
-        if (!list) list = R().deep() || [];
-        if (!list.length) {
-            host.innerHTML = '';
-            host.classList.add('hidden');
-            return;
-        }
-        host.classList.remove('hidden');
+    // 空态要给出口，不然「打错一个字」的用户面对的是一屏白色和一个还不认识的清空手势。
+    function emptyHtml() {
+        var total = (R().all() || []).length + (R().deep() || []).length;
+        return '<div class="tool-empty">没有匹配的工具，试试「年终奖」「增值税」「社保」' +
+            '<button type="button" id="toolbox-search-reset" class="tool-group-action">看看全部 ' + total + ' 个 ›</button>' +
+            '</div>';
+    }
 
-        // 子节用 **DOM id**（deepsec-<组>）而不是 data-group：它与速算侧共用同一套场景分组，
-        // 两边若都叫 data-group="salary"，锚点条的 querySelector 会永远撞上速算那一个。
-        function subsec(secId, title, tools) {
-            return '<div class="tool-subsec" id="' + esc(secId) + '">' +
-                '<div class="tool-subsec-head">' +
-                '<span class="tool-subsec-title">' + esc(title) + '</span>' +
-                '<span class="tool-subsec-count">' + tools.length + ' 个</span>' +
-                '</div>' +
-                '<div class="tool-grid-1">' +
-                tools.map(function (t) { return cardHtml(t, true); }).join('') +
-                '</div>' +
-                '</div>';
-        }
+    function bindSearchReset() {
+        var btn = document.getElementById('toolbox-search-reset');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var input = document.getElementById('toolbox-search');
+            if (input) input.value = '';
+            currentCategory = 'all';
+            categoryPicked = false;
+            renderToolbox('');
+            if (input) input.focus();
+        });
+    }
 
-        // 空子节不渲染：搜「残保金」只命中 1 张，五个场景子节若照旧全画，页面就是
-        // 「1 张卡 + 4 个写着 0 个的标题」—— 搜索是为了缩小范围，不是为了看一份空目录。
-        // 顺带把这一轮**真正画出来**的子节 id 记进 deepSecIds，锚点条按它列 chip。
-        deepSecIds = [];
-        var html = (R().groups() || []).map(function (g) {
-            var tools = list.filter(function (t) { return t.group === g.id; });
-            if (!tools.length) return '';
-            deepSecIds.push('deepsec-' + g.id);
-            return subsec('deepsec-' + g.id, g.name, tools);
+    // 内容区：**一次只渲染当前分类那一屏**。
+    // 搜索是唯一例外 —— 它横跨分类，这时候「属于哪一类」不再是用户脑里的分组依据，
+    // 按场景分段把命中的两版挨着摆出来（「增值税」旁边就是「增值税（进项逐笔）」），
+    // 用户不必先知道有第二版存在，就能看见它。
+    function contentHtml(result) {
+        if (result.matched) return searchResultHtml(result);
+        if (currentCategory === 'recent') return recentSectionHtml() || allSectionsHtml();
+        if (currentCategory === 'scenario') return scenarioSectionHtml() || allSectionsHtml();
+        if (currentCategory === 'all') return allSectionsHtml();
+        var g = (R().groups() || []).filter(function (x) { return x.id === currentCategory; })[0];
+        if (!g) return allSectionsHtml();
+        return groupBlockHtml(g, R().byGroup(g.id), R().deepByGroup(g.id));
+    }
+
+    // 「全部」= 五个场景段依次排开，每段内先「估个数」后「要明细」。
+    // 这是唯一会一次给出 41 个入口的视图，也是 chip 上永远留着的那一项 ——
+    // 新人要能一眼看全，入口总数必须在页面上数得出来（改了注册表这里自动跟上）。
+    function allSectionsHtml() {
+        return (R().groups() || []).map(function (g) {
+            return groupBlockHtml(g, R().byGroup(g.id), R().deepByGroup(g.id));
         }).join('');
-        // 兜底：忘了在 spec 上写 group 的完整测算仍要出场 —— 静默不显示是那种
-        // 「加了一个东西，上线前谁都没发现它不存在」的事故。
-        var rest = list.filter(function (t) { return !t.group; });
-        if (rest.length) html += subsec('deepsec-other', '其它', rest);
+    }
 
-        host.innerHTML = html;
-        bindEntries(host);
+    // 「清空」跟着这一区走（阶段19-10a）：原本它长在首页那张同名卡上，卡撤了以后
+    // 这里是唯一的清空入口 —— 不补回来的话，列表只能靠新的使用记录挤掉旧的。
+    var RECENT_CLEAR_HTML = '<div class="tool-group-actions">' +
+        '<button type="button" id="toolbox-recent-clear" class="tool-group-action">清空最近使用</button>' +
+        '</div>';
+
+    function recentSectionHtml() {
+        var recent = recentTools();
+        if (!recent.length) return '';
+        return flatSectionHtml('最近使用', '', recent, { id: 'gp-recent', actionHtml: RECENT_CLEAR_HTML });
+    }
+
+    // 身份推荐 = **一条置顶的分类**，不是筛选（19-2 遗留清偿③）：原实现走 else-if 只渲染推荐组，
+    // 其余 36 个入口当场消失，违反 §3.9。现在它跟其余分类平级，切到别类照样看得见全部入口。
+    function scenarioSectionHtml() {
+        var scen = currentScenario ? R().scenarios().filter(function (s) { return s.id === currentScenario; })[0] : null;
+        if (!scen) return '';
+        return flatSectionHtml('为你推荐（' + scen.name + '）', scen.desc, R().byScenario(currentScenario),
+            { id: 'gp-scenario' });
+    }
+
+    // 搜索结果按场景分段；空段落一律不渲染（此前的教训：搜「残保金」摊开 21 张，
+    // 命中那张埋在第 19 位；反过来若留下四个空段落，就是「1 张卡 + 4 个 0 个的标题」）。
+    function searchResultHtml(result) {
+        var html = (R().groups() || []).map(function (g) {
+            return groupBlockHtml(g,
+                (result.tools || []).filter(function (t) { return t.group === g.id; }),
+                (result.deep || []).filter(function (t) { return t.group === g.id; }));
+        }).join('');
+        // 兜底：spec 上漏写 group 的工具仍要出场 —— 静默不显示是那种
+        // 「加了一个东西，上线前谁都没发现它不存在」的事故。
+        var ids = (R().groups() || []).map(function (g) { return g.id; });
+        var orphan = (result.tools || []).concat(result.deep || []).filter(function (t) {
+            return ids.indexOf(t.group) < 0;
+        });
+        if (orphan.length) html += flatSectionHtml('其它', '', orphan, { id: 'gp-orphan' });
+        return html;
+    }
+
+    function bindRecentClear(keyword) {
+        // 每次重渲染都是新 DOM，清空按钮也跟着重建 —— 在这里绑而不是 init 里绑一次。
+        var btn = document.getElementById('toolbox-recent-clear');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            try { localStorage.removeItem(RECENT_KEY); } catch (e) { /* 隐私模式忽略 */ }
+            // 清空后这一区空了，手选的「最近」会渲染出一个空屏 —— 退回「全部」才不是白屏，
+            // 并且清掉手选标记，让下一次按默认规则重新决定。
+            currentCategory = 'all';
+            categoryPicked = false;
+            renderToolbox(keyword || '');
+        });
     }
 
     function openScenario(id) {
         scenarioCleared = false;    // 用户自己点了「看这类工具」—— 这次不必再替他清除
         currentScenario = id;
+        // 不在这里手设分类：renderToolbox('', id) 是外部导航（第二参有定义），会自己重算默认分类，
+        // 而带上了身份之后 defaultCategory() 算出来的就是「为你推荐」这一条。
         showPageFn(TOOLS_PAGE);
         renderToolbox('', id);
     }
@@ -2144,9 +2081,7 @@
         bindAdvancedSignal();
         bindHintToggles();
         renderScenarios();
-        renderToolbox('');
-        bindTypeFilter();   // T1
-        bindAnchors();      // T3
+        renderToolbox('');       // 内部会按数据-bound 幂等补上分类条的绑定
 
         // v1.142.0：改身份的工具页要立刻跟着变 —— 身份的使用场合多半是「刚改完身份，看看给我推荐了什么」。
         // 不做这条订阅，改完身份只能自己退到工具页再回来（= 没什么人会发现它生效了）。
@@ -2165,6 +2100,9 @@
             entry.addEventListener('click', function () {
                 // 从搜索入口进工具页 = 重新找工具，清掉上一次的身份推荐
                 currentScenario = null;
+                // 上一次可能停在某个分类里（那是浏览态）；这趟是「重新找」，回到默认。
+                // 不清的话会从「企业与经营」那一屏开始搜，看着像列表被剪过。
+                categoryPicked = false;
                 renderToolbox('');
                 showPageFn(TOOLS_PAGE);
                 focusSearchIfDesktop();

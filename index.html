@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.142.0';
+        window.__APP_VERSION__ = '1.143.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -692,64 +692,20 @@
                     <i class="fa fa-search tool-search-icon"></i>
                     <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
                 </div>
-                <!-- T1（阶段20 P2）：类型筛选 —— 完整测算从「末位折叠组」提为并列视图。
-                     21 个完整测算既是核心卖点也是付费值厚度，藏在末位折叠组等于对浏览者不存在。
-                     筛选是**互斥视图**，不是混排：选「完整测算」时只有它，选「速算」时只有速算器 ——
-                     因此不违反「速算与完整测算不混排」的旧约束（同一税种在两个视图各出现一次是对的）。
-                     计数由 JS 从注册表写（加工具不用回来改数字）；筛选状态是**会话级**的，
-                     不写 localStorage —— 下次进来停在「完整测算」会被当成列表坏了。 -->
-                <div id="toolbox-type-filter" class="tool-type-filter">
-                    <button type="button" class="tool-type-chip is-on" data-tool-type="all">全部 <span id="toolbox-count-all"></span></button>
-                    <button type="button" class="tool-type-chip" data-tool-type="quick">速算 <span id="toolbox-count-quick"></span></button>
-                    <button type="button" class="tool-type-chip" data-tool-type="deep">完整测算 <span id="toolbox-count-deep"></span></button>
-                </div>
-                <!-- T3（阶段20 P2）：场景锚点 chip 条（桌面 sticky，手机隐藏）——
-                     横向一行是**跳读**（我知道要哪一类，直接跳过去），不是分类树；
-                     §5.3 否决的是左侧深层级树状导航，两者不是一回事。 -->
-                <div id="toolbox-anchors" class="tool-anchor-bar"></div>
+                <!-- 分类选择器（v1.143.0）——
+                     此前这一页有三套导航在讲同一件事：①「全部 / 速算 / 完整测算」类型筛选；
+                     ② 内容几乎相同的一行场景锚点 chip；③ 五个可折叠的组头（点开才见卡片）。
+                     结果是有目标的人要在三套导航里挑一套，没目标的人看见一摞折叠标题。
+                     现在只剩一套：**一行分类 chip + 一块内容区**，选哪一类内容区就出哪一类，
+                     卡片直接铺出（不折叠 —— 找工具不该分「点开」和「再滚一遍」两步）。
+                     完整测算不再单占一条 chip：它按场景并进各自那一类（见 §6 同屏口径），
+                     于是「参数多 versus 估个数」变成同一个场景里当场可选的一步，而不是两个视图。 -->
+                <div id="toolbox-categories" class="tool-cat-bar" role="tablist" aria-label="工具分类"></div>
                 <div id="toolbox-scenario-chip" class="tool-scenario-chip hidden"></div>
                 <div id="toolbox-groups">
-                    <!-- 由 toolbox-ui.js 按 tool-registry.js 渲染（5 个场景组 + 搜索结果） -->
-                </div>
-
-                <!-- 完整测算：按年填全、出完整预算表（保存/导出已不是它的专利，全都支持），排在最后 -->
-                <!-- 阶段19-3：与上面 5 个场景组一样默认折叠、点标题展开并记住状态。
-                     v1.142.0：这一组与其它组一样由 renderDeepEntries() 渲染（卡片也是同一款「工具条」），
-                     里面不再有写死的静态卡与隐藏按钮，重画不会丢事件 —— 唯一的约束变成
-                     「新增一个完整测算改注册表，不动本文件」。 -->
-                <div id="toolbox-deep" class="tool-group is-collapsed" data-group="deep">
-                    <button type="button" class="tool-group-head" data-group-toggle="deep" aria-expanded="false">
-                        <i class="fa fa-angle-down tool-group-caret" aria-hidden="true"></i>
-                        <i class="fa fa-list-ol tool-group-icon"></i>
-                        <span class="tool-group-title">完整测算</span>
-                        <span id="toolbox-deep-count" class="tool-group-count"></span>
-                        <!-- 这句描述在 JS 里跟着视图改写（renderToolbox）：「上面的速算器」那句
-                             在「完整测算」视图里指向不存在的东西，静态文案做不到这点。 -->
-                        <span id="toolbox-deep-desc" class="tool-group-desc"></span>
-                    </button>
-                    <div class="tool-group-body">
-                    <!-- v1.142.0：入口只有一张表 —— 此前这里先摆 4 张写死的 mode-card
-                         （综合所得 / 经营所得 / 分类所得 / 反向倒算），其余 17 个再动态追加到下面一行，
-                         两套 markup、两种信息密度，看到的「完整测算」像两个入口拼起来的。
-                         那 4 张卡是阶段17 迁移时的历史债：当时它们的整页还在、按钮不能重建；
-                         页面早已删净（openTool 一律走 ISpec 向导），债到今天才还得上。 -->
-                    <!-- 21 个完整测算全部由 renderDeepEntries() 按注册表渲染，同款「工具条」卡片，
-                         并按 tool-registry 的 group 分成 5 个小节（复用上面那 5 个场景组的划分）：
-                         21 张同款卡平铺在一屏里没有次序可言，找某一个只能逐个读名字。
-                         新增一个税种只改 tool-registry.js —— spec 上有孪生速算器的自动继承它的组，
-                         没有孪生的那一批在 spec 上写 group；本文件不必再动。
-                         注册表现役清单（数字不写死，加一个税种这里自动跟上）：
-                         vat / cit / social / surtax-stamp / fee + business / reverse / forward / classification
-                         + withholding-deep 劳务报酬预扣预缴 + bonus-tax-deep 年终奖择优
-                         + equity-deep 股权激励 + severance-deep 离职补偿
-                         + early-retirement-deep 提前退休 / 内退 + expat-deep 外籍津补贴免税
-                         + annual-settlement-deep 年度汇算清缴 + special-deduction-deep 专项附加扣除
-                         + private-pension-deep 个人养老金与税优三件套
-                         + donation 公益慈善捐赠扣除 + property-transfer 个人转让房屋
-                         + non-resident 非居民 / 无住所。
-                         各税种为什么必须自带 spec（速算器答不了的那层），写在 tool-registry.js 各自的注释里。 -->
-                    <div id="toolbox-deep-extra" class="tool-subsecs hidden"></div>
-                    </div>
+                    <!-- 由 toolbox-ui.js 按分类渲染：全部 = 五个场景段；选中某类 = 那一段；
+                         有最近使用 / 身份推荐时多两条 chip。每段内先「估个数」后「要明细」两个区。
+                         新增工具只改 tool-registry.js，本文件不必动。 -->
                 </div>
             </div>
         </div>
@@ -1735,7 +1691,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.142.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.143.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页

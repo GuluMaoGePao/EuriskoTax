@@ -738,41 +738,21 @@
 }
 /* 事件卡一律用生活语言，**不得出现税种名与术语**（§3.3.3） */
 
-/* --- 3.1b 工具页：场景组折叠 + 卡片状态微标签（§3.4 / 19-3）——
-   41 个入口一次全铺开等于没有目录，故场景组默认折叠；
-   折叠只加 class、**不重建 DOM**（重建会冲掉「最近使用」等动态区已绑定的事件）。 */
+/* --- 3.1b 工具页：场景段标题 + 卡片状态微标签（§3.4 / 19-3）——
+   v1.143.0：**场景组不再折叠**。原先默认折叠是为了压住「41 个入口一次全铺开」的长度，
+   而这个长度现在由分类选择器承担（不选「全部」就只有一类），代价却还在：
+   折叠把每组工具藏在一次点击之后，没展开的组对浏览者等于不存在。
+   这里只留下段头的排版（组头已改回 div —— 没有可点的东西就不该是 button）。 */
 .tool-group-head {
-    /* 组头由 div 改成 button（可点、可键盘聚焦），故先抹掉浏览器默认外观 */
     display: flex;
     align-items: baseline;
     gap: 8px;
     flex-wrap: wrap;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
 }
-.tool-group-head:focus-visible {
-    outline: none;
-    box-shadow: var(--sh-focus);
-    border-radius: var(--r-ctrl);
-}
-.tool-group-caret {
-    font-size: var(--fs-xs);
-    color: var(--c-text-3);
-    transition: transform var(--dur-micro) var(--ease);
-}
-.tool-group.is-collapsed .tool-group-caret { transform: rotate(-90deg); }
-/* 折叠时看不到内容，组头必须说清里面有几个 —— 否则用户不知道该不该展开 */
 .tool-group-count {
     font-size: var(--fs-micro);
     color: var(--c-text-3);
 }
-.tool-group.is-collapsed .tool-group-body { display: none; }
 
 /* 微标签：算过 / 热门 / 可对比 —— 让 41 个入口带上「我的痕迹」 */
 .tool-entry-flags {
