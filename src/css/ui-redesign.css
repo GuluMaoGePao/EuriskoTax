@@ -374,9 +374,16 @@
     }
 }
 /* 手机 2 列时，张数为奇数则最后一张拉满整行 —— 3 行里的最后一行只站半格，
-   看着像漏了一块，补满即可（不是"重要所以要加宽"，是补齐缺口）。 */
-.profile-quick-grid .profile-quick-tile:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+   看着像漏了一块，补满即可（不是"重要所以要加宽"，是补齐缺口）。
+   ⚠️ 这条**必须锁在手机档**（v1.146.0 修的错位）：
+   auto-fit 的"折叠空轨道"只对**没有被任何 item 跨越**的轨道生效。登录态宫格是 5 格，
+   第 5 格若跨全行，6 条候选轨道就都算"被跨越"、一条都折不掉 —— 结果前 4 格各占 1 列
+   （每列 150px 打底），右边空出两列；第 5 格又拉满整行，于是「个人中心」比上面四格宽一倍、
+   剩下四格挤在左边。桌面只该按张数等分（4 格四等分、5 格五等分），跨列是手机档的补缺口手段。 */
+@media (max-width: 639.98px) {
+    .profile-quick-grid .profile-quick-tile:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
 }
 .profile-quick-tile {
     position: relative;

@@ -107,10 +107,30 @@ describe('顶层内页：同一条栅格', () => {
     });
 
     // share-landing.js 用 `#mode-selection-page .max-w-5xl` 定位首页容器挂载分享落地引导：
+
     // 类名摘了，分享落地首屏引导就挂不上（静默失效，不报错）。
     test('首页容器的 max-w-5xl 类名保留（share-landing.js 按它定位）', () => {
         expect(read('src/js/share/share-landing.js')).toContain('#mode-selection-page .max-w-5xl');
         expect(containerClassOf('mode-selection-page')).toContain('max-w-5xl');
+    });
+});
+
+// 2026-10 反馈：「我的」页网页版宫格错位 —— 前 4 格挤在左边、右边空两列，
+// 「个人中心」又单独拉满整行，两张尺寸的格子在同一块区域里并排。
+// 根因不是宽度，是**跨列规则没锁断点**：auto-fit 只在轨道"没有被任何 item 跨越"时才折叠，
+// 登录态第 5 格跨全行 → 6 条候选轨道全算被跨越 → 一条也折不掉，于是前 4 格各占 1 列、
+// 空 2 列，第 5 格再拉满。桌面只该按张数等分（4 格四等分、5 格五等分）。
+describe('「我的」宫格：跨列只属于手机档', () => {
+    test('grid-column: 1 / -1 只出现在手机断点内（≤639.98）', () => {
+        const CSS = read('src/css/ui-redesign.css');
+        const hits = [];
+        let i = -1;
+        while ((i = CSS.indexOf('grid-column: 1 / -1', i + 1)) > 0) hits.push(i);
+        expect(hits.length).toBeGreaterThan(0);
+        hits.forEach((at) => {
+            const head = CSS.slice(CSS.lastIndexOf('@media', at), at);
+            expect(head).toMatch(/max-width:\s*639/);
+        });
     });
 });
 
