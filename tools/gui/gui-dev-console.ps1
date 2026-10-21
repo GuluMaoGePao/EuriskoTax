@@ -1252,6 +1252,73 @@ function Show-InputBox {
 }
 
 # ==============================================================================
+# 辅助函数: Show-PasswordBox（掩码输入 + 二次确认）
+#
+# 为什么不能沿用 Show-InputBox：VisualBasic 的 InputBox 没有掩码，密码会明晃晃
+# 显示在屏幕上，顺带被截图工具一起带走。设置密码这种事，输错一次还看不出来。
+# 所以单独做一个：两遍输入、不一致就当取消。
+# ==============================================================================
+function Show-PasswordBox {
+    param(
+        [string]$Title = "设置新密码",
+        [string]$Prompt = "新密码（至少 12 位）："
+    )
+    Add-Type -AssemblyName System.Windows.Forms | Out-Null
+    Add-Type -AssemblyName System.Drawing | Out-Null
+
+    $f = New-Object System.Windows.Forms.Form
+    $f.Text = $Title
+    $f.ClientSize = New-Object System.Drawing.Size(440, 182)
+    $f.StartPosition = "CenterScreen"
+    $f.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $f.MaximizeBox = $false
+    $f.MinimizeBox = $false
+    $f.TopMost = $true
+
+    $lbl1 = New-Object System.Windows.Forms.Label
+    $lbl1.Text = $Prompt
+    $lbl1.Location = New-Object System.Drawing.Point(16, 14)
+    $lbl1.AutoSize = $true
+
+    $tb1 = New-Object System.Windows.Forms.TextBox
+    $tb1.Location = New-Object System.Drawing.Point(16, 36)
+    $tb1.Size = New-Object System.Drawing.Size(408, 24)
+    $tb1.UseSystemPasswordChar = $true
+
+    $lbl2 = New-Object System.Windows.Forms.Label
+    $lbl2.Text = "再输入一次确认（两次不一致视为取消）"
+    $lbl2.Location = New-Object System.Drawing.Point(16, 68)
+    $lbl2.AutoSize = $true
+
+    $tb2 = New-Object System.Windows.Forms.TextBox
+    $tb2.Location = New-Object System.Drawing.Point(16, 90)
+    $tb2.Size = New-Object System.Drawing.Size(408, 24)
+    $tb2.UseSystemPasswordChar = $true
+
+    $ok = New-Object System.Windows.Forms.Button
+    $ok.Text = "确定"
+    $ok.Location = New-Object System.Drawing.Point(268, 134)
+    $ok.Size = New-Object System.Drawing.Size(76, 28)
+    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+
+    $cancel = New-Object System.Windows.Forms.Button
+    $cancel.Text = "取消"
+    $cancel.Location = New-Object System.Drawing.Point(350, 134)
+    $cancel.Size = New-Object System.Drawing.Size(76, 28)
+    $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+
+    $f.Controls.AddRange(@($lbl1, $tb1, $lbl2, $tb2, $ok, $cancel))
+    $f.AcceptButton = $ok
+    $f.CancelButton = $cancel
+
+    $r = $f.ShowDialog()
+    if ($r -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
+    if ([string]::IsNullOrWhiteSpace($tb1.Text)) { return $null }
+    if ($tb1.Text -ne $tb2.Text) { return $null }
+    return $tb1.Text
+}
+
+# ==============================================================================
 # 辅助函数: Get-AdminToken（获取管理员令牌：优先读 server\.env，无则弹窗输入并回存）
 # ==============================================================================
 function Get-AdminToken {
@@ -3518,6 +3585,34 @@ Add-SectionCard -TabCtx $tab6bCtx `
         } },
     @{ Text = "🧪 安全发布试运行`nDry-Run · 只验证不推送"; Desc = "安全预演：只跑本地 verify:local 门禁，确认能全绿；不 commit、不 push，零风险。正式发布前建议先点这个。"; Color = "120, 165, 230"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "publish-dry" -Command "& '$OpsDir\ops-publish.ps1' -DryRun" -WorkingDir $ProjectRoot } }
+)
+
+Add-SectionCard -TabCtx $tab6bCtx `
+    -Title "5. 🔑 工作人员密码（应急重置）" `
+    -Subtitle "脚本：tools/ops/ops-staff-password.ps1（SSH 到生产服务器执行）" `
+    -Description "详细说明（v1.146.0）：管理台改成「工作人员账号 + 密码」登录后，**改密码本身也要先登录** —— 于是 owner 一旦忘了密码就登不进去，也就改不了自己。这个入口就是为那一刻准备的：它 SSH 到生产服务器跑 node scripts/staff.js reset-password。两个细节值得知道：① **新密码经 stdin 传给远程进程，不拼进命令行**（命令行参数在同机任何人 ps 一下或翻 shell history 就是明文）；② 密码在你这里是掩码输入 + 二次确认，传给脚本走环境变量 —— 因为本页按钮会把命令原文打到日志区，密码不能出现在命令里。日常改密码请在管理台「工作人员」Tab 做（需 owner 登录），不必走这里。" `
+    -AccentColor $C_GRAY -Buttons @(
+    @{ Text = "查看生产工作人员`n确认邮箱与角色"; Desc = "列出生产环境所有工作人员账号（邮箱 / 角色 / 状态 / 最后登录）。重置密码前先点它确认邮箱没写错 —— 邮箱写错会在服务器上报「账号不存在」。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "staff-list" -Command "& '$OpsDir\ops-staff-password.ps1' -List" -WorkingDir $ProjectRoot } },
+    @{ Text = "重置工作人员密码`n应急通道 · 需 SSH 可用"; Desc = "输入邮箱 + 两次新密码后，SSH 到生产服务器重置该账号。成功后该账号所有登录会话立即失效，需用新密码重新登录管理台。会先弹一次确认。"; Color = "225, 145, 80"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $mail = Show-InputBox -Title "重置工作人员密码" -Prompt "要重置哪个账号？输入其管理台登录邮箱（可先用左边的【查看生产工作人员】确认）：" -DefaultValue ""
+            if (-not $mail) { Write-Log "[密码] 已取消：未填邮箱" "WARN"; return }
+            $newPwd = Show-PasswordBox -Title "重置 $mail 的密码" -Prompt "新密码（至少 12 位，输入不回显）："
+            if (-not $newPwd) { Write-Log "[密码] 已取消：未输入或两次不一致" "WARN"; return }
+            if ($newPwd.Length -lt 12) { Show-GuiAlert -Title "密码太短" -Message "密码至少 12 位，请重新点一次。" -Kind "Warning"; return }
+            $ask = [System.Windows.Forms.MessageBox]::Show("确认重置 $mail 的管理台登录密码？`n`n该账号当前所有登录会话会立即失效。", "确认重置", "YesNo", "Warning")
+            if ($ask -ne "Yes") { Write-Log "[密码] 已取消" "WARN"; return }
+            # 密码走环境变量：Invoke-AsyncCommand 会把命令原文打到日志区，
+            # 命令里只出现邮箱，密码不会落在日志里，也不会出现在命令行参数中
+            try {
+                $env:EURISKO_STAFF_PWD = $newPwd
+                Invoke-AsyncCommand -Name "staff-pwd" -Command "& '$OpsDir\ops-staff-password.ps1' -Email '$mail'" -WorkingDir $ProjectRoot
+            } finally {
+                Remove-Item Env:EURISKO_STAFF_PWD -ErrorAction SilentlyContinue
+                $newPwd = $null
+            }
+        } }
 )
 
 # ==============================================================================

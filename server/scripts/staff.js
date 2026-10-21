@@ -12,7 +12,7 @@
  *   node scripts/staff.js set-role <email> <owner|admin|support>
  *   node scripts/staff.js disable <email>
  *   node scripts/staff.js enable <email>
- *   node scripts/staff.js reset-password <email> <newPassword>
+ *   node scripts/staff.js reset-password <email> [newPassword]     # 省略密码则从 stdin 读（推荐）
  *   node scripts/staff.js migrate-from-user <email> [owner|admin|support]
  *
  * `migrate-from-user` 用于 v1.145.0 升级：那个版本把管理员做成了 User.role='admin'，
@@ -39,18 +39,56 @@ function usage() {
   node scripts/staff.js set-role <email> <owner|admin|support>
   node scripts/staff.js disable <email>
   node scripts/staff.js enable <email>
-  node scripts/staff.js reset-password <email> <newPassword>
+  node scripts/staff.js reset-password <email> [newPassword]
+      # 省略 newPassword 则从 stdin 读：echo 时避免明文进命令行 / shell history
   node scripts/staff.js migrate-from-user <email> [owner|admin|support]`);
 }
 
 const norm = (e) => String(e || '').trim().toLowerCase();
+
+// 从 stdin 读一行密码：人在终端敲（TTY）时关回显只显示 *，
+// 走管道（非 TTY，例如 GUI 经 SSH 传过来）时静默读。
+//
+// 为什么绕这一步：新密码若写成命令行参数，同机任何人 ps 一下、
+// 或翻一下 shell history 就能拿到明文。改密码这件事值得多写这几十行。
+function readPasswordFromStdin() {
+    return new Promise((resolve) => {
+        const isTty = Boolean(process.stdin.isTTY);
+        let buf = '';
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            process.stdin.removeListener('data', onData);
+            if (isTty) {
+                try { process.stdin.setRawMode(false); } catch (e) { /* 终端不支持就算了 */ }
+                process.stdout.write('\n');
+            }
+            try { process.stdin.pause(); } catch (e) { /* 忽略 */ }
+            resolve(buf.trim());
+        };
+        const onData = (ch) => {
+            if (ch === '\r' || ch === '\n') { finish(); return; }
+            if (ch === '\u0003') { process.exit(1); }                      // Ctrl+C
+            if (ch === '\u007f') { buf = buf.slice(0, -1); if (isTty) process.stdout.write('\b \b'); return; }  // 退格
+            buf += ch;
+            if (isTty) process.stdout.write('*');
+        };
+        if (isTty) { try { process.stdin.setRawMode(true); } catch (e) { /* 忽略 */ } }
+        process.stdin.setEncoding('utf8');
+        process.stdin.on('data', onData);
+        process.stdin.on('end', finish);   // 管道不带换行时也要收尾
+        process.stdin.resume();
+    });
+}
 
 async function main() {
     // 各命令的参数位置不同，`password` 这个位在不同命令里装的是不同东西
     // （create 是密码、set-role 是角色、reset-password 是新密码），
     // 所以下面按命令各取所需，别指望这里的变量名能说明语义。
     const args = process.argv.slice(2);
-    const [cmd, email, password, username, roleArg] = args;
+    // 用 let 是因为 reset-password 可能要把 stdin 读到的密码回填到 password 这个位
+    let [cmd, email, password, username, roleArg] = args;
     if (!cmd) { usage(); process.exit(1); }
 
     if (cmd === 'list') {
@@ -166,6 +204,11 @@ async function main() {
     }
 
     if (cmd === 'reset-password') {
+        // 没给密码就从 stdin 读 —— 不写在命令行上（理由见 readPasswordFromStdin）
+        if (!password) {
+            if (process.stdin.isTTY) process.stdout.write(`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）: `);
+            password = await readPasswordFromStdin();
+        }
         if (!password) { usage(); process.exit(1); }
         if (String(password).length < MIN_PASSWORD_LENGTH) {
             console.error(`密码至少 ${MIN_PASSWORD_LENGTH} 位。`);
