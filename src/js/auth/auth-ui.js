@@ -554,6 +554,9 @@ function showResetPasswordPanel() {
     panel.classList.remove('hidden');
     updateAuthAgreementText('reset');
     setActiveTab('login');
+    // 上面回填邮箱是直接赋值（不派发 input 事件），按钮状态必须在这里补一次 ——
+    // 否则从登录面板点「忘记密码？」过来，邮箱填着、按钮却是灰的。
+    syncResetSendButtonState();
     setTimeout(() => resetEmail && resetEmail.focus(), 50);
 }
 
@@ -600,24 +603,51 @@ function switchAuthTab(mode) {
 // === 发送密码重置验证码 ===
 const RESET_CODE_COOLDOWN = 60;
 let resetSendTimer = null;
+// 倒计时锁的是「哪个邮箱」，不是「这个面板」—— 换了收件地址就该立刻能发。
+let resetSendTimerEmail = '';
 
-function startResetCodeCountdown(seconds) {
+// 「发送验证码」按钮是否可点，一律走这里算，别在事件里各写一遍。
+// 之前它就藏在 reset-email 的 input 监听里，于是只有「用户手打」才更新状态；
+// 而 showResetPasswordPanel 回填登录邮箱是直接赋值、不派发 input 事件，
+// 结果邮箱明晃晃填着、按钮却还停在 HTML 里的 disabled —— 点了没反应，且看不出为什么。
+function syncResetSendButtonState() {
+    const btn = document.getElementById('reset-send-code-btn');
+    const emailEl = document.getElementById('reset-email');
+    if (!btn || !emailEl) return;
+    const email = emailEl.value.trim().toLowerCase();
+    const coolingDown = !!resetSendTimer && email === resetSendTimerEmail;
+    btn.disabled = !email || coolingDown;
+    // 倒计时文案由 tick 维护；非冷却态才由这里复位，避免两边抢着写
+    if (!coolingDown) btn.textContent = '发送验证码';
+}
+
+function clearResetCodeCountdown() {
+    if (resetSendTimer) {
+        clearInterval(resetSendTimer);
+        resetSendTimer = null;
+    }
+    resetSendTimerEmail = '';
+}
+
+function startResetCodeCountdown(seconds, email) {
     const btn = document.getElementById('reset-send-code-btn');
     if (!btn) return;
     let remaining = seconds;
+    resetSendTimerEmail = String(email || '').trim().toLowerCase();
     btn.disabled = true;
     btn.textContent = `${remaining}s 后重发`;
     if (resetSendTimer) clearInterval(resetSendTimer);
     resetSendTimer = setInterval(() => {
         remaining -= 1;
         if (remaining <= 0) {
-            clearInterval(resetSendTimer);
-            resetSendTimer = null;
-            btn.textContent = '发送验证码';
-            const email = document.getElementById('reset-email')?.value.trim() || '';
-            btn.disabled = !email;
+            clearResetCodeCountdown();
+            syncResetSendButtonState();
         } else {
-            btn.textContent = `${remaining}s 后重发`;
+            // 倒计时只属于发过码的那个邮箱。中途换了地址（含从登录面板回填 ——
+            // 那是直接赋值，不会触发 input 去清 timer），就别再往按钮上写秒数了，
+            // 否则按钮已经可点、文字却还在倒数。
+            const current = (document.getElementById('reset-email')?.value || '').trim().toLowerCase();
+            if (current === resetSendTimerEmail) btn.textContent = `${remaining}s 后重发`;
         }
     }, 1000);
 }
@@ -643,10 +673,10 @@ async function handleResetSendCode() {
         await apiClient.sendResetCode(email);
         if (codeInput) codeInput.value = '';
         showAlert('验证码已发送至您的邮箱，请查收；若未收到，请查看垃圾邮件箱', 'success');
-        startResetCodeCountdown(RESET_CODE_COOLDOWN);
+        startResetCodeCountdown(RESET_CODE_COOLDOWN, email);
     } catch (error) {
-        btn.textContent = '发送验证码';
-        btn.disabled = false;
+        clearResetCodeCountdown();
+        syncResetSendButtonState();
         showAlert(error.message);
     }
 }
@@ -2567,9 +2597,11 @@ function setupAuthEventListeners() {
     const resetSendBtn = document.getElementById('reset-send-code-btn');
     if (resetEmailInput) {
         resetEmailInput.addEventListener('input', (e) => {
-            if (resetSendBtn && !resetSendTimer) {
-                resetSendBtn.disabled = !e.target.value.trim();
-            }
+            // 换了收件地址 = 换了一个冷却主体，旧的 60s 锁不该继续挡着
+            // （服务端限流也是按邮箱算的，占着不放只会让人以为按钮坏了）
+            const email = e.target.value.trim().toLowerCase();
+            if (resetSendTimer && email !== resetSendTimerEmail) clearResetCodeCountdown();
+            syncResetSendButtonState();
         });
         // 修改重置邮箱后清空已填验证码，避免提交到错误邮箱
         resetEmailInput.addEventListener('change', (e) => {

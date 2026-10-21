@@ -56,7 +56,7 @@ function isMailConfigured() {
 
 // 把验证码打印到后端控制台（仅开发/测试环境调用）
 function logCodeToConsole(email, code, expireMinutes, purpose) {
-    const action = purpose === 'reset' ? '密码重置' : '邮箱验证';
+    const action = purpose === 'reset' ? '密码重置' : '注册';
     console.log('\n====================================================');
     console.log(`  [开发模式] ${action}验证码（收件邮箱 ${email}）`);
     console.log(`  验证码  : ${code}（${expireMinutes} 分钟内有效）`);
@@ -87,18 +87,21 @@ async function sendVerificationCode(email, code, expireMinutes = 10, purpose = '
         logCodeToConsole(email, code, expireMinutes, purpose);
     }
 
-    const fromName = process.env.SMTP_FROM_NAME || 'EuriskoTax';
+    // 发件显示名：邮件里统一写作「EuriskoTax · 税费计算器」（间隔号写法）。
+    // 只写 EuriskoTax 的话，收件人在邮箱列表里分不清是哪个产品。
+    const fromName = process.env.SMTP_FROM_NAME || 'EuriskoTax · 税费计算器';
     const from = process.env.SMTP_USER;
     const isReset = purpose === 'reset';
 
     const subject = isReset
         ? `【${fromName}】密码重置验证码：${code}`
         : `【${fromName}】邮箱验证码：${code}`;
-    const actionHint = isReset ? '你正在重置 <strong>' + fromName + '</strong> 账号密码' : '你正在注册 <strong>' + fromName + '</strong> 账号';
+    // 品牌名已在标题与头部出现两次，正文再说第三遍只会把句子拉长；写信封与抬头一致即可
+    const actionHint = isReset ? '你正在重置账号密码' : '你正在注册账号';
     const html = `
 <div style="max-width:520px;margin:0 auto;font-family:'Microsoft YaHei',Arial,sans-serif;color:#333;">
     <div style="background:#1d4ed8;border-radius:12px 12px 0 0;padding:24px;text-align:center;">
-        <h2 style="color:#fff;margin:0;font-size:20px;">${fromName} · 个人所得税预算规划工具</h2>
+        <h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2>
     </div>
     <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:28px 32px;">
         <p style="margin:0 0 12px;">你好！</p>

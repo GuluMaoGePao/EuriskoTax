@@ -880,7 +880,7 @@ curl -X POST https://euriskotax.com/api/auth/reset-password \
 | `SMTP_PASS` | 授权码 |
 | `SMTP_PORT` | 可选，默认 465（465 走 SSL，587 走 STARTTLS） |
 | `SMTP_SECURE` | 可选，`true/false`（缺省按端口推断） |
-| `SMTP_FROM_NAME` | 可选，发件显示名，默认 EuriskoTax |
+| `SMTP_FROM_NAME` | 可选，发件显示名，默认 `EuriskoTax · 税费计算器`（只写 EuriskoTax 收件人分不清是哪个产品） |
 
 > ⚠️ 未配置 SMTP 时 send-code 返回失败，注册无法完成。生产环境务必在腾讯云服务器 `.env.shared` 配置。
 

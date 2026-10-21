@@ -184,3 +184,79 @@ describe('闭环⑤：邀请码在验证码之前校验（填错不吞验证码�
         expect(body).toMatch(/if \(!code\) return null;/);
     });
 });
+
+/**
+ * 重置面板的「发送验证码」按钮曾经只有一种情况会变灰解除：用户**手打**邮箱。
+ * 因为禁用状态写在 reset-email 的 input 监听里，而两个入口都是直接赋值：
+ *   ① 点「忘记密码？」时把登录框的邮箱回填进重置框（showResetPasswordPanel）；
+ *   ② 浏览器自动填充。
+ * 直接赋值不派发 input 事件，于是邮箱明晃晃填着、按钮却停在 HTML 的 disabled，
+ * 点了没反应 —— 用户唯一的线索是"它坏了"。修法是把状态收成一处计算函数，
+ * 每个可能改变它的时刻都显式调一次。
+ */
+describe('重置面板：发送验证码按钮的状态只有一处真相', () => {
+    const ui = readSrc('src/js/auth/auth-ui.js');
+
+    test('禁用条件由 syncResetSendButtonState 统一计算（值 + 冷却）', () => {
+        const body = fnBody(ui, 'function syncResetSendButtonState');
+        expect(body).toContain('const coolingDown = !!resetSendTimer && email === resetSendTimerEmail');
+        expect(body).toContain('btn.disabled = !email || coolingDown');
+    });
+
+    test('打开重置面板时补一次同步 —— 回填是直接赋值，不会有 input 事件', () => {
+        const body = fnBody(ui, 'function showResetPasswordPanel');
+        expect(body).toContain('resetEmail.value = loginEmailValue');
+        expect(body).toContain('syncResetSendButtonState()');
+    });
+
+    test('input 监听不再自己算 disabled，只调同步函数（否则又多一处真相）', () => {
+        const body = fnBody(ui, 'function setupAuthEventListeners');
+        expect(body).toContain('syncResetSendButtonState()');
+        expect(body).not.toContain('resetSendBtn.disabled = !e.target.value.trim()');
+    });
+
+    test('冷却锁跟着邮箱走：换个收件地址就该立刻能发', () => {
+        const body = fnBody(ui, 'function startResetCodeCountdown');
+        expect(body).toContain('resetSendTimerEmail');
+        const listener = fnBody(ui, 'function setupAuthEventListeners');
+        expect(listener).toContain('if (resetSendTimer && email !== resetSendTimerEmail) clearResetCodeCountdown();');
+    });
+});
+
+/**
+ * 邮件是这条链路上唯一离开本站、出现在用户邮箱列表里的东西 ——
+ * 发件名写什么，用户就以为自己在用什么产品。原先只写「EuriskoTax」，
+ * 收件人分不清是哪个站点，也容易被当成群发广告。
+ *
+ * 两处写法刻意不同：邮件用间隔号（EuriskoTax · 税费计算器），页面 title 用空格，
+ * 但去掉分隔符后必须是同一个名字 —— 这组断言钉的是「不会各自漂移成两个品牌名」，
+ * 而不是「两处字符串一模一样」。三处默认值（代码 / compose / 环境变量模板）
+ * 都钉在这里，漏改任何一处会指名到文件。
+ */
+describe('验证码邮件的发件名', () => {
+    const BRAND = 'EuriskoTax · 税费计算器';
+    const title = readSrc('index.html').match(/<title>([^<]+)<\/title>/)[1];
+
+    test('发件名用间隔号写法：EuriskoTax · 税费计算器（不是空格，也不是连写）', () => {
+        expect(BRAND).toBe('EuriskoTax · 税费计算器');
+    });
+
+    test('与站内 title 是同一个名字 —— 去掉分隔符后必须完全一致', () => {
+        const strip = (s) => s.split(' - ')[0].replace(/[·\s]/g, '');
+        expect(strip(title)).toBe(strip(BRAND));
+        expect(strip(BRAND)).toBe('EuriskoTax税费计算器');
+    });
+
+    test('mailService 默认发件名 = 品牌名（Subject 前缀与正文标题都取自它）', () => {
+        const mail = readSrc('server/src/services/mailService.js');
+        expect(mail).toContain(`process.env.SMTP_FROM_NAME || '${BRAND}'`);
+        // 正文抬头只写品牌名 —— 原先还缀着「· 个人所得税预算规划工具」，
+        // 既与产品覆盖范围（个税/企业税/社保）不符，也和抬头的名字重复
+        expect(mail).toContain('<h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2>');
+    });
+
+    test('compose 默认值与环境变量模板同样是品牌名（生产 cp .env.example 后仍生效）', () => {
+        expect(readSrc('deploy/lighthouse/docker-compose.yml')).toContain('SMTP_FROM_NAME:-' + BRAND + '}');
+        expect(readSrc('deploy/lighthouse/.env.example')).toContain('SMTP_FROM_NAME=' + BRAND);
+    });
+});

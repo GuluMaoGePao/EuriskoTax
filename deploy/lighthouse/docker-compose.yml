@@ -52,7 +52,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-EuriskoTax}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-EuriskoTax · 税费计算器}
     depends_on:
       db:
         condition: service_healthy
