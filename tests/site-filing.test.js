@@ -54,16 +54,28 @@ describe('备案位：已备案（当前状态 · ICP 号已下发）', () => {
         expect(a.getAttribute('rel')).toContain('noopener');
     });
 
-    test('公安号未下发时不许出现形似公安号的假号（⏳ 办理中）', () => {
+    test('公安号已下发：页脚按官方「联网备案代码」渲染 —— 号、警徽、查询链接一字不差', () => {
         const { api, host } = mount();
-        // 只查**公安号那一路**的痕：ICP 号本身也含长数字串（2026049608），
-        // 直接对整段文本查 /\d{10,}/ 会误伤自己 —— 断言要指名查什么。
-        expect(api.config.policeNumber).toBe('');
-        expect(host.textContent).not.toContain('公网安备');
-        const policeish = host.textContent.replace(api.config.icpNumber, '').match(/\d{6,}/);
-        expect(policeish).toBeNull();
-        // 号没下来就不该有可跳转的公安公示链接
-        expect(host.innerHTML).not.toContain('beian.mps.gov.cn');
+        // 官方代码原文：<a href="...webSearch?code=31011602003178" rel="noreferrer"
+        //   target="_blank">沪公网安备31011602003178号</a> —— 号中间没有空格，别自行改写
+        expect(api.config.policeNumber).toBe('沪公网安备31011602003178号');
+        expect(host.textContent).toContain('沪公网安备31011602003178号');
+
+        const a = Array.from(host.querySelectorAll('a'))
+            .find((el) => el.getAttribute('href').includes('beian.mps.gov.cn'));
+        expect(a).not.toBeNull();
+        // 链接必须带本站备案码（code 参数）—— 这是管局核验页脚时的核对点之一
+        expect(a.getAttribute('href')).toBe('https://beian.mps.gov.cn/#/query/webSearch?code=31011602003178');
+        expect(a.getAttribute('target')).toBe('_blank');
+        expect(a.getAttribute('rel')).toBe('noreferrer');
+
+        // 警徽图标：官方要求随号展示，且从公安站下载后本地托管（不热链对方资源）
+        const img = a.querySelector('img');
+        expect(img).not.toBeNull();
+        expect(img.getAttribute('src')).toBe('/images/ghs.png');
+        expect(img.getAttribute('alt')).toBe('公安联网备案');
+        // 根绝对路径：落地页在 /seo/ 子目录，相对路径在那里会 404
+        expect(img.getAttribute('src').startsWith('/')).toBe(true);
     });
 });
 
@@ -138,13 +150,12 @@ describe('备案位：号下发后只改配置', () => {
     test('公安联网备案也办结 → 两个号都在，各自链到正确的公示站', () => {
         const { api, host } = mount();
         api.config.icpNumber = '沪ICP备2026000000号-1';
-        api.config.policeNumber = '沪公网安备 31010402000000号';
         api.render();
 
         const hrefs = Array.from(host.querySelectorAll('a')).map((a) => a.getAttribute('href'));
         expect(hrefs).toEqual([
             'https://beian.miit.gov.cn/',
-            'https://beian.mps.gov.cn/#/query/webSearch'
+            'https://beian.mps.gov.cn/#/query/webSearch?code=31011602003178'
         ]);
     });
 

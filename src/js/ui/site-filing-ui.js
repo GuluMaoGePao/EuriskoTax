@@ -9,14 +9,13 @@
  *   3. 备案号是**法定义务**项（工信部要求页脚展示并链到 beian.miit.gov.cn），
  *      公安联网备案需在备案通过后 30 日内办理（beian.mps.gov.cn）。
  *
- * ── 当前状态（2026-10-01）────────────────────────────────────
+ * ── 当前状态（2026-10-21）────────────────────────────────────
  *   ICP 备案 ✅ 已下发：沪ICP备2026049608号-1（备案网站名称「EuriskoTax税费计算器」）；
- *   公安联网备案 ⏳ 办理中 —— 号下来后把 policeNumber 填上即可，无需改任何 HTML。
+ *   公安联网备案 ✅ 已下发：沪公网安备31011602003178号 —— 号与查询链接都按
+ *   beian.mps.gov.cn 生成的「联网备案代码」原文填装，不自作聪明加空格或改写。
  *
- * ── 备案号下发后的操作（只有下面这两行）─────────────────────────
- *   ① ✅ 已完成：icpNumber 已填管局下发的号；
- *   ② ⏳ 公安联网备案办结后填 policeNumber。
- *   占位行会被自动替换掉，无需改任何 HTML —— 全站多处容器共用这一个配置：
+ * ── 两处备案号都已填装，本文件此后只剩一种改法───────────────────
+ *   号变了就改 policeNumber / icpNumber 两行（链接里的 code 参数同步换）。
  *   ① App 登录页页尾（本域名首页 / 打开就是它 —— 工信部口径的「首页底部」即此处）；
  *   ② App 内「我的 → 关于我们」弹窗（v1.123.0：主应用**每个页面底部那条常驻页尾已删**，
  *      这里是 App 内唯一的备案落点）；③ 21 个落地页页脚。
@@ -46,21 +45,33 @@
         // ⬇⬇⬇ 备案号下发后只改这两行（icpNumber / policeNumber）⬇⬇⬇
         // ICP 备案 ✅ 2026-10-01 下发（管局下发的号，与备案订单、承诺书主体一致）
         icpNumber: '沪ICP备2026049608号-1',
-        // 公安联网备案 ⏳ 办理中（备案通过后 30 日内办结）—— 号下来后填这一行即可，
-        // 全站 22 页自动带「沪公网安备 XXXXXXXXXXXX号」并链到 beian.mps.gov.cn。
-        policeNumber: '',   // 例：'沪公网安备 31010402000000号'
-        // ⬆⬆⬆ 改完这两行，占位行自动替换为正式备案信息 ⬆⬆⬆
+        // 公安联网备案 ✅ 2026-10-21 下发 —— 号的写法与官方联网备案代码逐字一致
+        //（「沪公网安备31011602003178号」，中间无空格）；链接带本站备案码参数，
+        // 指向公安备案查询页。配套的警徽图标 images/ghs.png（官方 ghs.png，本地托管，
+        // 不热链公安站点资源），渲染见 policeLink()。
+        policeNumber: '沪公网安备31011602003178号',
 
         // 未备案时的状态语（置空则只显示主体名）。它描述的是状态，不是号 ——
         // 因此这里**不得出现任何形似备案号的数字串**，tests/site-filing.test.js 会拦。
         pendingText: 'ICP 备案办理中',
 
         icpUrl: 'https://beian.miit.gov.cn/',
-        policeUrl: 'https://beian.mps.gov.cn/#/query/webSearch'
+        policeUrl: 'https://beian.mps.gov.cn/#/query/webSearch?code=31011602003178',
+        policeIcon: '/images/ghs.png'
     };
 
     function link(href, text) {
         return '<a href="' + href + '" target="_blank" rel="noopener" class="hover:underline">' + text + '</a>';
+    }
+
+    // 公安备案链接按官方「联网备案代码」生成：警徽 + 备案号整体包在 <a> 里，
+    // rel 用官方要求的 noreferrer（noreferrer 蕴含 noopener，安全性只强不弱）。
+    // 图标路径用根绝对路径 —— 落地页在 /seo/ 子目录，相对路径会解析成 /seo/images/…。
+    function policeLink() {
+        return '<a href="' + ICP.policeUrl + '" target="_blank" rel="noreferrer" class="hover:underline">'
+            + '<img src="' + ICP.policeIcon + '" alt="公安联网备案"'
+            + ' style="display:inline-block;width:15px;height:15px;margin-right:4px;vertical-align:-2px;">'
+            + ICP.policeNumber + '</a>';
     }
 
     /**
@@ -77,7 +88,7 @@
 
         const parts = [];
         if (ICP.icpNumber) parts.push(link(ICP.icpUrl, ICP.icpNumber));
-        if (ICP.policeNumber) parts.push(link(ICP.policeUrl, ICP.policeNumber));
+        if (ICP.policeNumber) parts.push(policeLink());
 
         const hasNumber = parts.length > 0;
         const html = hasNumber
