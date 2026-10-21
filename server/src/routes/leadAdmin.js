@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const leadAdminController = require('../controllers/leadAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 转化线索管理（运维后台「线索」Tab）：列表 → 分配顾问 → 状态机跟进 → CSV 导出。
@@ -26,7 +26,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *       '200': { description: 列表（含 total / offset / limit / byStatus / items，items 关联 user） }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, leadAdminController.listLeads);
+router.get('/', requireBusinessAdmin, leadAdminController.listLeads);
 
 /**
  * @swagger
@@ -40,7 +40,7 @@ router.get('/', requireAdmin, leadAdminController.listLeads);
  *       '200': { description: { total, newToday, unassigned, byStatus, bySource, dateLabel } }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/stats', requireAdmin, leadAdminController.leadStats);
+router.get('/stats', requireBusinessAdmin, leadAdminController.leadStats);
 
 /**
  * @swagger
@@ -59,7 +59,7 @@ router.get('/stats', requireAdmin, leadAdminController.leadStats);
  *       '200': { description: 各步累计 steps + 今日 today + 转化率 rates + 北极星 northStar }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/funnel', requireAdmin, leadAdminController.funnelStats);
+router.get('/funnel', requireBusinessAdmin, leadAdminController.funnelStats);
 
 /**
  * @swagger
@@ -77,7 +77,7 @@ router.get('/funnel', requireAdmin, leadAdminController.funnelStats);
  *       '200': { description: text/csv 文件流 }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/export', requireAdmin, leadAdminController.exportLeads);
+router.get('/export', requireBusinessAdmin, leadAdminController.exportLeads);
 
 /**
  * @swagger
@@ -103,6 +103,6 @@ router.get('/export', requireAdmin, leadAdminController.exportLeads);
  *       '400': { description: 参数非法或未提供任何可更新字段 }
  *       '404': { description: 线索不存在 }
  */
-router.patch('/:id', requireAdmin, leadAdminController.updateLead);
+router.patch('/:id', requireBusinessAdmin, leadAdminController.updateLead);
 
 module.exports = router;

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const contentAdminController = require('../controllers/contentAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 内容中心管理（运维后台）：政策要点 / 更新公告 / 运营内容的增删改与发布
@@ -26,7 +26,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *       '200': { description: 分页列表（含 total / offset / limit / items） }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, contentAdminController.listContent);
+router.get('/', requireBusinessAdmin, contentAdminController.listContent);
 
 /**
  * @swagger
@@ -64,7 +64,7 @@ router.get('/', requireAdmin, contentAdminController.listContent);
  *       '201': { description: 已创建 }
  *       '400': { description: 参数非法或 item_id 重复 }
  */
-router.post('/', requireAdmin, contentAdminController.createContent);
+router.post('/', requireBusinessAdmin, contentAdminController.createContent);
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ router.post('/', requireAdmin, contentAdminController.createContent);
  *     responses:
  *       '200': { description: 最近 50 条发布记录 }
  */
-router.get('/releases', requireAdmin, contentAdminController.listReleases);
+router.get('/releases', requireBusinessAdmin, contentAdminController.listReleases);
 
 /**
  * @swagger
@@ -97,7 +97,7 @@ router.get('/releases', requireAdmin, contentAdminController.listReleases);
  *     responses:
  *       '200': { description: { version, notice, promotedCount } }
  */
-router.post('/releases', requireAdmin, contentAdminController.publishContent);
+router.post('/releases', requireBusinessAdmin, contentAdminController.publishContent);
 
 /**
  * @swagger
@@ -113,7 +113,7 @@ router.post('/releases', requireAdmin, contentAdminController.publishContent);
  *       '400': { description: 参数非法 }
  *       '404': { description: 条目不存在 }
  */
-router.patch('/:id', requireAdmin, contentAdminController.updateContent);
+router.patch('/:id', requireBusinessAdmin, contentAdminController.updateContent);
 
 /**
  * @swagger
@@ -128,6 +128,6 @@ router.patch('/:id', requireAdmin, contentAdminController.updateContent);
  *       '200': { description: 删除成功 }
  *       '404': { description: 条目不存在 }
  */
-router.delete('/:id', requireAdmin, contentAdminController.deleteContent);
+router.delete('/:id', requireBusinessAdmin, contentAdminController.deleteContent);
 
 module.exports = router;

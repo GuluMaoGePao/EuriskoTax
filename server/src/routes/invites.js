@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 const { listInvites, generateInvites } = require('../controllers/inviteController');
 
 /**
@@ -23,7 +23,7 @@ const { listInvites, generateInvites } = require('../controllers/inviteControlle
  *       '401': { description: 管理员令牌错误 }
  *       '503': { description: 服务端未配置 ADMIN_TOKEN }
  */
-router.get('/', requireAdmin, listInvites);
+router.get('/', requireBusinessAdmin, listInvites);
 
 /**
  * @swagger
@@ -59,6 +59,6 @@ router.get('/', requireAdmin, listInvites);
  *       '401': { description: 管理员令牌错误 }
  *       '503': { description: 服务端未配置 ADMIN_TOKEN }
  */
-router.post('/', requireAdmin, generateInvites);
+router.post('/', requireBusinessAdmin, generateInvites);
 
 module.exports = router;

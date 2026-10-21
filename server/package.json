@@ -12,7 +12,7 @@
     "prisma:generate:dev": "prisma generate --schema prisma/schema.dev.prisma",
     "prisma:push:dev": "prisma db push --schema prisma/schema.dev.prisma",
     "prisma:studio": "prisma studio",
-    "admin:user": "node scripts/admin-user.js",
+    "staff": "node scripts/staff.js",
     "postinstall": "prisma generate"
   },
   "keywords": [

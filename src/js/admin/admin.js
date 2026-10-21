@@ -56,7 +56,13 @@ const CONVERSION_STEPS = [
 
 const state = {
     token: '',
+    // 当前登录者的工作人员角色：owner | admin | support。
+    // 前端据此决定哪些 Tab 可见 —— 只是少给入口，**真正的拦截在后端**
+    // （requireOwner / requireBusinessAdmin），前端藏了不等于接口安全。
+    role: '',
+    adminEmail: '',   // 当前登录者邮箱，用于判断「这一行是我自己」
     tab: 'overview',
+    staff: { items: [] },
     users: { q: '', plan: '', offset: 0, limit: 20, total: 0, items: [] },
     // 专业版兑换码（阶段14 变现）：batch/status 为服务端筛选条件，counts 为全局三类计数
     proCodes: { batch: '', status: '', total: 0, items: [], availableCount: 0, usedCount: 0, disabledCount: 0 },
@@ -186,6 +192,8 @@ async function doLogin() {
             return;
         }
         state.token = body.data.token;
+        state.role = (body.data.user && body.data.user.role) || '';
+        state.adminEmail = (body.data.user && body.data.user.email) || '';
         remember ? localStorage.setItem(TOKEN_KEY, body.data.token) : localStorage.removeItem(TOKEN_KEY);
         enterApp();
     } catch (err) {
@@ -209,7 +217,21 @@ function enterApp() {
     $('#logout-btn').classList.remove('hidden');
     $('#connection-state').classList.remove('hidden');
     $('#connection-state').innerHTML = '<i class="fa fa-circle text-green-500"></i> 已连接';
+    applyRoleVisibility();
     switchTab('overview');
+}
+
+// 角色决定能看到哪些 Tab。客服只留「总览 / 反馈 / 排障」——
+// 客户名单、兑换码、税制参数这些他不该看见，更不该手滑点到。
+// 注意这只是收窄入口，不是权限：接口侧由 requireBusinessAdmin 独立把关。
+function applyRoleVisibility() {
+    const role = state.role;
+    const isOwner = role === 'owner';
+    const isBusiness = role === 'owner' || role === 'admin';
+    document.querySelectorAll('[data-nav="staff"]').forEach((el) => el.classList.toggle('hidden', !isOwner));
+    ['users', 'invites', 'procodes', 'content', 'taxrates', 'citysocial', 'leads'].forEach((t) => {
+        document.querySelectorAll(`[data-nav="${t}"]`).forEach((el) => el.classList.toggle('hidden', !isBusiness));
+    });
 }
 
 async function doLogout(reason) {
@@ -252,6 +274,7 @@ function switchTab(tab) {
     else if (tab === 'taxrates') loadTaxRates();
     else if (tab === 'citysocial') loadCitySocial();
     else if (tab === 'support') loadSupport();
+    else if (tab === 'staff') loadStaff();
 }
 
 // ---------- 总览 ----------
@@ -2420,9 +2443,138 @@ async function handleAction(e) {
     if (name === 'leads-next') { if (state.leads.offset + state.leads.limit < state.leads.total) { state.leads.offset += state.leads.limit; back(loadLeads()); } return; }
 }
 
+// ---------- 工作人员（v1.146.0：与客户分表，仅所有者可管） ----------
+const STAFF_ROLE_META = {
+    owner: { label: '所有者', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+    admin: { label: '管理员', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    support: { label: '客服', cls: 'bg-gray-50 text-gray-600 border-gray-200' }
+};
+const STAFF_ROLE_DESC = {
+    owner: '全部权限，且唯一能管理工作人员账号',
+    admin: '业务全部（客户权益 / 兑换码 / 内容 / 税制 / 社保 / 线索），不能管人',
+    support: '只处理用户反馈与排障话术'
+};
+
+async function loadStaff() {
+    const box = $('#staff-list');
+    box.innerHTML = '<div class="py-8 text-center text-gray-500 text-sm"><i class="fa fa-spinner fa-spin mr-2"></i>加载中…</div>';
+    $('#staff-editor').classList.add('hidden');
+    try {
+        const d = await api('/admin/staff');
+        state.staff.items = d.items || [];
+        renderStaff();
+    } catch (e) {
+        box.innerHTML = `<div class="py-8 text-center text-red-600 text-sm">${esc(e.message || '加载失败')}</div>`;
+    }
+}
+
+function renderStaff() {
+    const items = state.staff.items;
+    if (!items.length) {
+        $('#staff-list').innerHTML = '<div class="py-8 text-center text-gray-500 text-sm">还没有工作人员账号</div>';
+        return;
+    }
+    $('#staff-list').innerHTML = items.map((s) => {
+        const rm = STAFF_ROLE_META[s.role] || STAFF_ROLE_META.support;
+        const isSelf = s.email === state.adminEmail;
+        const disabled = s.status !== 'active';
+        const roleOptions = Object.entries(STAFF_ROLE_META)
+            .map(([k, v]) => `<option value="${k}"${k === s.role ? ' selected' : ''}>${v.label}</option>`).join('');
+        // 自己那一行不给操作入口：后端会拒绝，但没必要让人先点一下再吃个 403
+        const actions = isSelf
+            ? '<div class="text-xs text-gray-500">不能修改自己</div>'
+            : `<select data-staff-role="${s.id}" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5">${roleOptions}</select>
+               <button data-staff-toggle="${s.id}" data-next="${disabled ? 'active' : 'disabled'}" class="px-3 py-1.5 rounded-lg text-sm border border-gray-300 text-gray-600 hover:bg-gray-50">${disabled ? '启用' : '禁用'}</button>
+               <button data-staff-pwd="${s.id}" class="px-3 py-1.5 rounded-lg text-sm border border-gray-300 text-gray-600 hover:bg-gray-50">重置密码</button>`;
+        return `<div class="p-4 flex items-center gap-3 flex-wrap">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-medium text-gray-800">${esc(s.username || s.email)}</span>
+                    <span class="px-2 py-0.5 rounded border text-xs ${rm.cls}">${rm.label}</span>
+                    ${disabled ? '<span class="px-2 py-0.5 rounded border text-xs bg-red-50 text-red-600 border-red-200">已禁用</span>' : ''}
+                    ${isSelf ? '<span class="px-2 py-0.5 rounded border text-xs bg-gray-100 text-gray-500 border-gray-200">本人</span>' : ''}
+                </div>
+                <div class="text-xs text-gray-500 mt-1">${esc(s.email)} · 最后登录 ${fmtTime(s.last_login_at)}</div>
+            </div>
+            ${actions}
+        </div>`;
+    }).join('');
+}
+
+function openStaffEditor(mode, id) {
+    state.staff.editing = { mode, id };
+    const isCreate = mode === 'create';
+    const fields = isCreate
+        ? `<input id="staff-f-email" type="email" placeholder="邮箱" class="field" autocomplete="off">
+           <input id="staff-f-pwd" type="password" placeholder="初始密码（至少 12 位）" class="field" autocomplete="new-password">
+           <select id="staff-f-role" class="field">${Object.entries(STAFF_ROLE_META)
+               .map(([k, v]) => `<option value="${k}">${v.label} — ${STAFF_ROLE_DESC[k]}</option>`).join('')}</select>`
+        : `<input id="staff-f-pwd" type="password" placeholder="新密码（至少 12 位）" class="field" autocomplete="new-password">`;
+    $('#staff-editor').innerHTML = `
+        <div class="text-sm font-medium text-gray-800 mb-3">${isCreate ? '新增工作人员' : '重置密码'}</div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">${fields}</div>
+        <div class="mt-3 flex gap-2">
+            <button id="staff-submit" class="px-3 py-1.5 rounded-lg text-sm bg-primary text-white hover:bg-blue-800">${isCreate ? '创建' : '重置'}</button>
+            <button id="staff-cancel" class="px-3 py-1.5 rounded-lg text-sm border border-gray-300 text-gray-600 hover:bg-gray-50">取消</button>
+        </div>`;
+    $('#staff-editor').classList.remove('hidden');
+    $('#staff-submit').onclick = submitStaffEditor;
+    $('#staff-cancel').onclick = () => $('#staff-editor').classList.add('hidden');
+}
+
+async function submitStaffEditor() {
+    const { mode, id } = state.staff.editing || {};
+    const pwd = ($('#staff-f-pwd').value || '').trim();
+    if (pwd.length < 12) return toast('密码至少 12 位', 'error');
+    try {
+        if (mode === 'create') {
+            const email = ($('#staff-f-email').value || '').trim();
+            if (!email) return toast('请填写邮箱', 'error');
+            await api('/admin/staff', { method: 'POST', body: JSON.stringify({ email, password: pwd, role: $('#staff-f-role').value }) });
+            toast('已创建', 'success');
+        } else {
+            await api(`/admin/staff/${id}/password`, { method: 'POST', body: JSON.stringify({ password: pwd }) });
+            toast('密码已重置，该账号现有会话全部失效', 'success');
+        }
+        $('#staff-editor').classList.add('hidden');
+        loadStaff();
+    } catch (e) {
+        reportError(e, '操作失败');
+    }
+}
+
+async function onChangeStaffRole(id, role) {
+    try {
+        await api(`/admin/staff/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) });
+        toast('已更新角色，其现有会话会重新校验', 'success');
+        loadStaff();
+    } catch (e) { reportError(e, '更新失败'); loadStaff(); }
+}
+
+async function onToggleStaff(id, status) {
+    try {
+        await api(`/admin/staff/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+        toast(status === 'disabled' ? '已禁用，其现有会话立即失效' : '已启用', 'success');
+        loadStaff();
+    } catch (e) { reportError(e, '操作失败'); loadStaff(); }
+}
+
 // ---------- 初始化 ----------
 function init() {
     $('#login-btn').addEventListener('click', doLogin);
+    $('#staff-new-btn').addEventListener('click', () => openStaffEditor('create'));
+    // 列表是渲染出来的，用事件委托而不是渲染时逐个绑定
+    $('#staff-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.staffToggle) onToggleStaff(Number(btn.dataset.staffToggle), btn.dataset.next);
+        else if (btn.dataset.staffPwd) openStaffEditor('password', Number(btn.dataset.staffPwd));
+    });
+    $('#staff-list').addEventListener('change', (e) => {
+        if (e.target.dataset && e.target.dataset.staffRole !== undefined) {
+            onChangeStaffRole(Number(e.target.dataset.staffRole), e.target.value);
+        }
+    });
     // 两个输入框都支持回车登录：只给密码框绑的话，输完邮箱顺手一敲没反应，像卡住了
     ['#login-email-input', '#login-password-input'].forEach((sel) => {
         const el = $(sel);
@@ -2500,7 +2652,11 @@ function init() {
     if (saved) {
         $('#login-remember').checked = true;
         state.token = saved;
-        api('/admin/me').then(enterApp).catch(() => {
+        api('/admin/me').then((d) => {
+            state.role = (d && d.admin && d.admin.role) || '';
+            state.adminEmail = (d && d.admin && d.admin.email) || '';
+            enterApp();
+        }).catch(() => {
             state.token = '';
             localStorage.removeItem(TOKEN_KEY);
             showLoginError('登录已过期，请重新登录');

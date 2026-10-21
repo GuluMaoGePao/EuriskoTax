@@ -43,6 +43,8 @@
                 <button data-nav="citysocial" title="各城市社保/公积金缴费基数口径" class="tab-btn"><i class="fa fa-map-marker mr-1.5"></i>社保基数</button>
                 <span class="nav-sep"></span>
                 <button data-nav="support" title="客服排障话术库" class="tab-btn"><i class="fa fa-life-ring mr-1.5"></i>排障</button>
+                <span class="nav-sep"></span>
+                <button data-nav="staff" title="工作人员账号与角色（仅所有者可见）" class="tab-btn"><i class="fa fa-user-shield mr-1.5"></i>工作人员</button>
             </nav>
             <div class="ml-auto flex items-center gap-3 shrink-0">
                 <span id="connection-state" class="hidden text-xs text-gray-600"></span>
@@ -63,6 +65,7 @@
             <button data-nav="taxrates" class="tab-btn"><i class="fa fa-percent mr-1"></i>税率</button>
             <button data-nav="citysocial" class="tab-btn"><i class="fa fa-map-marker mr-1"></i>社保基数</button>
             <button data-nav="support" class="tab-btn"><i class="fa fa-life-ring mr-1"></i>排障</button>
+            <button data-nav="staff" class="tab-btn"><i class="fa fa-user-shield mr-1"></i>工作人员</button>
         </nav>
     </header>
 
@@ -480,6 +483,21 @@
             </div>
             <div id="support-editor" class="hidden mb-4 panel p-5"></div>
             <div id="support-list" class="space-y-3"></div>
+        </section>
+
+        <!-- 工作人员（v1.146.0：与客户完全分表，仅所有者可见可管） -->
+        <section id="view-staff" class="view-section hidden">
+            <div class="page-head">
+                <div>
+                    <h2 class="page-title"><i class="fa fa-user-shield text-primary"></i>工作人员账号</h2>
+                    <p class="text-xs text-gray-500 mt-1">与客户账号完全分开：工作人员没有客户端身份，这个账号也登录不了网站前台</p>
+                </div>
+                <button id="staff-new-btn" class="px-3 py-1.5 rounded-lg text-sm bg-primary text-white hover:bg-blue-800 transition-colors shrink-0">
+                    <i class="fa fa-plus mr-1"></i>新增工作人员
+                </button>
+            </div>
+            <div id="staff-editor" class="bg-white rounded-xl border border-gray-200 p-4 mb-4 hidden"></div>
+            <div id="staff-list" class="bg-white rounded-xl border border-gray-200"></div>
         </section>
 
         <!-- 税率（阶段12 C1：热改税制参数 + 版本化 + 可选公告联动） -->

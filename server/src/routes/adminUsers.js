@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userAdminController = require('../controllers/userAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 用户管理（运维后台）：查询用户、调整专业版权益（体验补发/永久/回落基础版）
@@ -25,7 +25,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *         description: 分页列表（含 total / offset / limit / items）
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, userAdminController.listUsers);
+router.get('/', requireBusinessAdmin, userAdminController.listUsers);
 
 /**
  * @swagger
@@ -46,7 +46,7 @@ router.get('/', requireAdmin, userAdminController.listUsers);
  *               description: 包含 user、counts（feedback/calculations 条数）、recentFeedback、recentCalculations
  *       '404': { description: 用户不存在 }
  */
-router.get('/:id', requireAdmin, userAdminController.getUserDetail);
+router.get('/:id', requireBusinessAdmin, userAdminController.getUserDetail);
 
 /**
  * @swagger
@@ -71,6 +71,6 @@ router.get('/:id', requireAdmin, userAdminController.getUserDetail);
  *       '200': { description: 更新后的用户信息 }
  *       '404': { description: 用户不存在 }
  */
-router.patch('/:id/plan', requireAdmin, userAdminController.setUserPlan);
+router.patch('/:id/plan', requireBusinessAdmin, userAdminController.setUserPlan);
 
 module.exports = router;

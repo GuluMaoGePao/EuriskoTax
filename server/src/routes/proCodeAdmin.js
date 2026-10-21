@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const proCodeAdminController = require('../controllers/proCodeAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 兑换码管理（运维后台）：生成批次 / 查询 / 作废 / 导出对账
@@ -25,7 +25,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *       '200': { description: 分页列表（含 total / availableCount / usedCount / disabledCount / items） }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, proCodeAdminController.list);
+router.get('/', requireBusinessAdmin, proCodeAdminController.list);
 
 /**
  * @swagger
@@ -51,7 +51,7 @@ router.get('/', requireAdmin, proCodeAdminController.list);
  *       '400': { description: count 或 durationDays 非法 }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.post('/', requireAdmin, proCodeAdminController.generate);
+router.post('/', requireBusinessAdmin, proCodeAdminController.generate);
 
 /**
  * @swagger
@@ -66,7 +66,7 @@ router.post('/', requireAdmin, proCodeAdminController.generate);
  *       '200': { description: CSV 文件（text/csv，含 UTF-8 BOM 便于 Excel 打开） }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/export', requireAdmin, proCodeAdminController.exportCsv);
+router.get('/export', requireBusinessAdmin, proCodeAdminController.exportCsv);
 
 /**
  * @swagger
@@ -92,6 +92,6 @@ router.get('/export', requireAdmin, proCodeAdminController.exportCsv);
  *       '404': { description: 兑换码不存在 }
  *       '409': { description: 该码已被兑换，无法作废 }
  */
-router.patch('/:id', requireAdmin, proCodeAdminController.patch);
+router.patch('/:id', requireBusinessAdmin, proCodeAdminController.patch);
 
 module.exports = router;

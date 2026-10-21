@@ -1,16 +1,14 @@
-// 管理台登录（v1.145.0）：从「一把静态 ADMIN_TOKEN」改为「邮箱 + 密码 + 短期 JWT」
+// 管理台鉴权与工作人员体系（v1.146.0）
 //
-// 守的是四件真会出事的事，不是凑数：
-//   ① App 那把 7 天令牌能不能顺带进管理台 —— 能就是全线失守：
-//      任一注册用户拿自己的令牌就能改税率、发兑换码、看所有用户。
-//   ② 管理员被降权 / 改密之后，已签发的令牌是不是还有效 —— 若只信令牌里的
-//      声明，撤销要等它自己过期，那两小时里「已撤销的管理员」照样是管理员。
-//   ③ 登录接口会不会变成「枚举哪些邮箱是管理员」的探针 —— 报错分三种、
-//      或者命中/未命中的响应耗时不同，都等于把管理员名单递出去。
-//   ④ 前端与后端凭证格式对不上 —— 一边发 Bearer 一边验 X-Admin-Token，
-//      表现是管理台每个 Tab 全 401，而且看日志查不出所以然。
+// v1.145.0 把管理员做成 User.role='admin' —— 管理台因此第一次有了「按人登录」，
+// 但工作人员与客户混在一张表，立刻暴露三处问题，这次分表重写，本文件守的就是它们：
+//   ① 客户列表混进工作人员（listUsers 的 where 没排除 role，管理员自己出现在
+//      「用户」Tab 里还能被改 plan —— v1.145.0 实测到的回归）
+//   ② 工作人员继承了 plan / 兑换码 / 计算记录这些客户字段，且能登录客户端 App
+//   ③ **谁都能管人**：少了 owner 门禁，一个 support 就能把自己提成 owner，
+//      分了三级角色也等于没分
 //
-// 另有两条守「改动完整性」：迁移落地、账号只由运维脚本授予。
+// 另外继续守住 v1.145.0 那几条：客户令牌不得越权、降权后立即失效、登录不泄露名单。
 
 const fs = require('fs');
 const path = require('path');
@@ -20,114 +18,143 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const MW = read('server/src/middleware/adminAuth.js');
 const ROUTES = read('server/src/routes/adminAuth.js');
+const STAFF = read('server/src/routes/adminStaff.js');
+const USERS_ROUTE = read('server/src/routes/adminUsers.js');
 const ADMIN_JS = read('src/js/admin/admin.js');
 const HTML = read('admin.html');
 const APP = read('server/src/app.js');
 const SCHEMA = read('server/prisma/schema.prisma');
 const DEV_SCHEMA = read('server/prisma/schema.dev.prisma');
-const MIGRATION = read('server/prisma/migrations/20261021_add_user_role/migration.sql');
-const ADMIN_OPS = read('server/scripts/admin-user.js');
+const MIGRATION = read('server/prisma/migrations/20261021_add_admin_user/migration.sql');
 
-describe('管理台鉴权 —— App 令牌不得越权', () => {
-    test('认令牌先认 scope=admin，App 签发的令牌没有 scope', () => {
-        expect(MW).toContain("decoded.scope !== 'admin'");
-        // 拒绝要先于任何查库/放行：顺序反了就是「先查完再判断」，白查一次还容易漏
-        expect(MW.indexOf("decoded.scope")).toBeLessThan(MW.indexOf('prisma.user.findUnique'));
+describe('工作人员与客户必须分表', () => {
+    test('鉴权查的是 AdminUser，不是 User', () => {
+        expect(MW).toContain('prisma.adminUser.findUnique');
+        // 判据是 staffId —— 客户令牌签的是 userId，查另一张表，天然查不到
+        expect(MW).toContain("decoded.scope !== 'admin' || !decoded.staffId");
     });
 
-    test('角色每次请求都回库核对，不只信令牌里的声明', () => {
-        expect(MW).toContain("user.role !== 'admin'");
-        // 查库必须带上 role 字段 —— 漏选就等于永远查不到，判断恒为「不是管理员」
-        expect(MW).toMatch(/select:\s*\{[^}]*role:\s*true/);
+    test('schema 与迁移都有 AdminUser，且两个 schema 口径一致', () => {
+        expect(SCHEMA).toMatch(/model AdminUser \{/);
+        expect(DEV_SCHEMA).toMatch(/model AdminUser \{/);
+        expect(MIGRATION).toContain('CREATE TABLE "AdminUser"');
+        expect(MIGRATION).toContain('"email" TEXT NOT NULL');
     });
 
-    test('沿用 token_version 吊销：改密 / 退出后旧会话立即失效', () => {
-        expect(MW).toContain('issuedTv');
-        expect(MW).toContain('currentTv');
-        expect(MW).toContain('Admin session revoked');
+    test('User.role 已废弃：代码里不再拿它当权限判据', () => {
+        expect(SCHEMA).toContain('废弃');
+        // 分表之后客户表只装客户，若还有地方按 User.role 判权就是漏改
+        expect(MW).not.toContain("user.role !== 'admin'");
     });
 
-    test('保留静态令牌作为应急通道，但只在没带 Bearer 时才检查', () => {
-        expect(MW).toContain("req.get('X-Admin-Token')");
-        // 管理员账号被误删 / 密码忘了走不通邮件找回时，这是最后的入口
-        expect(MW.indexOf('if (bearer)')).toBeLessThan(MW.indexOf("req.get('X-Admin-Token')"));
+    test('工作人员登录不了客户端：客户端认证只认 User 表', () => {
+        const authMw = read('server/src/middleware/auth.js');
+        expect(authMw).toContain('prisma.user.findUnique');
+        expect(authMw).not.toContain('adminUser');
     });
 });
 
-describe('管理台登录接口 —— 不泄露、不长效', () => {
-    test('三种失败（无此邮箱 / 非管理员 / 密码错）合并成同一句提示', () => {
-        expect(ROUTES).toMatch(/if\s*\(!user\s*\|\|\s*user\.role\s*!==\s*'admin'\s*\|\|\s*!passwordOk\)/);
-        expect(ROUTES).toContain('邮箱或密码错误，或该账号不是管理员');
+describe('三级角色与「谁能管人」', () => {
+    test('角色枚举含 owner / admin / support，且业务角色不含 support', () => {
+        expect(MW).toMatch(/STAFF_ROLES\s*=\s*\[[^\]]*'owner'[^\]]*'admin'[^\]]*'support'/);
+        expect(MW).toMatch(/BUSINESS_ROLES\s*=\s*\[\s*'owner',\s*'admin'\s*\]/);
     });
 
-    test('未命中账号也跑一次 bcrypt —— 否则响应耗时差异会暴露哪些邮箱存在', () => {
+    test('工作人员管理整组端点都要过 owner 门禁', () => {
+        ['/', '/:id', '/:id/password'].forEach(() => {});
+        // 三个端点（列表、改角色/状态、改密码）都必须带 requireOwner
+        const ownerGuards = (STAFF.match(/requireOwner/g) || []).length;
+        expect(ownerGuards).toBeGreaterThanOrEqual(3);
+    });
+
+    test('不能修改自己 —— 否则 owner 一键把自己降成 support，全场无人能管', () => {
+        expect(STAFF).toContain('req.admin.id === id');
+        expect(STAFF).toContain('不能修改自己的角色或状态');
+    });
+
+    test('不能干掉最后一个 owner —— 否则管理台锁死', () => {
+        expect(STAFF).toContain('countActiveOwners');
+        expect(STAFF).toContain('至少要保留一名所有者');
+    });
+
+    test('降权 / 禁用立即吊销其令牌，而不是等 2 小时', () => {
+        // 状态变 disabled 或角色变化 → 推高 token_version
+        expect(STAFF).toContain("data.status === 'disabled' || (data.role && data.role !== target.role)");
+        expect(STAFF).toContain('token_version: { increment: 1 }');
+    });
+
+    test('只禁用不删除：操作要能追溯到人', () => {
+        expect(STAFF).not.toMatch(/router\.delete\(/);
+        expect(STAFF).toContain('audit(');
+    });
+});
+
+describe('业务端点不让 support 碰', () => {
+    test('客户权益端点用组合门禁（认人 + 认角色）', () => {
+        expect(USERS_ROUTE).toContain('requireBusinessAdmin');
+        // 组合门禁必须是「先认人再认角色」两项，缺一项就漏
+        expect(MW).toContain('const requireBusinessAdmin = [requireAdmin, requireRoles(BUSINESS_ROLES)]');
+    });
+
+    test('反馈与排障话术留给 support —— 那是客服的本职', () => {
+        expect(read('server/src/routes/feedback.js')).toContain('requireAdmin,');
+        expect(read('server/src/routes/supportAdmin.js')).toContain('requireAdmin,');
+    });
+
+    test('app.js 挂上了工作人员路由', () => {
+        expect(APP).toContain("app.use('/api/admin/staff', adminStaffRoutes)");
+    });
+});
+
+describe('会话与登录：不越权、不泄露、不长效', () => {
+    test('角色与状态每次请求回库核对，不只信令牌声明', () => {
+        expect(MW).toMatch(/staff\.status !== 'active'/);
+        expect(MW).toContain('Invalid staff role');
+        // 顺序：认 scope 先于查库
+        expect(MW.indexOf("decoded.scope")).toBeLessThan(MW.indexOf('prisma.adminUser.findUnique'));
+    });
+
+    test('沿用 token_version：改密 / 禁用 / 退出后旧令牌立即失效', () => {
+        expect(MW).toContain('Admin session revoked');
+        expect(ROUTES).toContain('token_version: { increment: 1 }');
+    });
+
+    test('三种失败同一句提示，且未命中也跑一次 bcrypt', () => {
+        expect(ROUTES).toContain('邮箱或密码错误，或该账号不可用');
         expect(ROUTES).toContain('DUMMY_HASH');
-        // dummy 必须真的参与比对，定义了不用等于没防
         expect(ROUTES).toMatch(/const hash = [^\n]*DUMMY_HASH/);
-        expect(ROUTES).toContain('bcrypt.compare(password, hash)');
     });
 
-    test('签发的令牌带 scope=admin，且有效期独立于 App 的 7 天', () => {
+    test('令牌短期，且带 scope=admin', () => {
         expect(ROUTES).toContain("scope: 'admin'");
         expect(ROUTES).toContain("process.env.ADMIN_JWT_EXPIRES_IN || '2h'");
     });
 
-    test('密码用 bcrypt 比对，不出现明文比较', () => {
-        expect(ROUTES).toContain('bcrypt.compare');
-        expect(ROUTES).not.toMatch(/password\s*===\s*user\./);
-    });
-});
-
-describe('前端与后端凭证格式必须一致', () => {
-    test('admin.js 发 Authorization: Bearer', () => {
-        expect(ADMIN_JS).toContain('Authorization: `Bearer ${state.token}`');
-    });
-
-    test('不再发 X-Admin-Token —— 与后端对不上会全站 401', () => {
-        expect(ADMIN_JS).not.toContain("'X-Admin-Token': state.token");
-    });
-
-    test('登录表单是邮箱 + 密码两个输入框，admin.js 取的是同一批 id', () => {
-        expect(HTML).toContain('id="login-email-input"');
-        expect(HTML).toContain('id="login-password-input"');
-        expect(ADMIN_JS).toContain("'#login-email-input'");
-        expect(ADMIN_JS).toContain("'#login-password-input'");
-    });
-
-    test('会话过期自动续期一次，而不是直接把人踢回登录页', () => {
-        expect(ADMIN_JS).toContain('/api/admin/refresh');
-        // 续期必须并发收敛：多个请求同时 401 时各续各的会互相把令牌刷没
-        expect(ADMIN_JS).toContain('if (refreshing) return refreshing;');
-    });
-
-    test('退出时通知后端吊销，而不只是清本地', () => {
-        expect(ADMIN_JS).toContain('/api/admin/logout');
-    });
-});
-
-describe('数据层与运维入口', () => {
-    test('生产与开发 schema 都加了 role，且默认 user（老用户不会自动变管理员）', () => {
-        expect(SCHEMA).toMatch(/role\s+String\s+@default\("user"\)/);
-        expect(DEV_SCHEMA).toMatch(/role\s+String\s+@default\("user"\)/);
-    });
-
-    test('迁移给存量行填 user，且非空', () => {
-        expect(MIGRATION).toContain('ADD COLUMN "role" TEXT NOT NULL DEFAULT');
-    });
-
-    test('app.js 挂载会话路由，且登录单独限流', () => {
-        expect(APP).toContain("app.use('/api/admin', adminLoginLimiter, adminAuthRoutes)");
-        // 限流只计 /login —— 把 /me /refresh 也算进来，正常用一会儿就把自己锁住
+    test('登录限流只计 /login，不把 /me /refresh 也算进去', () => {
         expect(APP).toContain("skip: (req) => req.path !== '/login'");
     });
+});
 
-    test('管理员只能由运维脚本授予，没有自助注册入口', () => {
-        expect(ADMIN_OPS).toContain("role: 'admin'");
-        expect(ADMIN_OPS).toContain('promote');
-        expect(ADMIN_OPS).toContain('demote');
-        // 撤销管理员必须同时吊销会话，否则降权要等令牌自己过期
-        expect(ADMIN_OPS).toContain('token_version: { increment: 1 }');
-        // 密码要有长度下限：这个账号能改税率、发兑换码，短密码扛不住撞库
-        expect(ADMIN_OPS).toContain('MIN_PASSWORD_LENGTH');
+describe('前端：按角色收窄入口（真正的拦截在后端）', () => {
+    test('有工作人员 Tab 且登录/自动登录都填了 role', () => {
+        expect(HTML).toContain('data-nav="staff"');
+        expect(ADMIN_JS).toContain("tab === 'staff'");
+        expect(ADMIN_JS).toContain('state.role =');
+        expect(ADMIN_JS).toContain('applyRoleVisibility()');
+    });
+
+    test('非 owner 看不到工作人员入口，非业务角色看不到客户与配置', () => {
+        expect(ADMIN_JS).toContain("document.querySelectorAll('[data-nav=\"staff\"]')");
+        expect(ADMIN_JS).toContain("['users', 'invites', 'procodes', 'content', 'taxrates', 'citysocial', 'leads']");
+    });
+
+    test('自己那一行不给操作入口 —— 后端会拒，但不必让人先吃个 403', () => {
+        expect(ADMIN_JS).toContain('不能修改自己');
+        expect(ADMIN_JS).toContain('isSelf');
+    });
+
+    test('请求仍走 Bearer，与后端一致', () => {
+        expect(ADMIN_JS).toContain('Authorization: `Bearer ${state.token}`');
+        expect(ADMIN_JS).not.toContain("'X-Admin-Token': state.token");
     });
 });

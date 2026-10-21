@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const citySocialAdminController = require('../controllers/citySocialAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 城市社保参数管理（运维后台「社保基数」Tab）：热改各城市缴费基数口径 + 版本化 + 可选公告联动
@@ -19,7 +19,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *       '200': { description: 当前配置 current + 出厂基线 defaults + 历史版本 history }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, citySocialAdminController.listCitySocial);
+router.get('/', requireBusinessAdmin, citySocialAdminController.listCitySocial);
 
 /**
  * @swagger
@@ -71,7 +71,7 @@ router.get('/', requireAdmin, citySocialAdminController.listCitySocial);
  *       '201': { description: 发布成功：config 为新配置，公告联动时 release 为公告结果（未联动为 null） }
  *       '400': { description: 参数校验失败或版本号重复 }
  */
-router.post('/', requireAdmin, citySocialAdminController.createCitySocialConfig);
+router.post('/', requireBusinessAdmin, citySocialAdminController.createCitySocialConfig);
 
 /**
  * @swagger
@@ -95,6 +95,6 @@ router.post('/', requireAdmin, citySocialAdminController.createCitySocialConfig)
  *       '400': { description: 参数非法 }
  *       '404': { description: 配置版本不存在 }
  */
-router.post('/rollback', requireAdmin, citySocialAdminController.rollbackCitySocial);
+router.post('/rollback', requireBusinessAdmin, citySocialAdminController.rollbackCitySocial);
 
 module.exports = router;

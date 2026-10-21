@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const taxRateAdminController = require('../controllers/taxRateAdminController');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireBusinessAdmin } = require('../middleware/adminAuth');
 
 /**
  * 税制参数管理（运维后台「税率」Tab）：热改税率 + 版本化 + 可选公告联动
@@ -19,7 +19,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
  *       '200': { description: 当前配置 current + 出厂基线 defaults + 历史版本 history }
  *       '401': { description: 未认证或 Admin Token 无效 }
  */
-router.get('/', requireAdmin, taxRateAdminController.listTaxRates);
+router.get('/', requireBusinessAdmin, taxRateAdminController.listTaxRates);
 
 /**
  * @swagger
@@ -53,7 +53,7 @@ router.get('/', requireAdmin, taxRateAdminController.listTaxRates);
  *       '201': { description: 发布成功：config 为新配置，公告联动时 release 为公告结果（未联动为 null） }
  *       '400': { description: 税率校验失败或版本号重复 }
  */
-router.post('/', requireAdmin, taxRateAdminController.createTaxRateConfig);
+router.post('/', requireBusinessAdmin, taxRateAdminController.createTaxRateConfig);
 
 /**
  * @swagger
@@ -77,6 +77,6 @@ router.post('/', requireAdmin, taxRateAdminController.createTaxRateConfig);
  *       '400': { description: 参数非法 }
  *       '404': { description: 配置版本不存在 }
  */
-router.post('/rollback', requireAdmin, taxRateAdminController.rollbackTaxRates);
+router.post('/rollback', requireBusinessAdmin, taxRateAdminController.rollbackTaxRates);
 
 module.exports = router;

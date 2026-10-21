@@ -29,6 +29,7 @@ const leadAdminRoutes = require('./routes/leadAdmin');
 const proCodeRoutes = require('./routes/proCodes');
 const proCodeAdminRoutes = require('./routes/proCodeAdmin');
 const adminAuthRoutes = require('./routes/adminAuth');
+const adminStaffRoutes = require('./routes/adminStaff');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -268,6 +269,8 @@ const adminLoginLimiter = rateLimit({
 // 这些子路由的 requireAdmin 依赖本文件签发的令牌，顺序反了不影响匹配，
 // 但放在一起才看得出「会话」与「业务」是两层。
 app.use('/api/admin', adminLoginLimiter, adminAuthRoutes);
+// 工作人员账号管理：整组端点自带 requireOwner，非所有者拿到 403
+app.use('/api/admin/staff', adminStaffRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
 app.use('/api/admin/support', supportAdminRoutes);

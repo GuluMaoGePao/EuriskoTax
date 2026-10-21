@@ -22,11 +22,10 @@ model User {
   // 不引 Refresh Token 就能「立即吊销已签发 JWT」的最轻方案。
   // 存量行默认 0，老 token（无 tv 声明）按「未启用」放行，见 middleware/auth.js。
   token_version   Int       @default(0)
-  // 角色（v1.145.0）："user"（默认） | "admin"（可进管理台）。
-  // 管理台原先只认环境变量 ADMIN_TOKEN 这一把静态令牌 —— 谁拿到字符串谁就是管理员，
-  // 既没法按人区分，也没法单独吊销。改为复用已有的邮箱 + 密码 + bcrypt +
-  // token_version 体系：管理员就是 role=admin 的 User，改密 / 退出即刻吊销，
-  // 与 App 用户同一套机制、同一份审计口径。
+  // 角色（v1.145.0 引入，v1.146.0 起**废弃**）：工作人员已迁到独立的 AdminUser 表，
+  // 此列不再作为任何权限判据，保留仅为兼容存量行。
+  // 废弃原因见下方 AdminUser 的说明：工作人员与客户混在一张表，会让客户列表、
+  // 运营口径、客户端登录身份三处都说不清。
   role            String    @default("user")
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
@@ -34,6 +33,38 @@ model User {
   calculations Calculation[]
   feedbacks     Feedback[]
   leads         Lead[]
+}
+
+// 工作人员账号（v1.146.0）—— 与客户（User）彻底分表。
+//
+// 为什么不再用 User.role：工作人员会是**多个人**，而 User 是客户表。混在一张表里
+// 有三处说不清：① 客户列表里混着工作人员，客户数、留存这些运营口径要到处排除
+// （v1.145.0 刚犯过：listUsers 没过滤 role，管理员自己出现在客户列表里）；
+// ② 工作人员继承了 plan / 兑换码 / 计算记录这些客户字段，语义是错的；
+// ③ 工作人员能用同一个账号登录客户端 App —— 内部账号不该有客户端身份。
+// 分表之后：客户表只装客户，工作人员的密码策略、吊销与审计各自独立。
+//
+// 注意 staff 与客户的令牌**不通用**：App 令牌签的是 userId（User），
+// 管理台签的是 staffId（AdminUser），两者查不同的表，天然不越权。
+model AdminUser {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  username       String
+  password_hash  String
+  // 角色 —— 多人协作的最小权限面：
+  //   owner   ：全部权限，**且只有它能管理工作人员账号**
+  //   admin   ：业务全部（客户权益 / 兑换码 / 内容 / 税制 / 社保 / 线索），不能管人
+  //   support ：只处理用户反馈与排障话术，碰不到客户权益与配置
+  // 「谁能加人、谁能改别人的角色」必须单独门禁 —— 否则一个 support 就能把自己
+  // 提成 owner，多人体系里分了三级也等于没分。
+  role           String    @default("support")
+  // active | disabled。禁用不删行：工作人员的操作要能追溯到具体的人
+  status         String    @default("active")
+  // 与 User 同款的登录态版本号：改密 / 禁用 / 退出后 +1，已签发令牌立即失效
+  token_version  Int       @default(0)
+  last_login_at  DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 }
 
 model Calculation {
