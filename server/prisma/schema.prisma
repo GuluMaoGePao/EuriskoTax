@@ -22,6 +22,12 @@ model User {
   // 不引 Refresh Token 就能「立即吊销已签发 JWT」的最轻方案。
   // 存量行默认 0，老 token（无 tv 声明）按「未启用」放行，见 middleware/auth.js。
   token_version   Int       @default(0)
+  // 角色（v1.145.0）："user"（默认） | "admin"（可进管理台）。
+  // 管理台原先只认环境变量 ADMIN_TOKEN 这一把静态令牌 —— 谁拿到字符串谁就是管理员，
+  // 既没法按人区分，也没法单独吊销。改为复用已有的邮箱 + 密码 + bcrypt +
+  // token_version 体系：管理员就是 role=admin 的 User，改密 / 退出即刻吊销，
+  // 与 App 用户同一套机制、同一份审计口径。
+  role            String    @default("user")
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 

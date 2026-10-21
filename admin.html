@@ -74,14 +74,17 @@
                     <i class="fa fa-lock text-2xl"></i>
                 </div>
                 <h1 class="text-xl font-bold text-gray-800">管理员登录</h1>
-                <p class="text-xs text-gray-600 mt-1">请输入服务端环境变量 <span class="mono">ADMIN_TOKEN</span> 的取值</p>
+                <p class="text-xs text-gray-600 mt-1">使用管理员账号的邮箱与密码登录（会话默认 2 小时）</p>
             </div>
-            <label class="label" for="login-token-input">访问令牌</label>
-            <input id="login-token-input" type="password" autocomplete="off" spellcheck="false"
-                placeholder="粘贴 ADMIN_TOKEN" class="mono field">
+            <label class="label" for="login-email-input">邮箱</label>
+            <input id="login-email-input" type="email" autocomplete="username" spellcheck="false"
+                placeholder="管理员邮箱" class="field">
+            <label class="label mt-3" for="login-password-input">密码</label>
+            <input id="login-password-input" type="password" autocomplete="current-password" spellcheck="false"
+                placeholder="请输入密码" class="field">
             <label class="flex items-center gap-2 mt-3 text-xs text-gray-500 cursor-pointer select-none">
                 <input id="login-remember" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                在本机记住令牌（下次免输，仅保存在本机 localStorage）
+                在本机保持登录（令牌仅保存在本机 localStorage，2 小时后需重新登录）
             </label>
             <button id="login-btn" class="mt-5 w-full bg-primary hover:bg-blue-800 text-white font-semibold rounded-lg py-2.5 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
                 <i class="fa fa-sign-in"></i>进入管理台

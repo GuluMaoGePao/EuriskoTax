@@ -1,5 +1,7 @@
 // EuriskoTax Admin Console（运维后台）
-// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码 / 内容中心 / 税制参数 / 城市社保参数；所有请求带 X-Admin-Token。
+// 轻量管理台：总览 / 反馈处理 / 用户权益 / 兑换码 / 内容中心 / 税制参数 / 城市社保参数。
+// 登录方式：管理员邮箱 + 密码（v1.145.0 起），后端签短期 JWT，请求带 Authorization: Bearer。
+// 与 App 的 7 天令牌互不通用 —— 两处权限不同，令牌就该是两把钥匙。
 
 const TOKEN_KEY = 'eurisko_admin_token';
 
@@ -95,14 +97,43 @@ const fmtShort = (iso) => {
 };
 
 // ---------- 请求封装 ----------
+// v1.145.0：凭证从「静态 ADMIN_TOKEN」换成后端签发的短期 JWT，走 Authorization 头。
+// 与 App 的令牌互不通用：管理台令牌带 scope=admin，App 那把 7 天令牌进不了管理台。
 function headers() {
-    return { 'Content-Type': 'application/json', ...(state.token ? { 'X-Admin-Token': state.token } : {}) };
+    return { 'Content-Type': 'application/json', ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}) };
+}
+
+// 续期只并发一次：多个请求同时 401 时后面的复用同一次续期，
+// 否则 A 续到一半 B 又拿旧令牌去续，后端按「已吊销」处理，两边一起掉线。
+let refreshing = null;
+async function tryRefresh() {
+    if (refreshing) return refreshing;
+    refreshing = (async () => {
+        try {
+            const res = await fetch('/api/admin/refresh', { method: 'POST', headers: headers() });
+            const body = await res.json().catch(() => null);
+            if (!res.ok || !body || body.success === false || !body.data || !body.data.token) return false;
+            state.token = body.data.token;
+            if (localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, body.data.token);
+            return true;
+        } catch { return false; }
+    })();
+    try { return await refreshing; } finally { refreshing = null; }
 }
 
 async function api(path, options = {}) {
-    const res = await fetch(`/api${path}`, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
-    let body = null;
-    try { body = await res.json(); } catch { /* 非 JSON */ }
+    const call = async () => {
+        const res = await fetch(`/api${path}`, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+        let body = null;
+        try { body = await res.json(); } catch { /* 非 JSON */ }
+        return { res, body };
+    };
+    let { res, body } = await call();
+    // 会话默认只有 2 小时 —— 收到「过期」先静默续期一次再重试，
+    // 否则人正看着数据就被踢回登录页。登录接口自己不参与重试（它本就不需要令牌）。
+    if (res.status === 401 && state.token && path !== '/admin/login') {
+        if (await tryRefresh()) ({ res, body } = await call());
+    }
     if (!res.ok || !body || body.success === false) {
         const err = new Error((body && body.error && body.error.message) || `请求失败（HTTP ${res.status}）`);
         err.status = res.status;
@@ -133,22 +164,32 @@ function reportError(err, fallback = '操作失败') {
 
 // ---------- 登录 / 登出 ----------
 async function doLogin() {
-    const input = $('#login-token-input');
+    const email = ($('#login-email-input').value || '').trim();
+    const password = $('#login-password-input').value || '';
     const remember = $('#login-remember').checked;
-    const token = (input.value || '').trim();
-    if (!token) return showLoginError('请输入访问令牌');
+    if (!email || !password) return showLoginError('请输入邮箱与密码');
     $('#login-error').classList.add('hidden');
-    state.token = token;
     const btn = $('#login-btn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 验证中…';
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 登录中…';
     try {
-        await api('/stats/overview'); // 轻量探测令牌有效性
-        remember ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY);
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || body.success === false) {
+            // 401 的三种原因（无此邮箱 / 不是管理员 / 密码错）后端已合并成同一句提示，
+            // 这里照原样显示即可 —— 分开显示就等于把「哪些邮箱是管理员」告诉试探者
+            showLoginError((body && body.error && body.error.message) || '登录失败');
+            return;
+        }
+        state.token = body.data.token;
+        remember ? localStorage.setItem(TOKEN_KEY, body.data.token) : localStorage.removeItem(TOKEN_KEY);
         enterApp();
     } catch (err) {
-        state.token = '';
-        showLoginError(err.status === 401 ? '令牌无效或已失效，请检查 ADMIN_TOKEN' : (err.message || '连接服务器失败'));
+        showLoginError(err.message || '连接服务器失败');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-sign-in"></i>进入管理台';
@@ -171,17 +212,27 @@ function enterApp() {
     switchTab('overview');
 }
 
-function doLogout(reason) {
+async function doLogout(reason) {
+    const token = state.token;
     state.token = '';
     localStorage.removeItem(TOKEN_KEY);
     $('#app-view').classList.add('hidden');
     $('#logout-btn').classList.add('hidden');
     $('#connection-state').classList.add('hidden');
-    const input = $('#login-token-input');
-    if (input) input.value = '';
+    const emailEl = $('#login-email-input');
+    if (emailEl) emailEl.value = '';
+    const pwdEl = $('#login-password-input');
+    if (pwdEl) pwdEl.value = '';
     if (reason) showLoginError(reason);
     else { const e = $('#login-error'); if (e) e.classList.add('hidden'); }
     $('#login-view').classList.remove('hidden');
+    // 让后端推高登录态版本号：这一刻之前签出的令牌全部作废。
+    // 不做这一步，复制走的令牌在剩下的一小时里照样能改税率、发兑换码。
+    if (token) {
+        try {
+            await fetch('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+        } catch { /* 网络问题不影响本地已登出 */ }
+    }
 }
 
 // ---------- Tab 切换 ----------
@@ -2372,7 +2423,11 @@ async function handleAction(e) {
 // ---------- 初始化 ----------
 function init() {
     $('#login-btn').addEventListener('click', doLogin);
-    $('#login-token-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    // 两个输入框都支持回车登录：只给密码框绑的话，输完邮箱顺手一敲没反应，像卡住了
+    ['#login-email-input', '#login-password-input'].forEach((sel) => {
+        const el = $(sel);
+        if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    });
     $('#logout-btn').addEventListener('click', () => doLogout());
 
     document.querySelectorAll('[data-nav]').forEach((btn) => {
@@ -2438,12 +2493,18 @@ function init() {
         if (e.target && e.target.id === 'cs-f-notify-enabled') updateCitySocialNotifyFields();
     });
 
-    // 记住的令牌直接进入
+    // 记住的令牌直接进入 —— 但先校验一次：带着过期的令牌进界面，
+    // 会在每个 Tab 上弹一堆 401，不如直接回登录页说清楚。
+    // （这里走 api() 而非裸 fetch：会话过期会自动续期一次，有效期内无缝进入）
     const saved = localStorage.getItem(TOKEN_KEY);
     if (saved) {
-        $('#login-token-input').value = saved;
         $('#login-remember').checked = true;
-        doLogin();
+        state.token = saved;
+        api('/admin/me').then(enterApp).catch(() => {
+            state.token = '';
+            localStorage.removeItem(TOKEN_KEY);
+            showLoginError('登录已过期，请重新登录');
+        });
     }
 }
 

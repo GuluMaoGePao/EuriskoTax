@@ -28,6 +28,7 @@ const leadRoutes = require('./routes/leads');
 const leadAdminRoutes = require('./routes/leadAdmin');
 const proCodeRoutes = require('./routes/proCodes');
 const proCodeAdminRoutes = require('./routes/proCodeAdmin');
+const adminAuthRoutes = require('./routes/adminAuth');
 
 // 生产环境安全校验
 if (process.env.NODE_ENV === 'production') {
@@ -249,6 +250,24 @@ app.use('/api/config', configLimiter, taxRateRoutes);
 app.use('/api/config', configLimiter, citySocialRoutes);
 app.use('/api/leads', leadLimiter, leadRoutes);
 app.use('/api/pro-codes', redeemLimiter, proCodeRoutes);
+// 管理台登录限流：10 次/15 分钟/IP（仅计 /login）。
+// 与 /api/auth 同额度：管理台登录同样属于「凭证猜测」类动作，且管理员账号一旦被
+// 撞开，危害面是全部用户数据与配置，不能比 App 登录更宽松。
+// 只计 /login —— 若把 /me /refresh 也算进来，正常用一会儿就会被自己锁住。
+const adminLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    skip: (req) => req.path !== '/login',
+    message: {
+        success: false,
+        error: { message: '登录尝试过于频繁，请 15 分钟后再试', statusCode: 429 }
+    }
+});
+
+// 管理台会话（/login /me /refresh /logout）必须挂在其它 /api/admin/* 之前：
+// 这些子路由的 requireAdmin 依赖本文件签发的令牌，顺序反了不影响匹配，
+// 但放在一起才看得出「会话」与「业务」是两层。
+app.use('/api/admin', adminLoginLimiter, adminAuthRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/content', contentAdminRoutes);
 app.use('/api/admin/support', supportAdminRoutes);

@@ -25,6 +25,8 @@ model User {
   pro_granted_by  String?   // 授权来源："seed" | "invite" | "admin" | "purchase"
   // 登录态版本号（v1.144.0）：改密 / 重置密码 / 退出登录时 +1，与生产 schema 必须一致
   token_version   Int       @default(0)
+  // 角色："user"（默认） | "admin"（可进管理台），与生产 schema 必须一致
+  role            String    @default("user")
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
