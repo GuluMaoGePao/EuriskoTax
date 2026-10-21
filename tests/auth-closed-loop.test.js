@@ -259,4 +259,19 @@ describe('验证码邮件的发件名', () => {
         expect(readSrc('deploy/lighthouse/docker-compose.yml')).toContain('SMTP_FROM_NAME:-' + BRAND + '}');
         expect(readSrc('deploy/lighthouse/.env.example')).toContain('SMTP_FROM_NAME=' + BRAND);
     });
+
+    /**
+     * 这条守的是「邮件能不能发出去」，不是「邮件长什么样」——比上面几条更要命。
+     * 生产机解析 smtp.qq.com 只拿到 AAAA（IPv6）记录而 IPv6 不可达，Node 22 按 DNS
+     * 原序先试 IPv6，ENETUNREACH 之后**不会回退 IPv4**，整条发信链路静默失效：
+     * 代码、账号、授权码全对，用户点「发送验证码」却永远收不到，后端日志也不报错。
+     * 谁把 family: 4 当多余配置删掉，注册与找回密码就一起断在这里。
+     */
+    test('SMTP 强制走 IPv4 —— 否则生产机连不上只解析出 IPv6 的邮件服务器', () => {
+        const mail = readSrc('server/src/services/mailService.js');
+        expect(mail).toMatch(/family:\s*4/);
+        // 只钉 SMTP 这一处：全局改解析顺序会连带影响数据库等其它连接。
+        // 注意这里查的是**调用**（带左括号），本文件注释里提到这个函数名不算。
+        expect(mail).not.toContain('setDefaultResultOrder(');
+    });
 });

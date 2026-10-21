@@ -41,6 +41,13 @@ function getTransporter() {
             host: process.env.SMTP_HOST,
             port,
             secure,
+            // 强制走 IPv4。腾讯云这台机解析 smtp.qq.com 只拿到 AAAA（IPv6）记录，
+            // 而本机 IPv6 不可达；Node 22 默认按 DNS 原序取址，会先试 IPv6 并以
+            // ENETUNREACH 失败，且**不会自动回退到 IPv4** —— 表现是线上验证码发不出去，
+            // 而代码、账号、授权码全都看不出问题（2026-10-21 实测：加 family:4 后立刻连通）。
+            // 只钉 SMTP 这一处，不用 dns.setDefaultResultOrder 改全局解析顺序 ——
+            // 那会连带影响数据库等其它连接。
+            family: 4,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
