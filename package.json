@@ -1,7 +1,7 @@
 {
   "name": "EuriskoTax",
   "version": "1.144.0",
-  "description": "个人所得税预算规划工具 - 全栈应用 + 运维守护 + GUI 控制台",
+  "description": "EuriskoTax 税费计算器 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --minify && tailwindcss -i src/css/admin.src.css -o src/css/admin.css --minify",
     "watch:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --watch",

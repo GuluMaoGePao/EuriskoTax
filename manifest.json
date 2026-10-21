@@ -1,7 +1,7 @@
 {
-  "name": "EuriskoTax - 个人所得税预算规划工具",
+  "name": "EuriskoTax - 税费计算器",
   "short_name": "EuriskoTax",
-  "description": "专业的个人所得税预算规划工具，支持综合所得、经营所得、分类所得计算与反向倒算，离线可用。",
+  "description": "EuriskoTax 税费计算器：个税、企业税、社保公积金等 20 个税种在线测算，计算在浏览器本地完成，离线可用。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
