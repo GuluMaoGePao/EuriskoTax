@@ -2963,85 +2963,12 @@ Add-SectionCard -TabCtx $tab2Ctx `
 )
 
 Add-SectionCard -TabCtx $tab2Ctx `
-    -Title "3. 邀请码管理（一机一码）" `
-    -Subtitle "注册邀请码：生成 · 查看 · 复制（生产 / 本地）" `
-    -Description "详细说明：每个邀请码仅可注册一个账号，注册成功即作废。操作通过管理员令牌认证，本地与生产各用独立令牌：本地读 server\.env 的 ADMIN_TOKEN，生产读 ADMIN_TOKEN_PROD（腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 查看），缺失会弹窗输入一次并回存 server\.env。生产目标 https://euriskotax.com，本地 http://localhost:3000（需后端已启动）。" `
-    -AccentColor $C_PURPLE -Buttons @(
-    @{ Text = "生成邀请码到生产`n自动复制到剪贴板"; Desc = "输入数量（1-100）后调用生产环境邀请码接口生成，成功后自动复制到剪贴板并弹窗提示，明细写入下方日志区。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = {
-            $cnt = Show-InputBox -Title "生成数量" -Prompt "要生成几个邀请码？（1-100）：" -DefaultValue "10"
-            if (-not $cnt) { return }
-            if ($cnt -notmatch '^\d+$' -or [int]$cnt -lt 1 -or [int]$cnt -gt 100) {
-                Show-GuiAlert -Title "数量无效" -Message "数量必须是 1-100 之间的整数。" -Kind "Warning"; return
-            }
-            $r = Invoke-InviteApi -Method "POST" -Target "prod" -Body @{ count = [int]$cnt }
-            if ($r.Ok) {
-                $codes = ($r.Data.codes -join "`r`n")
-                Set-Clipboard -Value $codes
-                Write-Log "✅ 生产环境已生成 $($r.Data.createdCount) 个邀请码（已复制到剪贴板）："
-                foreach ($c in $r.Data.codes) { Write-Log "    $c" }
-                Show-GuiAlert -Title "生成成功" -Message "已在生产环境生成 $($r.Data.createdCount) 个邀请码，已复制到剪贴板。明细见下方日志区。"
-            } else {
-                Write-Log "❌ 生产生成邀请码失败：$($r.Error)" "ERR"
-                Show-GuiAlert -Title "生成失败" -Message $r.Error -Kind "Error"
-            }
-        } },
-    @{ Text = "生成邀请码到本地`n写入本地开发库"; Desc = "同生成到生产，但写入本地开发数据库（需本地后端已启动，否则会提示连接失败）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = {
-            $cnt = Show-InputBox -Title "生成数量" -Prompt "要生成几个邀请码？（1-100）：" -DefaultValue "10"
-            if (-not $cnt) { return }
-            if ($cnt -notmatch '^\d+$' -or [int]$cnt -lt 1 -or [int]$cnt -gt 100) {
-                Show-GuiAlert -Title "数量无效" -Message "数量必须是 1-100 之间的整数。" -Kind "Warning"; return
-            }
-            $r = Invoke-InviteApi -Method "POST" -Target "local" -Body @{ count = [int]$cnt }
-            if ($r.Ok) {
-                Write-Log "✅ 本地已生成 $($r.Data.createdCount) 个邀请码："
-                foreach ($c in $r.Data.codes) { Write-Log "    $c" }
-            } else {
-                Write-Log "❌ 本地生成邀请码失败：$($r.Error)" "ERR"
-                Show-GuiAlert -Title "生成失败" -Message $r.Error -Kind "Error"
-            }
-        } },
-    @{ Text = "查看生产邀请码`n未使用 / 已使用列表"; Desc = "拉取生产环境全部邀请码，按未使用/已使用分组显示在下方日志区，已使用项显示注册用户名和时间。"; Color = "75, 140, 230";
-       OnClick = {
-            $r = Invoke-InviteApi -Method "GET" -Target "prod"
-            if ($r.Ok) {
-                Write-Log "📋 生产邀请码：共 $($r.Data.total) 个 = 未使用 $($r.Data.availableCount) + 已使用 $($r.Data.usedCount)" "OK"
-                foreach ($c in $r.Data.available) { Write-Log "    [未使用] $($c.code)" }
-                foreach ($c in $r.Data.used) { Write-Log "    [已使用] $($c.code) → 用户 $($c.usedBy)（$($c.usedAt.ToString('yyyy-MM-dd HH:mm'))）" "WARN" }
-            } else {
-                Write-Log "❌ 拉取生产邀请码失败：$($r.Error)" "ERR"
-                Show-GuiAlert -Title "查看失败" -Message $r.Error -Kind "Error"
-            }
-        } },
-    @{ Text = "查看本地邀请码`n未使用 / 已使用列表"; Desc = "拉取本地开发库全部邀请码，分组显示在下方日志区（需本地后端已启动）。"; Color = "75, 140, 230";
-       OnClick = {
-            $r = Invoke-InviteApi -Method "GET" -Target "local"
-            if ($r.Ok) {
-                Write-Log "📋 本地邀请码：共 $($r.Data.total) 个 = 未使用 $($r.Data.availableCount) + 已使用 $($r.Data.usedCount)" "OK"
-                foreach ($c in $r.Data.available) { Write-Log "    [未使用] $($c.code)" }
-                foreach ($c in $r.Data.used) { Write-Log "    [已使用] $($c.code) → 用户 $($c.usedBy)（$($c.usedAt.ToString('yyyy-MM-dd HH:mm'))）" "WARN" }
-            } else {
-                Write-Log "❌ 拉取本地邀请码失败：$($r.Error)" "ERR"
-                Show-GuiAlert -Title "查看失败" -Message $r.Error -Kind "Error"
-            }
-        } },
-    @{ Text = "复制生产未使用邀请码`n一行一个，发用户用"; Desc = "拉取生产环境全部未使用邀请码并整批复制到剪贴板（一行一个），方便直接粘贴发给用户。无可用码时提示先生成。"; Color = "85, 180, 110";
-       OnClick = {
-            $r = Invoke-InviteApi -Method "GET" -Target "prod"
-            if ($r.Ok) {
-                if ($r.Data.availableCount -eq 0) {
-                    Show-GuiAlert -Title "无可用邀请码" -Message "生产环境没有未使用的邀请码，请先用【生成邀请码到生产】补充。" -Kind "Warning"; return
-                }
-                $codes = ($r.Data.available | ForEach-Object { $_.code }) -join "`r`n"
-                Set-Clipboard -Value $codes
-                Write-Log "✅ 已复制 $($r.Data.availableCount) 个生产未使用邀请码到剪贴板" "OK"
-                Show-GuiAlert -Title "复制成功" -Message "已复制 $($r.Data.availableCount) 个未使用邀请码到剪贴板（一行一个）。"
-            } else {
-                Write-Log "❌ 复制失败：$($r.Error)" "ERR"
-                Show-GuiAlert -Title "复制失败" -Message $r.Error -Kind "Error"
-            }
-        } }
+    -Title "3. 邀请码（已迁到线上管理台）" `
+    -Subtitle "注册邀请码的生成与查看，请到管理台操作" `
+    -Description "详细说明（v1.146.0 起）：邀请码是**业务数据**，而本控制台是基础设施工具（迁移 / 生成 / 数据重置 / 部署），两者不再混在一起。原先这里直接用 ADMIN_TOKEN_PROD 这把静态令牌调生产接口 —— 而静态令牌已降级为应急通道，不该再承担日常业务；管理台现在有按人登录、三级角色与操作留痕，才是做这件事的地方。" `
+    -AccentColor $C_GRAY -Buttons @(
+    @{ Text = "打开管理台邀请码页`n线上 /admin.html"; Desc = "在浏览器打开生产管理台。用**工作人员账号**（邮箱 + 密码）登录后进入「邀请码」Tab 生成与查看 —— 客服角色看不到这个入口，只有所有者 / 管理员可以。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process "https://euriskotax.com/admin.html"; Write-Log "已打开线上管理台（邀请码在「邀请码」Tab）" "INFO" } }
 )
 
 # ==============================================================================
@@ -4002,6 +3929,65 @@ $form.Add_Shown({
     Write-Log "提示: 鼠标悬停任何按钮可查看详细说明。导航选中后左侧有蓝色指示条。" "INFO"
     Write-Log ""
 }.GetNewClosure())
+
+# ==============================================================================
+# 启动口令（v1.146.0）
+#
+# 这个控制台能 SSH 部署生产、回滚、初始化服务器、重建数据库 —— **权限高于管理台**
+# （管理台还要邮箱 + 密码，令牌 2 小时过期）。而此前双击 .bat 就能用：
+# 谁打开这台电脑，谁就是站长。
+#
+# 加一道口令，至少挡住「顺手点开」「别人借用电脑时误触部署」这两种真实场景。
+# 口令哈希存在 .console-pass（本地文件，已加入 .gitignore，不进仓库）。
+#
+# ⚠️ 这是**本机防误触**，不是强认证：它拦不住能读到文件的人。
+# 真正的生产凭证（SSH 私钥、ADMIN_TOKEN）保护在服务器与文件系统权限那一层。
+# ==============================================================================
+function Get-ConsolePassFile {
+    return (Join-Path $ScriptDir ".console-pass")
+}
+
+function Get-ConsolePassHash {
+    param([string]$Plain, [string]$Salt)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes("$Salt|$Plain")
+        return (($sha.ComputeHash($bytes)) | ForEach-Object { $_.ToString('x2') }) -join ''
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Test-ConsolePass {
+    $file = Get-ConsolePassFile
+
+    if (-not (Test-Path $file)) {
+        $p1 = [Microsoft.VisualBasic.Interaction]::InputBox(
+            '首次使用：本控制台能部署生产、回滚、初始化服务器，请设置一个启动口令（至少 6 位）。',
+            'EuriskoTax 开发控制台', '')
+        if ([string]::IsNullOrWhiteSpace($p1) -or $p1.Length -lt 6) { return $false }
+        $p2 = [Microsoft.VisualBasic.Interaction]::InputBox('请再输入一次以确认：', 'EuriskoTax 开发控制台', '')
+        if ($p1 -ne $p2) {
+            [System.Windows.Forms.MessageBox]::Show('两次输入不一致。', '提示', 'OK', 'Warning') | Out-Null
+            return $false
+        }
+        $salt = -join ((65..90) + (97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ })
+        "$salt`:$(Get-ConsolePassHash $p1 $salt)" | Set-Content -Path $file -Encoding UTF8
+        return $true
+    }
+
+    $saved = (Get-Content -Path $file -Raw).Trim()
+    $parts = $saved -split ':', 2
+    if ($parts.Count -ne 2) { return $false }
+    $typed = [Microsoft.VisualBasic.Interaction]::InputBox('请输入启动口令：', 'EuriskoTax 开发控制台', '')
+    if ([string]::IsNullOrWhiteSpace($typed)) { return $false }
+    return ((Get-ConsolePassHash $typed $parts[0]) -eq $parts[1])
+}
+
+if (-not (Test-ConsolePass)) {
+    [System.Windows.Forms.MessageBox]::Show('口令不正确，控制台已退出。', 'EuriskoTax 开发控制台', 'OK', 'Error') | Out-Null
+    exit 1
+}
 
 [void]$form.ShowDialog()
 $timer.Stop()

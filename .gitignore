@@ -65,3 +65,6 @@ Thumbs.db
 # 视觉回归基线的比对临时产物（tools/ops/ui-screenshot-baseline.js --check 的输出）
 # baseline/ 那 12 张要入仓；.tmp/ 每次比对都会被覆写，不进版本库
 tools/ops/screenshots/.tmp/
+
+# GUI 开发控制台的启动口令哈希（本机生成，含凭据性质，绝不入库）
+tools/gui/.console-pass
