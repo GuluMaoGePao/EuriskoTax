@@ -145,6 +145,17 @@
         <button id="sw-update-refresh" class="underline font-bold hover:text-blue-200 ml-1">点击刷新</button>
         以使用最新功能
     </div>
+    <!-- PWA 独立窗口提示（只对**存量已安装**用户；display 已改 browser，不会再有新安装）。
+         这批人的桌面图标按**安装那一刻的 manifest 快照**打开，仍是独立窗口，而浏览器
+         不提供「网站卸载自己」的 API —— 只能引导，不能强制。故提示一次、关掉不再出现。 -->
+    <div id="standalone-hint" class="hidden fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white text-center py-2 px-4 text-sm shadow-md">
+        <i class="fa fa-info-circle mr-2"></i>
+        建议在浏览器中打开本站：可分享、可打印，也能用返回键。
+        <button id="standalone-hint-copy" class="underline font-bold hover:text-blue-200 ml-1">复制网址</button>
+        <span class="mx-2 opacity-60">|</span>
+        桌面图标长按可卸载
+        <button id="standalone-hint-close" class="ml-3 font-bold hover:text-blue-200" aria-label="关闭">×</button>
+    </div>
     <!-- 登录页面（正式版：桌面左右分栏 —— 左品牌价值主张、右表单；窄屏收成单列卡 -->
     <div id="login-page" class="auth-page min-h-screen">
         <div class="auth-shell">
@@ -3001,6 +3012,56 @@
             if (installBtn) installBtn.classList.remove('hidden');
             console.log('[PWA] 可安装到桌面');
         });
+
+        // ====== PWA 独立窗口提示（一次性，仅存量已安装用户可见）======
+        // display 已改 browser，不会再有新用户安装；但存量那批的桌面图标是按安装时
+        // 的 manifest 快照打开的，仍是独立窗口。浏览器不提供「网站卸载自己」的 API，
+        // 所以只能引导 —— 提示一次即可，关掉后不再打扰（localStorage 记住）。
+        (function () {
+            var HINT_KEY = 'pwa-standalone-hint-dismissed';
+            var banner = document.getElementById('standalone-hint');
+            if (!banner) return;
+
+            // 独立窗口判据复用 runtime-env.js 的口径（它还会给 <html> 打 data-app-mode）
+            var standalone = false;
+            try {
+                standalone = document.documentElement.getAttribute('data-app-mode') === 'standalone'
+                    || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                    || window.navigator.standalone === true;
+            } catch (e) { standalone = false; }
+            var dismissed = false;
+            try { dismissed = localStorage.getItem(HINT_KEY) === '1'; } catch (e) { /* 隐私模式 */ }
+            if (!standalone || dismissed) return;
+
+            // 离线条与更新条同样是 fixed top-0 —— 有它们就让位，别叠在一起
+            var occupied = ['offline-banner', 'sw-update-banner'].some(function (id) {
+                var el = document.getElementById(id);
+                return el && !el.classList.contains('hidden');
+            });
+            if (occupied) banner.classList.add('top-8');
+            banner.classList.remove('hidden');
+
+            var closeBtn = document.getElementById('standalone-hint-close');
+            if (closeBtn) closeBtn.addEventListener('click', function () {
+                banner.classList.add('hidden');
+                try { localStorage.setItem(HINT_KEY, '1'); } catch (e) { /* ignore */ }
+            });
+
+            // 独立窗口里点链接不会跳出容器（这正是 v1.141.0 / v1.142.x 踩过的坑），
+            // 所以给用户能带走的东西：把网址复制出来，自己粘到浏览器。
+            var copyBtn = document.getElementById('standalone-hint-copy');
+            if (copyBtn) copyBtn.addEventListener('click', function () {
+                var url = location.origin + '/';
+                var done = function () { copyBtn.textContent = '已复制'; };
+                try {
+                    var r = window.EuriskoEnv && window.EuriskoEnv.copyToClipboard
+                        ? window.EuriskoEnv.copyToClipboard(url) : null;
+                    if (r && typeof r.then === 'function') r.then(done, done);
+                    else if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, done);
+                    else done();
+                } catch (e) { done(); }
+            });
+        })();
 
         document.addEventListener('DOMContentLoaded', function () {
             // SW 更新提示条的刷新按钮

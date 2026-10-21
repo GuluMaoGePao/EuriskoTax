@@ -164,3 +164,40 @@ describe('Phase 1.5 模块契约', () => {
         expect(typeof env.standalone).toBe('boolean');
     });
 });
+
+/**
+ * display 改 browser 后不会再有新用户安装，但**存量已装用户**的桌面图标是按安装时
+ * 的 manifest 快照打开的，仍是独立窗口。浏览器不提供「网站卸载自己」的 API，
+ * 只能引导 —— 这条提示条就是引导。四条要钉住：
+ *   ① 默认隐藏（正常浏览器用户不该看到任何东西）
+ *   ② 只在独立窗口下出现
+ *   ③ 一次性（关掉后 localStorage 记住，不再打扰）
+ *   ④ 给「复制网址」—— 独立窗口里点链接不会跳出容器，用户得能带走地址
+ * 少 ①② 它会变成对所有人的骚扰，少 ③ 它会变成永远赶不走的牛皮癣，
+ * 少 ④ 用户只能手打域名（v1.141.0 / v1.142.x 已经踩过「跳不出去」这个坑）。
+ */
+describe('PWA 独立窗口提示（一次性引导，只对存量已安装用户）', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+
+    test('提示条默认隐藏 —— 浏览器用户不该看到任何东西', () => {
+        const m = html.match(/<div id="standalone-hint"([^>]*)>/);
+        expect(m).not.toBeNull();
+        expect(m[1]).toContain('hidden');
+    });
+
+    test('只在独立窗口下出现（复用 runtime-env 的 data-app-mode 口径）', () => {
+        expect(html).toContain("document.documentElement.getAttribute('data-app-mode') === 'standalone'");
+        expect(html).toContain("window.matchMedia('(display-mode: standalone)').matches");
+        expect(html).toContain('if (!standalone || dismissed) return;');
+    });
+
+    test('一次性：关闭后写入 localStorage，不再打扰', () => {
+        expect(html).toContain("var HINT_KEY = 'pwa-standalone-hint-dismissed';");
+        expect(html).toContain('localStorage.setItem(HINT_KEY,');
+    });
+
+    test('给「复制网址」—— 独立窗口里跳不出去，用户要能带走地址', () => {
+        expect(html).toContain('id="standalone-hint-copy"');
+        expect(html).toContain('location.origin');
+    });
+});
