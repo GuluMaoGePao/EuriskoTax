@@ -2914,11 +2914,11 @@ Add-SectionCard -TabCtx $tab1Ctx `
 Add-SectionCard -TabCtx $tab1Ctx `
     -Title "4. 线上环境（生产站点）" `
     -Subtitle "直接打开生产页面：站点 · 管理台 · 缓存清洗（不需要本地后端）" `
-    -Description "详细说明：三个链接都指向已部署的生产环境 https://euriskotax.com。管理台用于看用户反馈（反馈 Tab）、用户列表与兑换码，登录令牌填腾讯云服务器 .env.shared 里的 ADMIN_TOKEN_PROD（勾选「在本机记住令牌」后免输）；线上缓存清洗页用于用户反馈「页面还是旧的」时一键重置。" `
+    -Description "详细说明：三个链接都指向已部署的生产环境 https://euriskotax.com。管理台用于看用户反馈（反馈 Tab）、用户列表与兑换码 —— 用**工作人员账号**（邮箱 + 密码）登录，不再需要 ADMIN_TOKEN（静态令牌已在生产停用）；线上缓存清洗页用于用户反馈「页面还是旧的」时一键重置。" `
     -AccentColor $C_SUCCESS -Buttons @(
     @{ Text = "🌐 打开线上站点`neuriskotax.com"; Desc = "在默认浏览器打开生产环境首页，也就是发给用户的正式地址。"; Color = "85, 180, 110";
        OnClick = { Start-Process "https://euriskotax.com"; Write-Log "已打开线上站点: https://euriskotax.com" "INFO" } },
-    @{ Text = "🛠 打开管理台`n用户反馈 / 用户 / 兑换码"; Desc = "打开 https://euriskotax.com/admin.html，粘贴 ADMIN_TOKEN_PROD 后进入：「反馈」Tab 看用户提交的 Bug/建议（含附图，可改状态并保存），「用户」Tab 可搜索用户、授予限时专业版，「兑换码」Tab 管理一机一码。"; Color = "100, 150, 240";
+    @{ Text = "🛠 打开管理台`n用户反馈 / 用户 / 兑换码"; Desc = "打开 https://euriskotax.com/admin.html，用**工作人员账号**（邮箱 + 密码）登录进入：「反馈」Tab 看用户提交的 Bug/建议（含附图，可改状态并保存），「用户」Tab 可搜索用户、授予限时专业版，「兑换码」Tab 管理一机一码。客服角色只能看到「反馈」与「排障」两个入口 —— 客户名单、兑换码、税制参数对它不可见。"; Color = "100, 150, 240";
        OnClick = { Start-Process "https://euriskotax.com/admin.html"; Write-Log "已打开线上管理台: https://euriskotax.com/admin.html（令牌用 ADMIN_TOKEN_PROD）" "INFO" } },
     @{ Text = "🧹 线上缓存清洗页`n用户说「页面还是旧的」时给他"; Desc = "打开 https://euriskotax.com/clean-cache.html：注销全部 Service Worker + 清空缓存后跳回首页。发新版后用户仍看到旧页面时，把这条链接发给他。"; Color = "230, 160, 70";
        OnClick = { Start-Process "https://euriskotax.com/clean-cache.html"; Write-Log "已打开线上缓存清洗页: https://euriskotax.com/clean-cache.html" "INFO" } }

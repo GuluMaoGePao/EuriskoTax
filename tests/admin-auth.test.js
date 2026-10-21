@@ -158,3 +158,25 @@ describe('前端：按角色收窄入口（真正的拦截在后端）', () => {
         expect(ADMIN_JS).not.toContain("'X-Admin-Token': state.token");
     });
 });
+
+describe('应急通道收口（v1.146.0）', () => {
+    const SEED = read('tools/ops/ops-seed-prod.js');
+
+    test('静态令牌在生产一律不认 —— 不能只靠「生产恰好没配置」', () => {
+        // 显式挡 production：否则谁为省事把 ADMIN_TOKEN 配回 .env.shared，门就又开了，
+        // 而且从代码上看不出那是意外还是有意
+        expect(MW).toMatch(/NODE_ENV === 'production' \? '' : process\.env\.ADMIN_TOKEN/);
+        // 门禁脚本自注入 ADMIN_TOKEN 跑管理端点，跑的是 development，不受影响
+        expect(read('server/scripts/verify-local-auth.js')).toContain("NODE_ENV: 'development'");
+    });
+
+    test('生产补种改走工作人员登录，不再依赖静态令牌', () => {
+        expect(SEED).toContain('ADMIN_STAFF_EMAIL');
+        expect(SEED).toContain('/api/admin/login');
+        expect(SEED).toContain('Bearer ${bearer}');
+    });
+
+    test('没有凭证时跳过而不是失败 —— 补种不该阻断发布', () => {
+        expect(SEED).toContain('return EXIT_NO_TOKEN');
+    });
+});

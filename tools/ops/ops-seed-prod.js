@@ -6,7 +6,12 @@
 //   server/data/content/tax-policy.json 退役为「纯种子源」。
 //   因此「换新库 / 重置生产库」后线上内容表为空，会导致：
 //     ops-check-prod.ps1 判定 /api/content/tax-policy「version 为空 + items=0」→ 发布门禁永远不绿。
-//   本脚本通过后台 API（X-Admin-Token）把种子源幂等补进生产库，作为发布流水线的一环。
+//   本脚本通过后台 API 把种子源幂等补进生产库，作为发布流水线的一环。
+//
+// 凭证（v1.146.0 起）：
+//   生产只能用**工作人员账号登录**（ADMIN_STAFF_EMAIL / ADMIN_STAFF_PASSWORD，
+//   环境变量或 server/.env）—— 静态令牌 ADMIN_TOKEN_PROD 已被中间件在生产永久拒绝。
+//   建议专门开一个 role=admin 的运维账号给本脚本用：补种只要内容权限，不需要管人的权限。
 //
 // 与 server/scripts/seed-content.js 的关系：
 //   同一份种子源、同一套字段映射；区别是前者直连数据库（本地/可访问库），
@@ -22,10 +27,11 @@
 //   node tools/ops/ops-seed-prod.js --dry-run            # 只报告将要做什么，不写库
 //   node tools/ops/ops-seed-prod.js --wait=180           # 等后台接口就绪（新构建滚动中）
 //   node tools/ops/ops-seed-prod.js --base-url=http://localhost:3000
-//   node tools/ops/ops-seed-prod.js --token=xxx          # 也可用环境变量 ADMIN_TOKEN_PROD
+//   node tools/ops/ops-seed-prod.js --token=xxx          # 本地/旧环境可用静态令牌；生产请用下方账号凭证
+//                                                        # 凭证也可走环境变量：ADMIN_STAFF_EMAIL / ADMIN_STAFF_PASSWORD
 //
 // 退出码：
-//   0 = 成功（含「无变化」）  1 = 失败（网络/接口/数据）  2 = 未配置 ADMIN_TOKEN_PROD（调用方可据此跳过）
+//   0 = 成功（含「无变化」）  1 = 失败（网络/接口/数据）  2 = 未配置任何生产凭证（调用方可据此跳过）
 // =============================================================================
 const fs = require('fs');
 const path = require('path');
@@ -88,6 +94,43 @@ function resolveToken() {
     return (env.ADMIN_TOKEN_PROD || '').trim();
 }
 
+// v1.146.0：静态令牌（ADMIN_TOKEN_PROD）在生产已被中间件永久拒绝 ——
+// 生产补种改用**工作人员账号登录**拿短期 JWT：2 小时过期、可按人吊销、留 last_login，
+// 比一把永不过期且不留痕的静态字符串好得多。
+//
+// 凭证读 ADMIN_STAFF_EMAIL / ADMIN_STAFF_PASSWORD（环境变量或 server/.env）。
+// 建议专门开一个 role=admin 的运维账号给脚本用，而不是填自己的 owner 账号 ——
+// 补种只需要内容权限，不需要管人的权限。
+function resolveStaffCredentials() {
+    const env = readEnvFile(SERVER_ENV_FILE);
+    return {
+        email: (process.env.ADMIN_STAFF_EMAIL || env.ADMIN_STAFF_EMAIL || '').trim(),
+        password: process.env.ADMIN_STAFF_PASSWORD || env.ADMIN_STAFF_PASSWORD || ''
+    };
+}
+
+async function loginAsStaff() {
+    const { email, password } = resolveStaffCredentials();
+    if (!email || !password) return null;
+    try {
+        const res = await fetch(`${BASE_URL}/api/admin/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const parsed = await res.json().catch(() => null);
+        if (res.ok && parsed && parsed.success !== false && parsed.data && parsed.data.token) {
+            log(`  已登录工作人员账号：${email}`);
+            return parsed.data.token;
+        }
+        log(`  工作人员登录失败（HTTP ${res.status}）：${email}`);
+        return null;
+    } catch (err) {
+        log(`  工作人员登录异常：${err.message}`);
+        return null;
+    }
+}
+
 function loadSeedSource() {
     const raw = fs.readFileSync(CONTENT_FILE, 'utf8');
     const parsed = JSON.parse(raw);
@@ -119,13 +162,17 @@ function toItemPayload(item) {
     };
 }
 
-async function api(pathname, { method = 'GET', token, body } = {}) {
+async function api(pathname, { method = 'GET', token, bearer, body } = {}) {
     const url = `${BASE_URL}/api/admin/content${pathname}`;
+    const headers = { 'Content-Type': 'application/json' };
+    // 优先 Bearer（工作人员登录签发的短期令牌），回落静态令牌（仅本地/旧环境还认它）
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    else if (token) headers['X-Admin-Token'] = token;
     let res;
     try {
         res = await fetch(url, {
             method,
-            headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+            headers,
             body: body === undefined ? undefined : JSON.stringify(body)
         });
     } catch (err) {
@@ -140,17 +187,17 @@ async function api(pathname, { method = 'GET', token, body } = {}) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 等后台内容接口就绪（新构建滚动期间先 404），并把不可恢复的错误区分开
-async function waitForAdminApi(token, seconds) {
+async function waitForAdminApi(cred, seconds) {
     const deadline = Date.now() + seconds * 1000;
     let lastDetail = '';
     for (;;) {
-        const r = await api('?limit=1', { token });
+        const r = await api('?limit=1', cred);
         if (r.status === 200) return { ok: true };
         if (r.status === 401) {
-            return { ok: false, fatal: true, detail: '后台拒绝了 ADMIN_TOKEN_PROD（401）：令牌与生产环境 ADMIN_TOKEN 不一致' };
+            return { ok: false, fatal: true, detail: '后台拒绝了凭证（401）：工作人员账号密码有误，或该账号已被禁用 / 降权' };
         }
         if (r.status === 503) {
-            return { ok: false, fatal: true, detail: '生产服务端未配置 ADMIN_TOKEN（503）：请先在腾讯云服务器 /home/ubuntu/euriskotax/.env.shared 设置该环境变量' };
+            return { ok: false, fatal: true, detail: '后台鉴权未就绪（503）：生产已停用静态令牌，请配置 ADMIN_STAFF_EMAIL / ADMIN_STAFF_PASSWORD 走工作人员登录' };
         }
         lastDetail = `HTTP ${r.status || 'N/A'}${r.error ? ` (${r.error})` : ''}`;
         if (Date.now() >= deadline) {
@@ -169,10 +216,14 @@ async function main() {
         throw new Error('当前 Node 不支持 fetch，请使用 Node 18+');
     }
 
-    const token = resolveToken();
-    if (!token) {
-        say('[跳过] 未配置 ADMIN_TOKEN_PROD（环境变量或 server/.env）→ 不做生产内容种子。');
-        say(`       需要时手动执行：node tools/ops/ops-seed-prod.js --token=<生产ADMIN_TOKEN>`);
+    // 凭证优先级：工作人员登录（生产唯一可用）> 静态令牌（仅本地 / 旧环境还认它）
+    const bearer = await loginAsStaff();
+    const staticToken = resolveToken();
+    const cred = bearer ? { bearer } : (staticToken ? { token: staticToken } : null);
+    if (!cred) {
+        say('[跳过] 未配置生产凭证 → 不做生产内容种子。');
+        say('       生产请配置 ADMIN_STAFF_EMAIL / ADMIN_STAFF_PASSWORD（工作人员账号，环境变量或 server/.env）；');
+        say('       静态令牌 ADMIN_TOKEN_PROD 已在生产停用 —— 中间件对 production 一律拒绝。');
         return EXIT_NO_TOKEN;
     }
 
@@ -182,14 +233,14 @@ async function main() {
 
     if (WAIT_SECONDS > 0) {
         log(`等待后台内容接口就绪（最多 ${WAIT_SECONDS}s）...`);
-        const ready = await waitForAdminApi(token, WAIT_SECONDS);
+        const ready = await waitForAdminApi(cred, WAIT_SECONDS);
         if (!ready.ok) {
             say(`[失败] ${ready.detail}`);
             return EXIT_FAIL;
         }
     }
 
-    const listRes = await api('?limit=200', { token });
+    const listRes = await api('?limit=200', cred);
     if (listRes.status !== 200) {
         say(`[失败] 读取线上内容列表失败：HTTP ${listRes.status || 'N/A'}${listRes.error ? ` (${listRes.error})` : ''}` +
             `${listRes.status === 404 ? ' —— 生产仍是旧构建（无后台内容接口），稍后重试' : ''}`);
@@ -213,7 +264,7 @@ async function main() {
             log(`  [待新增] ${itemId}`);
             continue;
         }
-        const r = await api('', { method: 'POST', token, body: toItemPayload(item) });
+        const r = await api('', { method: 'POST', ...cred, body: toItemPayload(item) });
         if (r.status !== 201) {
             say(`[失败] 新增 ${itemId} 失败：HTTP ${r.status || 'N/A'} ${r.text ? r.text.slice(0, 200) : ''}`);
             return EXIT_FAIL;
@@ -223,7 +274,7 @@ async function main() {
     }
 
     // 发布批次：仅在「有新条目」或「批次缺失」时登记，避免复跑刷新 published_at
-    const relRes = await api('/releases', { token });
+    const relRes = await api('/releases', cred);
     if (relRes.status !== 200) {
         say(`[失败] 读取发布批次失败：HTTP ${relRes.status || 'N/A'}`);
         return EXIT_FAIL;
@@ -234,7 +285,7 @@ async function main() {
         if (DRY_RUN) {
             releaseNote = `待登记批次 ${content.version}`;
         } else {
-            const r = await api('/releases', { method: 'POST', token, body: { version: content.version, notice: content.notice || '' } });
+            const r = await api('/releases', { method: 'POST', ...cred, body: { version: content.version, notice: content.notice || '' } });
             if (r.status !== 200) {
                 say(`[失败] 登记发布批次失败：HTTP ${r.status || 'N/A'} ${r.text ? r.text.slice(0, 200) : ''}`);
                 return EXIT_FAIL;

@@ -4,11 +4,9 @@
  * 认两种凭证：
  *   ① `Authorization: Bearer <JWT>` —— 管理台「邮箱 + 密码」登录签发的**短期**令牌，
  *      payload 是 `{ staffId, tv, role, scope: 'admin' }`，查的是 **AdminUser 表**。
- *   ② `X-Admin-Token: <ADMIN_TOKEN>` —— 环境变量里的静态令牌（应急通道）。
- *
- * 为什么留着 ②：① 依赖数据库里存在工作人员账号。万一账号被误删、或密码忘了又
- * 走不通邮件找回，静态令牌是最后的入口 —— 删掉它等于把唯一钥匙也扔了。
- * 但它只在**没带 Bearer** 时才检查，日常登录不该走这条路。
+ *      这是唯一的正式通道。
+ *   ② `X-Admin-Token: <ADMIN_TOKEN>` —— 静态令牌，**仅本地开发可用**（生产一律拒绝，
+ *      见下方 requireAdmin）。门禁脚本 verify-local-auth.js 自注入它来跑管理端点。
  *
  * 与客户端令牌的关系：App 登录签的是 `{ userId }`（查 User 表），管理台签的是
  * `{ staffId }`（查 AdminUser 表）。**两张表、两个字段名**，所以客户的令牌天然
@@ -70,10 +68,20 @@ const requireAdmin = async (req, res, next) => {
         }
     }
 
-    // ② 静态令牌：未配置时拒绝访问，防止管理接口裸奔
-    const adminToken = process.env.ADMIN_TOKEN;
+    // ② 静态令牌：**生产环境一律不认**（v1.146.0）。
+    //
+    // 这条通道曾经是「最后的钥匙」，但工作人员体系上线后它在生产上失去了存在理由：
+    // 应急的正确做法是 SSH 上去 `node scripts/staff.js create/reset-password`
+    // 建/改一个 owner 账号 —— 有审计、可吊销、2 小时过期；而静态令牌是
+    // 「谁拿到字符串谁就是 owner」，永不过期、不留痕。
+    //
+    // 保留仅用于本地开发：门禁脚本 verify-local-auth.js 自注入 ADMIN_TOKEN 跑管理端点。
+    // **这里显式挡掉 production**，而不是只靠「生产没配置」这一现状 ——
+    // 否则哪天有人为了省事把 ADMIN_TOKEN 配回 .env.shared，后面门就又开了，
+    // 而且从代码上看不出来那是意外还是有意。
+    const adminToken = process.env.NODE_ENV === 'production' ? '' : process.env.ADMIN_TOKEN;
     if (!adminToken) {
-        return deny(res, 'Admin access is not configured. Set ADMIN_TOKEN or create a staff account.', 503);
+        return deny(res, 'Admin access is not configured. Log in with a staff account.', 503);
     }
     if (req.get('X-Admin-Token') !== adminToken) {
         return deny(res, 'Invalid admin token');
