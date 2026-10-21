@@ -98,20 +98,22 @@
 | email | string | 是 | 邮箱（唯一，小写归一化） |
 | password | string | 是 | 密码（**至少 6 位**，服务端强制校验；注册/重置/改密一致） |
 | phone | string | 否 | 手机号 |
-| inviteCode | string | 是 | **一机一码邀请码**（`EURISKO-XXXX-XXXX`，需向开发者获取） |
+| inviteCode | string | 否 | 邀请码（`EURISKO-XXXX-XXXX`，**选填**；填了才校验，一码一用） |
 | verificationCode | string | 是 | 邮箱验证码（先调 2.1 发送） |
 
-校验顺序：必填 → 查重（避免浪费一次性验证码）→ 邮箱验证码校验（通过即作废）→ **事务内**创建用户 + 原子消耗邀请码。
+校验顺序：必填 → 查重（避免浪费一次性验证码）→ **邀请码预检**（填了才查；放验证码之前，
+填错邀请码不会吞掉一次性验证码）→ 邮箱验证码校验（通过即作废）→ **事务内**创建用户 + 原子消耗邀请码。
 
-响应（201）：注册返回用户对象（**不含 token**，注册成功后引导走登录）：
+> v1.144.0：邀请码由必填改为**选填**。公测期一码一码本意是控量，实际把"没听说过邀请码的
+> 普通人"挡在门外 —— 他们注册失败后不会去要码，只会关掉页面。邮箱验证码已承担
+> 「这个邮箱是真的」这一层，邀请码只剩"谁带来的"，不该是注册门槛。
+
+响应（201）：注册成功**直接签发令牌**，无需再走一次登录：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | number | 用户ID |
-| username | string | 用户名 |
-| email | string | 邮箱 |
-| phone | string/null | 手机号 |
-| created_at | string | 创建时间 |
+| token | string | JWT（Bearer） |
+| user | object | `{ id, username, email, phone, plan, plan_expires_at, pro_granted_by, created_at }` |
 
 典型错误：用户名/邮箱已存在（400）、验证码无效/过期/尝试超限（400/429）、邀请码不存在或已被使用（403）、验证码发送过于频繁（429）。
 
@@ -123,10 +125,13 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| email | string | 是 | **邮箱 或 用户名**（字段名沿用 `email` 以兼容既有客户端；含 `@` 按邮箱匹配、大小写不敏感，其余按用户名精确匹配） |
+| email | string | 是 | **注册邮箱**（字段名沿用 `email` 以兼容既有客户端；大小写不敏感） |
 | password | string | 是 | 密码 |
 
-> v1.118.0：登录标识扩到用户名（用户名注册时即唯一校验，无需额外验证手段）。
+> v1.144.0：登录标识**收敛为邮箱唯一**，不再接受用户名（v1.118.0 加的双入口已撤回）。
+> 理由是"账号"不该有两个真相源 —— 用户名注册时不校验邮箱归属、改了邮箱用户名不变；
+> 忘记密码链路也跟着分叉（填用户名的人收不到验证码邮件，只能回头猜注册时用的邮箱）。
+> 邮箱是唯一经过验证码验证的字段，登录与找回共用它。非邮箱格式在查库前直接 401。
 > **手机号不可作为登录凭据** —— `User.phone` 是可空非唯一字段且未做验证，当凭据会出现串号/冒领；
 > 要支持必须先接短信验证码 + `phone` 唯一索引 + `phone_verified_at`（见 CHANGELOG 1.118.0）。
 
@@ -134,8 +139,22 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| token | string | JWT（Bearer） |
-| user | object | `{ id, username, email, phone }` |
+| token | string | JWT（Bearer），payload 含 `{ userId, tv }` |
+| user | object | `{ id, username, email, phone, plan, plan_expires_at, pro_granted_by }` |
+
+> `tv` = 签发时刻的 `User.token_version`。中间件每次比对库里的当前值，不一致即 401 ——
+> 改密 / 重置 / 退出都会把它 +1，从而让此前签发的 token 立即失效（见 2.10）。
+> 上线前签发的老 token 没有 `tv`，按 0 处理，不会被本次上线集体踢下线。
+
+### 2.3.1 退出登录
+
+**POST** `/api/auth/logout`
+
+认证：JWT。把 `User.token_version` 自增，使该用户**此前签发的全部 JWT** 立即失效。
+JWT 本身无状态、无法删除，版本号是唯一能"收回"它的手段。响应：`{ message }`。
+
+> 前端无论本端点成功与否都要清本地会话 —— 离线 / 后端不可用时也要能退出，
+> 服务端这一步只是"让别处的会话也下线"。
 
 ### 2.4 获取用户信息
 
@@ -184,7 +203,7 @@
 行为：仅对**已注册邮箱**发送 6 位数字重置验证码（10 分钟有效、60 秒重发冷却、同 IP 15 分钟最多 5 次，与注册验证码合并限流）。未注册邮箱返回 404 且**不发送邮件**（避免邮件轰炸）。
 用途区分：验证码按 `register` / `reset` 两种用途独立存储，互不干扰。
 
-典型错误：邮箱格式错误（400）、该邮箱未注册（404）、发送过于频繁（429）。
+典型错误：该邮箱未注册（404；先查注册状态再校验格式，所以格式非法同样落到 404，不对未注册地址泄露更多信息）、发送过于频繁（429）。
 
 ### 2.9 重置密码（忘记密码）
 
@@ -196,11 +215,18 @@
 |------|------|------|------|
 | email | string | 是 | 注册邮箱 |
 | verificationCode | string | 是 | 2.8 发送的 6 位验证码（通过即作废） |
-| newPassword | string | 是 | 新密码（**至少 6 位**，与注册校验一致） |
+| newPassword | string | 是 | 新密码（**至少 6 位**，与注册校验一致；**不能与当前密码相同**） |
 
-行为：校验邮箱已注册 → 校验重置验证码（一次性使用）→ 更新密码哈希。重置后原密码立即失效。
+行为：校验邮箱已注册 → 校验重置验证码（一次性使用）→ 同一次 update 里更新密码哈希并
+`token_version + 1` → 返回新令牌。
 
-典型错误：参数缺失 / 密码过短 / 验证码无效或过期（400/429）、该邮箱未注册（404）。
+> v1.144.0：① 新旧密码相同直接 400 —— 否则"重置成功"是句空话，还白白把所有设备踢下线；
+> ② 重置成功后**已签发的旧 token 全部失效**，并返回 `{ token, user }` 直接登录 ——
+> 邮箱验证码已证明归属，再让用户回登录页输一遍是多余的断口。
+
+响应：`{ token, user }`（与 2.3 登录同构）。
+
+典型错误：参数缺失 / 密码过短 / 新旧密码相同 / 验证码无效或过期（400/429）、该邮箱未注册（404）。
 
 ### 2.10 专业版兑换码（用户端 · 阶段14）
 
@@ -747,12 +773,14 @@ curl -X POST https://euriskotax.com/api/auth/send-code \
   -d '{"email":"user@example.com"}'
 # → { "success": true, "data": { "cooldownMs": 60000 } }
 
-# ② 注册（verificationCode 为邮件中的 6 位数字，inviteCode 向开发者获取）
+# ② 注册（verificationCode 为邮件中的 6 位数字；inviteCode 选填，未受邀可省略）
 curl -X POST https://euriskotax.com/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"zhangsan","email":"user@example.com","password":"secret123","inviteCode":"EURISKO-XXXX-XXXX","verificationCode":"123456"}'
+  -d '{"username":"zhangsan","email":"user@example.com","password":"secret123","verificationCode":"123456"}'
+# → { "success": true, "data": { "token": "<JWT>", "user": { ... } } }
+#    v1.144.0 起注册成功即签发令牌，无需下面的第 ③ 步；需要换设备时再调登录即可。
 
-# ③ 登录拿 token
+# ③ 登录拿 token（注册已返回令牌，此步仅在其它设备/重新登录时需要）
 curl -X POST https://euriskotax.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"secret123"}'
@@ -767,17 +795,13 @@ curl -X POST https://euriskotax.com/api/auth/send-reset-code \
   -d '{"email":"user@example.com"}'
 # → { "success": true, "data": { "cooldownMs": 60000 } }
 
-# ② 提交新密码（verificationCode 为邮件中的 6 位数字）
+# ② 提交新密码（verificationCode 为邮件中的 6 位数字；不能与当前密码相同）
 curl -X POST https://euriskotax.com/api/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","verificationCode":"123456","newPassword":"newsecret123"}'
-# → { "success": true, "data": { "message": "Password reset successfully" } }
-
-# ③ 用新密码登录
-curl -X POST https://euriskotax.com/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"newsecret123"}'
-```
+# → { "success": true, "data": { "token": "<JWT>", "user": { ... } } }
+#    v1.144.0 起重置成功即签发新令牌，且此前签发的旧 token 全部失效，
+#    无需下面的第 ③ 步。
 
 ### 6.3 综合所得计算示例
 
@@ -823,8 +847,10 @@ curl -X POST https://euriskotax.com/api/auth/login \
 | 登录/验证码限流 | 429 | 15 分钟配额（10 次/5 次，两个发码端点合并计数） |
 | 该邮箱未注册 | 404 | send-reset-code / reset-password（不发送邮件，防轰炸） |
 | 密码少于 6 位 | 400 | register / reset-password / updateProfile 改密 |
-| 邮箱或密码错误 | 401 | login |
+| 新密码与当前密码相同 | 400 | reset-password / updateProfile 改密 |
+| 邮箱或密码错误 | 401 | login（非邮箱格式的标识同样 401，不泄露是否注册过） |
 | 当前密码错误 | 401 | verify-password / 改密 |
+| 会话已失效（改密 / 重置 / 退出后） | 401 | 任何受保护接口；前端按状态码清会话并重载 |
 | 记录不存在 / 非本人 | 404 / 403 | calculations/:id |
 | 参数校验失败 | 400 | 计算/反馈/邀请码 count 非法 |
 | 免费版无云同步（code=PRO_REQUIRED） | 403 | calculations/sync |
@@ -873,8 +899,8 @@ curl -X POST https://euriskotax.com/api/auth/login \
 
 ## 9. 附录：注册流程与邀请码
 
-1. **获取邀请码**：公测期间每码仅可注册一个账号。开发者通过本地 GUI「邀请码管理」（生产目标即腾讯云正式站）或直接调用 `POST /api/invites`（带 `X-Admin-Token`）生成后分发。
-2. **用户注册路径**：输入邮箱 → 点「发送验证码」（60s 冷却倒计时）→ 收到 6 位数字邮件 → 填入验证码 + 邀请码 + 用户名密码 → 注册成功 → 自动跳转登录。
+1. **获取邀请码**：每码仅可注册一个账号。开发者通过本地 GUI「邀请码管理」（生产目标即腾讯云正式站）或直接调用 `POST /api/invites`（带 `X-Admin-Token`）生成后分发。**v1.144.0 起邀请码为选填**，未受邀的用户不填也能注册。
+2. **用户注册路径**：输入邮箱 → 点「发送验证码」（60s 冷却倒计时）→ 收到 6 位数字邮件 → 填入验证码 + 用户名密码（邀请码可不填）→ 注册成功 → **直接登录进入应用**（v1.144.0 起不再跳转回登录页）。
 3. **兜底机制**：服务启动时若 `InviteCode` 表为空，自动批量生成 20 个并打印到启动日志（幂等，非空不生成），防止"无码可用"。
 4. 历史固定邀请码 `EURISKO2026BETA` 已废弃，不再接受。
 
