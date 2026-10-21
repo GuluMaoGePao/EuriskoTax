@@ -94,7 +94,7 @@
 | `app.json` / `project.config.json` | ❌ **不存在** |
 | 全库 `appid` / `mp.weixin` / `miniprogram` | ❌ **0 命中** |
 | 微信 JS-SDK | ❌ 未接入 |
-| `manifest.json`（`display: standalone` + service worker） | ✅ 存在，是 **H5 + PWA** |
+| `manifest.json`（service worker 离线缓存） | ✅ 存在，是 **H5 + PWA（离线）** —— `display` 已于 v1.144.x 由 `standalone` 改为 `browser`，**不再开独立窗口**（见 §11 现状说明） |
 
 **所以当前代码库没有任何小程序。** 它是**纯网页 + PWA**，在微信里只能作为「网页」被打开。请明确「小程序」具体指哪一种：
 
@@ -1004,6 +1004,14 @@ Phase 3「桌面可交付（导出/打印体系化）」的价值**高度依赖�
 > 正确做法是**失败时才说**，并同时给出长图/复制两条能立刻用上的出路。
 
 #### ② PWA 独立窗口（standalone）—— 最有价值的那一批用户在的形态
+
+> ⚠️ **现状变更（v1.144.x）**：`manifest.json` 的 `display` 已由 `standalone` 改为 `browser`。
+> 产品口径是「所有内容都在浏览器网页内呈现，不出 PWA 独立窗口」。因此下面两条适配
+> （应用内返回出口、History 接管）**保留但通常不再触发**。
+> 保留它们的理由：这些坑真实发生过两次（v1.141.0、v1.142.x —— 外链 `target=_blank`
+> 跳出应用容器，用户看到「点一下 App 没了」），若将来改回 standalone 会立刻复发。
+> 另外注意：**离线能力由 Service Worker 提供，与是否安装无关** —— 用户只要访问过一次，
+> 缓存就已生效，不装也能离线打开。
 
 装机用户（`beforeinstallprompt` / `appinstalled` 已实现）是留存与复访最高的一批，
 但他们**失去了浏览器提供给我们的兜底**：

@@ -129,6 +129,21 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 `site-filing.test.js` 的「公安号未下发不许出现假号」组断言翻转为「已下发逐字核对」——
 改号的人动到链接、图标或 rel 任何一个，测试指名到行。
 
+**PWA 不再开独立窗口（`display: standalone` → `browser`）。** 产品口径是：所有内容与
+弹窗都在浏览器网页内呈现，不允许跳出 PWA 窗口。这一项精确对应 `manifest.json` 的
+`display` 一个字段，改成 `browser` 后站点始终以普通标签页打开。
+
+要澄清一处常见误解：**离线能力由 Service Worker 提供，与用户是否安装无关** —— 访问过
+一次即缓存生效，不装也能离线打开算税。所以这次改的只是「窗口形态」，离线价值完整保留。
+代价是 Chrome 的可安装性条件要求 `display` 属于 standalone / fullscreen / minimal-ui，
+改成 `browser` 后不再判定为可安装，登录页顶部那颗安装按钮（`pwa-install-btn`，原先就是
+`hidden`、只在 `beforeinstallprompt` 触发时才显形）此后再不会出现。
+
+为 standalone 做的那些适配（`page-history.js` 接管返回、`@media (display-mode: standalone)`
+的出口）**保留不删**：这些坑真实发生过两次（v1.141.0、v1.142.x —— 外链 `target=_blank`
+跳出应用容器，用户看到「点一下 App 没了」），将来若改回 standalone 会立刻复发。文档
+（`ui-ux-master-plan.md` §11、`ui-design-spec.md` §11）已标注现状变更，历史记述不改写。
+
 ### 顺带修掉的两处文档漂移
 
 - `send-reset-code` swagger 写"邮箱格式错误 400"，实际先查注册状态，格式非法同样落 404；

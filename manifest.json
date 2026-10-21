@@ -4,7 +4,7 @@
   "description": "EuriskoTax 税费计算器：个税、企业税、社保公积金等 20 个税种在线测算，计算在浏览器本地完成，离线可用。",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "browser",
   "orientation": "portrait-primary",
   "background_color": "#1e40af",
   "theme_color": "#1e40af",
