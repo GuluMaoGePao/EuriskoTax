@@ -483,17 +483,24 @@
             </div>
         </nav>
 
-        <!-- 主内容区 -->
-        <div class="container mx-auto px-4 pt-4">
+        <!-- 主内容区
+             px-2 sm:px-4（v1.146.0）：手机页边距 8px。三档试过的结论：
+             36px（外层 16 + 内层 20）内容净宽只有 318，明显往中间挤；0（整页贴边）
+             必须配圆角归零，卡片就不再是卡片了。8px 是两者的边界值 ——
+             留白窄到"没有一条白带"，又刚好让圆角有 8px 的地方转过去；
+             文字离屏边 = 8 + 卡片内距 16 = 24，不贴边。桌面 16 + 24 = 40 不变。 -->
+        <div class="container mx-auto px-2 sm:px-4 pt-4">
         <!-- 工作台首页（卡片流） -->
         <div id="mode-selection-page" class="page active">
             <!-- data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。
                  别改成用宽度工具类选择容器 —— 宽度会被反复调，锚点不能跟着漂。 -->
-            <!-- px-4（v1.135.0）：工具页 / 我的页的容器都自带 px-4，首页没有 —— 同一个
-                 max-w-5xl 下首页内容 1024、另两页 992，切页时卡片区宽窄跳 32px。补上即三页同宽。
+            <!-- 左右内距（v1.146.0 改为 px-0）：手机端**只由外层 .container 给一档**（12px）。
+                 此前这里 px-5(20) 再叠一层，手机上卡片距屏幕边缘 36px —— 390 宽机型
+                 内容净宽只剩 318，卡片里再扣一层内距就窄成一条。
+                 sm:px-6 服务 ≥640：那里外层 16 + 本层 24 = 40，桌面宽屏不缺这点宽度。
                  ⚠️ 类名 max-w-5xl 别摘：share-landing.js 用 `#mode-selection-page .max-w-5xl`
                  定位首页容器挂载分享落地引导。 -->
-            <div class="max-w-5xl mx-auto pt-2 pb-6 px-5 sm:px-6" data-page-container>
+            <div class="max-w-5xl mx-auto pt-2 pb-6 px-0 sm:px-6" data-page-container>
 
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
@@ -715,7 +722,7 @@
                  反向提醒：速算器页不要跟着加宽。它是表单，要守 65–75 字符行宽，
                  令牌 --c-narrow(720px) 就是为它设的。列表宜宽、表单宜窄，不是同一件事。
                  data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。 -->
-            <div class="max-w-5xl mx-auto py-4 px-5 sm:px-6" data-page-container>
+            <div class="max-w-5xl mx-auto py-4 px-0 sm:px-6" data-page-container>
                 <div class="tool-search-wrap">
                     <i class="fa fa-search tool-search-icon"></i>
                     <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
@@ -749,7 +756,10 @@
              quick-next …），只加一层布局容器：toolbox-ui.js、share-card、lead-context 与单测
              都按 id 找这些节点，结构重组会让它们同时失效。 -->
         <div id="quick-calculator-page" class="page hidden">
-            <div class="quick-page-inner mx-auto py-4 px-4">
+            <!-- px-0 sm:px-4（v1.146.0）：手机端与外层 .container 只叠一层（外层给 12px）
+                 —— 原先为 16 + 16 = 32px，比首页 / 工具页窄一档，切页时表单区会跳一下。
+                 桌面 16 + 16 = 32 不变。 -->
+            <div class="quick-page-inner mx-auto py-4 px-0 sm:px-4">
                 <!-- 顶部：返回 + 标题 + 政策时效 -->
                 <div class="mb-3">
                     <div class="flex items-start gap-3">
@@ -2274,7 +2284,7 @@
          #app-container 下，于是手机上「我的」内容 358px、首页 326px，切过去留白跳一截。
          补上同一个 .container，七页与其余四页共用一条栅格。
          ⚠️ 不加 pt-4：各页自己的容器带 pt/pb，再垫一层顶距会把首屏往下推。 -->
-    <div class="container mx-auto px-4">
+    <div class="container mx-auto px-2 sm:px-4">
 
     <!-- 用户中心页面（仪表盘） -->
     <div id="profile-page" class="page hidden">
@@ -2288,13 +2298,13 @@
              ⚠️ 此前只有首页与工具页标了它，「我的」没标 —— 而容器只有 pb-6(24px)，
              小于底栏 52px + 安全区，手机上最后一张「服务与支持」卡会被底栏压住一截
              （jsdom 没有布局引擎，这条靠肉眼才看得见）。 -->
-        <!-- px-5 sm:px-6（v1.141.0）：卡片到屏幕边缘的距离 = 外层 .container 的 16px +
-             本容器的左右内距。原先本容器只给 16px，合计 32px —— 卡片几乎贴着屏幕边，
-             一屏四组内容全宽铺满，看着发闷。现在合计 36 / 40px：手机少 8px 内容宽，
-             换两侧各 4px 的呼吸，卡片与边缘的关系才立得住。
-             ⚠️ 这一档是三个顶层页共用的一条栅格（首页 / 工具页 / 我的）：只改「我的」
-             会在 Tab 切换时看到内容宽度跳一下，`page-width.test.js` 也在守这条一致性。 -->
-        <div class="max-w-5xl mx-auto px-5 sm:px-6 pt-3 pb-6" data-page-container>
+        <!-- px-0 sm:px-6（v1.146.0）：手机端左右边距只由外层 .container 给（12px）。
+             v1.141.0 曾把本层提到 px-5 —— 合计 36px，本意是"别贴边"，但手机 390 宽下
+             内容净宽只剩 318，卡片再扣一层内距，「我的」页每组信息都被压成窄条。
+             现在与本页横幅、首页、工具页、二级页、速算器、深度测算统一为 12px。
+             ⚠️ 这一档是三个顶层页共用的一条栅格（首页 / 工具页 / 我的）：
+             只改一处会在 Tab 切换时看到内容宽度跳一下，`page-width.test.js` 也在守这条。 -->
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pt-3 pb-6" data-page-container>
             <!-- 页头已撤（2026-10-03）：原来的「← 返回 + 个人中心」把顶层 Tab 页当二级页用 ——
                  返回去的就是首页，与底部/顶部 Tab 的「首页」是同一目的地的第二条路径；
                  「个人中心」也不是这一页的名字（这页叫「我的」，Tab 已经写着），它是页内的一个入口，
@@ -2439,7 +2449,7 @@
         <!-- 二级页统一 768（max-w-3xl）：原先六个二级页写了三种宽度（672 / 768 / 896），
              在「我的」页里点进点出，留白来回跳。二级页比顶层窄一档是层级表达，
              但六个之间必须同宽。面包屑条 .profile-sub-nav-inner 跟着这个值（见 tailwind.src.css）。 -->
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-settings" class="profile-sub-nav-back">
@@ -2599,7 +2609,7 @@
     
     <!-- 税务档案页面 -->
     <div id="profile-tax-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-tax" class="profile-sub-nav-back">
@@ -2707,7 +2717,7 @@
 
     <!-- 数据管理页面 -->
     <div id="profile-data-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-data" class="profile-sub-nav-back">
@@ -2764,7 +2774,7 @@
     
     <!-- 税务日历页面 -->
     <div id="profile-calendar-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-calendar" class="profile-sub-nav-back">
@@ -2785,7 +2795,7 @@
 
     <!-- 计算历史页面（个人中心内） -->
     <div id="profile-history-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile-history" class="profile-sub-nav-back">
@@ -2807,7 +2817,7 @@
 
     <!-- 批量计算页面（个人中心内 · 阶段19-11 E4） -->
     <div id="profile-batch-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-6 pb-6">
+        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-batch" class="profile-sub-nav-back">

@@ -46,15 +46,53 @@ describe('顶层内页：同一条栅格', () => {
 
     // 这条守的是「同是 max-w-5xl 却差 32px」：首页原先不带左右内距（靠父级 .container 给），
     // 另两页自带 —— 桌面 1024 vs 992，手机 326 vs 358。
-    // v1.141.0：内距档位从 px-4(16) 提到 px-5 sm:px-6(20 / 24) —— 卡片到屏幕边缘
-    // 只有 32px，贴边发闷。断言跟着改成守**同一档**（px-5 + sm:px-6），不再钉死 16px：
-    // 这条测试守的是"三页不许各写一条栅格"，不是"内距必须是 16"。
-    test('三个容器自带同一档左右内距（px-5 sm:px-6）', () => {
+    // v1.146.0 定档：手机页边距 8px（外层 .container 的 px-2），且**只由一层给**。
+    // 三档试过的结论：
+    //   36px（16 + 20）内容净宽只剩 318，明显往中间挤；
+    //   0（整页贴边）必须配圆角归零，卡片就不再是卡片，文字也跟着贴到边上；
+    //   8px 是边界值 —— 屏幕边到卡片还有 8px 让圆角转过去，文字离屏边 8 + 16 = 24。
+    // 这条测试守两件事：三页同一条栅格；手机档不许再叠第二层左右内距。
+    test('三个容器手机端不叠内距、桌面同档（px-0 sm:px-6）', () => {
         TOP_PAGES.forEach((id) => {
             const cls = containerClassOf(id);
-            expect(cls).toContain('px-5');
+            expect(cls).toContain('px-0');
             expect(cls).toContain('sm:px-6');
         });
+    });
+
+    // 手机档 gutter 的**唯一真源**：内容区 .container 的 px-2（8px）。
+    // 只断言"内层是 px-0"堵不住：外层被谁改成 px-5 时，内层那行一个字没动，
+    // 手机边距却从 8 涨到 28 —— 所以两处必须一起守。
+    test('内容区 .container 的手机档是 px-2、桌面回到 px-4', () => {
+        expect(HTML).toContain('<div class="container mx-auto px-2 sm:px-4 pt-4">');
+        expect(HTML).toContain('<div class="container mx-auto px-2 sm:px-4">');
+    });
+
+    // 收边距时最容易连带牺牲的两件事（整页贴边那版两个都丢过，于是回退）：
+    // ① 卡片圆角 —— 归零后 Hero 变成通栏色块，卡片流降级成列表页；
+    // ② 搜索条的胶囊形态 —— 改通栏直角后放大镜顶在最左，看着像"图标位置错了"。
+    // 守的是"收边距只动间距，不动形态"。
+    test('手机档保留卡片圆角与搜索条胶囊（收边距不牺牲形态）', () => {
+        const CSS = read('src/css/ui-redesign.css');
+        const tail = CSS.slice(CSS.lastIndexOf('@media (max-width: 767.98px)'));
+        expect(tail).not.toMatch(/border-radius:\s*0/);
+        expect(tail).not.toMatch(/box-shadow:\s*none/);
+    });
+
+    // 页面容器在手机档只允许一条左右内距声明（px-0），sm: 变体不算 ——
+    // 这是"36px 那次"复发的入口：px-5 与 px-0 并存时，谁写在哪个断点根本看不出来。
+    test('九处页面容器的手机档只有 px-0 一条内距', () => {
+        TOP_PAGES.concat(SUB_PAGES).forEach((id) => {
+            const cls = containerClassOf(id).replace(/sm:\S+/g, '');
+            expect(cls.match(/px-\d+/g) || []).toEqual(['px-0']);
+        });
+    });
+
+    // 速算器页不在这两页清单里（它的容器是 .quick-page-inner，宽 --c-narrow 720）
+    test('速算器容器手机档同样不叠内距（px-0 sm:px-4）', () => {
+        const cls = containerClassOf('quick-calculator-page');
+        expect(cls).toContain('px-0');
+        expect(cls).toContain('sm:px-4');
     });
 
     // 根因②：七个「我的」系列页原先直接挂在 #app-container 下，不在 .container 里，
@@ -62,7 +100,7 @@ describe('顶层内页：同一条栅格', () => {
     // 某个断点对得上，跨断点又会错开。
     test('「我的」系列页与其余内页在同一个 .container 里', () => {
         const at = HTML.indexOf('id="profile-page"');
-        expect(HTML.slice(Math.max(0, at - 1200), at)).toContain('<div class="container mx-auto px-4">');
+        expect(HTML.slice(Math.max(0, at - 1200), at)).toContain('<div class="container mx-auto px-2');
         // 闭合：最后一个二级页（批量）之后要收口
         const last = HTML.indexOf('id="profile-batch-page"');
         expect(HTML.slice(last, last + 6000)).toMatch(/<\/div><!-- \/\.container/);
@@ -77,13 +115,13 @@ describe('顶层内页：同一条栅格', () => {
 });
 
 describe('「我的」二级页：同宽 + 面包屑对齐', () => {
-    // v1.141.0：内距档位随顶层页一起提到 px-5 sm:px-6（二级页与顶层页共用同一条栅格，
-    // 只改顶层会让二级页反倒比它宽）。
-    test('六个二级页容器同宽（max-w-3xl + px-5 sm:px-6）', () => {
+    // v1.146.0：内距档位随顶层页一起回到 px-0 sm:px-6（二级页与顶层页共用同一条栅格，
+    // 只改顶层会让二级页反倒比它宽 —— 同一层叠两层 16/20 的坑也要一起躲）。
+    test('六个二级页容器同宽（max-w-3xl + px-0 sm:px-6）', () => {
         SUB_PAGES.forEach((id) => {
             const cls = containerClassOf(id);
             expect(cls).toContain('max-w-3xl');
-            expect(cls).toContain('px-5');
+            expect(cls).toContain('px-0');
             expect(cls).toContain('sm:px-6');
         });
     });

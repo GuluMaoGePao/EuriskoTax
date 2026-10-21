@@ -316,6 +316,7 @@
     border-color: var(--c-border);
 }
 
+
 /* --- 首页身份 chip 行（阶段20 P1 · ⑤）---
    身份卡降为一行 chip：身份是「设置默认视角」，不是导航，不值得占一整卡。
    只在 .identity-chip-row 容器里改写排版 —— 同一批 DOM 在别处（工具页等）仍是整卡。 */
@@ -2041,4 +2042,38 @@
     background-clip: content-box;
 }
 .modal-body::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+/* ====== 手机端页边距与搜索条（v1.146.0） ======
+   ① 页边距：三个顶层页 / 六个二级页 / 速算器页的内层容器改为 px-0（HTML 里改的），
+      手机端只保留外层 .container 的 16px —— 此前 16 + 20 = 36px，390 宽下内容净宽
+      只剩 318，卡片再扣一层内距就窄成一条。这里不再写 padding 覆盖：真源在 HTML 类
+      与 tests/page-width.test.js，CSS 只是记录"为什么是 16"。
+   ② 搜索条：390 宽下举例文案折成两行（条高 40 → 68），单行 + 省略号即可。
+   ⚠️ 本块必须留在文件**末尾**：tests/nav-responsive.test.js 用"第一个 767.98 媒体块"
+      取导航规则，插在导航段之前会把它顶掉。 */
+@media (max-width: 767.98px) {
+    .home-searchbar {
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .home-searchbar > .fa {
+        flex-shrink: 0;
+    }
+    .home-searchbar > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 圆角不归零（v1.146.0 第三版）：试过整页贴边（gutter 0 + 圆角归零），
+       结论是**圆角不能让** —— 它是"这是一张卡片"这件事的唯一表达，归零之后
+       Hero 就成了通栏色块、卡片成了分隔线，页面从"卡片流"变成"列表页"。
+       所以贴边只做到 gutter 8（HTML 里 .container 的 px-2）：圆角仍在，
+       屏幕边与卡片之间留 8px 让圆角有地方"转过去"，卡片内距 16 保证文字不贴边。 */
+    .hero-card {
+        /* 24 → 20：卡片变宽之后，24 会把内容又推回中间 */
+        padding: var(--sp-5);
+    }
+}
 
