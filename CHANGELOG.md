@@ -137,7 +137,19 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 一次即缓存生效，不装也能离线打开算税。所以这次改的只是「窗口形态」，离线价值完整保留。
 代价是 Chrome 的可安装性条件要求 `display` 属于 standalone / fullscreen / minimal-ui，
 改成 `browser` 后不再判定为可安装，登录页顶部那颗安装按钮（`pwa-install-btn`，原先就是
-`hidden`、只在 `beforeinstallprompt` 触发时才显形）此后再不会出现。
+`hidden`、只在 `beforeinstallprompt` 触发时才显形）此后再不会出现 —— 连带地址栏安装图标、
+菜单里的「安装此站点」三个入口一并消失，因为判定条件变了，不是按钮坏了。
+
+**但 iOS 不受影响，且恰好是想要的形态**：iOS 的「添加到主屏幕」不看 `display`，只看
+`apple-mobile-web-app-capable`；项目从未加过这个 meta，所以 iOS 用户加图标后点开**仍是
+在 Safari 里** —— 有桌面图标、不出独立窗口，两件事同时成立。
+
+**这是有意识的取舍，不是遗漏**：要让 Android / 桌面 Chrome 也能一键安装，只能退回
+`minimal-ui` 或 `standalone`，而 Chrome 把「可安装」与「以独立窗口打开」绑在一起，
+不存在「能装但打开是普通标签页」这一档。为 Android 的一键安装去破坏「不出独立窗口」
+不划算 —— Android 用户仍可用浏览器自带的「创建快捷方式」（站点不可安装时生成的就是
+普通网址快捷方式，打开是标签页）。三档对照：`browser`（现选，不可安装，标签页）／
+`minimal-ui`（可安装，带少量控件的窗口）／`standalone`（可安装，完全独立窗口）。
 
 为 standalone 做的那些适配（`page-history.js` 接管返回、`@media (display-mode: standalone)`
 的出口）**保留不删**：这些坑真实发生过两次（v1.141.0、v1.142.x —— 外链 `target=_blank`
