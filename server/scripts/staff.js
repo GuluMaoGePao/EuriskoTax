@@ -46,7 +46,11 @@ function usage() {
 const norm = (e) => String(e || '').trim().toLowerCase();
 
 async function main() {
-    const [cmd, email, password, username, roleArg] = process.argv.slice(2);
+    // 各命令的参数位置不同，`password` 这个位在不同命令里装的是不同东西
+    // （create 是密码、set-role 是角色、reset-password 是新密码），
+    // 所以下面按命令各取所需，别指望这里的变量名能说明语义。
+    const args = process.argv.slice(2);
+    const [cmd, email, password, username, roleArg] = args;
     if (!cmd) { usage(); process.exit(1); }
 
     if (cmd === 'list') {
@@ -129,16 +133,21 @@ async function main() {
     if (!staff) { console.error('没有这个邮箱的工作人员。'); process.exit(1); }
 
     if (cmd === 'set-role') {
-        if (!ROLES.includes(roleArg)) { console.error(`角色只能是 ${ROLES.join(' / ')}`); process.exit(1); }
-        if (staff.role === 'owner' && roleArg !== 'owner') {
+        // 用法是 set-role <email> <role>：角色是**第三个**参数，
+        // 不是通用签名里那个 roleArg（那是 create 的第五个参数）。
+        // 曾写成 roleArg，结果 set-role 永远拿到 undefined，静默走进
+        // 「角色只能是 owner / admin / support」的分支，改一个角色改不动。
+        const newRole = String(args[2] || '').trim();
+        if (!ROLES.includes(newRole)) { console.error(`角色只能是 ${ROLES.join(' / ')}`); process.exit(1); }
+        if (staff.role === 'owner' && newRole !== 'owner') {
             const owners = await prisma.adminUser.count({ where: { role: 'owner', status: 'active' } });
             if (owners <= 1) { console.error('至少要保留一名所有者。'); process.exit(1); }
         }
         await prisma.adminUser.update({
             where: { email: target },
-            data: { role: roleArg, token_version: { increment: 1 } }
+            data: { role: newRole, token_version: { increment: 1 } }
         });
-        console.log(`${staff.email} 角色改为 ${roleArg}，其现有会话已失效。`);
+        console.log(`${staff.email} 角色改为 ${newRole}，其现有会话已失效。`);
         return;
     }
 

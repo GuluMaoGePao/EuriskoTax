@@ -270,7 +270,7 @@ STARTTLS 处理并告警（不信任被改错的配置），且 `requireTLS: tru
 
 ### 验收
 
-- 单测 **125 套件 2403 例**全绿（`login-identifier.test.js` 整段改写为"只认邮箱"版本，
+- 单测 **125 套件 2400 例**全绿（`login-identifier.test.js` 整段改写为"只认邮箱"版本，
   新增 `auth-closed-loop.test.js` 19 例钉住四段闭环；邀请码选填与「邀请码先于验证码」
   各有断言）；
 - `verify:local` **266/266**（新增 7 项闭环门禁：注册即签令牌 · 重置回新 token ·

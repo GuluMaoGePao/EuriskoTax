@@ -87,6 +87,14 @@ describe('三级角色与「谁能管人」', () => {
         expect(STAFF).not.toMatch(/router\.delete\(/);
         expect(STAFF).toContain('audit(');
     });
+
+    test('运维脚本 set-role 取的是第三个参数，不是 create 的 roleArg', () => {
+        // 踩过：写成 roleArg（create 的第五个参数），set-role 永远拿到 undefined，
+        // 静默走进「角色只能是 …」分支 —— 改一个角色改不动，还看不出是脚本错了
+        const SCRIPT = read('server/scripts/staff.js');
+        expect(SCRIPT).toContain('const newRole = String(args[2]');
+        expect(SCRIPT).toContain('data: { role: newRole');
+    });
 });
 
 describe('业务端点不让 support 碰', () => {
