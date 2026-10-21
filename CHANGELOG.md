@@ -129,16 +129,20 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 `site-filing.test.js` 的「公安号未下发不许出现假号」组断言翻转为「已下发逐字核对」——
 改号的人动到链接、图标或 rel 任何一个，测试指名到行。
 
-**修复：生产验证码邮件发不出去（SMTP 强制走 IPv4）。** 线上 `smtp.qq.com` 在这台腾讯云机上
-**只解析出 AAAA（IPv6）记录**（`2402:4e00:…`）而本机 IPv6 不可达；Node 22 按 DNS 原序取址，
-先试 IPv6 得到 `ENETUNREACH` 之后**不会回退到 IPv4** —— 结果就是验证码发不出去，而 host /
-账号 / 授权码 / 端口全都正确，后端日志也不报错，用户侧只表现为「点了发送没反应」。
-实测：默认配置 `verify()` 失败（`connect ENETUNREACH 2402:4e00:…:587`），加 `family: 4`
-后立刻 `IPV4_VERIFY_OK`。
+**修复：生产验证码邮件发不出去（587 端口错配隐式 TLS）。** 根因是生产 `.env` 的
+`SMTP_SECURE=true` 配了 **587** 端口：587 是 STARTTLS 端口（先明文建连再升级），
+`secure:true` 却让客户端一建连就发起 TLS 握手，撞上服务器回的明文问候而报
+`wrong version number`。更麻烦的是它**先**撞上本机 IPv6 不可达（`smtp.qq.com` 解析出的
+AAAA 地址连不通），错误被伪装成 `ENETUNREACH` —— 两个问题叠在一起，日志里只看得到网络
+故障，配置错误被完全盖住，而 host / 账号 / 授权码 / 端口全都「看着是对的」。
+四组对照实测：587+STARTTLS ✅、465+SSL ✅、587+隐式TLS ❌。
 
-修复只钉 SMTP 这一处 —— 没有用 `dns.setDefaultResultOrder` 改全局解析顺序，那会连带影响
-数据库连接。新增一条断言：`family: 4` 若被当成多余配置删掉，注册与找回密码会一起断在这里，
-且从代码到日志都看不出原因。
+⚠️ 中途曾把根因误判为「IPv6 不可达需强制 IPv4」，据此加过 `family: 4` 并写过记述。
+四组对照证明 `family: 4` 并不稳定生效（同配置时通时不通），而**用域名 + 正确的 STARTTLS
+即可连通** —— IPv6 不是障碍。已回滚 `family: 4`，改按真实根因修：① 代码在 587 下强制按
+STARTTLS 处理并告警（不信任被改错的配置），且 `requireTLS: true` —— 不加密发授权码等于
+明文泄漏；② 生产 `.env` 的 `SMTP_SECURE` 改 false。模板 `.env.example` 本是 465+true 的
+自洽组合，无需改动。
 
 **PWA 不再开独立窗口（`display: standalone` → `browser`）。** 产品口径是：所有内容与
 弹窗都在浏览器网页内呈现，不允许跳出 PWA 窗口。这一项精确对应 `manifest.json` 的

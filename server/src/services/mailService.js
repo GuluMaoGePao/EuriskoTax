@@ -33,21 +33,28 @@ function getTransporter() {
     }
     if (!transporter) {
         const port = parseInt(process.env.SMTP_PORT) || 465;
-        // 465 走 SSL 直连，587 走 STARTTLS
-        const secure = process.env.SMTP_SECURE
+        // 465 走 SSL 直连，587 走 STARTTLS（先明文连上再升级）
+        let secure = process.env.SMTP_SECURE
             ? process.env.SMTP_SECURE === 'true'
             : port === 465;
+
+        // 587 + secure:true 是**错误组合**，这里直接纠正，不信任配置：
+        // 隐式 TLS 会在 TCP 建连后立刻发起握手，而 587 端口回的是明文 SMTP 问候，
+        // 于是报 "wrong version number"；若机器同时 IPv6 不可达，它还会先伪装成
+        // ENETUNREACH —— 两个问题叠在一起，日志里只看到网络错误，配置错误被完全盖住
+        // （2026-10-21 线上实测：四组对照里只有 587+STARTTLS 与 465+SSL 能通过）。
+        // 生产 .env 的 SMTP_SECURE 也应改为 false，这里只是防止它被改回去。
+        if (secure && port === 587) {
+            console.warn('[mail] SMTP_SECURE=true 与 587 端口冲突（587 走 STARTTLS），已按 STARTTLS 处理');
+            secure = false;
+        }
+
         transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST,
             port,
             secure,
-            // 强制走 IPv4。腾讯云这台机解析 smtp.qq.com 只拿到 AAAA（IPv6）记录，
-            // 而本机 IPv6 不可达；Node 22 默认按 DNS 原序取址，会先试 IPv6 并以
-            // ENETUNREACH 失败，且**不会自动回退到 IPv4** —— 表现是线上验证码发不出去，
-            // 而代码、账号、授权码全都看不出问题（2026-10-21 实测：加 family:4 后立刻连通）。
-            // 只钉 SMTP 这一处，不用 dns.setDefaultResultOrder 改全局解析顺序 ——
-            // 那会连带影响数据库等其它连接。
-            family: 4,
+            // 587 下强制要求 STARTTLS：不加密就发授权码等于明文泄漏
+            requireTLS: !secure,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
