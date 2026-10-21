@@ -25,15 +25,8 @@ const register = async (req, res, next) => {
             });
         }
 
-        if (!inviteCode) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    message: 'Invite code is required',
-                    statusCode: 400
-                }
-            });
-        }
+        // v1.144.0：邀请码改为选填 —— 不填即跳过校验与消耗（门槛交给邮箱验证码承担）。
+        // 前端未填时会传空串/null，这里不做必填拦截。
 
         if (!verificationCode) {
             return res.status(400).json({
@@ -48,15 +41,22 @@ const register = async (req, res, next) => {
         // 先查重（在消耗一次性验证码之前），已注册账号给出明确提示，避免浪费验证码
         await authService.checkDuplicate(username, email);
 
+        // 邀请码先校验再消耗验证码（v1.144.0）：
+        // 顺序反了会出现"验证码正确、邀请码无效 → 码已被吞，用户得重新收一封邮件"。
+        // 邀请码是纯查库、无副作用，放在前面最省事，且失败时不碰验证码。
+        await authService.checkInviteCode(inviteCode);
+
         // 邮箱验证码校验（一次性使用，校验通过即作废）
         await verificationService.verifyRegisterCode(email, verificationCode);
 
-        // 注册 + 一机一码邀请码在事务内原子消耗
+        // 注册 + 邀请码在事务内原子消耗
         const user = await authService.registerUser(username, email, password, phone, inviteCode);
 
+        // v1.144.0 闭环点①：注册成功直接签发令牌，用户不必再回到登录页输一遍密码。
+        // 邮箱验证码已经证明"这个邮箱是他的"，再让他登录一次只是把刚走完的流程走第二遍。
         res.status(201).json({
             success: true,
-            data: user
+            data: { token: authService.signTokenForUser(user), user }
         });
     } catch (err) {
         next(err);
@@ -94,7 +94,8 @@ const sendCode = async (req, res, next) => {
 
 const login = async (req, res, next) => {
     try {
-        // 字段名沿用 email（兼容既有客户端），取值允许是「邮箱 或 用户名」
+        // v1.144.0：登录凭据收敛为邮箱唯一（详见 authService.loginUser 的注释）。
+        // 字段名沿用 email（兼容既有客户端），但**只接受邮箱** —— 非邮箱格式由 service 直接 401。
         const { email, password } = req.body;
         const account = typeof email === 'string' ? email.trim() : '';
         
@@ -234,6 +235,22 @@ const updateProfile = async (req, res, next) => {
     }
 };
 
+// 退出登录（v1.144.0 闭环点③）：把登录态版本号推高，使该用户此前签发的全部 JWT 失效。
+// 旧行为只有前端清 localStorage —— token 一旦被复制出去，7 天内照样能调通所有接口。
+// 端点本身是"通知服务端"的语义：成功与否前端都会清本地（离线/后端挂了也要能退出）。
+const logout = async (req, res, next) => {
+    try {
+        const result = await authService.logout(req.user.id);
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 const verifyPassword = async (req, res, next) => {
     try {
         const { currentPassword } = req.body;
@@ -348,6 +365,7 @@ module.exports = {
     register,
     sendCode,
     login,
+    logout,
     profile,
     claimTrial,
     updateProfile,

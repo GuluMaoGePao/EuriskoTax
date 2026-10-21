@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.143.0';
+        window.__APP_VERSION__ = '1.144.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -181,22 +181,28 @@
                     </button>
                 </div>
 
-                <!-- 登录表单 -->
-                <form id="login-form" class="auth-form">
-                    <div class="auth-field">
-                        <label for="login-email" class="label">邮箱或用户名</label>
-                        <div class="relative">
-                            <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="text" id="login-email" class="input-field pl-10" placeholder="请输入邮箱或用户名" autocomplete="username">
-                        </div>
+                <!-- 登录表单（v1.144.0：登录凭据收敛为邮箱唯一） -->
+                <form id="login-form" class="auth-form" novalidate>
+                    <div class="auth-form__head">
+                        <h2 class="auth-form__title">登录账号</h2>
+                        <p class="auth-form__sub">使用注册邮箱登录</p>
                     </div>
                     <div class="auth-field">
-                        <label for="login-password" class="label">密码</label>
+                        <label for="login-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
+                        <div class="relative">
+                            <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                            <input type="email" id="login-email" class="input-field pl-10" placeholder="name@example.com" autocomplete="email" required>
+                        </div>
+                        <p id="login-email-error" class="field-error hidden" role="alert"></p>
+                    </div>
+                    <div class="auth-field">
+                        <label for="login-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="password" id="login-password" class="input-field pl-10 pr-10" placeholder="请输入密码">
+                            <input type="password" id="login-password" class="input-field pl-10 pr-10" placeholder="请输入密码" autocomplete="current-password" required>
                             <i id="login-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                         </div>
+                        <p id="login-password-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div class="auth-form__aux">
                         <label class="inline-flex items-center cursor-pointer select-none" title="勾选后，登录状态将在本机保持；未勾选则关闭浏览器后自动退出登录">
@@ -210,14 +216,18 @@
                     </button>
                 </form>
 
-                <!-- 注册表单 -->
-                <form id="register-form" class="auth-form hidden">
+                <!-- 注册表单（v1.144.0：邀请码改选填；注册成功直接登录） -->
+                <form id="register-form" class="auth-form hidden" novalidate>
+                    <div class="auth-form__head">
+                        <h2 class="auth-form__title">注册账号</h2>
+                        <p class="auth-form__sub">注册成功后自动登录</p>
+                    </div>
                     <div class="auth-grid-2">
                         <div class="auth-field">
                             <label for="register-username" class="label">用户名<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-user absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="register-username" class="input-field pl-10" placeholder="请输入用户名" autocomplete="username">
+                                <input type="text" id="register-username" class="input-field pl-10" placeholder="2-20 位字符" autocomplete="username" required>
                             </div>
                             <p id="register-username-error" class="field-error hidden" role="alert"></p>
                         </div>
@@ -225,7 +235,7 @@
                             <label for="register-email" class="label">邮箱<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="email" id="register-email" class="input-field pl-10" placeholder="请输入邮箱" autocomplete="email">
+                                <input type="email" id="register-email" class="input-field pl-10" placeholder="name@example.com" autocomplete="email" required>
                             </div>
                             <p id="register-email-error" class="field-error hidden" role="alert"></p>
                         </div>
@@ -235,7 +245,7 @@
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric">
+                                <input type="text" id="register-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric" required>
                             </div>
                             <button type="button" id="send-code-btn" class="btn auth-btn-outline whitespace-nowrap" disabled>
                                 发送验证码
@@ -246,22 +256,25 @@
                     </div>
                     <div class="auth-grid-2">
                         <div class="auth-field">
-                            <label for="register-phone" class="label">联系手机号（选填）</label>
+                            <label for="register-phone" class="label">联系手机号<span class="label-optional">选填</span></label>
                             <div class="relative">
                                 <i class="fa fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="tel" id="register-phone" class="input-field pl-10" placeholder="选填，用于顾问回电" autocomplete="tel">
                             </div>
                             <p id="register-phone-error" class="field-error hidden" role="alert"></p>
-                            <p class="text-xs text-gray-500 mt-1">仅用于顾问回电，不用于登录</p>
                         </div>
+                        <!-- 邀请码（v1.144.0）：必填 → 选填 —— 公测期一码一码本意是控量，实际
+                             把"没听说过邀请码的普通人"挡在门外；邮箱验证码已证明身份，
+                             邀请码只剩"谁带来的"这一层，不该是注册门槛。
+                             页面上只留「选填」二字 + 一句给用户的话（未受邀可不填）；
+                             「填了才校验」「一码一用」是实现与运营口径，不往用户眼前摆。 -->
                         <div class="auth-field">
-                            <label for="register-invite-code" class="label">邀请码<i class="req-star" aria-hidden="true">*</i></label>
+                            <label for="register-invite-code" class="label">邀请码<span class="label-optional">选填</span></label>
                             <div class="relative">
                                 <i class="fa fa-gift absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="公测期邀请码（一码一用）" autocomplete="off">
+                                <input type="text" id="register-invite-code" class="input-field pl-10" placeholder="未受邀可不填" autocomplete="off">
                             </div>
                             <p id="register-invite-code-error" class="field-error hidden" role="alert"></p>
-                            <p class="text-xs text-gray-500 mt-1">每个邀请码仅限注册一个账号，请通过开发者获取</p>
                         </div>
                     </div>
                     <div class="auth-grid-2">
@@ -269,7 +282,7 @@
                             <label for="register-password" class="label">密码<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="至少 6 位" autocomplete="new-password">
+                                <input type="password" id="register-password" class="input-field pl-10 pr-10" placeholder="至少 6 位" autocomplete="new-password" required>
                                 <i id="register-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                             </div>
                             <p id="register-password-error" class="field-error hidden" role="alert"></p>
@@ -283,7 +296,7 @@
                             <label for="register-confirm-password" class="label">确认密码<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码" autocomplete="new-password">
+                                <input type="password" id="register-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入密码" autocomplete="new-password" required>
                                 <i id="register-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                             </div>
                             <p id="register-confirm-password-error" class="field-error hidden" role="alert"></p>
@@ -306,54 +319,58 @@
                     </button>
                 </form>
 
-                <!-- 重置密码面板（忘记密码自助找回：验证邮箱 → 设置新密码） -->
+                <!-- 重置密码面板（v1.144.0：忘记密码自助找回 → 重置后直接登录） -->
                 <div id="reset-password-form" class="auth-form hidden">
-                    <div class="flex items-center justify-between mb-1">
-                        <h3 class="text-base font-semibold text-gray-800">
-                            <i class="fa fa-key text-primary mr-2"></i>重置密码
-                        </h3>
-                        <button type="button" id="reset-back-to-login" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
-                            <i class="fa fa-arrow-left mr-1"></i>返回登录
-                        </button>
+                    <div class="auth-form__head">
+                        <div class="flex items-center justify-between">
+                            <h2 class="auth-form__title">
+                                <i class="fa fa-key text-primary mr-2"></i>重置密码
+                            </h2>
+                            <button type="button" id="reset-back-to-login" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+                                <i class="fa fa-arrow-left mr-1"></i>返回登录
+                            </button>
+                        </div>
+                        <p class="auth-form__sub">通过邮箱验证码设置新密码，10 分钟内有效</p>
                     </div>
-                    <p class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">
-                        输入注册邮箱获取验证码，验证通过后即可设置新密码。验证码 10 分钟内有效。
-                    </p>
                     <div class="auth-field">
-                        <label for="reset-email" class="label">注册邮箱</label>
+                        <label for="reset-email" class="label">注册邮箱<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="relative">
                             <i class="fa fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                            <input type="email" id="reset-email" class="input-field pl-10" placeholder="请输入注册邮箱" autocomplete="email">
+                            <input type="email" id="reset-email" class="input-field pl-10" placeholder="name@example.com" autocomplete="email" required>
                         </div>
+                        <p id="reset-email-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div class="auth-field">
-                        <label for="reset-code" class="label">邮箱验证码</label>
+                        <label for="reset-code" class="label">邮箱验证码<i class="req-star" aria-hidden="true">*</i></label>
                         <div class="flex space-x-2">
                             <div class="relative flex-1">
                                 <i class="fa fa-shield absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric">
+                                <input type="text" id="reset-code" class="input-field pl-10" placeholder="6 位验证码" maxlength="6" autocomplete="off" inputmode="numeric" required>
                             </div>
                             <button type="button" id="reset-send-code-btn" class="btn auth-btn-outline whitespace-nowrap" disabled>
                                 发送验证码
                             </button>
                         </div>
+                        <p id="reset-code-error" class="field-error hidden" role="alert"></p>
                     </div>
                     <div class="auth-grid-2">
                         <div class="auth-field">
-                            <label for="reset-new-password" class="label">新密码</label>
+                            <label for="reset-new-password" class="label">新密码<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="请输入新密码（至少 6 位）" autocomplete="new-password">
+                                <input type="password" id="reset-new-password" class="input-field pl-10 pr-10" placeholder="至少 6 位" autocomplete="new-password" required>
                                 <i id="reset-new-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                             </div>
+                            <p id="reset-new-password-error" class="field-error hidden" role="alert"></p>
                         </div>
                         <div class="auth-field">
-                            <label for="reset-confirm-password" class="label">确认新密码</label>
+                            <label for="reset-confirm-password" class="label">确认新密码<i class="req-star" aria-hidden="true">*</i></label>
                             <div class="relative">
                                 <i class="fa fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码" autocomplete="new-password">
+                                <input type="password" id="reset-confirm-password" class="input-field pl-10 pr-10" placeholder="请再次输入新密码" autocomplete="new-password" required>
                                 <i id="reset-confirm-password-toggle" class="fa fa-eye absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"></i>
                             </div>
+                            <p id="reset-confirm-password-error" class="field-error hidden" role="alert"></p>
                         </div>
                     </div>
                     <button type="button" id="reset-submit" class="btn btn-primary auth-submit">
@@ -1691,7 +1708,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.143.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.144.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2473,7 +2490,7 @@
                                 <i class="fa fa-save mr-1"></i>保存
                             </button>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1.5">保存后立即生效，无需提交整个页面；仅作联系方式，不用于登录（登录请用邮箱或用户名）</p>
+                        <p class="text-xs text-gray-500 mt-1.5">仅作联系方式，不用于登录</p>
                     </div>
                 </div>
                 <!-- v1.136.0：退出登录从顶栏用户菜单迁到这里 —— 手机端顶栏整体隐藏

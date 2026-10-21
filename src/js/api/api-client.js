@@ -62,20 +62,23 @@ const ERROR_MESSAGE_MAP = {
     'Username, email and password are required': '请填写用户名、邮箱和密码',
     'Email and password are required': '请填写账号和密码',
     'Username or email already exists': '用户名或邮箱已被注册',
-    // v1.118.0：登录标识支持邮箱或用户名，错误提示不再单指邮箱
-    'Invalid account or password': '账号或密码错误，请检查邮箱/用户名与密码',
-    'Invalid email or password': '账号或密码错误，请检查邮箱/用户名与密码',
+    // v1.118.0 遗留：老后端（1.118~1.143）的登录错误串，保留映射以兼容旧服务端
+    'Invalid account or password': '账号或密码错误，请检查邮箱与密码',
+    // v1.144.0：登录凭据收敛为邮箱唯一，错误串跟着改成 Invalid email or password
+    'Invalid email or password': '邮箱或密码错误，请重新输入',
     'Invalid invite code. Public beta requires an invite code.': '邀请码无效，公测期注册需要有效邀请码',
     'Invite code is required': '请填写邀请码',
-    'Invite code not found': '邀请码无效，请向开发者获取',
-    'Invite code already used': '该邀请码已被使用，每个邀请码仅可注册一个账号',
+    // 「请向开发者获取」是内部口吻（而且邀请码已改选填，用户填了说明他本来就有码，只是填错了）
+    'Invite code not found': '邀请码无效，请检查后重试，或留空直接注册',
+    'Invite code already used': '该邀请码已被使用，请换一个或留空直接注册',
     'Email already registered. Please login directly': '该邮箱已注册，请直接登录',
     'Username already taken': '用户名已被占用，请换一个',
     'Verification code is required': '请填写邮箱验证码',
     'Email is required': '请填写邮箱',
     'Invalid email format': '邮箱格式不正确',
     'Code resend too frequent. Please wait a moment': '验证码发送过于频繁，请稍后再试',
-    'SMTP mail is not configured': '邮件服务未配置，请联系开发者',
+    // 「未配置」是部署侧的问题，用户既看不懂也帮不上 —— 只说结果与下一步
+    'SMTP mail is not configured': '邮件服务暂时不可用，请稍后再试',
     'Verification code not found. Please request a new one': '请先获取验证码',
     'Verification code expired. Please request a new one': '验证码已过期，请重新获取',
     'Too many attempts. Please request a new code': '错误次数过多，验证码已失效，请重新获取',
@@ -157,8 +160,13 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
 
     if (!result.success) {
         const errorMessage = result.error?.message || '';
-        // Token 过期或无效时，清理登录状态并刷新页面回到登录页
-        if (errorMessage === 'Token expired' || errorMessage === 'Token invalid' || errorMessage === 'Token expired or invalid' || errorMessage === 'Access token is missing' || errorMessage === 'Invalid token') {
+        // v1.144.0：会话失效统一按 **HTTP 401 状态码**判定，不再枚举后端错误文案。
+        // 旧写法列了 'Token expired' / 'Token invalid' / 'Access token is missing' 等六个字符串，
+        // 后端改一个词、或新增一处 401（如 token_version 校验不通过）就静默漏判 ——
+        // 用户看到的是「点了没反应」，而不是回到登录页重新登录。
+        // 唯一例外是登录接口自身：那里的 401 是「这次没登上去」，不是「会话失效」，
+        // 清掉本地会话会误伤（用户可能正拿着另一个账号在试）。
+        if (response.status === 401 && url !== '/auth/login') {
             removeAuthToken();
             removeCurrentUser();
             window.location.reload();
@@ -173,8 +181,10 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     return result.data;
 }
 
-async function registerUser(username, email, password, phone = null, inviteCode = null, verificationCode = null) {
-    return await apiRequest('/auth/register', 'POST', {
+// v1.144.0：注册成功服务端直接签令牌（data = { token, user }），这里与登录同样落会话 ——
+// 表单已经走完邮箱验证码，再让用户回登录页输一遍密码是把刚走完的流程走第二遍。
+async function registerUser(username, email, password, phone = null, inviteCode = null, verificationCode = null, remember = true) {
+    const result = await apiRequest('/auth/register', 'POST', {
         username,
         email,
         password,
@@ -182,6 +192,11 @@ async function registerUser(username, email, password, phone = null, inviteCode 
         inviteCode,
         verificationCode
     });
+    if (result && result.token) {
+        setAuthToken(result.token, remember);
+        setCurrentUser(result.user, remember);
+    }
+    return result;
 }
 
 // 发送注册验证码到邮箱
@@ -194,17 +209,25 @@ async function sendResetCode(email) {
     return await apiRequest('/auth/send-reset-code', 'POST', { email });
 }
 
-// 忘记密码：校验重置验证码后设置新密码
-async function resetPassword(email, verificationCode, newPassword) {
-    return await apiRequest('/auth/reset-password', 'POST', {
+// 忘记密码：校验重置验证码后设置新密码。
+// v1.144.0：服务端同时把旧 token 作废并签发新令牌（data = { token, user }），
+// 这里直接落会话 —— 邮箱验证码已证明归属，重置完还要再登录一次是多余的断口。
+async function resetPassword(email, verificationCode, newPassword, remember = true) {
+    const result = await apiRequest('/auth/reset-password', 'POST', {
         email,
         verificationCode,
         newPassword
     });
+    if (result && result.token) {
+        setAuthToken(result.token, remember);
+        setCurrentUser(result.user, remember);
+    }
+    return result;
 }
 
 // remember = true → token 存 localStorage（勾选"保持登录状态"），false → sessionStorage（关闭浏览器即失效）
-// account：邮箱 或 用户名（后端按形态自动识别；字段名沿用 email 以兼容既有客户端）
+// v1.144.0：account 必须是**注册邮箱**（后端已不再接受用户名，非邮箱格式直接 401）；
+// 字段名沿用 email 以兼容既有客户端。
 async function loginUser(account, password, remember = true) {
     const result = await apiRequest('/auth/login', 'POST', {
         email: account,
@@ -217,7 +240,17 @@ async function loginUser(account, password, remember = true) {
     return result;
 }
 
+// v1.144.0 闭环点③：退出先通知服务端（token_version 自增 → 已签发的全部 JWT 失效），
+// 再清本地。服务端调用失败**不阻断退出**：离线 / 后端不可用时也要能退出，
+// 本地清理才是"退出"这件事本身，服务端那一步只是"让别处的会话也下线"。
 async function logoutUser() {
+    if (isLoggedIn()) {
+        try {
+            await apiRequest('/auth/logout', 'POST', {}, true);
+        } catch (e) {
+            // 服务端吊销失败不阻断本地退出
+        }
+    }
     removeAuthToken();
     removeCurrentUser();
 }
@@ -245,8 +278,15 @@ async function getProfile() {
 async function updateProfile(data) {
     const result = await apiRequest('/auth/profile', 'PUT', data, true);
     // PUT 返回体不含 plan 等版本字段：整包覆盖会丢失本地会话的档位信息，改为字段合并保留
+    const { token: rotatedToken, ...userFields } = result || {};
     const prev = getCurrentUser() || {};
-    setCurrentUser({ ...prev, ...result });
+    setCurrentUser({ ...prev, ...userFields });
+    // v1.144.0：改密码时服务端推高 token_version 并回一个新令牌 —— 不换掉本地的，
+    // 下一次请求就会因版本不匹配被 401 踢下线（本人这台设备不该被自己改密码踢出去）。
+    // 存储策略跟随现状：token 当前在 localStorage 就继续持久化，在 sessionStorage 就继续会话级。
+    if (rotatedToken) {
+        setAuthToken(rotatedToken, localStorage.getItem('auth_token') !== null);
+    }
     return result;
 }
 

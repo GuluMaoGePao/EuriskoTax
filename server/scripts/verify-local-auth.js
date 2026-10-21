@@ -134,6 +134,15 @@ function extractCodeFromLog(log, email) {
     return m ? m[1] : null;
 }
 
+// 同一个邮箱会被发两次验证码（注册一次、重置一次），取**最后一次**；
+// extractCodeFromLog 取首次，重置那段再用它会拿到已被消费的注册码。
+function extractLastCodeFromLog(log, email) {
+    const idx = log.lastIndexOf(email);
+    if (idx === -1) return null;
+    const m = log.slice(idx).match(/验证码\s*:\s*(\d{6})/);
+    return m ? m[1] : null;
+}
+
 // Feedback.attachments 在库中是 JSON 字符串（服务端写入时 JSON.stringify），
 // 用户端 / 管理员端接口按库中原样返回，断言前统一解析成数组
 function parseAttachments(raw) {
@@ -2341,8 +2350,15 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
                     phone: null, inviteCode: invite.code, verificationCode: code,
                 },
             });
-            tmpUserId = reg.body && reg.body.data && reg.body.data.id || null;
+            // v1.144.0：注册响应由 user 改为 { token, user } —— 取 id 要往下一层；
+            // 写成 data.id 会静默拿到 undefined，后面两条断言（新号登录 / 身份校验）整段跳过，
+            // 门禁总数悄悄少两项还全绿（本版就是这么掉到 257 的）。
+            const regData = (reg.body && reg.body.data) || {};
+            const regUser = regData.user || regData;
+            tmpUserId = regUser.id || null;
             record('POST /register 注册新号（验证码+邀请码）', reg.status === 201, `HTTP ${reg.status}`);
+            // 闭环点①：注册成功必须直接签令牌，否则前端还得让用户再输一遍密码
+            record('注册即登录：响应带回 token', !!regData.token, regData.token ? 'token 已签发' : 'data.token 缺失');
 
             if (tmpUserId) {
                 const login2 = await request(PORT, 'POST', '/api/auth/login', { json: { email: newEmail, password: newPassword } });
@@ -2352,6 +2368,38 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
                 if (t2) {
                     const p2 = await request(PORT, 'GET', '/api/auth/profile', { token: t2 });
                     record('新号身份校验', p2.status === 200 && p2.body.data.username === newUsername, `HTTP ${p2.status}`);
+
+                    // === 登录闭环（v1.144.0）：改密 / 退出必须让已签发的 token 立即失效 ===
+                    // 这三条形同废话，但旧行为恰好全是反的：重置密码后旧会话还能用满 7 天，
+                    // 退出只清了本浏览器 localStorage。JWT 无状态收不回，靠的是 token_version。
+                    const resetSend = await request(PORT, 'POST', '/api/auth/send-reset-code', { json: { email: newEmail } });
+                    record('POST /send-reset-code 发送重置验证码', resetSend.status === 200, `HTTP ${resetSend.status}`);
+
+                    let resetCode = null;
+                    for (let i = 0; i < 20 && !resetCode; i++) {
+                        resetCode = extractLastCodeFromLog(serverLog, newEmail);
+                        if (!resetCode) await sleep(300);
+                    }
+                    record('截取到重置验证码', !!resetCode, resetCode ? `code=${resetCode}` : '（未见 [开发模式] 验证码打印）');
+
+                    if (resetCode) {
+                        const rp = await request(PORT, 'POST', '/api/auth/reset-password', {
+                            json: { email: newEmail, verificationCode: resetCode, newPassword: `${newPassword}_new` }
+                        });
+                        const rpToken = rp.body && rp.body.data && rp.body.data.token;
+                        record('POST /reset-password 重置成功并回新 token', rp.status === 200 && !!rpToken, `HTTP ${rp.status}`);
+
+                        const stale = await request(PORT, 'GET', '/api/auth/profile', { token: t2 });
+                        record('重置后旧 token 立即失效(401)', stale.status === 401, `HTTP ${stale.status}`);
+
+                        if (rpToken) {
+                            const lo = await request(PORT, 'POST', '/api/auth/logout', { token: rpToken });
+                            record('POST /auth/logout 退出成功', lo.status === 200, `HTTP ${lo.status}`);
+
+                            const after = await request(PORT, 'GET', '/api/auth/profile', { token: rpToken });
+                            record('退出后该 token 立即失效(401)', after.status === 401, `HTTP ${after.status}`);
+                        }
+                    }
                 }
             }
         }

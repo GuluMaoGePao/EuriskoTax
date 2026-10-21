@@ -17,6 +17,11 @@ model User {
   plan            String    @default("free")
   plan_expires_at DateTime? // null = 永久
   pro_granted_by  String?   // 授权来源："seed" | "invite" | "admin" | "purchase"
+  // 登录态版本号（v1.144.0）：改密 / 重置密码 / 退出登录时 +1。
+  // JWT payload 带 tv，中间件与库里的值比对，不一致即 401 —— 这是不上 Redis、
+  // 不引 Refresh Token 就能「立即吊销已签发 JWT」的最轻方案。
+  // 存量行默认 0，老 token（无 tv 声明）按「未启用」放行，见 middleware/auth.js。
+  token_version   Int       @default(0)
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 

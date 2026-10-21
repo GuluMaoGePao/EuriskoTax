@@ -119,13 +119,28 @@ function triggerContentSync() {
 }
 
 async function handleLogin() {
-    // 登录标识：邮箱 或 用户名（后端按形态识别，前端不做格式约束，避免挡住纯用户名账号）
+    // v1.144.0：登录凭据收敛为**邮箱唯一**。输入框 type=email 也会做一遍格式校验，
+    // 这里再加一道是为了让错误红字挂在本字段（不弹全局 alert，符合其它字段的体验）。
     const account = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const btn = document.getElementById('login-submit');
-    
-    if (!account || !password) {
-        showAlert('请输入邮箱或用户名、密码');
+
+    clearLoginFieldErrors();
+    let firstInvalid = null;
+    if (!account) {
+        showLoginFieldError('login-email', '请输入邮箱');
+        firstInvalid = 'login-email';
+    } else if (!EMAIL_PATTERN.test(account)) {
+        showLoginFieldError('login-email', '请输入正确的邮箱格式');
+        firstInvalid = 'login-email';
+    }
+    if (!password) {
+        showLoginFieldError('login-password', '请输入密码');
+        if (!firstInvalid) firstInvalid = 'login-password';
+    }
+    if (firstInvalid) {
+        const target = document.getElementById(firstInvalid);
+        if (target) target.focus();
         return;
     }
     
@@ -154,10 +169,45 @@ async function handleLogin() {
             window.EuriskoIdentityOnboarding.maybeOpenAfterLogin();
         }
     } catch (error) {
+        // 401 走的是后端错误（密码错 / 账号错），不再清会话（apiRequest 也不清）
         showAlert(error.message);
     } finally {
         setLoading(btn, false);
     }
+}
+
+// 邮箱格式口径：登录 / 注册发码 / 重置发码与提交四处共用一份。
+// 原先每处各写一遍内联正则，改一处忘一处就出现「注册拦得住、重置拦不住」。
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// 登录字段级红字提示（与注册共用一套样式：field-error + label-danger）
+function showLoginFieldError(fieldId, message) {
+    const errorEl = document.getElementById(fieldId + '-error');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    }
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.add('input-error');
+    const label = document.querySelector(`label[for="${fieldId}"]`);
+    if (label) label.classList.add('label-danger');
+    return !!errorEl;
+}
+
+function clearLoginFieldError(fieldId) {
+    const errorEl = document.getElementById(fieldId + '-error');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.remove('input-error');
+    const label = document.querySelector(`label[for="${fieldId}"]`);
+    if (label) label.classList.remove('label-danger');
+}
+
+function clearLoginFieldErrors() {
+    ['login-email', 'login-password'].forEach(clearLoginFieldError);
 }
 
 // === 注册表单字段级校验：必填项未填写时红字标注，填写后自动消除 ===
@@ -248,14 +298,14 @@ async function handleRegister() {
 
     clearAllRegisterFieldErrors();
 
-    // 必填项未填写：就地红字标注对应字段，填写后自动消除
+    // 必填项未填写：就地红字标注对应字段，填写后自动消除。
+    // v1.144.0：邀请码已改为**选填**，不在这份清单里（公测期门槛撤掉，未受邀也能注册）。
     const requiredChecks = [
         { fieldId: 'register-username', filled: !!username, message: '请输入用户名' },
         { fieldId: 'register-email', filled: !!email, message: '请输入邮箱' },
         { fieldId: 'register-code', filled: !!verificationCode, message: '请输入邮箱验证码' },
         { fieldId: 'register-password', filled: !!password, message: '请输入密码' },
-        { fieldId: 'register-confirm-password', filled: !!confirmPassword, message: '请再次输入密码' },
-        { fieldId: 'register-invite-code', filled: !!inviteCode, message: '请输入邀请码' }
+        { fieldId: 'register-confirm-password', filled: !!confirmPassword, message: '请再次输入密码' }
     ];
     let firstInvalidId = null;
     const fallbackMessages = [];
@@ -302,10 +352,11 @@ async function handleRegister() {
 
     try {
         setLoading(btn, true);
-        await apiClient.registerUser(username, email, password, phone || null, inviteCode, verificationCode);
-        // 回到登录并预填邮箱
-        switchAuthTab('login');
-        document.getElementById('login-email').value = email;
+        // v1.144.0 闭环点①：注册成功服务端直接签令牌，apiClient.registerUser 已落会话 ——
+        // 表单走完邮箱验证码才到这一步，再让用户回登录页输一遍密码是把流程走第二遍。
+        await apiClient.registerUser(username, email, password, phone || null, inviteCode || null, verificationCode);
+
+        // 清空表单（下次打开注册面板是干净的），不再切回登录页
         document.getElementById('register-username').value = '';
         document.getElementById('register-email').value = '';
         document.getElementById('register-phone').value = '';
@@ -316,9 +367,20 @@ async function handleRegister() {
         registerCodeSentEmail = '';
         if (agreeEl) agreeEl.checked = false;
         clearAllRegisterFieldErrors();
-        showAlert('注册成功，请登录（注册邮箱已自动填入）', 'success', () => {
-            document.getElementById('login-email').focus();
-        });
+
+        // 与 handleLogin 成功路径保持同一套后续动作：清历史 → 摘游客标记 → 刷 UI → 云同步 → 内容同步
+        clearPageHistory();
+        exitGuestSession();
+        updateAuthUI();
+        if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
+            window.EuriskoSync.afterLogin(apiClient.getCurrentUser());
+        }
+        triggerContentSync();
+        // 「我是谁」引导：注册是给出身份的最佳时机（v1.139.0 起登录后只弹一次）
+        if (window.EuriskoIdentityOnboarding && typeof window.EuriskoIdentityOnboarding.maybeOpenAfterLogin === 'function') {
+            window.EuriskoIdentityOnboarding.maybeOpenAfterLogin();
+        }
+        showAlert('注册成功，已为你自动登录', 'success');
     } catch (error) {
         // 已注册邮箱（后端 409）：给出明确提示并引导去登录，而不是让用户干等验证码
         if (error && error.statusCode === 409) {
@@ -370,7 +432,7 @@ async function handleSendCode() {
         return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!EMAIL_PATTERN.test(email)) {
         if (!showRegisterFieldError('register-email', '请输入正确的邮箱格式')) showAlert('请输入正确的邮箱格式');
         document.getElementById('register-email').focus();
         return;
@@ -442,13 +504,29 @@ function updateAuthAgreementText(mode) {
     if (mode === 'register') {
         el.innerHTML = '点击「注册」按钮即表示已阅读并同意' + links;
     } else if (mode === 'reset') {
-        el.innerHTML = '仅已注册邮箱可获取重置验证码；若收不到邮件请检查垃圾箱，或<a href="mailto:2044781167@qq.com" class="underline hover:text-white">联系开发者</a>';
+        // 只留用户当下用得上的话：「联系开发者」+ 个人 QQ 邮箱是内部排障口，
+        // 「仅已注册邮箱可获取」是实现规则 —— 两样都不该出现在用户眼前。
+        el.innerHTML = '收不到验证码请检查垃圾箱，或稍后重新发送';
     } else {
         el.innerHTML = '登录即表示同意' + links;
     }
 }
 
 // === 忘记密码：重置密码面板 ===
+const RESET_FIELD_IDS = ['reset-email', 'reset-code', 'reset-new-password', 'reset-confirm-password'];
+
+function clearAllResetFieldErrors() {
+    RESET_FIELD_IDS.forEach(clearLoginFieldError);
+}
+
+// 重置面板的字段级红字：能标在字段下方就不弹窗 —— 弹窗会盖住表单、
+// 还得再点一次「知道了」才看得到自己哪一栏没填。节点缺失（旧页面）时才退回弹窗。
+function rejectResetField(fieldId, message) {
+    if (!showLoginFieldError(fieldId, message)) showAlert(message);
+    const field = document.getElementById(fieldId);
+    if (field) field.focus();
+}
+
 function isResetPanelOpen() {
     const panel = document.getElementById('reset-password-form');
     return panel && !panel.classList.contains('hidden');
@@ -460,12 +538,14 @@ function showResetPasswordPanel() {
     const registerForm = document.getElementById('register-form');
     if (!panel || !loginForm) return;
     clearAllRegisterFieldErrors();
+    clearAllResetFieldErrors();
 
-    // 复制当前登录邮箱到重置面板，减少输入。登录框现在可能是用户名 ——
-    // 只有形似邮箱才复制，否则会把用户名塞进「接收验证码的邮箱」，白等一封永不到达的邮件。
+    // 复制当前登录邮箱到重置面板，减少输入。
+    // v1.144.0 起登录框只可能是邮箱，但复制前仍判一次格式 —— #login-email 允许被脚本
+    // （如开发环境的「填入测试账号」）塞入任意值，把非邮箱塞进「接收验证码的邮箱」会白等一封永不到达的邮件。
     const loginEmailValue = document.getElementById('login-email')?.value.trim() || '';
     const resetEmail = document.getElementById('reset-email');
-    if (resetEmail && loginEmailValue && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmailValue)) {
+    if (resetEmail && loginEmailValue && EMAIL_PATTERN.test(loginEmailValue)) {
         resetEmail.value = loginEmailValue;
     }
 
@@ -547,12 +627,13 @@ async function handleResetSendCode() {
     const btn = document.getElementById('reset-send-code-btn');
     const codeInput = document.getElementById('reset-code');
 
+    clearAllResetFieldErrors();
     if (!email) {
-        showAlert('请先输入注册邮箱');
+        rejectResetField('reset-email', '请先输入注册邮箱');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showAlert('请输入正确的邮箱格式');
+    if (!EMAIL_PATTERN.test(email)) {
+        rejectResetField('reset-email', '请输入正确的邮箱格式');
         return;
     }
 
@@ -577,35 +658,48 @@ async function handleResetPassword() {
     const confirmPassword = document.getElementById('reset-confirm-password').value;
     const btn = document.getElementById('reset-submit');
 
+    clearAllResetFieldErrors();
     if (!email) {
-        showAlert('请先输入注册邮箱');
+        rejectResetField('reset-email', '请先输入注册邮箱');
+        return;
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+        rejectResetField('reset-email', '请输入正确的邮箱格式');
         return;
     }
     if (!code) {
-        showAlert('请输入邮箱验证码');
+        rejectResetField('reset-code', '请输入邮箱验证码');
         return;
     }
     if (!newPassword || newPassword.length < 6) {
-        showAlert('新密码长度不能少于 6 位');
+        rejectResetField('reset-new-password', '新密码至少 6 位');
         return;
     }
     if (newPassword !== confirmPassword) {
-        showAlert('两次输入的新密码不一致，请重新输入');
+        rejectResetField('reset-confirm-password', '两次输入的新密码不一致');
         return;
     }
 
     try {
         setLoading(btn, true);
+        // v1.144.0 闭环点②：服务端重置成功后签发新令牌（旧 token 已作废），
+        // apiClient.resetPassword 已落会话 —— 邮箱验证码已证明归属，不必再走一遍登录。
         await apiClient.resetPassword(email, code, newPassword);
         // 清理重置面板
         document.getElementById('reset-code').value = '';
         document.getElementById('reset-new-password').value = '';
         document.getElementById('reset-confirm-password').value = '';
-        // 回到登录并自动填入邮箱
-        switchAuthTab('login');
-        document.getElementById('login-email').value = email;
-        document.getElementById('login-email').focus();
-        showAlert('密码重置成功，请使用新密码登录', 'success');
+
+        // 与登录 / 注册成功路径同一套后续动作
+        clearPageHistory();
+        exitGuestSession();
+        closeResetPasswordPanel();
+        updateAuthUI();
+        if (window.EuriskoSync && typeof window.EuriskoSync.afterLogin === 'function') {
+            window.EuriskoSync.afterLogin(apiClient.getCurrentUser());
+        }
+        triggerContentSync();
+        showAlert('密码已重置，已为你自动登录', 'success');
     } catch (error) {
         showAlert(error.message);
     } finally {
@@ -614,7 +708,9 @@ async function handleResetPassword() {
 }
 
 async function handleLogout() {
-    apiClient.logoutUser();
+    // v1.144.0 闭环点③：apiClient.logoutUser 现在是**异步**的 —— 它会先通知服务端
+    // 把 token_version 推高（其它设备上的旧 token 随即失效），服务端不可用也不阻断本地退出。
+    await apiClient.logoutUser();
     clearLocalUserData();
     // 阶段10：云同步引擎登出（停防抖表、清本地同步元数据）
     if (window.EuriskoSync && typeof window.EuriskoSync.afterLogout === 'function') {
@@ -1740,7 +1836,7 @@ async function handleSendProfileCode() {
         showAlert('未获取到绑定邮箱，请稍后重试');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!EMAIL_PATTERN.test(email)) {
         showAlert('绑定邮箱格式异常，请联系客服');
         return;
     }
@@ -1787,7 +1883,9 @@ async function handleChangeProfilePassword() {
         document.getElementById('profile-code').value = '';
         document.getElementById('profile-password').value = '';
         document.getElementById('profile-confirm-password').value = '';
-        showAlert('密码修改成功，下次登录请使用新密码', 'success');
+        // v1.144.0：服务端改密时会推高 token_version 并回一个新令牌（已由 apiClient 落会话），
+        // 所以本人这台设备**不会**掉线，而其它设备上的旧 token 立即失效 —— 提示要照实说。
+        showAlert('密码已修改，其它设备的登录状态已失效', 'success');
     } catch (error) {
         showAlert('修改失败: ' + error.message);
     } finally {
@@ -2392,20 +2490,20 @@ function setupAuthEventListeners() {
     const sendCodeBtn = document.getElementById('send-code-btn');
     if (sendCodeBtn) sendCodeBtn.addEventListener('click', handleSendCode);
     // Enter 键提交（按钮为 type=button，表单无隐式提交，需手动绑定）
-    document.querySelectorAll('#login-form input').forEach(input => {
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleLogin();
-            }
-        });
-    });
-    document.querySelectorAll('#register-form input').forEach(input => {
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleRegister();
-            }
+    // 三个面板共用同一套绑定：回车提交 + 输入即消除本字段红字。
+    [
+        { form: '#login-form', submit: handleLogin, clear: clearLoginFieldError },
+        { form: '#register-form', submit: handleRegister, clear: clearRegisterFieldError },
+        { form: '#reset-password-form', submit: handleResetPassword, clear: clearLoginFieldError }
+    ].forEach(({ form, submit, clear }) => {
+        document.querySelectorAll(`${form} input`).forEach(input => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submit();
+                }
+            });
+            input.addEventListener('input', () => clear(input.id));
         });
     });
     // === 注册表单必填红字提示：填写即消除、空值失焦即标注 ===
@@ -2414,8 +2512,9 @@ function setupAuthEventListeners() {
         'register-email': '请输入邮箱',
         'register-code': '请输入邮箱验证码',
         'register-password': '请输入密码',
-        'register-confirm-password': '请再次输入密码',
-        'register-invite-code': '请输入邀请码'
+        'register-confirm-password': '请再次输入密码'
+        // 邀请码是选填（v1.144.0）—— 放进这张表会让用户点一下空邀请码就被标红
+        // 「请输入邀请码」，等于把刚撤掉的门槛又用红字说了一遍。
     };
     Object.keys(REGISTER_BLUR_ERROR_MESSAGES).forEach(id => {
         const fieldEl = document.getElementById(id);
@@ -2484,14 +2583,8 @@ function setupAuthEventListeners() {
     if (resetSendBtn) resetSendBtn.addEventListener('click', handleResetSendCode);
     const resetSubmit = document.getElementById('reset-submit');
     if (resetSubmit) resetSubmit.addEventListener('click', handleResetPassword);
-    document.querySelectorAll('#reset-password-form input').forEach(input => {
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleResetPassword();
-            }
-        });
-    });
+    // 回车提交与「输入即清红字」由上方的通用绑定循环统一处理（三个面板同一套），
+    // 这里不再重复绑 keydown —— 重复绑会让一次回车触发两次 handleResetPassword。
 
     // R1（阶段20 P0）：顶栏菜单里的 #profile-link 已删（个人中心是目的地不是账号动作，走 Tab「我的」），
     // 绑定同步删除 —— 元素没了还 getElementById().addEventListener 会在初始化时抛错中断后续绑定。

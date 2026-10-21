@@ -49,6 +49,46 @@ const claimTrial = async (userId) => {
     });
 };
 
+// 签发登录令牌：payload 带登录态版本号 tv（中间件据此吊销旧 token）。
+// 抽成独立函数是因为 v1.144.0 起签发点不止登录一处 —— 注册成功同样直接签令牌，
+// 两处必须走同一份 payload 结构，否则一处漏带 tv 就等于那条链路绕过了吊销。
+const signTokenForUser = (user) => jwt.sign(
+    { userId: user.id, tv: user.token_version ?? 0 },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+);
+
+// 登录态版本号 +1 —— 使该用户**此前签发的全部 JWT** 一次性失效。
+// 用于改密码、重置密码、退出登录这三处「必须让旧会话下线」的时刻。
+const bumpTokenVersion = async (userId) => prisma.user.update({
+    where: { id: userId },
+    data: { token_version: { increment: 1 } },
+    select: { id: true, token_version: true }
+});
+
+// 邀请码预检（v1.144.0）：注册事务之前先确认这个码能用。
+// 单独抽出来是为了把「邀请码无效」挡在**验证码被消费之前** —— 邮箱验证码是一次性的，
+// 若先校验验证码、后校验邀请码，邀请码填错的用户就得重新收一封邮件（旧行为的坑）。
+// 邀请码是纯查库、无副作用，放前面最省事；空值直接放行（选填语义）。
+// 事务内仍会再查一次：这里的通过不代表那一刻还没被别人抢走。
+const checkInviteCode = async (inviteCode) => {
+    const code = String(inviteCode || '').trim();
+    if (!code) return null;
+
+    const invite = await prisma.inviteCode.findUnique({ where: { code } });
+    if (!invite) {
+        const error = new Error('Invite code not found');
+        error.statusCode = 403;
+        throw error;
+    }
+    if (invite.used_by !== null) {
+        const error = new Error('Invite code already used');
+        error.statusCode = 403;
+        throw error;
+    }
+    return invite;
+};
+
 // 查重（区分用户名/邮箱，注册前拦截，避免浪费一次性验证码）
 const checkDuplicate = async (username, rawEmail) => {
     const email = normalizeEmail(rawEmail);
@@ -94,18 +134,25 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
                 throw error;
             }
 
-            // 一机一码：码不存在或已被使用均拒绝注册
+            // v1.144.0：邀请码改为**选填**。
+            // 原先必填（公测期一机一码）本意是控量，实际挡住的是"没听说过邀请码的普通人" ——
+            // 他们注册失败后不会去找开发者要码，只会关掉页面。邮箱验证码已经承担了
+            // 「这个邮箱是真的」这一层，邀请码只剩"谁带来的"这一层，那就不该是门槛。
+            // 填了才校验：不存在 / 已用过都拒绝；不填则完全跳过，不占用任何码。
             const code = String(inviteCode || '').trim();
-            const invite = await tx.inviteCode.findUnique({ where: { code } });
-            if (!invite) {
-                const error = new Error('Invite code not found');
-                error.statusCode = 403;
-                throw error;
-            }
-            if (invite.used_by !== null) {
-                const error = new Error('Invite code already used');
-                error.statusCode = 403;
-                throw error;
+            let invite = null;
+            if (code) {
+                invite = await tx.inviteCode.findUnique({ where: { code } });
+                if (!invite) {
+                    const error = new Error('Invite code not found');
+                    error.statusCode = 403;
+                    throw error;
+                }
+                if (invite.used_by !== null) {
+                    const error = new Error('Invite code already used');
+                    error.statusCode = 403;
+                    throw error;
+                }
             }
 
             // 种子期：注册即授予 pro（granted_by="seed"，永久）；收费期该开关关闭后为默认 free
@@ -133,10 +180,13 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
                 }
             });
 
-            await tx.inviteCode.update({
-                where: { id: invite.id },
-                data: { used_by: created.id, used_at: new Date() }
-            });
+            // 只有真的填了邀请码才消耗它（未填时 invite 为 null）
+            if (invite) {
+                await tx.inviteCode.update({
+                    where: { id: invite.id },
+                    data: { used_by: created.id, used_at: new Date() }
+                });
+            }
 
             return created;
         });
@@ -153,22 +203,31 @@ const registerUser = async (username, email, password, phone = null, inviteCode 
     }
 };
 
-// v1.118.0：登录标识支持「邮箱 或 用户名」。形似邮箱（含 @ 且有域名段）按邮箱查，
-// 其余按用户名查 —— 用户名注册时即唯一校验，无需额外验证手段，零成本扩登录入口。
-// 手机号**不**作为登录凭据：它是未验证字段（任何人可填任意 11 位），当凭据会出现
-// 串号/冒领，要支持必须先接短信验证码（决策见 CHANGELOG 1.118.0）。
+// v1.144.0：登录凭据收敛为**邮箱唯一**。
+// 原先「邮箱 或 用户名」双入口（v1.118.0）留下的问题是：账号这个概念有了两个真相源 ——
+// 用户名注册时不校验邮箱归属、改邮箱后用户名不变，于是「我是哪个账号」要同时记两件事；
+// 忘记密码链路也跟着分叉：填用户名的人收不到验证码邮件，只能回头猜自己注册时用的邮箱。
+// 邮箱是唯一经过验证码验证的字段，收敛到它之后，登录与找回共用同一个标识。
+// 手机号**仍然不**作为登录凭据：它是未验证字段（注册选填、个人中心随手可改），
+// 当凭据会出现串号/冒领，要支持必须先接短信验证码 + phone 唯一索引 + phone_verified_at。
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const loginUser = async (account, password) => {
     const identifier = String(account || '').trim();
-    const user = await prisma.user.findFirst({
-        where: EMAIL_RE.test(identifier)
-            ? { email: normalizeEmail(identifier) }
-            : { username: identifier }
+
+    // 非邮箱格式在查库前就拒：既不留"顺手试试用户名"的口子，也让错误提示能明确指向邮箱
+    if (!EMAIL_RE.test(identifier)) {
+        const error = new Error('Invalid email or password');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { email: normalizeEmail(identifier) }
     });
 
     if (!user) {
-        const error = new Error('Invalid account or password');
+        const error = new Error('Invalid email or password');
         error.statusCode = 401;
         throw error;
     }
@@ -176,7 +235,7 @@ const loginUser = async (account, password) => {
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
-        const error = new Error('Invalid account or password');
+        const error = new Error('Invalid email or password');
         error.statusCode = 401;
         throw error;
     }
@@ -191,11 +250,7 @@ const loginUser = async (account, password) => {
         user.pro_granted_by = 'seed';
     }
     
-    const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const token = signTokenForUser(user);
     
     return {
         token,
@@ -285,8 +340,16 @@ const updateUser = async (userId, data) => {
         }
     }
 
+    // 改密码：与重置密码同口径 —— 先挡掉"新旧相同"（否则白白把所有设备踢下线），
+    // 再把 token_version 推高，让旧会话立即失效；同时返回新令牌，本人这台设备不掉线。
     if (data.password) {
+        if (await bcrypt.compare(data.password, current.password_hash)) {
+            const error = new Error('新密码不能与当前密码相同');
+            error.statusCode = 400;
+            throw error;
+        }
         updateData.password_hash = await bcrypt.hash(data.password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
+        updateData.token_version = { increment: 1 };
     }
 
     const user = await prisma.user.update({
@@ -297,9 +360,17 @@ const updateUser = async (userId, data) => {
             username: true,
             email: true,
             phone: true,
+            token_version: true,
             updated_at: true
         }
     });
+
+    // 改密码分支：token_version 只用来签新令牌，不该出现在返回体里（前端会整包存进
+    // current_user，多一个内部字段就多一处"这个数字是什么"的疑问）
+    if (data.password) {
+        const { token_version: _tv, ...publicUser } = user;
+        return { ...publicUser, token: signTokenForUser(user) };
+    }
 
     return user;
 };
@@ -335,7 +406,22 @@ const ensureEmailRegistered = async (rawEmail) => {
     return user;
 };
 
-// 重置密码（忘记密码自助找回）：校验通过后更新密码哈希
+// 对外用户字段：登录 / 注册 / 重置三处返回体必须同构，前端才能用同一份 current_user 渲染顶栏
+const PUBLIC_USER_SELECT = {
+    id: true,
+    username: true,
+    email: true,
+    phone: true,
+    plan: true,
+    plan_expires_at: true,
+    pro_granted_by: true
+};
+
+// 重置密码（忘记密码自助找回）：校验通过后更新密码哈希。
+// v1.144.0 两处变化：
+//   ① 新密码不能与旧密码相同 —— 否则"重置成功"是一句空话，还白白把所有设备踢下线；
+//   ② 密码与 token_version 同一次更新，并返回新令牌 —— 改完这一刻之前签出的 token 全部失效，
+//      而刚通过邮箱验证的用户不必再回头输一遍密码（闭环点）。
 const resetPassword = async (rawEmail, newPassword) => {
     const email = normalizeEmail(rawEmail);
     const user = await prisma.user.findUnique({ where: { email } });
@@ -346,13 +432,43 @@ const resetPassword = async (rawEmail, newPassword) => {
         throw error;
     }
 
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+        const error = new Error('新密码不能与当前密码相同');
+        error.statusCode = 400;
+        throw error;
+    }
+
     const passwordHash = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS) || 10);
-    await prisma.user.update({
+    const updated = await prisma.user.update({
         where: { id: user.id },
-        data: { password_hash: passwordHash }
+        data: {
+            password_hash: passwordHash,
+            token_version: { increment: 1 }
+        },
+        select: { ...PUBLIC_USER_SELECT, token_version: true }
     });
 
-    return { message: 'Password reset successfully' };
+    return { token: signTokenForUser(updated), user: pickPublicUser(updated) };
+};
+
+function pickPublicUser(user) {
+    return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        plan: user.plan,
+        plan_expires_at: user.plan_expires_at,
+        pro_granted_by: user.pro_granted_by
+    };
+}
+
+// 退出登录：让该用户此前签发的全部 JWT 失效。
+// JWT 本身无法"删除"，能做的是把版本号推高 —— 这样退出才真的等于"别处也下线了"，
+// 而不是只在当前浏览器清一下 localStorage（旧行为：token 复制出去 7 天内照样能用）。
+const logout = async (userId) => {
+    await bumpTokenVersion(userId);
+    return { message: 'Logged out successfully' };
 };
 
 // 邀请码字符集：排除易混淆字符 0/O、1/I/L、U/V
@@ -393,6 +509,7 @@ const ensureInviteCodes = async (count = 20) => {
 
 module.exports = {
     checkDuplicate,
+    checkInviteCode,
     registerUser,
     loginUser,
     claimTrial,
@@ -402,5 +519,9 @@ module.exports = {
     deleteUser,
     ensureEmailRegistered,
     resetPassword,
-    ensureInviteCodes
+    ensureInviteCodes,
+    // v1.144.0：登录态版本与签发
+    signTokenForUser,
+    bumpTokenVersion,
+    logout
 };

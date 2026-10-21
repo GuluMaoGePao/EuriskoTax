@@ -27,7 +27,8 @@ const authenticateToken = async (req, res, next) => {
                 email: true,
                 phone: true,
                 plan: true,
-                plan_expires_at: true
+                plan_expires_at: true,
+                token_version: true
             }
         });
         
@@ -36,6 +37,22 @@ const authenticateToken = async (req, res, next) => {
                 success: false,
                 error: {
                     message: 'Invalid token',
+                    statusCode: 401
+                }
+            });
+        }
+
+        // v1.144.0：登录态版本校验 —— 改密 / 重置 / 退出后旧 token 立即失效。
+        // 签发时把当时的 token_version 写进 payload（tv），这里与库里的当前值比对。
+        // 老 token（本次上线前签发）payload 里没有 tv：按 0 处理，库里也还是 0，
+        // 于是存量会话不会被这次上线集体踢下线；一旦该用户改过密码，版本号推高即失效。
+        const issuedTv = Number.isInteger(decoded.tv) ? decoded.tv : 0;
+        const currentTv = Number.isInteger(user.token_version) ? user.token_version : 0;
+        if (issuedTv !== currentTv) {
+            return res.status(401).json({
+                success: false,
+                error: {
+                    message: 'Token expired or invalid',
                     statusCode: 401
                 }
             });
