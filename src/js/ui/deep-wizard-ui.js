@@ -193,7 +193,7 @@
         // 结果步不显示：那一屏自己就是完整的数（老 CSS 里的 is-result-step 也是这个意思）
         if (steps[state.stepIndex] && steps[state.stepIndex].result) return '';
         return '<div id="dw-preview-bar" class="calc-preview-bar">' +
-            '<div class="max-w-5xl mx-auto">' + previewGridHtml(tool) + '</div></div>';
+            '<div class="max-w-6xl mx-auto">' + previewGridHtml(tool) + '</div></div>';
     }
 
     // 输入过程中只刷新**这一条**（不整屏重画 —— 重画会把正在输入的光标甩掉）
@@ -205,7 +205,7 @@
         if (!html) { host.classList.add('is-result-step'); return; }
         host.classList.remove('is-result-step');
         if (grid) grid.outerHTML = html;
-        else host.querySelector('.max-w-5xl').innerHTML = html;
+        else host.querySelector('.max-w-6xl').innerHTML = html;
     }
 
     function headerHtml(tool, steps) {
@@ -219,7 +219,7 @@
                 '<div class="step-number' + on + '">' + (i + 1) + '</div>' +
                 '<div class="step-title' + on + '">' + esc(s.title) + '</div></div>';
         }).join('');
-        return '<div class="calc-sticky-header"><div class="max-w-5xl mx-auto">' +
+        return '<div class="calc-sticky-header"><div class="max-w-6xl mx-auto">' +
                 '<div class="calc-top-row">' +
                     '<div class="flex items-center min-w-0 flex-1">' +
                         '<button id="dw-back" class="calc-back-btn" title="返回工具箱"><i class="fa fa-arrow-left"></i></button>' +
@@ -1068,7 +1068,7 @@
     function paneHtml(tool, steps) {
         var step = steps[state.stepIndex];
         var body = step.result ? resultHtml(tool) : inputHtml(tool, step);
-        return '<div class="step-content max-w-5xl mx-auto"><div class="step-pane active">' +
+        return '<div class="step-content max-w-6xl mx-auto"><div class="step-pane active">' +
             quickHintHtml(tool) + body + '</div></div>';
     }
 

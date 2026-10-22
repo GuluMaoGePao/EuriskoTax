@@ -17,7 +17,7 @@
 
     var BANNER_ID = 'share-landing-banner';
     var ANCHOR_ID = 'content-home-banner';   // 首页公告条：横幅插在它之后，保持首页既有信息层次
-    var HOST_SELECTOR = '#mode-selection-page .max-w-5xl';
+    var HOST_SELECTOR = '#mode-selection-page .max-w-6xl';
     // v1.139.0：原锚点是「我是谁」（#home-scenarios），它已撤出首页 ——
     // 改指「我遇到了什么事」（#home-event-rail）：分享落地的人要的是"从哪儿开始算"，
     // 事件轴是首页第一个可点的动作区，身份不是。

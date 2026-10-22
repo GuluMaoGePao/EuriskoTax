@@ -38,9 +38,11 @@ const containerClassOf = (id) => {
 };
 
 describe('顶层内页：同一条栅格', () => {
-    test('首页 / 工具页 / 我的 容器同宽（max-w-5xl）', () => {
+    // v1.148.0：三个顶层页一起从 1024（max-w-5xl）放宽到 1152（max-w-6xl）——
+    // 1024 在 1440 屏上两侧各剩 232px，内容看着仍"缩在中间"。
+    test('首页 / 工具页 / 我的 容器同宽（max-w-6xl）', () => {
         TOP_PAGES.forEach((id) => {
-            expect(containerClassOf(id)).toContain('max-w-5xl');
+            expect(containerClassOf(id)).toContain('max-w-6xl');
         });
     });
 
@@ -66,6 +68,21 @@ describe('顶层内页：同一条栅格', () => {
     test('内容区 .container 的手机档是 px-2、桌面回到 px-4', () => {
         expect(HTML).toContain('<div class="container mx-auto px-2 sm:px-4 pt-4">');
         expect(HTML).toContain('<div class="container mx-auto px-2 sm:px-4">');
+    });
+
+    // 顶栏 / Tab 行与页面内容必须落在同一条边线上（v1.148.0）：
+    // 它们原先各自用 .container（1280 打底），而内容区是 max-w-5xl(1024) ——
+    // 1440 视口下 logo 左缘 80、卡片左缘 232，同一屏两套边线，看什么都像"内容缩在中间"。
+    // 守的是：两处都**照抄内容区的双层结构**（外层 .container 给 gutter、内层 max-w-5xl
+    // 居中 + sm:px-6）。单层近似不行 —— 1024~1279 视口下外层 .container 的 16px 内距会把
+    // 单层 max-w-5xl 推开，logo 与卡片正好差 16px（实测）。
+    // 宽度档位必须跟内容区一起动：内容区放宽到 max-w-6xl 而导航不动，就又变回
+    // 「两套边线」（1024 vs 1152 差 64px 一侧）—— 所以这里连宽度类名一起守。
+    test('顶栏与 Tab 行跟内容区同栅格（双层：.container + max-w-6xl/px-0 sm:px-6）', () => {
+        const navBlock = HTML.slice(HTML.indexOf('<nav class="compact-nav'), HTML.indexOf('<!-- 主内容区'));
+        expect(navBlock.length).toBeGreaterThan(0);
+        expect(navBlock.match(/container mx-auto px-2 sm:px-4/g) || []).toHaveLength(2);
+        expect(navBlock.match(/max-w-6xl mx-auto px-0 sm:px-6/g) || []).toHaveLength(2);
     });
 
     // 收边距时最容易连带牺牲的两件事（整页贴边那版两个都丢过，于是回退）：
@@ -109,9 +126,11 @@ describe('顶层内页：同一条栅格', () => {
     // share-landing.js 用 `#mode-selection-page .max-w-5xl` 定位首页容器挂载分享落地引导：
 
     // 类名摘了，分享落地首屏引导就挂不上（静默失效，不报错）。
-    test('首页容器的 max-w-5xl 类名保留（share-landing.js 按它定位）', () => {
-        expect(read('src/js/share/share-landing.js')).toContain('#mode-selection-page .max-w-5xl');
-        expect(containerClassOf('mode-selection-page')).toContain('max-w-5xl');
+    test('首页容器的 max-w-6xl 类名与 share-landing.js 的选择器一致', () => {
+        const cls = containerClassOf('mode-selection-page');
+        const m = cls.match(/max-w-\d?xl/);
+        expect(m).not.toBeNull();
+        expect(read('src/js/share/share-landing.js')).toContain(`#mode-selection-page .${m[0]}`);
     });
 });
 
@@ -137,22 +156,39 @@ describe('「我的」宫格：跨列只属于手机档', () => {
 describe('「我的」二级页：同宽 + 面包屑对齐', () => {
     // v1.146.0：内距档位随顶层页一起回到 px-0 sm:px-6（二级页与顶层页共用同一条栅格，
     // 只改顶层会让二级页反倒比它宽 —— 同一层叠两层 16/20 的坑也要一起躲）。
-    test('六个二级页容器同宽（max-w-3xl + px-0 sm:px-6）', () => {
+    // v1.148.0：768 → 1024。顶层页放宽到 1152 后，768 只占 67%，从「我的」点进
+    // 二级页像被推窄一半（计算历史的多列列表、税务日历的月网格都在喊窄）。
+    // 1024 = 顶层净宽的 88%，仍比顶层窄一档，层级还在。
+    test('六个二级页容器同宽（max-w-5xl + px-0 sm:px-6）', () => {
         SUB_PAGES.forEach((id) => {
             const cls = containerClassOf(id);
-            expect(cls).toContain('max-w-3xl');
+            expect(cls).toContain('max-w-5xl');
             expect(cls).toContain('px-0');
             expect(cls).toContain('sm:px-6');
         });
     });
 
-    // 二级页比顶层窄一档（768 vs 1024）是层级表达，不是随手写的 —— 只要六个之间
-    // 没有第三种值即可。672(2xl) / 896(4xl) 是并掉的两档，不许再冒出来。
-    test('二级页容器不再出现 2xl / 4xl（已并到 3xl）', () => {
+    // 六个之间不许有第三种值：672(2xl) / 768(3xl) / 896(4xl) 都是并掉过的档。
+    test('二级页容器不再出现 2xl / 3xl / 4xl（已并到 5xl）', () => {
         SUB_PAGES.forEach((id) => {
             const cls = containerClassOf(id);
             expect(cls).not.toContain('max-w-2xl');
+            expect(cls).not.toContain('max-w-3xl');
             expect(cls).not.toContain('max-w-4xl');
+        });
+    });
+
+    // 层级不能倒挂：二级页可以比顶层窄，但不许比顶层**宽** —— 点进二级页反而变宽
+    // 等于层级反了。顶层再放宽时，这条会逼着二级页一起动。
+    test('二级页不比顶层页宽（层级不倒挂）', () => {
+        const rank = (cls) => {
+            const m = cls.match(/max-w-(\d)xl/);
+            return m ? Number(m[1]) : 0;
+        };
+        const top = rank(containerClassOf('profile-page'));
+        expect(top).toBeGreaterThan(0);
+        SUB_PAGES.forEach((id) => {
+            expect(rank(containerClassOf(id))).toBeLessThanOrEqual(top);
         });
     });
 

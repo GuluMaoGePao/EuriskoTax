@@ -699,9 +699,9 @@
 
             /* 宽屏下为计算页主体增加左右留白，避免步骤条与卡片紧贴屏幕边缘 */
             @media (min-width: 640px) {
-                .step-content.max-w-5xl,
-                .calc-sticky-header > .max-w-5xl,
-                .calc-preview-bar > .max-w-5xl {
+                .step-content.max-w-6xl,
+                .calc-sticky-header > .max-w-6xl,
+                .calc-preview-bar > .max-w-6xl {
                     padding-left: 1.5rem;
                     padding-right: 1.5rem;
                 }
@@ -792,7 +792,7 @@
                 body.task-mode .compact-nav { display: none; }
                 body.task-mode .calc-sticky-header { top: 0; }
 
-                .calc-sticky-header > .max-w-5xl { @apply flex items-center gap-2; }
+                .calc-sticky-header > .max-w-6xl { @apply flex items-center gap-2; }
                 .calc-sticky-header .calc-top-row { @apply flex-1 min-w-0 py-1; }
                 .calc-sticky-header .step-indicator { @apply py-0; }
                 /* 单行后长标题不能把步骤条挤到换行，否则刚省下的高度又被吃掉 */

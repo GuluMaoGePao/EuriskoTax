@@ -420,7 +420,15 @@
     <div id="app-container" class="hidden">
         <!-- 顶部导航栏（紧凑 56px） -->
         <nav class="compact-nav bg-primary text-white shadow-md sticky top-0 z-40">
-            <div class="container mx-auto px-4 h-full flex justify-between items-center">
+            <!-- 顶栏与页面内容同栅格（v1.148.0）：原先这里是 `.container`（1280 打底），
+                 内容区是 max-w-5xl(1024) —— 1440 视口下 logo 左缘 80、卡片左缘 232，
+                 两者差 128px，同一屏里并排放着两套边线，看着像内容"缩在中间"。
+                 现在顶栏**照抄内容区那套双层结构**（外层 .container 给 gutter、内层
+                 max-w-6xl 居中 + px-6），不做单层近似 —— 单层写法在 1024~1279 视口
+                 会被外层 .container 的 16px 内距推开，正好差 16px（实测发现的）。
+                 实测 1440 / 1080：logo、Tab、卡片左缘都是 168 / 52，逐像素对齐。 -->
+            <div class="container mx-auto px-2 sm:px-4 h-full">
+            <div class="max-w-6xl mx-auto px-0 sm:px-6 h-full flex justify-between items-center">
                 <!-- EuriskoTax 品牌导航 -->
                 <div class="flex items-center cursor-pointer" id="brand-home-link">
                     <img src="images/logo.png" alt="EuriskoTax" class="nav-logo">
@@ -468,6 +476,7 @@
                     </div>
                 </div>
             </div>
+            </div>
         </nav>
 
         <!-- ====== 顶部 Tab 行（桌面形态，≥768px） ======
@@ -476,10 +485,15 @@
              桌面放底部是横贯 1440px 的通栏，既浪费横向空间也违背桌面「导航在上」的惯例。
              小屏由 md:block 隐藏（纯展示层折叠），显隐逻辑仍由 syncNav() 判断，两者不冲突。 -->
         <nav id="top-tabbar" class="top-tabbar hidden md:block sticky top-14 z-40 bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700" aria-label="主导航">
-            <div class="container mx-auto px-4 h-11 flex items-center gap-1">
+            <!-- 与顶栏、页面内容同一条栅格（v1.148.0）：Tab 行若继续用 .container，
+                 「首页 / 工具 / 我的」三个 Tab 会比下方的内容区左移 128px（1440 视口），
+                 导航与它指向的页面反而不在一条线上。同样照抄内容区的双层结构。 -->
+            <div class="container mx-auto px-2 sm:px-4 h-11">
+            <div class="max-w-6xl mx-auto px-0 sm:px-6 h-full flex items-center gap-1">
                 <button type="button" class="top-tab" data-tab="mode-selection-page">首页</button>
                 <button type="button" class="top-tab" data-tab="tools-page">工具</button>
                 <button type="button" class="top-tab" data-tab="profile-page">我的</button>
+            </div>
             </div>
         </nav>
 
@@ -498,9 +512,10 @@
                  此前这里 px-5(20) 再叠一层，手机上卡片距屏幕边缘 36px —— 390 宽机型
                  内容净宽只剩 318，卡片里再扣一层内距就窄成一条。
                  sm:px-6 服务 ≥640：那里外层 16 + 本层 24 = 40，桌面宽屏不缺这点宽度。
-                 ⚠️ 类名 max-w-5xl 别摘：share-landing.js 用 `#mode-selection-page .max-w-5xl`
-                 定位首页容器挂载分享落地引导。 -->
-            <div class="max-w-5xl mx-auto pt-2 pb-6 px-0 sm:px-6" data-page-container>
+                 ⚠️ 类名 max-w-6xl 别摘：share-landing.js 用 `#mode-selection-page .max-w-6xl`
+                 定位首页容器挂载分享落地引导（加宽容器时两处必须一起改，否则落地引导
+                 挂载点整个消失）。 -->
+            <div class="max-w-6xl mx-auto pt-2 pb-6 px-0 sm:px-6" data-page-container>
 
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
@@ -719,10 +734,12 @@
             <!-- 容器原为 max-w-3xl(768px)：20 个速算器挤在窄栏里纵向排开，
                  桌面右侧白白空出一条。改 max-w-5xl(1024px)，与首页同一栅格 ——
                  换页时留白不跳，视觉上才像同一个 App。
+                 v1.148.0 再放宽到 max-w-6xl(1152px)：1024 在 1440 屏上两侧各剩 232px，
+                 内容看着仍"缩在中间"。列表/网格类页面宜宽，加宽直接多排一列入口。
                  反向提醒：速算器页不要跟着加宽。它是表单，要守 65–75 字符行宽，
                  令牌 --c-narrow(720px) 就是为它设的。列表宜宽、表单宜窄，不是同一件事。
                  data-page-container：底栏避让 padding 的锚点（见 toolbox.css）。 -->
-            <div class="max-w-5xl mx-auto py-4 px-0 sm:px-6" data-page-container>
+            <div class="max-w-6xl mx-auto py-4 px-0 sm:px-6" data-page-container>
                 <div class="tool-search-wrap">
                     <i class="fa fa-search tool-search-icon"></i>
                     <input id="toolbox-search" class="tool-search" type="search" placeholder="搜工具：年终奖 / 增值税 / 社保 / 残保金…" autocomplete="off">
@@ -2325,6 +2342,8 @@
         <!-- 容器原为 max-w-4xl(896px)：与首页 / 工具页的 1024 差一档，从「工具」切到「我的」
              留白会跳一下 —— 同一个 App 的顶层页不该各写一条栅格。改 max-w-5xl，
              与首页（#mode-selection-page）/ 工具页（#tools-page）/ 深度测算同栅格。
+             v1.148.0 三个顶层页一起放宽到 max-w-6xl(1152px)：顶栏与 Tab 行同步跟着改，
+             否则导航与它指向的页面又回到"两套边线"（见顶栏那段的注释）。
              ⚠️ 反过来：个人中心的**二级页**不跟这里对齐，它们守 768（见 profile-*-page）。 -->
         <!-- pt-3（v1.141.0）：三个顶层页的顶距原先各写各的 —— 首页 pt-2、工具页 pt-4、
              「我的」是 0（横幅直接顶着顶栏），Tab 切过来第一屏的呼吸感不一致。
@@ -2338,7 +2357,7 @@
              现在与本页横幅、首页、工具页、二级页、速算器、深度测算统一为 12px。
              ⚠️ 这一档是三个顶层页共用的一条栅格（首页 / 工具页 / 我的）：
              只改一处会在 Tab 切换时看到内容宽度跳一下，`page-width.test.js` 也在守这条。 -->
-        <div class="max-w-5xl mx-auto px-0 sm:px-6 pt-3 pb-6" data-page-container>
+        <div class="max-w-6xl mx-auto px-0 sm:px-6 pt-3 pb-6" data-page-container>
             <!-- 页头已撤（2026-10-03）：原来的「← 返回 + 个人中心」把顶层 Tab 页当二级页用 ——
                  返回去的就是首页，与底部/顶部 Tab 的「首页」是同一目的地的第二条路径；
                  「个人中心」也不是这一页的名字（这页叫「我的」，Tab 已经写着），它是页内的一个入口，
@@ -2480,10 +2499,14 @@
 
     <!-- 个人中心（从「我的」页卡片点击进入，不再叫「账户设置」） -->
     <div id="profile-settings-page" class="page hidden">
-        <!-- 二级页统一 768（max-w-3xl）：原先六个二级页写了三种宽度（672 / 768 / 896），
-             在「我的」页里点进点出，留白来回跳。二级页比顶层窄一档是层级表达，
-             但六个之间必须同宽。面包屑条 .profile-sub-nav-inner 跟着这个值（见 tailwind.src.css）。 -->
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <!-- 二级页宽度（v1.148.0 从 768 / max-w-3xl 放宽到 1024 / max-w-5xl）：
+             原先六个二级页写了三种宽度（672 / 768 / 896），在「我的」页里点进点出
+             留白来回跳 —— 先统一成 768。顶层页放宽到 1152 之后，768 只占 67%，
+             从「我的」点进二级页像被推窄了一半（尤其计算历史那种多列列表、
+             税务日历那种一个月七行的网格）。放宽到 1024 = 顶层净宽的 88%，
+             仍比顶层窄一档（层级还在），六个之间也必须同宽。
+             面包屑条 .profile-sub-nav-inner 不再自己限宽，跟着容器走（见 tailwind.src.css）。 -->
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-settings" class="profile-sub-nav-back">
@@ -2643,7 +2666,7 @@
     
     <!-- 税务档案页面 -->
     <div id="profile-tax-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-tax" class="profile-sub-nav-back">
@@ -2751,7 +2774,7 @@
 
     <!-- 数据管理页面 -->
     <div id="profile-data-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-data" class="profile-sub-nav-back">
@@ -2808,7 +2831,7 @@
     
     <!-- 税务日历页面 -->
     <div id="profile-calendar-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-calendar" class="profile-sub-nav-back">
@@ -2829,7 +2852,7 @@
 
     <!-- 计算历史页面（个人中心内） -->
     <div id="profile-history-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-profile-history" class="profile-sub-nav-back">
@@ -2851,7 +2874,7 @@
 
     <!-- 批量计算页面（个人中心内 · 阶段19-11 E4） -->
     <div id="profile-batch-page" class="page hidden">
-        <div class="max-w-3xl mx-auto px-0 sm:px-6 pb-6">
+        <div class="max-w-5xl mx-auto px-0 sm:px-6 pb-6">
             <div class="profile-sub-nav">
                 <div class="profile-sub-nav-inner">
                     <button id="back-from-batch" class="profile-sub-nav-back">

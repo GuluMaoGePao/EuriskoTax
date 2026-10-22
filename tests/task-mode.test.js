@@ -23,7 +23,7 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const FIXTURE = `
 <div id="classification-calculation-page" class="page hidden has-preview-bar">
     <div class="calc-sticky-header">
-        <div class="max-w-5xl mx-auto">
+        <div class="max-w-6xl mx-auto">
             <div class="calc-top-row"><span class="calc-page-title">分类所得计税</span></div>
             <div class="step-indicator"><span class="step-title active">基本参数</span></div>
         </div>
@@ -119,7 +119,7 @@ describe('TaskMode：跨文件契约（改坏不会报错，只会悄悄失效�
         const block = mediaBlock(CSS, idx);
         expect(block.text).toContain('body.task-mode .compact-nav { display: none; }');
         expect(block.text).toContain('body.task-mode .calc-sticky-header { top: 0; }');
-        expect(block.text).toContain('.calc-sticky-header > .max-w-5xl');
+        expect(block.text).toContain('.calc-sticky-header > .max-w-6xl');
 
         const rest = CSS.slice(0, block.start) + CSS.slice(block.end);
         expect(rest).not.toContain('body.task-mode');

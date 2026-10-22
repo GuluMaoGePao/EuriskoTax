@@ -79,8 +79,10 @@ describe('弹窗统一外壳：基类与尺寸档', () => {
         expect(CSS).not.toContain('.modal-shell--xl');
     });
 
-    test('内容型档 = 48rem（与使用帮助同宽）', () => {
-        expect(TOKENS).toMatch(/--w-modal-lg:\s*48rem/);
+    // v1.148.0：48rem 在放宽后的内容区（卡片净宽 1104）里只占 67%，弹窗比页面还窄；
+    // 取 60rem(960) = 净宽的 87%，浮得住又不顶边。改这个值请先看 tokens.css 那段注释。
+    test('内容型档 = 60rem（内容区净宽的 87%）', () => {
+        expect(TOKENS).toMatch(/--w-modal-lg:\s*60rem/);
     });
 
     // transform 若写进基类，openModal 摘掉 scale-95 类后弹窗永远缩着 ——
