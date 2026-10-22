@@ -50,9 +50,17 @@
     var DEFAULTS = {
         wecomQrUrl: '',
         wecomQrByChannel: {},
+        // 加好友码是**独立的**一项，不参与上面的按入口分码：
+        //   它不在弹窗头部出现，只在提交成功态出现一次（可选动作）。
+        wecomAddFriendQr: '',
         advisorName: '',
         advisorTitle: ''
     };
+
+    // 成功态停留时长：没有加好友码时 3.2 秒（只确认「收到了」，读完就走）；
+    // 有加好友码时延长到 9 秒 —— 长按识别还要挑图，3.2 秒关掉等于没给。
+    var SUCCESS_CLOSE_MS = 3200;
+    var SUCCESS_CLOSE_WITH_QR_MS = 9000;
 
     // 入口 → 专属活码的渠道白名单（见 wecomQrUrl）：
     //   modal   —— 站内留资弹窗（结果页 / 个人中心）
@@ -164,6 +172,41 @@
             qr.classList.add('hidden');
             if (fallback) fallback.classList.remove('hidden');
         }
+        return true;
+    }
+
+    // 加好友码（可选）：与服务通道分开，只在提交成功态出现一次。
+    // 不参与按入口分码 —— 它的来源就是「刚留过资」，分不出也不需要分第二个。
+    function addFriendQrUrl() {
+        var v = config().wecomAddFriendQr;
+        return typeof v === 'string' ? v.trim() : '';
+    }
+
+    // 渲染成功态的加好友引导。
+    // 拿不到图就整块不显示（不留裂图、不留空框）：它是可选动作，缺了不影响主流程；
+    // 但绝不能出现「码位空白、下面还写着扫码添加」—— 那比不给更掉价。
+    function renderAddFriendQr() {
+        var box = el('lead-add-friend');
+        var img = el('lead-add-friend-qr');
+        var link = el('lead-add-friend-link');
+        if (!box || !img) return false;
+
+        var url = addFriendQrUrl();
+        var src = url ? (isImageLikeUrl(url) ? url : qrDataUrl(url)) : '';
+        if (!src) {
+            // 与 renderQr 同口径：摘掉空 src（src="" 会让浏览器再去请求一次当前页）
+            img.removeAttribute('src');
+            box.classList.add('hidden');
+            return false;
+        }
+
+        if (link) {
+            link.setAttribute('href', url);
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener');
+        }
+        img.src = src;
+        box.classList.remove('hidden');
         return true;
     }
 
@@ -417,9 +460,11 @@
                     ? window.CopyStandard.LEAD.success
                     : '') || '已收到您的信息，顾问会尽快与您联系，请留意来电或微信。';
             }
+            // 先渲染再加 success 态：加好友块在成功态内部，显隐由 setView 统一管
+            var hasAddFriend = renderAddFriendQr();
             setView('success');
             document.dispatchEvent(new CustomEvent('euriskotax:lead-submit', {
-                detail: { source: state.source, scene: state.scene, merged: !!(data && data.merged) }
+                detail: { source: state.source, scene: state.scene, merged: !!(data && data.merged), addFriendQr: hasAddFriend }
             }));
             // 成功后自动关闭；计时器存进 state 并在 open/close 里清掉 ——
             // 否则用户重开弹窗后会被上一次的计时器突然关掉（看起来像闪退）
@@ -427,7 +472,7 @@
             state.successTimer = setTimeout(function () {
                 state.successTimer = 0;
                 close();
-            }, 3200);
+            }, hasAddFriend ? SUCCESS_CLOSE_WITH_QR_MS : SUCCESS_CLOSE_MS);
         } catch (err) {
             showError((err && err.message) ? err.message : '提交失败，请稍后再试');
         } finally {
@@ -623,5 +668,5 @@
     }
 
     // _wecom 只给测试用：活码形态判定与生码是「配错就裂图、但没有报错」的地方，必须有断言盯着
-    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr, wecomQrUrl: wecomQrUrl, channelOfSource: channelOfSource } };
+    window.LeadModal = { open: open, close: close, _wecom: { isImageLikeUrl: isImageLikeUrl, qrDataUrl: qrDataUrl, renderQr: renderQr, wecomQrUrl: wecomQrUrl, channelOfSource: channelOfSource, addFriendQrUrl: addFriendQrUrl, renderAddFriendQr: renderAddFriendQr } };
 })();

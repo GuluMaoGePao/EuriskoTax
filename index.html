@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.147.0';
+        window.__APP_VERSION__ = '1.148.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1729,7 +1729,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.147.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.148.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1873,18 +1873,21 @@
                          码右边缘落在距右 56px（20px padding + 36px），两者不重叠。
                          列宽 80 / 96 / 112：手机 80、≥640 96、≥1280 112。 -->
                     <div id="lead-wecom-channel" class="hidden shrink-0 w-20 sm:w-24 xl:w-28 mr-9">
-                        <!-- 二维码整块可点：手机点一下直接进企微会话，桌面端扫码。
+                        <!-- 二维码整块可点：手机点一下直接进会话，桌面端扫码。
                              href 由 lead-modal.js 按入口取码写入（wecomQrByChannel → wecomQrUrl 兜底）。
-                             白底卡 + ring：码压在品牌渐变上，不加白底容器会分不清边界。 -->
+                             白底卡 + ring：码压在品牌渐变上，不加白底容器会分不清边界。
+                             这里是**微信客服会话码**：扫码即聊、不用加好友 ——
+                             下面的字必须说清"不用加好友"，否则用户以为扫了就被加好友（投诉源）。
+                             加好友码不摆在这里，见 LEAD_CONFIG.wecomAddFriendQr。 -->
                         <a id="lead-wecom-link" href="#" target="_blank" rel="noopener"
-                           title="扫码或点此联系顾问"
+                           title="扫码或点此咨询顾问（无需添加好友）"
                            class="block rounded-xl bg-white p-1 shadow-lg ring-1 ring-black/5">
                             <!-- w-full + aspect-square：码跟着**列宽**走，列宽改一处码自己跟着变。 -->
-                            <img id="lead-wecom-qr" src="" alt="顾问二维码"
+                            <img id="lead-wecom-qr" src="" alt="顾问二维码（扫码咨询，无需添加好友）"
                                  class="w-full aspect-square rounded-lg bg-white object-contain" />
                         </a>
-                        <p id="lead-wecom-fallback" class="hidden text-micro text-white mt-1 text-center">点此联系顾问 →</p>
-                        <p class="text-micro text-white/75 mt-1 text-center">扫码联系</p>
+                        <p id="lead-wecom-fallback" class="hidden text-micro text-white mt-1 text-center">点此咨询顾问 →</p>
+                        <p class="text-micro text-white/75 mt-1 text-center">扫码咨询</p>
                     </div>
                 </div>
             </div>
@@ -2047,6 +2050,28 @@
                     </div>
                     <p class="text-base font-bold text-gray-800 mt-3.5">已收到您的信息</p>
                     <p id="lead-success-sub" class="text-xs text-gray-500 mt-1.5"></p>
+
+                    <!-- 加企业微信好友（可选）：**服务之后**才提出 —— 用户刚留完信息、动机最强的
+                         时候给一条长期联系的路。两条硬约束：
+                         ① 必须是可选的，明写「不加也会正常答复」，不做成流程的一环；
+                         ② 出现时成功态停留时间随之延长（3.2 秒扫不完，等于没给）。
+                         默认 hidden，由 lead-modal.js 按 LEAD_CONFIG.wecomAddFriendQr 决定；
+                         没配码或生不出图就整块不出现 —— 半张裂图比没有更伤。 -->
+                    <div id="lead-add-friend" class="hidden mt-5 pt-4 border-t border-gray-100">
+                        <p class="text-xs text-gray-600">后续还有问题，也可以加企业微信顾问（可选）</p>
+                        <div class="mt-3 flex items-center justify-center gap-3">
+                            <a id="lead-add-friend-link" href="#" target="_blank" rel="noopener"
+                               title="扫码添加企业微信顾问（桌面端可用微信扫一扫识别）"
+                               class="block rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200">
+                                <img id="lead-add-friend-qr" src="" alt="企业微信顾问二维码"
+                                     class="w-24 h-24 rounded-lg bg-white object-contain" />
+                            </a>
+                            <div class="text-left text-micro text-gray-500 leading-relaxed">
+                                <p>微信扫码添加 · 长按可识别</p>
+                                <p>不加也会正常答复</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2224,11 +2249,11 @@
            ② 图片：后台下载的活码 PNG 或企微图床地址（wework.qpic.cn），直接当 <img src> 显示。
               ⚠ 图片形态下「点击」只能打开这张图（手机上长按可识别），没有可跳转的加好友链接；
                  哪天在后台看到「复制链接」，优先换回链接形态。
-         按入口分码（wecomQrByChannel），留空即回落到下面的兜底码，通道不会因少配而失效。
-         目前是两条线并存（取舍见 docs/marketing/wecom-channel-playbook.md 第 5 节）：
-           · 站内弹窗 → 微信客服 kfid：不加好友、门槛低，欢迎语可按客服账号分别配；
-           · 分享图 / 落地页 → 客户联系「联系我」加好友活码（images/weworkQR.png）：
-             加好友沉淀长期关系、可打标签，代价是多了「加好友」这一步。
+         两条线的分工（2026-10-22 定，取舍见 docs/marketing/wecom-channel-playbook.md 第 5 节）：
+           · wecomQrUrl（微信客服 kfid）= **唯一的对外承接通道**：扫码即聊、不加好友，门槛最低；
+           · wecomAddFriendQr（客户联系「联系我」加好友码 images/weworkQR.png）= **沉淀通道**，
+             由客服在会话中按需推荐（运营 SOP），并在留资成功态里出现一次 —— 顺序是刻意的：
+             没提供任何服务就要用户加好友，转化低且观感差；服务之后提出才站得住。
          ⚠ 不要手工给客服链接拼 ?from=xxx：企微规定客服链接不可改写、参数不可复制到别的链接，
          拼了页面照开，但「进入会话事件」参数校验失败、回调拿不到来源 —— 看着能用，实际没数据。
          后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/wecom-channel-playbook.md。
@@ -2241,14 +2266,23 @@
            并能在页面公示信用码（见 docs/marketing/wecom-channel-playbook.md） -->
     <script>
         window.LEAD_CONFIG = {
-            // 兜底码：微信客服 kfid —— 未单独配码的入口都用它（站内弹窗走这条）
+            // 承接通道：微信客服 kfid —— 扫码即聊、**不用加好友**，门槛最低。
+            //   2026-10-22 定为唯一对外主通道：先让用户在会话里把问题问完，
+            //   再由客服在会话中按需推荐加企业微信好友（见下 wecomAddFriendQr）。
+            //   这条顺序是刻意的：没提供任何服务就要用户加好友，转化低且观感差；
+            //   服务之后提出，是"后续还能找到我"的正当理由。
             wecomQrUrl: 'https://work.weixin.qq.com/kfid/kfcdb871293d06fc4d0',
             // 按入口的专属码：留空即回落到上面的兜底码，通道不会因少配而失效
             wecomQrByChannel: {
-                modal: '',                     // 站内留资弹窗（结果页 / 个人中心）→ 用兜底微信客服，扫码即聊、不加好友
-                share: 'images/weworkQR.png',  // 分享图带来的访客 → 客户联系「联系我」加好友活码（图片形态）
-                landing: 'images/weworkQR.png' // 站外落地页 / SEO 页（source 含 seo_ / landing）
-            }
+                modal: '',   // 站内留资弹窗（结果页 / 个人中心）
+                share: '',   // 分享图带来的访客
+                landing: ''  // 站外落地页 / SEO 页（source 含 seo_ / landing）
+            },
+            // 加企业微信好友的活码（客户联系「联系我」）：**不是**主通道，
+            //   只在两处出现 —— ① 客服在会话中按需发送（运营 SOP，代码不参与）；
+            //   ② 留资提交成功态里出现一次，且明确为可选（不加也能得到答复）。
+            //   留空则不展示成功态那一块，通道不受影响。
+            wecomAddFriendQr: 'images/weworkQR.png'
         };
     </script>
     <!-- 留资「所在城市」的省市数据 —— 必须早于 lead-modal.js（弹窗打开时同步渲染省市级联，不做动态加载） -->

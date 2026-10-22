@@ -26,7 +26,11 @@ function setupDom() {
         '<div id="lead-modal" class="hidden"></div>',
         '<a id="lead-wecom-link" href="#"></a>',
         '<img id="lead-wecom-qr" src="" />',
-        '<p id="lead-wecom-fallback" class="hidden"></p>'
+        '<p id="lead-wecom-fallback" class="hidden"></p>',
+        // 加好友引导（成功态，可选动作）
+        '<div id="lead-add-friend" class="hidden"></div>',
+        '<a id="lead-add-friend-link" href="#"></a>',
+        '<img id="lead-add-friend-qr" src="" />'
     ].join('');
 }
 
@@ -120,6 +124,70 @@ describe('阶段13B 活码渲染（链接型 vs 图片型）', () => {
     test('未配置时 renderQr 返回 false —— 弹窗据此降级为仅留言通道并告警', () => {
         window.LEAD_CONFIG = {};
         expect(LeadModal._wecom.renderQr()).toBe(false);
+    });
+});
+
+describe('加企业微信好友（可选 · 只在提交成功态出现一次）', () => {
+    // 为什么单独立一组：加好友是「关系沉淀」通道，不是承接通道 ——
+    // 它没配、生不出图都不许影响主流程；但它一旦出现，就必须让人看清是可选的。
+    beforeEach(() => {
+        setupDom();
+        delete window.qrcode;
+    });
+
+    test('没配 wecomAddFriendQr 就整块不出现（可选动作，缺了主流程照跑）', () => {
+        window.LEAD_CONFIG = { wecomQrUrl: KFID };
+
+        expect(LeadModal._wecom.renderAddFriendQr()).toBe(false);
+        expect(document.getElementById('lead-add-friend').classList.contains('hidden')).toBe(true);
+        expect(document.getElementById('lead-add-friend-qr').hasAttribute('src')).toBe(false);
+    });
+
+    test('图片型加好友码直接当 src：整块显示，且整块可点', () => {
+        window.LEAD_CONFIG = { wecomAddFriendQr: 'images/weworkQR.png' };
+
+        expect(LeadModal._wecom.renderAddFriendQr()).toBe(true);
+        expect(document.getElementById('lead-add-friend-qr').getAttribute('src')).toBe('images/weworkQR.png');
+        expect(document.getElementById('lead-add-friend-link').getAttribute('href')).toBe('images/weworkQR.png');
+        expect(document.getElementById('lead-add-friend').classList.contains('hidden')).toBe(false);
+    });
+
+    test('链接型加好友码现场生码（后台给了「联系我」链接就不必换图）', () => {
+        window.qrcode = fakeQrcode('data:image/gif;base64,FRIEND');
+        const link = 'https://work.weixin.qq.com/ca/caXXXXXXXX';
+        window.LEAD_CONFIG = { wecomAddFriendQr: link };
+
+        expect(LeadModal._wecom.renderAddFriendQr()).toBe(true);
+        expect(document.getElementById('lead-add-friend-qr').getAttribute('src')).toBe('data:image/gif;base64,FRIEND');
+        expect(document.getElementById('lead-add-friend-link').getAttribute('href')).toBe(link);
+    });
+
+    test('生不出图就整块隐藏，不留空框（写了「扫码添加」却没有码，比不给更掉价）', () => {
+        // window.qrcode 未加载（CDN 挂了）—— 链接型生不出码
+        window.LEAD_CONFIG = { wecomAddFriendQr: 'https://work.weixin.qq.com/ca/caXXXXXXXX' };
+
+        expect(LeadModal._wecom.renderAddFriendQr()).toBe(false);
+        expect(document.getElementById('lead-add-friend').classList.contains('hidden')).toBe(true);
+    });
+
+    test('引导块必须写清「可选」与「不加也会答复」—— 非强制是可加好友的前提', () => {
+        const start = INDEX_HTML.indexOf('id="lead-add-friend"');
+        const end = INDEX_HTML.indexOf('id="lead-modal-footer"', start);
+        expect(start).toBeGreaterThan(-1);
+        expect(end).toBeGreaterThan(start);
+
+        const block = INDEX_HTML.slice(start, end);
+        expect(block).toContain('可选');
+        expect(block).toContain('不加也会正常答复');
+        // 成功态不复述流程：加一块引导可以，但不能变回步骤清单
+        expect(block).not.toContain('<li');
+    });
+
+    test('加好友码填的本地图片必须在磁盘上（填错 = 线上裂图且不报错）', () => {
+        const m = INDEX_HTML.match(/wecomAddFriendQr\s*:\s*'([^']*)'/);
+        expect(m).not.toBeNull();
+        const v = m[1];
+        if (!/^https?:\/\//i.test(v)) expect(fs.existsSync(path.join(ROOT, v))).toBe(true);
     });
 });
 
