@@ -87,7 +87,7 @@
 |---|------|------|-----------|
 | 1 | 改代码 | 小改直接 `main`；大改动开短分支（`feat/xxx` → 合回 `main`） | 不引入 develop 常驻分支：两个人维护，多一个分支就多一份要同步的东西 |
 | 2 | 本地门禁 | `npm test`（单测）+ `npm run verify:local`（266 项）；动过 `schema.prisma` / `migrations/` 再加 `npm run verify:pg` | 迁移的**首次执行**不能发生在生产库上（这就是 beta 存在的原因） |
-| 3 | 版本五处同步 + CHANGELOG | `package.json` / `version.json` / `index.html` 两处 / `CHANGELOG.md` 最新条目 | 漏改会让用户**每次新会话清一次缓存**（版本哨兵读到不一致就自愈重载） |
+| 3 | 版本五处同步 + CHANGELOG | **`npm run bump:version`**（五处：package.json / version.json / index.html 两处 / CHANGELOG 最新条目） | 漏改会让用户**每次新会话清一次缓存**（版本哨兵读到不一致就自愈重载）。递一处、同步五处；**任一一处匹配不上就报错退出，不静默跳过**（静默跳过等于制造第六处漏改） |
 | 4 | 两条自检 | `npm run verify:release`（版本五处一致 + 文档口径与实测一致）、`npm run status:release`（当前发到哪了） | 口径漂移 = 对外承诺的验证强度与实现对不上（曾经三处 165 项躲过守卫存活很久） |
 | 5 | 提交推送 | `git add ... && git commit && git push origin main` | **push 不会自动上线**，可放心推。push 后 GitHub Actions（`.github/workflows/ci.yml`）会自动跑同一套门禁：`npm test` + `verify:local` + `verify:release`。它证明的是「**仓库绿**」——本机绿不等于仓库绿（漏提交文件、依赖没写进 `package.json`，本机永远看不出来） |
 | 6 | 发预发并验收 | `ops-deploy-beta.ps1` → `ops-check-beta.ps1`（37 项）→ **`npm run smoke:beta`**（登录→算一笔→云端同步→内容→留资，7 步打真实 HTTP 与真实库）| 本地 jsdom 全绿 ≠ 真机可用（18-6a 行名括号、v1.144 `if` 包断言两次教训）。指纹核对**不登录不写数据**，证明不了登录后的链路；冒烟补的就是这一段 |

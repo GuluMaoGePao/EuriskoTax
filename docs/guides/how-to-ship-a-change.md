@@ -14,11 +14,37 @@
 | 「发预发」（或「发 beta 我看效果」） | `ops-deploy-beta.ps1` → `ops-check-beta.ps1`（37 项） |
 | 「跑冒烟」 | 开 SSH 隧道 → `npm run smoke:beta`（7 步，登录后的链路） |
 | 「发正式」 | `ops-deploy.ps1` → `ops-check-prod.ps1`（37 项）→ 台账 `--write` + `git tag` |
-| 「发版」（= 走完整个流程） | 升版本五处 + CHANGELOG → 门禁 → 自检 → push → 发 beta → 发正式 → 台账 + 标签 |
+| 「发版」（= 走完整个流程） | `npm run bump:version`（升版本五处）→ 门禁 → 自检 → push → 发 beta → 发正式 → 台账 + 标签 |
 | 「回滚」 | `ops-deploy.ps1 -Rollback`（软链指回上一版，约 1 分钟） |
 | 「看 41 个工具还出不出数」 | `npm run smoke:ui`（真机逐个算一遍，**不写留痕**，跑完还原 localStorage） |
-| 「拍个视觉对比」 | `node tools/ops/ui-screenshot-baseline.js`（浅色 + 深色各 12 张） |
+| 「拍个视觉对比」 | `node tools/ops/ui-screenshot-baseline.js`（7 页 × 2 断点 × 2 主题 = 28 张） |
 | 「本地起服务」 | `powershell -File tools/ops/ops-start-dev.ps1`（`:3000`，可加 `-Share` 出公网地址给朋友看） |
+
+### 「发版」这一档的第一句话：升版本号
+
+版本号**不会**在发版时自动加号。它散在五处：package.json / version.json（含 releasedAt）/
+index.html 的 `window.__APP_VERSION__`（页面哨兵读的就是它）/ index.html 页尾「版本 x.y.z」/
+CHANGELOG 首个小节。**漏改任一一处都不会报错** —— 页面哨兵拿它与线上 version.json 比对，
+不一致就重置缓存并重载，用户体感是「每次新会话都被清一次缓存，页面闪一下」。
+这类问题从用户反馈几乎定位不到（页面照样有数字、照样能用）。
+
+所以升版本是一条命令，递一处、同步五处：
+
+| 参数 | 作用 |
+|---|---|
+| （默认） | 末位 +1（PATCH）：1.149.6 → 1.149.7 |
+| `--minor` / `--major` | 中间位 +1 / 首位 +1（换口径的大改才用 major） |
+| `--set=x.y.z` | 直接指定版本 |
+| `--dry-run` | 只列出五处会改成什么，一个字节都不写 |
+| `--no-changelog` | 只改四处，不动 CHANGELOG（比如同一天连发两版） |
+
+两个刻意的设计：
+
+- **任一一处匹配不上就报错退出，绝不静默跳过** —— 静默跳过等于制造了第六处漏改，那比不改更糟。
+- 日期取 **UTC 当天**而不是本机日期：preflight 是按 UTC 判定「发布日不可能在未来」的，
+  北京时间 00:00–08:00 这段写本机日期会被判成「晚于今天」。
+
+跑完它，下一步就是「发布前自检」（`npm run verify:release`）—— 它会当场校验五处一致，漏改即红。
 
 ## 二、按改动分三档：走哪条路由改动性质决定
 
