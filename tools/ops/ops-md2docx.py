@@ -512,7 +512,11 @@ def render(doc, lines, center=False):
         m = re.match(r"^(\s*)(\d+)\.\s+(.*)$", raw)
         if m:
             level = min(2, len(m.group(1)) // 2)
-            num = num + 1 if in_num else 1
+            # 编号以源文件为准：md 里写了 "2." 就必须是 "2."。
+            # 只有"每条都写 1."（markdown 常见写法）时才自增——那种写法里 1 不是编号，
+            # 是标记。否则显式编号会被自增覆盖成 1./2./3.（曾把 2./3. 全导成 1.）。
+            src_num = int(m.group(2))
+            num = (num + 1) if (in_num and src_num == 1) else src_num
             in_num = True
             p = doc.add_paragraph()
             set_para(p, before=0, after=3, line=1.35,
