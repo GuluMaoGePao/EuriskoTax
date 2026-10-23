@@ -9,7 +9,7 @@
  *
  * 汇算口径（与内核完全一致，逐字对齐 tax-calculator.js#performTaxCalculation）：
  *   全年收入       = 月薪 × 任职月数
- *   年度总扣除     =（5000 + 五险一金 + 专项附加扣除）× 任职月数
+ *   年度总扣除     =（5000 + 三险一金 + 专项附加扣除）× 任职月数
  *   应纳税所得额   = max(0, 全年收入 − 年度总扣除)
  *   年度应纳税额   = 应纳税所得额 × 年度税率 − 速算扣除数
  *   已预缴税额     = 用户按个税 App 实际已缴税额填写优先；未填写则按累计预扣法推演
@@ -63,7 +63,7 @@
         return income * m;
     }
 
-    // 年度总扣除 =（5000 + 五险一金 + 专项附加扣除）× 任职月数（与内核 totalDeduction 同写法）
+    // 年度总扣除 =（5000 + 三险一金 + 专项附加扣除）× 任职月数（与内核 totalDeduction 同写法）
     function annualDeductionOf(months, monthlyInsurance, monthlySpecialAdditional) {
         var m = monthsOf(months);
         if (m <= 0) return 0;
@@ -98,7 +98,7 @@
     }
 
     // 按累计预扣法推演的已预缴税额：逐月累加应纳税所得额后查同一张年度税率表。
-    // 与内核 calculateCumulativePrepaidTax 同构（五险一金/专项附加以外的扣除项传 0），
+    // 与内核 calculateCumulativePrepaidTax 同构（三险一金/专项附加以外的扣除项传 0），
     // 也与落地页 salary-tax-quick.js 的 taxOf 结果一致 —— 两处都由测试对拍钉住。
     function prepaidOf(monthlyIncome, months, monthlyInsurance, monthlySpecialAdditional, table) {
         var income = Number(monthlyIncome);
@@ -235,7 +235,7 @@
     // ---------------------------------------------------------------------------
     // 阶段17 17D-7（v1.63.0）：年度汇算清缴 deep 的可复用口径
     //
-    // 速算器那五个输入框（月薪 / 任职月数 / 五险一金 / 专项附加 / 已预缴）只认「一处任职、
+    // 速算器那五个输入框（月薪 / 任职月数 / 三险一金 / 专项附加 / 已预缴）只认「一处任职、
     // 全年 12 个月、只有工资」，而真实的汇算有三层它表达不出来，全部收在这里，
     // 由 deep 的 compute 只做编排 —— 一个税率、一条公式都没复制：
     //   ① 基本减除费用在汇算时是**年定额 6 万**，不按任职月数折算；

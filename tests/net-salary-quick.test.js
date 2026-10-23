@@ -4,7 +4,7 @@
 // **抄公式看不出来**的事：
 //   ① 解出来的税前**代回正向**确实能拿到目标到手（反算校验，误差 < 0.01 元）；
 //   ② 解是**最小解** —— 少 1 分钱就拿不到目标（否则谈薪时会白让利）；
-//   ③ 口径同源：五险一金与个税全部来自 social-insurance-quick / 常量，本文件不复制费率。
+//   ③ 口径同源：三险一金与个税全部来自 social-insurance-quick / 常量，本文件不复制费率。
 //
 // 另有三件「算法测不出来、但错了会直接误导谈薪」的事，也在这里钉住：
 //   ① 「每月到手 X」有两种口径（全年平均 / 首月），同一句话倒推出的税前能差上千元；
@@ -29,8 +29,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'seo', 'net-salary.html'
 const BASE = { socialAverage: 8000, housingRate: 0.12, specialMonthly: 1000 };
 const input = (target, extra) => Object.assign({}, BASE, { targetMonthly: target }, extra || {});
 
-describe('谈薪倒算：口径来源单一（复用五险一金与累计预扣）', () => {
-    test('倒算模块不自带费率：五险一金与个税全部走 social-insurance-quick', () => {
+describe('谈薪倒算：口径来源单一（复用三险一金与累计预扣）', () => {
+    test('倒算模块不自带费率：三险一金与个税全部走 social-insurance-quick', () => {
         expect(window.EuriskoNetSalaryQuick).toBeDefined();
         expect(window.EuriskoNetSalaryQuick.solveOf).toBeDefined();
         // 同源验证：倒算结果与正向实现在同一份常量上（注册表声明的全局量）
@@ -88,7 +88,7 @@ describe('倒算结果：代回正向能拿到目标（反算校验）', () => {
         expect(Math.abs(cmp.annualNetGap)).toBeCloseTo(943.83, 2);
     });
 
-    test('目标 20000：税前 27137.50 已超封顶线，五险一金固定在 5400', () => {
+    test('目标 20000：税前 27137.50 已超封顶线，三险一金固定在 5400', () => {
         const r = window.EuriskoNetSalaryQuick.solveOf(input(20000, { mode: 'annual' }));
         expect(r.gross).toBeCloseTo(27137.5, 2);
         expect(r.gross).toBeGreaterThan(24000);
@@ -100,7 +100,7 @@ describe('倒算结果：代回正向能拿到目标（反算校验）', () => {
         expect(r.net12).toBeCloseTo(18590, 2);
     });
 
-    test('目标 30000 / 50000：五险一金仍封顶在 5400（再涨也不增加）', () => {
+    test('目标 30000 / 50000：三险一金仍封顶在 5400（再涨也不增加）', () => {
         const quick = window.EuriskoNetSalaryQuick;
         const r30 = quick.solveOf(input(30000, { mode: 'annual' }));
         expect(r30.gross).toBeCloseTo(39853.33, 2);
@@ -159,7 +159,7 @@ describe('加薪试算：边际到手率（涨 1000 元不等于到手多 1000 �
         const r30 = quick.solveOf(input(30000, { mode: 'annual' }));
         expect(r20.netRate).toBeCloseTo(0.737, 3);
         expect(r30.netRate).toBeCloseTo(0.753, 3);
-        expect(r30.netRate).toBeGreaterThan(r20.netRate);   // 五险一金封顶 → 到手率反而不降略升
+        expect(r30.netRate).toBeGreaterThan(r20.netRate);   // 三险一金封顶 → 到手率反而不降略升
     });
 });
 

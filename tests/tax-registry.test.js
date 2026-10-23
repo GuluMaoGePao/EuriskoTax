@@ -77,6 +77,20 @@ describe('政策时效（到期提醒是注册表存在的理由之一）', () =
         expect(reg.expiringWithin(30, '2026-09-14')).toEqual([]);
         // 已过期的也算「需要复核」，不能因为过了日子就不提醒
         expect(reg.expiringWithin(365, '2028-06-01').map((s) => s.id)).toContain('bonus');
+
+        // 失业保险降费是全表**到期最快**的一项（2026-12-31，比年终奖那一批早整整一年），
+        // 而它此前根本没进注册表 —— 只有税常量里一句「各地执行期限不同」，页面永远说不出
+        // 还剩几天。到期后个人部分从 0.5% 回到法定 1%，个人三险一金从 22.5% 涨到 23%。
+        expect(reg.get('unemployment-rate-reduction').expiresOn).toBe('2026-12-31');
+        expect(reg.statusOf('unemployment-rate-reduction', '2026-12-31'))
+            .toMatchObject({ active: true, expired: false, daysLeft: 0 });
+        expect(reg.statusOf('unemployment-rate-reduction', '2027-01-01'))
+            .toMatchObject({ active: false, expired: true });
+        expect(reg.expiringWithin(365, '2026-10-24').map((s) => s.id))
+            .toContain('unemployment-rate-reduction');
+        // 到期日必须写死在注册表里，页面才能算出「还剩多少天」
+        expect(reg.expiringWithin(90, '2026-10-24').map((s) => s.id))
+            .toContain('unemployment-rate-reduction');
     });
 });
 

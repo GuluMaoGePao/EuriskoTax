@@ -1254,7 +1254,7 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && netPage.raw.includes('倒算只对月薪负责：年终奖另算，保底也会咬人')
             && netPage.raw.includes('边际到手率'),
             `HTTP ${netPage.status}`);
-        record('税后工资落地页复用同源脚本（常量 + 五险一金 + 反向求解），CTA 带归因参数',
+        record('税后工资落地页复用同源脚本（常量 + 三险一金 + 反向求解），CTA 带归因参数',
             netPage.status === 200 && registryJs.raw.includes("id: 'comprehensive'")
             && netPage.raw.includes('/src/js/calculation/tax-constants.js')
             && netPage.raw.includes('/src/js/calculation/social-insurance-quick.js')

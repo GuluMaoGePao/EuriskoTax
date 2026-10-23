@@ -33,7 +33,7 @@ const CASES = [];
     // 不足起征点 / 恰好等于起征点：应纳税所得额被夹到 0
     CASES.push({ months, insurance: INSURANCE, special: SPECIAL, income: 4000 });
     CASES.push({ months, insurance: INSURANCE, special: SPECIAL, income: 5000 + INSURANCE + SPECIAL });
-    // 无五险一金、无专项附加扣除（扣除项为 0 时也必须同口径）
+    // 无三险一金、无专项附加扣除（扣除项为 0 时也必须同口径）
     CASES.push({ months, insurance: 0, special: 0, income: 30000 });
 });
 
@@ -274,7 +274,7 @@ describe('多处任职 / 年中跳槽：与单单位口径对拍（减除费用 
         const q = window.EuriskoSettlementQuick;
         for (const b of MULTI_BOUNDARIES) {
             for (const taxable of [b - 1, b, b + 1]) {
-                // 反推：月薪 × 12 − (60000 + 五险一金 × 12 + 专项附加 × 12) = 目标应纳税所得额
+                // 反推：月薪 × 12 − (60000 + 三险一金 × 12 + 专项附加 × 12) = 目标应纳税所得额
                 const insurance = 3000;
                 const special = 2000;
                 const salary = (taxable + 60000 + insurance * 12 + special * 12) / 12;

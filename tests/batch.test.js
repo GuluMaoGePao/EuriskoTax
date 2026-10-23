@@ -151,11 +151,18 @@ describe('守护 3：批量 N 行 = 单行逐个算（防两套口径的最后�
 describe('列识别：认错了不会有任何提示，所以这一档必须钉死', () => {
     test('表头带单位/空格/括号照样认出来', () => {
         const tool = R().get('salary-tax');
-        const header = ['姓名', '税前月薪（元）', ' 五险一金（个人 / 月） ', '专项附加扣除(月)'];
+        const header = ['姓名', '税前月薪（元）', ' 三险一金（个人 / 月） ', '专项附加扣除(月)'];
         const det = B().detectMapping(tool, header);
         expect(det.matched).toBe(3);
         expect(det.mapping.slice(1)).toEqual(['monthlyIncome', 'monthlyInsurance', 'monthlySpecialAdditional']);
         expect(det.mapping[0]).toBe('');      // 「姓名」不是任何字段 —— 留空，但它要原样带出（见导出那组）
+
+        // 个人缴纳部分是**三险一金**（养老 / 医疗 / 失业 + 公积金；工伤与生育个人不缴），
+        // 但工资表上「五险一金（个人 / 月）」这种写法非常常见 —— 财务系统里那列名就是这么起的。
+        // 两种写法必须落到同一列上，否则改了工具里的叫法，用户粘过来的整张表就一列都认不出。
+        const alias = B().detectMapping(tool, ['姓名', '税前月薪（元）', '五险一金（个人 / 月）', '专项附加扣除(月)']);
+        expect(alias.matched).toBe(3);
+        expect(alias.mapping.slice(1)).toEqual(['monthlyIncome', 'monthlyInsurance', 'monthlySpecialAdditional']);
     });
 
     test('一个字都没认出来 → 按顺序对号入座，并把这件事说出来', () => {
@@ -230,7 +237,7 @@ describe('单元格的脏样子：空 = 0，算不出来的要标出来', () => 
 
 // ==========================================================================
 describe('权益：整批通过才算，绝不截前 5 行', () => {
-    const manyRows = (n) => ['税前月薪\t五险一金（个人/月）'].concat(
+    const manyRows = (n) => ['税前月薪\t三险一金（个人/月）'].concat(
         Array.from({ length: n }, (_, i) => `${9000 + i * 100}\t1500`)
     ).join('\n');
 

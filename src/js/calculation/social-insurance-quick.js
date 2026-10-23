@@ -269,15 +269,19 @@
         // 公积金基数多数地区与社保基数一致，允许单独指定（部分地区上下限不同）
         var housingBase = num(input.housingBase) > 0 ? num(input.housingBase) : base;
         var overrides = input.employerRates || {};
+        // 个人侧同样允许覆盖 —— 不是为了给用户乱改，而是「到期对照」要按法定费率重算一遍
+        var personalOverrides = input.personalRates || {};
 
         var items = R.items.map(function (it) {
             var employerRate = resolveRate(overrides[it.key], it.employerRate, 0, 1);
+            var personalRate = resolveRate(personalOverrides[it.key], it.personalRate, 0, 1);
             return {
                 key: it.key,
                 name: it.name,
-                personalRate: it.personalRate,
+                personalRate: personalRate,
                 employerRate: employerRate,
-                personal: round(base * it.personalRate),
+                // 金额必须跟着覆盖后的比例走：只改比例字段不改钱，等于「说了 1% 却仍按 0.5% 算」
+                personal: round(base * personalRate),
                 employer: round(base * employerRate),
                 note: it.note
             };
@@ -367,7 +371,7 @@
         return out;
     }
 
-    // 到手工资：工资 − 个人五险一金 − 个税（累计预扣）
+    // 到手工资：工资 − 个人三险一金 − 个税（累计预扣）
     function netSalaryOf(input) {
         input = input || {};
         var s = socialInsuranceOf(input);
@@ -437,8 +441,67 @@
         };
     }
 
+    /**
+     * ⑤ 失业保险的 1% 是**阶段性降费**，执行至 2026-12-31
+     * （到期日与法定费率都来自 tax-constants，页面与注册表共读这一份）。
+     *
+     * 到期后若无延续文件，按《失业保险条例》（国务院令第 258 号）第六条恢复单位 2%、职工个人 1% ——
+     * 个人那一份直接翻倍，三险一金从 22.5% 变成 23%。月薪 1 万：个人一年多缴 600 元，
+     * 个税专项扣除跟着多 600 元（税额少 18 元），到手净少 582 元。
+     * 这里刻意**不算单位那一份的对照**：它不进个人到手，算进来只会把结论搅浑。
+     */
+    function unemploymentExpiryOf(input) {
+        input = input || {};
+        var u = null;
+        (R.items || []).forEach(function (it) { if (it.key === 'unemployment') u = it; });
+        if (!u) return null;
+
+        var legalPersonal = u.legalPersonalRate === undefined ? u.personalRate : u.legalPersonalRate;
+        var legalEmployer = u.legalEmployerRate === undefined ? u.employerRate : u.legalEmployerRate;
+
+        var current = netSalaryOf(input);
+        var after = netSalaryOf(Object.assign({}, input, {
+            employerRates: { unemployment: legalEmployer },
+            personalRates: { unemployment: legalPersonal }
+        }));
+
+        var monthlyGap = round(after.personalTotal - current.personalTotal);
+        return {
+            expiresOn: u.reducedUntil || null,
+            name: u.name,
+            // 现行 vs 法定（到期后）两栏：用户真正要的是「明年我要少拿多少」
+            current: {
+                personalRate: u.personalRate,
+                employerRate: u.employerRate,
+                monthlyPersonal: current.personalTotal,
+                annualPersonal: round(current.personalTotal * 12),
+                annualTax: current.annualTax,
+                annualNet: current.annualNet,
+                statutoryRate: current.social.statutoryPersonalRate
+            },
+            expired: {
+                personalRate: legalPersonal,
+                employerRate: legalEmployer,
+                monthlyPersonal: after.personalTotal,
+                annualPersonal: round(after.personalTotal * 12),
+                annualTax: after.annualTax,
+                annualNet: after.annualNet,
+                statutoryRate: after.social.statutoryPersonalRate
+            },
+            gap: {
+                monthlyPersonal: monthlyGap,
+                annualPersonal: round(monthlyGap * 12),
+                annualTax: round(after.annualTax - current.annualTax),
+                annualNet: round(after.annualNet - current.annualNet)
+            },
+            splitNote: u.splitNote || '',
+            note: u.note || ''
+        };
+    }
+
     window.EuriskoSocialQuick = {
         rules: function () { return R; },
+        unemploymentExpiryOf: unemploymentExpiryOf,
         baseOf: baseOf,
         socialInsuranceOf: socialInsuranceOf,
         netSalaryOf: netSalaryOf,

@@ -101,7 +101,7 @@ describe('减除费用是年定额 6 万，不按任职月数折算', () => {
         const out = compute({ jobs: [{ monthlyIncome: 20000, months: 6, monthlyInsurance: 1500, monthlySpecial: 0 }] });
 
         expect(row(out, '汇算收入额合计')).toBe(120000);
-        // 扣除 = 6 万定额 + 五险一金 9000（1500 × 6），专项附加未申报
+        // 扣除 = 6 万定额 + 三险一金 9000（1500 × 6），专项附加未申报
         expect(row(out, '扣除合计')).toBe(69000);
         expect(row(out, '应纳税所得额')).toBe(51000);
         expect(row(out, '全年应纳税额')).toBe(2580);
@@ -170,7 +170,7 @@ describe('劳务报酬 / 稿酬 / 特许权：按收入额并入，预扣率与�
     });
 
     test('有工资也有劳务：合并后档位抬高，退税被吃掉一部分', () => {
-        // 月薪 1 万 × 12 + 劳务 10 万：收入额 = 12 万 + 8 万 = 20 万，扣除 6 万 + 五险一金 1.8 万
+        // 月薪 1 万 × 12 + 劳务 10 万：收入额 = 12 万 + 8 万 = 20 万，扣除 6 万 + 三险一金 1.8 万
         const out = compute({
             jobs: [{ monthlyIncome: 10000, months: 12, monthlyInsurance: 1500, monthlySpecial: 0 }],
             labor: 100000
@@ -302,7 +302,7 @@ describe('多处任职并行：重复扣除 6 万是补税的另一个来源', (
             ]
         });
         expect(row(out, '汇算收入额合计')).toBe(144000);
-        expect(row(out, '扣除合计')).toBe(72000);          // 6 万 + 五险一金 1.2 万（只减一份 6 万）
+        expect(row(out, '扣除合计')).toBe(72000);          // 6 万 + 三险一金 1.2 万（只减一份 6 万）
         expect(row(out, '全年应纳税额')).toBe(4680);        // 72000 × 10% − 2520
         expect(row(out, '全年已预缴')).toBe(360);           // 两处各 180：累计都是 6000，按 3%
         expect(out.primary.value).toBe(4320);

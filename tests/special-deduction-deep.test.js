@@ -84,7 +84,7 @@ describe('与速算器同源：一个人、满 12 个月 ≡ annualOf / savingOf
         expect(compute().primary.value).toBe(2400);
     });
 
-    test('扣除前应纳税所得额 = 全年工资 − 6 万 − 五险一金 − 其他扣除', () => {
+    test('扣除前应纳税所得额 = 全年工资 − 6 万 − 三险一金 − 其他扣除', () => {
         const r = full({ selfMonthlyIncome: 20000, selfMonthlyInsurance: 2000, selfOtherDeduction: 12000 });
         expect(r.self.income).toBe(240000);
         expect(r.self.taxableBefore).toBe(240000 - 60000 - 24000 - 12000);

@@ -48,6 +48,30 @@ describe('社保公积金：口径来源单一（常量 + 注册表）', () => {
         expect(of('maternity').personalRate).toBe(0);
         // 个人实际承担：养老 8% + 医疗 2% + 失业 0.5% = 10.5%
         expect(rules.items.reduce((s, i) => s + i.personalRate, 0)).toBeCloseTo(0.105, 10);
+
+        // 失业的 0.5% 是**阶段性降费**的结果，不是法定费率：《失业保险条例》
+        // （国务院令第 258 号）第六条是单位 2%、个人 1%，现行总费率 1% 执行至 2026-12-31。
+        // 这是全表最快到期的一项优惠，到期后个人那一份直接翻倍。
+        expect(of('unemployment').legalPersonalRate).toBe(0.01);
+        expect(of('unemployment').legalEmployerRate).toBe(0.02);
+        expect(of('unemployment').reducedUntil).toBe('2026-12-31');
+
+        const exp = window.EuriskoSocialQuick.unemploymentExpiryOf({
+            wage: 10000, socialAverage: 8000, housingRate: 0.12, specialMonthly: 1000
+        });
+        expect(exp.expiresOn).toBe('2026-12-31');
+        // 月薪 1 万：个人三险一金 2250 → 2300，一年多缴 600 元
+        expect(exp.current.monthlyPersonal).toBeCloseTo(2250, 2);
+        expect(exp.expired.monthlyPersonal).toBeCloseTo(2300, 2);
+        expect(exp.gap.annualPersonal).toBeCloseTo(600, 2);
+        expect(exp.current.statutoryRate).toBeCloseTo(0.225, 10);
+        expect(exp.expired.statutoryRate).toBeCloseTo(0.23, 10);
+        // 专项扣除多 600 元 → 税额少 18 元 → 到手净少 582 元（不是 600，税会回一点）
+        expect(exp.gap.annualTax).toBeCloseTo(-18, 2);
+        expect(exp.gap.annualNet).toBeCloseTo(-582, 2);
+        // 单位那一份不进到手工资，所以这里只对照个人侧
+        expect(exp.current.employerRate).toBe(0.005);
+        expect(exp.expired.employerRate).toBe(0.02);
     });
 
     test('缴费基数：60% 保底 / 300% 封顶；公积金 5%~12% 且免税上限 12% 与社平 3 倍', () => {
@@ -241,7 +265,7 @@ describe('到手工资：与内核 / 工资薪金累计预扣同源', () => {
         expect(diff).toEqual([]);
     });
 
-    test('与 salary-tax-quick 同口径：五险一金作为扣除项时结果一致', () => {
+    test('与 salary-tax-quick 同口径：三险一金作为扣除项时结果一致', () => {
         const quick = window.EuriskoSocialQuick;
         const salary = window.EuriskoSalaryQuick;
         const r = quick.netSalaryOf({ wage: 20000, socialAverage: AVG, housingRate: 0.12, specialMonthly: 2000 });

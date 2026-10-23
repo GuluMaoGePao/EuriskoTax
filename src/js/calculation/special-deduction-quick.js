@@ -247,7 +247,7 @@
         return n;
     }
 
-    /** 扣除前应纳税所得额：全年工资薪金 − 6 万 − 五险一金 − 其他扣除（不含专项附加扣除） */
+    /** 扣除前应纳税所得额：全年工资薪金 − 6 万 − 三险一金 − 其他扣除（不含专项附加扣除） */
     function personOf(input, prefix) {
         var monthly = Math.max(0, toNumber(input[prefix + 'MonthlyIncome']));
         var insurance = Math.max(0, toNumber(input[prefix + 'MonthlyInsurance']));

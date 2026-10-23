@@ -41,7 +41,7 @@
                 "operatingSystem": "Web",
                 "inLanguage": "zh-CN",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
-                "description": "按年度综合所得口径计算全年应纳税额，与已预缴税额相减得出应退或应补税额：输入月薪、任职月数、五险一金与专项附加扣除，可选填个税 App 中的已预缴税额。"
+                "description": "按年度综合所得口径计算全年应纳税额，与已预缴税额相减得出应退或应补税额：输入月薪、任职月数、三险一金与专项附加扣除，可选填个税 App 中的已预缴税额。"
             },
             {
                 "@type": "FAQPage",
@@ -149,7 +149,7 @@
                     <input class="calc-input" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12" style="width:100%">
                 </div>
                 <div style="flex:1 1 200px;min-width:0">
-                    <label class="calc-label" for="insurance-input">每月五险一金（元）</label>
+                    <label class="calc-label" for="insurance-input">每月三险一金（元）</label>
                     <input class="calc-input" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000" style="width:100%">
                 </div>
                 <div style="flex:1 1 200px;min-width:0">
@@ -212,7 +212,7 @@
                     <input class="calc-input" id="m1-months" type="number" inputmode="numeric" min="1" max="12" step="1" value="6" style="width:100%">
                 </div>
                 <div style="flex:1 1 150px;min-width:0">
-                    <label class="calc-label" for="m1-insurance">五险一金/月（元）</label>
+                    <label class="calc-label" for="m1-insurance">三险一金/月（元）</label>
                     <input class="calc-input" id="m1-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
                 </div>
                 <div style="flex:1 1 150px;min-width:0">
@@ -230,7 +230,7 @@
                     <input class="calc-input" id="m2-months" type="number" inputmode="numeric" min="0" max="12" step="1" value="6" style="width:100%">
                 </div>
                 <div style="flex:1 1 150px;min-width:0">
-                    <label class="calc-label" for="m2-insurance">五险一金/月（元）</label>
+                    <label class="calc-label" for="m2-insurance">三险一金/月（元）</label>
                     <input class="calc-input" id="m2-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
                 </div>
                 <div style="flex:1 1 150px;min-width:0">
@@ -304,10 +304,10 @@
 
         <h2>怎么算：先算年度税，再减已预缴</h2>
         <ol>
-            <li><strong>算全年应纳税额</strong>：全年收入 = 月薪 × 任职月数；全年扣除 =（5000 + 五险一金 + 专项附加扣除）× 任职月数；应纳税所得额 = 全年收入 − 全年扣除（不足 0 按 0）；再查年度税率表。</li>
+            <li><strong>算全年应纳税额</strong>：全年收入 = 月薪 × 任职月数；全年扣除 =（5000 + 三险一金 + 专项附加扣除）× 任职月数；应纳税所得额 = 全年收入 − 全年扣除（不足 0 按 0）；再查年度税率表。</li>
             <li><strong>减掉已预缴税额</strong>：应退/应补 = 全年应纳税额 − 全年已预缴税额。<strong>正数 = 应补，负数 = 应退</strong>。</li>
         </ol>
-        <p class="muted small">例：月薪 20000 元、全年任职 12 个月、每月五险一金 3000 元、每月专项附加扣除 2000 元 → 全年收入 240000 元，全年扣除 (5000 + 3000 + 2000) × 12 = 120000 元，应纳税所得额 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）→ 全年应纳税额 = 120000 × 10% − 2520 = 9480 元；若全年已预缴 9480 元，则应退应补为 0。</p>
+        <p class="muted small">例：月薪 20000 元、全年任职 12 个月、每月三险一金 3000 元、每月专项附加扣除 2000 元 → 全年收入 240000 元，全年扣除 (5000 + 3000 + 2000) × 12 = 120000 元，应纳税所得额 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）→ 全年应纳税额 = 120000 × 10% − 2520 = 9480 元；若全年已预缴 9480 元，则应退应补为 0。</p>
 
         <h2>年度综合所得税率表（汇算适用）</h2>
         <div class="table-scroll">
@@ -359,7 +359,7 @@
         <h2>三种典型情形的汇算结果</h2>
         <div class="table-scroll">
             <table id="example-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">均按每月五险一金 3000 元、每月专项附加扣除 2000 元测算；最后一列正数 = 应补，负数 = 应退（已预缴税额为示例值，实际请填个税 App 里的数字）</caption>
+                <caption class="small muted" style="text-align:left;padding:8px 0">均按每月三险一金 3000 元、每月专项附加扣除 2000 元测算；最后一列正数 = 应补，负数 = 应退（已预缴税额为示例值，实际请填个税 App 里的数字）</caption>
                 <thead>
                 <tr>
                     <th scope="col">情形</th>

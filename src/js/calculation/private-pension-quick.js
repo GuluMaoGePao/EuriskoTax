@@ -171,7 +171,7 @@
         return global.calculateTaxByTaxableIncome(Math.max(0, Number(taxable) || 0)).tax;
     }
 
-    /** 扣除前应纳税所得额：全年工资 − 6 万 − 五险一金 − 专项附加扣除 − 其他扣除 */
+    /** 扣除前应纳税所得额：全年工资 − 6 万 − 三险一金 − 专项附加扣除 − 其他扣除 */
     function personOf(input, prefix) {
         var monthly = Math.max(0, toNumber(input[prefix + 'MonthlyIncome']));
         var insurance = Math.max(0, toNumber(input[prefix + 'MonthlyInsurance']));

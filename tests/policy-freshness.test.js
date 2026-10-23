@@ -149,8 +149,8 @@ describe('19-12 B4 结果标政策版本', () => {
     });
 
     test('版本来自政策库，渲染层不自带数字（自带就一定会在改口径时忘同步）', () => {
-        window.EuriskoTaxRegistry = Object.assign({}, real, { VERSION: '2026.3' });
-        expect(TB().policyVersionHtml()).toContain('2026.3');
+        window.EuriskoTaxRegistry = Object.assign({}, real, { VERSION: '2026.4' });
+        expect(TB().policyVersionHtml()).toContain('2026.4');
     });
 
     test('政策库不给版本 → 不标，也不编一个', () => {

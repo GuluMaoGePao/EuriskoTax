@@ -65,7 +65,7 @@
             annualTax: net.annualTax,
             // 到手占比 = 员工真正拿到手的 / 企业实际花掉的（剩下的都是社保、公积金与个税）
             netShare: annualPerPerson > 0 ? netAnnual / annualPerPerson : 0,
-            // 「中间差额」：企业花了但员工没拿到手的部分（单位五险一金 + 个人五险一金 + 个税）
+            // 「中间差额」：企业花了但员工没拿到手的部分（单位五险一金 + 个人三险一金 + 个税）
             wedge: round(annualPerPerson - netAnnual),
             // 单位成本占工资比（不含个人部分）
             employerRate: wage > 0 ? s.employerTotal / wage : 0
@@ -141,7 +141,7 @@
     // 涨薪成本：税前多 step 元，企业每年多花多少、员工多拿到多少
     //
     // 两个方向都算，是因为它们差得很远：企业多付的钱里，只有一部分变成员工到手
-    // （剩下的走了单位五险一金、个人五险一金与累进个税）—— 这个比值就是**传递率**。
+    // （剩下的走了单位五险一金、个人三险一金与累进个税）—— 这个比值就是**传递率**。
     function raiseOf(input, step) {
         var delta = num(step) > 0 ? num(step) : 1000;
         var base = costOf(input);

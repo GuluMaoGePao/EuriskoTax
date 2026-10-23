@@ -8,7 +8,7 @@
  *     或被 tax-rates-sync.js 从 /api/config/tax-rates 覆盖后的运营热改值，与 App 同一份。
  *
  * 累计预扣预缴口径（与内核一致）：
- *   每月应纳税所得额 = 月薪 − 5000 − 五险一金 − 专项附加扣除 − 其他扣除（不足 0 按 0）
+ *   每月应纳税所得额 = 月薪 − 5000 − 三险一金 − 专项附加扣除 − 其他扣除（不足 0 按 0）
  *   累计应纳税所得额 = Σ 每月应纳税所得额
  *   累计应纳税额     = 累计应纳税所得额 × 预扣率 − 速算扣除数
  *   本月应预扣税额   = 截至本月的累计应纳税额 − 截至上月的累计应纳税额
@@ -38,7 +38,7 @@
         return [];
     }
 
-    // 每月应纳税所得额：扣完起征点/五险一金/专项附加后，不足 0 按 0（负值不抵后续月份）
+    // 每月应纳税所得额：扣完起征点/三险一金/专项附加后，不足 0 按 0（负值不抵后续月份）
     function monthlyTaxableOf(monthlyIncome, monthlyInsurance, monthlySpecialAdditional) {
         var income = Number(monthlyIncome);
         if (!Number.isFinite(income)) return 0;

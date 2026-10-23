@@ -182,7 +182,7 @@
                     <div class="v" id="c-base">—</div>
                 </div>
                 <div class="result">
-                    <div class="k">个人五险一金/月（元）</div>
+                    <div class="k">个人三险一金/月（元）</div>
                     <div class="v" id="c-personal">—</div>
                 </div>
                 <div class="result">
@@ -386,7 +386,7 @@
         <p>
             未封顶时企业每月多付 <strong>1395.00 元</strong>（工资 1000 + 单位五险一金 395），
             全年多付 16740.00 元，而员工全年到手只多 <strong>8370.00~9021.00 元</strong> ——
-            中间被单位五险一金、个人五险一金与累进个税吃掉一半，这就是<strong>传递率约 50%</strong> 的来源。
+            中间被单位五险一金、个人三险一金与累进个税吃掉一半，这就是<strong>传递率约 50%</strong> 的来源。
             已封顶后单位部分不再增加，企业每月只多付 1000 元，传递率反而升到 <strong>70%~80%</strong>。
         </p>
         <h3>3. 公积金是双边的，且这一页只算法定五险一金</h3>
@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     + '单位部分停在 ' + money(r.employerTotal) + ' 元，成本倍数降到 ' + ratio(r.multiple) + '。');
             }
             msg.push('企业每花 100 元，员工实际到手约 ' + Math.round(r.netShare * 1000) / 10
-                + ' 元 —— 差额是单位五险一金、个人五险一金与个税。');
+                + ' 元 —— 差额是单位五险一金、个人三险一金与个税。');
             if (msg.length) {
                 hint.innerHTML = msg.join(' ');
                 hint.hidden = false;

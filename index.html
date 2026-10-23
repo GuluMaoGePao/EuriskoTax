@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.149.6';
+        window.__APP_VERSION__ = '1.149.7';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1746,7 +1746,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.149.6</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.149.7</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2221,7 +2221,7 @@
     <script src="src/js/auth/plan.js"></script>
     <script src="src/js/data/history-sync.js"></script>
     <!-- Phase 1：多步计税流程的本地草稿（断点续算）—— 手机上填到第三步被打断也不丢。
-         收入 / 五险一金属个保法敏感个人信息：只存本机 localStorage（独立 euriskoDraft: 命名空间，
+         收入 / 三险一金属个保法敏感个人信息：只存本机 localStorage（独立 euriskoDraft: 命名空间，
          不进云同步链路），7 天自动过期，恢复条上明示并支持一键清除，退出登录随本地数据一并清。 -->
     <!-- 17B-4（v1.50.0）：页面式草稿随分类所得页面一起删了 —— 四个页面式 deep 全数迁走后，
          它登记的最后一个 containerId 也不存在了（留着只会让 bindFlow 静默失败）。
@@ -2910,7 +2910,7 @@
             <div class="entity-field" style="margin-top:12px">
                 <span>粘贴名单 / 工资表</span>
                 <textarea id="batch-paste" class="batch-paste" spellcheck="false"
-                    placeholder="从 Excel / WPS / 飞书复制整张表（带表头最好），直接粘贴到这里&#10;例：姓名&#9;税前月薪&#9;五险一金（个人/月）&#9;专项附加扣除（月）"></textarea>
+                    placeholder="从 Excel / WPS / 飞书复制整张表（带表头最好），直接粘贴到这里&#10;例：姓名&#9;税前月薪&#9;三险一金（个人/月）&#9;专项附加扣除（月）"></textarea>
             </div>
 
             <div class="entity-form-ops">

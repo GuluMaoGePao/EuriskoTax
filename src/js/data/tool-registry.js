@@ -1082,7 +1082,7 @@
                     ] },
 
                 { key: 'otherTaxable', step: 'settle', label: '全年其他综合所得的应纳税所得额（元）', type: 'money', default: 0,
-                    hint: '工资薪金等已减 6 万基本减除、五险一金与专项附加扣除后的余额；填 0 表示全年只有这里填的这笔收入' }
+                    hint: '工资薪金等已减 6 万基本减除、三险一金与专项附加扣除后的余额；填 0 表示全年只有这里填的这笔收入' }
             ],
             steps: [
                 { key: 'type', title: '所得类型', why: '三类所得的预扣率表与收入额折算比例都不同 —— 先定类型，后面的每一步才有对应的口径' },
@@ -2416,7 +2416,7 @@
         {
             // 阶段17 17D-7（v1.63.0）：个税场景完整度 **10/16 → 11/16** 的第七个场景 —— 年度汇算清缴。
             //
-            // 速算器那五个输入框（月薪 / 任职月数 / 五险一金 / 专项附加 / 已预缴）
+            // 速算器那五个输入框（月薪 / 任职月数 / 三险一金 / 专项附加 / 已预缴）
             // 只认「一处任职、全年 12 个月、只有工资」这一种人生，而汇算真正会出错的三层它一个都表达不出来：
             //   ① **基本减除费用在汇算时是年定额 6 万元，不按任职月数折算**（个税法第六条）——
             //      累计预扣法里的「5000 × 任职月数」只是**预扣**阶段的算法。年中入职 6 个月、
@@ -2445,7 +2445,7 @@
                     itemFields: [
                         { key: 'monthlyIncome', label: '税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0 },
                         { key: 'months', label: '任职月数', type: 'number', default: 12, min: 1, max: 12 },
-                        { key: 'monthlyInsurance', label: '五险一金（个人 / 月）', type: 'money', default: 0, sample: 1500, min: 0 },
+                        { key: 'monthlyInsurance', label: '三险一金（个人 / 月）', type: 'money', default: 0, sample: 1500, min: 0 },
                         { key: 'monthlySpecial', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000, min: 0 }
                     ] },
                 { key: 'labor', step: 'income', label: '全年劳务报酬（含税）', type: 'money', default: 0, min: 0,
@@ -2527,7 +2527,7 @@
                     { label: '汇算收入额合计', value: r.incomeAmountTotal, kind: 'money',
                         hint: '综合所得的收入额：工资薪金按全额，劳务报酬与特许权使用费按 80% 折算、稿酬按 56% 折算' },
                     { label: '减除费用', value: r.basicDeduction, kind: 'money', hint: '年定额 6 万元，不按任职月数折算' },
-                    { label: '专项扣除（五险一金）', value: r.insuranceTotal, kind: 'money' },
+                    { label: '专项扣除（三险一金）', value: r.insuranceTotal, kind: 'money' },
                     { label: '专项附加扣除', value: r.specialTotal, kind: 'money',
                         hint: r.medical.deduction > 0 ? '含大病医疗 ' + Math.round(r.medical.deduction) + ' 元（只在汇算时扣）' : '七项合计' },
                     { label: '其他扣除', value: r.otherDeduction, kind: 'money' },
@@ -2563,7 +2563,7 @@
                         title: '任职段明细（各段独立预扣）',
                         note: '新单位不掌握上一家的累计收入，累计预扣从 0 重新开始 —— 档位被重置、速算扣除数被扣两次',
                         table: {
-                            head: ['任职段', '月收入', '月数', '收入', '五险一金', '专项附加', '已预缴'],
+                            head: ['任职段', '月收入', '月数', '收入', '三险一金', '专项附加', '已预缴'],
                             rows: r.jobs.map(function (j, i) {
                                 return ['第 ' + (i + 1) + ' 段', money(j.monthlyIncome), String(j.months) + ' 个月',
                                     money(j.income), money(j.insurance), money(j.special), money(j.prepaid)];
@@ -2612,7 +2612,7 @@
                 }
 
                 var note = '汇算收入额 ' + Math.round(r.incomeAmountTotal) + ' 元，扣除合计 '
-                    + Math.round(r.deductionTotal) + ' 元（6 万定额 + 五险一金 ' + Math.round(r.insuranceTotal)
+                    + Math.round(r.deductionTotal) + ' 元（6 万定额 + 三险一金 ' + Math.round(r.insuranceTotal)
                     + ' + 专项附加 ' + Math.round(r.specialTotal)
                     + (r.otherDeduction > 0 ? ' + 其他扣除 ' + Math.round(r.otherDeduction) : '')
                     + '），全年应纳税额 ' + Math.round(r.annualTax) + ' 元、已预缴 ' + Math.round(r.prepaidTax)
@@ -2641,7 +2641,7 @@
                     title: '② 扣除：6 万定额 + 三项扣除',
                     rows: [
                         { label: '基本减除费用（年定额）', value: r.basicDeduction, format: 'money', note: '不按任职月数折算 —— 年中入职也扣满 6 万' },
-                        { label: '专项扣除（五险一金）', value: r.insuranceTotal, format: 'money' },
+                        { label: '专项扣除（三险一金）', value: r.insuranceTotal, format: 'money' },
                         { label: '专项附加扣除', value: r.specialTotal, format: 'money',
                             note: r.medical.deduction > 0 ? '含大病医疗 ' + Math.round(r.medical.deduction) + ' 元（只在汇算时扣）' : '七项合计' },
                         { label: '其他扣除', value: r.otherDeduction, format: 'money' },
@@ -2691,12 +2691,12 @@
             fields: [
                 { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0,
                     hint: '扣除只抵本人的应纳税所得额，所以夫妻两人的收入都要填，才能算出「给谁更省」' },
-                { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
+                { key: 'selfMonthlyInsurance', step: 'income', label: '本人三险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
                 { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0,
                     hint: '个人养老金（≤12000）/ 企业年金 / 税优健康险（≤2400）等 —— 它们与专项附加扣除叠加享受' },
                 { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
                     hint: '填 0 表示按单身（或配偶无综合所得）计算' },
-                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶三险一金（元/月）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseOtherDeduction', step: 'income', label: '配偶其他扣除（元/年）', type: 'money', default: 0, min: 0 },
 
                 { key: 'children', step: 'children', label: '子女教育：符合条件的子女个数', type: 'number', default: 1, min: 0,
@@ -2811,7 +2811,7 @@
 
                 rows.push(
                     { label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, kind: 'money',
-                        hint: '全年工资 − 6 万 − 五险一金 − 其他扣除（不含专项附加扣除）' },
+                        hint: '全年工资 − 6 万 − 三险一金 − 其他扣除（不含专项附加扣除）' },
                     { label: '本人适用税率（扣除前）', value: r.self.bracket ? r.self.bracket.rate : 0, kind: 'percent' },
                     { label: '本人扣除后个税', value: best.taxSelf, kind: 'money' }
                 );
@@ -2909,7 +2909,7 @@
                 }, {
                     title: '② 扣除落到各自的应纳税所得额上',
                     rows: [{ label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, format: 'money',
-                        note: '全年工资 − 6 万 − 五险一金 − 其他扣除' },
+                        note: '全年工资 − 6 万 − 三险一金 − 其他扣除' },
                         { label: '本人扣除后', value: Math.max(0, r.self.taxableBefore - best.deductionSelf), format: 'money' },
                         { label: '本人个税', value: best.taxSelf, format: 'money' }].concat(r.hasSpouse ? [
                             { label: '配偶扣除前应纳税所得额', value: r.spouse.taxableBefore, format: 'money' },
@@ -2960,12 +2960,12 @@
             fields: [
                 { key: 'selfMonthlyIncome', step: 'income', label: '本人税前月薪（元）', type: 'money', default: 0, sample: 15000, min: 0,
                     hint: '三项税优扣的都是同一个应纳税所得额，所以它必须由收入推出来，而不是让你自己填一个数' },
-                { key: 'selfMonthlyInsurance', step: 'income', label: '本人五险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
+                { key: 'selfMonthlyInsurance', step: 'income', label: '本人三险一金（元/月）', type: 'money', default: 0, sample: 1500, min: 0 },
                 { key: 'selfSpecialDeduction', step: 'income', label: '本人专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'selfOtherDeduction', step: 'income', label: '本人其他扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseMonthlyIncome', step: 'income', label: '配偶税前月薪（元）', type: 'money', default: 0, min: 0,
                     hint: '12000 是每个人的额度，不是一家人的 —— 填了配偶才能算出「家里的钱该给谁缴」' },
-                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶五险一金（元/月）', type: 'money', default: 0, min: 0 },
+                { key: 'spouseMonthlyInsurance', step: 'income', label: '配偶三险一金（元/月）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseSpecialDeduction', step: 'income', label: '配偶专项附加扣除（元/年）', type: 'money', default: 0, min: 0 },
                 { key: 'spouseOtherDeduction', step: 'income', label: '配偶其他扣除（元/年）', type: 'money', default: 0, min: 0 },
 
@@ -3049,7 +3049,7 @@
                 var money = function (x) { return { value: x, kind: 'money' }; };
                 var rows = [
                     { label: '本人扣除前应纳税所得额', value: r.self.taxableBefore, kind: 'money',
-                        hint: '全年工资 − 6 万 − 五险一金 − 专项附加扣除 − 其他扣除' },
+                        hint: '全年工资 − 6 万 − 三险一金 − 专项附加扣除 − 其他扣除' },
                     { label: '本人适用税率（扣除前）', value: r.self.bracket ? r.self.bracket.rate : 0, kind: 'percent' },
                     { label: '三项合计可扣除', value: r.totalDeductible, kind: 'money' },
                     { label: '扣除后应纳税所得额', value: r.taxableAfter, kind: 'money' },
@@ -3231,7 +3231,7 @@
                     hint: '同时发生按 30% 扣除与全额扣除的，扣除次序自行选择' },
 
                 { key: 'comprehensiveTaxable', step: 'income', label: '综合所得应纳税所得额（元，捐赠前）', type: 'money', default: 0, sample: 36000, min: 0,
-                    hint: '限额按应纳税所得额算，不是收入 —— 已扣完 6 万与五险一金、专项附加之后的那个数' },
+                    hint: '限额按应纳税所得额算，不是收入 —— 已扣完 6 万与三险一金、专项附加之后的那个数' },
                 { key: 'comprehensiveBasis', step: 'income', label: '上面这个数是', type: 'select', default: 'year',
                     options: [{ value: 'year', label: '全年（居民个人）' }, { value: 'month', label: '当月（非居民个人）' }] },
                 { key: 'businessTaxable', step: 'income', label: '经营所得应纳税所得额（元，捐赠前）', type: 'money', default: 0, sample: 300000, min: 0,
@@ -4467,6 +4467,8 @@
                 '灵活就业的基数在社平 60%~300% 之间自选，与单位职工「按实际工资定」根本不同',
                 '统筹部分不退还：断缴、身故、出国定居只退还个人账户（8%）那一部分',
                 '工伤、生育个人不缴（生育已并入医保），算到手时扣掉就多扣了',
+                '失业保险的 0.5% 也是阶段性的：执行至 2026-12-31，到期后若无延续文件个人回到 1% —— 三险一金从 22.5% 变成 23%，月薪 1 万一年多缴 600 元',
+                '失业保险 1% 之内个人与单位的分摊各省自定（闽赣陕 各 0.5%、滇晋 0.7%/0.3%），工具默认的 0.5% 只是其中一种口径',
                 '缴费基数仍受 60% 保底 / 300% 封顶约束：工资 3000 按下限缴、工资 5 万只按 3 倍封顶数缴'
             ],
             compute: function (v) {
@@ -4608,7 +4610,7 @@
                             + yuan(it.employer) + ' 元/月' + (it.personalRate ? '' : '（个人不缴）')
                     });
                 });
-                rows.push({ label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' });
+                rows.push({ label: '个人三险一金 / 月', value: s.personalTotal, kind: 'money' });
                 rows.push({ label: '单位缴纳 / 月', value: s.employerTotal, kind: 'money' });
                 rows.push({ label: '到手（第 1 月）', value: n.net1, kind: 'money' });
                 rows.push({ label: '到手（第 12 月）', value: n.net12, kind: 'money',
@@ -4646,7 +4648,7 @@
                     + yuan(hf.personal) + ' 元/月，其中免税 ' + yuan(hf.taxFree) + ' 元'
                     + (hf.taxable > 0 ? '，超标 ' + yuan(hf.taxable) + ' 元要并入工资计税（基数超社平 3 倍）' : '')
                     + '。';
-                note += ' 个人五险一金 ' + yuan(s.personalTotal) + ' 元/月，单位 '
+                note += ' 个人三险一金 ' + yuan(s.personalTotal) + ' 元/月，单位 '
                     + yuan(s.employerTotal) + ' 元/月。';
                 if (!comp.compliant) {
                     note += ' ⚠️ 单位按 ' + yuan(comp.declaredBase) + ' 元申报（比核定基数低 '
@@ -4655,6 +4657,7 @@
                         + ' 元（补缴 + 滞纳金 + 1~3 倍罚款）。';
                 }
 
+                var exp = S.unemploymentExpiryOf(input);
                 var extras = [{
                     title: '工资总额口径（什么进基数、什么不进）',
                     note: socialNote('wage') + '；' + socialNote('adjust'),
@@ -4706,6 +4709,39 @@
                     }
                 }];
 
+                // 到 2027 年这条优惠还在不在，用户自己说了不算 —— 但「在 / 不在差多少」是可以算出来的。
+                // 只对照个人那一份：单位那 2% 不进到手工资，算进来只会把结论搅浑。
+                if (exp) {
+                    extras.push({
+                        title: '失业保险降费到期对照（现行 1%，执行至 ' + exp.expiresOn + '）',
+                        note: '《失业保险条例》（国务院令第 258 号）第六条的法定费率是单位 2%、个人 1%，'
+                            + '现行总费率 1% 是阶段性降费 —— 到期后若无延续文件，个人那一份从 '
+                            + pct(exp.current.personalRate) + ' 回到 ' + pct(exp.expired.personalRate) + '，'
+                            + '个人三险一金从 ' + pct(exp.current.statutoryRate) + ' 变成 '
+                            + pct(exp.expired.statutoryRate) + '。' + (exp.splitNote ? ' ' + exp.splitNote : ''),
+                        table: {
+                            head: ['口径', '个人三险一金 / 月', '全年三险一金', '全年个税', '全年到手'],
+                            rows: [
+                                ['现行（至 ' + exp.expiresOn + '）',
+                                    { value: exp.current.monthlyPersonal, kind: 'money' },
+                                    { value: exp.current.annualPersonal, kind: 'money' },
+                                    { value: exp.current.annualTax, kind: 'money' },
+                                    { value: exp.current.annualNet, kind: 'money' }],
+                                ['到期后（法定 2% / 1%）',
+                                    { value: exp.expired.monthlyPersonal, kind: 'money' },
+                                    { value: exp.expired.annualPersonal, kind: 'money' },
+                                    { value: exp.expired.annualTax, kind: 'money' },
+                                    { value: exp.expired.annualNet, kind: 'money' }],
+                                ['差额',
+                                    { value: exp.gap.monthlyPersonal, kind: 'money' },
+                                    { value: exp.gap.annualPersonal, kind: 'money' },
+                                    { value: exp.gap.annualTax, kind: 'money' },
+                                    { value: exp.gap.annualNet, kind: 'money' }]
+                            ]
+                        }
+                    });
+                }
+
                 var steps = [{
                     title: '本人上年度月平均工资 → 缴费基数',
                     rows: [
@@ -4753,7 +4789,7 @@
                 }];
 
                 return {
-                    primary: { label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money',
+                    primary: { label: '个人三险一金 / 月', value: s.personalTotal, kind: 'money',
                         hint: '缴费基数 ' + yuan(wb.base) + ' 元（上年度月平均 ' + yuan(wb.monthlyAverage) + ' 元）' },
                     rows: rows,
                     note: note,
@@ -6064,7 +6100,7 @@
         {
             // 阶段17 17D-13（v1.69.0）：**非居民个人 / 无住所个人** —— 第三类「20 个速算器里
             // 没有一个能收它」的完整测算（前两个是 donation、property-transfer）。即便同为个税，
-            // 「月薪 + 五险一金 + 专项附加」那五个框**默认这位是中国税收居民**：monthsYears /
+            // 「月薪 + 三险一金 + 专项附加」那五个框**默认这位是中国税收居民**：monthsYears /
             // 累计预扣 / 年度汇算 / 专项附加扣除一律假定法定。而这一类人进门要解决的第一个问题
             // 根本不是「扣多少」，而是「**这笔钱要不要在中国缴**」。要补的四层：
             //   ① 居住天数 → 纳税义务四档（个税法第一条 + 34 号）：≤ 90 天只对「境内工作 +
@@ -6393,7 +6429,7 @@
             fields: [
                 { key: 'monthlyIncome', label: '税前月薪', type: 'money', default: 0, sample: 15000, hint: '税前工资（含岗位工资、绩效等固定发放部分）' },
                 { key: 'months', label: '计算月数', type: 'number', default: 12, min: 1, max: 12 },
-                { key: 'monthlyInsurance', label: '五险一金（个人 / 月）', type: 'money', default: 0, sample: 1500, hint: '个人缴纳部分；工伤与生育个人不缴' },
+                { key: 'monthlyInsurance', label: '三险一金（个人 / 月）', type: 'money', default: 0, sample: 1500, hint: '个人缴纳部分；工伤与生育个人不缴' },
                 { key: 'monthlySpecialAdditional', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000, hint: '专项附加扣除七项合计的月均额（每年 12 月要确认次年的信息）' }
             ],
             pitfalls: [
@@ -6430,12 +6466,12 @@
                                 rows: [
                                     { label: '税前月薪', note: '', value: v.monthlyIncome },
                                     { label: '减：基本减除费用（起征点）', note: '', value: Q.BASIC_DEDUCTION },
-                                    { label: '减：五险一金（个人）', note: '', value: v.monthlyInsurance },
+                                    { label: '减：三险一金（个人）', note: '', value: v.monthlyInsurance },
                                     { label: '减：专项附加扣除', note: '', value: v.monthlySpecialAdditional }
                                 ],
                                 totalLabel: '每月应纳税所得额',
                                 totalValue: perMonthTaxable,
-                                footnote: '月薪 − 5000 − 五险一金 − 专项附加，不足 0 按 0'
+                                footnote: '月薪 − 5000 − 三险一金 − 专项附加，不足 0 按 0'
                             },
                             {
                                 title: '第二步：累计应纳税所得额',
@@ -6458,7 +6494,7 @@
                             }
                         ];
                     })(),
-                    note: '每月应纳税所得额 = 月薪 − 5000 − 五险一金 − 专项附加扣除；累计应纳税额按七级年度表查，本月税额 = 截至本月累计 − 截至上月累计。'
+                    note: '每月应纳税所得额 = 月薪 − 5000 − 三险一金 − 专项附加扣除；累计应纳税额按七级年度表查，本月税额 = 截至本月累计 − 截至上月累计。'
                 };
             }
         },
@@ -6475,7 +6511,7 @@
                 { key: 'specialMonthly', label: '专项附加扣除（月）', type: 'money', default: 0 }
             ],
             pitfalls: [
-                '倒算不能除以到手率：到手率不是常数，甚至不单调（五险一金按社平 3 倍封顶后不再增加）',
+                '倒算不能除以到手率：到手率不是常数，甚至不单调（三险一金按社平 3 倍封顶后不再增加）',
                 '「每月到手 X」有两种口径，全年平均与首月相差可达数百元',
                 '涨薪 1000 元 ≠ 到手多 1000 元（边际到手率约 65%~70%）'
             ],
@@ -6501,7 +6537,7 @@
                         { label: '取整到百元（好谈）', value: r.grossHundred, kind: 'money' },
                         { label: '第 1 月到手', value: r.net1, kind: 'money' },
                         { label: '第 12 月到手', value: r.net12, kind: 'money' },
-                        { label: '五险一金（个人 / 月）', value: r.personalTotal, kind: 'money' },
+                        { label: '三险一金（个人 / 月）', value: r.personalTotal, kind: 'money' },
                         { label: '到手率', value: r.netRate, kind: 'percent' },
                         { label: '企业月成本（含单位部分）', value: r.employerMonthly, kind: 'money' }
                     ],
@@ -6549,7 +6585,7 @@
             policyKey: 'special-deduction',
             nextTools: ['salary-tax', 'annual-settlement', 'private-pension'],
             fields: [
-                { key: 'taxableBefore', label: '扣除前全年应纳税所得额', type: 'money', default: 0, sample: 200000, hint: '全年收入 − 6 万 − 五险一金 − 其他扣除后的金额' },
+                { key: 'taxableBefore', label: '扣除前全年应纳税所得额', type: 'money', default: 0, sample: 200000, hint: '全年收入 − 6 万 − 三险一金 − 其他扣除后的金额' },
                 { key: 'children', label: '子女教育（个数）', type: 'number', default: 1, min: 0, hint: '每个子女 2000 元/月' },
                 { key: 'infants', label: '3 岁以下婴幼儿（个数）', type: 'number', default: 0, min: 0, hint: '每个婴幼儿 2000 元/月' },
                 { key: 'elderly', label: '赡养老人', type: 'select', default: 'only', options: [{ value: 'none', label: '不适用' }, { value: 'only', label: '独生子女（3000 元/月）' }, { value: 'shared', label: '非独生子女（分摊）' }] },
@@ -6622,7 +6658,7 @@
             fields: [
                 { key: 'monthlyIncome', label: '税前月薪', type: 'money', default: 0, sample: 15000 },
                 { key: 'months', label: '当年任职月数', type: 'number', default: 12, min: 1, max: 12, hint: '年中入职 / 离职按实际月数' },
-                { key: 'monthlyInsurance', label: '五险一金（个人 / 月）', type: 'money', default: 0, sample: 1500 },
+                { key: 'monthlyInsurance', label: '三险一金（个人 / 月）', type: 'money', default: 0, sample: 1500 },
                 { key: 'monthlySpecialAdditional', label: '专项附加扣除（月）', type: 'money', default: 0, sample: 1000 },
                 { key: 'prepaidTax', label: '全年已预缴个税', type: 'money', default: 0, hint: '填 0 则按累计预扣法自动推演；填实际值更准（看个税 App 已申报税额）' }
             ],
@@ -6641,7 +6677,7 @@
                     primary: { label: refund ? '应退个税' : '应补个税', value: Math.abs(r.diff), kind: 'money' },
                     rows: [
                         { label: '全年收入', value: r.annualIncome, kind: 'money' },
-                        { label: '全年扣除合计', value: r.annualDeduction, kind: 'money', hint: '年度汇算能扣的三类：6 万元基本减除费用、五险一金、专项附加扣除' },
+                        { label: '全年扣除合计', value: r.annualDeduction, kind: 'money', hint: '年度汇算能扣的三类：6 万元基本减除费用、三险一金、专项附加扣除' },
                         { label: '全年应纳税所得额', value: r.annualTaxable, kind: 'money' },
                         { label: '全年应纳税额', value: r.annualTax, kind: 'money' },
                         { label: '已预缴税额', value: r.prepaidTax, kind: 'money', hint: r.providedPrepaid ? '使用你填写的值' : '按累计预扣法推演' },
@@ -7057,7 +7093,7 @@
                     hint: '比例 ' + pct(s.housingRate) + '，单位同比例再缴 ' + yuan(s.housingEmployer) + ' 元/月'
                 });
                 // ③ 月度小计
-                rows.push({ label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' });
+                rows.push({ label: '个人三险一金 / 月', value: s.personalTotal, kind: 'money' });
                 rows.push({ label: '单位缴纳 / 月', value: s.employerTotal, kind: 'money' });
                 rows.push({ label: '到手（第 1 月）', value: n.net1, kind: 'money' });
                 rows.push({
@@ -7079,9 +7115,9 @@
                     hint: '用工成本：税前工资加上单位为你缴的五险一金；多个人再乘人数'
                 });
                 return {
-                    primary: { label: '个人五险一金 / 月', value: s.personalTotal, kind: 'money' },
+                    primary: { label: '个人三险一金 / 月', value: s.personalTotal, kind: 'money' },
                     rows: rows,
-                    note: '到手 = 工资 − 个人五险一金 − 个税（累计预扣）。企业用工成本 = 工资 + 单位五险一金。'
+                    note: '到手 = 工资 − 个人三险一金 − 个税（累计预扣）。企业用工成本 = 工资 + 单位五险一金。'
                 };
             }
         },
@@ -7155,7 +7191,7 @@
                     rows: [
                         { label: '缴费基数', value: c.base, kind: 'money', hint: clampText },
                         { label: '单位五险一金 / 月', value: c.employerTotal, kind: 'money' },
-                        { label: '个人五险一金 / 月', value: c.personalTotal, kind: 'money' },
+                        { label: '个人三险一金 / 月', value: c.personalTotal, kind: 'money' },
                         { label: '员工月到手', value: c.netMonthly, kind: 'money' },
                         { label: '员工全年个税', value: c.annualTax, kind: 'money' },
                         { label: '人均年成本', value: c.annualPerPerson, kind: 'money' },
@@ -7690,7 +7726,7 @@
         'private-pension': '养老金 12000 递延',
         'health-insurance': '健康险 2400 税优',
         'annuity': '年金 4% 企业年金',
-        'social-base': '社保 公积金 五险一金 基数 上下限',
+        'social-base': '社保 公积金 五险一金 三险一金 基数 上下限',
         'employer-cost': '用工成本 单位 成本倍数 涨薪',
         'disability-fund': '残保金 工会经费 30人',
         'vat': '增值税 小规模 一般纳税人 进项 销项 免税',

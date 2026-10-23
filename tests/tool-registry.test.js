@@ -118,6 +118,28 @@ describe('工具注册表：数量与分组', () => {
     // 明明两版是同一件事，检索却只在其中一版里找，等于替用户决定了他要用哪个。
     test('X-deep 继承同名速算器的别名（这几个词只写在速算器上）', () => {
         expect(R().search('五险一金').deep.map((t) => t.id)).toContain('social-base-deep');
+        // 同一个词有两种叫法，两个词都得搜到：五险一金是**单位参保**的制度口径（五险 + 公积金），
+        // 个人只缴养老 / 医疗 / 失业三险 + 公积金，个税专项扣除扣的也只有这四项 ——
+        // 工具里个人侧写「三险一金」，用户脑子里两个词都有，检索只认其中一个等于替他猜词。
+        expect(R().search('三险一金').tools.map((t) => t.id)).toContain('social-base');
+        expect(R().search('三险一金').deep.map((t) => t.id)).toContain('social-base-deep');
+
+        // 光有别名不够：**写出来的文案**不能再用个人 + 五险一金。个人只缴养老 / 医疗 / 失业三险
+        // + 公积金（工伤与生育 personalRate 为 0，见 tax-constants），两字之差就是把单位承担的两险
+        // 算到个人头上 —— 到手工资凭空少 2.1%，而页面上两个词长得几乎一样，肉眼查不出来。
+        // 只允许「五险一金个人与单位各交多少」这种**两栏并列**的写法，那是在讲制度整体。
+        const FORBIDDEN = ['个人五险一金', '五险一金（个人'];
+        const dirty = []
+            .concat(['src/js/data/tool-registry.js', 'src/js/ui/batch-ui.js', 'index.html'])
+            .concat(fs.readdirSync(path.join(ROOT, 'src', 'js', 'calculation'))
+                .filter((f) => f.endsWith('.js')).map((f) => 'src/js/calculation/' + f))
+            .concat(fs.readdirSync(path.join(ROOT, 'seo'))
+                .filter((f) => f.endsWith('.html')).map((f) => 'seo/' + f))
+            .reduce((acc, rel) => {
+                const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+                return acc.concat(FORBIDDEN.filter((w) => text.includes(w)).map((w) => rel + ' :: ' + w));
+            }, []);
+        expect(dirty).toEqual([]);
         expect(R().search('跳槽').deep.map((t) => t.id)).toContain('annual-settlement-deep');
         expect(R().search('工会经费').deep.map((t) => t.id)).toContain('disability-fund-deep');
     });
@@ -488,7 +510,7 @@ describe('工具注册表：金额不预填（用户没输就是 0）', () => {
     });
 
     // 边界的另一头：比例与法定标准不是「用户填的数」，不能被这轮归零误伤 ——
-    // 养老 8%、公积金 5%、增值税 13% 归零会让五险一金与税额直接塌掉。
+    // 养老 8%、公积金 5%、增值税 13% 归零会让三险一金与税额直接塌掉。
     test('比例与选项未被误伤（percent / select / switch 的 default 照旧）', () => {
         const rates = allFields().filter((x) => x.field.type === 'percent');
         expect(rates.length).toBeGreaterThan(0);

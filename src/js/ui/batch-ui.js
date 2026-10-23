@@ -95,14 +95,22 @@
     }
 
     // ====== 列识别 ======
+    // 同一件事的两种叫法，归一到左边那种，用户从财务系统粘过来的表头用哪一种都要认出来。
+    // 五险一金 = 五项保险（养老 / 医疗 / 失业 / 工伤 / 生育）+ 公积金，是**单位参保**的制度口径；
+    // 个人只缴养老、医疗、失业三险 + 公积金，个税「专项扣除」扣的也只有这四项 —— 所以工具里
+    // 个人侧一律写「三险一金」，而工资表上两种写法都很常见，列识别不能只认自己写的那一种。
+    var HEADER_TERMS = [['五险一金', '三险一金']];
+
     // 归一化只做"人看得懂的同一列"该做的收敛：去空白、去括号里的单位/口径说明、去冒号。
     // 不去"元/万元"这类前缀 —— 那是**口径**，把它抹掉等于替用户换了单位。
     function norm(s) {
-        return String(s === undefined || s === null ? '' : s)
+        var out = String(s === undefined || s === null ? '' : s)
             .replace(/[\s\u3000]/g, '')
             .replace(/[（(][^（()）]*[)）]/g, '')
             .replace(/[:：]$/, '')
             .toLowerCase();
+        HEADER_TERMS.forEach(function (pair) { out = out.split(pair[0]).join(pair[1]); });
+        return out;
     }
 
     function detectMapping(tool, headerCells) {
@@ -119,7 +127,7 @@
                 if (used[f.key]) continue;
                 if (nh === norm(f.label) || nh === norm(f.key)) hit = f;
             }
-            // ② 互相包含（"月薪" ⊂ "税前月薪"、"五险一金个人" ⊃ "五险一金（个人/月）"）
+            // ② 互相包含（"月薪" ⊂ "税前月薪"、"三险一金个人" ⊃ "三险一金（个人/月）"）
             for (var b = 0; b < fields.length && !hit; b++) {
                 var g = fields[b];
                 if (used[g.key]) continue;

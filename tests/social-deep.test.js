@@ -82,8 +82,22 @@ describe('与速算器同源：核定后的数传给 quick，逐点相等', () =
         s.items.forEach((it) => {
             expect(row(out, it.name + '（个人 / 月）')).toBe(it.personal);
         });
-        expect(row(out, '个人五险一金 / 月')).toBe(s.personalTotal);
+        expect(row(out, '个人三险一金 / 月')).toBe(s.personalTotal);
         expect(row(out, '单位缴纳 / 月')).toBe(s.employerTotal);
+
+        // 失业保险降费 2026-12-31 到期：到 2027 年这条优惠还在不在，用户说了不算 ——
+        // 但「在 / 不在差多少」是能算出来的，页面不给这张表，做跨年预算只能按现行的 1% 瞎估。
+        // 只对照个人侧：单位那 2% 不进到手工资，算进来只会把结论搅浑。
+        const sec = out.extras.find((x) => x.title.includes('失业保险降费到期对照'));
+        expect(sec).toBeDefined();
+        expect(sec.title).toContain('2026-12-31');
+        const e = S().unemploymentExpiryOf({ wage: 10000, socialAverage: 8000, housingRate: 0.12 });
+        expect(sec.table.rows.map((r) => r[1].value))
+            .toEqual([e.current.monthlyPersonal, e.expired.monthlyPersonal, e.gap.monthlyPersonal]);
+        // 个人三险一金 22.5% → 23%（工伤、生育个人始终不缴，这两个不在口径里）
+        expect(e.current.statutoryRate).toBeCloseTo(0.225, 10);
+        expect(e.expired.statutoryRate).toBeCloseTo(0.23, 10);
+        expect(sec.note).toContain('国务院令第 258 号');
     });
 
     test('到手与全年汇总走 netSalaryOf（累计预扣，逐月相加）', () => {
