@@ -86,13 +86,34 @@ describe('docs 索引登记不能有遗漏', () => {
     const DOCS_ROOT = path.resolve(__dirname, '../docs');
     const readme = () => fs.readFileSync(path.join(DOCS_ROOT, 'README.md'), 'utf8');
 
+    // 被本机 .gitignore 忽略的文档（如 docs/admin/account-credentials.md，凭证速查，
+    // 不入仓库）不要求登记：登记进 docs/README.md 反而会给 clone 仓库的人留死链接。
+    // 用 git 自己判断而不是维护一份手写排除清单 —— 新增私有文档时守卫自动放行。
+    function ignoredDocs() {
+        try {
+            const { execSync } = require('child_process');
+            return execSync('git ls-files --others --ignored --exclude-standard -- docs', {
+                cwd: path.resolve(__dirname, '..'),
+                encoding: 'utf8',
+                stdio: ['pipe', 'pipe', 'pipe'],
+            }).split(/\r?\n/).filter(Boolean)
+                .map((f) => f.replace(/^docs[\\/]/, '').replace(/\\/g, '/'));
+        } catch (e) {
+            return []; // git 不可用时退回旧行为（宁可误报，不可漏报）
+        }
+    }
+
     function docsMarkdowns() {
+        const ignored = new Set(ignoredDocs());
         const files = [];
         (function walk(dir) {
             fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
                 const full = path.join(dir, e.name);
                 if (e.isDirectory()) walk(full);
-                else if (e.name.endsWith('.md')) files.push(path.relative(DOCS_ROOT, full).replace(/\\/g, '/'));
+                else if (e.name.endsWith('.md')) {
+                    const rel = path.relative(DOCS_ROOT, full).replace(/\\/g, '/');
+                    if (!ignored.has(rel)) files.push(rel);
+                }
             });
         })(DOCS_ROOT);
         return files.filter((f) => f !== 'README.md');

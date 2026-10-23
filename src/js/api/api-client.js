@@ -7,6 +7,13 @@ const API_BASE_URL = (() => {
     return `${window.location.protocol}//${window.location.host}/api`;
 })();
 
+// 部署环境判定（错误文案的措辞取决于它）：
+// 本地预览可以提示「打开 localhost:3000」；线上（正式/预发站）用户手里根本没有
+// 本地服务，照着提示去做只会更懵 —— v1.149.1 实测：用户在预发站撞上部署窗口
+// （pm2 重启几十秒、网关返回 502 HTML），弹的却是「请打开 http://localhost:3000」。
+const IS_LOCAL_PREVIEW = window.location.hostname === 'localhost'
+    || window.location.hostname === '127.0.0.1';
+
 // 会话存储策略：
 //   - 登录时勾选「保持登录状态」→ localStorage（跨浏览器会话保持登录）
 //   - 未勾选 → sessionStorage（关闭标签页/浏览器即失效）
@@ -141,7 +148,9 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     try {
         response = await fetch(`${API_BASE_URL}${url}`, options);
     } catch (e) {
-        const error = new Error(CONNECT_ERROR_MESSAGE);
+        const error = new Error(IS_LOCAL_PREVIEW
+            ? CONNECT_ERROR_MESSAGE
+            : '网络连接失败：请检查网络后刷新重试；若持续出现请联系我们');
         error.cause = e;
         throw error;
     }
@@ -152,7 +161,18 @@ async function apiRequest(url, method = 'GET', data = null, requiresAuth = false
     try {
         result = await response.json();
     } catch (e) {
-        const error = new Error(RESPONSE_ERROR_MESSAGE);
+        // 502/503/504 是网关在后端重启/过载时返回的 HTML 错误页，跟「打错服务」
+        // 不是一回事：部署窗口（pm2 重启几十秒）正好在用的用户就会撞上，
+        // 提示应该是「稍等刷新」，而不是让线上用户去开一个本地服务。
+        let message;
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+            message = '服务器正在更新或重启，请十几秒后刷新重试';
+        } else if (IS_LOCAL_PREVIEW) {
+            message = RESPONSE_ERROR_MESSAGE;
+        } else {
+            message = '服务器返回了非预期内容，请刷新重试；若持续出现请联系我们';
+        }
+        const error = new Error(message);
         error.statusCode = response.status;
         error.cause = e;
         throw error;
