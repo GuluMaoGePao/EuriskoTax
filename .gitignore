@@ -20,6 +20,7 @@ tools/ops/.verify-local-last.json
 # Deploy config (contains server credentials)
 tools/ops/ops-deploy.config.json
 tools/ops/deploy.config.json
+tools/ops/deploy.config.beta.json
 
 # Account credentials doc (contains all passwords/tokens)
 docs/admin/account-credentials.md

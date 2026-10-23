@@ -1,0 +1,40 @@
+{
+  "_comment": "beta（预发）部署配置模板 —— 复制为 deploy.config.beta.json 并填入实际值。deploy.config.beta.json 不入库（已在 .gitignore），本模板入仓。",
+  "_comment_why": "为什么要有 beta：正式站是「软链一指、全量瞬切」，且 prisma migrate deploy 的首次执行发生在生产库上。beta 让迁移、依赖安装、真机链路先在独立环境跑一遍。",
+  "_comment_hard_rules": "四条硬性前置：① 独立数据库（DATABASE_URL 必须是绝对路径，且指向 beta 自己的库）；② 独立 JWT_SECRET（否则 beta 签的 token 能在正式站用）；③ SMTP_PASS 留空（禁止向真实用户发测试邮件）；④ 禁止被搜索引擎收录（postDeploy 注入 noindex，另建议 Caddy 加 Basic Auth）。",
+
+  "server": {
+    "host": "your-server-ip",
+    "port": 22,
+    "user": "ubuntu",
+    "authMethod": "key",
+    "privateKeyPath": "~/.ssh/euriskotax_sskkey.pem"
+  },
+
+  "build": {
+    "excludePatterns": ["node_modules", ".git", "tests", "docs", "tools", "screenshots", "logs", ".codebuddy", "*.log"]
+  },
+
+  "deploy": {
+    "nodeVersion": "20",
+    "processManager": "pm2",
+    "processName": "euriskotax-beta",
+    "remotePath": "/home/ubuntu/euriskotax-beta",
+    "keepReleases": 3
+  },
+
+  "env": {
+    "serverEnvFile": "/home/ubuntu/euriskotax-beta/.env.shared",
+    "PORT": "3001",
+    "NODE_ENV": "production",
+    "CORS_ORIGIN": "*",
+    "_secrets_note": "DATABASE_URL / JWT_SECRET / ADMIN_TOKEN 走 -InitEnv 在服务器上填，不经过本地。DATABASE_URL 必须是 beta 独立的绝对路径（绝不能指到正式库）；SMTP_PASS 留空。"
+  },
+
+  "hooks": {
+    "healthCheckPath": "/health",
+    "healthCheckTimeout": 30,
+    "_comment_postDeploy": "给 beta 站打两个标记：channel=beta（前端据此显示「预发环境」角标）+ robots noindex（防被搜索引擎收录）。只调用一个脚本、不内联 sed：PowerShell 5.1 往 ssh 传参会吃掉双引号，内联 sed 会被远端 bash 当重定向。脚本由 beta-init-server.sh 部署到位。",
+    "postDeploy": "bash /home/ubuntu/euriskotax-beta/beta-mark.sh"
+  }
+}

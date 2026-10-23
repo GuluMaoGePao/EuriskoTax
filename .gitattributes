@@ -1,0 +1,7 @@
+# 服务器脚本必须保持 LF：Windows 上 checkout 若转成 CRLF，
+# Linux bash 会把 `#!/usr/bin/env bash\r` 里的回车当成解释器名的一部分，
+# 报 `/usr/bin/env: 'bash\r': No such file or directory`，且报错信息很难联想到行尾。
+*.sh text eol=lf
+
+# 部署/运维脚本同理（现有 .ps1 都是 CRLF+BOM，保持现状不动）
+*.ps1 text eol=crlf
