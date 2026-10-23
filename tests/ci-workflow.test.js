@@ -66,3 +66,32 @@ describe('CI 里不许出现凭据与部署动作', () => {
         expect(text).not.toContain('smoke:beta');
     });
 });
+
+// CI 与本机唯一实质差别：**它每次 clone 下来都是空库**。
+// 这条差别本身就是一类缝 —— 凡是「本机 dev.db 里早就有数据」才成立的门禁项，
+// 在 CI 上必然红，而本机永远绿。2026-10-24 实测：内容种子只做在 PostgreSQL 演练分支里，
+// SQLite 分支不种子 → 「内容中心公开端点」拿到 items=0 → 干净克隆里 265/266，本机 266/266。
+describe('门禁脚本在空库上也要自足（本机 dev.db 早有数据，看不见这类缝）', () => {
+    const gate = fs.readFileSync(
+        path.resolve(__dirname, '../server/scripts/verify-local-auth.js'), 'utf8'
+    );
+    const seedAt = gate.indexOf('seed-content.js');
+    const pushAt = gate.indexOf('db push --schema prisma/schema.dev.prisma');
+
+    test('有种子化这一步（删了它，CI 红而本机照样全绿）', () => {
+        expect(seedAt).toBeGreaterThan(-1);
+    });
+
+    test('种子化排在 SQLite 建表之后 —— 即两种模式共用，不属于演练分支独有', () => {
+        // 原来的位置在 PG_MODE 分支里（排在 db push 之前），所以「排在之后」能抓住它
+        expect(pushAt).toBeGreaterThan(-1);
+        expect(seedAt).toBeGreaterThan(pushAt);
+    });
+
+    test('种子写入失败直接 FAIL 退出，不静默吞掉', () => {
+        // 吞掉的话后面只会看到 items=0，看不出是种子没写进去还是端点坏了
+        const tail = gate.slice(seedAt, seedAt + 400);
+        expect(tail).toMatch(/status\s*!==\s*0/);
+        expect(tail).toMatch(/process\.exit\(1\)/);
+    });
+});

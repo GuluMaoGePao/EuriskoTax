@@ -239,15 +239,7 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         }
         const migrateTail = migrateOut.trim().split(/\r?\n/).filter(Boolean).pop() || '';
         console.log(`  [OK] 迁移已应用（${migrateTail}）`);
-        // 内容端点断言依赖库内内容，演练库是空的，必须先种子化（幂等）
-        const seed = spawnSync(process.execPath, [path.join(serverDir, 'scripts', 'seed-content.js')],
-            { cwd: serverDir, encoding: 'utf8', timeout: 60000 });
-        if (seed.status !== 0) {
-            console.error('  [FAIL] 内容种子写入演练库失败（后面「内容中心公开端点」断言会因此失败）。');
-            console.error(((seed.stdout || '') + (seed.stderr || '')).slice(-800));
-            process.exit(1);
-        }
-        console.log('  [OK] Prisma Client(PostgreSQL) 已生成，迁移已应用，内容已种子化');
+        console.log('  [OK] Prisma Client(PostgreSQL) 已生成，迁移已应用');
     } else {
         // npm install 的 postinstall 会用生产 schema(PostgreSQL) 生成 Prisma Client，
         // 必须先按本地 SQLite schema 重新 generate，否则 PrismaClient 与 dev.db 引擎不匹配
@@ -276,6 +268,19 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         }
         console.log('  [OK] Prisma Client(SQLite) 已生成，dev.db 表结构已同步');
     }
+
+    // 内容端点断言依赖库内内容，而刚建好的库是空的 —— 必须先种子化（幂等，只补不存在的条目）。
+    // 刻意放在两种模式共用的位置，而不是只给演练库做：
+    //   本机 dev.db 里早就有内容，所以「空库」这条缝本机**永远**看不见（本机跑永远是 266/266），
+    //   只有 clone 下来的干净环境才会暴露 —— CI 的 Linux runner 每次都是这种环境（2026-10-24 实测 265/266）。
+    const contentSeed = spawnSync(process.execPath, [path.join(serverDir, 'scripts', 'seed-content.js')],
+        { cwd: serverDir, encoding: 'utf8', timeout: 60000 });
+    if (contentSeed.status !== 0) {
+        console.error(`  [FAIL] 内容种子写入${PG_MODE ? '演练库' : 'dev.db'}失败（后面「内容中心公开端点」断言会因此失败）。`);
+        console.error(((contentSeed.stdout || '') + (contentSeed.stderr || '')).slice(-800));
+        process.exit(1);
+    }
+    console.log(`  [OK] 内容已种子化（${PG_MODE ? 'PostgreSQL 演练库' : 'SQLite dev.db'}，幂等）`);
 
     let prisma;
     try {
