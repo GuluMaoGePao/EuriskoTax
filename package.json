@@ -13,6 +13,7 @@
     "verify:local": "node server/scripts/verify-local-auth.js",
     "verify:pg": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1",
     "verify:pg:fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1 -Fresh",
+    "bump:version": "node tools/ops/ops-bump-version.js",
     "verify:release": "node tools/ops/preflight-release.js",
     "status:release": "node tools/ops/release-status.js",
     "smoke:beta": "node tools/ops/beta-smoke.js",

@@ -2124,7 +2124,7 @@ $tabs = @(
     @{ Name = "测试中心"; Icon = "🧪"; Desc = "单测 · 覆盖率 · 性能 · 发布门禁 · UI 与视觉 · CI 预演 (22个功能)"; Color = $C_PURPLE   },
     @{ Name = "运维监控"; Icon = "🛠"; Desc = "看门狗守护 · cpolar 内网穿透 (6个功能)";           Color = $C_WARN     },
     @{ Name = "通知日志"; Icon = "📧"; Desc = "邮件通知配置 · 日志查看 (12个功能)";               Color = $C_CYAN     },
-    @{ Name = "部署";     Icon = "📦"; Desc = "预发 · 正式 · 回滚 · 线上核对 · 发布台账 (25个功能)"; Color = $C_ACCENT   },
+    @{ Name = "部署";     Icon = "📦"; Desc = "升版本号 · 预发 · 正式 · 回滚 · 线上核对 · 发布台账 (28个功能)"; Color = $C_ACCENT   },
     @{ Name = "快捷入口"; Icon = "📂"; Desc = "目录 · 终端 · 浏览器 · 文档 (16个功能)";           Color = $C_GRAY     },
     @{ Name = "Git & 账号"; Icon = "🔐"; Desc = "Git 操作 · 账号密码管理 (18个功能)";              Color = $C_PURPLE   }
 )
@@ -3247,10 +3247,23 @@ Add-SectionCard -TabCtx $tab4bCtx `
 # ==============================================================================
 # ============ 标签页 5: 部署 ============
 # ==============================================================================
-$tab5Ctx = New-TabPanel -HeaderText "📦  部署" -HeaderTagline "预发 · 正式 · 线上核对 · 发布台账 · 部署配置" -HeaderDesc "本页包含 4 个功能区：① 预发（beta：部署/试运行/线上核对/真机冒烟/SSH 隧道/回滚/初始化）  ② 正式（腾讯云：试运行/部署/紧急部署/回滚/初始化/停止）  ③ 发完核对与台账（线上指纹 37 项/查看台账/更新台账）  ④ 部署配置和文档"
+$tab5Ctx = New-TabPanel -HeaderText "📦  部署" -HeaderTagline "升版本号 · 预发 · 正式 · 线上核对 · 发布台账 · 部署配置" -HeaderDesc "本页包含 5 个功能区：① 发版（升版本号五处，发之前的第一个动作）  ② 预发（beta：部署/试运行/线上核对/真机冒烟/SSH 隧道/回滚/初始化）  ③ 正式（腾讯云：试运行/部署/紧急部署/回滚/初始化/停止）  ④ 发完核对与台账（线上指纹 37 项/查看台账/更新台账）  ⑤ 部署配置和文档"
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "1. 预发（beta · 上线前的眼睛）" `
+    -Title "1. 发版：升版本号（发之前的第一个动作）" `
+    -Subtitle "脚本：tools/ops/ops-bump-version.js（递一处，同步五处）" `
+    -Description "详细说明：版本号散在五个地方（package.json / version.json / index.html 的版本哨兵 / index.html 页尾「版本 x.y.z」/ CHANGELOG 首个小节），**发版不会自动加号**，必须五处一起动。漏改任一一处**不会报错** —— 页面里的版本哨兵会拿它与线上 version.json 比对，不一致就重置缓存并重载，用户体感是「每次新会话都被清一次缓存，页面闪一下」。这类问题从用户反馈几乎定位不到（页面照样有数字、照样能用），所以把它做成一条命令：递一处、同步五处。日期刻意取 UTC 当天而不是本机日期 —— 发布日是按 UTC 判定「不可能在未来」的，北京时间 00:00-08:00 这段写本机日期会被判成晚于今天。" `
+    -AccentColor $C_ACCENT -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🔢 升版本号`n末位 +1（PATCH）`n⭐发版点这个"; Desc = "把版本号末位 +1，并同步改五处：package.json / version.json（含 releasedAt）/ index.html 哨兵 / index.html 页尾 / CHANGELOG 新起一个小节（验收基线三要素从上一节继承）。任一一处匹配不上就报错退出，不会静默跳过 —— 静默跳过等于制造了第六处漏改。跑完下一步是「发布前自检」，它会当场校验五处一致。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "bump" -Command "npm run bump:version" -WorkingDir $ProjectRoot } },
+    @{ Text = "🔢 升次版本号`n中间位 +1（MINOR）"; Desc = "累计到一批功能、要对外讲一个新版本时才用（--minor），日常修修补补用上面的 PATCH。想一次跨大版本用 --major（那是要换口径的大改，不在按钮上，避免手滑）。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "bump-minor" -Command "npm run bump:version -- --minor" -WorkingDir $ProjectRoot } },
+    @{ Text = "🧪 预览升版本`n只看不写"; Desc = "--dry-run：把五处会改成什么逐条列出来，一个字节都不写。想先看清楚再决定就点这个。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "bump-dry" -Command "npm run bump:version -- --dry-run" -WorkingDir $ProjectRoot } }
+)
+
+Add-SectionCard -TabCtx $tab5Ctx `
+    -Title "2. 预发（beta · 上线前的眼睛）" `
     -Subtitle "脚本：tools/ops/ops-deploy-beta.ps1（独立库 eurisko_beta，与正式站物理隔离）" `
     -Description "详细说明：正式站是软链一指的全量瞬切、没有灰度，beta 是唯一能在真机上先看见的地方。改了工具（算错是核心风险）或动了 schema / 认证 / 兑换码 / 留资 / 邮件（错了会丢数据或发不出去），正式上线前必须先过这里。三条别踩的硬事实：① beta 用独立库，正式站账号登不进去，beta 账号要用脚本现建；② SMTP_PASS 刻意留空，注册收不到验证码；③ 公网地址下 Basic Auth 与应用的 Bearer 共用一个 Authorization 头、无法共存，所以要登录态的冒烟必须先开下面的 SSH 隧道。" `
     -AccentColor $C_ACCENT -ButtonsPerRow 2 -Buttons @(
@@ -3294,7 +3307,7 @@ Add-SectionCard -TabCtx $tab5Ctx `
 )
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "2. 正式（腾讯云 · 唯一上线入口）" `
+    -Title "3. 正式（腾讯云 · 唯一上线入口）" `
     -Subtitle "脚本：tools/ops/ops-deploy.ps1" `
     -Description "详细说明：部署会通过 SSH 把代码推到远程服务器并执行命令。先编辑配置文件填好服务器信息，再先用 试运行 预演一遍没问题再正式部署。" `
     -AccentColor $C_ACCENT -Buttons @(
@@ -3322,7 +3335,7 @@ Add-SectionCard -TabCtx $tab5Ctx `
 )
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "3. 发完之后：核对与台账" `
+    -Title "4. 发完之后：核对与台账" `
     -Subtitle "线上指纹 37 项 + 发布台账（发完不做这一步等于没验）" `
     -Description "详细说明：部署脚本只负责把代码换上去。换上去之后是不是**真的是新版本**、关键资源有没有被缓存挡住、预发与正式有没有落在同一版 —— 这三件事它不回答，这里的按钮回答。指纹核对读的是真实域名（不是本地），台账记下这一版发到哪了，免得下次发版时忘了预发还落后着（在旧代码上看现象，会得出错误的结论）。" `
     -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
@@ -3337,7 +3350,7 @@ Add-SectionCard -TabCtx $tab5Ctx `
 )
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "4. 部署配置和文档" `
+    -Title "5. 部署配置和文档" `
     -Subtitle "配置文件和参考资料" `
     -Description "详细说明：正式部署前必须先编辑 ops-deploy.config.json，填入服务器地址、SSH账号、项目路径等信息。没有的话可以从 example 复制。" `
     -AccentColor $C_GRAY -Buttons @(
