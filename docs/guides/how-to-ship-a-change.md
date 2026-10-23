@@ -112,3 +112,30 @@ npm run smoke:beta       # 7 步：登录 → 算一笔 → 云端同步 → 内
 
 改动落库后 **push 即触发 CI**（`.github/workflows/ci.yml`）：`npm test` + `verify:local` + `verify:release`。
 它证明的是"仓库绿"，**不碰线上**。
+
+## 六、想提前知道 CI 会不会红：本机干净克隆跑一遍
+
+CI 与本机**唯一实质差别是它每次都是 clone 下来的全新仓库**（空 `dev.db`、全新 `node_modules`、
+没有本机的 `.env`）。凡是"本机早就有数据 / 早就装好了"才成立的门禁项，在 CI 上必然红，
+而本机永远绿 —— 这类缝只能靠干净环境暴露，等 GitHub Actions 跑完再改是事后：
+
+```powershell
+git clone <本仓库> ci-gate-check     # 目录名别用 . 开头，原因见下
+cd ci-gate-check
+npm ci                               # 根：jest / jsdom / tailwind
+cd server && npm ci                  # 后端：postinstall 会 prisma generate
+cd ..
+npm test -- --coverage=false --maxWorkers=2
+npm run verify:local                 # 这一步才是空库环境
+npm run verify:release
+```
+
+两个已经踩过的坑（2026-10-24 实测）：
+
+- **clone 的目标目录名不能以 `.` 开头**（比如 `.ci-gate-check`）：jest 的 `testMatch` 是 glob，
+  它不匹配以点开头的路径段，于是报 `No tests found, exit 1` —— 看着像仓库坏了，其实是目录名。
+  CI 的路径 `/home/runner/work/...` 不带点，不会遇到。
+- **空库的缝只能这么抓**：内容种子原本只做在 PostgreSQL 演练分支里，SQLite 分支不种子，
+  于是干净克隆里是 **265/266**（"内容中心公开端点"拿到 `items=0`），而本机 `dev.db` 里早就有内容，
+  本机跑永远是 266/266。修完后 `tests/ci-workflow.test.js` 末尾加了 3 条守卫：
+  删掉种子化会在 `npm test` 就红，不用等 CI。

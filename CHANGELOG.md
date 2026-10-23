@@ -37,7 +37,7 @@
 ### 验收
 
 - 工作流经 `yaml.safe_load` 校验：单 job `gate`、`runs-on: ubuntu-latest`、7 步齐全；
-- 新增 5 条测试全绿；单测 **130 套件 2463 例**全绿；门禁 `verify:local` **266/266**；
+- 新增 5 条测试全绿；单测 **130 套件 2466 例**全绿；门禁 `verify:local` **266/266**；
 - 线上指纹 **37 项**：正式与预发各 **37/37**；`npm run verify:release` 通过。
 
 > 说明：CI 的**首次真实运行结果**要在本次 push 后到 GitHub → Actions 页确认
