@@ -32,6 +32,7 @@
 | `beta-mark-server.sh` | beta 标记注入（幂等）：`window.__APP_CHANNEL__='beta'`（前端据此显示「预发环境 · 数据非生产」角标）+ robots noindex。**单独成脚本**是因为 postDeploy 经 SSH 传参会丢引号，内联 sed 会被远端 bash 当重定向 | ✅ |
 | `deploy.config.beta.example.json` | beta 部署配置模板（独立目录 / 进程 / 端口 / 库） | ✅ |
 | `deploy.config.beta.json` | beta 部署配置（服务器信息，含敏感值） | ❌ 已 gitignore |
+| `beta-smoke.js` | **beta 真机冒烟**（npm `smoke:beta`）：登录 → 档案 → 算一笔 → 云端同步（上传/拉回核对/墓碑清理）→ 内容 → 留资，7 步打真实 HTTP 与真实库，补上 37 项指纹「不登录不写数据」覆盖不到的那段。两道护栏：**默认拒绝打正式站**（留资会写真线索表）；**429 判跳过不算失败**（限流是环境自保）。必须走 SSH 隧道（Basic Auth 与 Bearer 共用 Authorization 头，不可共存） | ✅ |
 | `release-status.js` | **发布台账**：读正式站与预发站 `/version.json` + `CHANGELOG.md`，给出每版的「预发 ✅ / 正式 ✅」两列与结论；**预发落后于正式会报警**（beta 已失去提前一步的意义）；`-- --write` 写回 `docs/development/release-status.md`；npm 入口 `npm run status:release` | ✅ |
 | `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码、新增 urlCreated） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
