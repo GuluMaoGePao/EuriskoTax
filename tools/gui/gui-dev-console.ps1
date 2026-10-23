@@ -3103,7 +3103,16 @@ Add-SectionCard -TabCtx $tab3Ctx `
     @{ Text = "📋 发布前自检`nverify:release"; Desc = "发版前的静态自检（约 1 秒）：版本五处（package.json / version.json / index.html ×2 / CHANGELOG）是否一致，以及文档口径与实测（套件数 / 用例数 / 门禁项数 / 指纹项数）是否一致 —— 漂移了它会直接把漏改的地方指名到行。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "verify-release" -Command "npm run verify:release" -WorkingDir $ProjectRoot } },
     @{ Text = "🚦 一键跑全套门禁`n单测 → verify:local → verify:release`n⭐发版前点这个"; Desc = "把发版前该跑的三步串起来一次跑完（约 2-4 分钟）：130 套件单测 → 266 项本地链路门禁 → 发布前自检。任一步红就停在那里，后面不再继续 —— 与 CI 的判定顺序一致，日志里看得出是哪一步红的。平时改完东西不知道该跑什么，就点这个。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-AsyncCommand -Name "gate-all" -Command "npm test; if (`$?) { npm run verify:local; if (`$?) { npm run verify:release } }" -WorkingDir $ProjectRoot } }
+       OnClick = {
+            $busy = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
+            if ($busy) {
+                $r = [System.Windows.Forms.MessageBox]::Show("检测到 :3000 有进程在监听（多半是本地后端）。`n`nWindows 下运行中的后端会锁定 Prisma 引擎 DLL，门禁里的 prisma generate 会报 EPERM —— 那不是代码问题，但门禁会红。`n`n建议先去【启动管理】点【停止后端服务】再跑这一步。", "后端还在跑，仍要继续吗？", "YesNo", "Warning")
+                if ($r -ne "Yes") { Write-Log "[门禁] 已取消：先停掉 :3000 的后端再跑" "WARN"; return }
+            }
+            # 用 $LASTEXITCODE 而不是 $?：npm 这类外部命令的成败，$LASTEXITCODE 才是它的退出码；
+            # $? 在 PS 5.1 下对外部命令（尤其经过管道/重定向时）并不能稳定反映失败。
+            Invoke-AsyncCommand -Name "gate-all" -Command "npm test; if (`$LASTEXITCODE -eq 0) { npm run verify:local; if (`$LASTEXITCODE -eq 0) { npm run verify:release } }" -WorkingDir $ProjectRoot
+        } }
 )
 
 Add-SectionCard -TabCtx $tab3Ctx `
