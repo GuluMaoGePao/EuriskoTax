@@ -11,6 +11,36 @@
 
 ---
 
+## [1.149.1] - 2026-10-23 - beta 站挂上公网域名，并修掉核对脚本在重定向时丢凭据的缺陷
+
+**beta 域名上线**：`https://beta.euriskotax.com`（DNS 加 A 记录指向 `101.42.89.184`，
+Caddy 自动签发证书）。这解锁了两件以前做不到的事：**手机上也能开**（不用 SSH 隧道），
+**同事可以直接验收**。锁是 Basic Auth 而不是「靠自觉」—— beta 与正式站长得几乎一样，
+被搜索引擎收录或被无关人员误入都是麻烦；另加 `X-Robots-Tag: noindex, nofollow, noarchive`
+作兜底（实测响应头已生效）。`ops-check-beta.ps1` 默认就打这个域名，带凭据核对。
+
+**顺带踩到的真缺陷**：挂上 Basic Auth 后 beta 核对是 36/37，唯一红的 `/reset`
+并不是页面坏了 —— 它后端是 **302 到 `clean-cache.html?auto=1`**，而 `Invoke-WebRequest`
+在重定向时会主动丢掉 `Authorization` 头（.NET 的安全行为），第二跳就变成匿名请求、
+被 Basic Auth 挡回 401。**正式站没有 Basic Auth，所以这个缺陷在正式核对里永远沉默**，
+只有挂上 Basic Auth 的 beta 才会踩到——现象又很像「页面坏了」，容易带着错误的结论去改代码。
+修法：带凭据时改走 `HttpWebRequest` 自己跟重定向，并在每一跳都带上 Authorization；
+不带凭据（正式站）仍走原来的 `Invoke-WebRequest` 分支，行为一字未改。
+没用 `HttpClient`，因为 Windows PowerShell 5.1 默认不加载 `System.Net.Http` 程序集
+（实测报「找不到类型」）。
+
+### 验收
+
+- 单测 **126 套件 2429 例**全绿（本次只动核对脚本与文档，未碰受测产品代码，故例数不变）
+- 门禁 `verify:local` **266/266**（同上：无服务端/前端逻辑变更）
+- 线上指纹 **37 项**：正式站回归 `ops-check-prod.ps1` **37/37**（不带凭据，走原分支）；
+  公网 beta `ops-check-beta.ps1 -BaseUrl https://beta.euriskotax.com` **37/37**
+- Basic Auth 三态自证：匿名 **401** / 正确口令 **200** / 错误口令 **401**
+- noindex 兜底：`X-Robots-Tag: noindex, nofollow, noarchive` 已在响应头
+- `npm run verify:release` 通过：版本号五处一致、文档口径与实测一致
+
+---
+
 ## [1.149.0] - 2026-10-22 - 补上 beta（预发）环境：发布不再「本地绿完就直接上生产」
 
 **起因**：此前从改完代码到正式站只有一步 —— 本地门禁全绿就 `ops-deploy.ps1` 发到腾讯云。
