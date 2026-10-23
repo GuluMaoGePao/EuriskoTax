@@ -1,6 +1,9 @@
 > 本文件首个 `##` 小节被 `tools/ops/release-metrics.js` 扫描（门禁项数 / 套件数 / 用例数 /
 > 线上指纹项数），新版本小节必须带这四项基线，改完记得跑
 > `node -e "require('./tools/ops/release-metrics.js').syncMetricNumbers({write:true})"`。
+>
+> 2026-10-24 文档整理：`docs/` 下 42 份文档全部改为**中文名**（历史文档确定用中文名），
+> 历史条目中引用的文档路径已同步为新名（**条目内容一字未改**）—— 留旧路径会变成死链。
 
 # Changelog
 
@@ -8,6 +11,57 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本（Semantic Versioning）](https://semver.org/lang/zh-CN/)。
+
+---
+
+## [1.149.8] - 2026-10-23 - 界面上那 35 处裸星号：守卫自己就是瞎的
+
+**起因**：`copy-tone` 那条「不许裸加粗」的守卫一直全绿，而界面上实实在在印着 35 处 `**`。
+查下来是守卫自己有两个洞，还互相掩护。
+
+### 洞一：正则只认 `键名: '串'`，拼接片段整片漏掉（28 处）
+
+```js
+hint: '比例 ≤ ' + pct(hf.capRate) + ' **且** 基数 ≤ 社平 ' + ...
+```
+
+后面那些片段前面没有 `键名:`，正则根本不匹配。而它们最终照样显示在界面上 ——
+一整片加粗就这样藏在守卫的眼皮底下。
+
+### 洞二：为跳过正则加的过滤，把句首加粗一并丢掉（6 处）
+
+```js
+if (/^\s*[\/*]/.test(s)) continue;   // 本意是跳过 '/…/' 这类正则字面量
+```
+
+`**统筹部分不退还**：… 恰好以星号开头，被当成正则跳过了。
+偏偏「**XX**：说明」正是最常见的加粗写法 —— 强调词一放句首就隐身。
+（这一洞比洞一更难发现：它连「已扫到」的串都能扔掉。）
+
+### 改法：换成状态机
+
+先剥掉注释与正则，再把单引号 / 双引号 / **反引号**里的文本全部收上来。
+键名只作附加信息保留（拼出来的片段没有键名，不计入提示字段）。
+模板字符串一并扫 —— 项目里 `admin.js` 有 160 处，那里面装的是 HTML 文案。
+
+### 清出来的东西
+
+- 35 处、64 个星号对，**界面上、PDF 里、分享图上都不再有裸 `**`**
+- 其中不少**只有开头没有闭合**（`**统筹部分不退还**：…）—— 界面上是个孤零零挂在句首的星号对，比成对出现还刺眼
+- 删完留下一处断句裂缝：「家里的额度给 配偶 最省。」里的两个空格原本是给加粗留的，一并收掉
+
+### 一个探针用例因此翻了面
+
+`deep-wizard` 里那条用例原来是「**找出**一个带加粗的字段，再验它渲染后没有星号」——
+等于承认源头会写、出了问题靠渲染链兜底。现在倒过来钉源头：
+**拿不出**带加粗的字段才算干净。渲染链（`escRich → strongify`）仍留着，
+历史草稿与外部数据带进来的 `**` 不至于原样端到用户眼前。
+
+### 验收
+
+- 单测 130 套件 2466 例
+- 门禁 verify:local 266/266
+- 线上指纹 37 项
 
 ---
 
@@ -167,7 +221,7 @@
 - 单测 **128 套件 2445 例**全绿；门禁 `verify:local` **266/266**；
 - 线上指纹 **37 项**：正式与预发各 **37/37**；`npm run verify:release` 通过。
 
-账号与口令记在本机 `docs/admin/account-credentials.md`（已 gitignore，不入库）。
+账号与口令记在本机 `docs/admin/账号凭证速查.md`（已 gitignore，不入库）。
 
 ---
 
@@ -183,13 +237,13 @@
 - **`tools/ops/release-status.js`**（npm 入口 `npm run status:release`）：以 `CHANGELOG.md`
   为版本清单、以两站 `/version.json` 为事实来源，自动判定每个版本的「预发 ✅ / 正式 ✅」
   两列，并给出结论（还没发预发 / 已在预发待发正式 / 已全量）；`-- --write` 写回
-  `docs/development/release-status.md` 台账；
+  `docs/development/发布台账.md` 台账；
 - **两类静默失效会报警**：预发落后于正式（beta 失去意义）、线上跑着的版本没归档进
   CHANGELOG（漏归档，或有人绕过流程直接发了）；读不到预发版本时提示补 Basic Auth 凭据，
   而不是误判成「没发」；
 - **台账自动生成，不手写**：手写台账必然漂移，漂移了比没有更糟 —— 照着旧台账发错环境；
   需要留档的结论（真机手点结果）写在台账的「真机验收记录」小节，那块不被覆盖；
-- **把流程写成一个 8 步清单**（`development-workflow.md`）：改代码 → 本地门禁 →
+- **把流程写成一个 8 步清单**（`开发工作流总览.md`）：改代码 → 本地门禁 →
   版本五处同步 → 两条自检 → push → 发 beta 验收 → 发正式 → 打标签 + 更新台账，
   每步附「不做会怎样」，因为「该不该先发 beta」这类判断靠记忆是靠不住的。
 
@@ -285,7 +339,7 @@ Caddy 自动签发证书）。这解锁了两件以前做不到的事：**手机
 **流程与口径**：发布入口从已停用的 `ops-publish.ps1`（Zeabur 时代，默认指向测试环境且
 本机直连不通）改回 `ops-deploy.ps1`，并写清「哪三类改动必须先过 beta」
 （schema/migration、认证·兑换码·留资·邮件、大规模 UI 重构）。顺带修掉
-`development-workflow.md` 里三处早年的「165 项」过期口径（→ 266 项）：它们此前躲过了
+`开发工作流总览.md` 里三处早年的「165 项」过期口径（→ 266 项）：它们此前躲过了
 口径守卫 —— `GATE_PATTERNS` 只认「verify:local N 项」这类写法，认不出表格里
 「165 项 …」和全角括号那两种，已给守卫补上这两种写法。
 
@@ -532,7 +586,7 @@ STARTTLS 处理并告警（不信任被改错的配置），且 `requireTLS: tru
 为 standalone 做的那些适配（`page-history.js` 接管返回、`@media (display-mode: standalone)`
 的出口）**保留不删**：这些坑真实发生过两次（v1.141.0、v1.142.x —— 外链 `target=_blank`
 跳出应用容器，用户看到「点一下 App 没了」），将来若改回 standalone 会立刻复发。文档
-（`ui-ux-master-plan.md` §11、`ui-design-spec.md` §11）已标注现状变更，历史记述不改写。
+（`UI-UX上位方案-论证过程稿.md` §11、`UI设计方案-唯一执行依据.md` §11）已标注现状变更，历史记述不改写。
 
 **存量已安装用户改为引导，不强制。** 桌面图标是按**安装那一刻的 manifest 快照**打开的，
 所以改 `display` 影响不到这批人；而浏览器不提供「网站卸载自己」的 API —— 唯一沾点边的
@@ -754,7 +808,7 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 
 ### 附：为什么这次的动作是这个方向
 
-同一轮另起了一份 `docs/guides/user-journey-and-platform-role.md`，先把**谁在用、怎么用、我们靠什么活、
+同一轮另起了一份 `docs/guides/用户旅程与平台角色.md`，先把**谁在用、怎么用、我们靠什么活、
 哪些不能碰**写成一张纸，工具页的结构是从那张纸推出来的结论（§6），不是另一套独立的设计。
 其中两条直接决定了上面的取舍：① 北极星是 `calc_done`，找工具的路径不能变长；
 ② 站内零购买语义是牌照问题（经营性 ICP 许可证），所以这一屏里不存在任何价格与购买引导。
@@ -997,7 +1051,7 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 
 同批处理的两处可见细节：**角标位置反转** —— 「多步骤」原先只出现在完整测算组内部（21 张全挂着，
 等于没写），而真正需要它的混合列表（最近使用 / 搜索结果 / 为你推荐，那里两版同屏）
-反而没有任何标记；现在反过来，文案照旧（`deep-wizard-ui-spec.md` §D6 的本期结论 —— 改位置不改措辞）。
+反而没有任何标记；现在反过来，文案照旧（`多步测算向导UI规范.md` §D6 的本期结论 —— 改位置不改措辞）。
 **组描述跟着视图改写** —— 「用**上面的**速算器更快」在「完整测算」视图里是句假话：那个视图
 速算组整块不渲染，上面什么都没有。另外首页搜索条那颗「41 个 ›」**删掉**：它要么写死（工具增减就过期）、
 要么动态维护（为一句装饰文案常驻一次渲染），而它不帮用户做任何决定。
@@ -1220,7 +1274,7 @@ v1.118.0 加的「邮箱 或 用户名」双入口撤回。它留下的代价是
 同一个 `.btn-primary` 在留资弹窗是 16px、在意见反馈是 14px（那边额外写了 `text-sm`），
 后台 `admin.css` 又一直是 14px。
 
-**四档阶梯**（已写进 `ui-design-spec.md` §7.3 与 `ui-ux-master-plan.md` §6.2）：
+**四档阶梯**（已写进 `UI设计方案-唯一执行依据.md` §7.3 与 `UI-UX上位方案-论证过程稿.md` §6.2）：
 
 | 层级 | 类 | 值 | 用途 |
 |---|---|---|---|
@@ -1345,10 +1399,10 @@ z-index 下**DOM 顺序决定谁在上面**。不处理的话，从「关于」�
 ### 口径类
 
 - 文档对外口径：`README.md`（生产环境表 + 部署章节）、`docs/README.md`、`docs/marketing/` 三份推广
-  物料、`docs/api/api-reference.md` 里的「在 Zeabur 面板配置」全部改成腾讯云服务器 `.env.shared`。
+  物料、`docs/api/API接口文档.md` 里的「在 Zeabur 面板配置」全部改成腾讯云服务器 `.env.shared`。
 - **地域订正**：此前几处写「腾讯云轻量（上海）」，实际**服务器在北京、备案主体在上海**，一并改正。
-- 历史文档**不改写事实**，只在关键处加状态标注：`lighthouse-deployment-guide.md` 标「切流已完成」、
-  `development-plan.md` 云平台章节标「2026-10-10 已切流」、`set-canonical-domain.ps1` 与
+- 历史文档**不改写事实**，只在关键处加状态标注：`腾讯云部署与迁移手册.md` 标「切流已完成」、
+  `开发总计划-阶段与基线.md` 云平台章节标「2026-10-10 已切流」、`set-canonical-domain.ps1` 与
   `swap-canonical-domain.js` 标为已完成的一次性工具（`-check` / `--check` 仍可当体检用）。
 - 两个 `.env.example` 的注释口径同步；`Dockerfile` / `deploy/lighthouse/` 注释去掉平台名。
 - `tests/copy-standard.test.js` 的域名白名单**保留**旧域（测试环境仍可能合法出现），注释写明原因。
@@ -2606,7 +2660,7 @@ hidden 反制规则，应当成为惯例。
 本版把 16A 从**一张目标表**补成**能照着执行的手册**（原表只有目标与交付物，
 "数据迁移与回滚预案"正是它的交付物之一），并顺带排掉一个切换当天的坑。
 
-### 执行手册（`docs/development/stage16-migration-and-compliance-plan.md` §16A.1）
+### 执行手册（`docs/development/阶段16-迁移与合规方案.md` §16A.1）
 
 按「先迁数据、后切流，验证阶段用 IP 直连不动 DNS」的顺序写，九节：开工前先看清的三件事、
 顺序、数据库、环境变量逐项、部署与 HTTPS、切流同批换 canonical、切换窗口、验证、回滚、
@@ -2721,7 +2775,7 @@ pending 样式）。号一下发它们必然红 —— 这正是当初写它们�
 
 ### 动作三：把比备案更硬的两条写进合规文档
 
-`docs/guides/user-facing-copy-standard.md` 新增 §6.4：① **非经营性备案 ≠ 可以收费** ——
+`docs/guides/面向用户文案规范与台账.md` 新增 §6.4：① **非经营性备案 ≠ 可以收费** ——
 专业版属经营性信息服务，官方支付（阶段16B）的硬前置是**经营性 ICP 许可证**，不只是备案号；
 ② **涉税服务边界**：文案只能落在"咨询解答"，出现"代办 / 代理申报 / 代理记账 / 包过"即越界。
 同批修正 §6.1「落地页主体名 ❌」（那是 CP-5 补容器之前的旧状态，现在 21 页与共用脚本
@@ -2884,7 +2938,7 @@ exportFinalReport(...)       // 传的却是 { meta: {...} }
 断点是阶段17：`17B-1` 删旧页面时，注释写着「向导有自己的导出路径，不需要这条 kind」——
 于是模块留下了、调用方没了。留下的后果不是死代码那么轻：
 
-1. **付费权益没兑现**（`business-plan-for-partners.md` 的 ProCode 权益表列着「汇算清缴 PDF
+1. **付费权益没兑现**（`合伙人版商业企划.md` 的 ProCode 权益表列着「汇算清缴 PDF
    完整报告」）—— 用户交了钱，拿到的仍是标准版，且没有任何一处会报错；
 2. **留资钩子跟着死了**：版本弹窗里那句「需要交付版？留资，由顾问协助」是变现链路的一环，
    链路一断，这条钩子再没被任何人看见过；
@@ -6076,7 +6130,7 @@ data-management 里的引用 + 相关测试）。**页面式 deep 由 4 → 3**�
   ⑤ ④ 的正则不能空转。
 - `tests/docs-metrics.test.js` 新增「docs 索引登记不能有遗漏」守护（2 例）：
   `docs/` 下每个 .md 必须在 `docs/README.md` 里出现 —— 顺带补登了此前从没进过索引的
-  `development/stage12-core-enhancement-plan.md` 与 `reports/performance-optimization-report.md`。
+  `development/阶段12-核心补强与税制参数配置-历史.md` 与 `reports/历史快照-交付重构性能与测试报告.md`。
 
 ### 验证
 
@@ -6181,8 +6235,8 @@ data-management 里的引用 + 相关测试）。**页面式 deep 由 4 → 3**�
 ## [1.39.0] - 2026-09-17（变现闭环：精装版报告版本选择 + 留资换权益钩子）
 
 ### 文档收口（台账 F/G/H/I 四项，纯文档零代码风险）
-- **F（gtm 待办过期）**：`gtm-execution-plan.md` 待办 #7/#8 更正为已完成（social-base v1.29.0 / net-salary v1.30.0）；顺带修掉 `seo-landing-plan.md` 同表两行过期「待办」（与同表 ✅ 行自相矛盾）及已失效的「待办页推荐顺序」段。
-- **G（活码术语不一致）**：gtm 文档 3 处「联系我」活码统一更正为「微信客服」活码（kfid 型客服账号链接），口径对齐 `wecom-channel-playbook.md` —— 术语错会把人引去企微后台错误的配置入口找不着的「客户联系」加好友那套。
+- **F（gtm 待办过期）**：`商业模式落地执行手册.md` 待办 #7/#8 更正为已完成（social-base v1.29.0 / net-salary v1.30.0）；顺带修掉 `SEO落地页方案-阶段14-历史.md` 同表两行过期「待办」（与同表 ✅ 行自相矛盾）及已失效的「待办页推荐顺序」段。
+- **G（活码术语不一致）**：gtm 文档 3 处「联系我」活码统一更正为「微信客服」活码（kfid 型客服账号链接），口径对齐 `企业微信分码操作手册.md` —— 术语错会把人引去企微后台错误的配置入口找不着的「客户联系」加好友那套。
 - **H（stage10 DoD 与头部自相矛盾）**：七项按**可查证的验证载体**逐项勾销（authService `SEED_GRANT_PRO`、verify:local「上传/全量拉取、冲突新者胜、墓碑广播、SYNC_MAX_RECORDS、free 403 PRO_REQUIRED」、history-sync 单测、ops-check-prod.ps1 线上指纹）；双真机矩阵未单独留痕处如实标注、以引擎断言为准 —— 不盲勾。
 - **I（stage13 漏 province/city）**：§4 Prisma 模型与 §5 字段表补齐两字段（≤20 字符，v1.17.0 增补），含「其他/海外」哨兵值出参剔除、幂等合并省市各自判断两条实现口径（出处 `schema.prisma:243-244` / `leadController.js:37-38,104-105`）。
 
@@ -6236,7 +6290,7 @@ data-management 里的引用 + 相关测试）。**页面式 deep 由 4 → 3**�
   等于在北极星 `lead_submit` 上凭空丢弃线索；且行政区划不可能穷尽（县级市 / 境外），
   「其他」兜底之外仍有用户无解。现改为**只收不验**：控件位置与「便于按当地口径核对」的建议文案保留，
   星号与拦截去掉。同步点五处：`lead-modal.js` / `index.html` / `verify-local-auth.js` 门禁断言
-  （原先连必填星号都断言了，等于把这条摩擦写进验收）/ `api-reference.md` / `README`；
+  （原先连必填星号都断言了，等于把这条摩擦写进验收）/ `API接口文档.md` / `README`；
   并改用**反向断言**（`!includes('请填写所在城市')`、「必填星号不得复活」）防止半吊子回滚。
 
 - **Phase 1.5 微信 + PWA 可用性**（此前判定做的缺口 D）：新增 `src/js/utils/runtime-env.js`
@@ -6286,7 +6340,7 @@ data-management 里的引用 + 相关测试）。**页面式 deep 由 4 → 3**�
     - **一个真实的接线坑**：`showPage` 的**分支A（初始导航 / 深链直达）会直接 `return`**，
       因此 `sync` 必须放在两个分支**之前** —— 否则首次进入与深链完全不生效，而常规点进又正常
       （最容易骗过手工验证的那种失效）。已把这条写成单测断言（sync 索引必须早于分支A）。
-    - **顺带发现两个问题，均未擅自改**（详见 `ui-ux-master-plan.md` §13.2 的 J / K 行）：
+    - **顺带发现两个问题，均未擅自改**（详见 `UI-UX上位方案-论证过程稿.md` §13.2 的 J / K 行）：
       ① `auth-ui.js` 用 `document.querySelector('.app-container')?.` 开关主容器，但全库**没有**这个 class
       （`index.html:345` 只有 id），`?.` 抹掉了报错 ⇒ 这两行从未生效；而唯一真正在放行的 `showApp()`
       只在 `isLoggedIn()` 时被调用，意味着**未登录游客目前看不到任何计算器**。这是访问门槛的产品决定，
@@ -6590,7 +6644,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 > 线上指纹 **37 项**（不改动指纹覆盖点）。
 
 ### 变更
-- `docs/marketing/wecom-channel-playbook.md`：第 5 节 B 方案补「待办」两条 ——
+- `docs/marketing/企业微信分码操作手册.md`：第 5 节 B 方案补「待办」两条 ——
   后台若能看到「联系我」的**复制链接**，下次动活码时把 `wecomQrByChannel.share / .landing`
   从 `images/weworkQR.png` 换成该链接（点击直达 + 换人不换图）；
   没有链接就维持图片形态（扫码正常，点击只是打开这张图，手机长按可识别）
@@ -6630,7 +6684,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 > 线上指纹 **37 项**（不改动指纹覆盖点）。
 
 ### 变更
-- `docs/marketing/wecom-channel-playbook.md` 新增**第 5 节 B 方案**（手册 v1.2）
+- `docs/marketing/企业微信分码操作手册.md` 新增**第 5 节 B 方案**（手册 v1.2）
 
 ### 加好友活码怎么弄（官方路径，出自《如何添加客户》《联系我》）
 管理后台 → 客户与上下游 → 客户联系 → 加客户 → **联系我** → 新建联系方式
@@ -6661,7 +6715,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 > 线上指纹 **37 项**（不改动指纹覆盖点）。
 
 ### 变更
-- 仅修订 `docs/marketing/wecom-channel-playbook.md` 至 v1.1（站点侧 v1.37.3 的分码机制**不需要改** —— 微信客服「一账号一链接」正好对上「一入口一码」）
+- 仅修订 `docs/marketing/企业微信分码操作手册.md` 至 v1.1（站点侧 v1.37.3 的分码机制**不需要改** —— 微信客服「一账号一链接」正好对上「一入口一码」）
 
 ### 核实到的四点（决定做法，均出自企微官方帮助中心）
 - 这个 `kfid` 是**微信客服**的客服账号，不是「客户联系」的加好友活码 —— 两者能力不同，不能按加好友那套配
@@ -6691,7 +6745,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 企微《获取客服账号链接》规定：客服链接**不可改写、参数不可复制到别的链接**，否则「进入会话事件」参数校验失败、回调拿不到来源 —— 手工拼 `?from=xxx` 是"页面照开、实际没数据"的假成功，比不做更糟
 
 ### 文档
-- 新增 `docs/marketing/wecom-channel-playbook.md`：企微后台建码 / 欢迎语 / 打标签三步 + 验证清单 + 常见错误；未能核实的后台能力（微信客服能否自动打标签）明确标注为待确认项，不编造
+- 新增 `docs/marketing/企业微信分码操作手册.md`：企微后台建码 / 欢迎语 / 打标签三步 + 验证清单 + 常见错误；未能核实的后台能力（微信客服能否自动打标签）明确标注为待确认项，不编造
 
 ---
 
@@ -6707,7 +6761,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - **二维码整块可点**：手机点一下直接进企微「添加顾问」页，桌面端扫码；生码或图片都拿不到时降级为「点此联系顾问」，不留裂图
 
 ### 文档
-- 冷启动 P0 状态更新：`gtm-execution-plan.md`（Go/No-Go #1 与待办 #1 → ✅）、`business-plan-for-partners.md`、`stage13-acquisition-and-leads-plan.md`、`cold-start-materials.md`、`docs/README.md` 商业状态段
+- 冷启动 P0 状态更新：`商业模式落地执行手册.md`（Go/No-Go #1 与待办 #1 → ✅）、`合伙人版商业企划.md`、`阶段13-获客与转化方案-历史.md`、`冷启动素材.md`、`docs/README.md` 商业状态段
 
 ### 这一版钉住的口径（一条）
 - **配错形态不报错，只会静默失效**：活码链接被当成图片用了，弹窗看起来一切正常、二维码位却是破图，而留资是冷启动唯一的即时承接通道。这类「不报错的坏」只能靠断言盯着，所以新套件里专门有一条判「kfid 链接不是图片」
@@ -6729,8 +6783,8 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
   - 带扫描覆盖下限（脚本数 / 含中文脚本数 / 带 BOM 数），防「路径写错导致空跑全绿」；关键运维脚本名单（`ops-publish` / `ops-verify-pg` / `ops-check-prod` / `ops-start-dev` / `gui-dev-console`）改名或挪目录同样会红
 
 ### 变更
-- `docs/development/file-management-policy.md`：§4.3 补记 v1.37.0 的两次复发（`ops-verify-pg.ps1` 真炸、`gui-dev-console.ps1` 被 bat 兜底），§4.4 明确这条纪律已由单测强制，不再依赖「记得手动 ParseFile」
-- `docs/guides/development-workflow.md` §5 排障行指向新守护测试
+- `docs/development/文件管理规范.md`：§4.3 补记 v1.37.0 的两次复发（`ops-verify-pg.ps1` 真炸、`gui-dev-console.ps1` 被 bat 兜底），§4.4 明确这条纪律已由单测强制，不再依赖「记得手动 ParseFile」
+- `docs/guides/开发工作流总览.md` §5 排障行指向新守护测试
 
 ### 这一版钉住的口径（一条）
 - **兜底不算防线**：启动 bat 的 BOM 自检让一个本该打不开的脚本一直能用，于是没人去修根因。凡是有兜底的地方，都要补一条会红的检查 —— 否则「能用」会把「已经坏了」长期伪装成正常
@@ -7180,7 +7234,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 ## [1.17.0] - 2026-09-13（产品方向调整：取消计算页「参保城市」选择，回到默认基数 + 用户自改；省市改由留资收集）
 
 > 门禁基线：**verify:local 167 项，实跑 167/167 全绿**（快照 `tools/ops/.verify-local-last.json`）。本版新增：移除已下线前端模块的 6 项静态断言；新增「城市改在留资里」5 项 + 「省份随城市一起落库（采集剔除哨兵值 + 按省搜索命中）」2 项 + 「缴费比例可输入 / 留空越界兜底」2 项 + 「经营页基数 × 比例联动」1 项断言。**口径修正**：文档曾按「基线 + 新增项」推算为 164，与实跑不符（少 1 项），现按实跑值回填 —— 该项数一律以实跑快照为准，不做推算。
-> 生产等价演练：本版动过 `schema.prisma` 与 `server/prisma/migrations/`，按 `docs/guides/development-workflow.md` 属**必跑** `npm run verify:pg` 的范围 —— 已于 2026-09-13 在本机装好 Docker Desktop（4.90.0 / 引擎 29.7.2 / Compose v5.5.1，WSL2 后端）并**实跑通过：167/167 全绿**（与线上容器同序：`generate` → `migrate deploy` → 内容种子 → 起服务），迁移 `20260913_add_lead_city` 与 `20260913_add_lead_province` 均已在生产等价 PostgreSQL 上验收；此前记的「本机未装 Docker、尚未执行」按实跑结果更正。同批做的离线等价核对：两份 schema 各自 `prisma validate` 通过（`schema.prisma` 需给 PG 形状的 `DATABASE_URL`，本地 `.env` 的 `file:./dev.db` 会触发 URL 协议不匹配，属既有约定）、两份 `Lead` 模型逐字段一致（`province String @default("")` + `city String @default("")`）、两条迁移 SQL 都是纯加列语句（`ALTER TABLE "Lead" ADD COLUMN "city"/"province" TEXT NOT NULL DEFAULT ''`，带非空默认值，PG 对存量行安全 —— 存量线索的 `province` 落到空串，顾问侧表现为「只知城市、不知省份」，不会误判成某个省）；SQLite 侧的省 / 市落库、按城市与按省份搜索、CSV 省市两列已由 `verify:local` 实跑覆盖。**改动迁移时随时可重跑 `npm run verify:pg`**（全新库首部署场景用 `verify:pg:fresh`；演练库端口 55432、容器 `euriskotax-pg-drill`，跑完只停容器、数据卷 `pg_drill_data` 保留，彻底清理用 `docker compose -f docker-compose.postgres.yml down -v`）。注意 `verify:pg` 会把 Prisma Client 切成 PG 形态，收尾若报「恢复 SQLite Client 失败」需手动 `cd server && npm run prisma:generate:dev`（本次已手动恢复）。
+> 生产等价演练：本版动过 `schema.prisma` 与 `server/prisma/migrations/`，按 `docs/guides/开发工作流总览.md` 属**必跑** `npm run verify:pg` 的范围 —— 已于 2026-09-13 在本机装好 Docker Desktop（4.90.0 / 引擎 29.7.2 / Compose v5.5.1，WSL2 后端）并**实跑通过：167/167 全绿**（与线上容器同序：`generate` → `migrate deploy` → 内容种子 → 起服务），迁移 `20260913_add_lead_city` 与 `20260913_add_lead_province` 均已在生产等价 PostgreSQL 上验收；此前记的「本机未装 Docker、尚未执行」按实跑结果更正。同批做的离线等价核对：两份 schema 各自 `prisma validate` 通过（`schema.prisma` 需给 PG 形状的 `DATABASE_URL`，本地 `.env` 的 `file:./dev.db` 会触发 URL 协议不匹配，属既有约定）、两份 `Lead` 模型逐字段一致（`province String @default("")` + `city String @default("")`）、两条迁移 SQL 都是纯加列语句（`ALTER TABLE "Lead" ADD COLUMN "city"/"province" TEXT NOT NULL DEFAULT ''`，带非空默认值，PG 对存量行安全 —— 存量线索的 `province` 落到空串，顾问侧表现为「只知城市、不知省份」，不会误判成某个省）；SQLite 侧的省 / 市落库、按城市与按省份搜索、CSV 省市两列已由 `verify:local` 实跑覆盖。**改动迁移时随时可重跑 `npm run verify:pg`**（全新库首部署场景用 `verify:pg:fresh`；演练库端口 55432、容器 `euriskotax-pg-drill`，跑完只停容器、数据卷 `pg_drill_data` 保留，彻底清理用 `docker compose -f docker-compose.postgres.yml down -v`）。注意 `verify:pg` 会把 Prisma Client 切成 PG 形态，收尾若报「恢复 SQLite Client 失败」需手动 `cd server && npm run prisma:generate:dev`（本次已手动恢复）。
 > 单测 **30 套件 595 例**（删除 `tests/city-social-sync.test.js` 32 例；`tests/leads.test.js` 新增省 / 市字段契约 4 例（城市 2 + 省份 2），搜索字段扩为五字段同步 1 例）。
 > 线上指纹 **37 项**（本版不改动指纹覆盖点）。
 > 本版不动税率与税额算法：只调整「谁来提供城市」与字段链路。
@@ -7194,14 +7248,14 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 数据库新增 `Lead.city`（`TEXT NOT NULL DEFAULT ''`）：`server/prisma/schema.prisma` + `schema.dev.prisma` + 迁移 `20260913_add_lead_city`；同批新增 `Lead.province`（`TEXT NOT NULL DEFAULT ''`）+ 迁移 `20260913_add_lead_province`
 - **三页「缴费比例」由固定两档下拉改为用户可输入的数字框**（默认 5% 只是初始值）：各地公积金比例 5%~12% 不等（上海 5/6/7、北京 5~12），固定档位会让用户选不到自己的比例；现在与同页其他「缴费比例」控件（`<input type="number">` + `%`）形态一致。正向 / 反向页由 `change` 改为 `input` 事件即时重算，并新增 `normalizeRateInput`（失焦时把留空 / 非数字 / 越界值回落默认 5%）—— 否则用户清空输入会按 `parseFloat('')||0` 静默算成 0，看起来像算错
 - **修复经营所得页「缴费基数 / 缴费比例」从未接线**：社保基数、公积金基数、养老 / 医疗 / 失业 / 公积金比例这 6 个输入框此前改什么都不发生，连「低于下限」提示位（`business-social-security-base-warning`、`business-housing-fund-base-warning`）也没有人写入；现补齐 `基数 × 比例 → 月度金额` 联动（新增 `calculateBusinessInsurance` / `calculateBusinessSocialInsurance`）并接上 `validateSocialSecurityBase('business')` / `validateHousingFundBase('business')`，与正向页口径一致。注意各险种清空后回落的是**自己的**默认比例（养老 8 / 医疗 2 / 失业 0.5 / 公积金 5），不是统一 5%
-- 门禁口径收口：`tools/ops/ops-verify-pg.ps1`、`tools/gui/gui-dev-console.ps1`、`docs/guides/development-workflow.md` 里遗留的旧口径「152 项 / 156 项」共 10 处统一回填为实跑值 **165 项**——`verify:release` 与 `tests/docs-metrics.test.js` 都以「文档声明＝实跑结果」为准，旧口径会让口径自检变红
+- 门禁口径收口：`tools/ops/ops-verify-pg.ps1`、`tools/gui/gui-dev-console.ps1`、`docs/guides/开发工作流总览.md` 里遗留的旧口径「152 项 / 156 项」共 10 处统一回填为实跑值 **165 项**——`verify:release` 与 `tests/docs-metrics.test.js` 都以「文档声明＝实跑结果」为准，旧口径会让口径自检变红
 - **口径守卫加固（旧口径残留防护）**：`tools/ops/release-metrics.js` 原先只校验「每份文件里数值最大的那一条」项数声明，同文件内其余出现既不校验、也不要求版本前缀 —— 上面那 10 处旧口径正是这么漏过去的。现改为**逐条校验 + 版本前缀约束**：非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`（增量描述「新增 / 移除 / 少 N 项」不计入）；`history` 落点的当前口径还必须锚定当前版本，不再靠「取最大」猜（项数下降的版本里历史值会比当前值大）；`ops-verify-pg.ps1` / `gui-dev-console.ps1` 一并纳入扫描
 
 ### 说明
 - **城市社保参数库保留，但不再被端上消费**：`GET /api/config/city-social`（公开只读）、管理端发布 / 回滚 / 版本唯一校验与「社保基数」Tab 全部保留原样，供后续「社保基数」SEO 落地页复用（该页需要真实城市口径）；日后要恢复端上分档，按 git 历史回滚那两个前端模块并在 `index.html` 重新引入即可
 - **口径提示降级为「全国兜底」**：非全国口径城市的用户可能收到本不该出现的「低于最低标准」提示（如上海公积金下限远低于 7546），这类差异改由顾问在留资后人工核对 —— 属本期「前期缩小范围」的已知取舍
 - 门禁断言同步改造：删掉 6 条已下线模块的静态断言，换成「回滚不残留（`index.html` 不得再引用这两个文件）+ 留资城市字段四处接线」断言，并给 e2e 加上城市落库 / 按城市搜索 / CSV 城市列的核对；省市两级一起下后端后又补了「采集时剔除 `PROVINCE_OTHER` 哨兵值」静态断言与「按省份搜索命中」e2e 断言，原 e2e 的落库 / CSV 核对同步扩为省市两列
-- **本地测试账号改为「本机可覆盖，凭据不进版本库」**：开发用的测试账号不再把邮箱 / 密码写进代码 —— 仓库里只留一份任何机器都能跑通的默认账号（`dev@example.com` / `password`，门禁 / 重置脚本会自动创建），本机想用自己账号就在仓库根放一个 `dev-account.local.json`（已 gitignore，字段 `email` / `password`，可选 `username`）：新增 `server/scripts/dev-account.js` 与 `tools/ops/dev-account.ps1` 两个同源读取器，`reset-dev-user.js`、`verify-local-auth.js`、`get-token.ps1`、`debug-swagger*.ps1`、`ops-start-dev.ps1` 与 GUI 控制台的账号 / 密码 / 一键复制按钮、环境检查、取 Token 全部改为读它；登录页「开发环境：填入本地测试账号」预填也改为运行时拉 `/dev-account.local.json`（拿不到就回落默认账号），代码里不再内联任何真实凭据；对外分享邮件模板同步还原为占位账号，并在分享说明里补一句「对外测试账号另备，勿填本机凭据」。顺带修掉两个真问题：①「重置开发测试账号」原来是**删账号重建**，而 `Calculation` / `Feedback` 对 User 都是 `onDelete: Cascade` —— 本机测试账号若是使用者自己的账号，点一下会连带删掉名下的计算记录与反馈，已改为**原地重置密码**；②门禁 `GET /profile 身份校验` 原先拿用户名比对，但账号已存在时用户名是用户自设昵称（脚本只在新建时才写 `devuser`），会把「账号已存在」误判成链路故障 —— 改为按邮箱（账号标识）比对，昵称仅作输出展示；③开发/测试环境下「验证码邮件真发信失败」原先会让 `POST /send-code` 直接返回 500、把本地门禁整条挂掉（如 QQ 邮箱对 `example.com` 这类保留域名必然 550 反垃圾拦截，且因域名不可投递而**稳定复现**，并非瞬时风控），而此时验证码其实早已打印到后端控制台 —— 现改为开发/测试环境只告警不报错（本地链路不依赖真实投递），生产环境仍严格要求发信成功；④`docs/tech-reports/watchdog-deployment-guide.md` 里那条真实发信日志样例的收件人邮箱也一并脱敏为占位账号
+- **本地测试账号改为「本机可覆盖，凭据不进版本库」**：开发用的测试账号不再把邮箱 / 密码写进代码 —— 仓库里只留一份任何机器都能跑通的默认账号（`dev@example.com` / `password`，门禁 / 重置脚本会自动创建），本机想用自己账号就在仓库根放一个 `dev-account.local.json`（已 gitignore，字段 `email` / `password`，可选 `username`）：新增 `server/scripts/dev-account.js` 与 `tools/ops/dev-account.ps1` 两个同源读取器，`reset-dev-user.js`、`verify-local-auth.js`、`get-token.ps1`、`debug-swagger*.ps1`、`ops-start-dev.ps1` 与 GUI 控制台的账号 / 密码 / 一键复制按钮、环境检查、取 Token 全部改为读它；登录页「开发环境：填入本地测试账号」预填也改为运行时拉 `/dev-account.local.json`（拿不到就回落默认账号），代码里不再内联任何真实凭据；对外分享邮件模板同步还原为占位账号，并在分享说明里补一句「对外测试账号另备，勿填本机凭据」。顺带修掉两个真问题：①「重置开发测试账号」原来是**删账号重建**，而 `Calculation` / `Feedback` 对 User 都是 `onDelete: Cascade` —— 本机测试账号若是使用者自己的账号，点一下会连带删掉名下的计算记录与反馈，已改为**原地重置密码**；②门禁 `GET /profile 身份校验` 原先拿用户名比对，但账号已存在时用户名是用户自设昵称（脚本只在新建时才写 `devuser`），会把「账号已存在」误判成链路故障 —— 改为按邮箱（账号标识）比对，昵称仅作输出展示；③开发/测试环境下「验证码邮件真发信失败」原先会让 `POST /send-code` 直接返回 500、把本地门禁整条挂掉（如 QQ 邮箱对 `example.com` 这类保留域名必然 550 反垃圾拦截，且因域名不可投递而**稳定复现**，并非瞬时风控），而此时验证码其实早已打印到后端控制台 —— 现改为开发/测试环境只告警不报错（本地链路不依赖真实投递），生产环境仍严格要求发信成功；④`docs/tech-reports/Watchdog监控部署指南.md` 里那条真实发信日志样例的收件人邮箱也一并脱敏为占位账号
 
 ## [1.16.0] - 2026-09-13（阶段14 剩余项：第三个 SEO 落地页「汇算清缴」+ 参保城市下拉两处修复）
 
@@ -7231,7 +7285,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - **「未指定」与默认城市的说法统一**：选项文案由「未指定（按默认城市）」改为「未指定（按默认城市：全国平均）」，提示由「按『全国平均』口径」改为「未指定参保城市，按默认城市『全国平均』口径」，并注明可选比例已同步到上方「缴费比例」控件
 
 ### 说明
-- 本版发布后，阶段14 的公开待办仅剩「其余关键词落地页」（社保基数 / 税后工资），优先级见 `seo-landing-plan.md` §3；其中「社保基数」页依赖管理台录入真实城市口径（当前库内只有兜底城市 `national`，下拉因此只有一个可选城市）
+- 本版发布后，阶段14 的公开待办仅剩「其余关键词落地页」（社保基数 / 税后工资），优先级见 `SEO落地页方案-阶段14-历史.md` §3；其中「社保基数」页依赖管理台录入真实城市口径（当前库内只有兜底城市 `national`，下拉因此只有一个可选城市）
 - 汇算页的流量高峰在次年 3—6 月，旺季前上线以便收录起飞；本页复用的仍是 App 的年度汇算口径（基本减除费用按任职月数累计），页面上已如实写明
 
 ---
@@ -7257,7 +7311,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 门禁新增 4 条「月薪个税」落地页断言：可访问且含 canonical/FAQPage 与政策依据、**静态预扣率表与 `comprehensiveTaxRates` 逐档一致**、静态逐月示例表可被读到（首月 300 / 第 4 月 580 / 全年 9480）、CTA 带归因参数；`sitemap.xml` 断言由「收录首页与年终奖页」改为「收录首页与全部落地页」
 
 ### 说明
-- 本版发布后，阶段14 的公开待办仅剩「其余关键词落地页」（汇算清缴 / 社保基数 / 税后工资），优先级见 `seo-landing-plan.md` §3
+- 本版发布后，阶段14 的公开待办仅剩「其余关键词落地页」（汇算清缴 / 社保基数 / 税后工资），优先级见 `SEO落地页方案-阶段14-历史.md` §3
 - 落地页自然流量受收录周期影响，不适合衡量短期转化；转化看的是 `?source=seo_*` 归因回来的线索
 
 ---
@@ -7277,16 +7331,16 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
   - 进 App 的链接带 `?source=seo_bonus`，服务端 `SOURCES` 白名单同步登记：落地页带来的留资可在管理台按来源区分
   - 正文注明政策依据《财政部 税务总局公告 2023 年第 30 号》（执行至 2027-12-31）与免责声明
 - **`robots.txt` + `sitemap.xml`**：允许抓取公开页，屏蔽 `/api/`、`/admin.html`、`/clean-cache.html`；站点地图收录首页与落地页
-- **方案文档 `docs/development/seo-landing-plan.md`**：设计原则（页面自己有用 / 口径同源 / 静态可抓取 / 零 CDN / 一页一词 / 可归因）、关键词→页面映射表与后续待办页面
+- **方案文档 `docs/development/SEO落地页方案-阶段14-历史.md`**：设计原则（页面自己有用 / 口径同源 / 静态可抓取 / 零 CDN / 一页一词 / 可归因）、关键词→页面映射表与后续待办页面
 
 ### 变更
 - 门禁新增 6 条 SEO 落地页断言：robots 声明 sitemap、sitemap 收录首页与落地页、落地页含 canonical/FAQPage 与政策依据、**落地页静态税率表与 `tax-constants.js` 逐档一致**、CTA 带归因参数、**sitemap 内每条 URL 实测可访问**
 - 新增「门禁实跑口径快照」：`verify:local` 每次本地实跑把真实项数写入 `tools/ops/.verify-local-last.json`（已 gitignore），`npm run verify:release` 与 `tests/docs-metrics.test.js` 据此对账 —— 从此「文档里的门禁项数是推算出来的」会在测试里直接红（即 1.13.0 发布时 142 vs 146 那一类问题）
 - `verify:local` 结尾新增口径自检输出：文档声明项数 ≠ 本次实跑项数时，直接列出需要修改的文件与行号（只提示、不改退出码 —— 口径滞后由 `npm test` / `verify:release` 拦，门禁本身变红会掩盖真正的功能失败）
-- `development-plan.md` 状态行回填：阶段11「🚧 进行中」更正为「✅ 已完成（v1.8.0 · 2026-09-11）」；阶段12 更正为「🟡 部分完成 / 已拆分」（A + C1 随 v1.11.0、C2 随 v1.13.0 已上线；支付体系与 B 端 API 仍因 ICP 备案阻塞顺延阶段15）—— 这两行自 v1.8.0 / v1.11.0 起一直没回填
+- `开发总计划-阶段与基线.md` 状态行回填：阶段11「🚧 进行中」更正为「✅ 已完成（v1.8.0 · 2026-09-11）」；阶段12 更正为「🟡 部分完成 / 已拆分」（A + C1 随 v1.11.0、C2 随 v1.13.0 已上线；支付体系与 B 端 API 仍因 ICP 备案阻塞顺延阶段15）—— 这两行自 v1.8.0 / v1.11.0 起一直没回填
 
 ### 说明
-- 本版发布后，阶段14 的公开待办仅剩「更多关键词落地页」（个税计算器 / 汇算清缴 / 社保基数 / 税后工资），优先级见 `seo-landing-plan.md` §3
+- 本版发布后，阶段14 的公开待办仅剩「更多关键词落地页」（个税计算器 / 汇算清缴 / 社保基数 / 税后工资），优先级见 `SEO落地页方案-阶段14-历史.md` §3
 - 落地页在 ICP 备案完成前后都能工作，但自然流量要等收录周期，不宜用它衡量短期转化
 
 ---
@@ -7347,13 +7401,13 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 
 ### 文档
 - `tools/ops/ops-check-prod.ps1` 线上指纹新增「兑换码端点已上线」（读 `/api/docs.json` 核对 5 个路径，只读零副作用 —— 不生成也不兑换任何真实码）；线上核对 **36 → 37 项**
-- 门禁口径全量同步：`verify:local` 100 → **146 项**（**口径修正**：142 是「基线 100 + 新增项」的推算值，发布前实跑为 146/146 —— 已改为按分段实测登记，明细见本版基线行）、单测 20 套件 412 例 → **26 套件 545 例**（`tests/plan.test.js` 7 例守护权益口径与交叉一致性 + 新增 `tests/version-sync.test.js` 4 例守护版本号五处同步 + 新增 `tests/docs-metrics.test.js` 5 例守护文档口径，配套 `npm run verify:release` 一条命令核对并自动同步）、线上指纹 36 → **37 项**（`README.md` / `docs/guides/development-workflow.md` / `tools/ops/README.md` / `tools/gui/README.md` / `gui-dev-console.ps1` 按钮文案与 `ops-verify-pg.ps1` 提示）
-- 阶段13 补强口径同步：`docs/development/stage13-acquisition-and-leads-plan.md` 新增「§3.4 咨询情境 —— 只展示能核实的信息」（含「为什么不直接上传历史记录完整数据」的取舍说明），并更新文件改动表（`lead-context.js`）与 13B/13D 的 DoD；`docs/api/api-reference.md` 的 `scene` 字段说明与请求/响应示例改为非金额摘要口径
-- `docs/api/api-reference.md` 升 **v2.8**：新增 §10.4 城市社保参数（公开只读 + `since` 增量 + 兜底城市不变量）与 §5.15 城市社保参数管理（当前配置 / 发布 / 回滚 / 校验清单），目录补书；§5.11 补「此处为全国口径，用户已选城市时以城市口径为准」的交叉提示
-- `docs/guides/support-playbook.md`：新增 §五.5「社保基数提示低于最低标准但用户认为合规」核对流程（先问参保城市 → 核对「社保基数」Tab 当地口径 → 城市下线回落 → 灰置下拉属离线非故障）+ 话术表补一条
-- `docs/marketing/cold-start-materials.md`：管理台 Tab 说明补「社保基数」（用户被提示基数偏低时先来这里核对）
-- `docs/guides/tax-calculation-rules.md` §8 重写：由「全国平均值 7546」改为**分层口径**说明（常量兜底 → C1 全国口径 → C2 参保城市口径）、各城市参数的表单默认值与校验提示、`window.CitySocial` / `CitySocialUI` 契约与端上回落规则
-- `docs/development/development-plan.md`：阶段14 状态行更新为**已随 v1.13.0 上线**（14A/14B/14C/14D/C2 ✅ 已完成；仅剩「高商业意图 SEO 落地页」）
+- 门禁口径全量同步：`verify:local` 100 → **146 项**（**口径修正**：142 是「基线 100 + 新增项」的推算值，发布前实跑为 146/146 —— 已改为按分段实测登记，明细见本版基线行）、单测 20 套件 412 例 → **26 套件 545 例**（`tests/plan.test.js` 7 例守护权益口径与交叉一致性 + 新增 `tests/version-sync.test.js` 4 例守护版本号五处同步 + 新增 `tests/docs-metrics.test.js` 5 例守护文档口径，配套 `npm run verify:release` 一条命令核对并自动同步）、线上指纹 36 → **37 项**（`README.md` / `docs/guides/开发工作流总览.md` / `tools/ops/README.md` / `tools/gui/README.md` / `gui-dev-console.ps1` 按钮文案与 `ops-verify-pg.ps1` 提示）
+- 阶段13 补强口径同步：`docs/development/阶段13-获客与转化方案-历史.md` 新增「§3.4 咨询情境 —— 只展示能核实的信息」（含「为什么不直接上传历史记录完整数据」的取舍说明），并更新文件改动表（`lead-context.js`）与 13B/13D 的 DoD；`docs/api/API接口文档.md` 的 `scene` 字段说明与请求/响应示例改为非金额摘要口径
+- `docs/api/API接口文档.md` 升 **v2.8**：新增 §10.4 城市社保参数（公开只读 + `since` 增量 + 兜底城市不变量）与 §5.15 城市社保参数管理（当前配置 / 发布 / 回滚 / 校验清单），目录补书；§5.11 补「此处为全国口径，用户已选城市时以城市口径为准」的交叉提示
+- `docs/guides/客服排障手册.md`：新增 §五.5「社保基数提示低于最低标准但用户认为合规」核对流程（先问参保城市 → 核对「社保基数」Tab 当地口径 → 城市下线回落 → 灰置下拉属离线非故障）+ 话术表补一条
+- `docs/marketing/冷启动素材.md`：管理台 Tab 说明补「社保基数」（用户被提示基数偏低时先来这里核对）
+- `docs/guides/计税规则手册.md` §8 重写：由「全国平均值 7546」改为**分层口径**说明（常量兜底 → C1 全国口径 → C2 参保城市口径）、各城市参数的表单默认值与校验提示、`window.CitySocial` / `CitySocialUI` 契约与端上回落规则
+- `docs/development/开发总计划-阶段与基线.md`：阶段14 状态行更新为**已随 v1.13.0 上线**（14A/14B/14C/14D/C2 ✅ 已完成；仅剩「高商业意图 SEO 落地页」）
 
 ---
 
@@ -7414,8 +7468,8 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 > 轮换后的值只存在于 Zeabur 控制台与本地 `.env`；本 CHANGELOG 不记录任何凭据明文。
 
 ### 文档
-- 新增 `docs/development/stage13-acquisition-and-leads-plan.md`（四项决策、13A-13E 排期与 DoD、合规清单）
-- `docs/api/api-reference.md` 升 **v2.6**：新增 §5.12 转化线索管理、§5.13 转化漏斗统计、§11 公开写入口（线索提交）、§12 公开埋点接口（漏斗上报）
+- 新增 `docs/development/阶段13-获客与转化方案-历史.md`（四项决策、13A-13E 排期与 DoD、合规清单）
+- `docs/api/API接口文档.md` 升 **v2.6**：新增 §5.12 转化线索管理、§5.13 转化漏斗统计、§11 公开写入口（线索提交）、§12 公开埋点接口（漏斗上报）
 - 门禁口径全量同步：`verify:local` 68 → **100 项**、单测 17 套件 361 例 → **20 套件 412 例**、线上指纹 35 → **36 项**（README / docs/README / development-workflow / ops / gui 文档与脚本）
 - 订正 `server/src/routes/leads.js` 注释与 Swagger 的限流口径（3 → 10 次/IP/小时，与 `app.js` 实际一致）
 
@@ -7452,9 +7506,9 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 发布门禁 `verify:local` **68/68**：税率相关 9 项断言为**结构型**（`typeof === 'number'`、末级 `max` 为 `null` 等），不锁死基数量值，故本次改值无需改门禁；发布动作仍以「当前生效值原样」回填，跑完不改动任何计税结果
 
 ### 文档
-- `docs/guides/tax-calculation-rules.md`：§8.1 常量值与说明、§8.3 警告文案同步为 7546；订正 §8.1「代码实现」指向（两个基数量已迁至 `tax-constants.js`，原指向 `helper-functions.js` 第 3-5 行已失效）
-- `docs/api/api-reference.md`：税率配置请求/响应示例中的两个基数同步为 7546
-- 历史计划文档（`development-plan.md` §社保缴费基数优化、`stage12-core-enhancement-plan.md`）保留当时口径，不改写历史
+- `docs/guides/计税规则手册.md`：§8.1 常量值与说明、§8.3 警告文案同步为 7546；订正 §8.1「代码实现」指向（两个基数量已迁至 `tax-constants.js`，原指向 `helper-functions.js` 第 3-5 行已失效）
+- `docs/api/API接口文档.md`：税率配置请求/响应示例中的两个基数同步为 7546
+- 历史计划文档（`开发总计划-阶段与基线.md` §社保缴费基数优化、`阶段12-核心补强与税制参数配置-历史.md`）保留当时口径，不改写历史
 
 ---
 
@@ -7488,8 +7542,8 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 新增 `tests/scenario.test.js`（17 例，方案库纯函数 + 付费上限 + 年终奖方案口径）
 
 #### 文档
-- 新增 `docs/development/stage12-core-enhancement-plan.md`（A 阶段实施方案与完成记录）
-- 订正 `docs/development/development-plan.md`：原「前端计算改为调 API」记录与现状（前端本地计算）矛盾，已随本阶段修正
+- 新增 `docs/development/阶段12-核心补强与税制参数配置-历史.md`（A 阶段实施方案与完成记录）
+- 订正 `docs/development/开发总计划-阶段与基线.md`：原「前端计算改为调 API」记录与现状（前端本地计算）矛盾，已随本阶段修正
 
 ### 阶段12 C1 · 税制参数配置化（管理台热改税率 + 可选公告联动）
 
@@ -7515,8 +7569,8 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 发布门禁 `verify:local` 扩至 **68/68 通过**（新增 9 项税制参数断言：公开端点结构完整 + 末级无上限以 `null` 传输 / `since` 增量语义 / 管理端点无令牌 401 / 当前配置+出厂基线+历史 / 非法税率 400 + `details` / 发布 201 且公开端点转 `source=custom` / 回滚另存新版本。发布动作以「出厂基线原样」回填，跑完生效配置仍等价基线，不会改动任何计税结果）
 
 #### 文档
-- 新增 `docs/development/stage12-c1-tax-rate-config-plan.md`（C1 方案与实施记录）
-- 文档口径收口：`README` / `docs/README` / `tools/ops/README` / `tools/gui/README` / `docs/guides/development-workflow` / `ops-verify-pg.ps1` 的单元测试套件数与门禁断言数同步至 **17 套件 361 例** 与 **68 项**；`docs/api/api-reference.md` 升版 **v2.4** 并补 §5.11（税制参数管理）与 §10.3（公开只读端点）
+- 新增 `docs/development/阶段12-核心补强与税制参数配置-历史.md`（C1 方案与实施记录）
+- 文档口径收口：`README` / `docs/README` / `tools/ops/README` / `tools/gui/README` / `docs/guides/development-workflow` / `ops-verify-pg.ps1` 的单元测试套件数与门禁断言数同步至 **17 套件 361 例** 与 **68 项**；`docs/api/API接口文档.md` 升版 **v2.4** 并补 §5.11（税制参数管理）与 §10.3（公开只读端点）
 
 ### 发布流程加固 · 本地 PostgreSQL 演练门禁 + 回退 SOP 固化
 
@@ -7528,7 +7582,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 
 #### 变更
 - **移除未接线的状态红点**：`.assistant-fab-pulse` 自 1.10.0 起固定 `display:none`，且没有任何代码路径（含 `tax-assistant-ui.js`）会将其显示 —— 注释所述「有待办内容时显示」的数据源从未实现；已连同 `.assistant-fab.dock-left .assistant-fab-pulse` 定位规则和对应 `<span>` 元素一并删除，避免后续误判悬浮球具备未读提示能力
-- **回退 SOP 固化为两级流程**（`docs/guides/development-workflow.md` §4、`docs/guides/branch-release-strategy.md` §6.1）：明确「tag = 稳定锚点」语义，先止血（Zeabur 部署历史重部署上一正常构建，约 1 分钟）→ 再修根（`git revert` → 安全发布），并给出可直接抄的命令（含 `git revert --no-commit vX.Y.Z..main` 批量回退）
+- **回退 SOP 固化为两级流程**（`docs/guides/开发工作流总览.md` §4、`docs/guides/分支与版本发布策略.md` §6.1）：明确「tag = 稳定锚点」语义，先止血（Zeabur 部署历史重部署上一正常构建，约 1 分钟）→ 再修根（`git revert` → 安全发布），并给出可直接抄的命令（含 `git revert --no-commit vX.Y.Z..main` 批量回退）
 - **排障速查表补 3 条新现象**：`verify:pg` 无 Docker（码 2）/ `migrate deploy` 失败（这正是上线会炸的点）/ 演练后 Client provider 不匹配如何恢复
 - **GUI 接线**：控制台「🧪 测试中心」→「3. 发布门禁」卡片新增 **🐘 PostgreSQL 演练门禁**（`ops-verify-pg.ps1`）与 **🔄 全新库演练**（`-Fresh`）两个按钮，门禁不必再记命令行；未装 Docker 时按钮输出「已跳过 + 返回码 2」，并弹一次「是否打开 Docker Desktop 下载页」引导（同一提示 180s 内去重，连点两个按钮不会被弹两次），`tools/gui/README.md` 同步补按钮说明表
 - **演练前置检查（点按钮前先看 `:3000`）**：本机有 Docker 且检测到本地 `:3000` 后端在监听时，两个演练按钮会先弹警告二次确认（可取消，取消时不执行任何命令），避免「跑到 `prisma generate` 才以 EPERM 失败」再回头排查；未装 Docker 时跳过该检查，直接让脚本走「返回码 2 → 装 Docker 引导」链路，不叠加多余弹窗
@@ -7559,7 +7613,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - 新增 `tests/tax-assistant.test.js` 8 项：初始化默认半隐（带 `peek` 类且位移非 0）/ 展开后位移归零并带 `expanded` 类 / 隐藏写入偏好并激活热区 / 唤出清除隐藏态与偏好 / 隐藏偏好跨初始化保持 / 触屏首次点击只滑出第二次才开抽屉 / 抽屉内「隐藏助手」隐藏并关抽屉 / 关闭抽屉后恢复并回缩为半隐
 
 ### 文档
-- `docs/guides/development-workflow.md` 单测口径 12 套件 295 例 → 303 例
+- `docs/guides/开发工作流总览.md` 单测口径 12 套件 295 例 → 303 例
 
 ---
 
@@ -7572,7 +7626,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - **排障短链 `GET /reset`**：302 跳转 `/clean-cache.html?auto=1`，用于口播、客服话术与群公告发放；定义在 SPA 回退之前，避免被 `index.html` 兜底吞掉
 - **`version.json`**：新增版本哨兵基准文件（`server/src/app.js` 的 `setHeaders` 已对其下发 `Cache-Control: no-cache`；`service-worker.js` 对其放行，不缓存、不拦截）
 - **排障话术库改为后端可管理（阶段12）**：新增 `SupportScript` 模型（迁移 `20260912_add_support_scripts`，随部署自动执行）与 `/api/admin/support` 接口（列表 / 新建 / 编辑 / 删除 / 恢复内置，均需 `X-Admin-Token`）；管理台新增 `support` Tab，支持增删改、一键复制话术、关键词检索与分类筛选，话术中的 `{RESET_URL}` 占位符自动替换为当前站点的 `/reset` 短链。内置 9 条高频问题在服务启动时幂等播种（**仅当表为空**，不覆盖后台编辑），此后改文案即时生效、无需发版；接口不可用时前端自动回退离线快照，面板不会空白
-- **客服排障手册**：`docs/guides/support-playbook.md`
+- **客服排障手册**：`docs/guides/客服排障手册.md`
 
 ### 变更
 - **住房公积金默认基数 4250 → 7546**：与社保默认基数保持一致，同步正向计税、反向倒算、经营所得三处表单默认值与重置逻辑，以及税务档案默认公积金基数；派生公积金金额随基数联动为 377.30（7546 × 5%）。最低基数校验常量 `MIN_HOUSING_FUND_BASE = 4250` 不变（仍作低于标准的提示阈值）
@@ -7596,8 +7650,8 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 - `tests/profile-page.test.js` 税务档案默认公积金基数断言 4250 → 7546
 
 ### 文档
-- **版本落点由「三处」升为「五处」**：哨兵带来 `index.html` 的 `window.__APP_VERSION__` 与根目录 `version.json` 两个新落点，`branch-release-strategy.md` §3.2 / §4 核对清单同步，并写明漏改的两种后果（不一致 → 每会话清一次缓存；一起漏改 → 自愈失效）
-- **发布门禁补上哨兵覆盖**：`ops-check-prod.ps1` 新增 3 项线上校验 —— `__APP_VERSION__` 与本地 `package.json` 一致、`/version.json` 与本地一致、排障短链 `/reset` 命中清洗页而非被 SPA 回退吞成首页（线上指纹 32 → 35 项）；`development-workflow.md` 同步口径（单测 12 套件 295 例、线上 35 项指纹、版本五处）并在排障速查表加入 `/reset` 手法
+- **版本落点由「三处」升为「五处」**：哨兵带来 `index.html` 的 `window.__APP_VERSION__` 与根目录 `version.json` 两个新落点，`分支与版本发布策略.md` §3.2 / §4 核对清单同步，并写明漏改的两种后果（不一致 → 每会话清一次缓存；一起漏改 → 自愈失效）
+- **发布门禁补上哨兵覆盖**：`ops-check-prod.ps1` 新增 3 项线上校验 —— `__APP_VERSION__` 与本地 `package.json` 一致、`/version.json` 与本地一致、排障短链 `/reset` 命中清洗页而非被 SPA 回退吞成首页（线上指纹 32 → 35 项）；`开发工作流总览.md` 同步口径（单测 12 套件 295 例、线上 35 项指纹、版本五处）并在排障速查表加入 `/reset` 手法
 
 ---
 
@@ -7665,7 +7719,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
   - 阶段10 运维后台用户端点：无令牌 401、列表搜索（大小写不敏感且响应不含密码字段）、详情（反馈/计算计数 + 最近动态）、权益授予限时专业版 → 回落基础版（小节结束时自动恢复 dev 账号种子授权）
 - 同步修正 README / 开发工作流 / GUI 文档中已过期的门禁断言数（20/42 → 52）、单元测试套件数（203 → 252）与线上核对项数（10 → 22）
 - 版本口径收口：README / 文档中心 / API 参考 / 开发计划 的版本与发布日期同步至 **1.7.1**（此前仍停留在 1.6.1）
-- 分支收口：`feature/10a-cloud-sync` 按 [分支规范](./docs/guides/branch-release-strategy.md)「合完删除本地与远程分支」清理本地与远程分支（合入提交 `f33d694`，历史由 tag `v1.7.0` 承担）
+- 分支收口：`feature/10a-cloud-sync` 按 [分支规范](./docs/guides/分支与版本发布策略.md)「合完删除本地与远程分支」清理本地与远程分支（合入提交 `f33d694`，历史由 tag `v1.7.0` 承担）
 
 ---
 
@@ -7985,7 +8039,7 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
   - `tests/interaction.test.js`（45）：含参数提示初始化与交互专项
   - `tests/tax-calculator.test.js`（51）：计税核心逻辑（未变）
 
-- **技术复盘报告**：`docs/tech-reports/mock-client-concurrent-logging-retrospective.md`
+- **技术复盘报告**：`docs/tech-reports/MockClient并发日志复盘-历史.md`
   - 并发日志乱序问题的成因分析、方案选型对比、最终实现、验证方式、可复用经验
 
 ### 变更
@@ -8004,9 +8058,9 @@ v1.37.9 只改了**答案段落**，同一页面里更显眼的位置还留着�
 
 ### 文档
 
-- `docs/reports/test-report.md`：更新至 2026-08-05 / v1.1.0，4 套件 143 通过，新增税助手模块测试章节与浏览器交互验证结果
-- `docs/reports/refactor-summary-report.md`：新增 Phase 4 悬浮税助手与 MockClient 工具封装章节
-- `docs/reports/final-delivery-checklist.md`：版本升级为 1.1.0，质量验收标准 143/143
+- `docs/reports/历史快照-交付重构性能与测试报告.md`：更新至 2026-08-05 / v1.1.0，4 套件 143 通过，新增税助手模块测试章节与浏览器交互验证结果
+- `docs/reports/历史快照-交付重构性能与测试报告.md`：新增 Phase 4 悬浮税助手与 MockClient 工具封装章节
+- `docs/reports/历史快照-交付重构性能与测试报告.md`：版本升级为 1.1.0，质量验收标准 143/143
 
 ### 浏览器端实证（2026-08-05）
 

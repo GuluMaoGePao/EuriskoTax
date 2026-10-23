@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.149.7';
+        window.__APP_VERSION__ = '1.149.8';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1738,7 +1738,7 @@
                                  在 PWA（manifest 的 display: standalone）与微信内置浏览器里，
                                  target=_blank 会**跳出应用容器**、另开一个系统窗口，用户看到的
                                  是「点一下隐私政策，App 没了、弹出个浏览器页」。协议是页内阅读
-                                 场景，一律走 openPolicyModal 弹层（与 ui-design-spec 页型 F 一致：
+                                 场景，一律走 openPolicyModal 弹层（与 UI设计方案 页型 F 一致：
                                  「页内展开，不外跳」）。
                                  v1.141.0 再收一步：协议弹窗底部那条「在页面打开 ↗」也撤掉 ——
                                  它同样是往外跳的入口，App 内不再保留任何会跳出容器的协议入口。 -->
@@ -1746,7 +1746,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.149.7</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 1.149.8</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1863,7 +1863,7 @@
                      左上角、宽屏又贴顶；居中之后两种宽度下的相对位置都不跑。 -->
                 <div class="relative flex items-center gap-3 sm:gap-4">
                     <div class="min-w-0 flex-1">
-                        <!-- 文案见 docs/guides/user-facing-copy-standard.md §5.6（L-06/L-07/L-08）：
+                        <!-- 文案见 docs/guides/面向用户文案规范与台账.md §5.6（L-06/L-07/L-08）：
                              「有问必答」是绝对化承诺 → 改为「留个问题，顾问帮您核对」；
                              信任三枚第三枚**不写任何时效**（1 个工作日做不到，见 §2.5 留资时效铁律） -->
                         <p class="text-micro font-semibold tracking-widest text-white/70">使用协助 · 留个问题，顾问帮您核对</p>
@@ -2118,7 +2118,7 @@
     </div>
 
     <!-- 引入分离的JavaScript文件 -->
-    <!-- 面向用户文案单一真源（docs/guides/user-facing-copy-standard.md）：无依赖、必须最先加载，
+    <!-- 面向用户文案单一真源（docs/guides/面向用户文案规范与台账.md）：无依赖、必须最先加载，
          所有 src/js/** 的面向用户文案一律引用 window.CopyStandard，不再字面量硬编码 -->
     <script src="src/js/copy/copy-standard.js"></script>
     <!-- 税法常量（税率表 / 缴费基数下限）：单一事实来源，必须最先加载，供 calculation 与 utils 分组消费 -->
@@ -2271,21 +2271,21 @@
            ② 图片：后台下载的活码 PNG 或企微图床地址（wework.qpic.cn），直接当 <img src> 显示。
               ⚠ 图片形态下「点击」只能打开这张图（手机上长按可识别），没有可跳转的加好友链接；
                  哪天在后台看到「复制链接」，优先换回链接形态。
-         两条线的分工（2026-10-22 定，取舍见 docs/marketing/wecom-channel-playbook.md 第 5 节）：
+         两条线的分工（2026-10-22 定，取舍见 docs/marketing/企业微信分码操作手册.md 第 5 节）：
            · wecomQrUrl（微信客服 kfid）= **唯一的对外承接通道**：扫码即聊、不加好友，门槛最低；
            · wecomAddFriendQr（客户联系「联系我」加好友码 images/weworkQR.png）= **沉淀通道**，
              由客服在会话中按需推荐（运营 SOP），并在留资成功态里出现一次 —— 顺序是刻意的：
              没提供任何服务就要用户加好友，转化低且观感差；服务之后提出才站得住。
          ⚠ 不要手工给客服链接拼 ?from=xxx：企微规定客服链接不可改写、参数不可复制到别的链接，
          拼了页面照开，但「进入会话事件」参数校验失败、回调拿不到来源 —— 看着能用，实际没数据。
-         后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/wecom-channel-playbook.md。
+         后台怎么建码、怎么配欢迎语与标签、怎么验证，见 docs/marketing/企业微信分码操作手册.md。
          可选背书：advisorName / advisorTitle 填**真实**客服信息（如
          { advisorName: '王某某', advisorTitle: '客服 · 熟悉个税测算' }），留空则弹窗不显示该行 ——
          真实背书可以少，但不能编：写进弹窗的资质一旦被追问就必须拿得出来。
          ⚠ ICP 备案后**不要**填「注册税务师 / 税务师 / 财税顾问 / 一对一」这类资质或身份措辞：
            那是**涉税专业服务**话术，与页脚「仅供参考，不构成税务建议」自相矛盾，
            还可能超出备案时填报的服务内容 —— 真要提供涉税服务，须先完成涉税专业服务实名
-           并能在页面公示信用码（见 docs/marketing/wecom-channel-playbook.md） -->
+           并能在页面公示信用码（见 docs/marketing/企业微信分码操作手册.md） -->
     <script>
         window.LEAD_CONFIG = {
             // 承接通道：微信客服 kfid —— 扫码即聊、**不用加好友**，门槛最低。
