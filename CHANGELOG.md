@@ -11,6 +11,49 @@
 
 ---
 
+## [1.149.0] - 2026-10-22 - 补上 beta（预发）环境：发布不再「本地绿完就直接上生产」
+
+**起因**：此前从改完代码到正式站只有一步 —— 本地门禁全绿就 `ops-deploy.ps1` 发到腾讯云。
+等于「真机第一次见光就是正式域名」，而且 `prisma migrate deploy` 的**首次执行**发生在
+生产库上；正式站是软链一指的全量瞬切，判断失误就是全体用户受影响。本地 jsdom 全绿 ≠
+真机可用（18-6a 行名括号、v1.144 `if` 包断言两次教训），缺的正是中间那一环。
+
+**beta（预发）环境**（与正式同机不同目录，不额外花钱）：
+
+- `/home/ubuntu/euriskotax-beta` + pm2 `euriskotax-beta` + 端口 3001
+  + **独立库 `eurisko_beta`**（beta 账号无权访问生产库 —— 这是「在 beta 上点留资/兑换码
+  不会污染生产数据」的根本保证，光靠「小心一点」是靠不住的）；
+- `ops-deploy-beta.ps1` / `ops-check-beta.ps1` 两个薄封装：分别复用现有
+  `ops-deploy.ps1` 的 `-ConfigPath` 与 `ops-check-prod.ps1` 的 `-BaseUrl`，
+  所以**核对与正式是完全相同的 37 项指纹** —— beta 不会因为尺子更松而蒙混过关；
+- 四条硬约束：独立数据库 / 独立 `JWT_SECRET`（否则 beta 签的 token 能在正式站用）/
+  `SMTP_PASS` 留空（不向真实用户发测试邮件）/ 禁止被收录（`beta-mark.sh` 注入 noindex）；
+- 建环境 `beta-init-server.sh`、补种子 `beta-seed-server.sh`、打标记 `beta-mark-server.sh`
+  三个脚本都**幂等**，可重复跑；实测 beta 站 37/37 全绿。
+
+**功能开关（Feature Flags）**：新增 `src/js/utils/feature-flags.js`，新功能默认关闭，
+可用 `?ff=名字` / `?beta=1` / localStorage / beta 站（`window.__APP_CHANNEL__='beta'`）
+四种途径打开 —— 让「先给自己开、真机验完再全量」成为可能，这是没有流量灰度时的替代手段。
+未登记的开关名返回 `false` 并 `console.warn`，避免拼错退化成「静默不生效」。
+自带第一个用例：预发环境角标（beta 站显示，正式站永不出现）。
+
+**流程与口径**：发布入口从已停用的 `ops-publish.ps1`（Zeabur 时代，默认指向测试环境且
+本机直连不通）改回 `ops-deploy.ps1`，并写清「哪三类改动必须先过 beta」
+（schema/migration、认证·兑换码·留资·邮件、大规模 UI 重构）。顺带修掉
+`development-workflow.md` 里三处早年的「165 项」过期口径（→ 266 项）：它们此前躲过了
+口径守卫 —— `GATE_PATTERNS` 只认「verify:local N 项」这类写法，认不出表格里
+「165 项 …」和全角括号那两种，已给守卫补上这两种写法。
+
+### 验收
+
+- 单测 **126 套件 2429 例**全绿（新增 `tests/feature-flags.test.js` 16 条：默认全关 /
+  四条打开途径与优先级 / 未登记名字必关且会告警 / 正式站不出角标 / 接入完整性）；
+- beta 站 `ops-check-beta.ps1` **37/37**（经 SSH 隧道核对，与正式同一把尺子），
+  正式进程 `euriskotax` 未受影响；
+- `npm run verify:release` 通过：版本号五处一致 + 文档口径与实测一致。
+
+---
+
 ## [1.148.0] - 2026-10-22 - 桌面栅格统一（顶栏/内容区/二级页/弹窗一起放宽）、企业微信引导改顺序
 
 **加好友码从「对外主通道」降级为「沉淀通道」，顺序改到服务之后。** 原先想的是全站直接摆

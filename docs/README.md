@@ -22,14 +22,14 @@
 - **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
 - **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
 - **生产环境**：腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起正式公网，部署走 `tools/ops/ops-deploy.ps1`，手动触发，push 不自动上线）；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境
-- **测试**：125 套件 2413 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **测试**：126 套件 2429 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
   - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）
   - ✅ **阶段17 全税种完整测算（核心卖点）已收官**：21 个 spec 驱动完整测算 + 20 个速算器，税种覆盖 **6/6 类**、个税场景完整度 **16/16**
   - 🟡 **阶段18 配套链路收口** 大部分完成：18-1 ~ 18-6a 已交付；**剩两项待定** —— ① 18-6 按用户反馈补具体税种场景（待用户输入）；② 留资引导投放白名单是否从 4 类扩到更多 deep（待拍板）
   - ✅ **阶段19 UI 重构与留存设计 已收官**：19-0 ~ 19-13 全部交付（样式沙箱与截图基线 / 设计令牌迁回真源 / Tailwind 产物纯重建 / 阴影令牌收口 / 首页双轴导航 / 结果页省钱卡 / 字段级分级与视图信号 / 政策时效与政策版本 / **41 个工具真机冒烟**）；plan 里剩下的要么**刻意不做**（常用置顶；待办 × 台账 —— 拿用户自己标的 status 去催人会变成瞎催），要么**要后端**（主体跨设备同步、登录后随档案同步）
-- **商业与冷启动**：转化链路 + 线索管理 + 兑换码收款 + 20 个 SEO 落地页均已就绪，**尚未开始推广（0 用户 / 0 收入）**；三个点火动作已完成（域名 ✅ / ICP 备案 ✅ 已提交 / 企业微信活码 ✅ 2026-09-16 已配置），**P0 仅剩「顾问值班人与响应时限」**。战略与财务测算见 [business-plan-for-partners.md](marketing/business-plan-for-partners.md)，执行清单见 [gtm-execution-plan.md](marketing/gtm-execution-plan.md)
+- **商业与冷启动**：转化链路 + 线索管理 + 站外收款（兑换码）+ **21 个 SEO 落地页**均已就绪，**尚未开始推广（0 用户 / 0 收入）**；四个点火动作已完成（域名 ✅ / ICP 备案 ✅ 已下发 2026-10-01 / 公安备案 ✅ 已下发 2026-10-21 / 企业微信活码 ✅ 2026-09-16 已配置），**Go/No-Go 的 P0 仅剩「顾问值班人与响应时限」**。战略与财务测算见 [business-plan-for-partners.md](marketing/business-plan-for-partners.md)，执行清单见 [gtm-execution-plan.md](marketing/gtm-execution-plan.md)
 
 ---
 
@@ -206,11 +206,11 @@ EuriskoTax/
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
 | [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 🟢 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-18 |
-| [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md) | 🟢 **合伙人版商业企划**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项） | 2026-09-18 |
+| [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md) | 🟢 **合伙人版商业企划 · v2.0**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项）—— **2026-10-22 按 v1.148.0 事实重写**：备案与境内节点已落地（不再是风险）、在线支付的硬前置是**经营性 ICP 许可证**而非备案、第一层服务边界按主体经营范围重划为「咨询解答 + 转介持牌方」 | 2026-10-22 |
 | [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md) | 🟢 **商业模式落地执行手册**（Go/No-Go 检查表 · 第 0 周逐日点火 · 90 天周节奏 · 指标看板 · 线索跟进 SOP · 待办登记 · 单位经济学实测口径） | 2026-09-18 |
 | [marketing/wecom-channel-playbook.md](marketing/wecom-channel-playbook.md) | 🟢 **企业微信按入口分码操作手册**（一入口一码 / 欢迎语 / 打标签 / 验证清单；含「客服链接不可手工拼参数」的官方依据） | 2026-09-18 |
-| [marketing/business-plan-for-partners.docx](marketing/business-plan-for-partners.docx) | 企划书 **Word 发送版**（导出件 · 非真源，由 `tools/ops/ops-md2docx.py` 从同名 .md 导出） | 2026-09-14 |
-| [marketing/gtm-execution-plan.docx](marketing/gtm-execution-plan.docx) | 执行手册 **Word 发送版**（导出件 · 非真源，导出方式同上） | 2026-09-14 |
+| [marketing/business-plan-for-partners.docx](marketing/business-plan-for-partners.docx) | 企划书 **Word 发送版（v2.0）**（导出件 · 非真源，由 `tools/ops/ops-md2docx.py` 从同名 .md 导出；改 .md 后需重导） | 2026-10-22 |
+| [marketing/gtm-execution-plan.docx](marketing/gtm-execution-plan.docx) | 执行手册 **Word 发送版**（导出件 · 非真源，导出方式同上） | 2026-10-22 |
 
 ### 技术报告
 
