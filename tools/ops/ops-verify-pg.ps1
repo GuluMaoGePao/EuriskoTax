@@ -54,7 +54,7 @@ Write-Step "0/4 检查 Docker 环境"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Write-Host "  [跳过] 未检测到 docker 命令 —— 演练门禁需要 Docker Desktop。" -ForegroundColor Yellow
     Write-Host "         这不是代码问题：本机没有 Docker 时，请继续使用 npm run verify:local（SQLite）。" -ForegroundColor Gray
-    Write-Host "         想启用演练：安装 Docker Desktop 后重跑本命令，详见 docs/guides/development-workflow.md" -ForegroundColor Gray
+    Write-Host "         想启用演练：安装 Docker Desktop 后重跑本命令，详见 docs/guides/开发工作流总览.md" -ForegroundColor Gray
     exit 2
 }
 & docker compose version *> $null

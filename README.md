@@ -21,7 +21,7 @@
 | 运营闭环 | ✅ 意见反馈落库 + 管理员跟进；计算完成即进入「工具 → 服务」转化闭环（留资线索 + 顾问跟进状态机 + 转化漏斗，北极星 `lead_submit / calc_done`）；登录用户保存计算仅匿名上报"计算类型"，支撑运营统计 |
 | 完整测算（核心卖点） | ✅ 阶段17 已收官：**21 个 spec 驱动完整测算**（6 类税种全覆盖、个税场景 16/16）+ 20 个速算器 |
 | SEO 落地页 | ✅ 20 个落地页 + 工具总目录 `/seo/index.html`（年终奖 / 月薪 / 汇算清缴 / 劳务报酬 / 股权激励 / 离职补偿 / 专项附加 / 个人养老金 / 外籍 / 提前退休 / 增值税 / 企业所得税 / 附加税印花税 / 社保公积金 / 税后工资 / 用工成本 / 经营所得 / 残保金 / 年金 / 税优健康险），配 `robots.txt` / `sitemap.xml` |
-| 当前阶段 | 🚧 **阶段19 UI 重构与留存**（19-0 ~ 19-2 已交付，含 19-1 验收：全站对比度达 WCAG AA）· 🟡 阶段18 配套链路收口剩两项待定 · ⏳ 阶段16 迁移与合规阻塞于 ICP 备案 · ✅ 阶段17 已收官 —— 全阶段表见 [docs/development/development-plan.md](docs/development/development-plan.md) |
+| 当前阶段 | 🚧 **阶段19 UI 重构与留存**（19-0 ~ 19-2 已交付，含 19-1 验收：全站对比度达 WCAG AA）· 🟡 阶段18 配套链路收口剩两项待定 · ⏳ 阶段16 迁移与合规阻塞于 ICP 备案 · ✅ 阶段17 已收官 —— 全阶段表见 [docs/development/开发总计划-阶段与基线.md](docs/development/开发总计划-阶段与基线.md) |
 | 测试 | ✅ 130 套件 2466 个单元测试全通过（`npm test`，2026-09-21 复跑，含阶段13 线索契约 24 例 + 漏斗埋点 9 例 + 分享卡与落地 32 例 + 咨询情境契约 27 例 + 阶段14 专业版兑换码 28 例 + 城市社保参数 24 例 + 版本号五处同步 4 例 + 文档口径守护 5 例 + 阶段14 剩余项 SEO 落地页 41 例）；发布门禁 `verify:local` **266 项**全绿；动过 schema/迁移时另跑 `verify:pg`（生产等价 PostgreSQL 演练） |
 
 ---
@@ -40,7 +40,7 @@ powershell -File tools/ops/ops-check-prod.ps1         # 核对 37 项线上指�
 
 Zeabur（`euriskotax.zeabur.app`）自 2026-10-10 起降级为**测试环境**，所有脚本默认指向腾讯云正式域。
 
-环境变量清单见 [docs/development/development-plan.md](docs/development/development-plan.md) 阶段 6/7。
+环境变量清单见 [docs/development/开发总计划-阶段与基线.md](docs/development/开发总计划-阶段与基线.md) 阶段 6/7。
 
 ### 本地开发
 
@@ -60,7 +60,7 @@ npm run dev                   # 或直接 node src/app.js，监听 :3000
 .\tools\ops\ops-start-dev.ps1 -Share -Watchdog
 ```
 
-> 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **「第一次用：一键启动」**（新环境/刚拉代码）或 **「日常启动：快速启动」**（日常开发）开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md) 与 [开发工作流总览](docs/guides/development-workflow.md)。
+> 💡 **图形化开发控制台（推荐）**：双击 `tools/gui/EuriskoTax-Console.bat`。在「🚀 启动管理」Tab 点击 **「第一次用：一键启动」**（新环境/刚拉代码）或 **「日常启动：快速启动」**（日常开发）开启后端；另有数据库、API 文档、测试、Git 等 8 个 Tab / 110+ 按钮。详见 [tools/gui/README.md](tools/gui/README.md) 与 [开发工作流总览](docs/guides/开发工作流总览.md)。
 
 **本地测试账号**：默认 `dev@example.com` / `password`（由启动脚本自动重置）。本机想用自己账号，就在仓库根放一个 `dev-account.local.json`（已在 .gitignore，字段 `email` / `password`，可选 `username`）——登录页预填、GUI 复制按钮、门禁脚本都读它，**凭据不进版本库**；登录页在 localhost 下会自动出现「开发环境：填入本地测试账号」入口（生产不显示）
 
@@ -128,7 +128,7 @@ EuriskoTax/
 Get-Content .\tools\ops\events.log -Tail 20               # 查看事件日志
 ```
 
-详见 [tools/ops/README.md](tools/ops/README.md) 与 [docs/tech-reports/watchdog-notification-and-event-log-spec.md](docs/tech-reports/watchdog-notification-and-event-log-spec.md)。
+详见 [tools/ops/README.md](tools/ops/README.md) 与 [docs/tech-reports/通知与事件日志规范.md](docs/tech-reports/通知与事件日志规范.md)。
 
 ---
 
@@ -143,7 +143,7 @@ npm run verify:pg           # 生产等价演练：同一套断言跑在本地 P
 npm run verify:release      # 发版前自检：版本号五处 + 文档口径 vs 实测（不一致退出码 1；加 `-- --write` 自动同步数字）
 ```
 
-测试报告见 [docs/reports/test-report.md](docs/reports/test-report.md)。
+测试报告见 [docs/reports/历史快照-交付重构性能与测试报告.md](docs/reports/历史快照-交付重构性能与测试报告.md)。
 
 ---
 
@@ -158,10 +158,10 @@ npm run verify:release      # 发版前自检：版本号五处 + 文档口径 v
 
 ## 更多文档
 
-- **[UI 设计方案（确定性版本 · 开发唯一执行依据）](docs/guides/ui-design-spec.md)** —— 商业模式 / 目标群体 / 核心功能 · 导航架构 · 层级架构 · 24 个页面逐页内容与排版 · 结果页八段模板 · 后期开发注意事项与准入清单
-- [UI/UX 上位方案论证过程稿](docs/guides/ui-ux-master-plan.md) · [Phase 0 实施记录](docs/guides/dual-end-ui-plan.md)（结论已收敛到上面那篇，这两篇只回溯用）
-- [API 接口文档](docs/api/api-reference.md) · [开发计划](docs/development/development-plan.md)
-- [计税规则手册](docs/guides/tax-calculation-rules.md) · [UI 组件复用指南](docs/guides/ui-component-reuse-guide.md)
-- [开发工作流总览](docs/guides/development-workflow.md)（启动/验证/发布/回滚/排障，GUI 按钮命名权威）
-- [冷启动推广素材](docs/marketing/cold-start-materials.md) · [测试报告](docs/reports/test-report.md)
+- **[UI 设计方案（确定性版本 · 开发唯一执行依据）](docs/guides/UI设计方案-唯一执行依据.md)** —— 商业模式 / 目标群体 / 核心功能 · 导航架构 · 层级架构 · 24 个页面逐页内容与排版 · 结果页八段模板 · 后期开发注意事项与准入清单
+- [UI/UX 上位方案论证过程稿](docs/guides/UI-UX上位方案-论证过程稿.md) · [Phase 0 实施记录](docs/guides/双端UI-Phase0实施记录-过程稿.md)（结论已收敛到上面那篇，这两篇只回溯用）
+- [API 接口文档](docs/api/API接口文档.md) · [开发计划](docs/development/开发总计划-阶段与基线.md)
+- [计税规则手册](docs/guides/计税规则手册.md) · [UI 组件复用指南](docs/guides/UI组件复用指南.md)
+- [开发工作流总览](docs/guides/开发工作流总览.md)（启动/验证/发布/回滚/排障，GUI 按钮命名权威）
+- [冷启动推广素材](docs/marketing/冷启动素材.md) · [测试报告](docs/reports/历史快照-交付重构性能与测试报告.md)
 - 文档中心索引：[docs/README.md](docs/README.md)

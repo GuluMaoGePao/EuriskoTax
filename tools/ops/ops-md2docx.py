@@ -3,7 +3,7 @@
 
 用法（项目根目录执行）：
 
-    python tools\\ops\\ops-md2docx.py docs\\marketing\\business-plan-for-partners.md
+    python tools\\ops\\ops-md2docx.py docs\\marketing\\合伙人版商业企划.md
     python tools\\ops\\ops-md2docx.py <input.md> <output.docx>
 
 约定：

@@ -1,7 +1,7 @@
 /**
  * 面向用户展示文案 · 代码侧单一真源（Copy Standard）
  *
- * 上位依据：docs/guides/user-facing-copy-standard.md（v1.1）
+ * 上位依据：docs/guides/面向用户文案规范与台账.md（v1.1）
  * 为什么抽这一层：同一句免责声明此前散落在 index.html / deep-wizard-ui.js / share-card.js /
  * export-utils.js / 21 个落地页里，改一处漏一处（实测免责后缀曾有 8 种写法）。
  * 静态 HTML（index.html 与 seo/*.html）无法引用 JS 常量，那两处由 tests/copy-standard.test.js

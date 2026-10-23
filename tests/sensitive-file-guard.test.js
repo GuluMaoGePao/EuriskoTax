@@ -79,7 +79,7 @@ describe('后端源码 / 运维脚本 / 内部文档顶层目录不下发', () =
     });
 
     test('docs 目录：内部开发方案不外发', async () => {
-        await expectBlocked('/docs/development/development-plan.md', '203.0.113.9');
+        await expectBlocked('/docs/development/开发总计划-阶段与基线.md', '203.0.113.9');
     });
 });
 

@@ -1,7 +1,7 @@
 /**
  * 劳务报酬 / 稿酬 / 特许权使用费「预扣预缴」—— 轻量实现，供 SEO 落地页使用（阶段15 15A-1）
  *
- * 与 bonus / salary / annual-settlement 三个 quick 同一套思路（见 docs/development/seo-landing-plan.md §2）：
+ * 与 bonus / salary / annual-settlement 三个 quick 同一套思路（见 docs/development/SEO落地页方案-阶段14-历史.md §2）：
  *   - 逻辑写在可测试的代码里，由 tests/withholding-quick.test.js 与内核 calculateOtherIncome
  *     在临界点（800 / 4000 / 20000 / 50000）及其 ±1 元、档内采样、非法输入上逐点对拍；
  *   - 税率与费用扣除规则**不复制**：直接读 window.withholdingTaxRates / window.otherIncomeRules

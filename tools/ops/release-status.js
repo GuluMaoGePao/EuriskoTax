@@ -13,7 +13,7 @@
  * 用法：
  *   node tools/ops/release-status.js                 # 查实时状态（读两站 /version.json）
  *   node tools/ops/release-status.js --offline       # 不联网，只按本地信息判定
- *   node tools/ops/release-status.js --write         # 把表格写回 docs/development/release-status.md
+ *   node tools/ops/release-status.js --write         # 把表格写回 docs/development/发布台账.md
  *
  * 预发站带 Basic Auth：从环境变量 BETA_AUTH_USER / BETA_AUTH_PASS 取凭据；
  * 没给凭据时该列标「未知」并提示，不会误判成「没发」。
@@ -23,7 +23,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CHANGELOG = path.join(ROOT, 'CHANGELOG.md');
-const LEDGER = path.join(ROOT, 'docs', 'development', 'release-status.md');
+const LEDGER = path.join(ROOT, 'docs', 'development', '发布台账.md');
 
 const PROD_BASE = process.env.PROD_BASE_URL || 'https://euriskotax.com';
 const BETA_BASE = process.env.BETA_BASE_URL || 'https://beta.euriskotax.com';

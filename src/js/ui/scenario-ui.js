@@ -21,7 +21,7 @@
 
     const CURRENCY = '¥';
 
-    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    // 文案单一真源（docs/guides/面向用户文案规范与台账.md）：取不到常量时回落同义兜底
     const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
     const LEAD_COPY = COPY.LEAD || {};
     // 额度满了之后的唯一去处：留资（站内不出现档位营销与购买语义）

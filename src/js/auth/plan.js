@@ -71,7 +71,7 @@
         return getTier(user.plan, user.plan_expires_at, user.pro_granted_by);
     }
 
-    // UI 文案的唯一出处是 src/js/copy/copy-standard.js（docs/guides/user-facing-copy-standard.md §4 PAY-10）；
+    // UI 文案的唯一出处是 src/js/copy/copy-standard.js（docs/guides/面向用户文案规范与台账.md §4 PAY-10）；
     // 这里只做兜底：常量缺失时（单独 eval 本文件的单测环境）仍能给出同一口径的文案。
     const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
     const GATE_COPY = COPY.GATE || {};

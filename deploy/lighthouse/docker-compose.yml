@@ -13,7 +13,7 @@
 #
 # 注意：
 #   - 首次部署前若要导入 Zeabur（旧生产环境）的老数据，先看
-#     docs/tech-reports/lighthouse-deployment-guide.md 第 3 节（先导数据再起 app）
+#     docs/tech-reports/腾讯云部署与迁移手册.md 第 3 节（先导数据再起 app）
 #   - app 的 build 上下文是仓库根（context: ../..），别移动本文件的位置
 # =============================================================================
 name: euriskotax

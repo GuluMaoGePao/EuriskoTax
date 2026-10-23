@@ -3072,8 +3072,8 @@ Add-SectionCard -TabCtx $tab3Ctx `
         } },
     @{ Text = "打开 tests 目录`n测试代码所在目录"; Desc = "在资源管理器中打开 tests/ 目录，查看/编辑测试代码文件。"; Color = "120, 120, 140";
        OnClick = { Start-Process "explorer.exe" (Join-Path $ProjectRoot "tests") } },
-    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/test-report.md（历史快照：文中 203 用例 / 6 套件是 2026-09-07 的数字，现状 1750 例 / 94 套件见 CHANGELOG）。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\test-report.md") } }
+    @{ Text = "查看测试报告文档`nMarkdown 格式"; Desc = "打开 docs/reports/历史快照-交付重构性能与测试报告.md（🟡 历史快照：2026-10-24 四份一次性报告已合并为这一份；文中 203 用例 / 6 套件是 2026-09-07 的数字，现状 130 套件 2466 例见 CHANGELOG。下面「性能优化报告」「交付检查清单」两个按钮打开的也是这份）。"; Color = "120, 120, 140";
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\历史快照-交付重构性能与测试报告.md") } }
 )
 
 Add-SectionCard -TabCtx $tab3Ctx `
@@ -3083,8 +3083,8 @@ Add-SectionCard -TabCtx $tab3Ctx `
     -AccentColor $C_WARN -Buttons @(
     @{ Text = "运行性能基准测试`nnpm run test:performance"; Desc = "运行 scripts 中的性能基准脚本，结果输出到下方日志区。"; Color = "225, 165, 80";
        OnClick = { Invoke-AsyncCommand -Name "perf" -Command "npm run test:performance" -WorkingDir $ProjectRoot } },
-    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 performance-optimization-report.md（历史快照：测量点来自 2026-08 的代码，计税层之后已重写，只作参考）。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\performance-optimization-report.md") } },
+    @{ Text = "查看性能优化报告`n优化建议文档"; Desc = "打开 历史快照-交付重构性能与测试报告.md（🟡 历史快照：测量点来自 2026-08 的代码，计税层之后已重写，只作参考；2026-10-24 已并入这一份合并文件）。"; Color = "120, 120, 140";
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\历史快照-交付重构性能与测试报告.md") } },
     @{ Text = "运行 Jest 性能单测`ntax-assistant-perf"; Desc = "单独运行 tests/tax-assistant-perf.test.js，针对税务助手模块的性能测试。"; Color = "165, 105, 210";
        OnClick = { Invoke-AsyncCommand -Name "perftest" -Command "npx jest tests/tax-assistant-perf.test.js" -WorkingDir $ProjectRoot } }
 )
@@ -3201,8 +3201,8 @@ Add-SectionCard -TabCtx $tab4bCtx `
        OnClick = { Start-Process "notepad.exe" (Join-Path $OpsDir "ops-notify-reason-map.json") } },
     @{ Text = "编辑通知脚本源码"; Desc = "用记事本打开 ops-notify.ps1 源码，查看通知发送的核心逻辑。"; Color = "120, 120, 140";
        OnClick = { Start-Process "notepad.exe" (Join-Path $OpsDir "ops-notify.ps1") } },
-    @{ Text = "打开通知规范文档"; Desc = "打开 watchdog-notification-and-event-log-spec.md，了解通知系统的设计和字段说明。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\tech-reports\watchdog-notification-and-event-log-spec.md") } }
+    @{ Text = "打开通知规范文档"; Desc = "打开 通知与事件日志规范.md，了解通知系统的设计和字段说明。"; Color = "120, 120, 140";
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\tech-reports\通知与事件日志规范.md") } }
 )
 
 Add-SectionCard -TabCtx $tab4bCtx `
@@ -3345,8 +3345,8 @@ Add-SectionCard -TabCtx $tab5Ctx `
        OnClick = { Invoke-AsyncCommand -Name "status-release" -Command "npm run status:release" -WorkingDir $ProjectRoot } },
     @{ Text = "✍ 更新台账`nstatus:release --write"; Desc = "发完正式后把这一版写回台账（发到哪、什么时候）。台账由脚本生成，不要手改。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "status-write" -Command "npm run status:release -- --write" -WorkingDir $ProjectRoot } },
-    @{ Text = "📄 打开台账文件`nrelease-status.md"; Desc = "在编辑器里打开 docs/development/release-status.md 看完整发布台账（哪一版发到哪、谁发的）。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\development\release-status.md") } }
+    @{ Text = "📄 打开台账文件`n发布台账.md"; Desc = "在编辑器里打开 docs/development/发布台账.md 看完整发布台账（哪一版发到哪、谁发的）。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\development\发布台账.md") } }
 )
 
 Add-SectionCard -TabCtx $tab5Ctx `
@@ -3367,14 +3367,14 @@ Add-SectionCard -TabCtx $tab5Ctx `
        OnClick = { Start-Process "notepad.exe" (Join-Path $OpsDir "ops-deploy.config.example.json") } },
     @{ Text = "编辑部署脚本源码"; Desc = "用记事本打开 ops-deploy.ps1 源码，查看部署的完整流程。"; Color = "120, 120, 140";
        OnClick = { Start-Process "notepad.exe" (Join-Path $OpsDir "ops-deploy.ps1") } },
-    @{ Text = "查看部署指南文档"; Desc = "打开 watchdog-deployment-guide.md，详细阅读远程部署的步骤和注意事项。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\tech-reports\watchdog-deployment-guide.md") } },
-    @{ Text = "查看交付检查清单"; Desc = "打开 final-delivery-checklist.md，交付前逐项对照检查。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\final-delivery-checklist.md") } },
+    @{ Text = "查看部署指南文档"; Desc = "打开 Watchdog监控部署指南.md，详细阅读远程部署的步骤和注意事项。"; Color = "120, 120, 140";
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\tech-reports\Watchdog监控部署指南.md") } },
+    @{ Text = "查看交付检查清单"; Desc = "打开 历史快照-交付重构性能与测试报告.md，交付前逐项对照检查（2026-10-24 已并入这一份合并文件）。"; Color = "120, 120, 140";
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\历史快照-交付重构性能与测试报告.md") } },
     @{ Text = "打开 ops README"; Desc = "打开 tools/ops/README.md，综合查看运维脚本的说明。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $OpsDir "README.md") } },
-    @{ Text = "🧭 改完东西该点哪个`n流程文档"; Desc = "打开 docs/guides/how-to-ship-a-change.md：一句话指令对应哪些命令、A/B/C 三档改动各走什么路由、改 UI 的两个坑（不跑 build:css 线上不会有变化 / 深色是另一套值）。不知道下一步点什么就看它 —— 这个控制台的按钮顺序就是照它排的。"; Color = "255, 215, 120"; Width = $BTN_WIDE_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\how-to-ship-a-change.md") } }
+    @{ Text = "🧭 改完东西该点哪个`n流程文档"; Desc = "打开 docs/guides/改动交付流程速查.md：一句话指令对应哪些命令、A/B/C 三档改动各走什么路由、改 UI 的两个坑（不跑 build:css 线上不会有变化 / 深色是另一套值）。不知道下一步点什么就看它 —— 这个控制台的按钮顺序就是照它排的。"; Color = "255, 215, 120"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\改动交付流程速查.md") } }
 )
 
 # ==============================================================================
@@ -3422,8 +3422,8 @@ Add-SectionCard -TabCtx $tab6Ctx `
        OnClick = { Start-Process "http://localhost:5555/" } },
     @{ Text = "前端入口 index.html"; Desc = "打开项目根目录下的 index.html 文件。"; Color = "85, 180, 110"; Width = $BTN_SMALL_W;
        OnClick = { Start-Process (Join-Path $FrontDir "index.html") } },
-    @{ Text = "Markdown: API参考"; Desc = "打开 docs/api/api-reference.md 接口参考文档。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\api\api-reference.md") } },
+    @{ Text = "Markdown: API参考"; Desc = "打开 docs/api/API接口文档.md 接口参考文档。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\api\API接口文档.md") } },
     @{ Text = "Markdown: README"; Desc = "打开项目根目录的 README.md 总说明。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
        OnClick = { Start-Process (Join-Path $ProjectRoot "README.md") } }
 )
@@ -3439,10 +3439,10 @@ Add-SectionCard -TabCtx $tab6Ctx `
             if ($picked.Count -gt 0) { Invoke-Md2DocxExport -Files $picked }
             else { Write-Log "[导出] 已取消（未选择文件）。" "GRAY" }
        } },
-    @{ Text = "📘 导出合伙人版商业企划`n→ docs/marketing"; Desc = "直接导出 docs/marketing/business-plan-for-partners.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\business-plan-for-partners.md") } },
-    @{ Text = "📗 导出 90 天落地执行手册`n→ docs/marketing"; Desc = "直接导出 docs/marketing/gtm-execution-plan.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
-       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\gtm-execution-plan.md") } },
+    @{ Text = "📘 导出合伙人版商业企划`n→ docs/marketing"; Desc = "直接导出 docs/marketing/合伙人版商业企划.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\合伙人版商业企划.md") } },
+    @{ Text = "📗 导出 90 天落地执行手册`n→ docs/marketing"; Desc = "直接导出 docs/marketing/商业模式落地执行手册.md，输出到同目录同名 .docx（对外发送版）。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-Md2DocxExport -Files (Join-Path $ProjectRoot "docs\marketing\商业模式落地执行手册.md") } },
     @{ Text = "🔧 安装/升级导出依赖`npython-docx"; Desc = "执行 python -m pip install python-docx：导出脚本唯一的第三方依赖，换电脑或升级用它。"; Color = "75, 140, 230"; Width = $BTN_SMALL_W;
        OnClick = {
             $py = Get-PythonExe
@@ -3639,10 +3639,10 @@ Add-SectionCard -TabCtx $tab6bCtx `
        OnClick = { Invoke-AsyncCommand -Name "git" -Command "git diff" -WorkingDir $ProjectRoot } },
     @{ Text = "CHANGELOG 变更日志"; Desc = "打开 CHANGELOG.md，查看项目历史版本的改动说明。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
        OnClick = { Start-Process (Join-Path $ProjectRoot "CHANGELOG.md") } },
-    @{ Text = "开发计划文档"; Desc = "打开 docs/development/development-plan.md，看项目开发计划。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\development\development-plan.md") } },
-    @{ Text = "税务计算规则"; Desc = "打开 docs/guides/tax-calculation-rules.md，查看计税规则。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\tax-calculation-rules.md") } }
+    @{ Text = "开发计划文档"; Desc = "打开 docs/development/开发总计划-阶段与基线.md，看项目开发计划。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\development\开发总计划-阶段与基线.md") } },
+    @{ Text = "税务计算规则"; Desc = "打开 docs/guides/计税规则手册.md，查看计税规则。"; Color = "120, 120, 140"; Width = $BTN_SMALL_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\计税规则手册.md") } }
 )
 
 Add-SectionCard -TabCtx $tab6bCtx `
@@ -3693,8 +3693,8 @@ Add-SectionCard -TabCtx $tab6bCtx `
        OnClick = { Open-ApiDocsAuto } },
     @{ Text = "🖥 部署 SSH 配置`n远程服务器"; Desc = "正式部署时的 SSH 账号密码，配置文件：tools/ops/ops-deploy.config.json。从 ops-deploy.config.example.json 复制模板后填写。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
        OnClick = { Start-Process (Join-Path $ToolsDir "ops\ops-deploy.config.example.json") } },
-    @{ Text = "📖 查看完整账号文档`n账号管理说明"; Desc = "打开 docs/admin/account-credentials.md 查看所有账号的详细说明、获取方式、安全注意事项。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
-       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\admin\account-credentials.md") } }
+    @{ Text = "📖 查看完整账号文档`n账号管理说明"; Desc = "打开 docs/admin/账号凭证速查.md 查看所有账号的详细说明、获取方式、安全注意事项。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\admin\账号凭证速查.md") } }
 )
 
 Add-SectionCard -TabCtx $tab6bCtx `
@@ -4146,7 +4146,7 @@ $form.Add_Shown({
     Write-Log "【账号密码统一管理：】" "OK"
     Write-Log "  👉 左侧导航 → 【🔐 Git & 账号】 → 【2. 账号 & 密码管理】 查看所有账号" "INFO"
     Write-Log "  👉 一键复制登录邮箱 $($devAccount.Email)  /  密码 $($devAccount.Password)" "GRAY"
-    Write-Log "  👉 账号文档: docs/admin/account-credentials.md" "GRAY"
+    Write-Log "  👉 账号文档: docs/admin/账号凭证速查.md" "GRAY"
     Write-Log ""
     Write-Log "提示: 鼠标悬停任何按钮可查看详细说明。导航选中后左侧有蓝色指示条。" "INFO"
     Write-Log ""

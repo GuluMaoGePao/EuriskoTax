@@ -50,7 +50,7 @@
 
     var GUIDE_ID = 'lead-result-guide';
 
-    // 文案单一真源（docs/guides/user-facing-copy-standard.md §5.6）：
+    // 文案单一真源（docs/guides/面向用户文案规范与台账.md §5.6）：
     // 徽标「免费」→「顾问协助」、「免费协助」→「找顾问协助 ›」、导语去掉「最容易被」这类主观最高级。
     // 取不到常量时回落同义兜底，保证被单测单独 eval 时也有正确文案。
     var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};

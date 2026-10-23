@@ -103,7 +103,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **查看 3000 端口状态** | `Get-NetTCPConnection` | 查看 3000 端口的占用详情（PID、进程名、路径） |
 
 > 按钮名于 2026-09 统一（旧名「标准启动 / 快速启动 / 一键完整测试 / 开发模式」已废弃）。
-> 命名对照与完整工作流见 [docs/guides/development-workflow.md](../../docs/guides/development-workflow.md)。
+> 命名对照与完整工作流见 [docs/guides/开发工作流总览.md](../../docs/guides/开发工作流总览.md)。
 
 ### 2. 🗄️ 数据库
 
@@ -147,7 +147,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 > | **🐘 PostgreSQL 演练门禁** | `.\tools\ops\ops-verify-pg.ps1`（= `npm run verify:pg`） | 改动 `server/prisma/schema.prisma` 或 `migrations/` 后**必跑**：Docker 起临时 PostgreSQL（端口 55432、独立数据卷）→ `prisma generate` → `prisma migrate deploy` → 内容种子 → 同一套 **266 项**断言。与线上容器启动同序，专拦「本地 SQLite 全绿、线上迁移才炸」 |
 > | **🔄 全新库演练** | `.\tools\ops\ops-verify-pg.ps1 -Fresh`（= `npm run verify:pg:fresh`） | 等价「线上全新库首次部署」：先删演练数据卷再跑一遍，验证从零建表的路径 |
 >
-> 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。Windows 首次准备环境：① 启用 WSL2（`VirtualMachinePlatform` + WSL 可选功能两项，重启生效；家庭版无 Hyper-V，只能走 WSL2 后端）；② `docker version` 要能看到 **Server** 段、`docker compose version` 为 v2 以上（否则是引擎没起来，重启一次 Docker Desktop）；③ 拉 `postgres:16-alpine` 若报 `registry-1.docker.io` 超时，在 `Settings → Docker Engine` 配 `registry-mirrors`（配前先 `Test-NetConnection` 实测源可用）。两个按钮都会先做前置检查：本机有 Docker 且 `:3000` 有进程在监听时，先弹一次警告二次确认（可取消，取消则一个命令都不执行）；未装 Docker 时不做该检查，直接由脚本以**返回码 2** 优雅退出——按钮输出「未检测到 docker 命令，已跳过」，GUI 再打印橙色「[跳过] …这不是代码问题」说明，并弹一次「是否打开 Docker Desktop 下载页」的引导窗（同一提示 180s 内去重，连点两个演练按钮不会被弹两次）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。
+> 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。Windows 首次准备环境：① 启用 WSL2（`VirtualMachinePlatform` + WSL 可选功能两项，重启生效；家庭版无 Hyper-V，只能走 WSL2 后端）；② `docker version` 要能看到 **Server** 段、`docker compose version` 为 v2 以上（否则是引擎没起来，重启一次 Docker Desktop）；③ 拉 `postgres:16-alpine` 若报 `registry-1.docker.io` 超时，在 `Settings → Docker Engine` 配 `registry-mirrors`（配前先 `Test-NetConnection` 实测源可用）。两个按钮都会先做前置检查：本机有 Docker 且 `:3000` 有进程在监听时，先弹一次警告二次确认（可取消，取消则一个命令都不执行）；未装 Docker 时不做该检查，直接由脚本以**返回码 2** 优雅退出——按钮输出「未检测到 docker 命令，已跳过」，GUI 再打印橙色「[跳过] …这不是代码问题」说明，并弹一次「是否打开 Docker Desktop 下载页」的引导窗（同一提示 180s 内去重，连点两个演练按钮不会被弹两次）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/开发工作流总览.md)。
 
 > **发布自检 + 一键全套**（2026-10-24 新增，与上面三个门禁按钮同一张卡片）：
 >
@@ -230,7 +230,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **🔍 正式站线上核对** | `.\tools\ops\ops-check-prod.ps1` | 部署完必点：真去线上读一遍 37 项指纹，版本哨兵还是旧的就说明没生效或被缓存挡了 |
 | **📊 看看现在发到哪了** | `npm run status:release` | 读发布台账；**预发落后于正式会报警**（在旧代码上看现象会得出错误结论） |
 | **✍ 更新台账** | `npm run status:release -- --write` | 发完正式后写回台账（台账由脚本生成，不要手改） |
-| **🧭 改完东西该点哪个** | 打开 `docs/guides/how-to-ship-a-change.md` | 一句话指令对照表 + A/B/C 三档路由；本页按钮顺序就是照它排的 |
+| **🧭 改完东西该点哪个** | 打开 `docs/guides/改动交付流程速查.md` | 一句话指令对照表 + A/B/C 三档路由；本页按钮顺序就是照它排的 |
 
 ### 6. 🛠️ 常用工具
 
@@ -254,8 +254,8 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | 按钮 | 做什么 | 什么时候点 |
 |------|--------|-----------|
 | **📄 选择任意文件导出 Word** ⭐ | 弹文件选择器（Ctrl 可多选）→ 在**源文件所在目录**生成同名 `.docx` | 任意 `.md/.markdown/.txt/.log/.csv` 要做成对外发送版（自动加封面/目录/页码） |
-| **📘 导出合伙人版商业企划** | 免选择，直接导出 `docs/marketing/business-plan-for-partners.md` | 企划书改完要发合伙人之前 |
-| **📗 导出 90 天落地执行手册** | 免选择，直接导出 `docs/marketing/gtm-execution-plan.md` | 手册改完要发送之前 |
+| **📘 导出合伙人版商业企划** | 免选择，直接导出 `docs/marketing/合伙人版商业企划.md` | 企划书改完要发合伙人之前 |
+| **📗 导出 90 天落地执行手册** | 免选择，直接导出 `docs/marketing/商业模式落地执行手册.md` | 手册改完要发送之前 |
 | **🔧 安装/升级导出依赖** | `python -m pip install --upgrade python-docx` | 换电脑首次使用、或升级依赖包 |
 | **📝 查看/编辑导出脚本** | 记事本打开 `tools/ops/ops-md2docx.py` | 想改字体、页边距、封面提示语、emoji 替换表 |
 | **📂 打开上次导出目录** | 打开最近一次输出目录（未导出过则打开 `docs/marketing`） | 导出完立刻去拿 `.docx` |
@@ -338,8 +338,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/gui/tests/test-dia
 | **📤 Git Push** | `git push` | 推送本地提交（弹窗确认，防误操作） |
 | **📝 Git Diff** | `git diff` | 工作区代码 vs 上次提交的差异 |
 | **📄 CHANGELOG 变更日志** | 打开 `CHANGELOG.md` | 查看项目历史版本改动说明 |
-| **📄 开发计划文档** | 打开 `docs/development/development-plan.md` | 查阅开发计划与路线图 |
-| **📄 税务计算规则** | 打开 `docs/guides/tax-calculation-rules.md` | 计税规则详细参考手册 |
+| **📄 开发计划文档** | 打开 `docs/development/开发总计划-阶段与基线.md` | 查阅开发计划与路线图 |
+| **📄 税务计算规则** | 打开 `docs/guides/计税规则手册.md` | 计税规则详细参考手册 |
 
 #### 7.3 账号 & 密码管理
 

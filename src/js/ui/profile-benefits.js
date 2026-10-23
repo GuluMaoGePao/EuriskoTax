@@ -18,7 +18,7 @@
 (function () {
     'use strict';
 
-    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    // 文案单一真源（docs/guides/面向用户文案规范与台账.md）：取不到常量时回落同义兜底
     var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
     var UPGRADE_COPY = COPY.UPGRADE || {};
     var LEAD_COPY = COPY.LEAD || {};

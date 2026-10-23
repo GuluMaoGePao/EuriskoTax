@@ -1,35 +1,36 @@
 # EuriskoTax 文档中心
 
-> 最后更新：**2026-09-23**（v1.104.0 · 阶段15~19 已合回 `main`）
+> 最后更新：**2026-10-24**（v1.149.7 · 文档全量中文名 + 历史文档合并）
 > 维护原则：按用途分类存放，本文件为统一入口索引
-> 2026-09-23 合回：阶段15~19 的全部内容已从 `feature/stage15-17-wip` 合回 `main`（主干此前停在锚点 `4f381e8` 对外 v1.17.0）。**合回不等于上线** —— 公网仍是 v1.17.0，发布是**手动动作**（GUI「🚀 发布」或 `tools/ops/ops-publish.ps1`）。拆分原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)
-> 2026-09-20 清理：删除散落产物与零引用文件（根目录 `server-dev.log`、空目录 `backup/`、`coverage/`、`.playwright-cli/` 87 张临时截图、`tools/dup_reg_alert.png`）与从未使用过的 `tech-reports/health-check-report-template.md`（上线自检以 `ops-check-prod.ps1` 的 37 项指纹为准）；`clean-browser-cache.bat` 归位 `tools/ops/`；`logs/README.md` 恢复入库（`.gitignore` 写 `logs/` 会让 `!` 例外失效的坑见 [file-management-policy.md §6](development/file-management-policy.md)）
-> 2026-09-24 新增：**`docs/guides/user-facing-copy-standard.md`（面向用户展示文案规范与集中台账 · 单一真源）** —— 含本期定位（不做付费、全留资→私域→客服发升级码）、合规审核状态定义、术语表与禁用词、免责主句固定+后缀枚举、PAY-01~16 付费文案改造清单、14 类模块逐条台账（位置/现状/规范/状态）、ICP 备案专项（21 个落地页缺备案位🔴）、CP-1~5 批次与 7 条守护断言；**改文案前先改本文**
-> 2026-09-24 新增：**`docs/development/stage20-ia-and-ui-alignment-plan.md`（阶段20 信息架构与 UI 优化方案 · 方案稿未开工）** —— 功能架构图（七层 + 依赖交互 + 商业映射）、四层导航模型与去重规则、首页/工具页/我的页重排、电脑网页与手机小程序差异适配、P0–P4 路线；6 项待用户拍板后再动手
+> 2026-10-24 **文档整理（本次改动，三条）**：① **41 份文档全部改为中文名**（`docs/README.md` 索引本身保留英文）（历史文档确定用中文名，活跃文档一并统一；目录名保持英文、文件名中文，点开目录就能按用途认出要找的那份）；② **6 份合成 2 份** —— `docs/reports/` 下四份一次性报告合并为 [历史快照-交付重构性能与测试报告.md](reports/历史快照-交付重构性能与测试报告.md)，阶段12 的 core-enhancement 与 C1 两份合并为 [阶段12-核心补强与税制参数配置-历史.md](development/阶段12-核心补强与税制参数配置-历史.md)；③ 全仓引用一次性同步（源码注释 / GUI 按钮 / 21 个 SEO 落地页 / 脚本硬编码路径）。**动机器**：文档是按用途找的，`stage17-full-tax-coverage-plan.md` 这种名字要点进去才知道讲什么；四份同年同月的一次性报告分开存放，会让人误以为它们各自还在更新。旧英文名的历史叙述（如 CHANGELOG 条目）保持原样不改 —— 那是当时写下的记录，改了反而失真。
+> 2026-09-23 合回：阶段15~19 的全部内容已从 `feature/stage15-17-wip` 合回 `main`（主干此前停在锚点 `4f381e8` 对外 v1.17.0）。**合回不等于上线** —— 公网仍是 v1.17.0，发布是**手动动作**（GUI「🚀 发布」或 `tools/ops/ops-publish.ps1`）。拆分原因与操作顺序见 [development/分支拆分记录-20260918-历史.md](development/分支拆分记录-20260918-历史.md)
+> 2026-09-20 清理：删除散落产物与零引用文件（根目录 `server-dev.log`、空目录 `backup/`、`coverage/`、`.playwright-cli/` 87 张临时截图、`tools/dup_reg_alert.png`）与从未使用过的 `tech-reports/health-check-report-template.md`（上线自检以 `ops-check-prod.ps1` 的 37 项指纹为准）；`clean-browser-cache.bat` 归位 `tools/ops/`；`logs/README.md` 恢复入库（`.gitignore` 写 `logs/` 会让 `!` 例外失效的坑见 [文件管理规范.md §6](development/文件管理规范.md)）
+> 2026-09-24 新增：**`docs/guides/面向用户文案规范与台账.md`（面向用户展示文案规范与集中台账 · 单一真源）** —— 含本期定位（不做付费、全留资→私域→客服发升级码）、合规审核状态定义、术语表与禁用词、免责主句固定+后缀枚举、PAY-01~16 付费文案改造清单、14 类模块逐条台账（位置/现状/规范/状态）、ICP 备案专项（21 个落地页缺备案位🔴）、CP-1~5 批次与 7 条守护断言；**改文案前先改本文**
+> 2026-09-24 新增：**`docs/development/阶段20-信息架构与UI优化-未开工.md`（阶段20 信息架构与 UI 优化方案 · 方案稿未开工）** —— 功能架构图（七层 + 依赖交互 + 商业映射）、四层导航模型与去重规则、首页/工具页/我的页重排、电脑网页与手机小程序差异适配、P0–P4 路线；6 项待用户拍板后再动手
 > 2026-09-20 更新：「当前状态」重写为 v1.80.0 事实（原为 v1.17.0 过期快照）；层级总图补阶段17/18/19；新增「文档新鲜度分级」（🟢活 / 🟡历史快照 / 🔵过程稿）；文档清单刷新更新日期并逐份标注状态；新增「新增文档该放哪 / 该改哪」的硬规则
-> 2026-09-18 新增：**「文档层级总图」章节**（下面的表格是平的，只回答「有哪些」；新增这一节回答「什么关系、我要做的事该读哪一份」）；登记 `docs/guides/site-structure-map.md`（全站现状测绘）
-> 2026-09-14 新增：`docs/marketing/business-plan-for-partners.md`（合伙人版商业企划）与 `docs/marketing/gtm-execution-plan.md`（90 天落地执行手册）
-> 2026-09-17 新增：**`docs/guides/ui-design-spec.md`（UI 设计方案 · 确定性版本 · 开发唯一执行依据）**；登记此前漏收的 `ui-ux-master-plan.md`（论证过程稿）与 `dual-end-ui-plan.md`（Phase 0 实施记录）
+> 2026-09-18 新增：**「文档层级总图」章节**（下面的表格是平的，只回答「有哪些」；新增这一节回答「什么关系、我要做的事该读哪一份」）；登记 `docs/guides/站点结构图-现状测绘.md`（全站现状测绘）
+> 2026-09-14 新增：`docs/marketing/合伙人版商业企划.md`（合伙人版商业企划）与 `docs/marketing/商业模式落地执行手册.md`（90 天落地执行手册）
+> 2026-09-17 新增：**`docs/guides/UI设计方案-唯一执行依据.md`（UI 设计方案 · 确定性版本 · 开发唯一执行依据）**；登记此前漏收的 `UI-UX上位方案-论证过程稿.md`（论证过程稿）与 `双端UI-Phase0实施记录-过程稿.md`（Phase 0 实施记录）
 
 ---
 
-## 当前状态（v1.80.0 · 2026-09-20）
+## 当前状态（v1.149.7 · 2026-10-24）
 
 > 版本号以 [`CHANGELOG.md`](../CHANGELOG.md) 为准；本节在每个阶段收口时更新一次。
-> 2026-09-20 重写：上一版是「v1.17.0 快照 + ⚠️ 滞后」的写法，与事实差 60 多个版本 ——
-> **快照式写法本身就是问题**（读了还要自己判断过期没有），现改为「当前事实 + 逐阶段状态」，不再保留过期快照。
+> 写法：只写「当前事实 + 逐阶段状态」，**不留过期快照** —— 快照式写法本身就是问题（读了还要自己判断过期没有）。
 
-- **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
-- **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
-- **生产环境**：腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起正式公网，部署走 `tools/ops/ops-deploy.ps1`，手动触发，push 不自动上线）；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境
-- **测试**：130 套件 2466 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
-- **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
-  - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
-  - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）
+- **分支**：`main` 单主干（`feature/stage15-17-wip` 已于 2026-09-23 全部合回，拆分原因与顺序见 [分支拆分记录-20260918-历史.md](development/分支拆分记录-20260918-历史.md)）；发布路径见 [分支与版本发布策略.md](guides/分支与版本发布策略.md)
+- **当前版本**：**v1.149.7**（2026-10-24，已推正式）
+- **生产环境**：腾讯云轻量（**服务器北京** `101.42.89.184`，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起为正式公网；部署走 `tools/ops/ops-deploy.ps1`，**手动触发，push 不会自动上线**）；执行包与手册见 [腾讯云部署与迁移手册.md](tech-reports/腾讯云部署与迁移手册.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境，且本机直连不通
+- **测试**：**130 套件 2466 例**单元测试通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **阶段进度**（逐阶段明细与交付版本见 [开发总计划-阶段与基线.md](development/开发总计划-阶段与基线.md) 的阶段状态表）：
+  - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（21 个 SEO 落地页）
+  - ✅ **阶段16 迁移与合规 已收官**：2026-10-10 切流腾讯云、ICP 备案 2026-10-01 下发、公安备案 2026-10-21 下发；**只剩经营性 ICP 许可证未办**（它是官方在线支付的前置，与备案不是一回事）
   - ✅ **阶段17 全税种完整测算（核心卖点）已收官**：21 个 spec 驱动完整测算 + 20 个速算器，税种覆盖 **6/6 类**、个税场景完整度 **16/16**
   - 🟡 **阶段18 配套链路收口** 大部分完成：18-1 ~ 18-6a 已交付；**剩两项待定** —— ① 18-6 按用户反馈补具体税种场景（待用户输入）；② 留资引导投放白名单是否从 4 类扩到更多 deep（待拍板）
   - ✅ **阶段19 UI 重构与留存设计 已收官**：19-0 ~ 19-13 全部交付（样式沙箱与截图基线 / 设计令牌迁回真源 / Tailwind 产物纯重建 / 阴影令牌收口 / 首页双轴导航 / 结果页省钱卡 / 字段级分级与视图信号 / 政策时效与政策版本 / **41 个工具真机冒烟**）；plan 里剩下的要么**刻意不做**（常用置顶；待办 × 台账 —— 拿用户自己标的 status 去催人会变成瞎催），要么**要后端**（主体跨设备同步、登录后随档案同步）
-- **商业与冷启动**：转化链路 + 线索管理 + 站外收款（兑换码）+ **21 个 SEO 落地页**均已就绪，**尚未开始推广（0 用户 / 0 收入）**；四个点火动作已完成（域名 ✅ / ICP 备案 ✅ 已下发 2026-10-01 / 公安备案 ✅ 已下发 2026-10-21 / 企业微信活码 ✅ 2026-09-16 已配置），**Go/No-Go 的 P0 仅剩「顾问值班人与响应时限」**。战略与财务测算见 [business-plan-for-partners.md](marketing/business-plan-for-partners.md)，执行清单见 [gtm-execution-plan.md](marketing/gtm-execution-plan.md)
+  - 🔵 **阶段20 信息架构与 UI 优化**：方案稿，**未开工**（6 项待拍板）
+- **商业与冷启动**：转化链路 + 线索管理 + 站外收款（兑换码）+ **21 个 SEO 落地页**均已就绪，**尚未开始推广（0 用户 / 0 收入）**；四个点火动作已完成（域名 ✅ / ICP 备案 ✅ 已下发 2026-10-01 / 公安备案 ✅ 已下发 2026-10-21 / 企业微信活码 ✅ 2026-09-16 已配置），**Go/No-Go 的 P0 仅剩「顾问值班人与响应时限」**。战略与财务测算见 [合伙人版商业企划.md](marketing/合伙人版商业企划.md)，执行清单见 [商业模式落地执行手册.md](marketing/商业模式落地执行手册.md)
 
 ---
 
@@ -50,14 +51,15 @@ EuriskoTax/
 │   ├── ops/                           # 运维脚本（ops-start-dev / ops-watchdog / ops-notify + 通知配置 + ui-screenshot-baseline.js 视觉回归基线 + screenshots/ 基线图）
 │   ├── gui/                           # GUI 开发控制台（WinForms，8 Tab / 110+ 按钮）
 │   └── cpolar/                        # cpolar 内网穿透工具
-├── docs/                              # 项目文档
-│   ├── README.md                      # 本文件（文档索引）
-│   ├── api/                           # API 接口文档
-│   ├── development/                   # 开发规划
-│   ├── guides/                        # 使用与开发指南
+├── docs/                              # 项目文档（42 份 · 文件名中文，目录名英文）
+│   ├── README.md                      # 本文件（唯一索引）
+│   ├── api/                           # 接口契约
+│   ├── development/                   # 开发规划（总计划 / 各阶段方案 / 发布台账）
+│   ├── guides/                        # 使用与开发指南（唯一执行依据在此）
 │   ├── marketing/                     # 市场推广素材
-│   ├── reports/                       # 项目报告（交付/重构/测试）
-│   └── tech-reports/                  # 技术报告（规范/复盘/部署/SOP）
+│   ├── reports/                       # 历史报告（已无活文档：四份一次性报告合并为一份）
+│   ├── tech-reports/                  # 技术报告（规范 / 复盘 / 部署 / SOP）
+│   └── admin/                         # 账号凭证（已 gitignore，不入仓）
 ├── seo/                               # 21 个 SEO 落地页 + 共用 landing.css
 ├── images/                            # 项目图片资源
 ├── index.html                         # 前端入口
@@ -86,43 +88,47 @@ EuriskoTax/
 └── docs/README.md（本文件＝唯一索引）
 
 第 1 层  权威规范（SSOT）——「该怎么做」以此层为准，下级不得推翻上级
-├── guides/ui-design-spec.md        ★ UI 唯一权威（导航/层级/逐页排版/准入清单）
-│   ├── guides/deep-wizard-ui-spec.md    子文档：多步向导的排版细则（不持有策略）
-│   └── guides/site-structure-map.md     子文档：现状测绘 as-is（不持有决策）
-├── guides/tax-calculation-rules.md     计税规则权威
-└── api/api-reference.md                接口契约权威
+├── guides/UI设计方案-唯一执行依据.md        ★ UI 唯一权威（导航/层级/逐页排版/准入清单）
+│   ├── guides/多步测算向导UI规范.md    子文档：多步向导的排版细则（不持有策略）
+│   └── guides/站点结构图-现状测绘.md     子文档：现状测绘 as-is（不持有决策）
+├── guides/计税规则手册.md     计税规则权威
+└── api/API接口文档.md                接口契约权威
 
 第 2 层  现状测绘（as-is）——「现在是什么样」
-└── guides/site-structure-map.md（画面清单 / 双端 UI 结构图 / IA 内容图 / 三条主流程 / 逐页入口去向，全部附代码行号）
+└── guides/站点结构图-现状测绘.md（画面清单 / 双端 UI 结构图 / IA 内容图 / 三条主流程 / 逐页入口去向，全部附代码行号）
 
 第 3 层  方案与进度——「接下来做什么」
-├── development/development-plan.md      总进度与里程碑（**阶段状态表已含 17 / 18 / 19**）
-├── development/stage19-ui-redesign-plan.md         UI 重构与留存设计（功能全景 / 竞品对标 / 五断点诊断 / 11 类 persona 旅程 / 双轴导航首页 / 效率层 / 19-0~19-11 落地路线），**🚧 进行中：19-0 ~ 19-3 已交付**
-├── development/stage17-full-tax-coverage-plan.md   核心卖点（全税种完整测算）**✅ 已收官**：21 个 spec 驱动完整测算 / 6 类税种 / 个税场景 16/16
-├── development/stage16-migration-and-compliance-plan.md   ⏳ 迁移合规，阻塞于 ICP 备案
-├── development/stage18-spec-driven-followup.md   🟡 大部分完成：21 个完整测算里 17 个被漏掉的**静默失败**收口，**剩两项待定**（见该文 §3）
-└── development/stage10 / 12 / 13 / 15-* + seo-landing-plan   已关闭阶段的实施记录（只回查；阶段14 无独立方案文件）
+├── development/开发总计划-阶段与基线.md      总进度与里程碑（**阶段状态表已含 16 / 17 / 18 / 19 / 20**）
+├── development/阶段20-信息架构与UI优化-未开工.md   🔵 下一步的方案稿（功能架构图 / 四层导航模型 / 首页·工具页·我的页重排 / P0–P4 路线），**未开工，6 项待拍板**
+├── development/阶段18-spec驱动配套收口.md   🟡 大部分完成：21 个完整测算里 17 个被漏掉的**静默失败**收口，**剩两项待定**（见该文 §3）
+└── development/阶段10 / 12 / 13 / 15 / 16 / 17 / 19-* + SEO落地页方案   **已收官阶段的实施记录**（只回查；阶段14 无独立方案文件）
 
 第 4 层  论证过程稿——只在追问「为什么这么定」时回溯，日常开发不必读
-├── guides/ui-ux-master-plan.md   90KB，含「前稿判断有误」的自我修订记录
-└── guides/dual-end-ui-plan.md    Phase 0 实施记录（结论已并入第 1 层）
+├── guides/UI-UX上位方案-论证过程稿.md   90KB，含「前稿判断有误」的自我修订记录
+└── guides/双端UI-Phase0实施记录-过程稿.md    Phase 0 实施记录（结论已并入第 1 层）
 
 第 5 层  报告 / 技术报告 / 市场素材（reports / tech-reports / marketing）
+└── 注意：`reports/` 下已**没有活文档** —— 四份一次性报告已合并为一份 🟡 历史快照
 ```
 
 ### 按任务找文档（只读这一份起步）
 
 | 我要做的事 | 该读哪一份 |
 |---|---|
-| 动任何一处 UI | `guides/ui-design-spec.md` |
-| 改多步测算向导的排版 | `guides/deep-wizard-ui-spec.md` |
-| 想知道有多少页面 / 用户怎么走 / 入口在哪 | `guides/site-structure-map.md` |
-| 想知道当前做到哪一步 | 本文「当前状态」+ `development/development-plan.md` 的阶段状态表 |
-| 想知道某个版本发到哪了（预发 / 正式） | `development/release-status.md` 台账，或 `npm run status:release` |
-| 开工阶段19（UI 重构 / 动 CSS） | `development/stage19-ui-redesign-plan.md`（动 CSS 前先读它的施工约束） |
-| 回查全税种完整测算怎么落地的 | `development/stage17-full-tax-coverage-plan.md`（✅ 已收官） |
-| 新增 / 移动 / 删除文档或脚本 | `development/file-management-policy.md`（目录归属 / 命名 / 编码 / 变更清单） |
-| 追问「当时为什么这么定」 | `guides/ui-ux-master-plan.md`（🔵 过程稿；结论以第 1 层为准） |
+| 动任何一处 UI | `guides/UI设计方案-唯一执行依据.md` |
+| 改多步测算向导的排版 | `guides/多步测算向导UI规范.md` |
+| 想知道有多少页面 / 用户怎么走 / 入口在哪 | `guides/站点结构图-现状测绘.md` |
+| 想知道当前做到哪一步 | 本文「当前状态」+ `development/开发总计划-阶段与基线.md` 的阶段状态表 |
+| 想知道某个版本发到哪了（预发 / 正式） | `development/发布台账.md` 台账，或 `npm run status:release` |
+| 开工阶段19（UI 重构 / 动 CSS） | `development/阶段19-UI重构与留存设计方案.md`（动 CSS 前先读它的施工约束） |
+| 回查全税种完整测算怎么落地的 | `development/阶段17-全税种完整测算方案.md`（✅ 已收官） |
+| 新增 / 移动 / 删除文档或脚本 | `development/文件管理规范.md`（目录归属 / 命名 / 编码 / 变更清单） |
+| 改文案 / 改对外说法 | `guides/面向用户文案规范与台账.md`（单一真源，改文案前先改它） |
+| 客服收到用户问题 | `guides/客服排障手册.md`（处理路径与话术） |
+| 部署上线 / 核对线上 | `tech-reports/腾讯云部署与迁移手册.md`（部署动作走 `tools/ops/ops-deploy.ps1`） |
+| 要对外发商业材料 | `marketing/合伙人版商业企划.md`（用 `tools/ops/ops-md2docx.py` 现导 Word） |
+| 找账号口令 | `admin/账号凭证速查.md`（本机文件，已 gitignore，不入仓） |
+| 追问「当时为什么这么定」 | `guides/UI-UX上位方案-论证过程稿.md`（🔵 过程稿；结论以第 1 层为准） |
 
 ### 文档新鲜度分级（2026-09-20 加）
 
@@ -140,7 +146,7 @@ EuriskoTax/
 ### 三条硬规则
 
 1. **新增文档必须登记进本文件** —— 由 `tests/docs-metrics.test.js`（2026-09-17 加）断言守护，不登记会红。
-2. **第 1 层是唯一决策源** —— 第 1 层的子文档与第 4 层的过程稿都不得反向推翻它；冲突时以 `ui-design-spec.md` 为准。
+2. **第 1 层是唯一决策源** —— 第 1 层的子文档与第 4 层的过程稿都不得反向推翻它；冲突时以 `UI设计方案-唯一执行依据.md` 为准。
 3. **每份文档要能被判断新鲜度** —— 新增文档时在下面清单标注 🟢 / 🔵 / 🟡；阶段收口时把该阶段方案从 🟢 改标 🟡，并同步一次本文「当前状态」的阶段进度（进度更新是**唯一真源**在此，别在各阶段方案里各写一份）。
 
 ---
@@ -151,70 +157,68 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [api/api-reference.md](api/api-reference.md) | 🟢 后端 REST API 接口规范 v2.8（认证含邮箱验证码/邀请码、计税、历史记录、反馈、内容中心、税制参数、城市社保参数、转化线索、专业版兑换码、管理员、运营统计） | 2026-09-18 |
+| [api/API接口文档.md](api/API接口文档.md) | 🟢 后端 REST API 接口规范 v2.8（认证含邮箱验证码/邀请码、计税、历史记录、反馈、内容中心、税制参数、城市社保参数、转化线索、专业版兑换码、管理员、运营统计） | 2026-09-18 |
 
 ### 开发规划
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
 
-| [development/development-plan.md](development/development-plan.md) | 🟢 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-20 |
-| [development/file-management-policy.md](development/file-management-policy.md) | 🟢 文件管理规范（目录归属/命名/编码/变更流程） | 2026-09-18 |
-| [development/release-status.md](development/release-status.md) | 🟢 **发布台账**：每个版本现在在预发还是已推正式（`npm run status:release -- --write` 自动生成，不要手写） | 2026-10-23 |
-| [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 🟡 阶段10 免费/专业版实施方案（**已上线** v1.7.0：计税能力永不锁定，登录仅解锁云端历史同步；只作回查） | 2026-09-18 |
-| [development/stage12-core-enhancement-plan.md](development/stage12-core-enhancement-plan.md) | 🟡 阶段12 核心功能补强实施方案（A5/A3/A1/A2/A4 **全部已完成**：税法常量抽离与版本化、月度明细增强等；只动前端与常量，不碰后端） | 2026-09-14 |
-| [development/stage12-c1-tax-rate-config-plan.md](development/stage12-c1-tax-rate-config-plan.md) | 🟡 阶段12 C1 税制参数配置化方案与实施记录 | 2026-09-14 |
-| [development/stage13-acquisition-and-leads-plan.md](development/stage13-acquisition-and-leads-plan.md) | 🟡 阶段13 获客与转化（引流 → 线索）方案（13A 后端地基 ✅ / 13B 前端触点 ✅ / 13C 管理台「线索」Tab ✅ / 13D 一键结果分享图 ✅ / 13E 漏斗埋点 ✅，阶段13 已全部交付） | 2026-09-18 |
-| [development/seo-landing-plan.md](development/seo-landing-plan.md) | 🟡 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；已交付三页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0、「汇算清缴」✅ v1.16.0，其余词条并入阶段15） | 2026-09-18 |
-| [development/stage15-multi-tax-plan.md](development/stage15-multi-tax-plan.md) | 🟡 阶段15 税务计算能力扩展（多税种）方案（15A 个税纵深 / 15B 企业税种 / 15C 社保薪酬 / 15D 架构与守护；含竞品对标与取舍） | 2026-09-18 |
-| [development/stage16-migration-and-compliance-plan.md](development/stage16-migration-and-compliance-plan.md) | 🟢 阶段16 迁移与合规升级方案（16A 迁腾讯云国内节点 / 16B 官方支付 / 16C 微信小程序 / 16D B 端 API；含 ICP 备案 checklist） | 2026-09-14 |
-| [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md) | 🟡 **main 分支拆分记录（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，阶段15-19 的提交与文件迁至 `feature/stage15-17-wip`；**已于 2026-09-23 全部合回 main**，此文只作回查 | 2026-09-18 |
-| [development/stage17-full-tax-coverage-plan.md](development/stage17-full-tax-coverage-plan.md) | 🟡 **阶段17 全税种完整测算方案（核心卖点兑现）** —— UI 排版前置 → 17A spec 扩展 / 17B 反向迁移已有 4 个 deep / **17D 个税纵深补齐（P0）** / 17C 铺齐 5 类税种；目标覆盖 6/6 类 + 个税场景完整度 10/16（现状 6/6、**16/16 收官**） | 2026-09-19 |
-| [development/stage18-spec-driven-followup.md](development/stage18-spec-driven-followup.md) | 🟢 **阶段18 spec 驱动配套链路收口**（修的是「21 个完整测算里只有 4 个被照顾到、其余 17 个静默失败」）：18-1 加载顺序装配守护 / 18-2 历史查看按注册表统一分发 / 18-3+18-5 分享图取数与入口（改事件委托）/ 18-4 留资情境兜底 / 18-6a 真机补跑；**剩两项待定**（18-6 补场景待用户输入、留资引导白名单待拍板） | 2026-09-20 |
-| [development/stage19-ui-redesign-plan.md](development/stage19-ui-redesign-plan.md) | 🟢 **阶段19 UI 重构与留存设计方案** —— 现有核心功能全景（L0–L5 分层）/ 竞品对标（TurboTax·NerdWallet·国内工具站）/ 五个留存断点诊断 / **11 类 persona 完整使用旅程（§2.5，含常态×事件双轴模型）** / **首页双轴导航（事件卡组 × 身份卡组，§3.3）** / 工具页降载 · 结果页双栏与省钱卡 · 我的页权益可视化 / **效率层（§3.10：主体 E1→模板 E2→台账 E3→快捷 E5→批量 E4）** / 设计令牌增补（只增不改）/ 19-0~19-11 落地路线与门禁 | 2026-09-19 |
-| [development/stage20-ia-and-ui-alignment-plan.md](development/stage20-ia-and-ui-alignment-plan.md) | 🔵 **阶段20 信息架构与 UI 优化方案（方案稿，未开工）** —— **功能架构图（L0 环境 / L1 全局 / L2 目的地 / L3 任务 / L4 情境 / L5 能力 / L6 支撑）** + 依赖与交互关系 + 模块×商业指标映射；**四层导航模型与去重规则**（顶部=身份与环境 / 底部与顶部 Tab=同一导航的两种投影，同一目的地只有一条稳定路径）+ 7 条现状重复清单；首页 10 区块→7 区块重排（搜索常驻 / Hero / 事件卡 / 「接下来要办」三合一 / 身份降 chip / 继续上次 / 呼吸区）；工具页 21 个完整测算提为**并列类型筛选** + 桌面多列网格；我的页三段式 + 高频四宫格；**电脑网页 vs 手机小程序差异适配**（含小程序形态判定：现为 H5+PWA，只做外壳适配层 storage/导出/导航/支付）；P0–P4 落地路线与 6 项待拍板 | 2026-09-24 |
-| [guides/deep-wizard-ui-spec.md](guides/deep-wizard-ui-spec.md) | 🟢 **通用多步测算向导 UI 排版规范**（阶段17 的开工前置）—— 结果页「区域词典」（15 区块 / 5 必选 / 顺序固定）、统一栅格三档、明细表三型、入口层 5 处必修、响应式与暗色约定、10 条新增守护断言、现有 4 页迁移清单 | 2026-09-19 |
-| [guides/site-structure-map.md](guides/site-structure-map.md) | 🟢 **站点结构图（现状测绘 as-is）**：画面清单（14 个 App 视图 / 12 个页内步骤 / 21 个 SEO 落地页 / 20 个浮层）、UI 结构图（双端）、内容结构图（IA）、三条用户主流程、逐页结构图 + 功能入口去向表（全部附代码行号） | 2026-09-19 |
+> 本节的「阶段 N」文档按阶段号排序；已收官阶段的方案标 🟡（只作回查），进行中/待办的标 🟢 / 🔵。
+
+| [development/开发总计划-阶段与基线.md](development/开发总计划-阶段与基线.md) | 🟢 项目开发计划、里程碑、技术选型、**阶段状态表（阶段 1–20）** | 2026-10-24 |
+| [development/发布台账.md](development/发布台账.md) | 🟢 **发布台账**：每个版本现在在预发还是已推正式（`npm run status:release -- --write` 自动生成，不要手写） | 2026-10-24 |
+| [development/文件管理规范.md](development/文件管理规范.md) | 🟢 文件管理规范（目录归属 / 命名 / 编码 / 变更流程） | 2026-09-18 |
+| [development/阶段10-免费版与专业版方案-历史.md](development/阶段10-免费版与专业版方案-历史.md) | 🟡 阶段10 免费/专业版实施方案（**已上线** v1.7.0：计税能力永不锁定，登录仅解锁云端历史同步；只作回查） | 2026-09-18 |
+| [development/阶段12-核心补强与税制参数配置-历史.md](development/阶段12-核心补强与税制参数配置-历史.md) | 🟡 阶段12 实施方案（A1–A5 **全部已完成**：税法常量抽离与版本化 / 月度明细增强 / **C1 税制参数配置化**）—— **2026-10-24 由 `stage12-core-enhancement-plan` 与 `stage12-c1-tax-rate-config-plan` 两份合并** | 2026-10-24 |
+| [development/阶段13-获客与转化方案-历史.md](development/阶段13-获客与转化方案-历史.md) | 🟡 阶段13 获客与转化（引流 → 线索）方案（13A 后端地基 ✅ / 13B 前端触点 ✅ / 13C 管理台「线索」Tab ✅ / 13D 一键结果分享图 ✅ / 13E 漏斗埋点 ✅，阶段13 已全部交付） | 2026-09-18 |
+| [development/SEO落地页方案-阶段14-历史.md](development/SEO落地页方案-阶段14-历史.md) | 🟡 高商业意图 SEO 落地页方案（阶段14 剩余项：设计原则 / 关键词→页面映射 / 守护断言；已交付三页「年终奖个税」✅ v1.14.0、「月薪个税」✅ v1.15.0、「汇算清缴」✅ v1.16.0，其余词条并入阶段15） | 2026-09-18 |
+| [development/阶段15-多税种扩展方案-历史.md](development/阶段15-多税种扩展方案-历史.md) | 🟡 阶段15 税务计算能力扩展（多税种）方案（15A 个税纵深 / 15B 企业税种 / 15C 社保薪酬 / 15D 架构与守护；含竞品对标与取舍） | 2026-09-18 |
+| [development/阶段16-迁移与合规方案.md](development/阶段16-迁移与合规方案.md) | 🟡 阶段16 迁移与合规升级方案（16A 迁腾讯云国内节点 ✅ 2026-10-10 切流 / 16B 官方支付 ⏳ 卡在**经营性 ICP 许可证** / 16C 微信小程序 / 16D B 端 API；含 ICP 备案 checklist） | 2026-10-10 |
+| [development/阶段17-全税种完整测算方案.md](development/阶段17-全税种完整测算方案.md) | 🟡 **阶段17 全税种完整测算方案（核心卖点兑现）✅ 已收官** —— UI 排版前置 → 17A spec 扩展 / 17B 反向迁移已有 4 个 deep / **17D 个税纵深补齐（P0）** / 17C 铺齐 5 类税种；覆盖 6/6 类 + 个税场景完整度 **16/16** | 2026-09-19 |
+| [development/阶段18-spec驱动配套收口.md](development/阶段18-spec驱动配套收口.md) | 🟢 **阶段18 spec 驱动配套链路收口**（修的是「21 个完整测算里只有 4 个被照顾到、其余 17 个静默失败」）：18-1 加载顺序装配守护 / 18-2 历史查看按注册表统一分发 / 18-3+18-5 分享图取数与入口（改事件委托）/ 18-4 留资情境兜底 / 18-6a 真机补跑；**剩两项待定**（18-6 补场景待用户输入、留资引导白名单待拍板） | 2026-09-20 |
+| [development/阶段19-UI重构与留存设计方案.md](development/阶段19-UI重构与留存设计方案.md) | 🟡 **阶段19 UI 重构与留存设计方案 ✅ 已收官（19-0 ~ 19-13）** —— 现有核心功能全景（L0–L5 分层）/ 竞品对标（TurboTax·NerdWallet·国内工具站）/ 五个留存断点诊断 / **11 类 persona 完整使用旅程（§2.5）** / **首页双轴导航（§3.3）** / 工具页降载 · 结果页省钱卡 · 我的页权益可视化 / **效率层（§3.10）** / 设计令牌增补 | 2026-09-19 |
+| [development/阶段20-信息架构与UI优化-未开工.md](development/阶段20-信息架构与UI优化-未开工.md) | 🔵 **阶段20 信息架构与 UI 优化方案（方案稿，未开工）** —— **功能架构图（L0–L6 七层）** + 依赖与交互关系 + 模块×商业指标映射；**四层导航模型与去重规则** + 7 条现状重复清单；首页 10 区块→7 区块重排；工具页 21 个完整测算提为**并列类型筛选**；我的页三段式 + 高频四宫格；**电脑网页 vs 手机小程序差异适配**；P0–P4 路线与 6 项待拍板 | 2026-09-24 |
+| [development/分支拆分记录-20260918-历史.md](development/分支拆分记录-20260918-历史.md) | 🟡 **main 分支拆分记录（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，阶段15-19 的提交与文件迁至 `feature/stage15-17-wip`；**已于 2026-09-23 全部合回 main**，此文只作回查 | 2026-09-18 |
 
 ### 使用与开发指南
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [guides/ui-design-spec.md](guides/ui-design-spec.md) | 🟢 **UI 设计方案（确定性版本 · 开发唯一执行依据）**：商业模式/目标群体/核心功能 · 导航架构 · 层级架构 · 24 页逐页内容与排版 · 结果页八段模板 · 后期开发注意事项与准入清单 | 2026-09-19 |
-| [guides/ui-ux-master-plan.md](guides/ui-ux-master-plan.md) | 🔵 UI/UX 上位方案 **论证过程稿**（90KB，含取舍修订记录；**结论已收敛到 `ui-design-spec.md`**，日常开发不必读） | 2026-09-18 |
-| [guides/dual-end-ui-plan.md](guides/dual-end-ui-plan.md) | 🔵 **Phase 0 实施记录**（设计令牌/z 层级/断点/屏幕预算/容器加宽/助手推开/打印，S0–S8 ✅ 全完成） | 2026-09-18 |
-| [guides/user-facing-copy-standard.md](guides/user-facing-copy-standard.md) | 🟢 **面向用户展示文案规范与集中台账（单一真源）** —— 本期定位「不做付费功能、全部引导留资→私域成交→客服发升级码」与三条铁律 / **合规审核状态定义（✅通过·🟡待改·🔴必改·⏳待生效·⬜废弃·🆕新增）** / 全局术语表与禁用词 / **免责声明「主句固定 + 主管部门后缀 5 选 1」** / 广告法·税务·ICP·个保四条红线 / **付费文案改造清单 PAY-01~16（删除·改写·保留三类）** / 14 类页面模块逐条台账（ID·用途·位置·现状·规范·状态）/ ICP 备案专项（主站容器就绪⏳、21 个落地页缺备案位🔴）/ CP-1~5 批次与 7 条守护断言 | 2026-09-24 |
-| [guides/tax-calculation-rules.md](guides/tax-calculation-rules.md) | 🟢 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-09-19 |
-| [guides/ui-component-reuse-guide.md](guides/ui-component-reuse-guide.md) | 🟢 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-09-14 |
-| [guides/responsive-rules-reference.md](guides/responsive-rules-reference.md) | 🟢 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-19 |
-| [guides/development-workflow.md](guides/development-workflow.md) | 🟢 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-19 |
-| [guides/how-to-ship-a-change.md](guides/how-to-ship-a-change.md) | 🟢 **改完怎么走流程**：一句话指令 → 实际执行的命令；按改动分 A/B/C 三档决定走哪条路（排版看效果、工具功能改动的完整步骤、两个必踩的样式坑） | 2026-10-23 |
-| [guides/branch-release-strategy.md](guides/branch-release-strategy.md) | 🟢 分支与版本发布策略（主干模型/命名/版本号五处同步/自动打 tag/回滚） | 2026-09-14 |
-| [guides/gui-button-reference.md](guides/gui-button-reference.md) | 🟢 GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-09-14 |
-| [guides/coding-rules-reference.md](guides/coding-rules-reference.md) | 🟢 **编码约定速查**：作用域（不用 IIFE）/ 加载顺序 / 不静默吞错 / 接线契约测试 / 重构「零功能变化」怎么证明 / 命名允许名单 —— **每条均标注出处** | 2026-09-18 |
-| [guides/support-playbook.md](guides/support-playbook.md) | 🟢 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-19 |
-| [guides/user-journey-and-platform-role.md](guides/user-journey-and-platform-role.md) | 🟢 **用户、路径与平台角色**：六类常态 persona + 事件轴 · 每条路径「入口→想算什么→怎么算→得到什么→然后呢」· 平台三条边界（不代账/不代办/不对咨询结论负责）· 三层变现（服务转介为主、ProCode 为辅）· ICP/公安备案现状与四条合规硬门槛 · 最后是「这些约束规定了页面长什么样」 | 2026-10-12 |
+| [guides/UI设计方案-唯一执行依据.md](guides/UI设计方案-唯一执行依据.md) | 🟢 **UI 设计方案（确定性版本 · 开发唯一执行依据）**：商业模式/目标群体/核心功能 · 导航架构 · 层级架构 · 24 页逐页内容与排版 · 结果页八段模板 · 后期开发注意事项与准入清单 | 2026-09-19 |
+| [guides/UI-UX上位方案-论证过程稿.md](guides/UI-UX上位方案-论证过程稿.md) | 🔵 UI/UX 上位方案 **论证过程稿**（90KB，含取舍修订记录；**结论已收敛到 `UI设计方案-唯一执行依据.md`**，日常开发不必读） | 2026-09-18 |
+| [guides/双端UI-Phase0实施记录-过程稿.md](guides/双端UI-Phase0实施记录-过程稿.md) | 🔵 **Phase 0 实施记录**（设计令牌/z 层级/断点/屏幕预算/容器加宽/助手推开/打印，S0–S8 ✅ 全完成） | 2026-09-18 |
+| [guides/面向用户文案规范与台账.md](guides/面向用户文案规范与台账.md) | 🟢 **面向用户展示文案规范与集中台账（单一真源）** —— 本期定位「不做付费功能、全部引导留资→私域成交→客服发升级码」与三条铁律 / **合规审核状态定义（✅通过·🟡待改·🔴必改·⏳待生效·⬜废弃·🆕新增）** / 全局术语表与禁用词 / **免责声明「主句固定 + 主管部门后缀 5 选 1」** / 广告法·税务·ICP·个保四条红线 / **付费文案改造清单 PAY-01~16（删除·改写·保留三类）** / 14 类页面模块逐条台账（ID·用途·位置·现状·规范·状态）/ ICP 备案专项（主站容器就绪⏳、21 个落地页缺备案位🔴）/ CP-1~5 批次与 7 条守护断言 | 2026-09-24 |
+| [guides/计税规则手册.md](guides/计税规则手册.md) | 🟢 计税规则手册（综合所得/经营所得/反向倒算等） | 2026-09-19 |
+| [guides/UI组件复用指南.md](guides/UI组件复用指南.md) | 🟢 前端 UI 组件复用指南（Sticky 导航/卡片渲染/事件委托等） | 2026-09-14 |
+| [guides/响应式规则手册.md](guides/响应式规则手册.md) | 🟢 响应式规则维护手册（规则+性能数据+验证方法） | 2026-09-19 |
+| [guides/开发工作流总览.md](guides/开发工作流总览.md) | 🟢 开发工作流总览（启动/验证/发布/回滚/排障，按钮命名权威定义） | 2026-09-19 |
+| [guides/改动交付流程速查.md](guides/改动交付流程速查.md) | 🟢 **改完怎么走流程**：一句话指令 → 实际执行的命令；按改动分 A/B/C 三档决定走哪条路（排版看效果、工具功能改动的完整步骤、两个必踩的样式坑） | 2026-10-23 |
+| [guides/分支与版本发布策略.md](guides/分支与版本发布策略.md) | 🟢 分支与版本发布策略（主干模型/命名/版本号五处同步/自动打 tag/回滚） | 2026-09-14 |
+| [guides/GUI按钮速查.md](guides/GUI按钮速查.md) | 🟢 GUI 开发控制台按钮速查（110 按钮基线 + 邀请码管理增量） | 2026-09-14 |
+| [guides/编码约定速查.md](guides/编码约定速查.md) | 🟢 **编码约定速查**：作用域（不用 IIFE）/ 加载顺序 / 不静默吞错 / 接线契约测试 / 重构「零功能变化」怎么证明 / 命名允许名单 —— **每条均标注出处** | 2026-09-18 |
+| [guides/客服排障手册.md](guides/客服排障手册.md) | 🟢 客服排障手册（发布后用户问题的处理路径与话术，配套管理台「排障」Tab） | 2026-09-19 |
+| [guides/用户旅程与平台角色.md](guides/用户旅程与平台角色.md) | 🟢 **用户、路径与平台角色**：六类常态 persona + 事件轴 · 每条路径「入口→想算什么→怎么算→得到什么→然后呢」· 平台三条边界（不代账/不代办/不对咨询结论负责）· 三层变现（服务转介为主、ProCode 为辅）· ICP/公安备案现状与四条合规硬门槛 · 最后是「这些约束规定了页面长什么样」 | 2026-10-12 |
+| [guides/多步测算向导UI规范.md](guides/多步测算向导UI规范.md) | 🟢 **通用多步测算向导 UI 排版规范**（阶段17 的开工前置）—— 结果页「区域词典」（15 区块 / 5 必选 / 顺序固定）、统一栅格三档、明细表三型、入口层 5 处必修、响应式与暗色约定、10 条守护断言 | 2026-09-19 |
+| [guides/站点结构图-现状测绘.md](guides/站点结构图-现状测绘.md) | 🟢 **站点结构图（现状测绘 as-is）**：画面清单（14 个 App 视图 / 12 个页内步骤 / 21 个 SEO 落地页 / 20 个浮层）、双端 UI 结构图、IA 内容图、三条主流程、逐页入口去向表（全部附代码行号） | 2026-09-19 |
 
 ### 项目报告
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [reports/final-delivery-checklist.md](reports/final-delivery-checklist.md) | 🟡 最终交付清单（交付物总览/质量验收） | 2026-09-14 |
-| [reports/refactor-summary-report.md](reports/refactor-summary-report.md) | 🟡 重构成果汇总报告（三批次+Phase 4） | 2026-09-14 |
-| [reports/performance-optimization-report.md](reports/performance-optimization-report.md) | 🟡 前端渲染性能优化报告（主页 / 个人中心 / 税务助手的渲染测量点与优化手段） | 2026-09-14 |
-| [reports/test-report.md](reports/test-report.md) | 🟡 测试报告（**历史快照**：里面记的是当时的用例数，已不是现状） | 2026-09-14 |
+| [reports/历史快照-交付重构性能与测试报告.md](reports/历史快照-交付重构性能与测试报告.md) | 🟡 **2026-10-24 由四份一次性报告合并**：最终交付清单（交付物总览/质量验收）+ 重构成果汇总（三批次 + Phase 4）+ 前端渲染性能优化（主页/个人中心/税务助手的测量点与手段）+ 测试报告（203 用例 / 6 套件是 2026-09-07 的数字，**已不是现状**） | 2026-10-24 |
 
 ### 市场推广
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [marketing/cold-start-materials.md](marketing/cold-start-materials.md) | 🟢 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-18 |
-| [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md) | 🟢 **合伙人版商业企划 · v2.0**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项）—— **2026-10-22 按 v1.148.0 事实重写**：备案与境内节点已落地（不再是风险）、在线支付的硬前置是**经营性 ICP 许可证**而非备案、第一层服务边界按主体经营范围重划为「咨询解答 + 转介持牌方」 | 2026-10-22 |
-| [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md) | 🟢 **商业模式落地执行手册**（Go/No-Go 检查表 · 第 0 周逐日点火 · 90 天周节奏 · 指标看板 · 线索跟进 SOP · 待办登记 · 单位经济学实测口径） | 2026-09-18 |
-| [marketing/wecom-channel-playbook.md](marketing/wecom-channel-playbook.md) | 🟢 **企业微信按入口分码操作手册**（一入口一码 / 欢迎语 / 打标签 / 验证清单；含「客服链接不可手工拼参数」的官方依据） | 2026-09-18 |
+| [marketing/冷启动素材.md](marketing/冷启动素材.md) | 🟢 首批测试用户冷启动素材（文案/渠道/注册指引/反馈观察） | 2026-09-18 |
+| [marketing/合伙人版商业企划.md](marketing/合伙人版商业企划.md) | 🟢 **合伙人版商业企划 · v2.0**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项）—— **2026-10-22 按 v1.148.0 事实重写**：备案与境内节点已落地（不再是风险）、在线支付的硬前置是**经营性 ICP 许可证**而非备案、第一层服务边界按主体经营范围重划为「咨询解答 + 转介持牌方」 | 2026-10-22 |
+| [marketing/商业模式落地执行手册.md](marketing/商业模式落地执行手册.md) | 🟢 **商业模式落地执行手册**（Go/No-Go 检查表 · 第 0 周逐日点火 · 90 天周节奏 · 指标看板 · 线索跟进 SOP · 待办登记 · 单位经济学实测口径） | 2026-09-18 |
+| [marketing/企业微信分码操作手册.md](marketing/企业微信分码操作手册.md) | 🟢 **企业微信按入口分码操作手册**（一入口一码 / 欢迎语 / 打标签 / 验证清单；含「客服链接不可手工拼参数」的官方依据） | 2026-09-18 |
 
 > **Word 发送版（`.docx`）不入库**（2026-10-24 起）：需要时用 `tools/ops/ops-md2docx.py`
-> 从同名 `.md` 现导出 —— `python tools/ops/ops-md2docx.py docs/marketing/business-plan-for-partners.md`。
+> 从同名 `.md` 现导出 —— `python tools/ops/ops-md2docx.py docs/marketing/合伙人版商业企划.md`。
 > 原因：导出件与 `.md` 是一份内容的两个副本，改了 `.md` 忘了重导，发出去的就是旧版；
 > 库里只留真源，发送前现导，这个漂移就不存在了。
 
@@ -222,11 +226,11 @@ EuriskoTax/
 
 | 文档 | 用途 | 更新日期 |
 |------|------|---------|
-| [tech-reports/watchdog-deployment-guide.md](tech-reports/watchdog-deployment-guide.md) | 🟢 Watchdog 监控与邮件通知系统部署指南 v1.3（本地运维） | 2026-09-14 |
-| [tech-reports/lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md) | 🟢 腾讯云轻量服务器部署与迁移手册（Zeabur → 上海轻量，**2026-10-10 已切流完成**，现为正式公网；迁移包 `deploy/lighthouse/`，含数据迁移/证书/切换日流程/回滚/核对清单） | 2026-09-18 |
-| [tech-reports/watchdog-notification-and-event-log-spec.md](tech-reports/watchdog-notification-and-event-log-spec.md) | 🟢 守护脚本邮件通知与事件日志规范 v4.0（通知/日志唯一真源；§8 含 URL 邮件密集发送排查会话，OPEN） | 2026-09-14 |
-| [tech-reports/troubleshooting-sop-template.md](tech-reports/troubleshooting-sop-template.md) | 🟢 故障排查 SOP 标准模板 v1.0（复用模板） | 2026-09-14 |
-| [tech-reports/mock-client-concurrent-logging-retrospective.md](tech-reports/mock-client-concurrent-logging-retrospective.md) | 🟡 MockClient 并发日志乱序问题技术复盘 | 2026-09-14 |
+| [tech-reports/Watchdog监控部署指南.md](tech-reports/Watchdog监控部署指南.md) | 🟢 Watchdog 监控与邮件通知系统部署指南 v1.3（本地运维） | 2026-09-14 |
+| [tech-reports/腾讯云部署与迁移手册.md](tech-reports/腾讯云部署与迁移手册.md) | 🟢 腾讯云轻量服务器部署与迁移手册（Zeabur → 腾讯云轻量，**服务器北京** `101.42.89.184`、备案主体上海；**2026-10-10 已切流完成**，现为正式公网；迁移包 `deploy/lighthouse/`，含数据迁移/证书/切换日流程/回滚/核对清单） | 2026-10-10 |
+| [tech-reports/通知与事件日志规范.md](tech-reports/通知与事件日志规范.md) | 🟢 守护脚本邮件通知与事件日志规范 v4.0（通知/日志唯一真源；§8 含 URL 邮件密集发送排查会话，OPEN） | 2026-09-14 |
+| [tech-reports/故障排查SOP模板.md](tech-reports/故障排查SOP模板.md) | 🟢 故障排查 SOP 标准模板 v1.0（复用模板） | 2026-09-14 |
+| [tech-reports/MockClient并发日志复盘-历史.md](tech-reports/MockClient并发日志复盘-历史.md) | 🟡 MockClient 并发日志乱序问题技术复盘 | 2026-09-14 |
 
 ---
 
@@ -235,49 +239,49 @@ EuriskoTax/
 ### 项目概览与启动
 
 1. 阅读 [项目根 README](../README.md) 了解架构与快速启动
-2. 参考 [开发计划](development/development-plan.md) 了解阶段进度
-3. 按 [API 接口文档](api/api-reference.md) 对接前后端
+2. 参考 [开发计划](development/开发总计划-阶段与基线.md) 了解阶段进度
+3. 按 [API 接口文档](api/API接口文档.md) 对接前后端
 4. 版本变更见 [CHANGELOG.md](../CHANGELOG.md)
 
 ### 日常开发
 
-- **UI 设计（先读这里）**：[UI 设计方案 · 确定性版本](guides/ui-design-spec.md)（导航/层级/逐页排版/开发注意事项）
-  - **站点全貌（想知道有多少页面 / 用户怎么走 / 入口在哪，看这份）**：[站点结构图](guides/site-structure-map.md) —— 画面清单 + 双端 UI 结构图 + IA 内容图 + 三条主流程 + 逐页入口去向
-- 计税逻辑：[计税规则手册](guides/tax-calculation-rules.md)
-- 前端复用：[UI 组件复用指南](guides/ui-component-reuse-guide.md)
-- 响应式适配：[响应式规则维护手册](guides/responsive-rules-reference.md)
-- GUI 按钮：[GUI 按钮速查](guides/gui-button-reference.md)
-- 全流程：[开发工作流总览](guides/development-workflow.md)（启动/验证/发布/回滚/排障）
-- 改完之后该干什么：[改动怎么走流程](guides/how-to-ship-a-change.md)（含「该说什么指令」对照表与 A/B/C 三档路由）
-- 分支/版本/回滚：[分支与版本发布策略](guides/branch-release-strategy.md)
-- 接口联调：[API 接口文档](api/api-reference.md)
+- **UI 设计（先读这里）**：[UI 设计方案 · 确定性版本](guides/UI设计方案-唯一执行依据.md)（导航/层级/逐页排版/开发注意事项）
+  - **站点全貌（想知道有多少页面 / 用户怎么走 / 入口在哪，看这份）**：[站点结构图](guides/站点结构图-现状测绘.md) —— 画面清单 + 双端 UI 结构图 + IA 内容图 + 三条主流程 + 逐页入口去向
+- 计税逻辑：[计税规则手册](guides/计税规则手册.md)
+- 前端复用：[UI 组件复用指南](guides/UI组件复用指南.md)
+- 响应式适配：[响应式规则维护手册](guides/响应式规则手册.md)
+- GUI 按钮：[GUI 按钮速查](guides/GUI按钮速查.md)
+- 全流程：[开发工作流总览](guides/开发工作流总览.md)（启动/验证/发布/回滚/排障）
+- 改完之后该干什么：[改动怎么走流程](guides/改动交付流程速查.md)（含「该说什么指令」对照表与 A/B/C 三档路由）
+- 分支/版本/回滚：[分支与版本发布策略](guides/分支与版本发布策略.md)
+- 接口联调：[API 接口文档](api/API接口文档.md)
 
 ### 部署
 
-- **生产（腾讯云轻量 · 上海）**：`tools/ops/ops-deploy.ps1` 打包上传 → 依赖安装 + Prisma migrate deploy → pm2 重启 → 健康检查；部署后自检跑 `tools/ops/ops-check-prod.ps1`（**37 项线上指纹**）。**push 不会自动上线**，部署是手动动作；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（阶段16 之前的旧生产）已降级为测试环境
-- **本地开发**：`npm run dev`（SQLite + 内网穿透 + watchdog，详见 [运维脚本目录](../tools/ops/README.md)）
+- **生产（腾讯云轻量 · 服务器北京）**：`tools/ops/ops-deploy.ps1` 打包上传 → 依赖安装 + Prisma migrate deploy → pm2 重启 → 健康检查；部署后自检跑 `tools/ops/ops-check-prod.ps1`（**37 项线上指纹**）。**push 不会自动上线**，部署是手动动作；执行包与手册见 [腾讯云部署与迁移手册.md](tech-reports/腾讯云部署与迁移手册.md)。Zeabur（阶段16 之前的旧生产）已降级为测试环境，且本机直连不通
+- **本地预览**：仓库**没有 `dev` / `start` script**（`npm run dev` 会报 Missing script）。要起服务看效果，用 `tools/ops/ui-lib/screenshot-kit.js` 的 `kit.startServer(4173)` 再预览 `http://127.0.0.1:4173/`（**用完务必停掉 node 进程**，占着 4173 会让基线脚本起不来）；日常验证走 `npm test` / `npm run verify:local`，运维脚本见 [运维脚本目录](../tools/ops/README.md)
 
 ### 故障排查
 
 | 场景 | 参考文档 |
 |------|---------|
-| 邮件发送失败 | [部署指南 8.1](tech-reports/watchdog-deployment-guide.md#八故障排查) |
-| SMTP 端口被防火墙拦截 | [部署指南 8.6](tech-reports/watchdog-deployment-guide.md#86-smtp-端口被防火墙拦截) |
-| watchdog 未检测到异常 | [部署指南 8.2](tech-reports/watchdog-deployment-guide.md#八故障排查) |
-| 公网 URL 未检测到变更 | [部署指南 8.3](tech-reports/watchdog-deployment-guide.md#八故障排查) |
-| 后端服务频繁重启 | [部署指南 8.4](tech-reports/watchdog-deployment-guide.md#八故障排查) |
-| cpolar 隧道频繁断连 | [部署指南 8.5](tech-reports/watchdog-deployment-guide.md#八故障排查) |
-| 通用故障排查流程 | [SOP 模板](tech-reports/troubleshooting-sop-template.md) |
+| 邮件发送失败 | [部署指南 8.1](tech-reports/Watchdog监控部署指南.md#八故障排查) |
+| SMTP 端口被防火墙拦截 | [部署指南 8.6](tech-reports/Watchdog监控部署指南.md#86-smtp-端口被防火墙拦截) |
+| watchdog 未检测到异常 | [部署指南 8.2](tech-reports/Watchdog监控部署指南.md#八故障排查) |
+| 公网 URL 未检测到变更 | [部署指南 8.3](tech-reports/Watchdog监控部署指南.md#八故障排查) |
+| 后端服务频繁重启 | [部署指南 8.4](tech-reports/Watchdog监控部署指南.md#八故障排查) |
+| cpolar 隧道频繁断连 | [部署指南 8.5](tech-reports/Watchdog监控部署指南.md#八故障排查) |
+| 通用故障排查流程 | [SOP 模板](tech-reports/故障排查SOP模板.md) |
 
 ### 监控运维（本地开发环境）
 
 | 任务 | 参考文档 |
 |------|---------|
-| 启动 watchdog | [部署指南 第五章](tech-reports/watchdog-deployment-guide.md#五启动方式) |
-| 查看日志 | [部署指南 6.1](tech-reports/watchdog-deployment-guide.md#六日志系统) |
-| 修改邮件模板 | [部署指南 9.2](tech-reports/watchdog-deployment-guide.md#九维护操作) |
-| 添加收件人 | [部署指南 9.3](tech-reports/watchdog-deployment-guide.md#九维护操作) |
-| 通知与日志规范 | [通知与事件日志规范](tech-reports/watchdog-notification-and-event-log-spec.md) |
+| 启动 watchdog | [部署指南 第五章](tech-reports/Watchdog监控部署指南.md#五启动方式) |
+| 查看日志 | [部署指南 6.1](tech-reports/Watchdog监控部署指南.md#六日志系统) |
+| 修改邮件模板 | [部署指南 9.2](tech-reports/Watchdog监控部署指南.md#九维护操作) |
+| 添加收件人 | [部署指南 9.3](tech-reports/Watchdog监控部署指南.md#九维护操作) |
+| 通知与日志规范 | [通知与事件日志规范](tech-reports/通知与事件日志规范.md) |
 
 ---
 
@@ -287,9 +291,9 @@ EuriskoTax/
 
 | 日期 | 故障名称 | 等级 | 状态 | 归档文档 |
 |------|---------|------|------|---------|
-| 2026-08-15 | 公网 URL_CREATED/URL_CHANGED 邮件密集发送 | 中 | 会话记录 OPEN（并入规范 §8） | [通知与事件日志规范 §8](tech-reports/watchdog-notification-and-event-log-spec.md#八已知问题与排查记录) |
+| 2026-08-15 | 公网 URL_CREATED/URL_CHANGED 邮件密集发送 | 中 | 会话记录 OPEN（并入规范 §8） | [通知与事件日志规范 §8](tech-reports/通知与事件日志规范.md#八已知问题与排查记录) |
 
-> 归档文档命名规范：`troubleshooting-<故障简称>-<YYYYMMDD>.md`，基于 [SOP 模板](tech-reports/troubleshooting-sop-template.md) 填写。
+> 归档文档命名规范：`troubleshooting-<故障简称>-<YYYYMMDD>.md`，基于 [SOP 模板](tech-reports/故障排查SOP模板.md) 填写。
 
 ---
 
@@ -308,11 +312,16 @@ EuriskoTax/
 3. 如涉及故障排查，同步更新"故障排查档案"表格
 4. 若属 🔵 / 🟡，还要在该文档**头部**加一行同名标记块指回唯一真源（见「文档新鲜度分级」）
 
-### 文档命名规范
+### 文档命名规范（2026-10-24 起：中文名）
 
-- 使用小写字母 + 连字符（kebab-case）
-- 技术报告以模块名开头：`watchdog-xxx.md`、`troubleshooting-xxx.md`
+- **文件名用中文**，按「用途 + 属性」写全，一眼能认出讲什么 —— `阶段17-全税种完整测算方案.md`、`计税规则手册.md`、`客服排障手册.md`
+- **目录名保持英文**（`api/` `development/` `guides/` `marketing/` `reports/` `tech-reports/`）：路径短，脚本传参与链接里不会碰到编码问题
+- 段间用连字符 `-`，**不用空格与括号**（Windows 路径 / markdown 链接 / PowerShell 传参都会踩坑）；专有名词保留原文（`UI`、`spec`、`SOP`、`Watchdog`、`MockClient`）
+- 状态写在文件名末尾：历史记录 `-历史` / `-历史快照`、论证稿 `-过程稿`、未开工 `-未开工` —— **不用点开就知道能不能照着做**
 - 版本号写在文档头部，不在文件名中体现
+
+> **改名不是只改一个文件**：全仓引用要一次同步 —— `docs/` 内部交叉引用、源码注释里的「见 xx.md」、`tools/gui/gui-dev-console.ps1` 的按钮路径（注意是反斜杠）、21 个 SEO 落地页、`tools/ops/release-metrics.js` 的硬编码落点。
+> 改完跑 `npm test`：`tests/docs-metrics.test.js` 会校验「每份文档都登记进本索引」，漏登记会红。
 
 ### 文档版本管理
 

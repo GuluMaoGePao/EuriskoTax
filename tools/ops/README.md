@@ -34,7 +34,7 @@
 | `deploy.config.beta.example.json` | beta 部署配置模板（独立目录 / 进程 / 端口 / 库） | ✅ |
 | `deploy.config.beta.json` | beta 部署配置（服务器信息，含敏感值） | ❌ 已 gitignore |
 | `beta-smoke.js` | **beta 真机冒烟**（npm `smoke:beta`）：登录 → 档案 → 算一笔 → 云端同步（上传/拉回核对/墓碑清理）→ 内容 → 留资，7 步打真实 HTTP 与真实库，补上 37 项指纹「不登录不写数据」覆盖不到的那段。两道护栏：**默认拒绝打正式站**（留资会写真线索表）；**429 判跳过不算失败**（限流是环境自保）。必须走 SSH 隧道（Basic Auth 与 Bearer 共用 Authorization 头，不可共存） | ✅ |
-| `release-status.js` | **发布台账**：读正式站与预发站 `/version.json` + `CHANGELOG.md`，给出每版的「预发 ✅ / 正式 ✅」两列与结论；**预发落后于正式会报警**（beta 已失去提前一步的意义）；`-- --write` 写回 `docs/development/release-status.md`；npm 入口 `npm run status:release` | ✅ |
+| `release-status.js` | **发布台账**：读正式站与预发站 `/version.json` + `CHANGELOG.md`，给出每版的「预发 ✅ / 正式 ✅」两列与结论；**预发落后于正式会报警**（beta 已失去提前一步的意义）；`-- --write` 写回 `docs/development/发布台账.md`；npm 入口 `npm run status:release` | ✅ |
 | `ops-bump-version.js` | **升版本号**（npm `bump:version`）：递一处、同步五处 —— package.json / version.json（含 releasedAt）/ index.html 的 `window.__APP_VERSION__` / index.html 页尾「版本 x.y.z」/ CHANGELOG 首个小节。**版本号不会在发版时自动加号**，漏改任一一处都不报错，只会让页面哨兵反复重置用户缓存（体感是「每次新会话页面闪一下」，从用户反馈几乎定位不到）。参数 `--minor` / `--major` / `--set=x.y.z` / `--dry-run` / `--no-changelog`；**任一一处匹配不上就报错退出，绝不静默跳过**（静默跳过等于制造第六处漏改）；日期取 **UTC 当天**（preflight 按 UTC 判定发布日，北京时间 00:00–08:00 写本机日期会被判成晚于今天） | ✅ |
 | `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码、新增 urlCreated） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
@@ -145,10 +145,10 @@ npm run verify:pg:fresh
 
 ```powershell
 # 导出合伙人版商业企划（默认输出同名 .docx）
-python tools\ops\ops-md2docx.py docs\marketing\business-plan-for-partners.md
+python tools\ops\ops-md2docx.py docs\marketing\合伙人版商业企划.md
 
 # 导出 90 天落地执行手册
-python tools\ops\ops-md2docx.py docs\marketing\gtm-execution-plan.md
+python tools\ops\ops-md2docx.py docs\marketing\商业模式落地执行手册.md
 ```
 
 > **真源是 `.md`**：`.docx` 永远是导出件 —— 改内容请改 Markdown 后重新导出，不要在 Word 里改。
@@ -212,7 +212,7 @@ ssh -i <key> ubuntu@<host> 'bash /tmp/beta-init-server.sh <beta_db密码> <jwt_s
 scp -i <key> tools\ops\ops-seed-prod.js tools\ops\beta-seed-server.sh ubuntu@<host>:/tmp/
 ssh -i <key> ubuntu@<host> 'bash /tmp/beta-seed-server.sh'
 #    再建一个登录账号（独立库 + 不发信，注册走不通，只能库里直接建；口令记进
-#    docs/admin/account-credentials.md，该文件已 gitignore）
+#    docs/admin/账号凭证速查.md，该文件已 gitignore）
 scp -i <key> tools\ops\beta-ensure-test-user.sh ubuntu@<host>:/tmp/
 ssh -i <key> ubuntu@<host> 'bash /tmp/beta-ensure-test-user.sh beta-tester@euriskotax.com <口令>'
 
@@ -271,7 +271,7 @@ $ProjectRoot = Split-Path -Parent $ScriptDir  # 项目根目录
 
 1. 编辑 `notify.config.json` 填入 SMTP 授权码和收件人
 2. 配置 cpolar（如需公网分享）：`.\tools\cpolar\cpolar.exe authtoken <token>`
-3. 详细步骤参考 [部署指南](../docs/tech-reports/watchdog-deployment-guide.md)
+3. 详细步骤参考 [部署指南](../docs/tech-reports/Watchdog监控部署指南.md)
 
 ### 服务器部署
 
@@ -463,6 +463,6 @@ node tools/ops/ui-contrast-audit.js --strict            # 有确定失败项则�
 
 ## 相关文档
 
-- [部署指南](../docs/tech-reports/watchdog-deployment-guide.md) — 完整部署流程（本地开发）
-- [通知与事件日志规范](../docs/tech-reports/watchdog-notification-and-event-log-spec.md) — 通知策略与日志格式
-- [故障排查 SOP 模板](../docs/tech-reports/troubleshooting-sop-template.md) — 故障排查标准流程
+- [部署指南](../docs/tech-reports/Watchdog监控部署指南.md) — 完整部署流程（本地开发）
+- [通知与事件日志规范](../docs/tech-reports/通知与事件日志规范.md) — 通知策略与日志格式
+- [故障排查 SOP 模板](../docs/tech-reports/故障排查SOP模板.md) — 故障排查标准流程

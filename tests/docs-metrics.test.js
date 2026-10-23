@@ -23,7 +23,7 @@ describe('文档口径与实测一致', () => {
         const r = checkMetrics();
         const unparsed = r.issues.filter((i) => i.includes('解析不到'));
         expect(unparsed).toEqual([]);
-        // 至少要覆盖：README、docs/README、development-workflow、development-plan、CHANGELOG
+        // 至少要覆盖：README、docs/README、开发工作流总览、开发总计划、CHANGELOG
         expect(r.claims.units.length).toBeGreaterThanOrEqual(5);
         expect(r.claims.gate.length).toBeGreaterThanOrEqual(5);
         expect(r.claims.fingerprints.length).toBeGreaterThanOrEqual(3);
@@ -74,7 +74,7 @@ describe('文档口径与实测一致', () => {
 
 // 文档登记守护（2026-09-17）
 //
-// 背景：2026-09-16 / 09-17 新增的两份 UI 方案（`ui-ux-master-plan.md` / `dual-end-ui-plan.md`）
+// 背景：2026-09-16 / 09-17 新增的两份 UI 方案（`UI-UX上位方案-论证过程稿.md` / `双端UI-Phase0实施记录-过程稿.md`）
 // **从未被登记进 `docs/README.md`** —— 该索引最后更新停在 09-14，早于它们的创建日。
 // 后果不是报错，而是「想要的东西存在，但必须一层层点链接才找得到」：
 // 唯一入口变成被别的文档引用，文档之间越套越深，没人敢删也没人找得到。
@@ -86,7 +86,7 @@ describe('docs 索引登记不能有遗漏', () => {
     const DOCS_ROOT = path.resolve(__dirname, '../docs');
     const readme = () => fs.readFileSync(path.join(DOCS_ROOT, 'README.md'), 'utf8');
 
-    // 被本机 .gitignore 忽略的文档（如 docs/admin/account-credentials.md，凭证速查，
+    // 被本机 .gitignore 忽略的文档（如 docs/admin/账号凭证速查.md，凭证速查，
     // 不入仓库）不要求登记：登记进 docs/README.md 反而会给 clone 仓库的人留死链接。
     // 用 git 自己判断而不是维护一份手写排除清单 —— 新增私有文档时守卫自动放行。
     function ignoredDocs() {
@@ -134,7 +134,7 @@ describe('docs 索引登记不能有遗漏', () => {
 //
 // 旧实现只校验「每份文件里数值最大的那一条」项数声明，同文件内其余出现既不校验、也不要求版本前缀 ——
 // 只要旧口径不写得比当前值大，就能永久骗过断言（上一版在 ops-verify-pg.ps1 / gui-dev-console.ps1 /
-// development-workflow.md 里的 10 处「152 项 / 156 项」残留，全靠人工 grep 才捞出来）。
+// 开发工作流总览.md 里的 10 处「152 项 / 156 项」残留，全靠人工 grep 才捞出来）。
 // 现在：非当前口径的每条命中都必须带版本前缀自证是历史基线，否则判为「疑似旧口径残留」。
 describe('旧口径残留防护（版本前缀约束）', () => {
     const VERSION = '1.17.0';

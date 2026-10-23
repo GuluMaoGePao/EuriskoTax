@@ -78,7 +78,7 @@ describe('备案内容合规（承诺书级）', () => {
 
     test('首页无在线支付入口：承诺不涉及资金收付 / 支付结算（当前只发兑换码）', () => {
         // 真要开线上收款，先确认 ICP 是否为经营性、要不要增值电信许可 —— 这条红的时候别硬删，
-        // 而是先把资质问题想清楚（见 docs/marketing/wecom-channel-playbook.md）
+        // 而是先把资质问题想清楚（见 docs/marketing/企业微信分码操作手册.md）
         const src = read('index.html');
         ['微信支付', '支付宝', '立即付款', '在线支付', '扫码付款'].forEach((w) => {
             expect(src.includes(w)).toBe(false);

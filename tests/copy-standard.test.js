@@ -1,5 +1,5 @@
 /**
- * 面向用户展示文案 · 守护断言（docs/guides/user-facing-copy-standard.md §7.2）
+ * 面向用户展示文案 · 守护断言（docs/guides/面向用户文案规范与台账.md §7.2）
  *
  * 为什么需要这一份测试：
  *   文案规范是**文档**，而文档没有执行力。此前同一句免责声明在 index.html / deep-wizard-ui.js /

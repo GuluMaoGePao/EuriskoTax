@@ -1061,7 +1061,7 @@ async function publishContentItems() {
 // 数据源：GET/POST/PATCH/DELETE /api/admin/support。内置 9 条由服务端启动时幂等播种
 // （仅当 SupportScript 表为空），之后在后台改这里就生效，不必改代码发版。
 // 话术正文里的 {RESET_URL} 占位符，在渲染与复制时替换为当前站点的 /reset 短链。
-// 权威文档：docs/guides/support-playbook.md ｜ 服务端种子：server/src/services/supportScriptService.js
+// 权威文档：docs/guides/客服排障手册.md ｜ 服务端种子：server/src/services/supportScriptService.js
 const SUPPORT_CATEGORY_META = {
     cache: { label: '缓存 / 版本', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
     account: { label: '账号 / 登录', cls: 'bg-blue-50 text-blue-700 border-blue-200' },

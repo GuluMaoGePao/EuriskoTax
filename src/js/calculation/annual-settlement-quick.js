@@ -1,7 +1,7 @@
 /**
  * 综合所得年度汇算（应退/应补）—— 轻量实现，供 SEO 落地页使用（阶段14 剩余项 · 汇算清缴页）
  *
- * 与 bonus-tax-quick.js / salary-tax-quick.js 同一套思路（见 docs/development/seo-landing-plan.md §2）：
+ * 与 bonus-tax-quick.js / salary-tax-quick.js 同一套思路（见 docs/development/SEO落地页方案-阶段14-历史.md §2）：
  *   - 逻辑写在可测试的代码里，由 tests/annual-settlement-quick.test.js 与内核
  *     computeDeductions + performTaxCalculation（App 综合所得汇算的真源）逐点对拍；
  *   - 税率表**不复制**：直接读 window.comprehensiveTaxRates —— tax-constants.js 的出厂值，

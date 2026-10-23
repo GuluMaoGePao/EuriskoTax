@@ -7,7 +7,7 @@
 //
 // 现有拦截在 push 之后（ops-check-prod 的线上版本比对）。本套件把同一份纪律提前到本地：
 // 改版本号时五处任一漏改，本地就红，不必推到线上再回滚。
-// 五处口径见 docs/guides/development-workflow.md §2④；落点定义集中在 tools/ops/release-metrics.js
+// 五处口径见 docs/guides/开发工作流总览.md §2④；落点定义集中在 tools/ops/release-metrics.js
 // （同一份定义也供 npm run verify:release 使用，避免第三份事实）。
 const fs = require('fs');
 const path = require('path');

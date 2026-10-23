@@ -27,7 +27,7 @@
     var PREVIEW_ROWS = 20;        // 预览只画前 20 行：它是给人**核对列认对了没有**的，不是给人读数据的
     var DISCLAIMER = '（由 EuriskoTax 批量测算，仅供参考；正式申报以主管税务机关核定为准）';
 
-    // 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+    // 文案单一真源（docs/guides/面向用户文案规范与台账.md）：取不到常量时回落同义兜底
     var COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
     var LEAD_COPY = COPY.LEAD || {};
     function txt(v, fallback) { return v || fallback; }

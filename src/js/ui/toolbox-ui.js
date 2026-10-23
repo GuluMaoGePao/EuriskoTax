@@ -248,7 +248,7 @@
     // 每张再挂一颗同义角标等于没写，只是白白占掉标题行最贵的那几十像素。
     // 角标要出现在它有用的地方：**混合列表**（最近使用 / 搜索结果 / 为你推荐），
     // 那里一行里混着两版，「增值税」与「增值税（进项逐笔）」需要当场认出谁是完整版。
-    // 文案沿用「多步骤」（docs/guides/deep-wizard-ui-spec.md §D6 的本期结论），这次改的是位置不是措辞。
+    // 文案沿用「多步骤」（docs/guides/多步测算向导UI规范.md §D6 的本期结论），这次改的是位置不是措辞。
     function cardHtml(tool, hushBadge) {
         var badge = (!hushBadge && tool.status === 'deep')
             ? '<span class="tool-badge tool-badge-deep">多步骤</span>' : '';

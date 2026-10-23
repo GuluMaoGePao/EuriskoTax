@@ -1,7 +1,7 @@
 /**
  * 工资薪金个税（累计预扣预缴）—— 轻量实现，供 SEO 落地页使用（阶段14 剩余项 · 工资个税页）
  *
- * 与 bonus-tax-quick.js 同一套思路（见 docs/development/seo-landing-plan.md §2）：
+ * 与 bonus-tax-quick.js 同一套思路（见 docs/development/SEO落地页方案-阶段14-历史.md §2）：
  *   - 逻辑写在可测试的代码里，由 tests/salary-tax-quick.test.js 与内核
  *     calculateCumulativePrepaidTax 逐点对拍 → 等价性有断言，不靠口头约定；
  *   - 税率表**不复制**：直接读 window.comprehensiveTaxRates —— tax-constants.js 的出厂值，

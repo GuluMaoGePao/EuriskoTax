@@ -2,7 +2,7 @@
  * 股权激励个税（股票期权 / 限制性股票 / 股票增值权 / 股权奖励）—— 轻量实现（阶段15 15A-2）
  *
  * 与 bonus / salary / annual-settlement / withholding 四个 quick 同一套思路
- * （见 docs/development/seo-landing-plan.md §2，阶段15 沿用同一套）：
+ * （见 docs/development/SEO落地页方案-阶段14-历史.md §2，阶段15 沿用同一套）：
  *   - 税率不复制：直接读 window.comprehensiveTaxRates（年度综合所得税率表），
  *     App 内核 calculateTaxByTaxableIncome 读的也是这张表；
  *   - 规则不复制：读 window.equityIncentiveRules（政策口径与到期日），

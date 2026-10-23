@@ -179,7 +179,7 @@ if (document.readyState === 'loading') {
 
 // 17B-3（v1.49.0）：goToStep 随综合所得页面一起删了。它原先是「综合所得专用」的四分支
 // 步骤导航（并且被 draft-store 按函数名字符串绑定），现在页面式只剩分类所得，统一走
-// showStepByPanes —— 这正是 ui-design-spec §7 想要的「step 切换只有一处实现」。
+// showStepByPanes —— 这正是 UI设计方案 §7 想要的「step 切换只有一处实现」。
 function showStepByPanes(pageId, step, paneIds) {
     paneIds.forEach(id => {
         const el = document.getElementById(id);

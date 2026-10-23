@@ -10,7 +10,7 @@
  *   node tools/ops/seo-copy-batch.js          写入（默认）
  *   node tools/ops/seo-copy-batch.js --check  只检查不写入（CI / 人工核对用，有差异则 exit 1）
  *
- * 改文案的正确顺序（与 docs/guides/user-facing-copy-standard.md §1.3 一致）：
+ * 改文案的正确顺序（与 docs/guides/面向用户文案规范与台账.md §1.3 一致）：
  *   ① 改规范文档 → ② 改 src/js/copy/copy-standard.js → ③ 在下面加/改规则 → ④ 跑本脚本 → ⑤ 跑 npm test
  */
 'use strict';

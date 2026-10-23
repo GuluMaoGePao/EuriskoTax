@@ -2,7 +2,7 @@
  * 发版口径核对（共享库）—— 把「文档里写的数字」与「仓库里的实测数字」对账
  *
  * 为什么需要它：单测套件/用例数、门禁断言数、线上指纹数散落在
- * README / docs/README / development-workflow / development-plan / CHANGELOG / tools 下两份 README，
+ * README / docs/README / 开发工作流总览 / 开发总计划 / CHANGELOG / tools 下两份 README，
  * 改一次用例数要人肉手改 6 处；漏改的后果不是报错，而是**对外承诺的验证强度与实现对不上**
  * （说 537 例实际 544 例是低报，说 142 项实际 100 项是虚报）。
  *
@@ -113,7 +113,7 @@ function measureCounts() {
 const FIRST_SECTION = 'firstSection';
 
 // 套件/用例数：每个文件取其作用域内「用例数最大」的一条作为当前口径
-// （CHANGELOG 与 development-plan 会在同段里回指上一版基线，如「20 套件 412 例 → **25 套件 537 例**」，
+// （CHANGELOG 与 开发总计划 会在同段里回指上一版基线，如「20 套件 412 例 → **25 套件 537 例**」，
 //  历史值一定更小，取最大即可稳定命中当前值）
 // 「N 套件 M 例」的两种行文都要认：「N 例」与「N 个（单元测试）」
 const UNIT_PATTERN = /(\d+)\s*套件\s*(\d+)\s*(?:例|个)/g;
@@ -123,8 +123,8 @@ const UNIT_PATTERN = /(\d+)\s*套件\s*(\d+)\s*(?:例|个)/g;
 const UNIT_SPOTS = [
     { file: 'README.md' },
     { file: 'docs/README.md' },
-    { file: 'docs/guides/development-workflow.md' },
-    { file: 'docs/development/development-plan.md', history: true },
+    { file: 'docs/guides/开发工作流总览.md' },
+    { file: 'docs/development/开发总计划-阶段与基线.md', history: true },
     { file: 'CHANGELOG.md', scope: FIRST_SECTION, history: true },
 ];
 
@@ -137,7 +137,7 @@ const GATE_PATTERNS = [
     /(\d+)\s*项断言/g,
     /同一套\s*(?:\*\*\s*)?(\d+)\s*项/g,
     /→\s*\**\s*(\d+)\s*项/g,
-    // 2026-10-22 补：下面两种写法此前**完全没被扫到**，实测让 development-workflow.md
+    // 2026-10-22 补：下面两种写法此前**完全没被扫到**，实测让 开发工作流总览.md
     // 里三处「165 项」（实际 259 项）存活了很久 —— 单测全绿、文档却在对外虚报验证强度。
     // ① 全角括号：`verify:local（165 项 e2e 门禁）`，原正则只认半角/无括号；
     /verify:local\s*[（(]\s*\**\s*(\d+)\s*项/g,
@@ -150,8 +150,8 @@ const GATE_PATTERNS = [
 const GATE_SPOTS = [
     { file: 'README.md' },
     { file: 'docs/README.md' },
-    { file: 'docs/guides/development-workflow.md' },
-    { file: 'docs/development/development-plan.md', history: true },
+    { file: 'docs/guides/开发工作流总览.md' },
+    { file: 'docs/development/开发总计划-阶段与基线.md', history: true },
     { file: 'CHANGELOG.md', scope: FIRST_SECTION },
     { file: 'tools/ops/README.md' },
     { file: 'tools/gui/README.md' },
@@ -169,8 +169,8 @@ const FINGERPRINT_PATTERNS = [
 ];
 
 const FINGERPRINT_SPOTS = [
-    { file: 'docs/guides/development-workflow.md' },
-    { file: 'docs/development/development-plan.md', history: true },
+    { file: 'docs/guides/开发工作流总览.md' },
+    { file: 'docs/development/开发总计划-阶段与基线.md', history: true },
     { file: 'CHANGELOG.md', scope: FIRST_SECTION },
 ];
 
@@ -212,7 +212,7 @@ const currentHit = (hits, pick) => hits.reduce((a, b) => (pick(b) > pick(a) ? b 
 //
 // 加固（2026-09-13）：项数声明原先只校验「每份文件里数值最大的那一条」，同文件内其余出现
 // 既不校验、也不要求版本前缀 —— 只要旧口径不写得比当前值大，就能永久骗过断言
-// （上一版在 ops-verify-pg.ps1 / gui-dev-console.ps1 / development-workflow.md 里发现的
+// （上一版在 ops-verify-pg.ps1 / gui-dev-console.ps1 / 开发工作流总览.md 里发现的
 // 10 处「152 项 / 156 项」残留，全靠人工 grep 才捞出来）。现在两条硬约束：
 //   ① 逐条校验：任何项数命中要么等于当前口径，要么**明确带版本前缀**
 //      （同一行或所在 `## ` 小节标题含 vX.Y.Z / [X.Y.Z]）自证是历史基线，否则判为「疑似旧口径残留」；
@@ -454,7 +454,7 @@ function syncMetricNumbers(options) {
 
 // ======================= 五处版本落点 =======================
 
-// 发版时版本号需同步的五处（见 docs/guides/development-workflow.md §2④ 与 branch-release-strategy §3.2）
+// 发版时版本号需同步的五处（见 docs/guides/开发工作流总览.md §2④ 与 分支与版本发布策略 §3.2）
 function readVersionSpots() {
     const indexHtml = read('index.html');
     const pkgRaw = read('package.json');
