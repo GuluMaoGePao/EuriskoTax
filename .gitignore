@@ -69,3 +69,8 @@ tools/ops/screenshots/.tmp/
 
 # GUI 开发控制台的启动口令哈希（本机生成，含凭据性质，绝不入库）
 tools/gui/.console-pass
+
+# Markdown → Word 的导出件（tools/ops/ops-md2docx.py 产物）：不入库。
+# 导出件与 .md 是一份内容的两个副本，改了 .md 忘了重导，发出去的就是旧版 ——
+# 库里只留真源，发送前一条命令现导出，这个漂移就不存在了（2026-10-24）。
+docs/marketing/*.docx

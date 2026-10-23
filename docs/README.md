@@ -209,8 +209,11 @@ EuriskoTax/
 | [marketing/business-plan-for-partners.md](marketing/business-plan-for-partners.md) | 🟢 **合伙人版商业企划 · v2.0**（商业定位 / 目标客户分层 / 三层盈利模式 / 三驾马车获客 / 路线图 / 财务假设与敏感性 / 待拍板事项）—— **2026-10-22 按 v1.148.0 事实重写**：备案与境内节点已落地（不再是风险）、在线支付的硬前置是**经营性 ICP 许可证**而非备案、第一层服务边界按主体经营范围重划为「咨询解答 + 转介持牌方」 | 2026-10-22 |
 | [marketing/gtm-execution-plan.md](marketing/gtm-execution-plan.md) | 🟢 **商业模式落地执行手册**（Go/No-Go 检查表 · 第 0 周逐日点火 · 90 天周节奏 · 指标看板 · 线索跟进 SOP · 待办登记 · 单位经济学实测口径） | 2026-09-18 |
 | [marketing/wecom-channel-playbook.md](marketing/wecom-channel-playbook.md) | 🟢 **企业微信按入口分码操作手册**（一入口一码 / 欢迎语 / 打标签 / 验证清单；含「客服链接不可手工拼参数」的官方依据） | 2026-09-18 |
-| [marketing/business-plan-for-partners.docx](marketing/business-plan-for-partners.docx) | 企划书 **Word 发送版（v2.0）**（导出件 · 非真源，由 `tools/ops/ops-md2docx.py` 从同名 .md 导出；改 .md 后需重导） | 2026-10-22 |
-| [marketing/gtm-execution-plan.docx](marketing/gtm-execution-plan.docx) | 执行手册 **Word 发送版**（导出件 · 非真源，导出方式同上） | 2026-10-22 |
+
+> **Word 发送版（`.docx`）不入库**（2026-10-24 起）：需要时用 `tools/ops/ops-md2docx.py`
+> 从同名 `.md` 现导出 —— `python tools/ops/ops-md2docx.py docs/marketing/business-plan-for-partners.md`。
+> 原因：导出件与 `.md` 是一份内容的两个副本，改了 `.md` 忘了重导，发出去的就是旧版；
+> 库里只留真源，发送前现导，这个漂移就不存在了。
 
 ### 技术报告
 

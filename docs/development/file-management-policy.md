@@ -52,8 +52,8 @@ EuriskoTax/
 │   │   ├─ business-plan-for-partners.md ← 合伙人版商业企划（战略 / 盈利模式 / 路线图 / 财务假设，2026-09-14 新增）
 │   │   ├─ gtm-execution-plan.md      ← 商业模式落地执行手册（Go/No-Go · 90 天节奏 · 指标看板 · 线索 SOP，2026-09-14 新增）
 │   │   ├─ wecom-channel-playbook.md  ← 企业微信按入口分码操作手册（2026-09-16 新增）
-│   │   ├─ business-plan-for-partners.docx ← 合伙人版 Word 发送版（**导出件、非真源**）
-│   │   └─ gtm-execution-plan.docx    ← 手册 Word 发送版（同上，由 `tools/ops/ops-md2docx.py` 导出；改内容改 `.md` 后重新导出，勿在 Word 里直接改）
+│   │   └─ （*.docx 导出件不入库）     ← 由 `tools/ops/ops-md2docx.py` 从同名 .md 现导出；
+│   │                                     改内容只改 .md，发送前现导，勿在 Word 里直接改
 │   │
 │   ├─ reports/                       ← 测试报告 / 交付清单 / 性能（**均为 🟡 历史快照，数字已过期**）
 │   │   ├─ test-report.md
@@ -343,4 +343,5 @@ logs/*
 | 2026-09-07 | 1.3 | 文档去重合并：`debug-mail-spam.md` 内容并入 `docs/tech-reports/watchdog-notification-and-event-log-spec.md` §8（已知问题与排查，会话 OPEN），原文件删除；目录树与 §2.1 分类表示例同步；`watchdog-notification-and-event-log-spec.md` 升 v4.0、`watchdog-deployment-guide.md` 升 v1.3（通知策略与规范对齐为 URL_CREATED + URL_CHANGED 双事件） |
 | 2026-09-14 | 1.4 | 登记导出工具 `tools/ops/ops-md2docx.py`（Markdown → Word 发送版，Python + python-docx）与两份 `.docx` 导出件（`business-plan-for-partners.docx` / `gtm-execution-plan.docx`，均为**非真源**）；§4.1/§4.2 补充 `.py` 脚本归属与编码规范；登记营销侧新增 `business-plan-for-partners.md` / `gtm-execution-plan.md`；§2.1 分类表补 `docs/marketing/` 一行；目录树同步（v1.4 原有两条记录此处合并为一行） |
 | 2026-09-20 | **1.7** | **修正上一版的事实错误 + 清理散落**：上一版写「`logs/` 尚未建立」是错的 —— 它被 `.gitignore` 的 `logs/` 忽略，所以 `git status` 看不见，目录其实一直在（还自带一份 `README.md`）。**真坑在这里**：写 `logs/` 会把整个目录排除掉，后面那行 `!logs/README.md` 例外**永远不生效**（git 不进入被忽略的目录），导致日志规范一直没能入库 —— 已改 `logs/*` + `!logs/README.md`，README 现在正常入仓、`.log` 仍不入库（§6 记了这个坑）。同步：删掉从未使用过的 `docs/tech-reports/health-check-report-template.md`（线上自检以 `ops-check-prod.ps1` 37 项指纹为准），目录树与 `docs/README.md` 相应去掉；`tools/clean-browser-cache.bat` 归位到 `tools/ops/`（此前散在 `tools/` 根目录，与「辅助脚本按类型进子目录」矛盾）；§3.1 修正日志实际分布（脚本写的在 `tools/ops/`，`logs/` 里那两个 `dev-server*.log` 是手工重定向遗留，脚本里搜不到写它们的命令）。**散落产物已删**：根目录 `server-dev.log`、空目录 `backup/`、`coverage/`、`.playwright-cli/`（87 张临时截图）、零引用的 `tools/dup_reg_alert.png` |
+| 2026-10-24 | **1.8** | **Word 导出件（`.docx`）不再入库**：删除已入库的 3 份（`business-plan-for-partners` / `gtm-execution-plan` / `cold-start-materials`），`.gitignore` 加 `docs/marketing/*.docx`，`docs/README.md` 与 §1 目录树同步改为「现导出」说明。原因：导出件与 `.md` 是一份内容的两个副本，**改了 `.md` 忘了重导，发出去的就是旧版**（1.4 版里那句「改内容改 `.md` 后重新导出」正是给这个坑打的补丁，补丁不如不让副本进库）；需要时一条命令现导出即可 |
 | 2026-09-20 | **1.6** | ① **首次建档阶段18** —— `docs/development/stage18-spec-driven-followup.md`（此前无独立方案文件，只在 CHANGELOG 散记）；目录树与 `development-plan.md` 阶段表同步挂链接。② **§3 日志规范按事实重写**：明确「约定目标 `logs/`、当前实际 `tools/ops/`」，迁移落点清单核实后重写为一张「先 grep 再改」的表（原清单的行号已漂移，照着改会改错地方），新增 §3.3 标准日志文件名表（原先指向一个不存在的 `logs/README.md`）。§2.2 / §7.1 相应改为引用 §3.3 | **目录树按当前事实重写**（此前停在 2026-09-14，`docs/` 里 20+ 份文档从未登记过）：`guides/` 补 13 份并标出 UI 权威与两份 🔵 过程稿、`development/` 补 11 份并标出阶段状态、`marketing/` 补 `wecom-channel-playbook.md`、`tech-reports/` 补 `lighthouse-deployment-guide.md`；`src/css/` 9 份标出 `tokens.css` 为令牌真源与 Tailwind 构建产物对；`tools/ops/` 补 `ui-screenshot-baseline.js` + `screenshots/`（阶段19-0 视觉回归基线）与 `release-metrics.js` / `preflight-release.js`；新增 `seo/` 21 个落地页。**如实标注 `logs/` 目录尚未建立**（规范里写了、磁盘上没有，日志仍在 `tools/ops/*.log`）。新增 §2.4 文档新鲜度标记（🟢/🔵/🟡 + 阶段收口改标 + 进度唯一真源），§2.3 禁止项补「进度口径不要多处各写一份」。变更历史表按时间重排并合并重复的 1.4 行 |
