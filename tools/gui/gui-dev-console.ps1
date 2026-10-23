@@ -1,6 +1,16 @@
 ﻿# ==============================================================================
-# EuriskoTax 开发控制台 v3.3 (统一启动中心)
+# EuriskoTax 开发控制台 v3.5 (统一启动中心)
 # 双击 EuriskoTax-Console.bat 即可运行，无需消耗 AI 积分
+#
+# v3.5 更新内容:
+#   1. 补齐「文档里有、控制台里没有」的按钮：预发（beta）整条链路、41 个工具真机、
+#      视觉基线对比、对比度审计、线上指纹核对、发布台账、发布自检 verify:release
+#   2. 新增「CI 门禁预演」：干净克隆一份仓库跑 CI 的同款三步，push 之前就知道会不会红
+#   3. 部署页按动线重排：预发 → 正式 → 发完核对与台账，改完该点哪个一眼能看到
+#   4. 测试中心新增「UI 与视觉验证」区：改了 UI 该跑哪些，不用再去翻文档
+#
+# v3.4 更新内容:
+#   1. 覆盖式自定义滚动条（Win32 P/Invoke 方案），快捷方式优化
 #
 # v3.3 更新内容:
 #   1. 导航栏改回单行显示，修复双行文本导致标签不可见的渲染问题
@@ -1999,7 +2009,7 @@ function Switch-Tab {
 # 创建主窗体 (更宽敞: 1560x980)
 # ==============================================================================
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "EuriskoTax 开发控制台 v3.4 - 统一启动中心"
+$form.Text = "EuriskoTax 开发控制台 v3.5 - 统一启动中心"
 $form.Size = New-Object System.Drawing.Size(1560, 980)
 $form.MinimumSize = New-Object System.Drawing.Size(1200, 800)
 $form.StartPosition = "CenterScreen"
@@ -2057,7 +2067,7 @@ $headerPanel.Controls.Add($subtitleLabel)
 
 # 右侧版本标签 (小号字体，灰色)
 $versionLabel = New-Object System.Windows.Forms.Label
-$versionLabel.Text = "v3.4"
+$versionLabel.Text = "v3.5"
 $versionLabel.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
 $versionLabel.ForeColor = $C_FG_DIM
 $versionLabel.AutoSize = $true
@@ -2111,10 +2121,10 @@ $menuButtons = @()
 $tabs = @(
     @{ Name = "启动管理"; Icon = "🚀"; Desc = "启动/停止后端 · 端口管理 · 快速访问 · 线上站点/管理台 · 健康检查";   Color = $C_SUCCESS },
     @{ Name = "数据库";   Icon = "💾"; Desc = "迁移 · 生成 · 重置账号 · 可视化管理 (6个功能)";     Color = $C_ACCENT   },
-    @{ Name = "测试中心"; Icon = "🧪"; Desc = "单元测试 · 覆盖率 · 性能基准 · 发布门禁 (12个功能)"; Color = $C_PURPLE   },
+    @{ Name = "测试中心"; Icon = "🧪"; Desc = "单测 · 覆盖率 · 性能 · 发布门禁 · UI 与视觉 · CI 预演 (22个功能)"; Color = $C_PURPLE   },
     @{ Name = "运维监控"; Icon = "🛠"; Desc = "看门狗守护 · cpolar 内网穿透 (6个功能)";           Color = $C_WARN     },
     @{ Name = "通知日志"; Icon = "📧"; Desc = "邮件通知配置 · 日志查看 (12个功能)";               Color = $C_CYAN     },
-    @{ Name = "部署";     Icon = "📦"; Desc = "远程部署 · 回滚 · 服务器初始化 (11个功能)";        Color = $C_ACCENT   },
+    @{ Name = "部署";     Icon = "📦"; Desc = "预发 · 正式 · 回滚 · 线上核对 · 发布台账 (25个功能)"; Color = $C_ACCENT   },
     @{ Name = "快捷入口"; Icon = "📂"; Desc = "目录 · 终端 · 浏览器 · 文档 (16个功能)";           Color = $C_GRAY     },
     @{ Name = "Git & 账号"; Icon = "🔐"; Desc = "Git 操作 · 账号密码管理 (18个功能)";              Color = $C_PURPLE   }
 )
@@ -3041,7 +3051,7 @@ Add-SectionCard -TabCtx $tab2Ctx `
 # ==============================================================================
 # ============ 标签页 3: 测试中心 ============
 # ==============================================================================
-$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准 · 发布门禁（SQLite + PostgreSQL 演练）" -HeaderDesc "本页包含 3 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）  ③ 发布门禁（verify:local 本地链路 + verify:pg PostgreSQL 生产等价演练）"
+$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准 · 发布门禁 · UI 与视觉验证 · CI 预演" -HeaderDesc "本页包含 5 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）  ③ 发布门禁（一键全套 + verify:local 本地链路 + verify:pg 生产等价演练 + verify:release 发布自检）  ④ UI 与视觉验证（41 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫）  ⑤ CI 门禁预演（干净克隆跑 CI 同款三步）"
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "1. 单元测试" `
@@ -3089,7 +3099,41 @@ Add-SectionCard -TabCtx $tab3Ctx `
     @{ Text = "🐘 PostgreSQL 演练门禁`n（verify:pg · 与线上同序）"; Desc = "生产等价演练（约 2-4 分钟）：Docker 起临时 PostgreSQL（端口 55432）→ prisma generate → migrate deploy → 内容种子 → 同一套 266 项断言。需 Docker Desktop 已启动；未安装时会提示「跳过」并返回码 2（不是代码问题）。本地 :3000 后端运行中会锁 Prisma 引擎 DLL —— 点按钮时若检测到后端在跑会先警告二次确认。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg" -Command "& '$OpsDir\ops-verify-pg.ps1'" -WorkingDir $ProjectRoot } } },
     @{ Text = "🔄 全新库演练`n（verify:pg:fresh · 删卷重来）"; Desc = "等价「线上全新库首次部署」：先删演练数据卷（docker compose down -v）再跑一遍 migrate deploy + 266 项断言，验证从零建表的部署路径。同样需要 Docker Desktop（与上一个按钮共用 :3000 后端前置检查）。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
-       OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } } }
+       OnClick = { if (Confirm-PgDrillPreconditions) { Invoke-AsyncCommand -Name "verify-pg-fresh" -Command "& '$OpsDir\ops-verify-pg.ps1' -Fresh" -WorkingDir $ProjectRoot } } },
+    @{ Text = "📋 发布前自检`nverify:release"; Desc = "发版前的静态自检（约 1 秒）：版本五处（package.json / version.json / index.html ×2 / CHANGELOG）是否一致，以及文档口径与实测（套件数 / 用例数 / 门禁项数 / 指纹项数）是否一致 —— 漂移了它会直接把漏改的地方指名到行。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "verify-release" -Command "npm run verify:release" -WorkingDir $ProjectRoot } },
+    @{ Text = "🚦 一键跑全套门禁`n单测 → verify:local → verify:release`n⭐发版前点这个"; Desc = "把发版前该跑的三步串起来一次跑完（约 2-4 分钟）：130 套件单测 → 266 项本地链路门禁 → 发布前自检。任一步红就停在那里，后面不再继续 —— 与 CI 的判定顺序一致，日志里看得出是哪一步红的。平时改完东西不知道该跑什么，就点这个。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "gate-all" -Command "npm test; if (`$?) { npm run verify:local; if (`$?) { npm run verify:release } }" -WorkingDir $ProjectRoot } }
+)
+
+Add-SectionCard -TabCtx $tab3Ctx `
+    -Title "4. UI 与视觉验证（改了界面必跑）" `
+    -Subtitle "41 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫" `
+    -Description "详细说明：这一区守的是「页面上照样有数字、但其实已经坏了」。工具算错了没人会报（页面照样显示结果），颜色在深色模式下看不清（浅色看着对证明不了深色没问题），样式改一处串到别处（级联）—— 这些都不会让单测变红，只能真机点一遍。改了工具或界面之后，按 逐个算 → 视觉 → 对比度 → 级联 的顺序点一遍。" `
+    -AccentColor $C_CYAN -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🔧 41 个工具逐个算`nsmoke:ui · 真机"; Desc = "在真浏览器里把 41 个工具各算一遍：出不出数、抛不抛错、深侧徽标在不在。关键：它不写留痕 —— 跑前快照 localStorage、跑后整份还原。否则 41 次测算会灌进历史，「我算过什么」就被污染了，后面的截图基线也会跟着脏。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "smoke-ui" -Command "npm run smoke:ui" -WorkingDir $ProjectRoot } },
+    @{ Text = "📸 视觉基线对比`n7 页 × 2 断点 × 2 主题 = 28 张"; Desc = "把页面按 7 页 × 桌面/手机 × 浅色/深色 拍 28 张与基线比对，专抓排版被改坏。注意：生成与比对必须用同一个浏览器引擎（两套引擎有像素微差，混用会假报警）；网络差时可能拍出没加载完的图，那种状态别固化成基线。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "shot" -Command "node tools\ops\ui-screenshot-baseline.js" -WorkingDir $ProjectRoot } },
+    @{ Text = "🎨 对比度审计`n改了颜色必跑"; Desc = "逐项审计文字与背景的对比度，改了配色或新增色值时跑。深色模式是另一套值（阴影靠更黑不靠更灰，透明度 .30/.40/.50），浅色看着对证明不了深色没问题 —— 两个主题都要过。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "contrast" -Command "node tools\ops\ui-contrast-audit.js" -WorkingDir $ProjectRoot } },
+    @{ Text = "🧩 级联守卫`n样式串味检查"; Desc = "检查改一处样式有没有串到别处（check:cascade）。改了 tokens.css / ui-redesign.css 之后跑，比肉眼看页面更可靠。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "cascade" -Command "npm run check:cascade" -WorkingDir $ProjectRoot } }
+)
+
+Add-SectionCard -TabCtx $tab3Ctx `
+    -Title "5. CI 门禁预演（push 之前就知道会不会红）" `
+    -Subtitle "脚本：tools\ops\ops-ci-rehearsal.ps1（干净克隆 → CI 同款三步）" `
+    -Description "详细说明：CI（.github/workflows/ci.yml）与本机的唯一实质差别，是它每次都是 clone 下来的**全新仓库** —— 空 dev.db、全新 node_modules、没有本机 .env。凡是「本机早就有数据才成立」的门禁项，在 CI 上必然红、而本机永远绿（2026-10-24 就是这么抓到「空库没内容种子」这条缝的：干净环境 265/266，本机 266/266，CI 上三次全红）。push 之后等 Actions 页出结果是事后；这里在 push 之前就跑一遍同样的三步，提前知道答案。" `
+    -AccentColor $C_PURPLE -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🧪 CI 三步预演`n干净克隆 · 约 5-15 分钟"; Desc = "克隆一份当前仓库到临时目录，按 CI 的顺序跑：npm ci（根 + server）→ npm test → verify:local → verify:release。全绿 = push 后 CI 大概率也是绿的；任一步红 = CI 会红在同一步（失败即停，与 CI 一致）。只能验证已提交的内容：clone 只带走 HEAD，漏提交的文件在 CI 上就是不存在 —— 这恰恰是它要证明的东西。"; Color = "175, 110, 220"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "ci-rehearsal" -Command "& '$OpsDir\ops-ci-rehearsal.ps1'" -WorkingDir $ProjectRoot } },
+    @{ Text = "🧪 预演并保留副本`n跑完不删，方便翻日志"; Desc = "同上，但跑完保留克隆副本（-Keep），可以打开它翻每一步的完整输出。红了会自动保留（无论有没有勾这个），所以平时点上面那个就够。"; Color = "140, 90, 190"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "ci-rehearsal-keep" -Command "& '$OpsDir\ops-ci-rehearsal.ps1' -Keep" -WorkingDir $ProjectRoot } },
+    @{ Text = "📄 打开 CI 工作流`n.github\workflows\ci.yml"; Desc = "查看 / 编辑 CI 定义：跑哪三步写在步骤里，为什么刻意不跑 verify:pg 与 smoke:beta 写在注释里（改之前先读，别顺手「补全」）。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot ".github\workflows\ci.yml") } },
+    @{ Text = "🔗 打开 GitHub Actions`n看 CI 的真实结果"; Desc = "在浏览器打开本仓库的 Actions 页。预演说绿，这里应该也是绿；不一致就按线上日志修 —— 例如首次拉 Prisma 引擎的耗时、Node 版本差异，本机（含预演）都代替不了 Linux runner 的那一跑。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process "https://github.com/GuluMaoGePao/EuriskoTax/actions" } }
 )
 
 # ==============================================================================
@@ -3194,10 +3238,54 @@ Add-SectionCard -TabCtx $tab4bCtx `
 # ==============================================================================
 # ============ 标签页 5: 部署 ============
 # ==============================================================================
-$tab5Ctx = New-TabPanel -HeaderText "📦  部署" -HeaderTagline "远程部署 · 回滚 · 服务器环境初始化 · 部署配置" -HeaderDesc "本页包含 2 个功能区：① 部署执行（试运行/正式部署/紧急部署/回滚/初始化/停止）  ② 部署配置和文档（编辑配置/示例/源码/部署指南/检查清单）"
+$tab5Ctx = New-TabPanel -HeaderText "📦  部署" -HeaderTagline "预发 · 正式 · 线上核对 · 发布台账 · 部署配置" -HeaderDesc "本页包含 4 个功能区：① 预发（beta：部署/试运行/线上核对/真机冒烟/SSH 隧道/回滚/初始化）  ② 正式（腾讯云：试运行/部署/紧急部署/回滚/初始化/停止）  ③ 发完核对与台账（线上指纹 37 项/查看台账/更新台账）  ④ 部署配置和文档"
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "1. 部署执行" `
+    -Title "1. 预发（beta · 上线前的眼睛）" `
+    -Subtitle "脚本：tools/ops/ops-deploy-beta.ps1（独立库 eurisko_beta，与正式站物理隔离）" `
+    -Description "详细说明：正式站是软链一指的全量瞬切、没有灰度，beta 是唯一能在真机上先看见的地方。改了工具（算错是核心风险）或动了 schema / 认证 / 兑换码 / 留资 / 邮件（错了会丢数据或发不出去），正式上线前必须先过这里。三条别踩的硬事实：① beta 用独立库，正式站账号登不进去，beta 账号要用脚本现建；② SMTP_PASS 刻意留空，注册收不到验证码；③ 公网地址下 Basic Auth 与应用的 Bearer 共用一个 Authorization 头、无法共存，所以要登录态的冒烟必须先开下面的 SSH 隧道。" `
+    -AccentColor $C_ACCENT -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🚀 发到预发`nbeta.euriskotax.com`n⭐上线前必过"; Desc = "把当前代码部署到 beta。默认跳过 npm test —— beta 的价值是快，它不是门禁：正式发布前的全量测试照旧要在本地跑（测试中心的「一键跑全套门禁」）。改了工具或计算逻辑，先发这里看真机效果。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "deploy-beta" -Command "& '$OpsDir\ops-deploy-beta.ps1'" -WorkingDir $ProjectRoot } },
+    @{ Text = "🧪 预发试运行`n只打包不推送"; Desc = "ops-deploy-beta.ps1 -DryRun：跑一遍打包与准备步骤，不真上传。想先看看会推什么就点这个。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "deploy-beta" -Command "& '$OpsDir\ops-deploy-beta.ps1' -DryRun" -WorkingDir $ProjectRoot } },
+    @{ Text = "🔍 预发线上核对`n37 项指纹"; Desc = "对 beta 跑与正式站**同一把尺子**的 37 项指纹（不会出现 beta 用宽松标准蒙混过关）。只读核对、不登录，所以公网直连即可，不用开隧道。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "check-beta" -Command "& '$OpsDir\ops-check-beta.ps1'" -WorkingDir $ProjectRoot } },
+    @{ Text = "🔥 beta 真机冒烟`n登录后的关键链路`n（需先开隧道）"; Desc = "真机把登录之后的链路走一遍：登录 → 档案（顺带确认 plan=pro）→ 算一笔 → 云端同步（上传/拉回核对同一条）→ 内容 → 留资。打的是真实 HTTP + 真实数据库，不是 jsdom 模拟；跑完会清掉自己造的测试数据，不把脏数据留在预发库。必须先开下面的 SSH 隧道 —— 公网下 Basic Auth 会让「登录成功、之后每步 401」。"; Color = "225, 95, 90"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $p = "3001"
+            $cfgPath = Join-Path $OpsDir "deploy.config.beta.json"
+            if (Test-Path $cfgPath) {
+                try { $c = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json; if ($c.env.PORT) { $p = [string]$c.env.PORT } } catch { }
+            }
+            Invoke-AsyncCommand -Name "smoke-beta" -Command "npm run smoke:beta -- --base-url http://127.0.0.1:$p" -WorkingDir $ProjectRoot
+        } },
+    @{ Text = "🔌 开 beta SSH 隧道`n冒烟前的必备通道"; Desc = "beta 站有 Basic Auth，公网下它与应用的 Bearer 共用同一个 Authorization 头、无法共存。这条隧道绕过 Caddy 直连进程端口，登录态才能用。会从 deploy.config.beta.json 读服务器与私钥，在一个新窗口里开；关掉那个窗口即断开。"; Color = "225, 165, 80"; Width = $BTN_WIDE_W;
+       OnClick = {
+            $cfgPath = Join-Path $OpsDir "deploy.config.beta.json"
+            if (-not (Test-Path $cfgPath)) { Show-GuiAlert -Title "缺少 beta 配置" -Message "没找到：$cfgPath`n`n先从模板复制一份：deploy.config.beta.example.json" -Kind Error; return }
+            try { $cfg = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { Show-GuiAlert -Title "配置读取失败" -Message "deploy.config.beta.json 不是合法 JSON。" -Kind Error; return }
+            $port = if ($cfg.env.PORT) { [string]$cfg.env.PORT } else { "3001" }
+            $key  = $cfg.server.privateKeyPath
+            if ($key) { $key = $key -replace "^~", $env:USERPROFILE }
+            $target = "$($cfg.server.user)@$($cfg.server.host)"
+            $sshArgs = ""
+            if ($key) { $sshArgs += "-i `"$key`" " }
+            $sshArgs += "-L ${port}:127.0.0.1:${port} -N $target"
+            Write-Log "[SSH] 开 beta 隧道：ssh $sshArgs" "CMD"
+            Write-Log "       隧道通了之后，冒烟 / 登录态核对都走 http://127.0.0.1:$port" "GRAY"
+            Start-Process "cmd.exe" -ArgumentList "/k", "ssh $sshArgs"
+        } },
+    @{ Text = "↩ 预发回滚"; Desc = "ops-deploy-beta.ps1 -Rollback：把 beta 恢复到上一个版本（与正式回滚互不干扰）。"; Color = "225, 165, 80";
+       OnClick = { Invoke-AsyncCommand -Name "deploy-beta" -Command "& '$OpsDir\ops-deploy-beta.ps1' -Rollback" -WorkingDir $ProjectRoot } },
+    @{ Text = "🛠 首次初始化预发环境`n-InitEnv"; Desc = "首次搭 beta 时在服务器上建 .env.shared。四条硬性前置：独立数据库 / 独立 JWT_SECRET / SMTP_PASS 留空 / 禁止被收录。"; Color = "165, 105, 210";
+       OnClick = { Invoke-AsyncCommand -Name "deploy-beta" -Command "& '$OpsDir\ops-deploy-beta.ps1' -InitEnv" -WorkingDir $ProjectRoot } },
+    @{ Text = "⛔ 停止预发任务"; Desc = "停止正在跑的预发部署 / 核对 / 冒烟任务。"; Color = "180, 95, 95";
+       OnClick = { Stop-Job -Name "deploy-beta"; Stop-Job -Name "check-beta"; Stop-Job -Name "smoke-beta" } }
+)
+
+Add-SectionCard -TabCtx $tab5Ctx `
+    -Title "2. 正式（腾讯云 · 唯一上线入口）" `
     -Subtitle "脚本：tools/ops/ops-deploy.ps1" `
     -Description "详细说明：部署会通过 SSH 把代码推到远程服务器并执行命令。先编辑配置文件填好服务器信息，再先用 试运行 预演一遍没问题再正式部署。" `
     -AccentColor $C_ACCENT -Buttons @(
@@ -3225,7 +3313,22 @@ Add-SectionCard -TabCtx $tab5Ctx `
 )
 
 Add-SectionCard -TabCtx $tab5Ctx `
-    -Title "2. 部署配置和文档" `
+    -Title "3. 发完之后：核对与台账" `
+    -Subtitle "线上指纹 37 项 + 发布台账（发完不做这一步等于没验）" `
+    -Description "详细说明：部署脚本只负责把代码换上去。换上去之后是不是**真的是新版本**、关键资源有没有被缓存挡住、预发与正式有没有落在同一版 —— 这三件事它不回答，这里的按钮回答。指纹核对读的是真实域名（不是本地），台账记下这一版发到哪了，免得下次发版时忘了预发还落后着（在旧代码上看现象，会得出错误的结论）。" `
+    -AccentColor $C_SUCCESS -ButtonsPerRow 2 -Buttons @(
+    @{ Text = "🔍 正式站线上核对`n37 项指纹"; Desc = "对 https://euriskotax.com 跑 37 项指纹（默认正式域名）。部署完必点：它真去线上读一遍，版本哨兵还是旧的，说明部署没生效或被缓存挡了。"; Color = "85, 180, 110"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "check-prod" -Command "& '$OpsDir\ops-check-prod.ps1'" -WorkingDir $ProjectRoot } },
+    @{ Text = "📊 看看现在发到哪了`nstatus:release"; Desc = "读发布台账：当前版本、预发与正式各发到哪一版。预发落后于正式会报警 —— 在旧代码上看现象会得出错误结论，这一步能挡住它。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "status-release" -Command "npm run status:release" -WorkingDir $ProjectRoot } },
+    @{ Text = "✍ 更新台账`nstatus:release --write"; Desc = "发完正式后把这一版写回台账（发到哪、什么时候）。台账由脚本生成，不要手改。"; Color = "165, 105, 210"; Width = $BTN_WIDE_W;
+       OnClick = { Invoke-AsyncCommand -Name "status-write" -Command "npm run status:release -- --write" -WorkingDir $ProjectRoot } },
+    @{ Text = "📄 打开台账文件`nrelease-status.md"; Desc = "在编辑器里打开 docs/development/release-status.md 看完整发布台账（哪一版发到哪、谁发的）。"; Color = "120, 120, 140"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\development\release-status.md") } }
+)
+
+Add-SectionCard -TabCtx $tab5Ctx `
+    -Title "4. 部署配置和文档" `
     -Subtitle "配置文件和参考资料" `
     -Description "详细说明：正式部署前必须先编辑 ops-deploy.config.json，填入服务器地址、SSH账号、项目路径等信息。没有的话可以从 example 复制。" `
     -AccentColor $C_GRAY -Buttons @(
@@ -3247,7 +3350,9 @@ Add-SectionCard -TabCtx $tab5Ctx `
     @{ Text = "查看交付检查清单"; Desc = "打开 final-delivery-checklist.md，交付前逐项对照检查。"; Color = "120, 120, 140";
        OnClick = { Start-Process (Join-Path $ProjectRoot "docs\reports\final-delivery-checklist.md") } },
     @{ Text = "打开 ops README"; Desc = "打开 tools/ops/README.md，综合查看运维脚本的说明。"; Color = "120, 120, 140";
-       OnClick = { Start-Process (Join-Path $OpsDir "README.md") } }
+       OnClick = { Start-Process (Join-Path $OpsDir "README.md") } },
+    @{ Text = "🧭 改完东西该点哪个`n流程文档"; Desc = "打开 docs/guides/how-to-ship-a-change.md：一句话指令对应哪些命令、A/B/C 三档改动各走什么路由、改 UI 的两个坑（不跑 build:css 线上不会有变化 / 深色是另一套值）。不知道下一步点什么就看它 —— 这个控制台的按钮顺序就是照它排的。"; Color = "255, 215, 120"; Width = $BTN_WIDE_W;
+       OnClick = { Start-Process (Join-Path $ProjectRoot "docs\guides\how-to-ship-a-change.md") } }
 )
 
 # ==============================================================================
