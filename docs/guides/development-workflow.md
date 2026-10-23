@@ -69,6 +69,12 @@
 
 > beta 环境的四条硬约束（改配置时别破）：**独立数据库**、**独立 `JWT_SECRET`**、
 > **`SMTP_PASS` 留空**（不向真实用户发测试邮件）、**禁止被收录**（`beta-mark.sh` 注入 noindex）。
+>
+> **beta 的登录账号要现建，别拿正式站的账号去登**：独立库意味着正式站账号在 beta 不存在，
+> 而 `SMTP_PASS` 留空又让「注册」这条路走不通（收不到验证码），所以只剩在库里直接建号一条路：
+> `bash tools/ops/beta-ensure-test-user.sh <email> <口令>`（幂等，已存在则只重置密码）。
+> 建完记进本机 `docs/admin/account-credentials.md`（该文件已 gitignore）。
+> 2026-10-24 实测：beta 库 `User` 表 0 行、正式库 3 行 —— 建号前「真机验登录」其实是无从验起的。
 
 ### 标准发布清单（从改代码到打标签，8 步照做）
 

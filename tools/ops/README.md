@@ -28,6 +28,7 @@
 | `ops-check-beta.ps1` | **beta 核对薄封装**：复用 `ops-check-prod.ps1` 那 37 项线上指纹（同尺子才不会用宽松标准蒙混）；默认 `-BaseUrl https://beta.euriskotax.com`，本机直连 3001 不通时开 SSH 隧道后传 `http://127.0.0.1:3001` | ✅ |
 | `beta-init-server.sh` | **beta 环境初始化（服务器执行，幂等）**：建独立 PG 库 `eurisko_beta` 与角色 → 从正式 `.env.shared` **在服务器内部**复制后覆盖 `DATABASE_URL`/`JWT_SECRET`/`SMTP_PASS`/`PORT`（敏感值不经过本机、不打印）→ 落 `beta-mark.sh` | ✅ |
 | `beta-seed-server.sh` | beta 内容补种（服务器执行，幂等）：建工作人员账号 → 跑 `ops-seed-prod.js --base-url=http://127.0.0.1:3001`（beta 是空库，不补种则内容端点 `items=0` 会让核对红一项） | ✅ |
+| `beta-ensure-test-user.sh` | **beta 测试账号**（服务器执行，幂等）：在独立库 `eurisko_beta` 里创建/重置登录账号。必须现建的原因：独立库 → 正式站账号在 beta 不存在（实测 beta 库 0 用户 / 正式库 3）；`SMTP_PASS` 留空 → 注册收不到验证码，这条路也走不通。用法 `bash beta-ensure-test-user.sh <email> <口令>`（已存在则只重置密码，不删号重建） | ✅ |
 | `beta-mark-server.sh` | beta 标记注入（幂等）：`window.__APP_CHANNEL__='beta'`（前端据此显示「预发环境 · 数据非生产」角标）+ robots noindex。**单独成脚本**是因为 postDeploy 经 SSH 传参会丢引号，内联 sed 会被远端 bash 当重定向 | ✅ |
 | `deploy.config.beta.example.json` | beta 部署配置模板（独立目录 / 进程 / 端口 / 库） | ✅ |
 | `deploy.config.beta.json` | beta 部署配置（服务器信息，含敏感值） | ❌ 已 gitignore |
@@ -207,6 +208,10 @@ ssh -i <key> ubuntu@<host> 'bash /tmp/beta-init-server.sh <beta_db密码> <jwt_s
 #    再补种内容（空库不补会让核对红一项）
 scp -i <key> tools\ops\ops-seed-prod.js tools\ops\beta-seed-server.sh ubuntu@<host>:/tmp/
 ssh -i <key> ubuntu@<host> 'bash /tmp/beta-seed-server.sh'
+#    再建一个登录账号（独立库 + 不发信，注册走不通，只能库里直接建；口令记进
+#    docs/admin/account-credentials.md，该文件已 gitignore）
+scp -i <key> tools\ops\beta-ensure-test-user.sh ubuntu@<host>:/tmp/
+ssh -i <key> ubuntu@<host> 'bash /tmp/beta-ensure-test-user.sh beta-tester@euriskotax.com <口令>'
 
 # 1. 发到 beta（默认跳过 npm test，约 30s）
 powershell -File .\tools\ops\ops-deploy-beta.ps1
