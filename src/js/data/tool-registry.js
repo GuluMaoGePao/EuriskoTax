@@ -2616,14 +2616,14 @@
                     + ' + 专项附加 ' + Math.round(r.specialTotal)
                     + (r.otherDeduction > 0 ? ' + 其他扣除 ' + Math.round(r.otherDeduction) : '')
                     + '），全年应纳税额 ' + Math.round(r.annualTax) + ' 元、已预缴 ' + Math.round(r.prepaidTax)
-                    + ' 元 → ' + (r.diff < 0 ? '**应退 ' + Math.round(abs) + ' 元' : (r.diff > 0 ? '**应补 ' + Math.round(abs) + ' 元' : '不补不退'))
+                    + ' 元 → ' + (r.diff < 0 ? '应退 ' + Math.round(abs) + ' 元' : (r.diff > 0 ? '应补 ' + Math.round(abs) + ' 元' : '不补不退'))
                     + '。' + ex.reason + '。';
                 if (Math.abs(r.naiveGap) >= 1) {
                     note += ' 速算器按「5000 × 任职月数」当减除费用、且没有劳务 / 稿酬 / 大病这几个框，'
                         + '它会算出 ' + Math.round(r.naive.diff) + ' 元 —— 差 ' + Math.round(Math.abs(r.naiveGap)) + ' 元。';
                 }
                 if (r.bonus > 0) {
-                    note += ' 年终奖' + (r.bonusBetter === 'merged' ? '**并入综合所得**更省' : (r.bonusBetter === 'separate' ? '**单独计税**更省' : '两种口径相同'))
+                    note += ' 年终奖' + (r.bonusBetter === 'merged' ? '并入综合所得更省' : (r.bonusBetter === 'separate' ? '单独计税更省' : '两种口径相同'))
                         + '（' + Math.round(r.bonusSeparateTotal) + ' vs ' + Math.round(r.bonusMergedTotal)
                         + '，差 ' + Math.round(r.bonusGap) + ' 元）。';
                 }
@@ -3149,8 +3149,9 @@
                     note += '。';
                 }
                 if (r.hasSpouse && r.plans.length > 1) {
-                    note += ' 家里的额度给 ' + (r.bestPlan.key === 'both' ? '两个人各缴满' : (r.bestPlan.key === 'spouse' ? '配偶' : '本人'))
-                        + '** 最省。';
+                    // 那对空格原本是给 **配偶** 的加粗留的，星号删了空格就是断句的裂缝
+                    note += ' 家里的额度给' + (r.bestPlan.key === 'both' ? '两个人各缴满' : (r.bestPlan.key === 'spouse' ? '配偶' : '本人'))
+                        + '最省。';
                 }
 
                 var steps = [{
@@ -4594,7 +4595,7 @@
                     { label: '住房公积金（个人 / 月）', value: hf.personal, kind: 'money',
                         hint: '比例 ' + pct(hf.housingRate) + '，单位同比例再缴 ' + yuan(s.housingEmployer) + ' 元/月' },
                     { label: '公积金免税部分', value: hf.taxFree, kind: 'money',
-                        hint: '比例 ≤ ' + pct(hf.capRate) + ' **且** 基数 ≤ 社平 ' + hf.capRatio + ' 倍（'
+                        hint: '比例 ≤ ' + pct(hf.capRate) + ' 且 基数 ≤ 社平 ' + hf.capRatio + ' 倍（'
                             + yuan(hf.capBase) + ' 元）' },
                     { label: '公积金超标并入工资计税', value: hf.taxable, kind: 'money',
                         hint: hf.taxable > 0
@@ -4956,7 +4957,7 @@
                             rows: overseasRow.concat([
                                 { label: '上年末实收资本（股本）+ 资本公积', value: ab.prevCapital, kind: 'money' },
                                 { label: '本年末实收资本（股本）+ 资本公积', value: ab.currCapital, kind: 'money' },
-                                { label: '**增加额**（计税依据）', value: ab.increment, kind: 'money',
+                                { label: '增加额（计税依据）', value: ab.increment, kind: 'money',
                                     hint: stampNote('increment') },
                                 { label: '税率', value: ab.rateText, kind: 'text' },
                                 { label: '法定税额（未减半）', value: ab.statutoryTax, kind: 'money' },
@@ -4970,7 +4971,7 @@
                                 + (halve ? '（减半后）' : '（未享受减半）')
                                 + '。不是每年按总额重贴一遍 —— 误按 ' + yuan(ab.currCapital)
                                 + ' 元全额贴是 ' + yuan(ab.fullTax) + ' 元，'
-                                + (ab.gap > 0 ? '**多缴 ' + yuan(ab.gap) + ' 元' : '两者一致')
+                                + (ab.gap > 0 ? '多缴 ' + yuan(ab.gap) + ' 元' : '两者一致')
                                 + (ab.decreased ? '。注意：本年末低于上年末，增加额为 0，本年无需贴花（减少不退税）' : '')
                                 + '。',
                             extras: [{
@@ -4981,7 +4982,7 @@
                                     rows: [
                                         ['上年末实收资本（股本）+ 资本公积', { value: ab.prevCapital, kind: 'money' }],
                                         ['本年末实收资本（股本）+ 资本公积', { value: ab.currCapital, kind: 'money' }],
-                                        ['**增加额**（合法计税依据）', { value: ab.increment, kind: 'money' }],
+                                        ['增加额（合法计税依据）', { value: ab.increment, kind: 'money' }],
                                         ['按增加额应纳', { value: ab.tax, kind: 'money' }],
                                         ['按总额误算', { value: ab.fullTax, kind: 'money' }],
                                         ['差额（多缴）', { value: ab.gap, kind: 'money' }]
@@ -5024,7 +5025,7 @@
                                 { label: '实际结算金额', value: st.settledAmount, kind: 'money' },
                                 { label: '计税依据（不含列明的增值税）', value: s0.base, kind: 'money', hint: stampVatNote },
                                 { label: '结算时应纳税额', value: st.tax, kind: 'money' },
-                                { label: '**应补（多退少补）**', value: st.topUp, kind: 'money',
+                                { label: '应补（多退少补）', value: st.topUp, kind: 'money',
                                     hint: st.topUp > 0 ? '结算金额大于已贴部分，需补缴' : st.topUp < 0 ? '可申请退还 ' + yuan(st.refundable) + ' 元' : '刚好' },
                                 { label: '法定税额（未减半）', value: s0.statutoryTax, kind: 'money' }
                             ]),
@@ -5032,8 +5033,8 @@
                                 + '以后结算时再按实际金额计税、多退少补。本次实际结算 '
                                 + yuan(st.settledAmount) + ' 元（' + s0.name + ' ' + s0.rateText + '）'
                                 + ' → 应纳税额 ' + yuan(st.tax) + ' 元，'
-                                + (st.topUp > 0 ? '**应补 ' + yuan(st.topUp) + ' 元'
-                                    : st.topUp < 0 ? '**可申请退还 ' + yuan(st.refundable) + ' 元' : '不需补退')
+                                + (st.topUp > 0 ? '应补 ' + yuan(st.topUp) + ' 元'
+                                    : st.topUp < 0 ? '可申请退还 ' + yuan(st.refundable) + ' 元' : '不需补退')
                                 + '。注意：签的时候就该贴那 5 元，等结算完才贴，中间这段时间属于未按规定贴花。',
                             extras: [{
                                 title: '未列明金额：先贴 5 元，结算多退少补',
@@ -5044,7 +5045,7 @@
                                         ['签订时先贴花', { value: st.prepaid, kind: 'money' }],
                                         ['实际结算金额', { value: st.settledAmount, kind: 'money' }],
                                         ['结算时应纳税额', { value: st.tax, kind: 'money' }],
-                                        [st.topUp > 0 ? '**应补缴**' : '**应退还**', { value: Math.abs(st.topUp), kind: 'money' }]
+                                        [st.topUp > 0 ? '应补缴' : '应退还', { value: Math.abs(st.topUp), kind: 'money' }]
                                     ]
                                 }
                             }],
@@ -5090,16 +5091,16 @@
                                 { label: '分别列明时应纳', value: mx.separated, kind: 'money' },
                                 { label: '未分别列明时（从高 ' + mx.higherRateText + '）', value: mx.merged, kind: 'money',
                                     hint: '合并金额 ' + yuan(mx.mergedAmount) + ' 元 × ' + mx.higherRateText },
-                                { label: '**两种写法的差额**', value: mx.gap, kind: 'money',
+                                { label: '两种写法的差额', value: mx.gap, kind: 'money',
                                     hint: mx.gap > 0 ? '⚠️ 合同里把两个税目的金额分开写，能省下 ' + yuan(mx.gap) + ' 元' : '两种写法一致' },
                                 { label: '法定合计（未减半）', value: mx.statutoryTax, kind: 'money' }
                             ]),
                             note: '同一凭证载有两个以上税目事项：'
                                 + (mx.separatelyStated
-                                    ? '**分别列明金额**的分别适用税率 —— ' + f1.name + ' ' + yuan(f1.base) + ' 元 × '
+                                    ? '分别列明金额的分别适用税率 —— ' + f1.name + ' ' + yuan(f1.base) + ' 元 × '
                                         + f1.rateText + ' + ' + f2.name + ' ' + yuan(f2.base) + ' 元 × ' + f2.rateText
                                         + ' = ' + yuan(mx.separated) + ' 元'
-                                    : '**未分别列明金额**的**从高适用**税率 —— 合并 ' + yuan(mx.mergedAmount)
+                                    : '未分别列明金额的从高适用税率 —— 合并 ' + yuan(mx.mergedAmount)
                                         + ' 元 × ' + mx.higherRateText + '（' + mx.higherName + '）= ' + yuan(mx.merged) + ' 元')
                                 + '。两种写法差 ' + yuan(mx.gap) + ' 元'
                                 + (mx.gap > 0 ? ' —— 这一行金额写不写清楚，直接决定缴多少。' : '。')
@@ -5114,7 +5115,7 @@
                                             + f2.name + ' ' + yuan(f2.base) + ' × ' + f2.rateText, { value: mx.separated, kind: 'money' }],
                                         ['未分别列明（从高）', '合并 ' + yuan(mx.mergedAmount) + ' × ' + mx.higherRateText
                                             + '（' + mx.higherName + '）', { value: mx.merged, kind: 'money' }],
-                                        ['**差额**', '合同里分开写金额能省下的', { value: mx.gap, kind: 'money' }]
+                                        ['差额', '合同里分开写金额能省下的', { value: mx.gap, kind: 'money' }]
                                     ]
                                 }
                             }],
@@ -5172,7 +5173,7 @@
                             table: {
                                 head: ['项目', '是否减半', '法定税额', '减半后'],
                                 rows: [
-                                    [s.name, s.halveApplicable ? '是' : '**否**（证券交易）',
+                                    [s.name, s.halveApplicable ? '是' : '否（证券交易）',
                                         { value: s.statutoryTax, kind: 'money' }, { value: s.tax, kind: 'money' }]
                                 ]
                             }
@@ -5184,7 +5185,7 @@
                                 rows: [
                                     ['单税目、金额已列明', '按所列金额 × 本税目税率'],
                                     ['同一凭证两个以上税目（分别列明）', '分别适用各自税率'],
-                                    ['同一凭证两个以上税目（未分别列明）', '**从高适用**税率'],
+                                    ['同一凭证两个以上税目（未分别列明）', '从高适用税率'],
                                     ['签订时金额未列明', '先按 5 元贴花，结算时多退少补'],
                                     ['营业账簿', '只对增加部分计税（0.25‰）']
                                 ]
@@ -5243,7 +5244,7 @@
                         hint: b.deductedCredit > 0 ? surtaxNote('credit') : '本期无留抵退税' });
                 }
                 rows.push({ label: '实际缴纳的消费税', value: b.consumption, kind: 'money' });
-                rows.push({ label: '**计税依据**', value: b.base, kind: 'money',
+                rows.push({ label: '计税依据', value: b.base, kind: 'money',
                     hint: surtaxNote('base') });
                 rows.push({ label: '若误按申报表应纳数（含进口）', value: b.naiveBase, kind: 'money',
                     hint: b.importVat > 0 ? surtaxNote('importVat') : '' });
@@ -5254,7 +5255,7 @@
                 rows.push({ label: '城建税', value: r.cityTax, kind: 'money' });
                 rows.push({ label: '教育费附加（3%）', value: r.educationTax, kind: 'money' });
                 rows.push({ label: '地方教育附加（2%）', value: r.localEducationTax, kind: 'money' });
-                rows.push({ label: '**附加税费合计**', value: r.total, kind: 'money' });
+                rows.push({ label: '附加税费合计', value: r.total, kind: 'money' });
                 rows.push({ label: '综合负担率', value: r.effectiveRate, kind: 'percent' });
                 rows.push({ label: '减半优惠', value: r.saved, kind: 'money' });
                 rows.push({ label: '到期后（2028 起按 100%）', value: rFull.total, kind: 'money',
@@ -5307,13 +5308,13 @@
                             rows: [
                                 [isSmall ? '按 1% 征收率实际缴纳的增值税' : '申报期实际缴纳的增值税（境内）',
                                     { value: b.domesticVat, kind: 'money' }, '进'],
-                                ['减：增值税期末留抵退税额', { value: -b.deductedCredit, kind: 'money' }, '**扣**'],
-                                ['即征即退 / 先征后返退还的增值税', { value: b.instantRefund, kind: 'money' }, '**不扣**'],
-                                ['进口环节 / 代扣代缴的增值税', { value: b.importVat, kind: 'money' }, '**不附征**'],
+                                ['减：增值税期末留抵退税额', { value: -b.deductedCredit, kind: 'money' }, '扣'],
+                                ['即征即退 / 先征后返退还的增值税', { value: b.instantRefund, kind: 'money' }, '不扣'],
+                                ['进口环节 / 代扣代缴的增值税', { value: b.importVat, kind: 'money' }, '不附征'],
                                 ['实际缴纳的消费税', { value: b.consumption, kind: 'money' }, '进'],
-                                ['**法定计税依据**', { value: b.base, kind: 'money' }, '—'],
+                                ['法定计税依据', { value: b.base, kind: 'money' }, '—'],
                                 ['误按申报表应纳数（含进口）', { value: b.naiveBase, kind: 'money' }, '—'],
-                                ['**差额**', { value: b.gap, kind: 'money' }, '—']
+                                ['差额', { value: b.gap, kind: 'money' }, '—']
                             ]
                         }
                     }, {
@@ -5331,7 +5332,7 @@
                             rows: [
                                 ['法定（未减半）', { value: r.statutoryRate, kind: 'percent' }, { value: rFull.total, kind: 'money' }],
                                 ['现行减半' + (halve ? '（当前）' : ''), { value: r.effectiveRate, kind: 'percent' }, { value: r.total, kind: 'money' }],
-                                ['**差额**', { value: r.statutoryRate - r.effectiveRate, kind: 'percent' }, { value: r.saved, kind: 'money' }]
+                                ['差额', { value: r.statutoryRate - r.effectiveRate, kind: 'percent' }, { value: r.saved, kind: 'money' }]
                             ]
                         }
                     }],
@@ -5554,7 +5555,7 @@
                         + '。这个基数与社保缴费基数两个方向都不同：社保有 60% 保底与 300% 封顶，'
                         + '工资总额两头都不夹 —— 同一批人按社保基数是 ' + yuan(ub.socialAnnual)
                         + ' 元，按工资总额是 ' + yuan(ub.wageTotal) + ' 元，'
-                        + (ub.feeGap > 0 ? '**少估 ' + yuan(ub.feeGap) + ' 元' : ub.feeGap < 0 ? '**多估 ' + yuan(-ub.feeGap) + ' 元' : '两者一致')
+                        + (ub.feeGap > 0 ? '少估 ' + yuan(ub.feeGap) + ' 元' : ub.feeGap < 0 ? '多估 ' + yuan(-ub.feeGap) + ' 元' : '两者一致')
                         + '。企税扣除要凭《工会经费收入专用收据》'
                         + (u.overDeduction > 0 ? '，本次超提 ' + yuan(u.overDeduction) + ' 元不得扣除' : '，本次可全额扣除')
                         + '。';
@@ -5723,7 +5724,7 @@
                     + '。再招 1 名残疾人可省 ' + yuan(cmp.saving) + ' 元'
                     + (cmp.netReplace > 0 ? '（岗位本来就要招人 → 净省这个数）' : '')
                     + '；但专为省残保金增设岗位要付 ' + yuan(cmp.hireCost) + ' 元，'
-                    + (cmp.worthIt ? '划算' : '**不划算**')
+                    + (cmp.worthIt ? '划算' : '不划算')
                     + '（盈亏平衡年薪 ' + yuan(cmp.breakEvenWage) + ' 元）。'
                     + '另：现行减缴与 30 人免征均至 2027-12-31，到期后按 ' + yuan(expired) + ' 元征收。';
 
@@ -5742,7 +5743,7 @@
                                 ['常年用工（全年在岗）', h.regularCount],
                                 ['季节性用工折算（' + h.seasonalCount + ' 人 × ' + h.seasonalMonths + ' 月 ÷ 12）', h.seasonalEquivalent],
                                 ['劳务派遣（' + (h.dispatchHere ? '本单位计入' : '派遣单位计入') + '）', h.dispatchEquivalent],
-                                ['**上年月平均在职人数**', h.monthlyAverage],
+                                ['上年月平均在职人数', h.monthlyAverage],
                                 ['速算器口径（只填常年正式在册）', h.naive],
                                 ['差额（少算的人数）', h.gap],
                                 ['30 人以下暂免（法定）', h.exempt ? '是' : '否'],
@@ -6165,7 +6166,7 @@
                     }) },
                 { key: 'bonus', step: 'bonus', label: '一次性取得的数月奖金（元）', type: 'money', default: 0, sample: 120000,
                     hint: '非居民一个月内取得数月奖金：单独、不与当月工资合并、按 6 个月分摊且'
-                        + '**不减除费用**计税（公式五），一个公历年度内每人只能适用一次' }
+                        + '不减除费用计税（公式五），一个公历年度内每人只能适用一次' }
             ],
             steps: [
                 { key: 'residence', title: '身份与居住天数', why: '先定四档里的哪一档：90 天以内、90~183 天、满 183 天但不满六年、连续满六年' },

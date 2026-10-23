@@ -1961,7 +1961,7 @@ function renderHistoryItems(history, listElement) {
         const card = document.createElement('div');
         card.className = 'card profile-card-hover';
         card.innerHTML = `
-            <!-- v1.141.0：这条模板里四个文字**只有两个写了字号**，标题与金额都靠继承
+            <!-- v1.141.0：这条模板里四个文字只有两个写了字号，标题与金额都靠继承
                  （body 16px）—— 于是「日期」和「删除」是 14、标题和金额是 16，
                  同一张卡里两种正文，且金额比标题还抢。现在按四档归位：
                  标题 14 medium（靠字重领先）· 日期 12 · 金额 14 bold（靠颜色与字重突出，
@@ -2088,7 +2088,7 @@ function planTierOf(user) {
     return planLib.describe(user);
 }
 
-// 文案单一真源（docs/guides/user-facing-copy-standard.md）：取不到常量时回落同义兜底
+// 文案单一真源（docs/guides/面向用户文案规范与台账.md）：取不到常量时回落同义兜底
 const COPY = (typeof window !== 'undefined' && window.CopyStandard) ? window.CopyStandard : {};
 const UPGRADE_COPY = COPY.UPGRADE || {};
 const LEAD_COPY = COPY.LEAD || {};

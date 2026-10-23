@@ -123,7 +123,7 @@ describe('与速算器同源：核定后的数传给 quick，逐点相等', () =
 describe('① 实缴增值税的三处调整（方向各不相同）', () => {
     test('留抵退税**要扣**：计税依据 7 万不是 10 万，附加税差 1800', () => {
         const out = compute({ creditRefund: 30000, instantRefund: 0, importVat: 0 });
-        expect(row(out, '**计税依据**')).toBe(70000);
+        expect(row(out, '计税依据')).toBe(70000);
         expect(row(out, '若误按申报表应纳数（含进口）')).toBe(100000);
         expect(out.primary.value).toBe(4200);            // 7 万 × 6%
         expect(row(out, '按错误口径（含进口、不扣留抵退税）应缴')).toBe(6000);
@@ -132,7 +132,7 @@ describe('① 实缴增值税的三处调整（方向各不相同）', () => {
 
     test('即征即退**不扣**：同样 3 万退税，计税依据仍是 10 万', () => {
         const out = compute({ creditRefund: 0, instantRefund: 30000 });
-        expect(row(out, '**计税依据**')).toBe(100000);
+        expect(row(out, '计税依据')).toBe(100000);
         expect(out.primary.value).toBe(6000);
         // 与留抵退税那条对照：同一个数，方向相反 —— 这是最容易记反的一处
         expect(compute({ creditRefund: 30000, instantRefund: 0 }).primary.value).toBe(4200);
@@ -140,13 +140,13 @@ describe('① 实缴增值税的三处调整（方向各不相同）', () => {
 
     test('留抵退税不能把计税依据扣成负数', () => {
         const out = compute({ creditRefund: 999999 });
-        expect(row(out, '**计税依据**')).toBe(0);
+        expect(row(out, '计税依据')).toBe(0);
         expect(out.primary.value).toBe(0);
     });
 
     test('进口环节 / 代扣代缴的增值税**不附征**：误算进去多缴 3 万', () => {
         const out = compute({ creditRefund: 0, importVat: 500000 });
-        expect(row(out, '**计税依据**')).toBe(100000);
+        expect(row(out, '计税依据')).toBe(100000);
         expect(row(out, '若误按申报表应纳数（含进口）')).toBe(600000);
         expect(out.primary.value).toBe(6000);
         expect(row(out, '按错误口径（含进口、不扣留抵退税）应缴')).toBe(36000);
@@ -156,14 +156,14 @@ describe('① 实缴增值税的三处调整（方向各不相同）', () => {
     test('三处调整同时出现时各走各的方向', () => {
         // 应纳 10 万、留抵退税 3 万（扣）、即征即退 2 万（不扣）、进口 50 万（不附征）
         const out = compute({ creditRefund: 30000, instantRefund: 20000, importVat: 500000 });
-        expect(row(out, '**计税依据**')).toBe(70000);
+        expect(row(out, '计税依据')).toBe(70000);
         expect(row(out, '若误按申报表应纳数（含进口）')).toBe(600000);
         expect(out.primary.value).toBe(4200);
     });
 
     test('消费税进计税依据', () => {
         const out = compute({ creditRefund: 0, consumption: 50000 });
-        expect(row(out, '**计税依据**')).toBe(150000);
+        expect(row(out, '计税依据')).toBe(150000);
         expect(out.primary.value).toBe(9000);            // 15 万 × 6%
     });
 
@@ -171,9 +171,10 @@ describe('① 实缴增值税的三处调整（方向各不相同）', () => {
         const table = (compute({ creditRefund: 30000, instantRefund: 20000, importVat: 500000 })
             .extras.find((e) => e.title === '计税依据的三处调整（方向各不相同）')).table;
         const flat = JSON.stringify(table.rows);
-        expect(flat).toContain('**扣**');
-        expect(flat).toContain('**不扣**');
-        expect(flat).toContain('**不附征**');
+        // 带引号精确匹配：不然「扣」会被「不扣」顺带命中，删掉那一行也照样绿
+        expect(flat).toContain('"扣"');
+        expect(flat).toContain('"不扣"');
+        expect(flat).toContain('"不附征"');
     });
 });
 
@@ -182,14 +183,14 @@ describe('② 小规模纳税人：季度 30 万是整段跳变，不是渐进',
     test('季度 28 万：免征增值税 → 附加税 0', () => {
         const out = compute({ variant: 'surtaxSmall', quarterlySales: 280000 });
         expect(row(out, '实际缴纳的增值税（1% 征收率）')).toBe(0);
-        expect(row(out, '**计税依据**')).toBe(0);
+        expect(row(out, '计税依据')).toBe(0);
         expect(out.primary.value).toBe(0);
     });
 
     test('季度 31 万：按 1% 缴增值税 3100，附加税 186', () => {
         const out = compute({ variant: 'surtaxSmall', quarterlySales: 310000 });
         expect(row(out, '实际缴纳的增值税（1% 征收率）')).toBe(3100);
-        expect(row(out, '**计税依据**')).toBe(3100);
+        expect(row(out, '计税依据')).toBe(3100);
         expect(out.primary.value).toBe(186);             // 3100 × 6% = 186
     });
 
@@ -201,7 +202,7 @@ describe('② 小规模纳税人：季度 30 万是整段跳变，不是渐进',
 
     test('小规模也适用「进口不附征」', () => {
         const out = compute({ variant: 'surtaxSmall', quarterlySales: 310000, importVat: 200000 });
-        expect(row(out, '**计税依据**')).toBe(3100);
+        expect(row(out, '计税依据')).toBe(3100);
         expect(row(out, '若误按申报表应纳数（含进口）')).toBe(203100);
     });
 });
@@ -226,7 +227,7 @@ describe('③ 同一凭证多税目：分别列明 vs 从高适用', () => {
         // 合并 110 万 × 千分之一 = 1100，减半 550
         expect(row(out, '未分别列明时（从高 千分之一）')).toBe(550);
         expect(out.primary.value).toBe(550);
-        expect(row(out, '**两种写法的差额**')).toBe(350);
+        expect(row(out, '两种写法的差额')).toBe(350);
         expect(550 - 200).toBe(350);
     });
 
@@ -256,19 +257,19 @@ describe('④ 未列明金额 / 营业账簿 / 境外书立', () => {
         const out = compute({ variant: 'stamp', stampMode: 'undetermined', item: 'sale', settledAmount: 10000000 });
         expect(row(out, '签订时是否已贴花')).toBe('已按 5.00 元贴花');
         expect(row(out, '结算时应纳税额')).toBe(1500);     // 1000 万 × 万分之三 = 3000，减半 1500
-        expect(row(out, '**应补（多退少补）**')).toBe(1495);
+        expect(row(out, '应补（多退少补）')).toBe(1495);
         expect(out.primary.value).toBe(1495);             // 主结果是「应补」
     });
 
     test('结算金额小于已贴部分时可以退', () => {
         const out = compute({ variant: 'stamp', stampMode: 'undetermined', item: 'sale', settledAmount: 10000, halve: false });
         expect(row(out, '结算时应纳税额')).toBe(3);         // 1 万 × 万分之三 = 3
-        expect(row(out, '**应补（多退少补）**')).toBe(-2);  // 3 − 5 = −2 → 可退 2 元
+        expect(row(out, '应补（多退少补）')).toBe(-2);  // 3 − 5 = −2 → 可退 2 元
     });
 
     test('营业账簿只对**增加额**计税：375 而不是 1000，差 625', () => {
         const out = compute({ variant: 'stamp', stampMode: 'capital', prevCapital: 5000000, currCapital: 8000000 });
-        expect(row(out, '**增加额**（计税依据）')).toBe(3000000);
+        expect(row(out, '增加额（计税依据）')).toBe(3000000);
         expect(out.primary.value).toBe(375);              // 300 万 × 万分之二点五 = 750，减半 375
         expect(row(out, '若误按本年末全额贴（错）')).toBe(1000);   // 800 万 → 2000，减半 1000
         expect(1000 - 375).toBe(625);
@@ -276,7 +277,7 @@ describe('④ 未列明金额 / 营业账簿 / 境外书立', () => {
 
     test('资本公积减少时增加额为 0（减少不退税）', () => {
         const out = compute({ variant: 'stamp', stampMode: 'capital', prevCapital: 8000000, currCapital: 5000000 });
-        expect(row(out, '**增加额**（计税依据）')).toBe(0);
+        expect(row(out, '增加额（计税依据）')).toBe(0);
         expect(out.primary.value).toBe(0);
     });
 

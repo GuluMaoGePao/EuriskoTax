@@ -28,20 +28,101 @@ function walk(dir, out) {
     return out;
 }
 
+// 判断 / 是不是正则起点：看它前面最后一个非空白字符
+function regexAllowed(out) {
+    const t = out.replace(/\s+$/, '');
+    if (t === '') return true;
+    if ('([{;,!=&|?:+*%~^'.indexOf(t[t.length - 1]) !== -1) return true;
+    return /\b(return|typeof|in|of|case|else|do)$/.test(t);
+}
+
+/**
+ * 把源码切成字符串字面量，逐个连同行号与前导代码交出来。
+ *
+ * 早先这里就一条正则 `/(\w+)?\s*:\s*(['"])…\2/`，它有两个会互相掩护的洞：
+ *   ① 要求「键名 + 冒号 + 字面量」—— 拼接表达式里后面的片段（`+ ' **且** … '`）根本不匹配，
+ *      而那些片段最终照样显示在界面上，一整片加粗就这样藏起来了；
+ *   ② 为跳过正则字面量加的 `^\s*[\/*]` 过滤，会把以 `**` 开头的串一并丢掉 ——
+ *      偏偏「**XX**：说明」正是最常见的加粗写法，强调词一放句首就隐身。
+ * 于是改成状态机：先剥掉注释与正则，再把单引号 / 双引号 / 反引号里的文本全部收上来，
+ * 键名只作为附加信息保留（拼出来的片段没有键名，因此不计入提示字段）。
+ */
+function literals(src) {
+    const out = [];
+    let i = 0;
+    let line = 1;
+    let mode = 'code';
+    let buf = '';
+    let bufLine = 1;
+    let code = '';
+
+    const open = function (kind) { mode = kind; buf = ''; bufLine = line; };
+    const close = function () {
+        out.push({ line: bufLine, text: buf, prefix: code });
+        code = '';
+        mode = 'code';
+    };
+
+    while (i < src.length) {
+        const c = src[i];
+        const d = src[i + 1];
+        if (c === '\n') line += 1;
+
+        if (mode === 'code') {
+            if (c === '/' && d === '/') { mode = 'line'; i += 2; continue; }
+            if (c === '/' && d === '*') { mode = 'block'; i += 2; continue; }
+            if (c === '/' && regexAllowed(code)) { mode = 'regex'; i += 1; continue; }
+            if (c === "'" || c === '"') { open(c === "'" ? 's1' : 's2'); i += 1; continue; }
+            // 模板字符串多半是 HTML 片段，同样会显示在界面上；${…} 一并收进文本，
+            // 因为三元那两个分支（'**扣**' / '**不扣**'）就长在里面。
+            if (c === '`') { open('tpl'); i += 1; continue; }
+            code += c;
+            i += 1;
+            continue;
+        }
+        if (mode === 'line') { if (c === '\n') mode = 'code'; i += 1; continue; }
+        if (mode === 'block') {
+            if (c === '*' && d === '/') { mode = 'code'; i += 2; continue; }
+            i += 1;
+            continue;
+        }
+        if (mode === 'regex') {
+            if (c === '\\') { i += 2; continue; }
+            if (c === '[') { mode = 'regexClass'; i += 1; continue; }
+            if (c === '/') { code += ' '; mode = 'code'; i += 1; continue; }
+            i += 1;
+            continue;
+        }
+        if (mode === 'regexClass') {
+            if (c === '\\') { i += 2; continue; }
+            if (c === ']') { mode = 'regex'; i += 1; continue; }
+            i += 1;
+            continue;
+        }
+        // 字符串内（tpl 只由反引号关闭，${…} 里的引号关不掉它）
+        if (c === '\\') { buf += c + (d === undefined ? '' : d); i += 2; continue; }
+        if (mode === 'tpl' && c === '`') { close(); i += 1; continue; }
+        if ((mode === 's1' && c === "'") || (mode === 's2' && c === '"')) {
+            close();
+            i += 1;
+            continue;
+        }
+        buf += c;
+        i += 1;
+    }
+    return out;
+}
+
 // 取所有"用户可见"的字符串字面量，连同它前面的键名（用来判断是不是提示字段）。
-// 注释块里的加粗是写给自己看的，不在此列。
+// 注释块里的加粗是写给自己看的，不在此列 —— 状态机已经把它们剥掉了。
 function visibleStrings() {
     const out = [];
     walk(SRC, []).forEach(function (file) {
-        const src = fs.readFileSync(file, 'utf8');
-        const re = /(\w+)?\s*:\s*(['"])((?:\\\2|.)*?)\2/g;
-        let m;
-        while ((m = re.exec(src))) {
-            const s = m[3];
-            if (/^\s*[\/*]/.test(s)) continue;
-            if (!/[\u4e00-\u9fa5]/.test(s)) continue;      // 纯代码串（键名、类名）不算文案
-            out.push({ file: file, key: m[1] || '', text: s });
-        }
+        literals(fs.readFileSync(file, 'utf8')).forEach(function (lit) {
+            if (!/[\u4e00-\u9fa5]/.test(lit.text)) return;   // 纯代码串（键名、类名）不算文案
+            const m = /(\w+)\s*:\s*$/.exec(lit.prefix);
+            out.push({ file: file, key: m ? m[1] : '', text: lit.text, line: lit.line });
+        });
     });
     return out;
 }
@@ -56,8 +137,11 @@ describe('文案口吻：提示是给用户看的', () => {
     });
 
     test('用户可见文案里没有裸的 markdown 加粗', () => {
+        // 界面不渲染 markdown：留着星号，用户在导出 PDF / Word、分享图这些旁路上
+        // 看到的就是一对裸 `**`。报出文件与行号，改的时候不用先去猜它在哪。
         const bad = all.filter((x) => x.text.indexOf('**') !== -1);
-        expect(bad.slice(0, 5).map((x) => x.file + ' :: ' + x.text.slice(0, 60))).toEqual([]);
+        expect(bad.slice(0, 8).map((x) => path.relative(path.join(__dirname, '..'), x.file)
+            .replace(/\\/g, '/') + ':' + x.line + ' :: ' + x.text.slice(0, 60))).toEqual([]);
     });
 
     test('提示不许以「正确：/ 错误：」开头（那是内部校对的口吻）', () => {

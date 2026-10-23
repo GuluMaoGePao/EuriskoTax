@@ -1328,13 +1328,21 @@ describe('界面文案与结果页默认形态', () => {
         expect(host.innerHTML.indexOf('**')).toBe(-1);
         expect(host.querySelector('.tool-field-hint strong')).toBeTruthy();
 
-        // 真 spec 里带加粗提示的字段（20 个工具里挑得出来）渲染后同样不许留星号
-        const tool = R().all().concat(R().deep())
-            .find((t) => (t.fields || []).some((f) => f.hint && f.hint.indexOf('**') !== -1));
-        expect(tool).toBeTruthy();
+        // 源头那一半：spec 里写死的提示不许再带 **。早先这条用例是「找出一个带 ** 的字段」
+        // 再验它渲染后没有星号 —— 那等于承认源头会写、靠渲染链兜底。现在倒过来钉源头：
+        // 拿不出带 ** 的字段才算干净（真清干净以后，上面那条探针是找不到目标的）。
+        const dirty = R().all().concat(R().deep())
+            .filter((t) => (t.fields || []).some((f) => f.hint && f.hint.indexOf('**') !== -1))
+            .map((t) => t.id);
+        expect(dirty).toEqual([]);
+
+        // 渲染链那一半仍在（历史草稿、外部数据带进来的 ** 不至于原样端到用户眼前），
+        // 于是这里把所有工具全渲染一遍：源头已净，若还有星号漏出，必是渲染链断了。
         const host2 = document.createElement('div');
         document.body.appendChild(host2);
-        tool.fields.forEach((f) => { host2.innerHTML += TB().fieldHtml(f, {}, {}); });
+        R().all().concat(R().deep()).forEach((t) => {
+            (t.fields || []).forEach((f) => { host2.innerHTML += TB().fieldHtml(f, {}, {}); });
+        });
         expect(host2.innerHTML.indexOf('**')).toBe(-1);
 
         // 勾选框：不再替用户写一个「否」
