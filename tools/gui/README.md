@@ -86,7 +86,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 
 ---
 
-## 三、7 大功能面板详解（🚀 启动管理 · 🗄️ 数据库 · 🧪 测试 · 📋 日志查看 · 🚢 部署 · 🛠️ 常用工具 · 🔐 Git & 账号；另有左下角 ⏹ 紧急停止）
+## 三、8 个功能面板详解（🚀 启动管理 · 🗄️ 数据库 · 🧪 测试中心 · 🛠️ 运维监控 · 📧 通知日志 · 📦 部署 · 📂 快捷入口 · 🔐 Git & 账号；另有左下角 ⏹ 紧急停止）
 
 ### 1. 🚀 启动管理
 
@@ -149,6 +149,25 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 >
 > 前置条件：**Docker Desktop 已安装并启动** + 本地 `:3000` 后端已停止（运行中会锁 Prisma 引擎 DLL）。Windows 首次准备环境：① 启用 WSL2（`VirtualMachinePlatform` + WSL 可选功能两项，重启生效；家庭版无 Hyper-V，只能走 WSL2 后端）；② `docker version` 要能看到 **Server** 段、`docker compose version` 为 v2 以上（否则是引擎没起来，重启一次 Docker Desktop）；③ 拉 `postgres:16-alpine` 若报 `registry-1.docker.io` 超时，在 `Settings → Docker Engine` 配 `registry-mirrors`（配前先 `Test-NetConnection` 实测源可用）。两个按钮都会先做前置检查：本机有 Docker 且 `:3000` 有进程在监听时，先弹一次警告二次确认（可取消，取消则一个命令都不执行）；未装 Docker 时不做该检查，直接由脚本以**返回码 2** 优雅退出——按钮输出「未检测到 docker 命令，已跳过」，GUI 再打印橙色「[跳过] …这不是代码问题」说明，并弹一次「是否打开 Docker Desktop 下载页」的引导窗（同一提示 180s 内去重，连点两个演练按钮不会被弹两次）。演练收尾会自动把 Prisma Client 恢复为 SQLite 版本，不影响本地开发。详见 [开发工作流 §2③](../../docs/guides/development-workflow.md)。
 
+> **发布自检 + 一键全套**（2026-10-24 新增，与上面三个门禁按钮同一张卡片）：
+>
+> | 按钮 | 执行命令 | 适用场景 |
+> |------|---------|---------|
+> | **📋 发布前自检** | `npm run verify:release` | 发版前的静态自检（约 1 秒）：版本号五处一致 + 文档口径（套件/用例/门禁/指纹项数）与实测一致；漂移了会直接把漏改的地方指名到行 |
+> | **🚦 一键跑全套门禁** | `npm test` → `npm run verify:local` → `npm run verify:release` | ⭐ 发版前点这个：三步串起来一次跑完（约 2-4 分钟），任一步红就停在那里、后面不再继续 —— 与 CI 的判定顺序一致 |
+>
+> 本面板另有 **④ UI 与视觉验证** 与 **⑤ CI 门禁预演** 两张卡片（2026-10-24 新增）：
+>
+> | 按钮 | 执行命令 | 适用场景 |
+> |------|---------|---------|
+> | **🔧 41 个工具逐个算** | `npm run smoke:ui` | 真机把 41 个工具各算一遍（出不出数 / 抛不抛错 / deep 侧政策徽标在不在）。**不写留痕**：跑前快照 localStorage、跑后整份还原 —— 否则 41 次测算会污染历史与截图基线 |
+> | **📸 视觉基线对比** | `node tools\ops\ui-screenshot-baseline.js` | 7 页 × 桌面/手机 × 浅色/深色 = 28 张与基线比对。生成与比对必须用**同一个引擎**（两套引擎有像素微差，混用会假报警） |
+> | **🎨 对比度审计** | `node tools\ops\ui-contrast-audit.js` | 改了配色必跑。深色是另一套值（阴影靠更黑不靠更灰、透明度 .30/.40/.50）—— 浅色看着对证明不了深色没问题 |
+> | **🧩 级联守卫** | `npm run check:cascade` | 改了 `tokens.css` / `ui-redesign.css` 之后跑，抓「改一处串到别处」 |
+> | **🧪 CI 三步预演** | `.\tools\ops\ops-ci-rehearsal.ps1 [-Keep]` | push 之前把 CI 的同款三步跑一遍：干净克隆 → `npm ci`（根 + server）→ `npm test` → `verify:local` → `verify:release`。专抓「本机绿 ≠ 仓库绿」（空 `dev.db` / 全新依赖 / 没有本机 `.env`）。约 5-15 分钟；**红了会自动保留克隆副本** |
+> | **📄 打开 CI 工作流** | 记事本打开 `.github\workflows\ci.yml` | 改 CI 定义前先读注释（为什么刻意不跑 `verify:pg` 与 `smoke:beta`） |
+> | **🔗 打开 GitHub Actions** | 浏览器 | 看 push 后 CI 的真实结果 —— 本机与预演都代替不了 Linux runner 的那一跑 |
+
 ### 4. 📋 日志查看
 
 | 按钮 | 功能 | 适用场景 |
@@ -160,7 +179,23 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **📮 发送测试邮件** | `Send-TestNotification` | 测试邮件通知是否正常 |
 | **🗑️ 清空所有日志** | 清空 3 个 .log 文件 | 日志过大时清理（需确认） |
 
-### 5. 🚢 部署
+### 5. 🚢 部署（① 预发 · ② 正式 · ③ 发完核对与台账 · ④ 配置文档）
+
+> 2026-10-24 重排：**预发（beta）整条链路原先完全不在控制台里**（只能手敲命令），现已补齐并排在正式之前 —— 正式站是软链一指的全量瞬切、没有灰度，beta 是上线前唯一能在真机上先看见的地方。
+
+**① 预发（beta）**：
+
+| 按钮 | 执行命令 | 适用场景 |
+|------|---------|---------|
+| **🚀 发到预发** | `.\tools\ops\ops-deploy-beta.ps1` | ⭐ 改了工具 / 计算逻辑，上线前先发这里看真机效果。默认 `-SkipTest`：beta 求快，**它不是门禁** —— 正式发布前的全量测试照旧要在本地跑（一键全套门禁） |
+| **🧪 预发试运行** | `... -DryRun` | 只打包预览，不真上传 |
+| **🔍 预发线上核对** | `.\tools\ops\ops-check-beta.ps1` | 对 beta 跑与正式站**同一把尺子**的 37 项指纹（只读、不登录，公网直连即可，不用开隧道） |
+| **🔥 beta 真机冒烟** | `npm run smoke:beta -- --base-url http://127.0.0.1:<端口>` | 登录后的关键链路（登录→档案→算一笔→云端同步→内容→留资）打真实 HTTP + 真实库，跑完清掉自己造的数据。**必须先开隧道**（见下行） |
+| **🔌 开 beta SSH 隧道** | 新窗口跑 ssh（读 `deploy.config.beta.json` 的服务器与私钥） | 公网下 Basic Auth 与应用的 Bearer 共用一个 `Authorization` 头、无法共存（表现为「登录成功、之后每步 401」）。隧道绕过 Caddy 直连进程端口，登录态才可用；关掉那个窗口即断开 |
+| **↩ 预发回滚** | `... -Rollback` | 把 beta 退回上一版（与正式回滚互不干扰） |
+| **🛠 首次初始化预发环境** | `... -InitEnv` | 首次搭 beta：独立库 / 独立 `JWT_SECRET` / `SMTP_PASS` 留空 / 禁止被收录，四条前置 |
+
+**② 正式（腾讯云 · 唯一上线入口）**：
 
 | 按钮 | 执行命令 | 适用场景 |
 |------|---------|---------|
@@ -170,6 +205,15 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 | **↩️ 回滚到上一版本** | `ops-deploy.ps1 -Rollback` | 回滚到上一发布版本 |
 | **🔧 初始化服务器环境变量** | `ops-deploy.ps1 -InitEnv` | 首次部署时在服务器初始化 .env |
 | **📝 编辑 deploy.config.json** | 记事本 | 编辑部署配置（不存在则从模板创建） |
+
+**③ 发完之后（不做这一步等于没验）**：
+
+| 按钮 | 执行命令 | 适用场景 |
+|------|---------|---------|
+| **🔍 正式站线上核对** | `.\tools\ops\ops-check-prod.ps1` | 部署完必点：真去线上读一遍 37 项指纹，版本哨兵还是旧的就说明没生效或被缓存挡了 |
+| **📊 看看现在发到哪了** | `npm run status:release` | 读发布台账；**预发落后于正式会报警**（在旧代码上看现象会得出错误结论） |
+| **✍ 更新台账** | `npm run status:release -- --write` | 发完正式后写回台账（台账由脚本生成，不要手改） |
+| **🧭 改完东西该点哪个** | 打开 `docs/guides/how-to-ship-a-change.md` | 一句话指令对照表 + A/B/C 三档路由；本页按钮顺序就是照它排的 |
 
 ### 6. 🛠️ 常用工具
 

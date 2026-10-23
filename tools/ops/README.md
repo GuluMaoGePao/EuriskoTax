@@ -15,6 +15,7 @@
 | `ops-publish.ps1` | ~~安全发布流水线（唯一上线入口）~~ **已停用**：Zeabur 时代的脚本（默认 BaseUrl 指向已降级的测试环境且本机直连不通）。现行上线入口是 `ops-deploy.ps1`，留此脚本仅供查历史 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
 | `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 266 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
+| `ops-ci-rehearsal.ps1` | **CI 门禁预演**（`powershell -File tools\ops\ops-ci-rehearsal.ps1 [-Keep]`）：干净克隆一份仓库到临时目录，按 `.github/workflows/ci.yml` 的同款顺序跑 `npm ci`（根 + server）→ `npm test` → `verify:local` → `verify:release`。专抓「本机绿 ≠ 仓库绿」—— clone 下来的仓库是空 `dev.db`、全新 `node_modules`、没有本机 `.env`，本机永远看不见这类缝（2026-10-24 的**空库没内容种子**就是这么抓到的：干净环境 265/266，本机 266/266）。失败即停（与 CI 一致，否则「后面没跑」会被误读成后面是绿的）；红了保留克隆副本，绿了自动清理 | ✅ |
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
 | `release-metrics.js` | 上述自检与被单测复用的**口径定义单点**（`tests/version-sync.test.js` / `tests/docs-metrics.test.js`），避免「文档口径」出现第三份事实 | ✅ |
 | `ops-seed-prod.js` | 生产内容种子（走运维后台 API 幂等补种；换新库/重置生产库后必需） | ✅ |
