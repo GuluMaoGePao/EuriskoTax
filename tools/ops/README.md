@@ -12,7 +12,7 @@
 | `ops-watchdog.ps1` | 服务守护脚本（监控后端+cpolar，自动重启，事件记录） | ✅ |
 | `ops-notify.ps1` | 邮件通知模块（模板渲染+SMTP发送+详细日志） | ✅ |
 | `ops-deploy.ps1` | 一键部署脚本（打包+传输+安装+迁移+重启+健康检查+回滚） | ✅ |
-| `ops-publish.ps1` | **安全发布流水线（唯一上线入口）**：verify 门禁 → commit → push main → 线上指纹核对 → 自动打标签；含生产内容幂等补种 | ✅ |
+| `ops-publish.ps1` | ~~安全发布流水线（唯一上线入口）~~ **已停用**：Zeabur 时代的脚本（默认 BaseUrl 指向已降级的测试环境且本机直连不通）。现行上线入口是 `ops-deploy.ps1`，留此脚本仅供查历史 | ✅ |
 | `ops-check-prod.ps1` | 线上部署指纹校验（版本号 + 功能指纹 + 内容端点 + SW），发布门禁与人工复核共用 | ✅ |
 | `ops-verify-pg.ps1` | **生产等价演练门禁**：Docker 起临时 PostgreSQL → `migrate deploy` → 内容种子 → 同一套 266 项 e2e（入口 `npm run verify:pg`）；无 Docker 时优雅退出（码 2） | ✅ |
 | `preflight-release.js` | **发版前自检**（入口 `npm run verify:release`）：版本号五处落点 + 文档口径 vs 实测，`-- --write` 自动同步套件/用例数（只改当前声明值，历史值不动） | ✅ |
@@ -24,6 +24,13 @@
 | `ops-notify-templates.json` | 中文邮件模板 v3.2（URL_CREATED + URL_CHANGED + TEST） | ✅ |
 | `ops-notify-reason-map.json` | reason 代码到中文描述的映射（14 种） | ✅ |
 | `ops-deploy.config.example.json` | 部署配置模板（服务器信息+环境变量+hooks） | ✅ |
+| `ops-deploy-beta.ps1` | **beta（预发）部署薄封装**：配置走 `deploy.config.beta.json`，默认 `-SkipTest`（beta 求快，正式门禁照旧在本地跑），透传 `-DryRun`/`-Rollback`/`-InitEnv`，`-RunTest` 可开测试 | ✅ |
+| `ops-check-beta.ps1` | **beta 核对薄封装**：复用 `ops-check-prod.ps1` 那 37 项线上指纹（同尺子才不会用宽松标准蒙混）；默认 `-BaseUrl https://beta.euriskotax.com`，本机直连 3001 不通时开 SSH 隧道后传 `http://127.0.0.1:3001` | ✅ |
+| `beta-init-server.sh` | **beta 环境初始化（服务器执行，幂等）**：建独立 PG 库 `eurisko_beta` 与角色 → 从正式 `.env.shared` **在服务器内部**复制后覆盖 `DATABASE_URL`/`JWT_SECRET`/`SMTP_PASS`/`PORT`（敏感值不经过本机、不打印）→ 落 `beta-mark.sh` | ✅ |
+| `beta-seed-server.sh` | beta 内容补种（服务器执行，幂等）：建工作人员账号 → 跑 `ops-seed-prod.js --base-url=http://127.0.0.1:3001`（beta 是空库，不补种则内容端点 `items=0` 会让核对红一项） | ✅ |
+| `beta-mark-server.sh` | beta 标记注入（幂等）：`window.__APP_CHANNEL__='beta'`（前端据此显示「预发环境 · 数据非生产」角标）+ robots noindex。**单独成脚本**是因为 postDeploy 经 SSH 传参会丢引号，内联 sed 会被远端 bash 当重定向 | ✅ |
+| `deploy.config.beta.example.json` | beta 部署配置模板（独立目录 / 进程 / 端口 / 库） | ✅ |
+| `deploy.config.beta.json` | beta 部署配置（服务器信息，含敏感值） | ❌ 已 gitignore |
 | `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码、新增 urlCreated） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
 | `watchdog.log` | 守护脚本运行日志（运行时生成） | ❌ *.log 已 gitignore |
@@ -147,6 +154,10 @@ python tools\ops\ops-md2docx.py docs\marketing\gtm-execution-plan.md
 > `<!-- subtitle: 副标题 -->`、`<!-- notice: 封面底部提示 -->`、
 > `<!-- export:skip --> … <!-- /export:skip -->`（包住只在仓库里看、不进 Word 的内部元信息）。
 >
+> **有序列表编号以源文件为准（2026-10-22 修）**：md 里写 `2.` 就导出 `2.`。
+> 只有"每条都写 `1.`"的 markdown 习惯写法才自增成 1/2/3 —— 此前脚本一律自增，
+> 结果是显式编号被覆盖（导出件里出现三个「1.」）。emoji 会按脚本内的替换表转成 √ / × / ○ / ※。
+>
 > **不想敲命令行时**：开发控制台（GUI）→ 📂 快捷入口 Tab → 底部「3. 文档导出（任选文件 → Word）」卡片，
 > 点【📄 选择任意文件导出 Word】弹文件选择器（Ctrl 可多选），选完自动调用本脚本，在源文件同目录生成同名 `.docx`。
 > GUI 侧实现见 `tools/gui/gui-dev-console.ps1` 的 `Get-PythonExe` / `Show-ExportFilePicker` / `Invoke-Md2DocxExport`。
@@ -180,6 +191,35 @@ Copy-Item .\tools\ops\ops-deploy.config.example.json .\tools\ops\deploy.config.j
 # 6. 回滚到上一版本
 .\tools\ops\ops-deploy.ps1 -Rollback
 ```
+
+### 部署到 beta（预发）
+
+> 为什么有 beta：正式站是「软链一指、全量瞬切」，且 `prisma migrate deploy` 的
+> **首次执行**发生在生产库上。beta 让迁移、依赖安装、真机链路先在独立环境跑一遍。
+> 它与正式**同机不同目录**：`/home/ubuntu/euriskotax-beta` + pm2 `euriskotax-beta` +
+> 端口 3001 + **独立库 `eurisko_beta`**（beta 账号无权访问生产库）。
+
+```powershell
+# 0. 首次建环境（服务器上执行一次；后续重建/修配置可重复跑，幂等）
+scp -i <key> tools\ops\beta-init-server.sh ubuntu@<host>:/tmp/
+ssh -i <key> ubuntu@<host> 'bash /tmp/beta-init-server.sh <beta_db密码> <jwt_secret>'
+#    再补种内容（空库不补会让核对红一项）
+scp -i <key> tools\ops\ops-seed-prod.js tools\ops\beta-seed-server.sh ubuntu@<host>:/tmp/
+ssh -i <key> ubuntu@<host> 'bash /tmp/beta-seed-server.sh'
+
+# 1. 发到 beta（默认跳过 npm test，约 30s）
+powershell -File .\tools\ops\ops-deploy-beta.ps1
+powershell -File .\tools\ops\ops-deploy-beta.ps1 -DryRun    # 只打包预览
+powershell -File .\tools\ops\ops-deploy-beta.ps1 -Rollback  # 只回滚 beta
+
+# 2. 核对（与正式同一把尺子的 37 项指纹）。本机直连不到 3001（安全组只开 80/443/22），先开隧道：
+ssh -i <key> -L 3001:127.0.0.1:3001 -N ubuntu@<host>
+powershell -File .\tools\ops\ops-check-beta.ps1 -BaseUrl http://127.0.0.1:3001
+```
+
+四条硬约束（改配置时别破）：**独立数据库**、**独立 `JWT_SECRET`**（否则 beta 签的 token
+能在正式站用）、**`SMTP_PASS` 留空**（不向真实用户发测试邮件）、**禁止被收录**
+（`beta-mark.sh` 注入 noindex；域名可用后另在 Caddy 加 Basic Auth）。
 
 ### 查看日志
 

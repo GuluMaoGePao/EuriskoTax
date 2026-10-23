@@ -37,48 +37,67 @@
 
 | 场景 | GUI 按钮 / 命令 | 说明 |
 |------|----------------|------|
-| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 165 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
+| push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 266 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
 | 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 266 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 125 套件 2413 例（含版本号五处同步守护、文档口径守护） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 126 套件 2429 例（含版本号五处同步守护、文档口径守护） |
 | 改了工具 / 渲染器，想确认 41 个入口都还出得来数 | **`npm run smoke:ui`** | 真机把 20 个速算器 + 21 个完整测算**各算一次**，只问三件事：出不出数 / 抛没抛异常 / deep 结果卡的政策时效徽标在不在。跑前拍 localStorage 快照、跑后整份还原（不留痕）；只报不修，有失败退出码 1。热会话约 15 秒，全新会话要拉外网 CDN 可能数分钟 |
 | 发版前口径自检 | `npm run verify:release` | 一条命令列出**版本号五处落点**（含 `文件:行号`）+ **文档口径 vs 实测**（套件/用例数 / 门禁项数 / 线上指纹数）；不一致退出码 1。加 `-- --write` 只改「当前声明值」并自动同步套件/用例数（CHANGELOG 里「上一版基线 → 当前值」的历史值不会被误改）。**版本前缀约束**（2026-09-13 加固）：项数声明改为逐条校验 —— 非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`；「新增/移除/少 N 项」这类增量描述不计入总项数。口径定义与 `npm test` 里的守护同源：`tools/ops/release-metrics.js` |
 
-### D. 发布（GUI「🔐 Git & 账号」Tab → 卡片 4）
+### D. 发布（GUI「🚀 部署」Tab / 命令）
 
-| 场景 | GUI 按钮（官方名） | 等价命令 | 说明 |
-|------|-------------------|---------|------|
-| 上线前零风险预演 | **「安全发布试运行」** | `.\tools\ops\ops-publish.ps1 -DryRun` | 只跑本地门禁，不 commit 不 push |
-| **正式上线（唯一入口）** | **「安全发布」** | `.\tools\ops\ops-publish.ps1` | verify → git add+commit → push origin main → 自动轮询线上核对（附带生产内容幂等补种）→ 成功后自动打并推送 `v<package.json版本>` 标签（幂等） |
-| 跳过发布后自动打标签 | — | `.\tools\ops\ops-publish.ps1 -NoAutoTag` | 版本号未变/不需要新标签时使用（默认自动打，已存在则跳过） |
-| 跳过发布后内容补种 | — | `.\tools\ops\ops-publish.ps1 -NoSeedProd` | 阶段11：生产内容种子默认自动执行（幂等）；未配置 `ADMIN_TOKEN_PROD` 时自动跳过 |
-| 手动补种生产内容 | — | `node tools\ops\ops-seed-prod.js [--dry-run]` | 换新库/重置生产库后必需，否则内容端点 `items=0` 会让线上核对失败 |
-| 指定提交说明 | — | `.\tools\ops\ops-publish.ps1 -CommitMsg "feat: xxx"` | 弹窗输入即传此参数 |
-| 后端占用引擎 DLL 时发布 | — | `.\tools\ops\ops-publish.ps1 -SkipVerifyGenerate` | 等同给 verify 设逃生门 |
-| push 走代理（网络受限） | — | `.\tools\ops\ops-publish.ps1 -Proxy "http://127.0.0.1:7890"` | 仅本次 push 生效，不改 git 全局配置 |
-| 调长线上等待 | — | `-PollMaxSeconds 900` | 默认 600s |
-| 手动复核线上 | — | `.\tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]` | 37 项线上指纹，全绿退出码 0 |
+> 2026-10-22 重写：现网是**腾讯云单机 + 手动部署**（push 不会自动上线）。
+> `ops-publish.ps1` 是 Zeabur 时代的脚本（默认 BaseUrl 指向 `euriskotax.zeabur.app`，
+> 已于 2026-10-10 降级为测试环境且本机直连不通），**不要再用它发版**，留着仅供查历史。
+
+**两条路径：beta（预发）→ 正式。** beta 不是门禁，是「门禁之前的眼睛」——
+正式站是「软链一指、全量瞬切」，凡涉及 schema/migration、认证、兑换码、留资这类
+有副作用或涉及真实权益的改动，先在 beta 上跑一遍再发正式。
+
+| 场景 | 命令 | 说明 |
+|------|------|------|
+| **发到 beta** | `powershell -File tools\ops\ops-deploy-beta.ps1` | 打包 → 上传 → `migrate deploy`（**beta 独立库**）→ 切软链 → pm2 `euriskotax-beta` → 健康检查 → 打 beta 标记；约 30s。默认 `-SkipTest`（beta 求快；正式门禁照旧在本地跑，加 `-RunTest` 可开） |
+| beta 打包预览 | `ops-deploy-beta.ps1 -DryRun` | 只打包，不连服务器 |
+| beta 首次建环境 | 服务器：`bash tools/ops/beta-init-server.sh <db密码> <jwt>` → `bash tools/ops/beta-seed-server.sh` | 建独立 PG 库与角色、生成 beta `.env.shared`（独立 JWT、关 SMTP）、补种内容；幂等，可重跑 |
+| beta 回滚 / 环境重置 | `ops-deploy-beta.ps1 -Rollback` | 只动 beta 的软链，与正式无关 |
+| **beta 核对** | `powershell -File tools\ops\ops-check-beta.ps1` | 与正式**同一把尺子的 37 项指纹**；本机直连不到 3001 时先开隧道：`ssh -L 3001:127.0.0.1:3001 -N ubuntu@101.42.89.184`，再用 `-BaseUrl http://127.0.0.1:3001` |
+| **正式上线（唯一入口）** | GUI「正式部署到生产」/ `powershell -File tools\ops\ops-deploy.ps1` | 打包 → 上传 → `migrate deploy`（**生产库**）→ 切 `current` 软链 → pm2 `euriskotax` → 健康检查；建议先 `-DryRun` 预览 |
+| 跳过测试紧急部署 | GUI「跳过测试紧急部署」/ `ops-deploy.ps1 -SkipTest` | 不加它会在服务器部署前跑 `npm test`；已知坑：jest 的 PASS 行写进 stderr 会让 PowerShell 提前终止脚本 |
+| 手动复核线上 | `powershell -File tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]` | 37 项线上指纹，全绿退出码 0 |
+| 手动补种内容 | `node tools\ops\ops-seed-prod.js [--dry-run] [--base-url=...]` | 换新库/重置库后必需，否则内容端点 `items=0` 会让核对失败（beta 补种用 `beta-seed-server.sh`） |
+
+> beta 环境的四条硬约束（改配置时别破）：**独立数据库**、**独立 `JWT_SECRET`**、
+> **`SMTP_PASS` 留空**（不向真实用户发测试邮件）、**禁止被收录**（`beta-mark.sh` 注入 noindex）。
 
 ---
 
 ## 1. 完整工作流（一图流）
 
+> 2026-10-22 重写：此前画的是「push 到 GitHub → 平台自动构建」（Zeabur 时代），
+> 现网是**腾讯云单机 + 手动部署**（push 不会自动上线），且已补上 beta（预发）环。
+
 ```
-       本地                                     线上（腾讯云）
-┌──────────────────────────┐   ops-publish     ┌──────────────────────────────┐
-│ ① 启动后端（GUI 启动管理）│                  │ GitHub main 收到 push        │
-│    首次 → 第一次用一键     │ ── 门禁不绿 ──✗──▶│   → Dockerfile 自动构建       │
-│    日常 → 日常快速启动    │   物理推不出去     │   → prisma migrate deploy    │
-└──────────┬───────────────┘                  │   → 服务重启                  │
-           │ 改代码（前端 src / 后端 server）    └──────────────▲───────────────┘
-           ▼                                    ops-check-prod │
-│ ② 本地验证：npm test（单测）                    （发布后自动轮询）│
-│    + verify:local（165 项 e2e 门禁）                            │
-│    └ 全绿 ───────────────────────────────────────────────────┘
-│ ③ 发布：GUI「安全发布」/ ops-publish
-│    verify→commit→push→线上核对  ← 一条命令/一个按钮闭环
-│ ④ 出问题：git revert + 再走一次安全发布（见 §4 回滚）
-└──────────────────────────
+       本地                                    线上（腾讯云 · 手动部署）
+┌────────────────────────────────┐           ┌──────────────────────────────────┐
+│ ① 改代码（前端 src / 后端 server）│           │ beta（预发）                      │
+│ ② 本地门禁：                     │           │ /home/ubuntu/euriskotax-beta      │
+│    npm test（单测）              │  ───────▶ │ pm2 euriskotax-beta :3001         │
+│    verify:local（266 项 e2e）    │  改了就发  │ 独立库 eurisko_beta               │
+│    verify:pg（仅改了 schema 时） │           │ ops-deploy-beta.ps1（约 30s）     │
+│ ③ 版本号五处同步 + CHANGELOG     │           └──────────────┬───────────────────┘
+│ ④ commit → push main            │                          │ ops-check-beta 37 项
+└──────────────┬─────────────────┘                          │ + 真机手点关键路径
+               │                                             ▼
+               │  门禁全绿 + beta 已验      ┌──────────────────────────────────┐
+               └─────────────────────────▶ │ 正式：ops-deploy.ps1（唯一入口）  │
+                                           │ migrate deploy（**生产库**）      │
+                                           │ current 软链切换 = 全量瞬切        │
+                                           │ ops-check-prod 37 项              │
+                                           └──────────────┬───────────────────┘
+                                                          │ 出问题
+                                                          ▼
+                                           ops-deploy.ps1 -Rollback（~1 分钟）
+                                           → git revert → 补 beta 验证 → 再发一次
 ```
 
 ---
@@ -128,13 +147,42 @@ npm run verify:pg     # 生产等价演练：同一套断言跑在本地 Postgre
   3. **确认引擎真起来了**：`docker version` 必须能打印 **Server** 段（只有 Client 段＝引擎没起来），`docker compose version` 为 v2 以上；
   4. **拉不到镜像先修网络**：报 `dial tcp registry-1.docker.io:443` 超时或 EOF 时，在 `Settings → Docker Engine`（即 `~/.docker/daemon.json`）加 `registry-mirrors` 后重启 Desktop；**先用 `Test-NetConnection <来源域名> -Port 443` 实测源可用再写进去**，公开加速源失效很快。
 
-### ④ 发布（只走安全发布）
+### ④ 发布（beta → 正式，正式只有一条路）
 
-正式上线**只有一条路**：GUI「🔐 Git & 账号」→「🚀 安全发布」或命令行 `ops-publish.ps1`。
-它内部依次完成：verify 门禁（不过就中止）→ 自动 commit → push origin main（自动重试，可 `-Proxy`）→ 轮询线上 37 项指纹（全绿即完成）→ 自动打并推送版本标签 `v<package.json 版本>`（幂等，可用 `-NoAutoTag` 关闭）。
+正式上线**只有一条路**：GUI「🚀 部署」→「正式部署到生产」或命令行 `ops-deploy.ps1`。
+它内部依次完成：打包 → scp 上传 → 解压到 `releases/<时间戳>` → 同步 `.env.shared` →
+`npm install --production` + `prisma generate` + **`prisma migrate deploy`（生产库）** →
+切 `current` 软链 → pm2 重启 `euriskotax` → `/health` 健康检查 → 清理旧 release（保留最近 3 份）。
+
+**什么时候必须先发 beta**（2026-10-22 定的发布节奏）：
+
+| 改动类型 | 是否先过 beta | 理由 |
+|---------|--------------|------|
+| 动 `schema.prisma` / `migrations/` | **必须** | 迁移的**首次执行**不能发生在生产库上；beta 库结构与生产同构，先在它上面炸一次 |
+| 动认证 / 兑换码 / 留资 / 邮件 | **必须** | 有真实权益与对外副作用，错了要赔客户 |
+| 大规模 UI 重构、多模块联动 | 建议 | 本地 jsdom 全绿 ≠ 真机可用（历史教训：18-6a 行名括号、v1.144 `if` 包断言）；beta 站自带「预发环境」角标，不会认错站 |
+| 文案 / 样式 / 单模块小修 | 不必 | 本地门禁 + 发完手点即可；若是**新功能**，入口挂开关（见 ⑤） |
+
 > 版本号请在发布前同步**五处**：`package.json` / 关于弹窗 `版本 x.y.z` / `CHANGELOG.md` 最新条目 / `index.html` 的 `window.__APP_VERSION__` / 根目录 `version.json`（后两处是版本哨兵基准，漏改会让用户每次新会话都清一次缓存）。详见 [分支与版本发布策略 §3.2](branch-release-strategy.md)。
 
-小技巧：重要发布先点「🧪 安全发布试运行」零风险预演一遍，确认门禁能绿再正式发。
+小技巧：重要发布先 `ops-deploy.ps1 -DryRun` 预览一遍；发完立刻跑 `ops-check-prod.ps1` 37 项。
+
+### ⑤ 新功能怎么上：功能开关（Feature Flags）
+
+正式站是**全量瞬切**，没有按流量灰度，所以「新功能先给少数人看」靠开关：
+
+```js
+if (window.EuriskoFlags.enabled('my.newThing')) { renderNewThing(); }
+```
+
+- 开关登记在 `src/js/utils/feature-flags.js` 的 `REGISTRY`，**默认全关**；
+- 打开途径（后者覆盖前者）：`REGISTRY` 默认 → localStorage（`euriskoFeatureFlags`）
+  → URL `?ff=名字1,名字2` → `?beta=1` 或 beta 站（`window.__APP_CHANNEL__='beta'`）；
+- 未登记的开关名返回 `false` 并 `console.warn`，避免「拼错 = 静默不生效」；
+- 内置用例：预发环境角标 `env.betaBadge`（beta 站自动显示，正式站永不出现）；
+- 纪律：开关是**过渡态**不是配置。全量后要删掉判断与 `REGISTRY` 条目，别留死分支。
+
+单测守卫：`tests/feature-flags.test.js`（默认全关、四条途径优先级、正式站不出角标等）。
 
 ---
 
@@ -169,7 +217,7 @@ git revert --no-commit v1.10.0..main      # -no-commit 便于先审一遍变更
 ```
 
 - 第 1️⃣ 步是脚本回滚（推荐），需要平台侧回滚时**以腾讯云控制台实际界面为准**（本仓库历史文档曾记为「没有一键回滚」）；若没有该入口，直接走第 2️⃣ 步。
-- 回退同样受门禁保护：revert 后必须重新通过 165 项 + 37 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
+- 回退同样受门禁保护：revert 后必须重新通过 266 项 + 37 项指纹才会推上线，不会出现「为了救火反而推了更糟的版本」。
 - 旧自建服务器模式（`ops-deploy.ps1`，已非主要）：GUI「📦 部署」→「回滚到上一个版本」，或
   `.\tools\ops\ops-deploy.ps1 -Rollback`（切换 releases 软链接）。
 

@@ -11,7 +11,8 @@
 让**开发 → 测试 → 上线 → 回滚**都有清晰、可复制的路径：
 
 1. `main` 永远处于**可发布**状态（禁止在 main 上提交半成品）。
-2. 所有"上线"动作只走唯一入口 `ops-publish.ps1`（本地验证门禁全绿 → 提交 → push → 线上指纹核对）。
+2. 所有"上线"动作只走唯一入口 `ops-deploy.ps1`（打包 → 上传腾讯云 → `migrate deploy` → 切软链 → pm2 重启 → 健康检查 → `ops-check-prod.ps1` 核对）。
+   > `ops-publish.ps1` 是 Zeabur 时代的脚本（2026-10-10 起 Zeabur 降级为测试环境、且本机直连不通），**已停用**，留着仅供查历史。
 3. 每次发布都对应一个语义化版本 + 一个 git 标签（`vX.Y.Z`），可一键回溯/回滚。
 4. 历史归档使用 tag，不使用常驻 `archive/` 分支。
 
@@ -94,23 +95,35 @@
 
 ## 4. 发布流程（每次版本发布的固定动作）
 
-> 发布命令（推荐）：`.\tools\ops\ops-publish.ps1 -CommitMsg "chore(release): 发布 vX.Y.Z"`
-> 脚本在 push 成功后会自动创建/推送 `vX.Y.Z` 标签（已存在则跳过）。
-> 阶段11 起：线上核对前会自动幂等补种生产内容（读 `ADMIN_TOKEN_PROD`，缺失则跳过、失败不阻断）。
+> 发布命令（推荐）：
+> ```powershell
+> # ① beta（预发）—— 涉及 schema/migration、认证、兑换码、留资、大规模 UI 重构时必做
+> powershell -File tools\ops\ops-deploy-beta.ps1
+> powershell -File tools\ops\ops-check-beta.ps1        # 与正式同一把尺子的 37 项指纹
+> # ② 正式（唯一上线入口；push 不会自动上线）
+> powershell -File tools\ops\ops-deploy.ps1 -DryRun    # 预览
+> powershell -File tools\ops\ops-deploy.ps1            # 实发（后端占用 DLL 时加 -SkipTest）
+> powershell -File tools\ops\ops-check-prod.ps1        # 37 项核对
+> # ③ 打标签（部署脚本不打，需手打）
+> git tag -a vX.Y.Z -m "release vX.Y.Z" && git push origin vX.Y.Z
+> ```
+> 换新库/重置库后要补内容种子，否则内容端点 `items=0` 会让核对失败：
+> `node tools\ops\ops-seed-prod.js`（beta 用服务器上的 `beta-seed-server.sh`）。
 
 ### Checklist（发布人逐项确认）
 
+0. [ ] **beta 已过**（限「必须过 beta」的改动：schema/migration、认证、兑换码、留资/邮件、大规模 UI 重构 —— 判定表见 [开发工作流 §2④](development-workflow.md)）：`ops-check-beta.ps1` 37 项全绿，且关键路径真机手点过
 1. [ ] CHANGELOG 已按 3.3 归档本次变更（含日期）
 2. [ ] 版本号**五处**已同步为 `X.Y.Z`（见 3.2：`package.json` / 关于弹窗 / CHANGELOG / `index.html` 的 `__APP_VERSION__` / 根目录 `version.json`）
-3. [ ] 本地 `npm test` + `verify:local` 全绿（ops-publish 会自动再跑一遍）；另跑 `npm run verify:release` 核对版本五处 + 文档口径（套件/用例数、门禁项数、指纹项数）。两份数字若需更新，`-- --write` 可自动同步套件/用例数，门禁与指纹项数须以实跑输出为准手工改
-4. [ ] 执行 `ops-publish.ps1` → 等待线上指纹核对通过（阶段11 起 push 后自动幂等补种生产内容；未配置 `ADMIN_TOKEN_PROD` 时手动执行 `node tools\ops\ops-seed-prod.js`）
-5. [ ] 核对远程已出现 `vX.Y.Z` 标签：`git ls-remote --tags origin`
+3. [ ] 本地 `npm test` + `verify:local`（259 项）全绿；另跑 `npm run verify:release` 核对版本五处 + 文档口径（套件/用例数、门禁项数、指纹项数）。两份数字若需更新，`-- --write` 可自动同步套件/用例数，门禁与指纹项数须以实跑输出为准手工改
+4. [ ] 执行 `ops-deploy.ps1`（先 `-DryRun` 预览）→ 等待 37 项线上指纹核对通过（换新库/重置库时才需要 `node tools\ops\ops-seed-prod.js` 补种内容）
+5. [ ] 手打标签并推送：`git tag -a vX.Y.Z -m "release vX.Y.Z" && git push origin vX.Y.Z`（部署脚本不打标签）；核对远程：`git ls-remote --tags origin`
 6. [ ] （可选）GitHub Releases 按新标签发布说明，粘贴 CHANGELOG 摘要
 
 ### 若不需要升级版本（纯补丁推进）
 
-多次小修复共享同一版本号时：**只打一次 tag**（该版本最后一次发布后自动打），
-期间其余 push 因 tag 已存在自动跳过 —— `ops-publish` 的自动打 tag 是幂等的。
+多次小修复共享同一版本号时：**只打一次 tag**（该版本最后一次发布后手打一次即可），
+期间其余发布不打标签 —— 同一个 `vX.Y.Z` 只能指向一个 commit，重复打会失败。
 
 ---
 
@@ -120,7 +133,7 @@
 
 - 命名：`vX.Y.Z`（前导小写 `v`），**注释标签**：`git tag -a vX.Y.Z -m "release vX.Y.Z"`
 - 位置：发布提交（该版本 CHANGELOG 归档的 commit）上
-- 工具：`ops-publish.ps1` 发布成功后自动创建并推送；手动示例：
+- 工具：**手动打**（`ops-deploy.ps1` 只管部署、不打标签）；示例：
 
 ```powershell
 git tag -a v1.6.1 -m "release v1.6.1"
@@ -173,14 +186,14 @@ git push origin v1.6.1
 > 前置观念：**tag = 稳定锚点**。§5.3 表格里每一行都代表一次「线上指纹全绿的正式发布」（项数随版本递增，当前 **37 项**），
 > 所以线上任何时刻都存在一份可立即回去的已知良好产物——回退是「回到锚点」，不是「重新开发」。
 
-0. **先止血（约 1 分钟）**：Zeabur 控制台 → 服务 → 部署历史 → 选上一个正常构建重新部署。
-   不改代码、不过门禁，适合线上已不可用的场景（**能否这样操作以控制台实际界面为准**）；
-   恢复可用后，再按下面 1-3 把代码也修正过来。
+0. **先止血（约 1 分钟）**：`powershell -File tools\ops\ops-deploy.ps1 -Rollback`
+   （切 `current` 软链回上一份 release，服务器保留最近 3 份）。
+   不改代码、不过门禁，适合线上已不可用的场景；恢复可用后，再按下面 1-3 把代码也修正过来。
 1. **Revert 提交再发布**（推荐）：`git revert <坏commit>` → 冲突解决 → `ops-publish.ps1` 上线。
    保留历史，符合 trunk 模型；若坏提交后已有正常发布，只 revert 坏的那批。
 2. **切回旧版本 tag 快照**：`git checkout v1.6.0` 只能本地查看，**不能直接 push 覆盖 main**
    （会丢历史）。确需整体回退时用 `git revert <tag>..main` 批量回退后走安全发布。
-3. **临时下线**：Zeabur 控制台回滚到上一构建版本（不改代码的应急手段）。
+3. **临时下线**：`ops-deploy.ps1 -Rollback` 回到上一份 release（不改代码的应急手段）。
 
 > 比回退更重要的是**发布前提前发现**：动过 `server/prisma/schema.prisma` 或 `server/prisma/migrations/`
 > 时必须先跑 `npm run verify:pg`（生产等价 PostgreSQL 演练，见 [开发工作流 §2③](development-workflow.md)），
@@ -198,7 +211,7 @@ git push origin v1.6.1
 | 触发条件 | 演进方案 |
 |----------|---------|
 | 出现第 2 名开发者频繁协作 | 引入 PR 审查 + GitHub main 分支保护（require PR / status check） |
-| 需要独立"预发布/灰度"环境 | 新增 `develop` 分支 + 独立 Zeabur 项目自动部署，验收后 merge main 再上线 |
+| ~~需要独立"预发布/灰度"环境~~ | **已完成（2026-10-22）**：同机 beta 环境 `/home/ubuntu/euriskotax-beta` + 独立库 `eurisko_beta` + pm2 `euriskotax-beta:3001`，`ops-deploy-beta.ps1` / `ops-check-beta.ps1`；**不引入 develop 常驻分支**（仍是主干开发 + 短分支） |
 | 发布频率升高、多版本并行 | 引入 `release/*` 短分支 + 语义化 release 流程 |
 
 当前阶段（单人、频率不高、单生产环境）**不建议**提前引入以上机制。
