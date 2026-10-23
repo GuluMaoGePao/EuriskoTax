@@ -40,7 +40,7 @@
 | push 前必跑的全链路门禁 | **「本地登录链路验证（发布门禁）」** 或 `npm run verify:local` | 266 项：前端与 SW 网络优先特征冒烟 → 登录 dev 号 → 反馈落库+附图（含非法附图 400）+用户/管理员列表+状态跟进 → 匿名埋点+聚合统计 → 运维后台用户列表/详情/权益调档 → 税制参数公开只读 + 版本化发布/回滚 → 城市社保参数公开只读（兜底城市不变量 / 指纹增量）+ 管理端发布·回滚·版本号唯一·上限低于下限拒绝（端上已回退：不再让用户选参保城市）+ 回滚不残留（`index.html` 不得再引用已下线模块）→ 邀请码+验证码注册新号 → 新号登录 → 新号身份 → 线索留资 + 管理端列表/搜索/统计/状态机/CSV 导出 + 限流 → 专业版兑换码生成/兑换/叠加续期/一码一用/作废/导出，全绿才允许发布 |
 | `:3000` 后端运行中、schema 没改 | `VERIFY_SKIP_GENERATE=1 npm run verify:local` | 逃生门：跳过 `prisma generate`（运行中的后端锁着引擎 DLL，直接跑会 EPERM）。脚本会自动探测并提示 |
 | 改了 `schema.prisma`、或动过 `server/prisma/migrations/`，想确认「上线不会炸」 | **`npm run verify:pg`** | **生产等价演练**：用 Docker 起一个本地 PostgreSQL，按线上容器同序（`generate` → `migrate deploy` → 起服务）把同一套 266 项断言再跑一遍；`npm run verify:pg:fresh` = 先删数据卷（等价「全新库首次部署」）。需 Docker Desktop，未安装时优雅跳过（退出码 2，不是代码问题） |
-| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 127 套件 2434 例（含版本号五处同步守护、文档口径守护） |
+| 单元测试 | **「运行全部测试 + 覆盖率」** / `npm test` | 128 套件 2445 例（含版本号五处同步守护、文档口径守护） |
 | 改了工具 / 渲染器，想确认 41 个入口都还出得来数 | **`npm run smoke:ui`** | 真机把 20 个速算器 + 21 个完整测算**各算一次**，只问三件事：出不出数 / 抛没抛异常 / deep 结果卡的政策时效徽标在不在。跑前拍 localStorage 快照、跑后整份还原（不留痕）；只报不修，有失败退出码 1。热会话约 15 秒，全新会话要拉外网 CDN 可能数分钟 |
 | 发版前口径自检 | `npm run verify:release` | 一条命令列出**版本号五处落点**（含 `文件:行号`）+ **文档口径 vs 实测**（套件/用例数 / 门禁项数 / 线上指纹数）；不一致退出码 1。加 `-- --write` 只改「当前声明值」并自动同步套件/用例数（CHANGELOG 里「上一版基线 → 当前值」的历史值不会被误改）。**版本前缀约束**（2026-09-13 加固）：项数声明改为逐条校验 —— 非当前口径的每条命中都必须带 `vX.Y.Z` / `[X.Y.Z]`（同一行或所在 `## ` 小节标题）自证是历史基线，否则报「疑似旧口径残留」并指名 `文件:行号`；「新增/移除/少 N 项」这类增量描述不计入总项数。口径定义与 `npm test` 里的守护同源：`tools/ops/release-metrics.js` |
 
@@ -65,9 +65,29 @@
 | 跳过测试紧急部署 | GUI「跳过测试紧急部署」/ `ops-deploy.ps1 -SkipTest` | 不加它会在服务器部署前跑 `npm test`；已知坑：jest 的 PASS 行写进 stderr 会让 PowerShell 提前终止脚本 |
 | 手动复核线上 | `powershell -File tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]` | 37 项线上指纹，全绿退出码 0 |
 | 手动补种内容 | `node tools\ops\ops-seed-prod.js [--dry-run] [--base-url=...]` | 换新库/重置库后必需，否则内容端点 `items=0` 会让核对失败（beta 补种用 `beta-seed-server.sh`） |
+| **查「某个版本发到哪了」** | `npm run status:release` | 读正式站与预发站的 `/version.json` + `CHANGELOG.md`，给出每个版本的「预发 ✅ / 正式 ✅」两列与结论（还没发预发 / 待发正式 / 已全量）。**预发落后于正式会报警**（此时 beta 已不是提前一步，拿它验收等于拿旧版本验收）。加 `-- --write` 把表格写回 [发布台账](../development/release-status.md)；预发站要 Basic Auth 凭据（`BETA_AUTH_USER` / `BETA_AUTH_PASS`） |
 
 > beta 环境的四条硬约束（改配置时别破）：**独立数据库**、**独立 `JWT_SECRET`**、
 > **`SMTP_PASS` 留空**（不向真实用户发测试邮件）、**禁止被收录**（`beta-mark.sh` 注入 noindex）。
+
+### 标准发布清单（从改代码到打标签，8 步照做）
+
+> 一句话：**push 不上线，部署才上线**；中间隔着 beta（预发）这一环，
+> 动 schema / 认证 / 兑换码 / 留资 / 邮件 / 大规模 UI 时必须先过 beta。
+
+| # | 步骤 | 命令 | 不做会怎样 |
+|---|------|------|-----------|
+| 1 | 改代码 | 小改直接 `main`；大改动开短分支（`feat/xxx` → 合回 `main`） | 不引入 develop 常驻分支：两个人维护，多一个分支就多一份要同步的东西 |
+| 2 | 本地门禁 | `npm test`（单测）+ `npm run verify:local`（266 项）；动过 `schema.prisma` / `migrations/` 再加 `npm run verify:pg` | 迁移的**首次执行**不能发生在生产库上（这就是 beta 存在的原因） |
+| 3 | 版本五处同步 + CHANGELOG | `package.json` / `version.json` / `index.html` 两处 / `CHANGELOG.md` 最新条目 | 漏改会让用户**每次新会话清一次缓存**（版本哨兵读到不一致就自愈重载） |
+| 4 | 两条自检 | `npm run verify:release`（版本五处一致 + 文档口径与实测一致）、`npm run status:release`（当前发到哪了） | 口径漂移 = 对外承诺的验证强度与实现对不上（曾经三处 165 项躲过守卫存活很久） |
+| 5 | 提交推送 | `git add ... && git commit && git push origin main` | **push 不会自动上线**，可放心推 |
+| 6 | 发预发并验收 | `ops-deploy-beta.ps1` → `ops-check-beta.ps1`（37 项）→ 真机手点关键路径 | 本地 jsdom 全绿 ≠ 真机可用（18-6a 行名括号、v1.144 `if` 包断言两次教训） |
+| 7 | 发正式并核对 | `ops-deploy.ps1`（先 `-DryRun` 预览）→ `ops-check-prod.ps1`（37 项） | 正式是软链一指的全量瞬切，没有灰度；出问题走 `ops-deploy.ps1 -Rollback`（约 1 分钟） |
+| 8 | 打标签 + 更新台账 | `git tag -a vX.Y.Z -m "release vX.Y.Z" && git push origin vX.Y.Z`；`npm run status:release -- --write` | 部署脚本**不打标签**（只管部署）；台账不更新，下次就不知道这版发到哪了 |
+
+版本号的规矩：`X` 大改 / `Y` 新功能 / `Z` 修 bug 与小改 —— **每次改动都升版本并归档**，
+这样「线上跑的是哪一版」永远有唯一答案，回滚也知道回哪儿。
 
 ---
 

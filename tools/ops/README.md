@@ -31,6 +31,7 @@
 | `beta-mark-server.sh` | beta 标记注入（幂等）：`window.__APP_CHANNEL__='beta'`（前端据此显示「预发环境 · 数据非生产」角标）+ robots noindex。**单独成脚本**是因为 postDeploy 经 SSH 传参会丢引号，内联 sed 会被远端 bash 当重定向 | ✅ |
 | `deploy.config.beta.example.json` | beta 部署配置模板（独立目录 / 进程 / 端口 / 库） | ✅ |
 | `deploy.config.beta.json` | beta 部署配置（服务器信息，含敏感值） | ❌ 已 gitignore |
+| `release-status.js` | **发布台账**：读正式站与预发站 `/version.json` + `CHANGELOG.md`，给出每版的「预发 ✅ / 正式 ✅」两列与结论；**预发落后于正式会报警**（beta 已失去提前一步的意义）；`-- --write` 写回 `docs/development/release-status.md`；npm 入口 `npm run status:release` | ✅ |
 | `notify.config.json` | SMTP 配置+收件人+通知开关（含授权码、新增 urlCreated） | ❌ 已 gitignore |
 | `deploy.config.json` | 部署配置（服务器 IP/密钥/路径，含敏感信息） | ❌ 已 gitignore |
 | `watchdog.log` | 守护脚本运行日志（运行时生成） | ❌ *.log 已 gitignore |

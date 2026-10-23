@@ -1,6 +1,6 @@
 {
   "name": "EuriskoTax",
-  "version": "1.149.2",
+  "version": "1.149.3",
   "description": "EuriskoTax 税费计算器 - 全栈应用 + 运维守护 + GUI 控制台",
   "scripts": {
     "build:css": "tailwindcss -i src/css/tailwind.src.css -o src/css/tailwind.css --minify && tailwindcss -i src/css/admin.src.css -o src/css/admin.css --minify",
@@ -14,6 +14,7 @@
     "verify:pg": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1",
     "verify:pg:fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/ops/ops-verify-pg.ps1 -Fresh",
     "verify:release": "node tools/ops/preflight-release.js",
+    "status:release": "node tools/ops/release-status.js",
     "smoke:ui": "node tools/ops/ui-smoke-all-tools.js",
     "check:cascade": "node tools/ops/ui-lib/cascade-guard.js"
   },

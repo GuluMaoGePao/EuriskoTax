@@ -22,7 +22,7 @@
 - **分支历史（2026-09-18 ~ 2026-09-23）**：主干曾回退到锚点 `4f381e8` 对外保持 v1.17.0，v1.18.0 起的内容都在 `feature/stage15-17-wip` 上开发（保底副本 `backup/main-before-split-20260918`）；**2026-09-23 已全部合回 `main`**，公网仍是 v1.17.0 —— 原因与操作顺序见 [development/main-branch-split-20260918.md](development/main-branch-split-20260918.md)，发布路径见 [branch-release-strategy.md](guides/branch-release-strategy.md)
 - **当前版本**：**v1.104.0**（2026-09-23，阶段19-13：41 个工具真机冒烟收官）
 - **生产环境**：腾讯云轻量（服务器北京，备案主体上海）+ PostgreSQL + HTTPS，`https://euriskotax.com`（2026-10-10 起正式公网，部署走 `tools/ops/ops-deploy.ps1`，手动触发，push 不自动上线）；执行包与手册见 [lighthouse-deployment-guide.md](tech-reports/lighthouse-deployment-guide.md)。Zeabur（`euriskotax.zeabur.app`）已降级为测试环境
-- **测试**：127 套件 2434 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
+- **测试**：128 套件 2445 个单元测试全部通过（`npm test`）；发布门禁 `verify:local` **266/266** 全绿；线上指纹 **37 项**（`tools/ops/ops-check-prod.ps1`）；动过 schema/迁移另跑 `verify:pg`
 - **阶段进度**（逐阶段明细与交付版本见 [development-plan.md](development/development-plan.md) 的阶段状态表）：
   - ✅ **阶段 1–15 已全部关闭**：后端化 / PWA / 免费·专业版 / 内容中心 / 获客与转化 / 变现与可信度 / 多税种扩展（20 个 SEO 落地页）
   - ⏳ **阶段16 迁移与合规** —— 阻塞于 ICP 备案（域名 `euriskotax.com` 已购、企业主体备案已提交排队中）
@@ -118,6 +118,7 @@ EuriskoTax/
 | 改多步测算向导的排版 | `guides/deep-wizard-ui-spec.md` |
 | 想知道有多少页面 / 用户怎么走 / 入口在哪 | `guides/site-structure-map.md` |
 | 想知道当前做到哪一步 | 本文「当前状态」+ `development/development-plan.md` 的阶段状态表 |
+| 想知道某个版本发到哪了（预发 / 正式） | `development/release-status.md` 台账，或 `npm run status:release` |
 | 开工阶段19（UI 重构 / 动 CSS） | `development/stage19-ui-redesign-plan.md`（动 CSS 前先读它的施工约束） |
 | 回查全税种完整测算怎么落地的 | `development/stage17-full-tax-coverage-plan.md`（✅ 已收官） |
 | 新增 / 移动 / 删除文档或脚本 | `development/file-management-policy.md`（目录归属 / 命名 / 编码 / 变更清单） |
@@ -159,6 +160,7 @@ EuriskoTax/
 
 | [development/development-plan.md](development/development-plan.md) | 🟢 项目开发计划、里程碑、技术选型、阶段状态表 | 2026-09-20 |
 | [development/file-management-policy.md](development/file-management-policy.md) | 🟢 文件管理规范（目录归属/命名/编码/变更流程） | 2026-09-18 |
+| [development/release-status.md](development/release-status.md) | 🟢 **发布台账**：每个版本现在在预发还是已推正式（`npm run status:release -- --write` 自动生成，不要手写） | 2026-10-23 |
 | [development/stage10-free-pro-plan.md](development/stage10-free-pro-plan.md) | 🟡 阶段10 免费/专业版实施方案（**已上线** v1.7.0：计税能力永不锁定，登录仅解锁云端历史同步；只作回查） | 2026-09-18 |
 | [development/stage12-core-enhancement-plan.md](development/stage12-core-enhancement-plan.md) | 🟡 阶段12 核心功能补强实施方案（A5/A3/A1/A2/A4 **全部已完成**：税法常量抽离与版本化、月度明细增强等；只动前端与常量，不碰后端） | 2026-09-14 |
 | [development/stage12-c1-tax-rate-config-plan.md](development/stage12-c1-tax-rate-config-plan.md) | 🟡 阶段12 C1 税制参数配置化方案与实施记录 | 2026-09-14 |
