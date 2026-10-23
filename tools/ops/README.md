@@ -212,7 +212,11 @@ powershell -File .\tools\ops\ops-deploy-beta.ps1
 powershell -File .\tools\ops\ops-deploy-beta.ps1 -DryRun    # 只打包预览
 powershell -File .\tools\ops\ops-deploy-beta.ps1 -Rollback  # 只回滚 beta
 
-# 2. 核对（与正式同一把尺子的 37 项指纹）。本机直连不到 3001（安全组只开 80/443/22），先开隧道：
+# 2. 核对（与正式同一把尺子的 37 项指纹）
+$env:BETA_AUTH_USER = 'euriskotax-beta'
+$env:BETA_AUTH_PASS = '<Basic Auth 口令>'
+powershell -File .\tools\ops\ops-check-beta.ps1          # 默认 https://beta.euriskotax.com
+#   备用：域名/证书还没好时走 SSH 隧道绕过 Basic Auth（不需要凭据）
 ssh -i <key> -L 3001:127.0.0.1:3001 -N ubuntu@<host>
 powershell -File .\tools\ops\ops-check-beta.ps1 -BaseUrl http://127.0.0.1:3001
 ```

@@ -8,11 +8,15 @@
 # 好处是「beta 全绿」与「生产全绿」是同一把尺子 —— 不会出现 beta 用宽松标准蒙混过关。
 
 param(
-    [string]$BaseUrl = "https://beta.euriskotax.com"
+    [string]$BaseUrl = "https://beta.euriskotax.com",
+    # beta 站有 Basic Auth，公网核对必须带凭据；
+    # 走 SSH 隧道（-BaseUrl http://127.0.0.1:3001）时绕过 Caddy，不需要凭据。
+    [string]$AuthUser = $env:BETA_AUTH_USER,
+    [string]$AuthPass = $env:BETA_AUTH_PASS
 )
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $check = Join-Path $ScriptDir "ops-check-prod.ps1"
 
-& $check -BaseUrl $BaseUrl
+& $check -BaseUrl $BaseUrl -AuthUser $AuthUser -AuthPass $AuthPass
 exit $LASTEXITCODE

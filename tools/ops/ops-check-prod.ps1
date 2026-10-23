@@ -3,15 +3,64 @@
 # 作用: 部署后轮询线上资源，确认腾讯云正式站已更新到最新版本（认证/按钮/SW 版本指纹）
 #       任一检查不过时退出码非 0，用于发布门禁或人工核对。
 param(
-    [string]$BaseUrl = "https://euriskotax.com"
+    [string]$BaseUrl = "https://euriskotax.com",
+    # beta 站挂了 Basic Auth（真锁：既挡搜索引擎也挡无关人员访问），核对它就得带凭据。
+    # 正式站不带这两个参数，行为与加之前完全一致。
+    [string]$AuthUser = $env:BETA_AUTH_USER,
+    [string]$AuthPass = $env:BETA_AUTH_PASS
 )
 
 $ErrorActionPreference = "Stop"
 $checks = New-Object System.Collections.ArrayList
 
+# Basic Auth 凭据：只在给了凭据时才启用（beta 站有 Basic Auth，正式站没有）
+$script:AuthHeader = $null
+$script:BasicAuthToken = $null
+if ($AuthUser -and $AuthPass) {
+    $script:BasicAuthToken = [System.Convert]::ToBase64String(
+        [System.Text.Encoding]::UTF8.GetBytes("$($AuthUser):$($AuthPass)"))
+    $script:AuthHeader = @{ Authorization = "Basic $($script:BasicAuthToken)" }
+}
+
 function Fetch-Text {
     param([string]$Url)
-    (Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 25).Content
+    if (-not $script:AuthHeader) {
+        return (Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 25).Content
+    }
+    # 带凭据时必须自己跟重定向：Invoke-WebRequest（.NET HttpWebRequest）在重定向时
+    # 会主动丢掉 Authorization 头，而 /reset 这类短链后端是 302 到 clean-cache.html，
+    # 于是第二跳变成匿名请求、被 Basic Auth 挡回 401 —— 现象是「只有这一项红」，
+    # 看着像 beta 页面坏了，实际是核对脚本在丢凭据。正式站没有 Basic Auth，
+    # 所以这个缺陷在正式核对里永远沉默，只有挂上 Basic Auth 的 beta 才会踩到。
+    # 用 HttpWebRequest 而不是 Invoke-WebRequest：后者在重定向时会主动丢掉
+    # Authorization 头，而 /reset 这类短链后端是 302 到 clean-cache.html，
+    # 于是第二跳变成匿名请求、被 Basic Auth 挡回 401 —— 现象是「只有这一项红」，
+    # 看着像 beta 页面坏了，实际是核对脚本在丢凭据。正式站没有 Basic Auth，
+    # 所以这个缺陷在正式核对里永远沉默，只有挂上 Basic Auth 的 beta 才会踩到。
+    # （不用 HttpClient：Windows PowerShell 5.1 默认不加载 System.Net.Http 程序集。）
+    $target = $Url
+    for ($hop = 0; $hop -lt 5; $hop++) {
+        $req = [System.Net.HttpWebRequest]::Create($target)
+        $req.Method = 'GET'
+        $req.Timeout = 25000
+        $req.AllowAutoRedirect = $false   # 自己跳，才能在每一跳都带上 Authorization
+        $req.Headers['Authorization'] = "Basic $($script:BasicAuthToken)"
+        $resp = $req.GetResponse()
+        try {
+            $code = [int]$resp.StatusCode
+            if ($code -ge 300 -and $code -lt 400) {
+                $loc = $resp.Headers['Location']
+                if (-not $loc) { throw "重定向缺少 Location 头: $target" }
+                $target = if ($loc -match '^https?://') { $loc } else { (New-Object Uri((New-Object Uri($target)), $loc)).AbsoluteUri }
+                continue
+            }
+            $reader = New-Object System.IO.StreamReader($resp.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            try { return $reader.ReadToEnd() } finally { $reader.Close() }
+        } finally {
+            $resp.Close()
+        }
+    }
+    throw "重定向次数超过 5 次：$Url"
 }
 
 function Add-Check {

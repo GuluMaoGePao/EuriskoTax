@@ -60,7 +60,7 @@
 | beta 打包预览 | `ops-deploy-beta.ps1 -DryRun` | 只打包，不连服务器 |
 | beta 首次建环境 | 服务器：`bash tools/ops/beta-init-server.sh <db密码> <jwt>` → `bash tools/ops/beta-seed-server.sh` | 建独立 PG 库与角色、生成 beta `.env.shared`（独立 JWT、关 SMTP）、补种内容；幂等，可重跑 |
 | beta 回滚 / 环境重置 | `ops-deploy-beta.ps1 -Rollback` | 只动 beta 的软链，与正式无关 |
-| **beta 核对** | `powershell -File tools\ops\ops-check-beta.ps1` | 与正式**同一把尺子的 37 项指纹**；本机直连不到 3001 时先开隧道：`ssh -L 3001:127.0.0.1:3001 -N ubuntu@101.42.89.184`，再用 `-BaseUrl http://127.0.0.1:3001` |
+| **beta 核对** | `powershell -File tools\ops\ops-check-beta.ps1` | 默认打 `https://beta.euriskotax.com`（与正式是**同一把尺子的 37 项指纹**）。该站挂了 Basic Auth，凭据放环境变量 `BETA_AUTH_USER` / `BETA_AUTH_PASS`，或显式传 `-AuthUser/-AuthPass`；备用路径是 SSH 隧道（绕过 Basic Auth、不需要凭据）：`ssh -L 3001:127.0.0.1:3001 -N ubuntu@101.42.89.184` + `-BaseUrl http://127.0.0.1:3001` |
 | **正式上线（唯一入口）** | GUI「正式部署到生产」/ `powershell -File tools\ops\ops-deploy.ps1` | 打包 → 上传 → `migrate deploy`（**生产库**）→ 切 `current` 软链 → pm2 `euriskotax` → 健康检查；建议先 `-DryRun` 预览 |
 | 跳过测试紧急部署 | GUI「跳过测试紧急部署」/ `ops-deploy.ps1 -SkipTest` | 不加它会在服务器部署前跑 `npm test`；已知坑：jest 的 PASS 行写进 stderr 会让 PowerShell 提前终止脚本 |
 | 手动复核线上 | `powershell -File tools\ops\ops-check-prod.ps1 [-BaseUrl https://euriskotax.com]` | 37 项线上指纹，全绿退出码 0 |
