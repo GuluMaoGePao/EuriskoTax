@@ -1,0 +1,57 @@
+name: CI（门禁）
+
+# 一句话职责：**证明「仓库绿」，不碰任何线上环境**。
+#
+# 为什么需要它：此前所有验证都跑在本机，而「本机绿」不等于「仓库绿」——
+# 漏提交文件、依赖没写进 package.json、只在改过的机器上才成立的环境假设，
+# 都会让 clone 下来的仓库跑不起来，而且**不会有人报错**（本机永远是绿的）。
+#
+# 刻意不做的两件事（都写在这里，免得日后有人「顺手加上」）：
+#   1. 不跑 `verify:pg`（PostgreSQL 演练）—— 它由 ops-verify-pg.ps1 拉起 docker 演练库，
+#      是 PowerShell 脚本，只在 Windows 上成立；Linux runner 上必然失败。
+#   2. 不跑 beta 真机冒烟（`smoke:beta`）—— 它需要 SSH 隧道 + 服务器私钥 + beta 账号，
+#      即必须把生产凭据交托给 CI。冒烟是「发版前」的动作，不是「提交后」的动作。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      # 前端/测试依赖（jest 套件）
+      - name: 安装依赖（根）
+        run: npm ci
+
+      # 后端依赖。它的 postinstall = prisma generate（按生产 PostgreSQL schema 生成），
+      # 而 verify:local 会自己按 SQLite schema 重新生成一遍 —— 顺序上是安全的，别删这步。
+      - name: 安装依赖（server）
+        run: npm ci
+        working-directory: server
+
+      # --coverage=false：覆盖率不是门禁结论（本机另有覆盖率基线的口径），
+      # 开着只会让 CI 慢一倍。--maxWorkers=2：runner 内存有限，别把 job 跑成 OOM。
+      - name: 单元测试
+        run: npm test -- --coverage=false --maxWorkers=2
+
+      # 266 项：真的把后端跑起来做端到端验证（注册/登录/反馈/运维后台/云端同步/邀请码）。
+      # 走 SQLite dev.db 模式，所以**不需要 Postgres 服务容器**。
+      - name: 本地门禁 verify:local
+        run: npm run verify:local
+
+      # 版本五处一致 + 文档口径与实测一致 —— 防止「CHANGELOG 写着 37 项、实际只有 30 项」
+      # 这类对外承诺与实现对不上的漂移。
+      - name: 发布前自检 verify:release
+        run: npm run verify:release
