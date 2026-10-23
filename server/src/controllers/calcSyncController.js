@@ -1,6 +1,6 @@
 // 阶段10A：计算历史「云端同步」控制器
 //
-// 同步协议（设计见 docs/development/stage10-free-pro-plan.md §4）：
+// 同步协议（设计见 docs/development/阶段10-免费版与专业版方案-历史.md §4）：
 //   写主在本端，云端只是镜像。同步粒度为「登录设备全量快照 diff」而非实时每算一存。
 //   POST /calculations/sync { push: [条目...] } → 服务端按 (user_id, client_id) upsert
 //   （updatedAt 新者胜，幂等），随后返回该账号全量 active 列表 + 已删 clientId 集合。

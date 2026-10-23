@@ -8,7 +8,7 @@
 //   3. 播种只在表为空时发生，之后一律以数据库为准——运维在后台的编辑不会被覆盖；
 //      若内置条目被误删，用 restoreBuiltinScripts() 按 script_id 补回（POST /api/admin/support/restore）。
 //
-// 维护提示：话术正文与 docs/guides/support-playbook.md 对应，改动时请同步文档。
+// 维护提示：话术正文与 docs/guides/客服排障手册.md 对应，改动时请同步文档。
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
