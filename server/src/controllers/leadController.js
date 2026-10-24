@@ -31,6 +31,9 @@ const SOURCES = [
     'seo_disabilityfund',
     // 阶段15 15A-5 尾巴收尾：税优健康险、企业年金
     'seo_health_insurance', 'seo_annuity',
+    // 落地页总目录 /seo/index.html：20 个页面的汇聚入口，此前漏登记 ——
+    // 从目录页进 App 的线索全部被静默回落成 unknown，等于这一路的来源白丢。
+    'seo_index',
 ];
 
 // 文本长度上限（防超长脏数据撑爆库容）
