@@ -311,6 +311,13 @@ function auditPage(file, sitemapUrls, leadSources) {
         .filter((n) => n > 480);
     if (fixedW.length) W('固定宽度', `${fixedW.length} 处写死宽度 > 480px（${fixedW.join(' / ')}），窄屏会溢出`);
 
+    // 顶层 section（CTA / 相关测算）必须落在 .wrap 内：容器的 max-width 与内距对容器外的东西
+    // 不起作用，写在外面就是一条铺满视口的色块 —— 与上下内容宽度不一致，非常突兀。
+    // 这类错位多由「整块搬移模块」时把容器的闭合标签一起搬走造成（html 不报错，只是变宽）。
+    if (/^ {4}<\/div>[ \t]*\r?\n[ \t]*<section class=/m.test(html)) {
+        W('容器脱出', '.wrap 在 section 之前就闭合了，CTA / 相关测算会铺满视口宽度');
+    }
+
     // ---------- G. 收录清单 ----------
     if (!sitemapUrls.has(url)) F('sitemap', 'sitemap.xml 未收录本页');
 
