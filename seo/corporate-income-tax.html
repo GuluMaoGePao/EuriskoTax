@@ -309,6 +309,68 @@
             </noscript>
         </section>
 
+        <h2>企业所得税税率表（2026 年现行）</h2>
+        <div class="table-scroll">
+            <table id="cit-rate-table">
+                <caption class="small muted">应纳税额 = 应纳税所得额 × 适用税率 − 减免、抵免税额</caption>
+                <thead>
+                <tr>
+                    <th scope="col">税率</th>
+                    <th scope="col">适用范围</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">25%</td><td>居民企业一般适用（法定税率）</td></tr>
+                <tr><td class="num">20%</td><td>小型微利企业（减按 25% 计入应纳税所得额后适用，实际税负 5%）</td></tr>
+                <tr><td class="num">15%</td><td>高新技术企业（减按 15%）</td></tr>
+                <tr><td class="num">20%</td><td>非居民企业取得本法第三条第三款所得（预提所得税，实际减按 10% 征收）</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>小型微利企业：三个门槛须同时满足</h2>
+        <div class="table-scroll">
+            <table id="small-condition-table">
+                <caption class="small muted">依据财税〔2019〕13 号与财政部 税务总局公告 2023 年第 12 号；三个条件是「且」的关系，且为临界点</caption>
+                <thead>
+                <tr>
+                    <th scope="col">条件</th>
+                    <th scope="col">门槛</th>
+                    <th scope="col">超标后果</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>年度应纳税所得额</td><td class="num">≤ 300 万元</td><td>全部所得按 25% 计税</td></tr>
+                <tr><td>从业人数</td><td class="num">≤ 300 人</td><td>全部所得按 25% 计税</td></tr>
+                <tr><td>资产总额</td><td class="num">≤ 5000 万元</td><td>全部所得按 25% 计税</td></tr>
+                <tr><td>行业</td><td>非国家限制和禁止行业</td><td>不适用小微优惠</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>常见扣除限额（税前扣除的三大陷阱）</h2>
+        <div class="table-scroll">
+            <table id="deduction-limit-table">
+                <caption class="small muted">依据企业所得税法实施条例第四十三、四十四、五十三条；超出部分处理方式不同</caption>
+                <thead>
+                <tr>
+                    <th scope="col">项目</th>
+                    <th scope="col">扣除限额</th>
+                    <th scope="col">超出部分</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>业务招待费</td><td>发生额的 60% 与当年营业收入的 5‰ 孰低</td><td>不得扣除、<strong>不能结转</strong></td></tr>
+                <tr><td>广告费和业务宣传费</td><td>当年营业收入的 15%</td><td>准予<strong>结转以后年度</strong>扣除</td></tr>
+                <tr><td>公益性捐赠</td><td>年度利润总额的 12%</td><td>准予结转<strong>以后三年</strong>扣除</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            以营业收入 1000 万元、利润总额 100 万元为例：业务招待费 20 万元只能扣 5 万元（60% 是 12 万、5‰ 是 5 万，<strong>孰低</strong>取 5 万），调增 15 万元；
+            广宣费 200 万元可扣 150 万元，超出 50 万元结转以后年度；公益性捐赠 20 万元可扣 12 万元，超出 8 万元结转以后三年。
+        </p>
+
         <h2>示例：三档税率对照（应纳税所得额 100 万元）</h2>
         <div class="table-scroll">
             <table id="cit-example-table">
@@ -379,68 +441,6 @@
         <p class="small muted">
             企业与个人是<strong>两层税负</strong>：100 万元利润到个人股东手里，一般企业只剩 <strong>60 万元</strong>（综合 40%）。
             这也是「要不要把利润留在公司」这个问题的真实成本。
-        </p>
-
-        <h2>企业所得税税率表（2026 年现行）</h2>
-        <div class="table-scroll">
-            <table id="cit-rate-table">
-                <caption class="small muted">应纳税额 = 应纳税所得额 × 适用税率 − 减免、抵免税额</caption>
-                <thead>
-                <tr>
-                    <th scope="col">税率</th>
-                    <th scope="col">适用范围</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td class="num">25%</td><td>居民企业一般适用（法定税率）</td></tr>
-                <tr><td class="num">20%</td><td>小型微利企业（减按 25% 计入应纳税所得额后适用，实际税负 5%）</td></tr>
-                <tr><td class="num">15%</td><td>高新技术企业（减按 15%）</td></tr>
-                <tr><td class="num">20%</td><td>非居民企业取得本法第三条第三款所得（预提所得税，实际减按 10% 征收）</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>小型微利企业：三个门槛须同时满足</h2>
-        <div class="table-scroll">
-            <table id="small-condition-table">
-                <caption class="small muted">依据财税〔2019〕13 号与财政部 税务总局公告 2023 年第 12 号；三个条件是「且」的关系，且为临界点</caption>
-                <thead>
-                <tr>
-                    <th scope="col">条件</th>
-                    <th scope="col">门槛</th>
-                    <th scope="col">超标后果</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td>年度应纳税所得额</td><td class="num">≤ 300 万元</td><td>全部所得按 25% 计税</td></tr>
-                <tr><td>从业人数</td><td class="num">≤ 300 人</td><td>全部所得按 25% 计税</td></tr>
-                <tr><td>资产总额</td><td class="num">≤ 5000 万元</td><td>全部所得按 25% 计税</td></tr>
-                <tr><td>行业</td><td>非国家限制和禁止行业</td><td>不适用小微优惠</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>常见扣除限额（税前扣除的三大陷阱）</h2>
-        <div class="table-scroll">
-            <table id="deduction-limit-table">
-                <caption class="small muted">依据企业所得税法实施条例第四十三、四十四、五十三条；超出部分处理方式不同</caption>
-                <thead>
-                <tr>
-                    <th scope="col">项目</th>
-                    <th scope="col">扣除限额</th>
-                    <th scope="col">超出部分</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td>业务招待费</td><td>发生额的 60% 与当年营业收入的 5‰ 孰低</td><td>不得扣除、<strong>不能结转</strong></td></tr>
-                <tr><td>广告费和业务宣传费</td><td>当年营业收入的 15%</td><td>准予<strong>结转以后年度</strong>扣除</td></tr>
-                <tr><td>公益性捐赠</td><td>年度利润总额的 12%</td><td>准予结转<strong>以后三年</strong>扣除</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <p class="small muted">
-            以营业收入 1000 万元、利润总额 100 万元为例：业务招待费 20 万元只能扣 5 万元（60% 是 12 万、5‰ 是 5 万，<strong>孰低</strong>取 5 万），调增 15 万元；
-            广宣费 200 万元可扣 150 万元，超出 50 万元结转以后年度；公益性捐赠 20 万元可扣 12 万元，超出 8 万元结转以后三年。
         </p>
 
         <h2>三条常见易错口径</h2>
@@ -523,9 +523,9 @@
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>政策依据：《中华人民共和国企业所得税法》（主席令第 63 号，2008-01-01 施行，2018 年第七次修正）、《中华人民共和国企业所得税法实施条例》（国务院令第 512 号）、《关于进一步支持小微企业和个体工商户发展有关税费政策的公告》（财政部 税务总局公告 2023 年第 12 号，执行至 2027 年 12 月 31 日）、《关于实施小微企业普惠性税收减免政策的通知》（财税〔2019〕13 号）。</p>
-        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/vat.html">增值税测算</a> · <a href="/seo/corporate-income-tax.html">企业所得税测算</a></p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a></p>
+        <div id="site-filing" class="site-filing"></div>
     </div>
-    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：

@@ -28,6 +28,8 @@ const AS_SUMMARY = arg('--summary');
 const AS_JSON = arg('--json');
 const AS_STYLES = arg('--styles');
 const AS_CSS = arg('--css');
+const AS_OUTLINE = arg('--outline');
+const AS_FOOTER = arg('--footer');
 
 /** 从一段 HTML 里剥出 <script type="application/ld+json"> 的内容（只取正文，不解析） */
 function ldJsonBlocks(html) {
@@ -344,6 +346,39 @@ function main() {
         ];
         console.log('landing.css 版式基线\n');
         rows.forEach(([k, v]) => console.log(`  ${k.padEnd(6)} ${v}`));
+        process.exit(0);
+    }
+
+    // --outline：每页的模块顺序。「示例排在怎么算之前」这类错序单看一页看不出来，
+    // 只有把 21 页的骨架摆在一起比，才知道哪一页的节奏跟别人不一样。
+    if (AS_OUTLINE) {
+        files.forEach((f) => {
+            const html = fs.readFileSync(path.join(SEO_DIR, f), 'utf8');
+            const items = [];
+            let zone = '';
+            html.split('\n').forEach((line) => {
+                const sec = line.match(/<section[^>]*class="([^"]*)"/);
+                if (sec) zone = /cta/.test(sec[1]) ? 'CTA' : /related/.test(sec[1]) ? 'REL' : '';
+                if (/<\/section>/.test(line)) zone = '';
+                const h = line.match(/<h2[^>]*>([^<]*)/);
+                if (h) items.push((zone ? zone + '·' : '') + h[1].replace(/\s+/g, ' ').trim().slice(0, 24));
+            });
+            console.log(`${f.replace('.html', '').padEnd(21)} ${items.join(' → ')}`);
+        });
+        process.exit(0);
+    }
+
+    // --footer：页尾结构。页脚是 21 页共用形态，一处不对齐等于 21 页都不对齐
+    if (AS_FOOTER) {
+        files.forEach((f) => {
+            const html = fs.readFileSync(path.join(SEO_DIR, f), 'utf8');
+            const ft = (html.match(/<footer[\s\S]*?<\/footer>/i) || [''])[0];
+            const wrap = (ft.match(/<div class="wrap">([\s\S]*?)<\/div>/) || ['', ''])[1];
+            const ps = (wrap.match(/<p[ >]/g) || []).length;
+            const links = (wrap.match(/<a /g) || []).length;
+            const filingInWrap = /site-filing/.test(wrap);
+            console.log(`${f.replace('.html', '').padEnd(21)} wrap内段落=${ps} 链接=${String(links).padStart(2)} 备案号在wrap内=${filingInWrap ? '是' : '否 ← 会脱出容器内距'}`);
+        });
         process.exit(0);
     }
 

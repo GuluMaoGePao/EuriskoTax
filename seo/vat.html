@@ -295,6 +295,43 @@
             </noscript>
         </section>
 
+        <h2>一般纳税人税率表（2026 年现行）</h2>
+        <div class="table-scroll">
+            <table id="vat-rate-table">
+                <caption class="small muted">销项税额 = 不含税销售额 × 税率；应纳税额 = 销项税额 − 进项税额</caption>
+                <thead>
+                <tr>
+                    <th scope="col">税率</th>
+                    <th scope="col">适用范围</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">13%</td><td>销售货物、加工修理修配服务、有形动产租赁服务、进口货物</td></tr>
+                <tr><td class="num">9%</td><td>交通运输、邮政、基础电信、建筑、不动产租赁服务、销售不动产、转让土地使用权，以及农产品、自来水、暖气、图书、饲料化肥等货物</td></tr>
+                <tr><td class="num">6%</td><td>除上述以外的其他服务与无形资产</td></tr>
+                <tr><td class="num">0%</td><td>出口货物，以及境内单位和个人跨境销售国务院规定范围内的服务、无形资产</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>小规模纳税人与征收率</h2>
+        <div class="table-scroll">
+            <table id="small-rate-table">
+                <caption class="small muted">小规模纳税人标准：年应征增值税销售额未超过 500 万元；应纳税额 = 不含税销售额 × 征收率，不得抵扣进项</caption>
+                <thead>
+                <tr>
+                    <th scope="col">征收率</th>
+                    <th scope="col">适用</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td class="num">3%</td><td>法定征收率（简易计税方法）</td></tr>
+                <tr><td class="num">1%</td><td>现行优惠：适用 3% 征收率的应税销售收入减按 1% 征收，执行至 2027 年 12 月 31 日</td></tr>
+                <tr><td class="num">0</td><td>月销售额 10 万元以下（按季 30 万元以下）免征增值税</td></tr>
+                </tbody>
+            </table>
+        </div>
+
         <h2>示例：小规模纳税人（按季纳税，不含税销售额）</h2>
         <div class="table-scroll">
             <table id="small-example-table">
@@ -347,43 +384,6 @@
             第三行进项 9000 元大于销项 6000 元，应纳税额为 <strong>0 元</strong>，
             差额 3000 元<strong>留抵下期</strong>继续抵扣 —— 这不是「多缴了」，也不是欠税。
         </p>
-
-        <h2>一般纳税人税率表（2026 年现行）</h2>
-        <div class="table-scroll">
-            <table id="vat-rate-table">
-                <caption class="small muted">销项税额 = 不含税销售额 × 税率；应纳税额 = 销项税额 − 进项税额</caption>
-                <thead>
-                <tr>
-                    <th scope="col">税率</th>
-                    <th scope="col">适用范围</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td class="num">13%</td><td>销售货物、加工修理修配服务、有形动产租赁服务、进口货物</td></tr>
-                <tr><td class="num">9%</td><td>交通运输、邮政、基础电信、建筑、不动产租赁服务、销售不动产、转让土地使用权，以及农产品、自来水、暖气、图书、饲料化肥等货物</td></tr>
-                <tr><td class="num">6%</td><td>除上述以外的其他服务与无形资产</td></tr>
-                <tr><td class="num">0%</td><td>出口货物，以及境内单位和个人跨境销售国务院规定范围内的服务、无形资产</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>小规模纳税人与征收率</h2>
-        <div class="table-scroll">
-            <table id="small-rate-table">
-                <caption class="small muted">小规模纳税人标准：年应征增值税销售额未超过 500 万元；应纳税额 = 不含税销售额 × 征收率，不得抵扣进项</caption>
-                <thead>
-                <tr>
-                    <th scope="col">征收率</th>
-                    <th scope="col">适用</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td class="num">3%</td><td>法定征收率（简易计税方法）</td></tr>
-                <tr><td class="num">1%</td><td>现行优惠：适用 3% 征收率的应税销售收入减按 1% 征收，执行至 2027 年 12 月 31 日</td></tr>
-                <tr><td class="num">0</td><td>月销售额 10 万元以下（按季 30 万元以下）免征增值税</td></tr>
-                </tbody>
-            </table>
-        </div>
 
         <h2>三条常见易错口径</h2>
         <h3>1. 价外税：含税价不能直接用</h3>
@@ -464,9 +464,9 @@
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>政策依据：《中华人民共和国增值税法》（主席令第四十一号，2026-01-01 起施行）、《中华人民共和国增值税法实施条例》（国务院令第 826 号）、《关于增值税小规模纳税人减免增值税政策的公告》（财政部 税务总局公告 2023 年第 19 号，执行至 2027 年 12 月 31 日）。</p>
-        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/annual-settlement.html">个税汇算清缴</a> · <a href="/seo/vat.html">增值税测算</a></p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a></p>
+        <div id="site-filing" class="site-filing"></div>
     </div>
-    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：

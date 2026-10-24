@@ -219,6 +219,52 @@
             </noscript>
         </section>
 
+        <h2>月度税率表（内部退养定档用）</h2>
+        <div class="table-scroll">
+            <table id="monthly-rate-table">
+                <caption class="small muted">定档基数 = 月均额 + 当月工资薪金 − 5000；税额 = (当月工资 + 一次性收入 − 5000) × 税率 − 速算扣除数</caption>
+                <thead>
+                <tr>
+                    <th scope="col">定档基数（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 3000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>3000 ～ 12000</td><td class="num">10%</td><td class="num">210</td></tr>
+                <tr><td>12000 ～ 25000</td><td class="num">20%</td><td class="num">1410</td></tr>
+                <tr><td>25000 ～ 35000</td><td class="num">25%</td><td class="num">2660</td></tr>
+                <tr><td>35000 ～ 55000</td><td class="num">30%</td><td class="num">4410</td></tr>
+                <tr><td>55000 ～ 80000</td><td class="num">35%</td><td class="num">7160</td></tr>
+                <tr><td>超过 80000</td><td class="num">45%</td><td class="num">15160</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>年度综合所得税率表（提前退休分摊后定档用）</h2>
+        <div class="table-scroll">
+            <table id="annual-rate-table">
+                <caption class="small muted">分摊后每年的应纳税所得额 = 一次性补贴 ÷ 实际年度数 − 60000</caption>
+                <thead>
+                <tr>
+                    <th scope="col">全年应纳税所得额（元）</th>
+                    <th scope="col">税率</th>
+                    <th scope="col">速算扣除数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
+                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
+                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
+                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
+                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
+                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
+                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
+                </tbody>
+            </table>
+        </div>
+
         <h2>示例：提前退休（按年分摊）</h2>
         <div class="table-scroll">
             <table id="early-example-table">
@@ -284,52 +330,6 @@
                 <tr><td>税率表</td><td>综合所得<strong>年度</strong>税率表</td><td><strong>月度</strong>税率表</td><td>综合所得<strong>年度</strong>税率表</td></tr>
                 <tr><td>是否与当月工资合并</td><td>否</td><td><strong>是</strong>（定档与税基都含当月工资）</td><td>否</td></tr>
                 <tr><td>是否并入综合所得</td><td>单独计税</td><td>单独计税</td><td>单独计税</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>月度税率表（内部退养定档用）</h2>
-        <div class="table-scroll">
-            <table id="monthly-rate-table">
-                <caption class="small muted">定档基数 = 月均额 + 当月工资薪金 − 5000；税额 = (当月工资 + 一次性收入 − 5000) × 税率 − 速算扣除数</caption>
-                <thead>
-                <tr>
-                    <th scope="col">定档基数（元）</th>
-                    <th scope="col">税率</th>
-                    <th scope="col">速算扣除数</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td>不超过 3000</td><td class="num">3%</td><td class="num">0</td></tr>
-                <tr><td>3000 ～ 12000</td><td class="num">10%</td><td class="num">210</td></tr>
-                <tr><td>12000 ～ 25000</td><td class="num">20%</td><td class="num">1410</td></tr>
-                <tr><td>25000 ～ 35000</td><td class="num">25%</td><td class="num">2660</td></tr>
-                <tr><td>35000 ～ 55000</td><td class="num">30%</td><td class="num">4410</td></tr>
-                <tr><td>55000 ～ 80000</td><td class="num">35%</td><td class="num">7160</td></tr>
-                <tr><td>超过 80000</td><td class="num">45%</td><td class="num">15160</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>年度综合所得税率表（提前退休分摊后定档用）</h2>
-        <div class="table-scroll">
-            <table id="annual-rate-table">
-                <caption class="small muted">分摊后每年的应纳税所得额 = 一次性补贴 ÷ 实际年度数 − 60000</caption>
-                <thead>
-                <tr>
-                    <th scope="col">全年应纳税所得额（元）</th>
-                    <th scope="col">税率</th>
-                    <th scope="col">速算扣除数</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr><td>不超过 36000</td><td class="num">3%</td><td class="num">0</td></tr>
-                <tr><td>36000 ～ 144000</td><td class="num">10%</td><td class="num">2520</td></tr>
-                <tr><td>144000 ～ 300000</td><td class="num">20%</td><td class="num">16920</td></tr>
-                <tr><td>300000 ～ 420000</td><td class="num">25%</td><td class="num">31920</td></tr>
-                <tr><td>420000 ～ 660000</td><td class="num">30%</td><td class="num">52920</td></tr>
-                <tr><td>660000 ～ 960000</td><td class="num">35%</td><td class="num">85920</td></tr>
-                <tr><td>超过 960000</td><td class="num">45%</td><td class="num">181920</td></tr>
                 </tbody>
             </table>
         </div>
@@ -412,9 +412,9 @@
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
         <p>政策依据：《关于个人所得税法修改后有关优惠政策衔接问题的通知》第五条（二）（三）（财税〔2018〕164 号）、《关于个人所得税有关政策问题的通知》第一条（国税发〔1999〕58 号）。</p>
-        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/severance.html">离职补偿金个税</a> · <a href="/seo/early-retirement.html">提前退休 / 内部退养测算</a></p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a></p>
+        <div id="site-filing" class="site-filing"></div>
     </div>
-    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：

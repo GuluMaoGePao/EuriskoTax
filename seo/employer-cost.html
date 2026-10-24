@@ -336,6 +336,28 @@
             <strong>保底让低工资更贵，封顶让高工资更便宜</strong>。
         </p>
 
+        <h2>人均预算倒推：这笔预算能开多少工资</h2>
+        <div class="table-scroll">
+            <table id="budget-example-table">
+                <thead>
+                    <tr><th scope="col">企业人均月预算（元）</th><th scope="col">可开税前月薪（元）</th><th scope="col">取整到百元（元）</th><th scope="col">员工月均到手（元）</th><th scope="col">成本倍数</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="num">8000.00</td><td class="num">5734.77</td><td class="num">5700.00</td><td class="num">4444.45</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">7168.45</td><td class="num">7100.00</td><td class="num">5555.55</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">13950.00</td><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">7697.50</td><td class="num">1.40</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">14336.91</td><td class="num">14300.00</td><td class="num">10810.00</td><td class="num">1.40</td></tr>
+                    <tr><td class="num">30000.00</td><td class="num">21505.37</td><td class="num">21500.00</td><td class="num">15809.99</td><td class="num">1.39</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">40520.00</td><td class="num">40500.00</td><td class="num">30500.00</td><td class="num">1.23</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted">
+            最后一行倍数掉到 <strong>1.23</strong>：预算 50000 元对应税前 40520 元，
+            已超过社平 3 倍（24000 元），单位五险一金封顶在 9480.00 元 ——
+            预算再往上加，工资能跟着涨的比例更大。
+        </p>
+
         <h2>涨薪 1000 元：企业多付多少，员工多拿多少</h2>
         <div class="table-scroll table-scroll--sticky">
             <table id="raise-example-table">
@@ -357,28 +379,6 @@
             未封顶时企业每多付 1 元，员工只拿到约 <strong>0.50~0.54 元</strong>；
             超过封顶线（社平 8000 元时 24000 元）后单位部分不再增加，企业每多付 1 元员工能拿到
             <strong>0.70~0.80 元</strong>。给高薪员工涨薪，钱更"值"。
-        </p>
-
-        <h2>人均预算倒推：这笔预算能开多少工资</h2>
-        <div class="table-scroll">
-            <table id="budget-example-table">
-                <thead>
-                    <tr><th scope="col">企业人均月预算（元）</th><th scope="col">可开税前月薪（元）</th><th scope="col">取整到百元（元）</th><th scope="col">员工月均到手（元）</th><th scope="col">成本倍数</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td class="num">8000.00</td><td class="num">5734.77</td><td class="num">5700.00</td><td class="num">4444.45</td><td class="num">1.39</td></tr>
-                    <tr><td class="num">10000.00</td><td class="num">7168.45</td><td class="num">7100.00</td><td class="num">5555.55</td><td class="num">1.39</td></tr>
-                    <tr><td class="num">13950.00</td><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">7697.50</td><td class="num">1.40</td></tr>
-                    <tr><td class="num">20000.00</td><td class="num">14336.91</td><td class="num">14300.00</td><td class="num">10810.00</td><td class="num">1.40</td></tr>
-                    <tr><td class="num">30000.00</td><td class="num">21505.37</td><td class="num">21500.00</td><td class="num">15809.99</td><td class="num">1.39</td></tr>
-                    <tr><td class="num">50000.00</td><td class="num">40520.00</td><td class="num">40500.00</td><td class="num">30500.00</td><td class="num">1.23</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <p class="small muted">
-            最后一行倍数掉到 <strong>1.23</strong>：预算 50000 元对应税前 40520 元，
-            已超过社平 3 倍（24000 元），单位五险一金封顶在 9480.00 元 ——
-            预算再往上加，工资能跟着涨的比例更大。
         </p>
 
         <h2>三条常见易错口径</h2>
@@ -470,9 +470,9 @@
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
         <p id="policy-basis">政策依据：《中华人民共和国社会保险法》（主席令第 35 号）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《降低社会保险费率综合方案》（国办发〔2019〕13 号，养老单位费率 16%）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
-        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/social-base.html">社保公积金</a> · <a href="/seo/net-salary.html">税后工资倒算</a> · <a href="/seo/salary-tax.html">工资个税测算</a></p>
+        <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a></p>
+        <div id="site-filing" class="site-filing"></div>
     </div>
-    <div id="site-filing" class="site-filing"></div>
 </footer>
 
 <!-- 口径复用 App 同源脚本：

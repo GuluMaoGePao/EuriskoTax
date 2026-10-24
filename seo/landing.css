@@ -348,6 +348,12 @@ details p { margin: 10px 0 2px; color: var(--muted); }
 
 .site-footer a { color: var(--muted); }
 
+/* 页脚段落间距：原先靠浏览器默认的 1em 上下外距，各页段落数又不同（免责 / 政策依据 1~3 段 /
+   © 行），结果 21 页的页尾高度与行距全不一样，摆在一起就是参差的。统一成 6px 后，
+   段数与内容差异仍在，但「行与行之间」的节奏一致了。 */
+.site-footer p { margin: 0 0 6px; }
+.site-footer p:last-of-type { margin-bottom: 0; }
+
 /* 备案位（CP-5）：与主站 #site-filing 同构 —— 两号皆空时组件不渲染任何内容（未备案展示同样违规） */
 .site-filing {
     margin-top: 6px;
