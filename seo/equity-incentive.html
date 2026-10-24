@@ -12,8 +12,8 @@
               / window.equityIncentiveRules），页面上不出现第二份税率表；
            3) 政策依据文号与到期日来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
            4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
-    <title>股权激励个税计算器 2026：股票期权、限制性股票、股票增值权怎么算（单独计税执行至 2027 年底）</title>
-    <meta name="description" content="输入股票期权 / 限制性股票 / 股票增值权 / 股权奖励的股数与价格，算出股权激励收入（应纳税所得额）与单独计税应纳税额，并对照「若并入综合所得」的差异。含四种激励的收入公式、年度税率表与示例。政策依据：财税〔2018〕164 号、财政部 税务总局公告 2023 年第 25 号。">
+    <title>股权激励个税计算器 2026：期权与限制性股票怎么算</title>
+    <meta name="description" content="输入股票期权、限制性股票、股票增值权或股权奖励的股数与价格，算出股权激励收入与单独计税应纳税额，并对照并入综合所得的差异。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/equity-incentive.html">
     <meta name="robots" content="index, follow">
 
@@ -122,9 +122,9 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">股权激励个税速算（单独计税）</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <h2 id="calc-title" class="mt-0">股权激励个税速算（单独计税）</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="type-input">激励类型</label>
                     <select class="calc-input" id="type-input">
                         <option value="option" selected>股票期权</option>
@@ -133,34 +133,34 @@
                         <option value="award">股权奖励</option>
                     </select>
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="qty-input">数量（股 / 份）</label>
                     <input class="calc-input" id="qty-input" type="number" inputmode="numeric" min="0" step="1000" value="10000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="price-input">行权 / 解禁日每股价格（元）</label>
                     <input class="calc-input" id="price-input" type="number" inputmode="decimal" min="0" step="1" value="15" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="cost-input">每股成本（施权价 / 出资额，元）</label>
                     <input class="calc-input" id="cost-input" type="number" inputmode="decimal" min="0" step="1" value="5" aria-describedby="calc-note">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px" id="grant-wrap" hidden>
+            <div class="calc-input-row mb-12">
+                <div class="field" id="grant-wrap" hidden>
                     <label class="calc-label" for="grant-input">股票登记日每股价格（元，仅限制性股票需要）</label>
                     <input class="calc-input" id="grant-input" type="number" inputmode="decimal" min="0" step="1" value="10" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="ytd-input">本年度已计入的股权激励收入（元，多次需合并）</label>
                     <input class="calc-input" id="ytd-input" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 240px">
+                <div class="field">
                     <label class="calc-label" for="other-input">全年其他综合所得应纳税所得额（元，对照用）</label>
                     <input class="calc-input" id="other-input" type="number" inputmode="decimal" min="0" step="10000" value="100000" aria-describedby="calc-note">
                 </div>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 本页算的是<strong>现行单独计税</strong>的应纳税额；「并入综合所得」一栏是<strong>假设政策到期后并入</strong>的对照值
                 —— 现行政策下股权激励是「不并入」，不是「可选并入」。
             </p>
@@ -193,7 +193,7 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「四种激励的收入公式」「年度税率表」与「示例表」手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「四种激励的收入公式」「年度税率表」与「示例表」手工估算。</p>
             </noscript>
         </section>
 
@@ -219,7 +219,7 @@
         <h2>年度综合所得税率表（单独计税就查这张表）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">股权激励收入（合并后）全额适用本表，按「收入 × 税率 − 速算扣除数」计税</caption>
+                <caption class="small muted">股权激励收入（合并后）全额适用本表，按「收入 × 税率 − 速算扣除数」计税</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -328,6 +328,28 @@
             <h2>把工资、年终奖与股权激励一起算</h2>
             <p>输入全年工资、社保公积金、专项附加扣除与股权激励收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_equity">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/bonus-tax.html">
+                    <div class="t">年终奖个税</div>
+                    <div class="d">单独计税与临界点陷阱</div>
+                </a>
+                <a class="related-card" href="/seo/corporate-income-tax.html">
+                    <div class="t">企业所得税</div>
+                    <div class="d">25% / 15% / 小微实际税负 5%</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

@@ -12,7 +12,7 @@
               页面上不出现第二份税率表；
            3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
     <title>个税汇算清缴怎么算 2026：你是退税还是补税？</title>
-    <meta name="description" content="输入月薪、任职月数与各项扣除，算出全年应纳税额，再与已预缴税额相减，得出应退或应补税额。含年度综合所得税率表、常见退税/补税情形与办理时间（3 月 1 日至 6 月 30 日）。">
+    <meta name="description" content="输入月薪、任职月数与各项扣除，算出全年应纳税额，再与已预缴税额相减，得出应退或应补税额。汇算办理期为 3 月 1 日至 6 月 30 日。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/annual-settlement.html">
     <meta name="robots" content="index, follow">
 
@@ -138,31 +138,31 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">汇算应退/应补速算</h2>
+            <h2 id="calc-title" class="mt-0">汇算应退/应补速算</h2>
             <div class="calc-input-row">
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="salary-input">月薪（元，税前）</label>
-                    <input class="calc-input" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000" style="width:100%">
+                    <input class="calc-input w-full" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000">
                 </div>
-                <div style="flex:0 1 150px;min-width:0">
+                <div class="field-fixed">
                     <label class="calc-label" for="months-input">任职月数</label>
-                    <input class="calc-input" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12" style="width:100%">
+                    <input class="calc-input w-full" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12">
                 </div>
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="insurance-input">每月三险一金（元）</label>
-                    <input class="calc-input" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000" style="width:100%">
+                    <input class="calc-input w-full" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000">
                 </div>
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="special-input">每月专项附加扣除（元）</label>
-                    <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000" style="width:100%">
+                    <input class="calc-input w-full" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000">
                 </div>
-                <div style="flex:1 1 220px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="prepaid-input">已预缴税额（元，选填）</label>
-                    <input class="calc-input" id="prepaid-input" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按累计预扣法推演" style="width:100%">
+                    <input class="calc-input w-full" id="prepaid-input" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按累计预扣法推演">
                 </div>
-                <button class="btn btn-primary" id="calc-reset" type="button" style="align-self:flex-end">重算</button>
+                <button class="btn btn-primary self-end" id="calc-reset" type="button">重算</button>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 「已预缴税额」填 <strong>个人所得税 App → 收入纳税明细查询</strong> 里的合计已缴税额更贴近实报口径；留空时按累计预扣法推演
                 （全年等额月薪、扣除均已申报时，推演值就等于全年应纳税额，差额 0 —— 说明你本来就该补退为 0）。
                 本页只算<strong>工资薪金</strong>这一类综合所得；有劳务报酬、稿酬、特许权使用费或多处工资薪金时，请用
@@ -189,67 +189,67 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、年度税率表与示例表手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、年度税率表与示例表手工估算。</p>
             </noscript>
         </section>
 
         <section class="card" aria-labelledby="multi-title">
-            <h2 id="multi-title" style="margin-top:0">多处任职 / 年中跳槽：为什么你会补税</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="multi-title" class="mt-0">多处任职 / 年中跳槽：为什么你会补税</h2>
+            <p class="small muted mt-0">
                 两个机制，别混为一谈：<strong>① 多处任职（并行）</strong> —— 两家单位各自按累计预扣法预扣，
                 <strong>各自</strong>每月扣 5000 元基本减除费用，一年扣了两份 6 万，而汇算只减一份；
                 <strong>② 年中跳槽（前后衔接）</strong> —— 新单位<strong>不掌握</strong>上一家的收入与已预缴，
                 累计预扣从 0 重新开始，同一年的收入被拆成两段分别适用更低的档位、
                 <strong>速算扣除数被扣了两次</strong>。
             </p>
-            <div class="calc-input-row" style="margin-bottom:6px">
-                <div style="flex:1 1 160px;min-width:0">
+            <div class="calc-input-row mb-6">
+                <div class="field">
                     <label class="calc-label" for="m1-salary">第一段月薪（元）</label>
-                    <input class="calc-input" id="m1-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000" style="width:100%">
+                    <input class="calc-input w-full" id="m1-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000">
                 </div>
-                <div style="flex:0 1 120px;min-width:0">
+                <div class="field-fixed">
                     <label class="calc-label" for="m1-months">月数</label>
-                    <input class="calc-input" id="m1-months" type="number" inputmode="numeric" min="1" max="12" step="1" value="6" style="width:100%">
+                    <input class="calc-input w-full" id="m1-months" type="number" inputmode="numeric" min="1" max="12" step="1" value="6">
                 </div>
-                <div style="flex:1 1 150px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="m1-insurance">三险一金/月（元）</label>
-                    <input class="calc-input" id="m1-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
+                    <input class="calc-input w-full" id="m1-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000">
                 </div>
-                <div style="flex:1 1 150px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="m1-special">专项附加/月（元）</label>
-                    <input class="calc-input" id="m1-special" type="number" inputmode="decimal" min="0" step="500" value="2000" style="width:100%">
+                    <input class="calc-input w-full" id="m1-special" type="number" inputmode="decimal" min="0" step="500" value="2000">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 160px;min-width:0">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="m2-salary">第二段月薪（元）</label>
-                    <input class="calc-input" id="m2-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000" style="width:100%">
+                    <input class="calc-input w-full" id="m2-salary" type="number" inputmode="decimal" min="0" step="1000" value="20000">
                 </div>
-                <div style="flex:0 1 120px;min-width:0">
+                <div class="field-fixed">
                     <label class="calc-label" for="m2-months">月数</label>
-                    <input class="calc-input" id="m2-months" type="number" inputmode="numeric" min="0" max="12" step="1" value="6" style="width:100%">
+                    <input class="calc-input w-full" id="m2-months" type="number" inputmode="numeric" min="0" max="12" step="1" value="6">
                 </div>
-                <div style="flex:1 1 150px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="m2-insurance">三险一金/月（元）</label>
-                    <input class="calc-input" id="m2-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000" style="width:100%">
+                    <input class="calc-input w-full" id="m2-insurance" type="number" inputmode="decimal" min="0" step="500" value="3000">
                 </div>
-                <div style="flex:1 1 150px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="m2-special">专项附加/月（元）</label>
-                    <input class="calc-input" id="m2-special" type="number" inputmode="decimal" min="0" step="500" value="2000" style="width:100%">
+                    <input class="calc-input w-full" id="m2-special" type="number" inputmode="decimal" min="0" step="500" value="2000">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 260px;min-width:0">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="m-annual-special">全年专项附加扣除合计（元，选填）</label>
-                    <input class="calc-input" id="m-annual-special" type="number" inputmode="decimal" min="0" step="1000" placeholder="两处都申报了同一项目时填「只能扣一份」" style="width:100%">
+                    <input class="calc-input w-full" id="m-annual-special" type="number" inputmode="decimal" min="0" step="1000" placeholder="两处都申报了同一项目时填「只能扣一份」">
                 </div>
-                <div style="flex:1 1 220px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="m-prepaid">全年已预缴税额（元，选填）</label>
-                    <input class="calc-input" id="m-prepaid" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按各段累计预扣法推演" style="width:100%">
+                    <input class="calc-input w-full" id="m-prepaid" type="number" inputmode="decimal" min="0" step="100" placeholder="留空则按各段累计预扣法推演">
                 </div>
-                <button class="btn btn-primary" id="m-reset" type="button" style="align-self:flex-end">重算</button>
+                <button class="btn btn-primary self-end" id="m-reset" type="button">重算</button>
             </div>
-            <p class="small muted" style="margin-top:10px">
+            <p class="small muted mt-10">
                 第二段月数填 <strong>0</strong> 即按单一任职计算。本段按<strong>汇算口径</strong>：
                 减除费用按<strong>全年定额 60000 元</strong>（不按任职月数折算）；
                 上方单单位速算器按 5000 × 任职月数估算（用于估算预扣），
@@ -307,12 +307,14 @@
             <li><strong>算全年应纳税额</strong>：全年收入 = 月薪 × 任职月数；全年扣除 =（5000 + 三险一金 + 专项附加扣除）× 任职月数；应纳税所得额 = 全年收入 − 全年扣除（不足 0 按 0）；再查年度税率表。</li>
             <li><strong>减掉已预缴税额</strong>：应退/应补 = 全年应纳税额 − 全年已预缴税额。<strong>正数 = 应补，负数 = 应退</strong>。</li>
         </ol>
-        <p class="muted small">例：月薪 20000 元、全年任职 12 个月、每月三险一金 3000 元、每月专项附加扣除 2000 元 → 全年收入 240000 元，全年扣除 (5000 + 3000 + 2000) × 12 = 120000 元，应纳税所得额 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）→ 全年应纳税额 = 120000 × 10% − 2520 = 9480 元；若全年已预缴 9480 元，则应退应补为 0。</p>
+        <p class="muted small">例：月薪 20000 元、全年任职 12 个月、每月三险一金 3000 元、每月专项附加扣除 2000 元。</p>
+        <p class="muted small">全年收入 240000 元，全年扣除 (5000 + 3000 + 2000) × 12 = 120000 元，应纳税所得额 120000 元，落在「36000～144000」档（10%，速算扣除数 2520）。</p>
+        <p class="muted small">全年应纳税额 = 120000 × 10% − 2520 = 9480 元；若全年已预缴 9480 元，则应退应补为 0。</p>
 
         <h2>年度综合所得税率表（汇算适用）</h2>
         <div class="table-scroll">
             <table id="rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">按「全年应纳税所得额」定档，即全年收入减去 6 万元基本减除费用、专项扣除、专项附加扣除等之后的余额</caption>
+                <caption class="small muted">按「全年应纳税所得额」定档，即全年收入减去 6 万元基本减除费用、专项扣除、专项附加扣除等之后的余额</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -359,7 +361,7 @@
         <h2>三种典型情形的汇算结果</h2>
         <div class="table-scroll">
             <table id="example-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">均按每月三险一金 3000 元、每月专项附加扣除 2000 元测算；最后一列正数 = 应补，负数 = 应退（已预缴税额为示例值，实际请填个税 App 里的数字）</caption>
+                <caption class="small muted">均按每月三险一金 3000 元、每月专项附加扣除 2000 元测算；最后一列正数 = 应补，负数 = 应退（已预缴税额为示例值，实际请填个税 App 里的数字）</caption>
                 <thead>
                 <tr>
                     <th scope="col">情形</th>
@@ -420,6 +422,28 @@
             <h2>把工资、年终奖、劳务报酬一起算，看全年该退还是该补</h2>
             <p>输入各项收入与扣除，App 会给出全年应纳税额、已预缴税额、应退/应补税额，并对比年终奖「单独计税」与「并入综合所得」两种方式的差额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_settlement">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/bonus-tax.html">
+                    <div class="t">年终奖个税</div>
+                    <div class="d">单独计税与临界点陷阱</div>
+                </a>
+                <a class="related-card" href="/seo/special-deduction.html">
+                    <div class="t">专项附加扣除</div>
+                    <div class="d">七项能扣多少、少交多少</div>
+                </a>
+                <a class="related-card" href="/seo/labor-withholding.html">
+                    <div class="t">劳务报酬</div>
+                    <div class="d">800 元扣除与三级预扣率</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

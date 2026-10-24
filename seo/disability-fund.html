@@ -22,8 +22,8 @@
            不是只对超出的 1 个人算。
          配套的第二条：工会经费按**工资总额** × 2%（不是社保缴费基数），
          所以高薪员工的工会经费远高于拿社保基数估出来的数。 -->
-    <title>残保金计算器 2026：30 人以下免征、平均工资按社平 2 倍封顶、招残疾人省多少（附工会经费）</title>
-    <meta name="description" content="按 2026 年现行口径测算残疾人就业保障金与工会经费：31 人公司、年平均工资 10 万元且未安排残疾人就业，当年残保金 41850 元（30 人则免征为 0）；100 人、年平均 12 万元的公司实缴 162000 元，招 1 名残疾人降到 30000 元（省 132000 元），招 2 名归零；年平均工资超过当地社平工资 2 倍的部分不计征（社平 8000 元时上限 192000 元）。工会经费按工资总额 2% 拨缴（40% 上缴、60% 留存），基数是工资总额而不是社保缴费基数。政策依据：财税〔2015〕72 号、发改价格规〔2019〕2015 号、财政部公告 2019 年第 98 号、2023 年第 8 号公告、工会法第四十三条。">
+    <title>残保金计算器 2026：30 人以下免征、社平 2 倍封顶（附工会经费）</title>
+    <meta name="description" content="31 人公司年平均工资 10 万且未安排残疾人就业，当年残保金约 41850 元；30 人则免征为 0。含社平工资 2 倍封顶与工会经费按工资总额 2% 拨缴测算。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/disability-fund.html">
     <meta name="robots" content="index, follow">
 
@@ -104,6 +104,14 @@
                             "@type": "Answer",
                             "text": "可以，但限额是工资薪金总额的 2%，且需凭《工会经费收入专用收据》或税务机关代收凭据（企业所得税法实施条例第四十一条）。按规定 2% 拨缴的部分可全额扣除，超过 2% 的部分不得扣除。未建立工会的企业由上级工会按工资总额 2% 收取建会筹备金，各地执行口径与起算时间不同。"
                         }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为申报或预算依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。各地安排比例（1.5%~1.7%）、社平工资口径与人数口径不同，劳务派遣用工的计入方式还需与派遣单位协商；工会筹备金的起算时间与征收方式由各地规定。本测算结果仅供参考，不构成税务建议。"
+                        }
                     }
                 ]
             }
@@ -137,36 +145,36 @@
         </p>
 
         <section class="card" aria-labelledby="levy-title">
-            <h2 id="levy-title" style="margin-top:0">速算一：残保金（差额人数 × 年平均工资）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="levy-title" class="mt-0">速算一：残保金（差额人数 × 年平均工资）</h2>
+            <p class="small muted mt-0">
                 口径：应缴费额 =（人数 × 安排比例 − 已安排残疾人数）× 年平均工资；
                 年平均工资超过当地社平工资 <strong>2 倍</strong>的按 2 倍计征；
                 安排比例 1% 以下按 <strong>90%</strong> 征收、1%（含）以上按 <strong>50%</strong> 征收、达到规定比例不缴；
                 <strong>30 人（含）以下暂免</strong>
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 180px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="d-headcount">在职职工人数（人）</label>
                     <input class="calc-input" id="d-headcount" type="number" inputmode="numeric" min="1" step="1" value="100" aria-describedby="levy-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="d-disabled">已安排残疾人数（人）</label>
                     <input class="calc-input" id="d-disabled" type="number" inputmode="numeric" min="0" step="1" value="0" aria-describedby="levy-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="d-wage">在职职工年平均工资（元）</label>
                     <input class="calc-input" id="d-wage" type="number" inputmode="decimal" min="0" step="10000" value="120000" aria-describedby="levy-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="d-avg">当地上年度月社平工资（元）</label>
                     <input class="calc-input" id="d-avg" type="number" inputmode="decimal" min="0" step="500" value="8000" aria-describedby="levy-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="d-ratio">安排比例（%）</label>
                     <input class="calc-input" id="d-ratio" type="number" inputmode="decimal" min="1" max="3" step="0.1" value="1.5" aria-describedby="levy-note">
                 </div>
             </div>
-            <p class="small muted" id="levy-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="levy-note">
                 人数口径：含在编人员与签订 1 年以上（含）劳动合同的人员；季节性用工折算年平均人数；
                 劳务派遣用工由派遣单位与用工单位协商计入一方（不得重复计算）。安排比例由各省在 1.5%~1.7% 内确定。
             </p>
@@ -212,8 +220,8 @@
         </section>
 
         <section class="card" aria-labelledby="save-title">
-            <h2 id="save-title" style="margin-top:0">速算二：再招 1 名残疾人，能省多少</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="save-title" class="mt-0">速算二：再招 1 名残疾人，能省多少</h2>
+            <p class="small muted mt-0">
                 口径：分档是按<strong>实际安排比例</strong>跳档的，所以每多招一人省下的钱<strong>不一样</strong>
                 —— 省的是差额人数减少带来的应缴费额，且档位可能同步下降
             </p>
@@ -239,18 +247,18 @@
         </section>
 
         <section class="card" aria-labelledby="union-title">
-            <h2 id="union-title" style="margin-top:0">速算三：工会经费（工资总额 × 2%）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="union-title" class="mt-0">速算三：工会经费（工资总额 × 2%）</h2>
+            <p class="small muted mt-0">
                 口径：基数是<strong>工资总额</strong>（含奖金、津贴补贴、加班工资，<strong>没有上下限</strong>），
                 <strong>不是</strong>社保缴费基数；2% 中 40% 上缴上级工会、60% 基层留存；
                 企业所得税前扣除限额同为工资薪金总额 2%
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="u-total">全年工资总额（元）</label>
                     <input class="calc-input" id="u-total" type="number" inputmode="decimal" min="0" step="1000000" value="12000000" aria-describedby="union-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="u-union">是否已建立工会</label>
                     <select class="calc-input" id="u-union" aria-describedby="union-note">
                         <option value="yes" selected>已建立工会（2% 拨缴）</option>
@@ -258,7 +266,7 @@
                     </select>
                 </div>
             </div>
-            <p class="small muted" id="union-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="union-note">
                 未建立工会的企业，由上级工会按工资总额 2% 收取建会筹备金（各地执行口径与起算时间不同）。
             </p>
             <div class="results" id="union-results" hidden>
@@ -290,7 +298,7 @@
         <div class="table-scroll">
             <table id="headcount-example-table">
                 <thead>
-                    <tr><th>在职职工人数</th><th>应安排残疾人数（1.5%）</th><th>差额人数</th><th>应缴费额（元）</th><th>当年实缴（元）</th></tr>
+                    <tr><th scope="col">在职职工人数</th><th scope="col">应安排残疾人数（1.5%）</th><th scope="col">差额人数</th><th scope="col">应缴费额（元）</th><th scope="col">当年实缴（元）</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">25</td><td class="num">0.38</td><td class="num">0.38</td><td class="num">37500.00</td><td class="num">0.00</td></tr>
@@ -315,7 +323,7 @@
         <div class="table-scroll">
             <table id="disabled-example-table">
                 <thead>
-                    <tr><th>已安排残疾人数</th><th>实际安排比例</th><th>差额人数</th><th>应缴费额（元）</th><th>分档</th><th>当年实缴（元）</th></tr>
+                    <tr><th scope="col">已安排残疾人数</th><th scope="col">实际安排比例</th><th scope="col">差额人数</th><th scope="col">应缴费额（元）</th><th scope="col">分档</th><th scope="col">当年实缴（元）</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">0</td><td class="num">0%</td><td class="num">1.50</td><td class="num">180000.00</td><td class="num">×90%</td><td class="num">162000.00</td></tr>
@@ -337,7 +345,7 @@
         <div class="table-scroll">
             <table id="wage-example-table">
                 <thead>
-                    <tr><th>在职职工年平均工资（元）</th><th>计征工资（元）</th><th>是否封顶</th><th>应缴费额（元）</th><th>当年实缴（元）</th></tr>
+                    <tr><th scope="col">在职职工年平均工资（元）</th><th scope="col">计征工资（元）</th><th scope="col">是否封顶</th><th scope="col">应缴费额（元）</th><th scope="col">当年实缴（元）</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">60000.00</td><td class="num">60000.00</td><td class="num">—</td><td class="num">90000.00</td><td class="num">81000.00</td></tr>
@@ -363,7 +371,7 @@
         <div class="table-scroll">
             <table id="union-example-table">
                 <thead>
-                    <tr><th>全年工资总额（元）</th><th>工会经费 2%（元）</th><th>上缴上级工会 40%（元）</th><th>基层留存 60%（元）</th></tr>
+                    <tr><th scope="col">全年工资总额（元）</th><th scope="col">工会经费 2%（元）</th><th scope="col">上缴上级工会 40%（元）</th><th scope="col">基层留存 60%（元）</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">1000000.00</td><td class="num">20000.00</td><td class="num">8000.00</td><td class="num">12000.00</td></tr>
@@ -419,7 +427,8 @@
         </details>
         <details>
             <summary>30 人以下真的不用交残保金吗？31 人要多交多少？</summary>
-            <p>在职职工人数 30 人（含）以下的企业暂免征收残保金（财政部公告 2019 年第 98 号，现行延续至 2027 年 12 月 31 日）。但 30 人是临界点：31 人就要按全部 31 人计算，不是只对超出的 1 人算。年平均工资 10 万元、未安排残疾人的公司，30 人时为 0 元，31 人时应安排 0.465 人、应缴费额 46500 元、按 90% 征收实缴 41850 元 —— 多招 1 个人，当年多出一笔 41850 元的残保金。</p>
+            <p>在职职工人数 30 人（含）以下的企业暂免征收残保金（财政部公告 2019 年第 98 号，现行延续至 2027 年 12 月 31 日）。但 30 人是临界点：31 人就要按全部 31 人计算，不是只对超出的 1 人算。</p>
+            <p>年平均工资 10 万元、未安排残疾人的公司，30 人时为 0 元，31 人时应安排 0.465 人、应缴费额 46500 元、按 90% 征收实缴 41850 元 —— 多招 1 个人，当年多出一笔 41850 元的残保金。</p>
         </details>
         <details>
             <summary>招一个残疾人能省多少残保金？</summary>
@@ -427,7 +436,8 @@
         </details>
         <details>
             <summary>残保金的年平均工资有没有上限？是社平工资的 3 倍吗？</summary>
-            <p>有上限，而且是当地社平工资的 2 倍，不是 3 倍。自 2020 年 1 月 1 日起，用人单位在职职工年平均工资超过当地社平工资 2 倍的，按 2 倍计征（发改价格规〔2019〕2015 号）。社平 8000 元时上限为月 16000 元、年 192000 元：年平均工资 30 万元的公司，计征工资仍是 192000 元，应缴费额 288000 元、按 90% 征收实缴 259200 元；若不封顶应为 405000 元，封顶相当于少缴 145800 元。注意社保缴费基数的上限是社平 300%，两个「封顶」不是同一个数。</p>
+            <p>有上限，而且是当地社平工资的 2 倍，不是 3 倍。自 2020 年 1 月 1 日起，用人单位在职职工年平均工资超过当地社平工资 2 倍的，按 2 倍计征（发改价格规〔2019〕2015 号）。</p>
+            <p>社平 8000 元时上限为月 16000 元、年 192000 元：年平均工资 30 万元的公司，计征工资仍是 192000 元，应缴费额 288000 元、按 90% 征收实缴 259200 元；若不封顶应为 405000 元，封顶相当于少缴 145800 元。注意社保缴费基数的上限是社平 300%，两个「封顶」不是同一个数。</p>
         </details>
         <details>
             <summary>工会经费按什么基数算？2% 是工资总额还是社保缴费基数？</summary>
@@ -446,6 +456,28 @@
             <h2>把用工相关的税与费放在一处看</h2>
             <p>本页算的是企业侧的残保金与工会经费；单位五险一金与用工成本、员工到手工资与个税测算可在 App 里一起看。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_disabilityfund">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/employer-cost.html">
+                    <div class="t">企业用工成本</div>
+                    <div class="d">税前 1 万企业实际花多少</div>
+                </a>
+                <a class="related-card" href="/seo/social-base.html">
+                    <div class="t">社保公积金</div>
+                    <div class="d">基数上下限与个人单位各交多少</div>
+                </a>
+                <a class="related-card" href="/seo/corporate-income-tax.html">
+                    <div class="t">企业所得税</div>
+                    <div class="d">25% / 15% / 小微实际税负 5%</div>
+                </a>
+                <a class="related-card" href="/seo/surtax-stamp-duty.html">
+                    <div class="t">附加税与印花税</div>
+                    <div class="d">城建税三档与印花税税目</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

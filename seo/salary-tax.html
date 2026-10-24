@@ -12,7 +12,7 @@
               页面上不出现第二份税率表；
            3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
     <title>月薪个税计算器 2026：累计预扣法怎么算，每月到手多少？</title>
-    <meta name="description" content="输入月薪、三险一金与专项附加扣除，按累计预扣法算出全年个税与月均税额，并给出每月预扣明细。含预扣率表（3%～45% 七档）与政策依据（国家税务总局公告 2018 年第 61 号）。">
+    <meta name="description" content="输入月薪、三险一金与专项附加扣除，按累计预扣法算出全年个税与每月预扣明细，附七档预扣率表与政策依据。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/salary-tax.html">
     <meta name="robots" content="index, follow">
 
@@ -110,27 +110,27 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">月薪个税速算（累计预扣口径）</h2>
+            <h2 id="calc-title" class="mt-0">月薪个税速算（累计预扣口径）</h2>
             <div class="calc-input-row">
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="salary-input">月薪（元，税前）</label>
-                    <input class="calc-input" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000" style="width:100%">
+                    <input class="calc-input w-full" id="salary-input" type="number" inputmode="decimal" min="0" step="100" value="20000">
                 </div>
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="insurance-input">每月三险一金（元）</label>
-                    <input class="calc-input" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000" style="width:100%">
+                    <input class="calc-input w-full" id="insurance-input" type="number" inputmode="decimal" min="0" step="100" value="3000">
                 </div>
-                <div style="flex:1 1 200px;min-width:0">
+                <div class="field">
                     <label class="calc-label" for="special-input">每月专项附加扣除（元）</label>
-                    <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000" style="width:100%">
+                    <input class="calc-input w-full" id="special-input" type="number" inputmode="decimal" min="0" step="100" value="2000">
                 </div>
-                <div style="flex:0 1 140px;min-width:0">
+                <div class="field-fixed">
                     <label class="calc-label" for="months-input">计税月数</label>
-                    <input class="calc-input" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12" style="width:100%">
+                    <input class="calc-input w-full" id="months-input" type="number" inputmode="numeric" min="1" max="12" step="1" value="12">
                 </div>
-                <button class="btn btn-primary" id="calc-reset" type="button" style="align-self:flex-end">重算</button>
+                <button class="btn btn-primary self-end" id="calc-reset" type="button">重算</button>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 本页按「全年固定月薪」测算。若有年终奖，年终奖选择单独计税还是并入综合所得，会改变整体税负，请用<a href="/?source=seo_salary">完整测算对比两种方案</a>。
             </p>
 
@@ -154,7 +154,7 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、预扣率表与示例表手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、预扣率表与示例表手工估算。</p>
             </noscript>
         </section>
 
@@ -168,7 +168,7 @@
         <h2>预扣率表（居民个人工资薪金预扣预缴）</h2>
         <div class="table-scroll">
             <table id="rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">按「累计预扣预缴应纳税所得额」定档，即年初至今的累计所得；与综合所得年度税率表同档</caption>
+                <caption class="small muted">按「累计预扣预缴应纳税所得额」定档，即年初至今的累计所得；与综合所得年度税率表同档</caption>
                 <thead>
                 <tr>
                     <th scope="col">累计预扣预缴应纳税所得额（元）</th>
@@ -195,7 +195,7 @@
         </p>
         <div class="table-scroll">
             <table id="example-schedule">
-                <caption class="small muted" style="text-align:left;padding:8px 0">示例：月薪 20000 元 · 每月三险一金 3000 元 · 每月专项附加扣除 2000 元 · 12 个月</caption>
+                <caption class="small muted">示例：月薪 20000 元 · 每月三险一金 3000 元 · 每月专项附加扣除 2000 元 · 12 个月</caption>
                 <thead>
                 <tr>
                     <th scope="col">月份</th>
@@ -247,6 +247,28 @@
             <h2>把年终奖、社保基数一起算，看全年税负</h2>
             <p>输入工资、三险一金、专项附加扣除与年终奖，App 会给出全年应纳税额、两种年终奖计税方式的差额，以及社保基数是否低于最低标准（各地基数口径不同，可在 App 内留资，由顾问协助确认当地参数）。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_salary">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/net-salary.html">
+                    <div class="t">税后工资倒算</div>
+                    <div class="d">月到手 1 万，税前要谈多少</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/bonus-tax.html">
+                    <div class="t">年终奖个税</div>
+                    <div class="d">单独计税与临界点陷阱</div>
+                </a>
+                <a class="related-card" href="/seo/social-base.html">
+                    <div class="t">社保公积金</div>
+                    <div class="d">基数上下限与个人单位各交多少</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

@@ -17,8 +17,8 @@
          这一页背两条「纠偏」任务：
            ① 津补贴免税与专项附加扣除是**二选一**，不能叠加；
            ② 本政策**执行至 2027-12-31** —— 到期提醒必须写进正文，而不是写完就忘的装饰。 -->
-    <title>外籍个人津补贴免税 2026：与专项附加扣除怎么二选一（执行至 2027-12-31）</title>
-    <meta name="description" content="输入全年应纳税所得额、可免税津补贴与专项附加扣除，按 2026 年现行政策比较「津补贴免税」与「专项附加扣除」两条路径各少交多少个税，并给出更优方案与差额。含八项免税津补贴表、年度税率表与公开示例。政策依据：财政部 税务总局公告 2023 年第 29 号（执行至 2027-12-31）。">
+    <title>外籍个人津补贴免税 2026：与专项附加扣除怎么二选一</title>
+    <meta name="description" content="输入全年应纳税所得额与可免税津补贴，比较津补贴免税与专项附加扣除两条路径各少交多少个税，给出更优方案与差额。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/expat-allowance.html">
     <meta name="robots" content="index, follow">
 
@@ -130,22 +130,22 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">两条路径对比速算（免税津补贴 vs 专项附加扣除）</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 240px">
+            <h2 id="calc-title" class="mt-0">两条路径对比速算（免税津补贴 vs 专项附加扣除）</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="taxable-input">优惠前全年应纳税所得额（元）</label>
                     <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="allowance-input">全年可免税津补贴合计（元）</label>
                     <input class="calc-input" id="allowance-input" type="number" inputmode="decimal" min="0" step="5000" value="60000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="special-input">全年专项附加扣除合计（元）</label>
                     <input class="calc-input" id="special-input" type="number" inputmode="decimal" min="0" step="5000" value="36000" aria-describedby="calc-note">
                 </div>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 「优惠前全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除。
                 <strong>两条路径只能选一条</strong>：本页把两条各算一遍是为了比较，实际申报时选其一，
                 <strong>且一个纳税年度内不得变更</strong>。
@@ -180,14 +180,14 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「八项免税津补贴表」「年度税率表」与「示例表」手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「八项免税津补贴表」「年度税率表」与「示例表」手工估算。</p>
             </noscript>
         </section>
 
         <h2>八项免税津补贴与适用条件</h2>
         <div class="table-scroll">
             <table id="expat-item-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">项目与条件取自 App 常量 expatAllowanceRules（依据财税字〔1994〕020 号、国税发〔1997〕54 号）</caption>
+                <caption class="small muted">项目与条件取自 App 常量 expatAllowanceRules（依据财税字〔1994〕020 号、国税发〔1997〕54 号）</caption>
                 <thead>
                 <tr>
                     <th scope="col">项目</th>
@@ -214,7 +214,7 @@
         <h2>年度综合所得税率表（两条路径共用同一张表）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；免税与扣除降低的都是「应纳税所得额」这一列</caption>
+                <caption class="small muted">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；免税与扣除降低的都是「应纳税所得额」这一列</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -235,7 +235,7 @@
         </div>
 
         <h2>示例：三种典型情形</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-scroll--sticky">
             <table id="example-table">
                 <thead>
                 <tr>
@@ -325,6 +325,28 @@
             <h2>把两条路径放进全年账一起算</h2>
             <p>输入全年工资、社保公积金与扣除/免税项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_expat">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/special-deduction.html">
+                    <div class="t">专项附加扣除</div>
+                    <div class="d">七项能扣多少、少交多少</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/labor-withholding.html">
+                    <div class="t">劳务报酬</div>
+                    <div class="d">800 元扣除与三级预扣率</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

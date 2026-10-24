@@ -16,8 +16,8 @@
          这一页背一条主线任务：**把「提前退休 / 内部退养 / 离职补偿金」三套口径分开** ——
          它们都是「一次性收入」，但免税额度、是否分摊、用哪张表、是否与当月工资合并全都不同，
          网上最常见的错误就是把内部退养的「平均」当成真分摊、或把离职补偿的 3 倍免税套到内退上。 -->
-    <title>提前退休与内部退养一次性收入个税 2026：怎么算、和离职补偿有什么区别</title>
-    <meta name="description" content="输入一次性补贴与提前年数，或内部退养一次性收入与所属月份、当月工资，按 2026 年现行政策算出提前退休（按年分摊、单独适用综合所得税率表）与内部退养（按月平均只为定档、与当月工资合并后按月度税率表）各自应交的个税。含公式、示例表与三套口径区别。政策依据：财税〔2018〕164 号、国税发〔1999〕58 号。">
+    <title>提前退休与内部退养个税 2026：一次性收入怎么算</title>
+    <meta name="description" content="按现行政策算出提前退休（按年分摊、单独适用综合所得税率表）与内部退养（与当月工资合并）各自应交的个税，附公式、示例与三套口径区别。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/early-retirement.html">
     <meta name="robots" content="index, follow">
 
@@ -127,25 +127,25 @@
         </p>
 
         <section class="card" aria-labelledby="early-title">
-            <h2 id="early-title" style="margin-top:0">速算一：提前退休一次性补贴（按年分摊，年度税率表）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="early-title" class="mt-0">速算一：提前退休一次性补贴（按年分摊，年度税率表）</h2>
+            <p class="small muted mt-0">
                 公式：<strong>应纳税额 = {〔(一次性补贴 ÷ 实际年度数) − 60000〕× 适用税率 − 速算扣除数} × 实际年度数</strong>
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 240px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="subsidy-input">一次性补贴收入（元）</label>
                     <input class="calc-input" id="subsidy-input" type="number" inputmode="decimal" min="0" step="10000" value="180000" aria-describedby="early-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="years-input">实际年度数（年）</label>
                     <input class="calc-input" id="years-input" type="number" inputmode="decimal" min="0.1" step="0.5" value="2" aria-describedby="early-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="months-input">按月份算（自动 ÷ 12，可选）</label>
                     <input class="calc-input" id="months-input" type="number" inputmode="decimal" min="1" step="1" placeholder="如 65" aria-describedby="early-note">
                 </div>
             </div>
-            <p class="small muted" id="early-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="early-note">
                 「实际年度数」= 办理提前退休手续当月至法定退休年龄当月的实际月份数 ÷ 12，<strong>可以是小数</strong>
                 （如 65 个月 ≈ 5.42 年）；填了月份数会自动换算。本项<strong>单独计税、不并入当年综合所得</strong>，
                 也没有「3 倍社平工资」之类的免税额度。
@@ -172,26 +172,26 @@
         </section>
 
         <section class="card" aria-labelledby="internal-title">
-            <h2 id="internal-title" style="margin-top:0">速算二：内部退养一次性收入（平均只为定档，月度税率表）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="internal-title" class="mt-0">速算二：内部退养一次性收入（平均只为定档，月度税率表）</h2>
+            <p class="small muted mt-0">
                 口径：<strong>月均额</strong> = 一次性收入 ÷ 所属月份数；<strong>定档基数</strong> = 月均额 + 当月工资薪金 − 5000；
                 <strong>应纳税额</strong> = (当月工资薪金 + 一次性收入 − 5000) × 适用税率 − 速算扣除数
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="lump-input">一次性收入（元）</label>
                     <input class="calc-input" id="lump-input" type="number" inputmode="decimal" min="0" step="10000" value="120000" aria-describedby="internal-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="int-months-input">所属月份数（月）</label>
                     <input class="calc-input" id="int-months-input" type="number" inputmode="decimal" min="1" step="1" value="60" aria-describedby="internal-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="salary-input">领取当月工资薪金（元）</label>
                     <input class="calc-input" id="salary-input" type="number" inputmode="decimal" min="0" step="1000" value="6000" aria-describedby="internal-note">
                 </div>
             </div>
-            <p class="small muted" id="internal-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="internal-note">
                 「所属月份数」= 办理内部退养手续后至法定离退休年龄之间的月份数。
                 <strong>当月工资必须参与计算</strong>：既参与定档（与月均额合并减 5000），也参与税基（全额并入）。
             </p>
@@ -215,7 +215,7 @@
             </div>
             <div class="hint" id="internal-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、税率表与示例表手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、税率表与示例表手工估算。</p>
             </noscript>
         </section>
 
@@ -241,7 +241,7 @@
         </div>
 
         <h2>示例：内部退养（平均只为定档）</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-scroll--sticky">
             <table id="internal-example-table">
                 <thead>
                 <tr>
@@ -291,7 +291,7 @@
         <h2>月度税率表（内部退养定档用）</h2>
         <div class="table-scroll">
             <table id="monthly-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">定档基数 = 月均额 + 当月工资薪金 − 5000；税额 = (当月工资 + 一次性收入 − 5000) × 税率 − 速算扣除数</caption>
+                <caption class="small muted">定档基数 = 月均额 + 当月工资薪金 − 5000；税额 = (当月工资 + 一次性收入 − 5000) × 税率 − 速算扣除数</caption>
                 <thead>
                 <tr>
                     <th scope="col">定档基数（元）</th>
@@ -314,7 +314,7 @@
         <h2>年度综合所得税率表（提前退休分摊后定档用）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">分摊后每年的应纳税所得额 = 一次性补贴 ÷ 实际年度数 − 60000</caption>
+                <caption class="small muted">分摊后每年的应纳税所得额 = 一次性补贴 ÷ 实际年度数 − 60000</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -382,6 +382,28 @@
             <h2>把这笔一次性收入放进全年账一起看</h2>
             <p>输入全年工资、社保公积金与各项扣除，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_earlyretire">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/severance.html">
+                    <div class="t">离职补偿金</div>
+                    <div class="d">3 倍社平工资免税额度</div>
+                </a>
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/labor-withholding.html">
+                    <div class="t">劳务报酬</div>
+                    <div class="d">800 元扣除与三级预扣率</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

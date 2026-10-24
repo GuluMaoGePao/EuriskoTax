@@ -10,8 +10,8 @@
          站内路径断了 —— 从「月薪个税」进站的人看不到「年终奖 / 离职补偿 / 增值税」，
          App 里也一个入口都没有。这一页把全部工具摆在一屏内，
          既给读者做目录，也给爬虫做一张 HTML 版 sitemap（正文 + ItemList 结构化数据）。 -->
-    <title>税务测算工具箱 2026：个税 / 企业税 / 用工成本 20 个税费测算（免注册，附政策依据）</title>
-    <meta name="description" content="20 个税务测算工具一次列全：月薪个税、税后工资倒算（谈薪）、个税汇算清缴、年终奖、专项附加扣除、个人养老金、税优健康险、企业年金、离职补偿、提前退休、劳务报酬、股权激励、外籍津补贴、增值税、企业所得税、附加税与印花税、个体工商户经营所得（核定 vs 查账）、社保公积金、企业用工成本、残保金与工会经费。每个都能在线算，口径与 App 同源（累计预扣法、60%~300% 社保上下限、小微企业所得税优惠、社平 2 倍工资封顶），并标注政策依据文号。免注册、不采集收入金额。">
+    <title>税务测算工具箱 2026：个税 / 企业税 / 用工成本 20 个测算</title>
+    <meta name="description" content="20 个税务测算工具列全：月薪个税、年终奖、汇算清缴、专项附加扣除、增值税、企业所得税、社保公积金、用工成本、残保金等。免注册、不采集收入金额，口径与 App 同源。">
     <link rel="canonical" href="https://euriskotax.com/seo/index.html">
     <meta name="robots" content="index, follow">
 
@@ -65,6 +65,43 @@
                     { "@type": "ListItem", "position": 18, "url": "https://euriskotax.com/seo/disability-fund.html", "name": "残保金与工会经费测算（30 人以下免征）" },
                     { "@type": "ListItem", "position": 19, "url": "https://euriskotax.com/seo/health-insurance.html", "name": "税优健康险节税测算（2400 元/年限额）" },
                     { "@type": "ListItem", "position": 20, "url": "https://euriskotax.com/seo/enterprise-annuity.html", "name": "企业年金个税测算（个人 4% 当期扣除）" }
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "这 20 个测算要收费吗？需要注册吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "都不要。20 个工具在页面里直接算，免注册、免费用；需要保存历史、生成分享图或多情景对比时才用完整测算工具，同样免注册。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "会采集我的收入金额吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不会为测算而上传。输入的数据默认留在你自己的浏览器；云同步是登录后可选的开关，由你自己决定是否开启。留资表单是另一条链路，需要你主动填写。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这些计算和 App 里的结果一致吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "一致。落地页直接引用 App 同一份税率常量与算法实现，累计预扣法、社保 60%~300% 上下限、小微企业所得税优惠、社平工资 2 倍封顶都是同一套口径，并有逐点对拍测试守护，不会出现两套数。"
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "政策变了，页面上的税率会更新吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "会。页面加载时拉取运营后台维护的税率口径并覆盖出厂税率表，税率调整后无需改代码，页面按新口径重算。各页正文标注了政策依据文号。"
+                        }
+                    }
                 ]
             }
         ]
@@ -192,6 +229,24 @@
             <p>上面的单页工具各管一段；把所有收入放一起算、保存历史、生成结果分享图，用完整测算工具。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_index">打开 EuriskoTax 完整测算</a>
         </section>
+
+        <h2>常见问题</h2>
+        <details>
+            <summary>这 20 个测算要收费吗？需要注册吗？</summary>
+            <p>都不要。20 个工具在页面里直接算，免注册、免费用；需要保存历史、生成分享图或多情景对比时才用完整测算工具，同样免注册。</p>
+        </details>
+        <details>
+            <summary>会采集我的收入金额吗？</summary>
+            <p>不会为测算而上传。输入的数据默认留在你自己的浏览器；云同步是登录后可选的开关，由你自己决定是否开启。留资表单是另一条链路，需要你主动填写。</p>
+        </details>
+        <details>
+            <summary>这些计算和 App 里的结果一致吗？</summary>
+            <p>一致。落地页直接引用 App 同一份税率常量与算法实现，累计预扣法、社保 60%~300% 上下限、小微企业所得税优惠、社平工资 2 倍封顶都是同一套口径，并有逐点对拍测试守护，不会出现两套数。</p>
+        </details>
+        <details>
+            <summary>政策变了，页面上的税率会更新吗？</summary>
+            <p>会。页面加载时拉取运营后台维护的税率口径并覆盖出厂税率表，税率调整后无需改代码，页面按新口径重算。各页正文标注了政策依据文号。</p>
+        </details>
     </div>
 </main>
 

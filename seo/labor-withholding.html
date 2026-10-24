@@ -12,8 +12,8 @@
               / window.otherIncomeRules），页面上不出现第二份税率表；
            3) 政策依据文号来自税种注册表 tax-registry.js（15D-1），页面只负责呈现；
            4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
-    <title>劳务报酬个税计算器 2026：800 元扣除与 20%/30%/40% 预扣率怎么算</title>
-    <meta name="description" content="输入一笔劳务报酬 / 稿酬 / 特许权使用费，立即算出预扣预缴税额与税后到手，并对比「并入综合所得」后的实际税负（应退还是应补）。含预扣率表、费用扣除规则与示例表，政策依据：国家税务总局公告 2018 年第 61 号。">
+    <title>劳务报酬个税计算器 2026：800 元扣除与 20%/30%/40% 预扣率</title>
+    <meta name="description" content="输入一笔劳务报酬、稿酬或特许权使用费，算出预扣预缴税额与税后到手，并对比并入综合所得后是退税还是补税。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/labor-withholding.html">
     <meta name="robots" content="index, follow">
 
@@ -114,9 +114,9 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">劳务报酬 / 稿酬 / 特许权使用费预扣速算</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <h2 id="calc-title" class="mt-0">劳务报酬 / 稿酬 / 特许权使用费预扣速算</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="type-input">所得类型</label>
                     <select class="calc-input" id="type-input">
                         <option value="labor" selected>劳务报酬所得</option>
@@ -124,7 +124,7 @@
                         <option value="royalty">特许权使用费所得</option>
                     </select>
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="amount-input">收入金额（元，税前）</label>
                     <input class="calc-input" id="amount-input" type="number" inputmode="decimal" min="0" step="100" value="10000" aria-describedby="calc-note">
                 </div>
@@ -139,7 +139,7 @@
                 <option value="0.35">35%（660000 ～ 960000）</option>
                 <option value="0.45">45%（超过 960000）</option>
             </select>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 本页算的是<strong>预扣预缴</strong>（支付方先扣的数）与<strong>并入综合所得后的估算税负</strong>；
                 并入后的实际税负取决于全年收入与扣除，精确值请<a href="/?source=seo_withholding">在 App 里把全年收支填一次</a>。
             </p>
@@ -164,7 +164,7 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方预扣率表、费用扣除规则与示例表手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方预扣率表、费用扣除规则与示例表手工估算。</p>
             </noscript>
         </section>
 
@@ -178,7 +178,7 @@
         <h2>预扣率表（劳务报酬）</h2>
         <div class="table-scroll">
             <table id="rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">按「应纳税所得额」（已减费用）定档，稿酬与特许权使用费不查此表，预扣率固定 20%</caption>
+                <caption class="small muted">按「应纳税所得额」（已减费用）定档，稿酬与特许权使用费不查此表，预扣率固定 20%</caption>
                 <thead>
                 <tr>
                     <th scope="col">应纳税所得额（元）</th>
@@ -241,7 +241,7 @@
         </p>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">综合所得年度税率表（全年应纳税所得额）—— 汇算时按此表对全部综合所得计税</caption>
+                <caption class="small muted">综合所得年度税率表（全年应纳税所得额）—— 汇算时按此表对全部综合所得计税</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -260,16 +260,18 @@
                 </tbody>
             </table>
         </div>
-        <table>
-            <thead>
-            <tr><th scope="col">情况</th><th scope="col">汇算结果通常是</th></tr>
-            </thead>
-            <tbody>
-            <tr><td>全年综合所得低（如学生兼职、只有几笔稿酬）</td><td>预扣 20% 高于实际档位 → <strong>退税</strong></td></tr>
-            <tr><td>全年综合所得已进入较高档位（25% 及以上）</td><td>预扣率低于实际档位 → <strong>补税</strong></td></tr>
-            <tr><td>劳务报酬单笔金额大（应纳税所得额超过 5 万）</td><td>预扣 40%，多数情况会退一部分</td></tr>
-            </tbody>
-        </table>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr><th scope="col">情况</th><th scope="col">汇算结果通常是</th></tr>
+                </thead>
+                <tbody>
+                <tr><td>全年综合所得低（如学生兼职、只有几笔稿酬）</td><td>预扣 20% 高于实际档位 → <strong>退税</strong></td></tr>
+                <tr><td>全年综合所得已进入较高档位（25% 及以上）</td><td>预扣率低于实际档位 → <strong>补税</strong></td></tr>
+                <tr><td>劳务报酬单笔金额大（应纳税所得额超过 5 万）</td><td>预扣 40%，多数情况会退一部分</td></tr>
+                </tbody>
+            </table>
+        </div>
         <p class="small muted">判断的关键是把「并入后的全年应纳税额」与「已预缴税额」放在一起比。手工算容易出错，<a href="/?source=seo_withholding">在 App 里填一次全年收支，应退/应补会直接给出</a>（数据只存在本机浏览器）。</p>
 
         <h2>常见问题</h2>
@@ -298,6 +300,28 @@
             <h2>把全年收支一起算，看看到底退还是补</h2>
             <p>输入工资、社保公积金、专项附加扣除与劳务 / 稿酬收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_withholding">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/business-income.html">
+                    <div class="t">个体户经营所得</div>
+                    <div class="d">核定征收与查账征收对比</div>
+                </a>
+                <a class="related-card" href="/seo/expat-allowance.html">
+                    <div class="t">外籍个人津补贴</div>
+                    <div class="d">免税与专项附加扣除二选一</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

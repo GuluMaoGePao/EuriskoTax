@@ -11,8 +11,8 @@
            2) 税额口径复用 App 同源实现（bonus-tax-quick.js + window.bonusMonthlyTaxRates），
               页面上不出现第二份税率表；
            3) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。 -->
-    <title>年终奖个税计算器 2026：单独计税还是并入综合所得更省税？</title>
-    <meta name="description" content="输入年终奖金额，立即算出单独计税的应纳税额与税后到手，并给出临界点跳档提示。含 36000 / 144000 / 300000 等六个临界点对照表与政策依据（财政部 税务总局公告 2023 年第 30 号）。">
+    <title>年终奖个税计算器 2026：单独计税还是并入综合所得</title>
+    <meta name="description" content="输入年终奖金额，立即算出单独计税的应纳税额与税后到手，并提示 36000 / 144000 等六个临界点跳档风险（多发 1 元可能多缴上万元）。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/bonus-tax.html">
     <meta name="robots" content="index, follow">
 
@@ -111,13 +111,13 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">年终奖税后到手速算</h2>
+            <h2 id="calc-title" class="mt-0">年终奖税后到手速算</h2>
             <label class="calc-label" for="bonus-input">年终奖金额（元，税前）</label>
             <div class="calc-input-row">
                 <input class="calc-input" id="bonus-input" type="number" inputmode="decimal" min="0" step="100" value="60000" aria-describedby="calc-note">
                 <button class="btn btn-primary" id="calc-reset" type="button">重算</button>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 本页只算<strong>单独计税</strong>的结果。要判断「单独计税 vs 并入综合所得」哪个更省，需要结合全年工资与各项扣除，请用<a href="/?source=seo_bonus">完整测算一键对比</a>。
             </p>
 
@@ -137,7 +137,7 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方临界点对照表与公式手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方临界点对照表与公式手工估算。</p>
             </noscript>
         </section>
 
@@ -151,7 +151,7 @@
         <h2>税率表（全年一次性奖金单独计税）</h2>
         <div class="table-scroll">
             <table>
-                <caption class="small muted" style="text-align:left;padding:8px 0">按月换算后的综合所得税率表：先用奖金 ÷ 12 定档，再对奖金全额计税</caption>
+                <caption class="small muted">按月换算后的综合所得税率表：先用奖金 ÷ 12 定档，再对奖金全额计税</caption>
                 <thead>
                 <tr>
                     <th scope="col">奖金 ÷ 12 落在区间（元）</th>
@@ -198,16 +198,18 @@
         <p class="small muted">表中数字由本页速算器同源计算得出（税率表取自 App 的税率常量，可被运营在后台热改后同步），并由 <code>tests/bonus-tax-quick.test.js</code> 逐点与 App 内核结果对拍守护。</p>
 
         <h2>两个选择怎么选</h2>
-        <table>
-            <thead>
-            <tr><th scope="col">情况</th><th scope="col">通常更省的选择</th></tr>
-            </thead>
-            <tbody>
-            <tr><td>全年综合所得低、专项附加扣除用不完</td><td>并入综合所得（把扣除额度用足）</td></tr>
-            <tr><td>全年综合所得高、已进入较高税率档</td><td>单独计税（把奖金单独按低档算）</td></tr>
-            <tr><td>奖金刚过临界点</td><td>先算一遍两种结果；必要时与单位协商把超出部分挪到工资或递延</td></tr>
-            </tbody>
-        </table>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                <tr><th scope="col">情况</th><th scope="col">通常更省的选择</th></tr>
+                </thead>
+                <tbody>
+                <tr><td>全年综合所得低、专项附加扣除用不完</td><td>并入综合所得（把扣除额度用足）</td></tr>
+                <tr><td>全年综合所得高、已进入较高税率档</td><td>单独计税（把奖金单独按低档算）</td></tr>
+                <tr><td>奖金刚过临界点</td><td>先算一遍两种结果；必要时与单位协商把超出部分挪到工资或递延</td></tr>
+                </tbody>
+            </table>
+        </div>
         <p class="small muted">判断的关键是把「奖金并入后的综合所得应纳税额」与「单独计税税额」放在一起比。手工算这两种情景很容易出错，<a href="/?source=seo_bonus">在 App 里填一次工资与扣除，两种结果会并排给出</a>（数据只存在本机浏览器）。</p>
 
         <h2>常见问题</h2>
@@ -236,6 +238,28 @@
             <h2>把全年工资一起算，看两种算法的差额</h2>
             <p>输入工资、社保公积金与专项附加扣除，App 会同时给出「单独计税」与「并入综合所得」的结果、差额与拆分测算。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_bonus">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/net-salary.html">
+                    <div class="t">税后工资倒算</div>
+                    <div class="d">月到手 1 万，税前要谈多少</div>
+                </a>
+                <a class="related-card" href="/seo/labor-withholding.html">
+                    <div class="t">劳务报酬</div>
+                    <div class="d">800 元扣除与三级预扣率</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

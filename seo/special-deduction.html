@@ -15,8 +15,8 @@
            4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
          这一页额外背一条「纠偏」任务：很多人把「扣除额」直接当成「少交的税」，
          实际扣的是**应纳税所得额**，少交多少取决于这笔扣除落在哪几档税率上 —— 页面必须讲清。 -->
-    <title>专项附加扣除计算器 2026：七项能扣多少、能少交多少个税（附年度确认与分摊规则）</title>
-    <meta name="description" content="输入子女教育、3 岁以下婴幼儿照护、继续教育、大病医疗、住房贷款利息、住房租金、赡养老人七项信息，按 2026 年现行标准算出全年可扣除总额与少交的个人所得税（扣除的是应纳税所得额，不是直接减税）。含七项标准表、年度税率表与公开示例。政策依据：国发〔2018〕41 号、国发〔2023〕13 号。">
+    <title>专项附加扣除计算器 2026：七项能扣多少、少交多少税</title>
+    <meta name="description" content="输入子女教育、赡养老人、住房贷款利息等七项信息，按现行标准算出全年可扣除总额与少交的个税（扣的是应纳税所得额，不是直接减税）。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/special-deduction.html">
     <meta name="robots" content="index, follow">
 
@@ -136,24 +136,24 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">专项附加扣除速算（七项合计 + 少交多少个税）</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 160px">
+            <h2 id="calc-title" class="mt-0">专项附加扣除速算（七项合计 + 少交多少个税）</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="infants-input">3 岁以下婴幼儿（个）</label>
                     <input class="calc-input" id="infants-input" type="number" inputmode="numeric" min="0" step="1" value="0" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="infant-share">婴幼儿照护分摊</label>
                     <select class="calc-input" id="infant-share">
                         <option value="100" selected>一方扣 100%</option>
                         <option value="50">双方各扣 50%</option>
                     </select>
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="children-input">子女教育（个）</label>
                     <input class="calc-input" id="children-input" type="number" inputmode="numeric" min="0" step="1" value="1" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="child-share">子女教育分摊</label>
                     <select class="calc-input" id="child-share">
                         <option value="100" selected>一方扣 100%</option>
@@ -161,22 +161,22 @@
                     </select>
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 180px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="degree-input">学历（学位）继续教育（月）</label>
                     <input class="calc-input" id="degree-input" type="number" inputmode="numeric" min="0" max="48" step="1" value="0" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="cert-input">职业资格证书（本/当年）</label>
                     <input class="calc-input" id="cert-input" type="number" inputmode="numeric" min="0" step="1" value="0" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="medical-input">大病医疗：个人自付累计（元）</label>
                     <input class="calc-input" id="medical-input" type="number" inputmode="decimal" min="0" step="1000" value="0" aria-describedby="calc-note">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="housing-input">住房（房贷 / 房租二选一）</label>
                     <select class="calc-input" id="housing-input">
                         <option value="none" selected>不享受</option>
@@ -184,11 +184,11 @@
                         <option value="rent">住房租金</option>
                     </select>
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="loan-input">房贷利息享受月数（≤240）</label>
                     <input class="calc-input" id="loan-input" type="number" inputmode="numeric" min="0" max="240" step="1" value="12" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="rent-tier">住房租金城市档</label>
                     <select class="calc-input" id="rent-tier">
                         <option value="1" selected>直辖市 / 省会 / 计划单列市（1500 元/月）</option>
@@ -196,13 +196,13 @@
                         <option value="3">市辖区户籍人口不超 100 万（800 元/月）</option>
                     </select>
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="rent-input">住房租金享受月数</label>
                     <input class="calc-input" id="rent-input" type="number" inputmode="numeric" min="0" max="12" step="1" value="12" aria-describedby="calc-note">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="elderly-input">赡养老人</label>
                     <select class="calc-input" id="elderly-input">
                         <option value="none" selected>不享受</option>
@@ -210,16 +210,16 @@
                         <option value="shared">非独生子女（分摊）</option>
                     </select>
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="elderly-monthly">非独生子女分摊（元/月，≤1500）</label>
                     <input class="calc-input" id="elderly-monthly" type="number" inputmode="decimal" min="0" max="1500" step="100" value="1500" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 240px">
+                <div class="field">
                     <label class="calc-label" for="taxable-input">扣除前全年应纳税所得额（元）</label>
                     <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
                 </div>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 「扣除前全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除；
                 不确定就按「全年收入 − 6 万 − 社保公积金」估算。
                 <strong>住房贷款利息与住房租金同一年只能二选一</strong>，选了其中一项另一项自动不计。
@@ -266,14 +266,14 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「七项标准表」「年度税率表」与「示例表」手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「七项标准表」「年度税率表」与「示例表」手工估算。</p>
             </noscript>
         </section>
 
         <h2>七项标准一览表（2026 年现行口径）</h2>
         <div class="table-scroll">
             <table id="deduction-standard-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">标准取自 App 常量 specialDeductionRules（提高后的标准自 2023-01-01 起执行）</caption>
+                <caption class="small muted">标准取自 App 常量 specialDeductionRules（提高后的标准自 2023-01-01 起执行）</caption>
                 <thead>
                 <tr>
                     <th scope="col">扣除项目</th>
@@ -301,7 +301,7 @@
         <h2>年度综合所得税率表（扣除踩在哪几档，就按哪几档省税）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；专项附加扣除降低的是「应纳税所得额」这一列</caption>
+                <caption class="small muted">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；专项附加扣除降低的是「应纳税所得额」这一列</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -399,7 +399,16 @@
         <h2>常见问题</h2>
         <details>
             <summary>2026 年七项专项附加扣除的标准分别是多少？</summary>
-            <p>3 岁以下婴幼儿照护与子女教育各 2000 元/月/人；继续教育学历（学位）400 元/月（同一学历最长 48 个月）、职业资格 3600 元/年（取得证书当年）；大病医疗按医保目录内个人自付累计超过 15000 元的部分据实扣除、年度限额 80000 元；住房贷款利息 1000 元/月（最长 240 个月）；住房租金按城市 1500 / 1100 / 800 元/月；赡养老人 3000 元/月（独生子女），非独生子女分摊每人不超过 1500 元/月。依据国发〔2018〕41 号与国发〔2023〕13 号。</p>
+            <p>现行标准如下：</p>
+            <ul class="facts">
+                <li>3 岁以下婴幼儿照护、子女教育：各 2000 元/月/人</li>
+                <li>继续教育：学历（学位）400 元/月（同一学历最长 48 个月）；职业资格 3600 元/年（取得证书当年）</li>
+                <li>大病医疗：医保目录内个人自付累计超过 15000 元的部分据实扣除，年度限额 80000 元</li>
+                <li>住房贷款利息：1000 元/月，最长 240 个月</li>
+                <li>住房租金：按城市 1500 / 1100 / 800 元/月</li>
+                <li>赡养老人：3000 元/月（独生子女）；非独生子女分摊每人不超过 1500 元/月</li>
+            </ul>
+            <p class="small muted">依据国发〔2018〕41 号与国发〔2023〕13 号。</p>
         </details>
         <details>
             <summary>扣除额就是少交的税吗？</summary>
@@ -430,6 +439,28 @@
             <h2>把七项扣除填进全年账一起算</h2>
             <p>输入全年工资、社保公积金与专项附加扣除，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_special">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/private-pension.html">
+                    <div class="t">个人养老金</div>
+                    <div class="d">每年 12000 税前扣除值多少</div>
+                </a>
+                <a class="related-card" href="/seo/health-insurance.html">
+                    <div class="t">税优健康险</div>
+                    <div class="d">每年 2400 元税前扣除</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

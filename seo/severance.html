@@ -14,8 +14,8 @@
            4) 首屏零 CDN、无阻塞脚本，正文为静态 HTML（爬虫不执行 JS 也能读到全部内容）。
          这一页额外背一条「纠错」任务：网上大量计算器仍按国税发〔1999〕178 号把补偿金除以
          工作年限（≤12）平均成月工资再计税，该做法自 2019 年起已不再执行，本页必须讲清。 -->
-    <title>离职补偿金个税计算器 2026：经济补偿金免税额度（3 倍社平工资）与超过部分怎么算</title>
-    <meta name="description" content="输入经济补偿金、其他一次性补助、当地上年职工年平均工资与工作年限，算出 3 倍社平工资免税额度、法定经济补偿上限（12 年 / 3 倍月工资封顶）与单独计税应纳税额，并对照「若并入当年综合所得」的差异。含年度税率表与公开案例。政策依据：财税〔2018〕164 号。">
+    <title>离职补偿金个税 2026：3 倍社平工资免税额度怎么算</title>
+    <meta name="description" content="输入经济补偿金、当地上年职工平均工资与工作年限，算出 3 倍社平工资免税额度与单独计税应纳税额，并对照并入综合所得的差异。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/severance.html">
     <meta name="robots" content="index, follow">
 
@@ -125,36 +125,36 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">离职补偿金个税速算（免税额度 + 单独计税）</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <h2 id="calc-title" class="mt-0">离职补偿金个税速算（免税额度 + 单独计税）</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="eco-input">经济补偿金（元）</label>
                     <input class="calc-input" id="eco-input" type="number" inputmode="decimal" min="0" step="10000" value="280000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="other-input">其他一次性补助（医疗补助费等，元）</label>
                     <input class="calc-input" id="other-input" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="avgwage-input">当地上年职工年平均工资（元/年）</label>
                     <input class="calc-input" id="avgwage-input" type="number" inputmode="decimal" min="0" step="10000" value="50000" aria-describedby="calc-note">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 160px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="years-input">在本单位工作年限（年）</label>
                     <input class="calc-input" id="years-input" type="number" inputmode="decimal" min="0" step="1" value="14" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="wage-input">离职前 12 个月月平均工资（元）</label>
                     <input class="calc-input" id="wage-input" type="number" inputmode="decimal" min="0" step="1000" value="20000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 240px">
+                <div class="field">
                     <label class="calc-label" for="othertaxable-input">全年其他综合所得应纳税所得额（元，对照用）</label>
                     <input class="calc-input" id="othertaxable-input" type="number" inputmode="decimal" min="0" step="10000" value="100000" aria-describedby="calc-note">
                 </div>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 社平工资请填当地人社 / 统计部门公布的<strong>上年职工年平均工资</strong>（按月公布的请先 × 12）；
                 月平均工资用于判断《劳动合同法》的封顶，填 0 表示<strong>不校验法定上限</strong>（此时全额补偿视为符合法定标准）。
                 「并入综合所得」一栏是<strong>假设口径的对照值</strong> —— 现行政策是「不并入」，不是「可选并入」。
@@ -204,7 +204,7 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三道 3 倍 / 12 年」「年度税率表」与「示例表」手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三道 3 倍 / 12 年」「年度税率表」与「示例表」手工估算。</p>
             </noscript>
         </section>
 
@@ -234,7 +234,7 @@
         <h2>年度综合所得税率表（超额部分就查这张表）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">超过免税额度的部分全额适用本表，按「应纳税所得额 × 税率 − 速算扣除数」计税，不减除费用</caption>
+                <caption class="small muted">超过免税额度的部分全额适用本表，按「应纳税所得额 × 税率 − 速算扣除数」计税，不减除费用</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -350,6 +350,28 @@
             <h2>把工资、年终奖与一次性补偿一起算</h2>
             <p>输入全年工资、社保公积金、专项附加扣除与一次性补偿收入，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_severance">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/early-retirement.html">
+                    <div class="t">提前退休与内部退养</div>
+                    <div class="d">一次性收入怎么计税</div>
+                </a>
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+                <a class="related-card" href="/seo/employer-cost.html">
+                    <div class="t">企业用工成本</div>
+                    <div class="d">税前 1 万企业实际花多少</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

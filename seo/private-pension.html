@@ -18,8 +18,8 @@
            ② 适用税率 3% 的人「省 3%、领取时再交 3%」，两个环节相抵后税收净优惠为零。
               注意口径：本页只算**税额差额**（缴费少交 vs 领取交），不评价是否参与 ——
               备案内容限定为在线测算工具，「是否参与」属投资理财判断，不在承诺范围内。 -->
-    <title>个人养老金能抵多少税 2026：每年 12000 税前扣除 + 领取按 3% 单独计税（缴费与领取两环节税额测算）</title>
-    <meta name="description" content="输入每年缴费额与全年应纳税所得额，按 2026 年现行政策算出个人养老金当年少交的个人所得税、领取时按 3% 缴纳的税额与净优惠。含三环节税务处理表、年度税率表与公开示例。政策依据：财政部 税务总局公告 2024 年第 21 号。">
+    <title>个人养老金能抵多少税 2026：每年 12000 税前扣除 + 领取按 3%</title>
+    <meta name="description" content="输入每年缴费额与全年应纳税所得额，算出当年少交的个税、领取时按 3% 缴纳的税额与净优惠，附三环节税务处理表。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/private-pension.html">
     <meta name="robots" content="index, follow">
 
@@ -130,26 +130,26 @@
         </p>
 
         <section class="card" aria-labelledby="calc-title">
-            <h2 id="calc-title" style="margin-top:0">个人养老金税优速算（少交的税 − 领取时 3% = 净优惠）</h2>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <h2 id="calc-title" class="mt-0">个人养老金税优速算（少交的税 − 领取时 3% = 净优惠）</h2>
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="contribution-input">每年缴费额（元）</label>
                     <input class="calc-input" id="contribution-input" type="number" inputmode="decimal" min="0" step="1000" value="12000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 240px">
+                <div class="field">
                     <label class="calc-label" for="taxable-input">缴费当年全年应纳税所得额（元）</label>
                     <input class="calc-input" id="taxable-input" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="years-input">缴费年数</label>
                     <input class="calc-input" id="years-input" type="number" inputmode="numeric" min="1" step="1" value="10" aria-describedby="calc-note">
                 </div>
-                <div style="flex:1 1 220px">
+                <div class="field">
                     <label class="calc-label" for="withdraw-input">预计领取总额（元）</label>
                     <input class="calc-input" id="withdraw-input" type="number" inputmode="decimal" min="0" step="10000" value="120000" aria-describedby="calc-note">
                 </div>
             </div>
-            <p class="small muted" id="calc-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="calc-note">
                 「缴费当年全年应纳税所得额」= 全年综合所得收入 − 6 万元基本减除 − 社保公积金个人部分 − 其他扣除；
                 不确定就按「全年收入 − 6 万 − 社保公积金」估算。
                 <strong>每年最多扣 12000 元</strong>，超额部分当年不可扣、也不能结转到以后年度。
@@ -196,14 +196,14 @@
             </div>
             <div class="hint" id="calc-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三环节税务处理表」「年度税率表」与「示例表」手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方「三环节税务处理表」「年度税率表」与「示例表」手工估算。</p>
             </noscript>
         </section>
 
         <h2>三个环节的税务处理（2026 年现行口径）</h2>
         <div class="table-scroll">
             <table id="pension-rule-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">同一笔钱，缴费、投资、领取三个阶段各交一次「判断」，处理方式完全不同</caption>
+                <caption class="small muted">同一笔钱，缴费、投资、领取三个阶段各交一次「判断」，处理方式完全不同</caption>
                 <thead>
                 <tr>
                     <th scope="col">环节</th>
@@ -226,7 +226,7 @@
         <h2>年度综合所得税率表（缴费能省多少税，看你落在哪一档）</h2>
         <div class="table-scroll">
             <table id="annual-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；个人养老金缴费降低的是「应纳税所得额」这一列</caption>
+                <caption class="small muted">应纳税额 = 应纳税所得额 × 税率 − 速算扣除数；个人养老金缴费降低的是「应纳税所得额」这一列</caption>
                 <thead>
                 <tr>
                     <th scope="col">全年应纳税所得额（元）</th>
@@ -247,7 +247,7 @@
         </div>
 
         <h2>示例：四种典型情形</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-scroll--sticky">
             <table id="example-table">
                 <thead>
                 <tr>
@@ -325,6 +325,28 @@
             <h2>把个人养老金算进全年账一起看</h2>
             <p>输入全年工资、社保公积金与税前扣除项，App 会给出全年应纳税额、已预缴税额与应退或应补金额。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_pension">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/special-deduction.html">
+                    <div class="t">专项附加扣除</div>
+                    <div class="d">七项能扣多少、少交多少</div>
+                </a>
+                <a class="related-card" href="/seo/enterprise-annuity.html">
+                    <div class="t">企业年金</div>
+                    <div class="d">个人 4% 当期扣除与领取计税</div>
+                </a>
+                <a class="related-card" href="/seo/health-insurance.html">
+                    <div class="t">税优健康险</div>
+                    <div class="d">每年 2400 元税前扣除</div>
+                </a>
+                <a class="related-card" href="/seo/annual-settlement.html">
+                    <div class="t">个税汇算清缴</div>
+                    <div class="d">算清退税还是补税</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

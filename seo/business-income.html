@@ -18,8 +18,8 @@
          核定征收按「收入 × 应税所得率」计税，成本费用、业主 6 万费用扣除与专项附加一律不扣，
          核定期间的亏损也不得弥补；所以只有当**实际净利率高于临界点**时核定才划算。
          临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营业收入 —— 这个式子是本页的全部价值。 -->
-    <title>个体工商户核定征收与查账征收哪个税负低？经营所得个税对比计算器（核定 vs 查账，2026 口径）</title>
-    <meta name="description" content="核定征收不等于少交税：核定按「收入 × 应税所得率」计税，不扣成本费用、不扣业主 6 万费用与专项附加、亏损也不得弥补。临界净利率 = 核定应税所得率 + 6 万元 ÷ 年营收 —— 年营收 60 万、核定所得率 10% 时，净利率要高于 20% 核定才划算（另有工资时临界降回 10%）。含核定/查账并排速算、临界净利率速查表，以及「年应纳税所得额不超过 200 万元部分减半」（至 2027-12-31）的实算。政策依据：个人所得税法（主席令第九号）、实施条例（国务院令第 707 号）、个体工商户个人所得税计税办法（国家税务总局令第 35 号）、财政部 税务总局公告 2023 年第 12 号。">
+    <title>个体户经营所得：核定征收与查账征收哪个税负低（2026）</title>
+    <meta name="description" content="核定按收入乘应税所得率计税，不扣成本、不扣业主 6 万费用，亏损也不得弥补。算出临界净利率，判断核定与查账哪个更划算（减半优惠至 2027-12-31）。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/business-income.html">
     <meta name="robots" content="index, follow">
 
@@ -142,40 +142,40 @@
         </p>
 
         <section class="card" aria-labelledby="compare-title">
-            <h2 id="compare-title" style="margin-top:0">速算：核定与查账并排算，并给出你的临界净利率</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="compare-title" class="mt-0">速算：核定与查账并排算，并给出你的临界净利率</h2>
+            <p class="small muted mt-0">
                 口径：核定应纳税所得额 = 收入 × 应税所得率；查账应纳税所得额 =
                 收入 − 成本费用损失 − 以前年度亏损 − 业主费用扣除 6 万 − 社保公积金 − 专项附加扣除。
                 两者都适用<strong>经营所得五级税率表</strong>（5%~35%），并叠加≤200 万减半
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="b-revenue">年营业收入（元，不含增值税）</label>
                     <input class="calc-input" id="b-revenue" type="number" inputmode="decimal" min="0" step="10000" value="600000" aria-describedby="compare-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="b-cost">成本、费用、税金及损失（元）</label>
                     <input class="calc-input" id="b-cost" type="number" inputmode="decimal" min="0" step="10000" value="510000" aria-describedby="compare-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="b-ratio">核定应税所得率（%）</label>
                     <input class="calc-input" id="b-ratio" type="number" inputmode="decimal" min="1" max="30" step="1" value="10" aria-describedby="compare-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="b-loss">可弥补以前年度亏损（元）</label>
                     <input class="calc-input" id="b-loss" type="number" inputmode="decimal" min="0" step="10000" value="0" aria-describedby="compare-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="b-special">专项附加扣除（元/年）</label>
                     <input class="calc-input" id="b-special" type="number" inputmode="decimal" min="0" step="12000" value="0" aria-describedby="compare-note">
                 </div>
             </div>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="b-social">本人缴纳的社保公积金（元/年）</label>
                     <input class="calc-input" id="b-social" type="number" inputmode="decimal" min="0" step="1000" value="0" aria-describedby="compare-note">
                 </div>
-                <div style="flex:1 1 260px">
+                <div class="field">
                     <label class="calc-label" for="b-hascomp">本人是否另有工资薪金等综合所得</label>
                     <select class="calc-input" id="b-hascomp" aria-describedby="compare-note">
                         <option value="no" selected>没有（6 万扣在经营所得）</option>
@@ -183,10 +183,11 @@
                     </select>
                 </div>
             </div>
-            <p class="small muted" id="compare-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="compare-note">
                 应税所得率由各地税务局在国家税务总局规定的幅度内确定（农林业 3%~10%、制造业 5%~15%、
                 批发零售 4%~15%、建筑 8%~20%、饮食 8%~25%、娱乐 15%~30%），实际以主管税务机关核定为准；
-                本页默认 10% 仅作演示。有综合所得时，6 万基本减除费用、社保公积金与专项附加只能在工资侧扣一次。
+                本页默认 10% 仅作演示。</p>
+            <p class="small muted">有综合所得时，6 万基本减除费用、社保公积金与专项附加只能在工资侧扣一次。
             </p>
             <div class="results" id="compare-results" hidden>
                 <div class="result">
@@ -242,10 +243,10 @@
         </section>
 
         <h2>示例一：年营收 60 万、核定所得率 10%、没有工资（6 万扣在经营所得侧）</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-scroll--sticky">
             <table id="compare-example-table">
                 <thead>
-                    <tr><th>实际净利率</th><th>利润（元）</th><th>核定应纳税所得额（元）</th><th>核定实缴个税（元）</th><th>查账应纳税所得额（元）</th><th>查账实缴个税（元）</th><th>谁更省</th></tr>
+                    <tr><th scope="col">实际净利率</th><th scope="col">利润（元）</th><th scope="col">核定应纳税所得额（元）</th><th scope="col">核定实缴个税（元）</th><th scope="col">查账应纳税所得额（元）</th><th scope="col">查账实缴个税（元）</th><th scope="col">谁更省</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">3%</td><td class="num">18000.00</td><td class="num">60000.00</td><td class="num">2250.00</td><td class="num">0.00</td><td class="num">0.00</td><td>查账省 2250.00</td></tr>
@@ -270,7 +271,7 @@
         <div class="table-scroll">
             <table id="comprehensive-example-table">
                 <thead>
-                    <tr><th>实际净利率</th><th>利润（元）</th><th>核定实缴个税（元）</th><th>查账实缴个税（元）</th><th>谁更省</th></tr>
+                    <tr><th scope="col">实际净利率</th><th scope="col">利润（元）</th><th scope="col">核定实缴个税（元）</th><th scope="col">查账实缴个税（元）</th><th scope="col">谁更省</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">3%</td><td class="num">18000.00</td><td class="num">2250.00</td><td class="num">450.00</td><td>查账省 1800.00</td></tr>
@@ -293,7 +294,7 @@
         <div class="table-scroll">
             <table id="breakeven-example-table">
                 <thead>
-                    <tr><th>年营业收入</th><th>核定所得率 5%</th><th>核定所得率 10%</th><th>核定所得率 15%</th></tr>
+                    <tr><th scope="col">年营业收入</th><th scope="col">核定所得率 5%</th><th scope="col">核定所得率 10%</th><th scope="col">核定所得率 15%</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">30 万</td><td class="num">25.00%</td><td class="num">30.00%</td><td class="num">35.00%</td></tr>
@@ -313,7 +314,7 @@
         <div class="table-scroll">
             <table id="halve-example-table">
                 <thead>
-                    <tr><th>年应纳税所得额（元）</th><th>未减半税额（元）</th><th>减半减免（元）</th><th>实缴个税（元）</th><th>实际省了</th></tr>
+                    <tr><th scope="col">年应纳税所得额（元）</th><th scope="col">未减半税额（元）</th><th scope="col">减半减免（元）</th><th scope="col">实缴个税（元）</th><th scope="col">实际省了</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">200000.00</td><td class="num">29500.00</td><td class="num">14750.00</td><td class="num">14750.00</td><td class="num">50.0%</td></tr>
@@ -399,13 +400,36 @@
             <p>本页算的是核定与查账的选择；经营所得年度汇算、增值税与附加税费、工资个税测算可在 App 里一起看。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_bizincome">打开 EuriskoTax 完整测算</a>
         </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/vat.html">
+                    <div class="t">增值税</div>
+                    <div class="d">小规模免征与一般纳税人抵扣</div>
+                </a>
+                <a class="related-card" href="/seo/corporate-income-tax.html">
+                    <div class="t">企业所得税</div>
+                    <div class="d">25% / 15% / 小微实际税负 5%</div>
+                </a>
+                <a class="related-card" href="/seo/surtax-stamp-duty.html">
+                    <div class="t">附加税与印花税</div>
+                    <div class="d">城建税三档与印花税税目</div>
+                </a>
+                <a class="related-card" href="/seo/labor-withholding.html">
+                    <div class="t">劳务报酬</div>
+                    <div class="d">800 元扣除与三级预扣率</div>
+                </a>
+            </div>
+        </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际纳税请以主管税务机关认定为准。</p>
-        <p id="policy-basis">政策依据：《中华人民共和国个人所得税法》（主席令第九号，2018 年修正）、《中华人民共和国个人所得税法实施条例》（国务院令第 707 号）、《个体工商户个人所得税计税办法》（国家税务总局令第 35 号）、《关于进一步支持小微企业和个体工商户发展有关税费政策的公告》（财政部 税务总局公告 2023 年第 12 号）、《中华人民共和国税收征收管理法》（主席令第 23 号，2015 年修正）、《个体工商户税收定期定额征收管理办法》（国税发〔2006〕183 号）。</p>
+        <p id="policy-basis">政策依据：《中华人民共和国个人所得税法》（主席令第九号，2018 年修正）、《中华人民共和国个人所得税法实施条例》（国务院令第 707 号）、《个体工商户个人所得税计税办法》（国家税务总局令第 35 号）。</p>
+        <p class="small muted">另有《关于进一步支持小微企业和个体工商户发展有关税费政策的公告》（财政部 税务总局公告 2023 年第 12 号）、《中华人民共和国税收征收管理法》（主席令第 23 号，2015 年修正）、《个体工商户税收定期定额征收管理办法》（国税发〔2006〕183 号）。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/vat.html">增值税</a> · <a href="/seo/surtax-stamp-duty.html">附加税与印花税</a> · <a href="/seo/corporate-income-tax.html">企业所得税</a></p>
     </div>
     <div id="site-filing" class="site-filing"></div>

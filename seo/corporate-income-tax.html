@@ -17,8 +17,8 @@
          这一页背一条主线任务：**把「税率的乘法」和「门槛的悬崖」讲清楚** ——
          小微 5% 是「25% 计入 × 20% 税率」两档相乘来的，不是给了个 5% 税率；
          而三个门槛是「且」的关系且是临界点，超过一点就全额按 25%，多 1 万利润多缴 60 万税。 -->
-    <title>企业所得税怎么算 2026：一般 25% / 高新 15% / 小型微利实际税负 5%（300 万·300 人·5000 万门槛）计算器</title>
-    <meta name="description" content="按 2026 年现行政策算企业所得税：一般企业 25%、高新技术企业减按 15%、小型微利企业减按 25% 计入应纳税所得额后按 20% 税率（实际税负 5%，需同时满足应纳税所得额 300 万元、从业人数 300 人、资产总额 5000 万元）。含公式、临界点示例表、分红个税对照与常见扣除限额。政策依据：企业所得税法（主席令第 63 号）、实施条例（国务院令第 512 号）、财政部 税务总局公告 2023 年第 12 号。">
+    <title>企业所得税怎么算 2026：25% / 15% / 小微实际税负 5%</title>
+    <meta name="description" content="一般企业 25%、高新技术企业 15%、小型微利实际税负 5%（应纳税所得额 300 万、从业人数 300 人、资产总额 5000 万门槛）。含临界点与分红个税对照。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/corporate-income-tax.html">
     <meta name="robots" content="index, follow">
 
@@ -130,32 +130,32 @@
         </p>
 
         <section class="card" aria-labelledby="cit-title">
-            <h2 id="cit-title" style="margin-top:0">速算一：企业所得税（含小型微利门槛判定与临界点）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="cit-title" class="mt-0">速算一：企业所得税（含小型微利门槛判定与临界点）</h2>
+            <p class="small muted mt-0">
                 口径：<strong>应纳税额 = 应纳税所得额 × 适用税率</strong>；小微为「减按 25% 计入 × 20% 税率」；
                 高新 15% 与小微 5% <strong>不叠加</strong>，按孰优
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="c-taxable">年应纳税所得额（元）</label>
                     <input class="calc-input" id="c-taxable" type="number" inputmode="decimal" min="0" step="100000" value="1000000" aria-describedby="cit-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="c-staff">从业人数（人）</label>
                     <input class="calc-input" id="c-staff" type="number" inputmode="numeric" min="0" step="10" value="50" aria-describedby="cit-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="c-assets">资产总额（元）</label>
                     <input class="calc-input" id="c-assets" type="number" inputmode="decimal" min="0" step="1000000" value="3000000" aria-describedby="cit-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="c-hightech">企业类型</label>
                     <select class="calc-input" id="c-hightech" aria-describedby="cit-note">
                         <option value="no" selected>一般企业</option>
                         <option value="yes">高新技术企业（减按 15%）</option>
                     </select>
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="c-restricted">是否国家限制和禁止行业</label>
                     <select class="calc-input" id="c-restricted" aria-describedby="cit-note">
                         <option value="no" selected>否（非限制禁止行业）</option>
@@ -163,7 +163,7 @@
                     </select>
                 </div>
             </div>
-            <p class="small muted" id="cit-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="cit-note">
                 应纳税所得额 ≠ 会计利润：业务招待费、广宣费、公益性捐赠等都有<strong>扣除限额</strong>（见速算三）。
                 小微优惠依据财政部 税务总局公告 2023 年第 12 号，<strong>执行至 2027 年 12 月 31 日</strong><span id="small-expiry"></span>。
             </p>
@@ -193,25 +193,25 @@
         </section>
 
         <section class="card" aria-labelledby="div-title">
-            <h2 id="div-title" style="margin-top:0">速算二：税后利润分红到手（企业所得税 + 股息红利个税 20%）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="div-title" class="mt-0">速算二：税后利润分红到手（企业所得税 + 股息红利个税 20%）</h2>
+            <p class="small muted mt-0">
                 口径：<strong>税后利润 = 利润 − 企业所得税</strong>；<strong>分红个税 = 税后利润 × 20%</strong>；
                 <strong>到手 = 税后利润 × 80%</strong> —— 企业与股东是<strong>两层税负</strong>
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 220px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="d-profit">税前利润（元）</label>
                     <input class="calc-input" id="d-profit" type="number" inputmode="decimal" min="0" step="100000" value="1000000" aria-describedby="div-note">
                 </div>
-                <div style="flex:1 1 160px">
+                <div class="field">
                     <label class="calc-label" for="d-staff">从业人数（人）</label>
                     <input class="calc-input" id="d-staff" type="number" inputmode="numeric" min="0" step="10" value="50" aria-describedby="div-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="d-assets">资产总额（元）</label>
                     <input class="calc-input" id="d-assets" type="number" inputmode="decimal" min="0" step="1000000" value="3000000" aria-describedby="div-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="d-hightech">企业类型</label>
                     <select class="calc-input" id="d-hightech" aria-describedby="div-note">
                         <option value="no" selected>一般企业</option>
@@ -219,7 +219,7 @@
                     </select>
                 </div>
             </div>
-            <p class="small muted" id="div-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="div-note">
                 分红个税按「<strong>利息、股息、红利所得</strong>」20% 计征（分给<strong>个人</strong>股东时）；
                 居民企业之间符合条件的股息红利所得可免税，本速算器按个人股东口径测算。
             </p>
@@ -249,34 +249,34 @@
         </section>
 
         <section class="card" aria-labelledby="limit-title">
-            <h2 id="limit-title" style="margin-top:0">速算三：常见扣除限额（税前扣不掉的部分要调增）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="limit-title" class="mt-0">速算三：常见扣除限额（税前扣不掉的部分要调增）</h2>
+            <p class="small muted mt-0">
                 业务招待费：<strong>发生额的 60%</strong> 与 <strong>收入的 5‰</strong> <strong>孰低</strong>；
                 广宣费：<strong>收入 15%</strong> 以内；公益性捐赠：<strong>年度利润总额 12%</strong> 以内
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="l-revenue">当年营业收入（元）</label>
                     <input class="calc-input" id="l-revenue" type="number" inputmode="decimal" min="0" step="1000000" value="10000000" aria-describedby="limit-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="l-profit">年度利润总额（元）</label>
                     <input class="calc-input" id="l-profit" type="number" inputmode="decimal" min="0" step="100000" value="1000000" aria-describedby="limit-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="l-ent">业务招待费（元）</label>
                     <input class="calc-input" id="l-ent" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="limit-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="l-ad">广告费和业务宣传费（元）</label>
                     <input class="calc-input" id="l-ad" type="number" inputmode="decimal" min="0" step="100000" value="2000000" aria-describedby="limit-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="l-don">公益性捐赠（元）</label>
                     <input class="calc-input" id="l-don" type="number" inputmode="decimal" min="0" step="10000" value="200000" aria-describedby="limit-note">
                 </div>
             </div>
-            <p class="small muted" id="limit-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="limit-note">
                 广宣费与公益性捐赠超出限额的部分<strong>不是白扣</strong> ——
                 广宣费可<strong>结转以后年度</strong>扣除，公益性捐赠可结转<strong>以后三年</strong>扣除；
                 业务招待费超出部分<strong>不能结转</strong>，永久调增。
@@ -305,7 +305,7 @@
             </div>
             <div class="hint" id="limit-hint" hidden></div>
             <noscript>
-                <p class="hint" style="display:block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、税率表与示例表手工估算。</p>
+                <p class="hint block">当前浏览器未启用 JavaScript，速算器不可用；可用下方公式、税率表与示例表手工估算。</p>
             </noscript>
         </section>
 
@@ -384,7 +384,7 @@
         <h2>企业所得税税率表（2026 年现行）</h2>
         <div class="table-scroll">
             <table id="cit-rate-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">应纳税额 = 应纳税所得额 × 适用税率 − 减免、抵免税额</caption>
+                <caption class="small muted">应纳税额 = 应纳税所得额 × 适用税率 − 减免、抵免税额</caption>
                 <thead>
                 <tr>
                     <th scope="col">税率</th>
@@ -403,7 +403,7 @@
         <h2>小型微利企业：三个门槛须同时满足</h2>
         <div class="table-scroll">
             <table id="small-condition-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">依据财税〔2019〕13 号与财政部 税务总局公告 2023 年第 12 号；三个条件是「且」的关系，且为临界点</caption>
+                <caption class="small muted">依据财税〔2019〕13 号与财政部 税务总局公告 2023 年第 12 号；三个条件是「且」的关系，且为临界点</caption>
                 <thead>
                 <tr>
                     <th scope="col">条件</th>
@@ -423,7 +423,7 @@
         <h2>常见扣除限额（税前扣除的三大陷阱）</h2>
         <div class="table-scroll">
             <table id="deduction-limit-table">
-                <caption class="small muted" style="text-align:left;padding:8px 0">依据企业所得税法实施条例第四十三、四十四、五十三条；超出部分处理方式不同</caption>
+                <caption class="small muted">依据企业所得税法实施条例第四十三、四十四、五十三条；超出部分处理方式不同</caption>
                 <thead>
                 <tr>
                     <th scope="col">项目</th>
@@ -493,6 +493,28 @@
             <h2>把个人与企业的税放在一处看</h2>
             <p>本页算的是企业所得税与分红个税；增值税测算、个人工资与年度汇算可在 App 里一起看。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_cit">打开 EuriskoTax 完整测算</a>
+        </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/vat.html">
+                    <div class="t">增值税</div>
+                    <div class="d">小规模免征与一般纳税人抵扣</div>
+                </a>
+                <a class="related-card" href="/seo/surtax-stamp-duty.html">
+                    <div class="t">附加税与印花税</div>
+                    <div class="d">城建税三档与印花税税目</div>
+                </a>
+                <a class="related-card" href="/seo/business-income.html">
+                    <div class="t">个体户经营所得</div>
+                    <div class="d">核定征收与查账征收对比</div>
+                </a>
+                <a class="related-card" href="/seo/employer-cost.html">
+                    <div class="t">企业用工成本</div>
+                    <div class="d">税前 1 万企业实际花多少</div>
+                </a>
+            </div>
         </section>
     </div>
 </main>

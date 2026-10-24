@@ -17,8 +17,8 @@
          基数是本人上年度月平均工资，但低于当地社平工资 60% 的按 60% **保底**、
          高于 300% 的按 300% **封顶**；工伤与生育**个人不缴**；
          公积金只有在 12% 与社平 3 倍以内才**免征个税**，超出部分并回工资计税。 -->
-    <title>社保公积金计算器 2026：缴费基数上下限（60%~300%）、五险一金个人与单位各交多少、到手工资与企业用工成本一次算清</title>
-    <meta name="description" content="按 2026 年现行口径算五险一金：缴费基数不是工资 —— 低于当地上年度社平工资 60% 按 60% 保底、高于 300% 按 300% 封顶。养老个人 8%/单位 16%、医疗个人 2%/单位约 9.8%、失业各 0.5%、工伤与生育由单位缴纳。公积金比例 5%~12%，超过 12% 或基数超过社平 3 倍的部分并入工资计个税。含到手工资（累计预扣，逐月变少）与企业用工成本测算。政策依据：社会保险法（主席令第 35 号）、住房公积金管理条例（国务院令第 262 号）、国办发〔2019〕13 号、财税〔2006〕10 号。">
+    <title>社保公积金计算器 2026：基数上下限 60%~300%，各交多少</title>
+    <meta name="description" content="缴费基数不是工资：低于当地社平工资 60% 按 60% 保底、高于 300% 封顶。算出五险一金个人与单位各交多少、到手工资与企业用工成本。在线即算，免注册。">
     <link rel="canonical" href="https://euriskotax.com/seo/social-base.html">
     <meta name="robots" content="index, follow">
 
@@ -91,6 +91,14 @@
                             "@type": "Answer",
                             "text": "用工成本 = 应发工资 + 单位缴纳的五险一金。按常见费率，单位部分约为工资的 27.5% 再加同比例公积金 12%，即月薪 10000 元的企业月成本约 13950 元（1.395 倍），员工全年到手约占企业成本的 55%。"
                         }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "这个测算结果能直接作为缴费或报税依据吗？",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "不能。本页与 App 均按公开政策口径做测算，实际缴费基数上下限、单位费率与公积金免税口径以当地社保、公积金与税务机关的认定为准。本测算结果仅供参考，不构成税务建议。"
+                        }
                     }
                 ]
             }
@@ -121,43 +129,43 @@
         </p>
 
         <section class="card" aria-labelledby="insurance-title">
-            <h2 id="insurance-title" style="margin-top:0">速算一：五险一金个人与单位各交多少</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="insurance-title" class="mt-0">速算一：五险一金个人与单位各交多少</h2>
+            <p class="small muted mt-0">
                 口径：缴费基数 = 本人上年度月平均工资，低于社平工资 <strong>60%</strong> 按下限、高于 <strong>300%</strong> 按上限；
                 养老 8%/16%、医疗 2%/9.8%、失业 0.5%/0.5%、工伤与生育由单位缴、公积金 5%~12%
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="g-wage">月工资（元）</label>
                     <input class="calc-input" id="g-wage" type="number" inputmode="decimal" min="0" step="1000" value="10000" aria-describedby="insurance-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="g-avg">当地上年度月社平工资（元）</label>
                     <input class="calc-input" id="g-avg" type="number" inputmode="decimal" min="0" step="500" value="8000" aria-describedby="insurance-note">
                 </div>
-                <div style="flex:1 1 180px">
+                <div class="field">
                     <label class="calc-label" for="g-rate">公积金缴存比例（%）</label>
                     <input class="calc-input" id="g-rate" type="number" inputmode="decimal" min="5" max="12" step="1" value="12" aria-describedby="insurance-note">
                 </div>
             </div>
-            <details style="margin-bottom:10px">
+            <details>
                 <summary class="small muted">单位费率按当地口径调整（医疗 / 工伤 / 生育各地不同）</summary>
-                <div class="calc-input-row" style="margin-top:10px">
-                    <div style="flex:1 1 160px">
+                <div class="calc-input-row mt-10">
+                    <div class="field">
                         <label class="calc-label" for="g-er-medical">单位医疗（%）</label>
                         <input class="calc-input" id="g-er-medical" type="number" inputmode="decimal" min="0" max="20" step="0.1" value="9.8">
                     </div>
-                    <div style="flex:1 1 160px">
+                    <div class="field">
                         <label class="calc-label" for="g-er-injury">单位工伤（%）</label>
                         <input class="calc-input" id="g-er-injury" type="number" inputmode="decimal" min="0" max="5" step="0.1" value="0.4">
                     </div>
-                    <div style="flex:1 1 160px">
+                    <div class="field">
                         <label class="calc-label" for="g-er-maternity">单位生育（%）</label>
                         <input class="calc-input" id="g-er-maternity" type="number" inputmode="decimal" min="0" max="5" step="0.1" value="0.8">
                     </div>
                 </div>
             </details>
-            <p class="small muted" id="insurance-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="insurance-note">
                 上下限由各统筹地区按年度公布，这里按「社平工资 × 60% / ×300%」的通用规则计算；
                 公积金缴存基数多数地区与社保基数一致。
             </p>
@@ -199,22 +207,22 @@
         </section>
 
         <section class="card" aria-labelledby="net-title">
-            <h2 id="net-title" style="margin-top:0">速算二：到手工资（累计预扣，逐月变少）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="net-title" class="mt-0">速算二：到手工资（累计预扣，逐月变少）</h2>
+            <p class="small muted mt-0">
                 口径：应纳税所得额 = 工资 − 5000 − 个人社保 − <strong>免税部分</strong>公积金 − 专项附加扣除；
                 个人所得税按<strong>累计预扣法</strong>，累计所得越高档位越高 —— 到手逐月变少不是算错
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="n-special">专项附加扣除（元/月）</label>
                     <input class="calc-input" id="n-special" type="number" inputmode="decimal" min="0" step="500" value="1000" aria-describedby="net-note">
                 </div>
-                <div style="flex:1 1 200px">
+                <div class="field">
                     <label class="calc-label" for="n-fund-base">公积金缴存基数（元，留空同社保基数）</label>
                     <input class="calc-input" id="n-fund-base" type="number" inputmode="decimal" min="0" step="1000" placeholder="同社保基数" aria-describedby="net-note">
                 </div>
             </div>
-            <p class="small muted" id="net-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="net-note">
                 工资与社平工资沿用速算一的输入；公积金超过 12% 或基数超过社平 3 倍的部分并入工资计税<span id="fund-taxable-note"></span>。
             </p>
             <div class="results" id="net-results" hidden>
@@ -247,7 +255,7 @@
                 <table>
                     <caption class="small muted">逐月到手（累计预扣档位爬升）</caption>
                     <thead>
-                        <tr><th>月份</th><th>当月个税（元）</th><th>当月到手（元）</th></tr>
+                        <tr><th scope="col">月份</th><th scope="col">当月个税（元）</th><th scope="col">当月到手（元）</th></tr>
                     </thead>
                     <tbody id="net-schedule"></tbody>
                 </table>
@@ -256,17 +264,17 @@
         </section>
 
         <section class="card" aria-labelledby="cost-title">
-            <h2 id="cost-title" style="margin-top:0">速算三：企业用工成本（工资 + 单位五险一金）</h2>
-            <p class="small muted" style="margin-top:0">
+            <h2 id="cost-title" class="mt-0">速算三：企业用工成本（工资 + 单位五险一金）</h2>
+            <p class="small muted mt-0">
                 口径：用工成本 = 应发工资 + 单位缴纳的五险一金；员工到手只占其中一部分
             </p>
-            <div class="calc-input-row" style="margin-bottom:12px">
-                <div style="flex:1 1 200px">
+            <div class="calc-input-row mb-12">
+                <div class="field">
                     <label class="calc-label" for="c-headcount">人数</label>
                     <input class="calc-input" id="c-headcount" type="number" inputmode="numeric" min="1" step="1" value="1" aria-describedby="cost-note">
                 </div>
             </div>
-            <p class="small muted" id="cost-note" style="margin-top:10px">
+            <p class="small muted mt-10" id="cost-note">
                 工资、社平工资、公积金比例、单位费率与专项附加扣除沿用上面两处的输入。
             </p>
             <div class="results" id="cost-results" hidden>
@@ -298,7 +306,7 @@
         <div class="table-scroll">
             <table id="social-rate-table">
                 <thead>
-                    <tr><th>险种</th><th>个人</th><th>单位</th><th>说明</th></tr>
+                    <tr><th scope="col">险种</th><th scope="col">个人</th><th scope="col">单位</th><th scope="col">说明</th></tr>
                 </thead>
                 <tbody>
                     <tr><td>养老保险</td><td class="num">8%</td><td class="num">16%</td><td>单位 16% 自 2019-05-01 起执行（国办发〔2019〕13 号）；个人 8% 全部计入个人账户</td></tr>
@@ -312,10 +320,10 @@
         </div>
 
         <h2>示例：社平工资 8000 元、公积金 12%、专项附加 1000 元/月</h2>
-        <div class="table-scroll">
+        <div class="table-scroll table-scroll--sticky">
             <table id="social-example-table">
                 <thead>
-                    <tr><th>月工资（元）</th><th>缴费基数（元）</th><th>个人三险一金（元）</th><th>首月到手（元）</th><th>12 月到手（元）</th><th>全年个税（元）</th><th>企业月成本（元）</th></tr>
+                    <tr><th scope="col">月工资（元）</th><th scope="col">缴费基数（元）</th><th scope="col">个人三险一金（元）</th><th scope="col">首月到手（元）</th><th scope="col">12 月到手（元）</th><th scope="col">全年个税（元）</th><th scope="col">企业月成本（元）</th></tr>
                 </thead>
                 <tbody>
                     <tr><td class="num">4000.00</td><td class="num">4800.00</td><td class="num">1080.00</td><td class="num">2920.00</td><td class="num">2920.00</td><td class="num">0.00</td><td class="num">5896.00</td></tr>
@@ -388,13 +396,36 @@
             <p>本页算的是社保公积金与到手工资；年度汇算、年终奖、专项附加扣除与各项个税测算可在 App 里一起看。免注册使用 · 不采集收入金额。</p>
             <a class="btn btn-primary" href="/?source=seo_social">打开 EuriskoTax 完整测算</a>
         </section>
+
+        <section class="related">
+            <h2>相关测算</h2>
+            <div class="related-grid">
+                <a class="related-card" href="/seo/employer-cost.html">
+                    <div class="t">企业用工成本</div>
+                    <div class="d">税前 1 万企业实际花多少</div>
+                </a>
+                <a class="related-card" href="/seo/net-salary.html">
+                    <div class="t">税后工资倒算</div>
+                    <div class="d">月到手 1 万，税前要谈多少</div>
+                </a>
+                <a class="related-card" href="/seo/salary-tax.html">
+                    <div class="t">月薪个税</div>
+                    <div class="d">累计预扣法算每月到手</div>
+                </a>
+                <a class="related-card" href="/seo/disability-fund.html">
+                    <div class="t">残保金与工会经费</div>
+                    <div class="d">30 人以下免征与社平 2 倍封顶</div>
+                </a>
+            </div>
+        </section>
     </div>
 </main>
 
 <footer class="site-footer">
     <div class="wrap">
         <p>本测算结果仅供参考，不构成税务建议；实际缴费与纳税请以当地社保、公积金经办机构与主管税务机关认定为准。</p>
-        <p id="policy-basis">政策依据：《中华人民共和国社会保险法》（主席令第 35 号，2011-07-01 施行）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《降低社会保险费率综合方案》（国办发〔2019〕13 号，养老保险单位缴费比例降至 16%，2019-05-01 起执行）、《失业保险条例》（国务院令第 258 号，法定失业保险费率为单位 2%、个人 1%；现行阶段性降至总费率 1%，执行至 2026-12-31）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
+        <p id="policy-basis">政策依据：《中华人民共和国社会保险法》（主席令第 35 号，2011-07-01 施行）、《住房公积金管理条例》（国务院令第 262 号，2019 年修订）、《降低社会保险费率综合方案》（国办发〔2019〕13 号，养老保险单位缴费比例降至 16%，2019-05-01 起执行）。</p>
+        <p class="small muted">另有《失业保险条例》（国务院令第 258 号，法定失业保险费率为单位 2%、个人 1%；现行阶段性降至总费率 1%，执行至 2026-12-31）、《关于基本养老保险费基本医疗保险费失业保险费住房公积金有关个人所得税政策的通知》（财税〔2006〕10 号，公积金免税口径）。</p>
         <p>© 2026 EuriskoTax 税费计算器 · <a href="/">首页</a> · <a href="/seo/index.html">全部测算工具</a> · <a href="/seo/salary-tax.html">工资个税测算</a> · <a href="/seo/annual-settlement.html">年度汇算</a> · <a href="/seo/special-deduction.html">专项附加扣除</a></p>
     </div>
     <div id="site-filing" class="site-filing"></div>
