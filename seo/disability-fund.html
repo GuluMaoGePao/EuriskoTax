@@ -118,6 +118,15 @@
         ]
     }
     </script>
+<!-- 深色防闪：与主站同源（读同一个 localStorage.theme，见 index.html）
+     必须在渲染前同步执行 —— 放到 body 后面就会先闪一帧白底。
+     这是落地页里唯一一段同步脚本：约 150 字节、无网络请求，换的是「深色用户不再闪白」。 -->
+<script>
+    (function () {
+        var saved = localStorage.getItem('theme') || 'light';
+        if (saved === 'dark') document.documentElement.classList.add('dark');
+    })();
+</script>
 </head>
 <body>
 <header class="site-header">

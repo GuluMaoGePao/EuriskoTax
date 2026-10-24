@@ -38,6 +38,50 @@
     --brand-grad-end: #4338ca;
     --badge-new-bg:   #fee2e2;
     --badge-new-ink:  #b91c1c;
+
+    /* CTA 渐变拆成起止两个变量：深色档的起点**不能**跟着 --brand 走（见下方 .dark 段），
+       共用写死的 hex 会让「改深浅任一档」变成两处手改。 */
+    --cta-grad-from: var(--brand);
+    --cta-grad-to:   var(--brand-grad-end);
+
+    /* 按钮：浅色档是「品牌蓝底 + 白字」，深色档换成令牌那对主按钮色（深蓝底 + 白字） */
+    --btn-bg:        var(--brand);
+    --btn-bg-hover:  var(--brand-dark);
+    --btn-ink:       #ffffff;
+    --btn-ghost-bg:  #ffffff;
+}
+
+/* ====== 深色档（与主站同源：html.dark + localStorage.theme） ======
+   主流做法里的「跟随系统 prefers-color-scheme」这里**不用**：主站是显式切换并存 localStorage，
+   若落地页跟随系统，就会出现「系统深色 + 主站浅色 → 落地页深色」这种跟主站反着来的情况，
+   从主站跳过来照样闪一下。跟主站读同一个 key 才是一致。
+   共享语义色（--brand / --ink / --card / --line …）由 tokens.css 的 .dark 段整体切换，
+   这里只补**落地页局部色**的深色值 —— 那些在 App 里没有对应语义、写在本文件 :root 的颜色。
+   口径：正文 ≥4.5:1、大字 ≥3:1（WCAG 2.1 AA），比值按 ui-contrast-audit.js 同一套公式复核。 */
+html.dark {
+    --input-line:     #4b5563;
+    --focus-ring:     #1d4ed8;
+    --surface-sunken: #0b1220;  /* 表头底：比卡片更深一级，深底上才分得出层次 */
+    --hint-ink:       #fcd34d;  /* 提示正文（浅色档是棕 #78350f，深底上换成琥珀） */
+
+    /* CTA：深色档 --brand 是浅蓝（它是**文字色**），拿它当渐变起点，白字压上去只剩约 2.4:1
+       —— 就是「白字在深色档品牌色上不达标」那条。深色档改取 --c-hero-*：那是令牌里
+       Hero 深底用的同一对（Hero 早在 19-2 就踩过同一个坑，注释里写着 2.34:1 的实测值），
+       不是另挑一组蓝，也不在落地页里重写品牌 hex（seo-tokens.test.js 钉着）。 */
+    --cta-grad-from:  var(--c-hero-from);
+    --cta-grad-to:    var(--c-hero-to);
+
+    /* 主按钮：取令牌里主站深色主按钮那一对（白字 / 深蓝底 约 8.7:1）。
+       hover 不另设底色 —— 令牌里没有「深底 hover」这个角色，写死一个就是新副本，
+       改用 brightness 提亮，语义上仍是「按下去有反应」。 */
+    --btn-bg:        var(--c-btn-primary-bg);
+    --btn-bg-hover:  var(--c-btn-primary-bg);
+    --btn-ink:       var(--c-btn-primary-ink);
+    /* 幽灵按钮：深色档去掉白底，让品牌字直接压在卡片深底上（约 7:1） */
+    --btn-ghost-bg:  transparent;
+
+    --badge-new-bg:   #7f1d1d;
+    --badge-new-ink:  #fecaca;
 }
 
 * { box-sizing: border-box; }
@@ -101,9 +145,12 @@ a { color: var(--brand); }
     transition: background-color .15s ease, border-color .15s ease;
 }
 
-.btn-primary { background: var(--brand); color: #fff; }
-.btn-primary:hover { background: var(--brand-dark); }
-.btn-ghost { background: #fff; color: var(--brand); border-color: var(--brand-line); }
+/* 主按钮与幽灵按钮的底/字同样走变量：深色档的 --brand 是**文字色**（#60a5fa 浅蓝），
+   拿它当底色会让白字只剩约 2.4:1。深色档改用令牌里那对 --c-btn-primary-bg / -ink
+   （主站深色主按钮就是这一对），不是另挑一个蓝，是跟主站同一个来源。 */
+.btn-primary { background: var(--btn-bg); color: var(--btn-ink); }
+.btn-primary:hover { background: var(--btn-bg-hover); }
+.btn-ghost { background: var(--btn-ghost-bg); color: var(--brand); border-color: var(--brand-line); }
 .btn-ghost:hover { border-color: var(--brand); }
 .btn-sm { padding: 7px 14px; font-size: 14px; }
 
@@ -244,7 +291,7 @@ details p { margin: 10px 0 2px; color: var(--muted); }
 
 /* ---------- 行动号召 ---------- */
 .cta {
-    background: linear-gradient(120deg, var(--brand), var(--brand-grad-end));
+    background: linear-gradient(120deg, var(--cta-grad-from), var(--cta-grad-to));
     color: #fff;
     border-radius: 16px;
     padding: 26px;
@@ -255,6 +302,18 @@ details p { margin: 10px 0 2px; color: var(--muted); }
 .cta p { color: var(--brand-tint); margin-bottom: 16px; }
 .cta .btn-primary { background: #fff; color: var(--brand); }
 .cta .btn-primary:hover { background: var(--brand-tint); }
+
+/* 深色档的 CTA 三处不能跟着令牌走 —— 令牌的深色值是按「深底上的文字色」挑的，
+   而 CTA 的需求正好相反（深底上的**背景** + 白底上的**深字**）：
+   ① 渐变起点已由 --cta-grad-from 换成深蓝（见 .dark 变量段）；
+   ② 描述文字 --brand-tint 深色档是 #1e3a8a 深蓝，压在深靛渐变上等于看不见；
+   ③ 按钮字色 --brand 深色档是 #60a5fa 浅蓝，压在白底上只有约 2.6:1。
+   这三处改的不是配色偏好，是「令牌语义与 CTA 场景相反」这个真实冲突。 */
+html.dark .cta p { color: #e0e7ff; }
+html.dark .cta .btn-primary { color: var(--c-brand-subtle); }
+html.dark .cta .btn-primary:hover { background: #e0e7ff; color: var(--c-brand-subtle); }
+/* 深色档主按钮 hover：不换底色，改用提亮（换底色就得再写一个品牌 hex） */
+html.dark .btn-primary:hover { filter: brightness(1.18); }
 
 /* ---------- 工具聚合（/seo/index.html：20 个落地页的总目录 · 2026-09-17 更正，原写 15 个） ---------- */
 .tool-grid {
@@ -416,6 +475,24 @@ h2[id], h3[id] { scroll-margin-top: 76px; }
     body { background: #fff; color: #000; font-size: 12pt; line-height: 1.6; }
     .wrap { max-width: none; padding: 0; }
     main { padding: 0; }
+
+    /* 深色档打印：纸是白的，若按屏幕那套深色变量打，整页是一块黑底。
+       这里不改写变量（那等于给打印再立一套配色、日后必漂移），只把**渲染出来的**
+       底色与字色压回纸媒 —— 屏幕归屏幕，纸归纸。 */
+    body,
+    .card,
+    .result,
+    .answer,
+    .hint,
+    details,
+    table,
+    th,
+    td,
+    code,
+    .tool-card,
+    .related-card,
+    input,
+    select { background: #fff !important; color: #000 !important; }
 
     .card,
     .result,
