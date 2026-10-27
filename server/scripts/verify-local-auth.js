@@ -1196,21 +1196,22 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         const pctText = (rate) => `${String(Math.round(rate * 1000) / 10)}%`;
         const staleSocialRows = [
             { name: '养老保险', personal: pctText(0.08), employer: pctText(0.16) },
-            { name: '医疗保险', personal: pctText(0.02), employer: pctText(0.098) },
+            // 默认地区 = **上海**：职工医保单位 9% **已含生育**，所以生育这一行是 0% —— 不是漏了
+            { name: '医疗保险', personal: pctText(0.02), employer: pctText(0.09) },
             { name: '失业保险', personal: pctText(0.005), employer: pctText(0.005) },
             { name: '工伤保险', personal: '不缴', employer: pctText(0.004) },
-            { name: '生育保险', personal: '不缴', employer: pctText(0.008) }
+            { name: '生育保险', personal: '不缴', employer: pctText(0) }
         ].filter((row) => !(socialTable.includes(row.name)
             && socialTable.includes(`>${row.personal}<`) && socialTable.includes(`>${row.employer}<`)));
-        record('社保落地页静态费率表与常量逐项一致（养老 8/16、医疗 2/9.8、失业 0.5/0.5、工伤生育个人不缴）',
+        record('社保落地页静态费率表与常量逐项一致（养老 8/16、医疗 2/9（上海，含生育）、失业 0.5/0.5、工伤生育个人不缴）',
             socialPage.status === 200 && staleSocialRows.length === 0
             && socialTable.includes('住房公积金') && socialTable.includes('5%~12%')
             && socialPage.raw.includes('/src/js/calculation/tax-constants.js')
             && socialPage.raw.includes('/src/js/calculation/social-insurance-quick.js'),
             `与常量不一致 ${staleSocialRows.length} 项`);
-        record('社保落地页静态示例表可读：保底 4800/1080/2920、封顶 24000/5400/33020、用工成本 13950',
+        record('社保落地页静态示例表可读：保底 4800/1080/2920、封顶 24000/5400/33020、用工成本 13790',
             socialPage.status === 200 && ['>4000.00<', '>4800.00<', '>1080.00<', '>2920.00<',
-                '>2250.00<', '>7697.50<', '>630.00<', '>13950.00<',
+                '>2250.00<', '>7697.50<', '>630.00<', '>13790.00<',
                 '>4500.00<', '>15215.00<', '>14550.00<', '>8880.00<',
                 '>24000.00<', '>5400.00<', '>43260.00<', '>33020.00<', '>86040.00<']
                 .every((n) => socialPage.raw.includes(n)),
@@ -1238,9 +1239,9 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && netPage.raw.includes('2018 年第 61 号')
             && netPage.raw.includes('财税〔2006〕10 号'),
             `HTTP ${netPage.status}`);
-        record('税后工资落地页静态示例表可读：税前 6451.61/13175.62/27137.50/39853.33/68076.92、封顶 5400.00、边际 8370.00、企业成本 18379.98',
+        record('税后工资落地页静态示例表可读：税前 6451.61/13175.62/27137.50/39853.33/68076.92、封顶 5400.00、边际 8370.00、企业成本 18169.18',
             netPage.status === 200 && ['>6451.61<', '>13175.62<', '>27137.50<', '>39853.33<', '>68076.92<',
-                '>5400.00<', '>8370.00<', '>9600.00<', '>7800.00<', '>18379.98<']
+                '>5400.00<', '>8370.00<', '>9600.00<', '>7800.00<', '>18169.18<']
                 .every((n) => netPage.raw.includes(n)),
             `HTTP ${netPage.status}`);
         const modeTable = (netPage.raw.split('id="mode-example-table"')[1] || '').split('</table>')[0];
@@ -1264,7 +1265,7 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
         // 阶段15 15C-3：第十六个落地页「企业用工成本」——
         // 这一页要钉住的是**成本倍数不是常数**：工资越低倍数越高（缴费基数按社平 60% 保底），
         // 工资越高倍数越低（300% 封顶后单位部分不再增加）；配套钉住涨薪传递率
-        // （企业多付 1395 元、员工全年只多拿约 9000 元，封顶后传递率反而升高）。
+        // （企业多付 1379 元、员工全年只多拿约 9000 元，封顶后传递率反而升高）。
         const costPage = await request(PORT, 'GET', '/seo/employer-cost.html');
         record('企业用工成本落地页可访问且含 canonical/FAQPage 结构化数据与政策依据（社会保险法 + 公积金管理条例 + 国办发〔2019〕13 号 + 财税〔2006〕10 号）',
             costPage.status === 200 && costPage.raw.includes('rel="canonical"')
@@ -1274,19 +1275,19 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYA
             && costPage.raw.includes('国办发〔2019〕13 号')
             && costPage.raw.includes('财税〔2006〕10 号'),
             `HTTP ${costPage.status}`);
-        record('企业用工成本落地页静态成本表可读：13950.00/4896.00/59480.00、保底 4800.00 与封顶 24000.00、到手 7697.50',
-            costPage.status === 200 && ['>13950.00<', '>4896.00<', '>59480.00<', '>4800.00<', '>24000.00<',
-                '>1896.00<', '>9480.00<', '>167400.00<', '>7697.50<']
+        record('企业用工成本落地页静态成本表可读：13790.00/4819.20/59096.00、保底 4800.00 与封顶 24000.00、到手 7697.50',
+            costPage.status === 200 && ['>13790.00<', '>4819.20<', '>59096.00<', '>4800.00<', '>24000.00<',
+                '>1819.20<', '>9096.00<', '>165480.00<', '>7697.50<']
                 .every((n) => costPage.raw.includes(n)),
             `HTTP ${costPage.status}`);
         const raiseTable = (costPage.raw.split('id="raise-example-table"')[1] || '').split('</table>')[0];
-        record('企业用工成本落地页涨薪表可读：未封顶 1395.00/16740.00/9021.00、封顶后 1000.00/9600.00/8370.00',
-            costPage.status === 200 && ['>1395.00<', '>16740.00<', '>9021.00<', '>1000.00<', '>9600.00<', '>8370.00<']
+        record('企业用工成本落地页涨薪表可读：未封顶 1379.00/16548.00/9021.00、封顶后 1000.00/9600.00/8370.00',
+            costPage.status === 200 && ['>1379.00<', '>16548.00<', '>9021.00<', '>1000.00<', '>9600.00<', '>8370.00<']
                 .every((n) => raiseTable.includes(n)),
             `HTTP ${costPage.status}`);
         const budgetTable = (costPage.raw.split('id="budget-example-table"')[1] || '').split('</table>')[0];
-        record('企业用工成本落地页倒推表可读：预算 13950→10000.00、20000→14336.91、50000→40520.00',
-            costPage.status === 200 && ['>10000.00<', '>14336.91<', '>40520.00<', '>5734.77<']
+        record('企业用工成本落地页倒推表可读：预算 13790→10000.00、20000→14503.26、50000→40903.99',
+            costPage.status === 200 && ['>10000.00<', '>14503.26<', '>40903.99<', '>10926.03<']
                 .every((n) => budgetTable.includes(n)),
             `HTTP ${costPage.status}`);
         record('企业用工成本落地页写明三条易错口径：倍数不是常数、涨薪传递率、只算法定五险一金',

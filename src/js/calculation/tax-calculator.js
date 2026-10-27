@@ -99,8 +99,12 @@ function calculateOptimalBonusAllocation(totalIncome, totalDeduction) {
 }
 
 // 公益捐赠限额校验函数
+// 30% 这个限额**读常量**（donationRules.limitRatio）：它是 2019 年第 99 号给的口径，
+// 抄一份进内核就等于允许「改政策时这里漏改」，捐赠那一行会与政策依据各说一套。
 function validateCharitableDonation(donationAmount, taxableIncome) {
-    const maxDeduction = taxableIncome * 0.3;
+    const donationRatio = ((typeof donationRules !== 'undefined' && donationRules)
+        || (window.EuriskoTaxConstants && window.EuriskoTaxConstants.donationRules) || {}).limitRatio;
+    const maxDeduction = taxableIncome * (donationRatio || 0.3);
     const actualDeduction = Math.min(donationAmount, maxDeduction);
     const excessAmount = donationAmount - actualDeduction;
     
@@ -711,7 +715,11 @@ const REVERSE_DEDUCTION_KEYS = [
 // 综合所得的反向倒算扣除汇总（纯函数：不读 DOM，ded 为「去前缀 id → 值」字典）
 function calculateReverseDeductions(ded, workMonths) {
     ded = ded || {};
-    const basicDeduction = 5000;
+    // 5000 元/月的基本减除费用**读常量**（socialInsuranceRules.basicDeduction）：
+    // 它与工资薪金累计预扣同源，改一处就该两处一起变。
+    const socialRules = (typeof socialInsuranceRules !== 'undefined' && socialInsuranceRules)
+        || (window.EuriskoTaxConstants && window.EuriskoTaxConstants.socialInsuranceRules) || {};
+    const basicDeduction = socialRules.basicDeduction || 5000;
     
     const isSpecialDeductionVisible = !!ded['special-deduction-checkbox'];
     const isSpecialAdditionalDeductionVisible = !!ded['special-additional-deduction-checkbox'];
@@ -2064,8 +2072,10 @@ function calculateBusinessTaxCore(v, options) {
     const taxableIncomeBeforeDonation = Math.max(0, investorShare - investorDeduction -
         (hasComprehensiveIncome ? 0 : specialDeductionTotal) - specialAdditionalDeductionTotal - otherDeductionTotalBeforeDonation);
 
-    // 公益性捐赠扣除限额为应纳税所得额的30%
-    const charitableDonationLimit = taxableIncomeBeforeDonation * 0.3;
+    // 公益性捐赠扣除限额为应纳税所得额的 30%（口径同样读 donationRules，不写死）
+    const donationRatio = ((typeof donationRules !== 'undefined' && donationRules)
+        || (window.EuriskoTaxConstants && window.EuriskoTaxConstants.donationRules) || {}).limitRatio;
+    const charitableDonationLimit = taxableIncomeBeforeDonation * (donationRatio || 0.3);
     const actualCharitableDonation = Math.min(charitableDonation, charitableDonationLimit);
     const otherDeductionTotal = otherDeductionTotalBeforeDonation + actualCharitableDonation;
 

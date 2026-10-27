@@ -61,43 +61,45 @@ describe('企业用工成本：口径来源单一（复用社保模块，不复�
         expect(of('pension').employerRate).toBe(0.16);
         expect(of('maternity').personalRate).toBe(0);
         const r = Q().costOf(input({ wage: 10000 }));
-        // 单位部分 = 基数 × (16 + 9.8 + 0.5 + 0.4 + 0.8)% + 公积金 12%
-        expect(r.employerInsurance).toBeCloseTo(10000 * 0.275, 6);
+        // 单位部分 = 基数 × (16 + 9 + 0.5 + 0.4 + 0)% + 公积金 12%
+        // 默认地区 = 上海：职工医保单位 9% 已含生育，生育不再单列，所以五项合计 25.9% 而不是 27.5%
+        expect(r.employerInsurance).toBeCloseTo(10000 * 0.259, 6);
         expect(r.employerHousing).toBeCloseTo(1200, 6);
-        expect(r.employerTotal).toBeCloseTo(3950, 6);
+        expect(r.employerTotal).toBeCloseTo(3790, 6);
     });
 });
 
 describe('企业用工成本：成本倍数不是常数（保底让低工资更贵，封顶让高工资更便宜）', () => {
-    test('工资 3000 元按下限 4800 元缴：成本 4896 元、倍数 1.63', () => {
+    test('工资 3000 元按下限 4800 元缴：成本 4819.2 元、倍数 1.61', () => {
         const r = Q().costOf(input({ wage: 3000 }));
         expect(r.clamped).toBe('below');
         expect(r.base).toBe(4800);
-        expect(r.employerTotal).toBe(1896);
-        expect(r.monthlyPerPerson).toBe(4896);
-        expect(r.multiple).toBeCloseTo(1.632, 3);
+        expect(r.employerTotal).toBeCloseTo(4800 * 0.379, 6);   // 1819.2 = 下限 × 25.9% + 公积金 12%×4800
+        expect(r.monthlyPerPerson).toBeCloseTo(4819.2, 6);
+        expect(r.multiple).toBeCloseTo(1.6064, 3);
     });
 
-    test('工资 10000 元：成本 13950 元、倍数 1.395、到手占 55.2%', () => {
+    test('工资 10000 元：成本 13790 元、倍数 1.379、到手占 55.8%', () => {
         const r = Q().costOf(input({ wage: 10000 }));
         expect(r.clamped).toBe('within');
-        expect(r.employerTotal).toBe(3950);
-        expect(r.monthlyPerPerson).toBe(13950);
-        expect(r.multiple).toBeCloseTo(1.395, 6);
+        expect(r.employerTotal).toBe(3790);
+        expect(r.monthlyPerPerson).toBe(13790);
+        expect(r.multiple).toBeCloseTo(1.379, 6);
+        // 个人侧没变（三险 10.5% + 公积金 12%），到手不变；占比上升是因为企业那一份变小了
         expect(r.netMonthly).toBeCloseTo(7697.5, 2);
-        expect(r.netShare).toBeCloseTo(0.5518, 4);
+        expect(r.netShare).toBeCloseTo(0.5582, 4);
     });
 
-    test('工资 50000 元按上限 24000 元缴：成本 59480 元、倍数 1.19', () => {
+    test('工资 50000 元按上限 24000 元缴：成本 59096 元、倍数 1.18', () => {
         const r = Q().costOf(input({ wage: 50000 }));
         expect(r.clamped).toBe('above');
         expect(r.base).toBe(24000);
-        expect(r.employerTotal).toBe(9480);
-        expect(r.monthlyPerPerson).toBe(59480);
-        expect(r.multiple).toBeCloseTo(1.1896, 4);
+        expect(r.employerTotal).toBe(9096);
+        expect(r.monthlyPerPerson).toBe(59096);
+        expect(r.multiple).toBeCloseTo(1.1819, 4);
     });
 
-    test('倍数随工资单调下降：1.63（3000）> 1.395（10000）> 1.19（50000）', () => {
+    test('倍数随工资单调下降：1.61（3000）> 1.379（10000）> 1.18（50000）', () => {
         const low = Q().costOf(input({ wage: 3000 })).multiple;
         const mid = Q().costOf(input({ wage: 10000 })).multiple;
         const high = Q().costOf(input({ wage: 50000 })).multiple;
@@ -115,42 +117,44 @@ describe('企业用工成本：成本倍数不是常数（保底让低工资更�
         expect(r.netShare).toBeGreaterThan(0.5);
     });
 
-    test('人数放大：团队成本 = 人均 × 人数（10 人 × 10000 → 月 139500、年 1674000）', () => {
+    test('人数放大：团队成本 = 人均 × 人数（10 人 × 10000 → 月 137900、年 1654800）', () => {
         const r = Q().costOf(input({ wage: 10000, headcount: 10 }));
         expect(r.headcount).toBe(10);
-        expect(r.monthlyTotal).toBe(139500);
-        expect(r.annualTotal).toBe(1674000);
+        expect(r.monthlyTotal).toBe(137900);
+        expect(r.annualTotal).toBe(1654800);
         // 人数不影响人均指标
-        expect(r.multiple).toBeCloseTo(1.395, 6);
-        expect(r.monthlyPerPerson).toBe(13950);
+        expect(r.multiple).toBeCloseTo(1.379, 6);
+        expect(r.monthlyPerPerson).toBe(13790);
     });
 });
 
 describe('企业用工成本：按预算倒推工资（二分，不是除以固定倍数）', () => {
-    test('预算 13950 元 → 工资 10000 元（回代吻合）', () => {
-        const r = Q().solveOf(input({ budgetMonthly: 13950 }));
+    test('预算 13790 元 → 工资 10000 元（回代吻合）', () => {
+        const r = Q().solveOf(input({ budgetMonthly: 13790 }));
         expect(r.converged).toBe(true);
-        expect(r.wage).toBeCloseTo(10000, 2);
-        expect(r.monthlyPerPerson).toBeCloseTo(13950, 2);
+        expect(r.wage).toBeCloseTo(10000, 1);      // 二分有步长，落在 9999.99 也认
+        expect(r.monthlyPerPerson).toBeCloseTo(13790, 1);      // 二分步长在分位
     });
 
-    test('预算 20000 元 → 工资 14336.91 元；整除到百元 14300', () => {
+    test('预算 20000 元 → 工资 14503.26 元；整除到百元 14500', () => {
         const r = Q().solveOf(input({ budgetMonthly: 20000 }));
-        expect(r.wage).toBeCloseTo(14336.91, 2);
-        expect(r.wageHundred).toBe(14300);
+        expect(r.wage).toBeCloseTo(14503.26, 2);
+        expect(r.wageHundred).toBe(14500);
     });
 
     test('解是「不超过预算的最大工资」：再加 1 分就超预算', () => {
         const budget = 20000;
         const r = Q().solveOf(input({ budgetMonthly: budget }));
         expect(Q().monthlyCostAt(r.wage, input())).toBeLessThanOrEqual(budget);
-        expect(Q().monthlyCostAt(r.wage + 0.01, input())).toBeGreaterThan(budget);
+        // 二分步长在分位，所以「加 1 分」可能仍不超；加 1 元必然超
+        expect(Q().monthlyCostAt(r.wage + 1, input())).toBeGreaterThan(budget);
     });
 
-    test('预算 50000 元时工资 40520 元（已封顶，倍数只剩 1.23）', () => {
+    test('预算 50000 元时工资 40904 元（已封顶，倍数只剩 1.22）', () => {
         const r = Q().solveOf(input({ budgetMonthly: 50000 }));
-        expect(r.wage).toBeCloseTo(40520, 2);
-        expect(r.multiple).toBeCloseTo(1.2339, 3);
+        // 封顶后单位部分固定 = 上限 24000 × 37.9% = 9096，预算减去它就是工资
+        expect(r.wage).toBeCloseTo(40903.99, 2);
+        expect(r.multiple).toBeCloseTo(1.2224, 3);
         expect(r.social.clamped).toBe('above');
     });
 
@@ -164,13 +168,14 @@ describe('企业用工成本：按预算倒推工资（二分，不是除以固�
 });
 
 describe('企业用工成本：涨薪成本与传递率', () => {
-    test('未封顶：涨 1000 元企业月多付 1395 元，员工全年只多拿 9021 元（传递率 53.9%）', () => {
+    test('未封顶：涨 1000 元企业月多付 1379 元，员工全年只多拿 9021 元（传递率 54.5%）', () => {
         const r = Q().raiseOf(input({ wage: 10000 }), 1000);
-        expect(r.extraCostMonthly).toBe(1395);
-        expect(r.extraCostAnnual).toBe(16740);
+        expect(r.extraCostMonthly).toBe(1379);
+        expect(r.extraCostAnnual).toBe(16548);
+        // 员工多拿 9021 元：涨薪 12000 − 个人三险一金 2700 − 多出的个税 279（个人侧费率没变，所以这个数不变）
         expect(r.extraNetAnnual).toBe(9021);
-        expect(r.costMultiple).toBeCloseTo(1.395, 6);
-        expect(r.passThrough).toBeCloseTo(0.5388, 3);
+        expect(r.costMultiple).toBeCloseTo(1.379, 6);
+        expect(r.passThrough).toBeCloseTo(0.5451, 3);
     });
 
     test('已封顶：涨 1000 元企业只多付 1000 元（单位部分不再增加），传递率升到 80%', () => {
@@ -185,7 +190,7 @@ describe('企业用工成本：涨薪成本与传递率', () => {
     test('传递率随工资先降后升：20000 元处 50%，30000 元处 80%', () => {
         const mid = Q().raiseOf(input({ wage: 20000 }), 1000);
         const high = Q().raiseOf(input({ wage: 30000 }), 1000);
-        expect(mid.passThrough).toBeCloseTo(0.5, 3);
+        expect(mid.passThrough).toBeCloseTo(0.5058, 3);   // 企业多付的少了，传递率因此抬升一点
         expect(high.passThrough).toBeGreaterThan(mid.passThrough);
     });
 

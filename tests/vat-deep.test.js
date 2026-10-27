@@ -344,7 +344,8 @@ describe('走向导：由 spec 驱动', () => {
         expect(deep.fields).not.toBe(quick.fields);
         expect(deep.fields.map((f) => f.key)).toEqual([
             'taxpayer', 'rate', 'simplifiedCase',
-            'sales', 'taxIncluded', 'period', 'specialInvoice', 'exemptSales', 'simplifiedSales',
+            // levy = 征收率档：不动产与土地使用权是 5%，按 2026 年第 10 号不享受 3% 减按 1%
+            'sales', 'taxIncluded', 'period', 'levy', 'specialInvoice', 'exemptSales', 'simplifiedSales',
             'inputs', 'unallocatedInput',
             'annualSales', 'location', 'halve'
         ]);

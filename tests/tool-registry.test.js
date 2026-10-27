@@ -350,10 +350,11 @@ describe('工具注册表：App 内速算器（native）可用', () => {
         const sb = R().get('social-base');
         const base = {};
         sb.fields.forEach((f) => { base[f.key] = (f.sample !== undefined ? f.sample : f.default); });
-        const r = sb.compute(base);                 // 月薪 15000、社平 8000、公积金 12%
+        const r = sb.compute(base);                 // 月薪 15000、社平 12577（上海）、公积金 7%
         expect(r.error).toBeUndefined();
 
-        const input = { wage: 15000, socialAverage: 8000, housingRate: 0.12, specialMonthly: 0 };
+        // 与页面同一套参数：公积金用默认档 7%，不是法定上限 12%
+        const input = { wage: 15000, socialAverage: 8000, housingRate: 0.07, specialMonthly: 0 };
         const s = window.EuriskoSocialQuick.socialInsuranceOf(input);
         const n = window.EuriskoSocialQuick.netSalaryOf(input);
         const row = (label) => r.rows.find((x) => x.label === label).value;

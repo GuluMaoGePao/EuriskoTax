@@ -36,12 +36,15 @@ describe('社保公积金：口径来源单一（常量 + 注册表）', () => {
         expect(window.EuriskoSocialQuick.rules()).toBe(window.socialInsuranceRules);
     });
 
-    test('五项费率：养老 8/16、医疗 2/9.8、失业 0.5/0.5、工伤与生育个人不缴', () => {
+    test('五项费率：养老 8/16、医疗 2/9、失业 0.5/0.5、工伤与生育个人不缴', () => {
         const rules = window.EuriskoSocialQuick.rules();
         const of = (key) => rules.items.find((i) => i.key === key);
         expect(of('pension').personalRate).toBe(0.08);
         expect(of('pension').employerRate).toBe(0.16);
         expect(of('medical').personalRate).toBe(0.02);
+        // 默认地区 = 上海：职工医保单位 9%（**已含生育**），生育这一项因此是 0 —— 不是漏了
+        expect(of('medical').employerRate).toBe(0.09);
+        expect(of('maternity').employerRate).toBe(0);
         expect(of('unemployment').personalRate).toBe(0.005);
         expect(of('unemployment').employerRate).toBe(0.005);
         expect(of('injury').personalRate).toBe(0);
@@ -137,14 +140,14 @@ describe('缴费基数：不是工资，60% 保底 / 300% 封顶', () => {
 });
 
 describe('五险一金：个人与单位分项', () => {
-    test('工资 10000 / 社平 8000 / 公积金 12%：个人 1050 + 1200 = 2250，单位 2750 + 1200 = 3950', () => {
+    test('工资 10000 / 社平 8000 / 公积金 12%：个人 1050 + 1200 = 2250，单位 2590 + 1200 = 3790', () => {
         const r = window.EuriskoSocialQuick.socialInsuranceOf({ wage: 10000, socialAverage: AVG, housingRate: 0.12 });
         expect(r.base).toBeCloseTo(10000, 6);
         expect(r.personalInsurance).toBeCloseTo(1050, 6);   // 10000 × 10.5%
         expect(r.housingPersonal).toBeCloseTo(1200, 6);
         expect(r.personalTotal).toBeCloseTo(2250, 6);
-        expect(r.employerInsurance).toBeCloseTo(2750, 6);   // 10000 × 27.5%
-        expect(r.employerTotal).toBeCloseTo(3950, 6);
+        expect(r.employerInsurance).toBeCloseTo(2590, 6);   // 10000 × 25.9%（医疗 9% 已含生育）
+        expect(r.employerTotal).toBeCloseTo(3790, 6);
         expect(r.personalRate).toBeCloseTo(0.225, 10);
     });
 
@@ -154,7 +157,7 @@ describe('五险一金：个人与单位分项', () => {
         expect(of('injury').personal).toBe(0);
         expect(of('maternity').personal).toBe(0);
         expect(of('injury').employer).toBeCloseTo(80, 6);      // 20000 × 0.4%
-        expect(of('maternity').employer).toBeCloseTo(160, 6);  // 20000 × 0.8%
+        expect(of('maternity').employer).toBeCloseTo(0, 6);    // 上海：生育已并入医保的 9%，不单列
         expect(r.personalInsurance).toBeCloseTo(2100, 6);      // 20000 × 10.5%
     });
 
@@ -166,8 +169,8 @@ describe('五险一金：个人与单位分项', () => {
         const high = q.socialInsuranceOf({ wage: 10000, socialAverage: AVG, housingRate: 0.2 });
         expect(high.housingRate).toBe(0.12);
         expect(high.housingPersonal).toBeCloseTo(1200, 6);
-        // 非法输入退回默认 12%
-        expect(q.socialInsuranceOf({ wage: 10000, socialAverage: AVG }).housingPersonal).toBeCloseTo(1200, 6);
+        // 不传就退回默认 7% —— 默认地区是上海，上海标准档就是 7%（不是法定上限 12%）
+        expect(q.socialInsuranceOf({ wage: 10000, socialAverage: AVG }).housingPersonal).toBeCloseTo(700, 6);
     });
 
     test('单位费率可按当地口径覆盖（医疗 / 工伤 / 生育各地不同）', () => {
@@ -288,16 +291,16 @@ describe('到手工资：与内核 / 工资薪金累计预扣同源', () => {
 });
 
 describe('企业用工成本：工资 + 单位五险一金', () => {
-    test('工资 10000 / 公积金 12%：企业月成本 13950（1.395 倍）', () => {
+    test('工资 10000 / 公积金 12%：企业月成本 13790（1.379 倍）', () => {
         const r = window.EuriskoSocialQuick.employerCostOf({
             wage: 10000, socialAverage: AVG, housingRate: 0.12, specialMonthly: 1000, headcount: 1
         });
-        expect(r.employerTotal).toBeCloseTo(3950, 6);
-        expect(r.monthlyPerPerson).toBeCloseTo(13950, 6);
-        expect(r.monthly).toBeCloseTo(13950, 6);
-        expect(r.annual).toBeCloseTo(167400, 6);
-        expect(r.multiple).toBeCloseTo(1.395, 6);
-        expect(r.netShare).toBeCloseTo(92370 / 167400, 6);
+        expect(r.employerTotal).toBeCloseTo(3790, 6);
+        expect(r.monthlyPerPerson).toBeCloseTo(13790, 6);
+        expect(r.monthly).toBeCloseTo(13790, 6);
+        expect(r.annual).toBeCloseTo(165480, 6);
+        expect(r.multiple).toBeCloseTo(1.379, 6);
+        expect(r.netShare).toBeCloseTo(92370 / 165480, 6);
     });
 
     test('人数按整数处理：3 人月成本 = 单人 × 3；非法人数按 1 人', () => {
@@ -306,7 +309,7 @@ describe('企业用工成本：工资 + 单位五险一金', () => {
         const three = q.employerCostOf({ wage: 20000, socialAverage: AVG, housingRate: 0.12, specialMonthly: 1000, headcount: 3 });
         expect(three.headcount).toBe(3);
         expect(three.monthly).toBeCloseTo(one.monthlyPerPerson * 3, 6);
-        expect(one.monthlyPerPerson).toBeCloseTo(27900, 6);
+        expect(one.monthlyPerPerson).toBeCloseTo(27580, 6);   // 20000 + 20000 × 37.9%
         expect(q.employerCostOf({ wage: 20000, socialAverage: AVG, headcount: 'abc' }).headcount).toBe(1);
     });
 });
@@ -327,12 +330,13 @@ describe('社保公积金落地页：静态口径与页面声明（爬虫不执�
         expect(block).toContain('12%');
     });
 
-    test('页面静态示例表可读（保底 4800/1080/2920、封顶 24000/5400/33020、企业成本 13950）', () => {
+    test('页面静态示例表可读（保底 4800/1080/2920、封顶 24000/5400/33020、企业成本 13790）', () => {
         [
             '>4000.00<', '>4800.00<', '>1080.00<', '>2920.00<',
-            '>10000.00<', '>2250.00<', '>7697.50<', '>630.00<', '>13950.00<',
-            '>20000.00<', '>4500.00<', '>15215.00<', '>14550.00<', '>8880.00<', '>27900.00<',
-            '>50000.00<', '>24000.00<', '>5400.00<', '>43260.00<', '>33020.00<', '>86040.00<', '>59480.00<'
+            '>10000.00<', '>2250.00<', '>7697.50<', '>630.00<', '>13790.00<',
+            '>20000.00<', '>4500.00<', '>15215.00<', '>14550.00<', '>8880.00<', '>27580.00<',   // 20000 + 20000 × 37.9%
+            // 50000 行：单位部分封顶在 24000 × 37.9% = 9096，所以企业成本 = 50000 + 9096
+            '>50000.00<', '>24000.00<', '>5400.00<', '>43260.00<', '>33020.00<', '>86040.00<', '>59096.00<'
         ].forEach((n) => expect(html).toContain(n));
     });
 

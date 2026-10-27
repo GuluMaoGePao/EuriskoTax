@@ -76,15 +76,28 @@ function buildForwardBudgetTable(results) {
     const laborIncome = num(inc.labor);
     const authorIncome = num(inc.author);
     const royaltyIncome = num(inc.royalty);
-    // 这三类所得的费用扣除：4000 以上扣 20%，否则定额扣 800（预扣环节口径，与汇算时的减除费用无关）
+    // 这三类所得的费用扣除：4000 以上按 20% 扣，否则定额扣 800（预扣环节口径，与汇算时的减除费用无关）。
+    // 口径**读常量**（otherIncomeRules / withholdingTaxRates），不在这里抄第二份 ——
+    // 抄一份就等于承认「改税率时这里可以漏改」，明细表会印着与计算对不上的扣除额和税率。
+    const G = typeof window !== 'undefined' ? window : {};
+    const otherRules = G.otherIncomeRules || {};
+    const wRates = G.withholdingTaxRates || {};
+    const expenseOf = function (type, income) {
+        const r = otherRules[type] || { threshold: 4000, flat: 800, ratio: 0.8 };
+        return income > r.threshold ? income * (1 - r.ratio) : r.flat;
+    };
+    const preRateOf = function (type, taxable) {
+        const t = wRates[type] || [{ max: Infinity, rate: 0.2 }];
+        for (let i = 0; i < t.length; i++) { if (taxable <= t[i].max) return t[i].rate; }
+        return t[t.length - 1].rate;
+    };
     const other = [
         { name: '劳务所得', income: laborIncome, taxable: num(inc.laborCalculated), tax: num(inc.laborTax),
-            ded: laborIncome > 4000 ? laborIncome * 0.2 : 800,
-            rate: num(inc.laborCalculated) <= 20000 ? 0.2 : (num(inc.laborCalculated) <= 50000 ? 0.3 : 0.4) },
+            ded: expenseOf('labor', laborIncome), rate: preRateOf('labor', num(inc.laborCalculated)) },
         { name: '稿酬所得', income: authorIncome, taxable: num(inc.authorCalculated), tax: num(inc.authorTax),
-            ded: authorIncome > 4000 ? authorIncome * 0.2 : 800, rate: 0.2 },
+            ded: expenseOf('author', authorIncome), rate: preRateOf('author', num(inc.authorCalculated)) },
         { name: '特许权使用费', income: royaltyIncome, taxable: num(inc.royaltyCalculated), tax: num(inc.royaltyTax),
-            ded: royaltyIncome > 4000 ? royaltyIncome * 0.2 : 800, rate: 0.2 }
+            ded: expenseOf('royalty', royaltyIncome), rate: preRateOf('royalty', num(inc.royaltyCalculated)) }
     ];
     if (laborIncome > 0 || authorIncome > 0 || royaltyIncome > 0 || (bonusIncome > 0 && !bonusInclude)) {
         rows.push({ cells: [''], spans: [9] });

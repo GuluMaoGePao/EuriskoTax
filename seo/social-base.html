@@ -89,7 +89,7 @@
                         "name": "企业用一个员工到底要花多少钱？",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "用工成本 = 应发工资 + 单位缴纳的五险一金。按常见费率，单位部分约为工资的 27.5% 再加同比例公积金 12%，即月薪 10000 元的企业月成本约 13950 元（1.395 倍），员工全年到手约占企业成本的 55%。"
+                            "text": "用工成本 = 应发工资 + 单位缴纳的五险一金。按默认费率（上海 2026 年度），单位部分约为工资的 25.9% 再加同比例公积金，即月薪 10000 元、公积金 12% 的企业月成本约 13790 元（1.379 倍），员工全年到手约占企业成本的 56%。"
                         }
                     },
                     {
@@ -131,7 +131,7 @@
             按本人上年度月平均工资确定，但低于当地上年度社平工资 <strong>60%</strong> 的按 60% <strong>保底</strong>、
             高于 <strong>300%</strong> 的按 300% <strong>封顶</strong>。
             社平工资 8000 元时下限 4800 元、上限 24000 元：工资 4000 元按 4800 元缴，工资 50000 元只按 24000 元缴。
-            费率上，养老个人 <strong>8%</strong> / 单位 <strong>16%</strong>，医疗个人 <strong>2%</strong> / 单位约 <strong>9.8%</strong>，
+            费率上，养老个人 <strong>8%</strong> / 单位 <strong>16%</strong>，医疗个人 <strong>2%</strong> / 单位约 <strong>9%</strong>（上海口径，含生育），
             失业各 <strong>0.5%</strong>；<strong>工伤与生育个人不缴</strong>（生育已并入职工医保）。
             公积金单位与职工各 <strong>5%~12%</strong>，只有 <strong>12% 与社平 3 倍以内</strong>的部分免征个税。
             下面三个速算器分别实算：五险一金、到手工资、企业用工成本。
@@ -141,7 +141,7 @@
             <h2 id="insurance-title" class="mt-0">速算一：五险一金个人与单位各交多少</h2>
             <p class="small muted mt-0">
                 口径：缴费基数 = 本人上年度月平均工资，低于社平工资 <strong>60%</strong> 按下限、高于 <strong>300%</strong> 按上限；
-                养老 8%/16%、医疗 2%/9.8%、失业 0.5%/0.5%、工伤与生育由单位缴、公积金 5%~12%
+                养老 8%/16%、医疗 2%/9%、失业 0.5%/0.5%、工伤由单位缴、生育已并入医保、公积金 5%~12%（上海标准档 7%）
             </p>
             <div class="calc-input-row mb-12">
                 <div class="field">
@@ -319,10 +319,10 @@
                 </thead>
                 <tbody>
                     <tr><td>养老保险</td><td class="num">8%</td><td class="num">16%</td><td>单位 16% 自 2019-05-01 起执行（国办发〔2019〕13 号）；个人 8% 全部计入个人账户</td></tr>
-                    <tr><td>医疗保险</td><td class="num">2%</td><td class="num">9.8%</td><td>个人 2%；单位费率由统筹地区确定（多数 6%~10%），这里取常见值 9.8%</td></tr>
+                    <tr><td>医疗保险</td><td class="num">2%</td><td class="num">9%</td><td>个人 2%；单位费率由统筹地区确定（多数 6%~10%），默认按上海 2026 年度 9%（含生育）</td></tr>
                     <tr><td>失业保险</td><td class="num">0.5%</td><td class="num">0.5%</td><td>阶段性总费率 1%，<strong>执行至 2026-12-31</strong> —— 到期后若无延续文件，按《失业保险条例》恢复单位 2%、个人 1%（个人三险一金从 22.5% 涨到 23%）。1% 之内的分摊各省自定：福建 / 江西 / 陕西等为各 0.5%，云南 / 山西等为单位 0.7%、个人 0.3%</td></tr>
                     <tr><td>工伤保险</td><td class="num">不缴</td><td class="num">0.4%</td><td>按行业基准费率 0.2%~1.9% 由单位缴纳，个人不缴</td></tr>
-                    <tr><td>生育保险</td><td class="num">不缴</td><td class="num">0.8%</td><td>已与职工医保合并实施，由单位缴纳，个人不缴</td></tr>
+                    <tr><td>生育保险</td><td class="num">不缴</td><td class="num">0%</td><td>已与职工医保合并实施，由单位缴纳，个人不缴 —— 上海已并入医保的 9% 中、不单列；仍单列的地区按当地比例（常见 0.5%~1%）</td></tr>
                     <tr><td>住房公积金</td><td class="num">5%~12%</td><td class="num">5%~12%</td><td>单位与职工比例一致，均不低于 5%、不高于 12%（国务院令第 262 号）</td></tr>
                 </tbody>
             </table>
@@ -336,9 +336,9 @@
                 </thead>
                 <tbody>
                     <tr><td class="num">4000.00</td><td class="num">4800.00</td><td class="num">1080.00</td><td class="num">2920.00</td><td class="num">2920.00</td><td class="num">0.00</td><td class="num">5896.00</td></tr>
-                    <tr><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">2250.00</td><td class="num">7697.50</td><td class="num">7697.50</td><td class="num">630.00</td><td class="num">13950.00</td></tr>
-                    <tr><td class="num">20000.00</td><td class="num">20000.00</td><td class="num">4500.00</td><td class="num">15215.00</td><td class="num">14550.00</td><td class="num">8880.00</td><td class="num">27900.00</td></tr>
-                    <tr><td class="num">50000.00</td><td class="num">24000.00</td><td class="num">5400.00</td><td class="num">43260.00</td><td class="num">33020.00</td><td class="num">86040.00</td><td class="num">59480.00</td></tr>
+                    <tr><td class="num">10000.00</td><td class="num">10000.00</td><td class="num">2250.00</td><td class="num">7697.50</td><td class="num">7697.50</td><td class="num">630.00</td><td class="num">13790.00</td></tr>
+                    <tr><td class="num">20000.00</td><td class="num">20000.00</td><td class="num">4500.00</td><td class="num">15215.00</td><td class="num">14550.00</td><td class="num">8880.00</td><td class="num">27580.00</td></tr>
+                    <tr><td class="num">50000.00</td><td class="num">24000.00</td><td class="num">5400.00</td><td class="num">43260.00</td><td class="num">33020.00</td><td class="num">86040.00</td><td class="num">59096.00</td></tr>
                 </tbody>
             </table>
         </div>
@@ -393,7 +393,7 @@
         </details>
         <details>
             <summary>企业用一个员工到底要花多少钱？</summary>
-            <p>用工成本 = 应发工资 + 单位缴纳的五险一金。按常见费率，单位部分约为工资的 27.5% 再加同比例公积金 12%，即月薪 10000 元的企业月成本约 13950 元（1.395 倍），员工全年到手约占企业成本的 55%。</p>
+            <p>用工成本 = 应发工资 + 单位缴纳的五险一金。按默认费率（上海 2026 年度），单位部分约为工资的 25.9% 再加同比例公积金，即月薪 10000 元、公积金 12% 的企业月成本约 13790 元（1.379 倍），员工全年到手约占企业成本的 56%。</p>
         </details>
         <details>
             <summary>这个测算结果能直接作为缴费或报税依据吗？</summary>

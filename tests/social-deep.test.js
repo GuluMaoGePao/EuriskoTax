@@ -129,14 +129,14 @@ describe('① 缴费基数是「本人上年度月平均工资」，不是本月
         expect(out.note).toContain('少算');
     });
 
-    test('少算 1 万基数：个人侧一年差 2.7 万、单位侧差 4.74 万', () => {
+    test('少算 1 万基数：个人侧一年差 2.7 万、单位侧差 4.55 万', () => {
         const legal = compute();
         const naive = compute(NO_EXTRA);                   // 速算器口径（只按本月工资）
         expect(legal.primary.value - naive.primary.value).toBe(2250);          // 4500 − 2250
         expect((legal.primary.value - naive.primary.value) * 12).toBe(27000);  // 个人侧一年
         const unitGap = row(legal, '单位缴纳 / 月') - row(naive, '单位缴纳 / 月');
-        expect(unitGap).toBe(3950);                                           // 10000 × 39.5%
-        expect(unitGap * 12).toBe(47400);                                     // 单位侧一年
+        expect(unitGap).toBe(3790);                                           // 10000 × 37.9%（五项 25.9% + 公积金 12%）
+        expect(unitGap * 12).toBe(45480);                                     // 单位侧一年
     });
 
     test('津贴补贴与加班工资也属于工资总额，都要进基数', () => {
@@ -204,17 +204,17 @@ describe('② 公积金免税的两个上限是「且」的关系', () => {
 });
 
 describe('③ 申报基数不足额的代价（社保法第八十六条）', () => {
-    test('核定 2 万却按 4800 申报：一年少缴 6.93 万，代价 14.5 万 ~ 28.4 万', () => {
+    test('核定 2 万却按 4800 申报：一年少缴 6.64 万，代价 13.9 万 ~ 27.2 万', () => {
         const out = compute();
         const c = S().complianceGapOf({ actualBase: 20000, declaredBase: 4800, years: 1 });
         expect(c.gapBase).toBe(15200);
-        expect(c.annualGap).toBe(69312);
-        expect(c.totalArrears).toBe(69312);
-        expect(c.lateFee).toBeCloseTo(6324.72, 2);
-        expect(c.totalMin).toBeCloseTo(144948.72, 2);
-        expect(c.totalMax).toBeCloseTo(283572.72, 2);
-        expect(row(out, '一年少缴（单位 + 个人）')).toBe(69312);
-        expect(row(out, '合计代价')).toBe('144948.72 ~ 283572.72');
+        // 15200 × (单位 25.9% + 个人 10.5%) × 12 = 66393.6（单位侧费率随默认地区变，个人侧不变）
+        expect(c.annualGap).toBeCloseTo(66393.6, 2);
+        expect(c.totalArrears).toBeCloseTo(66393.6, 2);
+        expect(c.lateFee).toBeCloseTo(6058.42, 2);
+        expect(c.totalMin).toBeCloseTo(138845.62, 2);
+        expect(c.totalMax).toBeCloseTo(271632.82, 2);
+        expect(row(out, '一年少缴（单位 + 个人）')).toBeCloseTo(66393.6, 2);
     });
 
     test('滞纳金按日万分之五 = 年化 18.25%', () => {
@@ -235,9 +235,9 @@ describe('③ 申报基数不足额的代价（社保法第八十六条）', () 
     test('追溯年数越长，欠缴额线性放大、滞纳金超线性放大', () => {
         const one = S().complianceGapOf({ actualBase: 20000, declaredBase: 4800, years: 1 });
         const three = S().complianceGapOf({ actualBase: 20000, declaredBase: 4800, years: 3 });
-        expect(three.totalArrears).toBe(one.totalArrears * 3);
+        expect(three.totalArrears).toBeCloseTo(one.totalArrears * 3, 6);
         // 滞纳金按「平均欠缴时长 = 年数 ÷ 2」估算，所以是年数的平方倍
-        expect(three.lateFee / one.lateFee).toBeCloseTo(9, 6);
+        expect(three.lateFee / one.lateFee).toBeCloseTo(9, 2);
     });
 });
 

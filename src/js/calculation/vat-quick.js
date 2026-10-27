@@ -43,20 +43,35 @@
     }
 
     /**
-     * 小规模纳税人：不含税销售额 × 征收率（现行优惠减按 1%），不抵扣进项。
+     * 征收率档位：默认「一般应税交易」（3%，现行优惠减按 1%）；
+     * 销售 / 出租不动产、转让土地使用权、劳务派遣差额纳税是 **5%**，
+     * 按财政部 税务总局公告 2026 年第 10 号**不享受** 3% 减按 1%。
+     */
+    function levyTierOf(key) {
+        var list = (rules().smallScale.levyRates || []);
+        var hit = null;
+        list.forEach(function (t) { if (t.key === key) { hit = t; } });
+        return hit || list[0] || { key: 'general', label: '一般应税交易', rate: 0.03, reducedRate: 0.01 };
+    }
+
+    /**
+     * 小规模纳税人：不含税销售额 × 征收率（一般应税交易现行减按 1%），不抵扣进项。
      *
      * @param {Object} input
      *   sales           本期销售额（元）
      *   period          'quarter'（默认，按季纳税）或 'month'（按月纳税）
      *   taxIncluded     sales 是否为含税价（默认 false）
      *   specialInvoice  其中开具增值税专用发票的不含税销售额（元，免税部分不含专票）
+     *   levy            征收率档：'general'（默认）/ 'realestate' 不动产与土地使用权 / 'labor' 劳务派遣
      */
     function smallScaleOf(input) {
         input = input || {};
         var r = rules().smallScale;
         var period = input.period === 'month' ? 'month' : 'quarter';
         var raw = toNumber(input.sales);
-        var rate = r.reducedRate;
+        var tier = levyTierOf(input.levy);
+        var rate = tier.reducedRate;
+        var levyRate = tier.rate;
         // 免征判断与计税都用**不含税**销售额：含税价先按现行征收率分离
         var exclusive = input.taxIncluded ? raw / (1 + rate) : raw;
         var threshold = thresholdOf(period);
@@ -64,13 +79,15 @@
         var special = Math.min(toNumber(input.specialInvoice), exclusive);
         // 未超过额度：普票部分免征，专票部分按票面征收率照缴；超过额度：全额计税
         var tax = exempt ? special * rate : exclusive * rate;
-        var statutoryTax = exclusive * r.levyRate;
+        var statutoryTax = exclusive * levyRate;   // 法定征收率对照：5% 档两者相等（不享受减征）
         return {
             period: period,
             sales: raw,
             taxIncluded: !!input.taxIncluded,
+            levy: tier.key,
+            levyLabel: tier.label,
             rate: rate,
-            levyRate: r.levyRate,
+            levyRate: levyRate,
             exclusive: exclusive,
             threshold: threshold,
             exempt: exempt,

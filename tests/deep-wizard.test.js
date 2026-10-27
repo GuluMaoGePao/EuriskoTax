@@ -317,8 +317,9 @@ describe('多步向导：第四个税种（社保公积金）', () => {
             document.getElementById('dw-next').click();
         }
         const shown = document.getElementById('deep-wizard-page').textContent;
+        // 公积金用默认档 7%（上海），与向导里字段的默认值一致；填 12% 会与页面算出两个数
         const direct = R().get('social-base').compute({
-            wage: 20000, socialAverage: 8000, housingRate: 12, specialMonthly: 0
+            wage: 20000, socialAverage: 8000, housingRate: 7, specialMonthly: 0
         });
         expect(shown).toContain(TB().fmtValue(direct.primary.value, direct.primary.kind));
     });

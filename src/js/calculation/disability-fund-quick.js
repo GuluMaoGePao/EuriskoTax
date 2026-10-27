@@ -44,6 +44,19 @@
         return tiers[tiers.length - 1];
     }
 
+    // 「达到规定比例不缴」那一档的阈值必须**跟着当地比例走**：安排比例由各省在 1.5%~1.7% 内
+    // 确定（如福建 1.6%，见 disabilityFundRules.ratioNote），而 tiers 里的 0.015 只是默认省的
+    // 那个数。若免征档写死 1.5%，福建用户安排到 1.5%~1.6% 之间会被判成「已达标免征」——
+    // 差 0.1 个百分点就是一笔真金白银的费。所以按传入的 ratio 重算首档。
+    function tiersFor(ratio) {
+        var list = (rules().tiers || []).slice();
+        var r = num(ratio);
+        if (r > 0 && list.length) {
+            list[0] = Object.assign({}, list[0], { minRatio: r });
+        }
+        return list;
+    }
+
     // 分档减缴里「1%（含）以上减半」那一档 —— 从 tiers 里认，不写死 0.01
     function halfTierOf(list) {
         var tiers = (list || rules().tiers);
@@ -235,7 +248,8 @@
         var required = headcount * ratio;
         var gap = Math.max(required - disabled, 0);
         var arrangedRatio = headcount > 0 ? disabled / headcount : 0;
-        var tier = tierOf(arrangedRatio, r.tiers);
+        var tiers = tiersFor(ratio);
+        var tier = tierOf(arrangedRatio, tiers);
         var base = round(gap * avgWageUsed);                     // 应缴费额（未考虑分档）
         var payableBeforeExempt = round(base * tier.multiplier); // 分档后（未考虑 30 人免征）
         var smallExempt = headcount > 0 && headcount <= r.smallExempt.headcountUpTo;

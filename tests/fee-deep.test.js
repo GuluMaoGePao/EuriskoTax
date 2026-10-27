@@ -170,25 +170,25 @@ describe('② 「招几个才免征」取决于人数（100 人是第二个临�
 });
 
 describe('③ 招残疾人 vs 缴残保金（「要不要招一个人」的定价）', () => {
-    test('100 人公司：招第 1 人省 13.2 万，而雇一个人要付 16.74 万', () => {
+    test('100 人公司：招第 1 人省 13.2 万，而雇一个人要付 15.95 万', () => {
         const c = Q().hireCompareOf({
             headcount: 100, disabled: 0, socialAverageMonthly: 8000,
             avgAnnualWage: 120000, hireAnnualWage: 120000
         });
-        expect(c.totalRate).toBe(0.395);               // 27.5% 五项 + 12% 公积金
+        expect(c.totalRate).toBe(0.329);               // 25.9% 五项 + 7% 公积金（默认地区 = 上海）
         expect(c.saving).toBe(132000);                 // 1.35W → 0.25W
-        expect(c.hireCost).toBe(167400);               // 12 万 × 1.395
+        expect(c.hireCost).toBe(159480);               // 12 万 × 1.329
         expect(c.netReplace).toBe(132000);             // 情形 A：净省全额
-        expect(c.netAdd).toBe(35400);                  // 情形 B：净亏 3.54 万
-        expect(c.breakEvenWage).toBe(94623.66);        // 盈亏平衡年薪 9.46 万
+        expect(c.netAdd).toBe(27480);                  // 情形 B：净亏 2.75 万
+        expect(c.breakEvenWage).toBeCloseTo(99322.8, 2);   // 盈亏平衡年薪 = 13.2 万 ÷ 1.329
         expect(c.worthIt).toBe(false);
     });
 
-    test('费率保留 4 位小数：0.395 不能被舍成 0.40（否则用工成本凭空多 600 元）', () => {
+    test('费率保留 4 位小数：0.329 不能被舍成 0.33（否则用工成本凭空多 120 元）', () => {
         const c = Q().hireCompareOf({ headcount: 100, socialAverageMonthly: 8000, avgAnnualWage: 120000, hireAnnualWage: 120000 });
-        expect(c.totalRate).toBe(0.395);
-        expect(c.hireCost).toBe(167400);
-        expect(c.hireCost).not.toBe(168000);
+        expect(c.totalRate).toBe(0.329);
+        expect(c.hireCost).toBe(159480);
+        expect(c.hireCost).not.toBe(159600);
     });
 
     test('岗位年薪压到盈亏平衡以下，情形 B 才划算', () => {
@@ -198,7 +198,7 @@ describe('③ 招残疾人 vs 缴残保金（「要不要招一个人」的定�
         });
         expect(cheap.worthIt).toBe(true);
         expect(cheap.netAdd).toBeLessThan(0);          // 净赚
-        expect(cheap.breakEvenWage).toBe(94623.66);
+        expect(cheap.breakEvenWage).toBeCloseTo(99322.8, 2);
     });
 
     test('第一个残疾人最值钱：45 人公司第 1 人省 7.29 万、第 2 人一分钱都省不了', () => {
@@ -211,8 +211,8 @@ describe('③ 招残疾人 vs 缴残保金（「要不要招一个人」的定�
     test('结果里两种情形分行给出，不混成一个数', () => {
         const out = compute();
         expect(row(out, '情形 A：岗位本来就要招人 → 净省')).toBe(72900);
-        expect(row(out, '情形 B：专为省残保金增设岗位 → 净支出')).toBe(94500);
-        expect(row(out, '盈亏平衡年薪')).toBe(52258.06);
+        expect(row(out, '情形 B：专为省残保金增设岗位 → 净支出')).toBe(86580);   // 12 万 × 1.329 − 7.29 万
+        expect(row(out, '盈亏平衡年薪')).toBeCloseTo(54853.27, 2);              // 7.29 万 ÷ 1.329
         expect(out.note).toContain('不划算');
     });
 });
