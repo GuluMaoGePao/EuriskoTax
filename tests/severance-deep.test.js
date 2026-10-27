@@ -1,10 +1,10 @@
 // 离职补偿金的完整测算（阶段17 17D-4）的回归网
 //
 // 它守护的是四件速算器做不到、而用户真正需要的事：
-//   ① **按款项分类计税**：速算器 `severance` 只有 `economic` / `other` 两个框，而 compareOf 里写的是
-//      `legalPart = legalEconomic + other` —— 「其他一次性补助」被**全额认可为可享免税**。真实的
-//      补偿包是多笔构成的：竞业限制补偿 / 未休年休假折算 / 代通知金**不属于**解除劳动关系取得的
-//      一次性补偿，把它们算进补偿包就会**少算税**（这里量化那个差额）；
+//   ① **按款项分类计税**：速算器 `severance` 只有 `economic` / `other` 两个框，两者都按
+//      「解除劳动关系取得的一次性补偿收入」处理（可享社平 3 倍免税）。真实的补偿包是多笔构成的：
+//      竞业限制补偿 / 未休年休假折算 / 代通知金**不属于**这一类，把它们算进补偿包就会**少算税**
+//      （这里量化那个差额）；
 //   ② **法定应得的精确折算**：《劳动合同法》第 47 条是「满一年一个月、六个月以上不满一年按一年、
 //      不满六个月按半个月」，速算器直接把「年限」当月数用，8 年 7 个月会被算成 8.58 个月而不是 9 个月；
 //   ③ **代扣的社保公积金可以在计征时扣除**（财税〔2001〕157 号第二条）—— 速算器**没有这一栏**，
@@ -32,7 +32,9 @@ const Q = () => window.EuriskoSeveranceQuick;
 function compute(values) {
     return R().get('severance-deep').compute(Object.assign({
         avgWage: 120000, monthlyWage: 15000, years: 8, extraMonths: 0,
-        items: [{ kind: 'economic', amount: 300000 }],
+        // 50 万：超过社平 3 倍（36 万），才有税可算 —— 30 万那档在新旧口径下都是全额免税，
+        // 钉不出「免税额度抵总额」这件事
+        items: [{ kind: 'economic', amount: 500000 }],
         socialDeduction: 0, otherTaxable: 0, installments: false, times: 2
     }, values || {}));
 }
@@ -46,9 +48,11 @@ describe('与速算器同源：单笔输入下逐点相等', () => {
     test('应税 / 税额 / 免税额度 / 法定上限 —— 一律调同一个 quick 模块', () => {
         const out = compute({});
         const quick = Q().compareOf({
-            economic: 300000, other: 0, avgWage: 120000, monthlyWage: 15000, years: 8, otherTaxable: 0
+            economic: 500000, other: 0, avgWage: 120000, monthlyWage: 15000, years: 8, otherTaxable: 0
         });
-        expect(quick.taxable).toBe(180000);                    // 30 万 − 法定上限 12 万
+        // 50 万 − 免税额度 36 万（社平 12 万 × 3）= 14 万。
+        // 注意不是「50 万 − 法定上限 12 万」：免税看社平 3 倍，不看《劳动合同法》法定标准
+        expect(quick.taxable).toBe(140000);
         expect(row(out, '一次性补偿应纳税所得额')).toBe(quick.taxable);
         expect(row(out, '一次性补偿应纳个税')).toBe(quick.tax);
         expect(row(out, '免税额度（社平年工资 ×3）')).toBe(quick.exemptCap);
@@ -96,10 +100,11 @@ describe('按款项分类：不能免税的钱塞进补偿包会少算税', () =
         expect(row(out, '一次性补偿应纳个税')).toBe(0);            // 12 万全在免税额度内
         expect(row(out, '并入部分的增量税')).toBe(31080 - 3480);   // T(24万) − T(6万) = 27600
         expect(row(out, '应纳个税合计')).toBe(27600);
-        expect(row(out, '若全按一次性补偿（错误口径）')).toBe(19080);
-        expect(row(out, '混着填会少算')).toBe(8520);
+        // 混着填：30 万全额落在社平 3 倍（36 万）的免税额度内 → 错误口径算出 0
+        expect(row(out, '若全按一次性补偿（错误口径）')).toBe(0);
+        expect(row(out, '混着填会少算')).toBe(27600);
         expect(out.note).toContain('不属于');
-        expect(out.note).toContain('8520');
+        expect(out.note).toContain('27600');
     });
 
     test('并入永远不比单独更省（年度表超额累进 → T(a+b) ≥ T(a)+T(b)）', () => {
@@ -142,8 +147,8 @@ describe('破产企业的一次性安置费：全额免税，不受 3 倍限制'
         const out = compute({ items: [{ kind: 'economic', amount: 400000 }, { kind: 'placement', amount: 100000 }] });
         expect(row(out, '补偿包合计')).toBe(500000);
         expect(row(out, '其中：全额免税（破产安置费）')).toBe(100000);
-        expect(row(out, '一次性补偿应纳税所得额')).toBe(280000);   // 40 万 − 法定上限 12 万
-        expect(row(out, '一次性补偿应纳个税')).toBe(Q().taxSeparateOf(280000));
+        expect(row(out, '一次性补偿应纳税所得额')).toBe(40000);    // 40 万 − 免税额度 36 万（安置费另全额免税、不占额度）
+        expect(row(out, '一次性补偿应纳个税')).toBe(Q().taxSeparateOf(40000));
         expect(out.extras[0].table.rows[1][3]).toBe('全额免税');
     });
 });
@@ -185,12 +190,12 @@ describe('法定经济补偿：封顶值恰好等于免税额度（反直觉）'
 });
 
 describe('代扣的社保公积金可以在计征时扣除：速算器没有这一栏', () => {
-    test('扣 3 万社保公积金 → 税基 18 万降到 15 万，少交 6000', () => {
-        expect(row(compute({ socialDeduction: 0 }), '一次性补偿应纳个税')).toBe(19080);
+    test('扣 3 万社保公积金 → 税基 14 万降到 11 万，少交 3000', () => {
+        expect(row(compute({ socialDeduction: 0 }), '一次性补偿应纳个税')).toBe(11480);   // 14 万 × 10% − 2520
         const out = compute({ socialDeduction: 30000 });
         expect(row(out, '扣除：补偿款中代扣的社保公积金')).toBe(30000);
-        expect(row(out, '一次性补偿应纳税所得额')).toBe(150000);
-        expect(row(out, '一次性补偿应纳个税')).toBe(150000 * 0.2 - 16920);   // 13080
+        expect(row(out, '一次性补偿应纳税所得额')).toBe(110000);
+        expect(row(out, '一次性补偿应纳个税')).toBe(110000 * 0.1 - 2520);   // 8480
     });
 
     test('扣除额不会把税基压成负数', () => {
@@ -201,11 +206,11 @@ describe('代扣的社保公积金可以在计征时扣除：速算器没有这�
 });
 
 describe('免税额度只给一次：分次 / 跨年支付不能重复扣', () => {
-    test('30 万分 2 次支付、每次各扣免税额度 → 一次税都不用交（少算 19080）', () => {
+    test('50 万分 2 次支付、每次各扣免税额度 → 一次税都不用交（少算 11480）', () => {
         const out = compute({ installments: true, times: 2 });
-        expect(row(out, '一次性补偿应纳个税')).toBe(19080);
+        expect(row(out, '一次性补偿应纳个税')).toBe(11480);
         expect(row(out, '若分 2 次支付、每次各扣免税额度')).toBe(0);
-        expect(row(out, '分次各扣会少算')).toBe(19080);
+        expect(row(out, '分次各扣会少算')).toBe(11480);
         expect(out.extras[1].table.rows).toHaveLength(3);
     });
 

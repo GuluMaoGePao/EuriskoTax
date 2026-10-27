@@ -360,7 +360,7 @@ describe('年终奖择优与股权激励（deep）：两套口径都要给，不
     });
 });
 
-describe('离职补偿（deep）：只有符合法定标准的部分才吃免税额度', () => {
+describe('离职补偿（deep）：免税看社平 3 倍，不看《劳动合同法》的法定标准', () => {
     test('经济补偿 12 万在 3 倍社平 36 万以内 → 0；竞业限制 6 万并入 → 多出 6000', () => {
         const v = { avgWage: 120000, monthlyWage: 15000, years: 8, extraMonths: 0, socialDeduction: 0,
             otherTaxable: 60000, installments: false,
@@ -368,6 +368,15 @@ describe('离职补偿（deep）：只有符合法定标准的部分才吃免税
         expect(rowOf('severance-deep', v, '一次性补偿应纳个税')).toBe(0);
         // 并入口径：60000 + 60000 = 120000 → 9480；其他所得 60000 → 3480；差额 6000
         expect(primaryOf('severance-deep', v)).toBe(6000);
+    });
+
+    test('补偿 50 万远超法定上限 20 万：免税仍按社平 3 倍 36 万 → 应税 14 万 → 11480', () => {
+        // 财税〔2018〕164 号只按「社平 3 倍」划线，不区分发放金额是否符合《劳动合同法》法定标准。
+        // 旧口径把超出法定标准的 30 万判为不免税 → 应税 30 万 → 300000 × 20% − 16920 = 43080，
+        // 比政策原文口径多算 31600 元（往多算，谈离职包的人会被低估到手）。
+        const v = { avgWage: 120000, monthlyWage: 20000, years: 10, extraMonths: 0, socialDeduction: 0,
+            otherTaxable: 0, installments: false, items: [{ kind: 'economic', amount: 500000 }] };
+        expect(rowOf('severance-deep', v, '一次性补偿应纳个税')).toBe(11480);
     });
 });
 

@@ -1859,7 +1859,7 @@
                     { label: '其中：并入综合所得', value: mergePart, kind: 'money' },
                     { label: '免税额度（社平年工资 ×' + mult + '）', value: r.exemptCap, kind: 'money' },
                     { label: '实际使用免税额度', value: r.exemptUsed, kind: 'money',
-                        hint: '免税额度只抵「符合法定标准」的那部分' },
+                        hint: '免税额度抵「一次性补偿收入」总额 —— 财税〔2018〕164 号只按社平 3 倍划线，不因发放金额超出《劳动合同法》法定标准而否定免税' },
                     { label: '扣除：补偿款中代扣的社保公积金', value: socialDed, kind: 'money' },
                     { label: '一次性补偿应纳税所得额', value: taxable, kind: 'money' },
                     { label: '适用税率', value: br ? br.rate : 0, kind: 'percent' },
@@ -6810,7 +6810,7 @@
             ],
             pitfalls: [
                 '免税额度是当地上年职工年平均工资 × 3，不是「月工资 × 3」，也不是全国一个数',
-                '超过法定标准（工资超社平 3 倍 / 年限超 12 年）的部分不能享受免税',
+                '《劳动合同法》的法定上限（月工资超社平 3 倍、年限超 12 年）管的是「能合法拿多少补偿」，不决定个税免税额度 —— 免税只看「是否超过社平 3 倍」',
                 '离职补偿不并入综合所得，单独计税、且不做按年限平均'
             ],
             compute: function (v) {
@@ -6826,16 +6826,19 @@
                     rows: [
                         { label: '一次性收入合计', value: r.amount, kind: 'money' },
                         { label: '免税额度（社平 ×3）', value: r.exemptCap, kind: 'money' },
-                        { label: '实际使用免税额度', value: r.exemptUsed, kind: 'money', hint: '免税额度只抵「符合法定标准」的部分' },
+                        { label: '实际使用免税额度', value: r.exemptUsed, kind: 'money',
+                            hint: '抵的是一次性补偿收入总额 —— 财税〔2018〕164 号只按社平 3 倍划线，不因发放金额超出《劳动合同法》法定标准而否定免税' },
                         { label: '应纳税所得额', value: r.taxable, kind: 'money' },
                         { label: '适用税率', value: r.rate, kind: 'percent' },
                         { label: '税后到手', value: r.net, kind: 'money' },
                         { label: '实际税负率', value: r.effectiveRate, kind: 'percent' },
-                        { label: '法定经济补偿上限', value: r.legalCap === null || r.legalCap === undefined ? '未校验（未填工资/年限）' : r.legalCap, kind: r.legalCap === null || r.legalCap === undefined ? 'text' : 'money' },
-                        { label: '超法定标准部分', value: r.overLegal, kind: 'money' },
+                        { label: '法定经济补偿上限（不参与计税）', value: r.legalCap === null || r.legalCap === undefined ? '未校验（未填工资/年限）' : r.legalCap, kind: r.legalCap === null || r.legalCap === undefined ? 'text' : 'money',
+                            hint: '《劳动合同法》第四十七条：管的是「能合法拿多少」，不影响免税额度' },
+                        { label: '超法定标准部分（不参与计税）', value: r.overLegal, kind: 'money',
+                            hint: '这部分在劳动法是「超出法定应得」，但在税法上同样享受社平 3 倍以内的免税 —— 政策原文没有把它单独拎出来' },
                         { label: '与并入综合所得的比较', value: dirText, kind: 'text' }
                     ],
-                    note: '应纳税所得额 = 一次性收入 − 免税额度（社平年工资 ×3），单独按七级年度表计税，不并入综合所得、不做按年限平均。'
+                    note: '应纳税所得额 = 一次性收入 − 免税额度（社平年工资 ×3），单独按七级年度表计税，不并入综合所得、不做按年限平均。免税额度抵的是收入总额：财税〔2018〕164 号只按社平 3 倍划线，超出《劳动合同法》法定标准发放的部分同样免税。'
                 };
             }
         },

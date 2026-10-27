@@ -14,7 +14,14 @@
  *   2. 超过部分**不并入**当年综合所得，单独适用**年度**综合所得税率表，且不减除任何费用；
  *   3. 「12 年」是《劳动合同法》第四十七条对经济补偿金**本身**的封顶（月工资也按 3 倍封顶），
  *      不是计税方法 —— 国税发〔1999〕178 号「÷ 工作年限平均为月工资」的做法已不再执行；
- *   4. 免税额度只能抵「符合法定标准的补偿」：超出法定标准发放的部分不享受免税。
+ *   4. ⚠️ 政策原文**没有**「超出《劳动合同法》法定标准的部分不享受免税」这一层 ——
+ *      财税〔2018〕164 号第五条第一项只说「在当地上年职工平均工资 3 倍数额以内的部分，
+ *      免征个人所得税」，不区分发放金额是否符合《劳动合同法》第四十七条的法定标准。
+ *      项目曾额外加这一层（保守口径、宁可多算），后果是**往多算一大笔**：
+ *      社平 12 万、补偿 50 万这一例，旧口径 43080 元、政策原文口径 **11480 元**，差 31600 元 ——
+ *      拿它去谈离职包的人会被低估到手 3 万多，这是"算错"不是"保守"。
+ *      现按政策原文：免税额度抵**一次性补偿收入总额**；法定上限仍然算出来给用户看
+ *      （谈补偿包时有用），但**不参与计税**。
  */
 (function (global) {
     'use strict';
@@ -108,8 +115,8 @@
         var otherTaxable = toNumber(input.otherTaxable);
 
         var cap = legalCapOf(input);
-        var legalPart;   // 符合法定标准的补偿（这部分才能享受免税额度）
-        var overLegal;   // 超出法定标准发放的部分（不享受免税，全额计税）
+        var legalPart;   // 符合法定标准的补偿（只作参考，不参与计税）
+        var overLegal;   // 超出法定标准发放的部分（只作参考：税法上同样享受社平 3 倍以内的免税）
         if (cap) {
             var legalEconomic = Math.min(economic, cap.amount);
             legalPart = legalEconomic + other;   // 其他补助费按实际支付数认可（法定只设下限）
@@ -119,9 +126,11 @@
             overLegal = 0;
         }
 
-        // 免税额度 = 当地上年职工年平均工资 × 3；只能抵「符合法定标准」的那部分
+        // 免税额度 = 当地上年职工年平均工资 × 3（财税〔2018〕164 号第五条第一项）。
+        // 它抵的是「一次性补偿收入」**总额** —— 政策原文没有「超出《劳动合同法》法定标准的部分
+        // 不免税」这一层（见文件头第 4 条）。legalCap / overLegal 仍然算，但只作参考，不参与计税。
         var exemptCap = avgWage * rules().exemptMultipleOfAverageWage;
-        var exemptUsed = Math.min(legalPart, exemptCap);
+        var exemptUsed = Math.min(amount, exemptCap);
         var taxable = Math.max(0, amount - exemptUsed);
 
         var bracket = bracketOf(taxable);
