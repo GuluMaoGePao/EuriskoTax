@@ -420,6 +420,28 @@ describe('工具注册表：信息架构（场景 / 相关工具）', () => {
         expect(bad).toEqual([]);
     });
 
+    // v2.0.0（阶段21）：身份收成两大类，一级只做分组标题，存盘仍是下面的场景 id
+    test('身份分两大类：我自己 4 张 / 企业 2 张，且每张都归了类', () => {
+        expect(R().identityKinds().map((k) => k.id)).toEqual(['self', 'enterprise']);
+        expect(R().byKind('self').map((s) => s.id))
+            .toEqual(['employee', 'freelance', 'owner', 'executive']);
+        expect(R().byKind('enterprise').map((s) => s.id)).toEqual(['finance', 'hr']);
+        R().scenarios().forEach((s) => expect(s.kind).toBeTruthy());
+    });
+
+    test('高管 / 股东归「我自己」而不是「企业」（股权与补偿是个人所得，本人给自己算）', () => {
+        expect(R().kindOf('executive')).toBe('self');
+        expect(R().kindOf('finance')).toBe('enterprise');
+        expect(R().kindOf('hr')).toBe('enterprise');
+    });
+
+    test('两级标签 identityLabel：有卡有类才有「 · 」，未知 id 返回空串', () => {
+        expect(R().identityLabel('owner')).toBe('我自己 · 个体户 / 小店');
+        expect(R().identityLabel('hr')).toBe('企业 · HR / 薪酬');
+        expect(R().identityLabel('')).toBe('');
+        expect(R().identityLabel('no-such-id')).toBe('');
+    });
+
     test('nextTools 指向的工具都存在（结果页「下一步」不能是死链）', () => {
         const bad = [];
         R().all().concat(R().deep()).forEach((t) => {

@@ -6410,19 +6410,44 @@
     // ====== 「我是谁」场景入口 ======
     // 工具超过 20 个之后，分类浏览的效率低于「先认身份」：用户不知道年终奖属于哪一类，
     // 但一定知道自己是不是上班族。这一层把「我该用哪个」这个问题在入口就解决掉。
+    // v2.0.0（阶段21）：6 张卡不再平铺，按**立场轴**分成下面两大类：
+    //   self       我自己 = 给自己算（工资、劳务、经营所得、自己持有的股权）
+    //   enterprise 企业   = 替公司或客户算（企税、增值税、发票、用工成本）
+    // ⚠️ 改动前先看三条线：
+    //   1) kind 是**立场**，不是纳税人身份 —— 「这笔税算在谁头上」归 entity-store.js 的
+    //      kind（company / individual / person）管，两套值各管一件事：
+    //        身份（本处）→ 决定工具页默认推荐哪一组（唯一功能，见 identity-pref.js 文件头）
+    //        主体 → 决定税算在谁头上
+    //      kind id 刻意不叫 person / company：那两个字符串已被纳税主体占用，同名必串线。
+    //   2) 工具页的 5 个分组**不能按 kind 二分**：实测每组两侧都要用（个体户会点
+    //      「企业与经营」，财务会点「社保与用工」），二分等于没分还多一层点击。
+    //      分类维度保持「工具属性」，身份只决定默认落哪一屏 —— 两者正交。
+    //   3) 本文件约 4509 行的 `v.identity === 'flexible'` 是社保工具自己的字段
+    //      （灵活就业 vs 职工），与全局身份同名不同义，别一起改。
+    var IDENTITY_KINDS = [
+        {
+            id: 'self', name: '我自己', icon: 'fa-user',
+            desc: '算自己的工资、劳务、经营所得，或自己持有的股权'
+        },
+        {
+            id: 'enterprise', name: '企业', icon: 'fa-building',
+            desc: '替公司或客户算企税、增值税、发票与用工成本'
+        }
+    ];
+
     var SCENARIOS = [
         {
-            id: 'employee', name: '上班族', icon: 'fa-id-badge',
+            id: 'employee', kind: 'self', name: '上班族', icon: 'fa-id-badge',
             desc: '领工资、算年终奖、看汇算退税',
             tools: ['salary-tax', 'bonus-tax', 'annual-settlement', 'special-deduction', 'net-salary']
         },
         {
-            id: 'freelance', name: '自由职业 / 兼职', icon: 'fa-laptop',
+            id: 'freelance', kind: 'self', name: '自由职业 / 兼职', icon: 'fa-laptop',
             desc: '劳务报酬预扣、自己缴社保',
             tools: ['withholding', 'business-income', 'social-base', 'private-pension', 'annual-settlement']
         },
         {
-            id: 'owner', name: '个体户 / 小店', icon: 'fa-shopping-bag',
+            id: 'owner', kind: 'self', name: '个体户 / 小店', icon: 'fa-shopping-bag',
             desc: '经营所得、开票缴税、核定还是查账',
             tools: ['business-income', 'vat', 'surtax-stamp', 'social-base', 'disability-fund']
         },
@@ -6430,17 +6455,19 @@
             // 阶段19-2：原来这一张叫「企业财务 / HR」，把**会计**与**薪酬**两类人塞在一张卡里 ——
             // 前者关心企税与附加、后者关心用工成本与社保，默认视图给谁都不对。现拆成两张，
             // 身份卡凑到 6 张（下轴「我是谁」）；工具可达性不受影响，身份只改默认视图。
-            id: 'finance', name: '企业财务 / 会计', icon: 'fa-building',
+            id: 'finance', kind: 'enterprise', name: '企业财务 / 会计', icon: 'fa-building',
             desc: '企税、增值税、附加与印花',
             tools: ['corporate-income-tax', 'vat', 'surtax-stamp', 'disability-fund', 'business-income']
         },
         {
-            id: 'executive', name: '高管 / 股东 / 临近退休', icon: 'fa-trophy',
+            // v2.0.0：这一张原先归在企业侧，是错的 —— 股权激励 / 离职补偿 / 年金 /
+            // 外派都是**个人所得**，是本人给自己算，公司不会替他算。归「我自己」。
+            id: 'executive', kind: 'self', name: '高管 / 股东 / 临近退休', icon: 'fa-trophy',
             desc: '股权激励、离职补偿、退休与年金',
             tools: ['equity', 'severance', 'early-retirement', 'annuity', 'expat']
         },
         {
-            id: 'hr', name: 'HR / 薪酬', icon: 'fa-users',
+            id: 'hr', kind: 'enterprise', name: 'HR / 薪酬', icon: 'fa-users',
             desc: '发工资、算用工成本、社保与残保金',
             tools: ['employer-cost', 'social-base', 'disability-fund', 'salary-tax', 'severance']
         }
@@ -7748,6 +7775,42 @@
     function deepGroup() { return DEEP_GROUP; }
     function scenarios() { return SCENARIOS.slice(); }
 
+    // ====== 身份的两大类（v2.0.0 · 阶段21）======
+    // 上面 SCENARIOS 文件头那三条线（立场 vs 纳税人身份 / 分类条不可二分 / 社保同名字段）
+    // 在看下面四个接口时同样成立，改之前先回去读一遍。
+    function identityKinds() { return IDENTITY_KINDS.slice(); }
+
+    function kindName(kindId) {
+        for (var i = 0; i < IDENTITY_KINDS.length; i++) {
+            if (IDENTITY_KINDS[i].id === kindId) return IDENTITY_KINDS[i].name;
+        }
+        return '';
+    }
+
+    /** 场景 → 大类。未知 / 空 / 已废弃 id 一律返回 ''，由调用方回退到第一个大类。 */
+    function kindOf(scenarioId) {
+        if (!scenarioId) return '';
+        for (var i = 0; i < SCENARIOS.length; i++) {
+            if (SCENARIOS[i].id === scenarioId) return SCENARIOS[i].kind || '';
+        }
+        return '';
+    }
+
+    function byKind(kindId) {
+        return SCENARIOS.filter(function (s) { return s.kind === kindId; });
+    }
+
+    /** 两级标签的唯一真源：「我自己 · 上班族」。未知 id → ''，由调用方退回「我是谁」。 */
+    function identityLabel(scenarioId) {
+        var name = '';
+        for (var i = 0; i < SCENARIOS.length; i++) {
+            if (SCENARIOS[i].id === scenarioId) { name = SCENARIOS[i].name; break; }
+        }
+        if (!name) return '';
+        var kind = kindOf(scenarioId);
+        return kindName(kind) ? kindName(kind) + ' · ' + name : name;
+    }
+
     function get(id) {
         for (var i = 0; i < TOOLS.length; i++) if (TOOLS[i].id === id) return TOOLS[i];
         for (var j = 0; j < DEEP.length; j++) if (DEEP[j].id === id) return DEEP[j];
@@ -7950,6 +8013,10 @@
         byGroup: byGroup,
         deepByGroup: deepByGroup,
         byScenario: byScenario,
+        identityKinds: identityKinds,
+        kindOf: kindOf,
+        byKind: byKind,
+        identityLabel: identityLabel,
         search: search
     };
 })();
