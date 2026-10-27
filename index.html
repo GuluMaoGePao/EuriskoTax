@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '1.149.12';
+        window.__APP_VERSION__ = '2.0.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -1746,7 +1746,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 1.149.12</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 2.0.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -1795,8 +1795,8 @@
                 </button>
             </div>
             <div class="modal-body p-5">
-                <p class="text-sm text-gray-600 mb-4">选一个最贴近你的身份，工具页会把它相关的那组工具排在「为你推荐」、结果里的下一步也照这个顺序 —— 其余入口一个不少。不选也照常用全部工具。</p>
-                <div id="identity-modal-list" class="identity-pick-grid">
+                <p class="text-sm text-gray-600 mb-4">先看你是给自己算，还是替公司或客户算 —— 选一个大类，再选最贴近的那一张。工具页会把它相关的工具排在「为你推荐」，其余入口一个不少，不选也照常用。</p>
+                <div id="identity-modal-list" class="identity-groups">
                     <!-- 由 identity-onboarding.js 按 tool-registry.js 的 scenarios 渲染 -->
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
@@ -2424,7 +2424,7 @@
                                  等于看不见（对比度审计在 dark/profile 抓到的）。改用自定义类钉住深色，
                                  见 ui-redesign.css 的 .profile-identity__title / __sub。 -->
                             <h3 id="profile-identity-title" class="profile-identity__title font-semibold text-sm leading-snug">我是谁</h3>
-                            <p id="profile-identity-sub" class="profile-identity__sub text-xs mt-1 leading-relaxed">选一个最贴近你的身份，相关的工具会排在前面；也可以只填职务与公司名称</p>
+                            <p id="profile-identity-sub" class="profile-identity__sub text-xs mt-1 leading-relaxed">先选你是自己算还是替公司算，相关的工具会排在前面；也可以只填职务与公司名称</p>
                         </div>
                         <i class="fa fa-chevron-right text-gray-300 flex-shrink-0"></i>
                     </div>

@@ -311,6 +311,9 @@ describe('首页「我是谁」场景入口', () => {
         const chip = document.getElementById('toolbox-scenario-chip');
         expect(chip.classList.contains('hidden')).toBe(false);
         expect(chip.textContent).toContain('按身份推荐');   // 措辞跟着行为改：推荐，不是筛选
+        // v2.0.0：文案是**两级标签**（大类 · 场景），不是单张卡名
+        expect(chip.textContent).toContain('我自己');
+        expect(chip.textContent).toContain('上班族');
 
         // 身份不限制可达性：切到「全部」，不属于这个身份的入口照样在
         document.querySelector('#toolbox-categories .tool-cat-chip[data-cat="all"]').click();

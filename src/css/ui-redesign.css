@@ -562,6 +562,84 @@
     color: #e5e7eb;
 }
 
+/* ====== 身份弹窗：两大类分组（v2.0.0 · 阶段21）======
+   两类只是**分组标题**：一次展开一组，卡片仍是原来的 .identity-pick 整卡。
+   不换成两级弹窗/分步表单 —— 6 张卡本来一屏放得下，分步只多点击与状态机。
+   颜色 / 圆角 / 阴影一律取既有令牌，不发明新色。 */
+.identity-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.identity-group {
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: transparent;
+}
+.identity-group-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 14px;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: background .2s;
+}
+.identity-group-head:hover {
+    background: rgba(30, 64, 175, .04);
+}
+.identity-group-head > .fa:first-child {
+    font-size: 16px;
+    color: var(--c-brand);
+}
+.identity-group-name {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.identity-group-desc {
+    flex: 1;
+    min-width: 0;             /* 窄屏允许换行，不把兄弟元素挤出容器 */
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+    line-height: 1.4;
+}
+.identity-group-count {
+    flex-shrink: 0;
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+    background: rgba(30, 64, 175, .08);
+    text-align: center;
+}
+.identity-group-arrow {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--c-text-3);
+    transition: transform .2s;
+}
+.identity-group-head[aria-expanded="true"] .identity-group-arrow {
+    transform: rotate(180deg);
+}
+.identity-group-body {
+    padding: 0 12px 12px;
+}
+.dark .identity-group {
+    border-color: var(--c-border);
+}
+.dark .identity-group-head:hover {
+    background: rgba(59, 130, 246, .10);
+}
+.dark .identity-group-name {
+    color: #e5e7eb;
+}
+
 /* 备案位占位态（ICP 号待下发）：位置先占住，避免号一下来页脚跳版；
    弱化显示是因为它只是「主体名 + 状态」，不是法定展示项（法定项是号）。 */
 .site-filing--pending {

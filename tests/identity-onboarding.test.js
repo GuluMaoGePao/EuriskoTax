@@ -18,13 +18,18 @@ const INDEX_HTML = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 
 
 // 6 张身份卡用桩而不是真加载 tool-registry：这里测的是弹窗行为，
 // 数据源换一份不至于让整套用例跟着改（卡片数量与字段由 tool-registry.test.js 守）。
+// v2.0.0：身份收成两大类（我自己 / 企业），一级只做分组标题
+const IDENTITY_KINDS = [
+    { id: 'self', name: '我自己', icon: 'fa-user', desc: '算自己的工资、劳务、经营所得' },
+    { id: 'enterprise', name: '企业', icon: 'fa-building', desc: '替公司或客户算企税、增值税' }
+];
 const SCENARIOS = [
-    { id: 'employee', name: '上班族', desc: '领工资、算年终奖、看汇算退税', icon: 'fa-user' },
-    { id: 'freelance', name: '自由职业', desc: '接私活、按次结算', icon: 'fa-briefcase' },
-    { id: 'owner', name: '个体户 / 小店', desc: '经营所得与核定征收', icon: 'fa-shop' },
-    { id: 'finance', name: '企业财务', desc: '算工资、算用工成本', icon: 'fa-building' },
-    { id: 'executive', name: '高管 / 股东', desc: '股权、期权与分红', icon: 'fa-line-chart' },
-    { id: 'hr', name: 'HR / 薪酬', desc: '薪酬结构与社保基数', icon: 'fa-users' }
+    { id: 'employee', kind: 'self', name: '上班族', desc: '领工资、算年终奖、看汇算退税', icon: 'fa-user' },
+    { id: 'freelance', kind: 'self', name: '自由职业', desc: '接私活、按次结算', icon: 'fa-briefcase' },
+    { id: 'owner', kind: 'self', name: '个体户 / 小店', desc: '经营所得与核定征收', icon: 'fa-shop' },
+    { id: 'finance', kind: 'enterprise', name: '企业财务', desc: '算工资、算用工成本', icon: 'fa-building' },
+    { id: 'executive', kind: 'self', name: '高管 / 股东', desc: '股权、期权与分红', icon: 'fa-line-chart' },
+    { id: 'hr', kind: 'enterprise', name: 'HR / 薪酬', desc: '薪酬结构与社保基数', icon: 'fa-users' }
 ];
 
 function evalFile(rel) {
@@ -46,7 +51,7 @@ function setup() {
         '</body>';
     window.openModal = jest.fn();
     window.closeModal = jest.fn();
-    window.EuriskoToolRegistry = { scenarios: () => SCENARIOS };
+    window.EuriskoToolRegistry = { scenarios: () => SCENARIOS, identityKinds: () => IDENTITY_KINDS };
     evalFile('src/js/ui/identity-pref.js');
     evalFile('src/js/ui/identity-onboarding.js');
 }
@@ -57,6 +62,21 @@ function picks() {
 
 function pickById(id) {
     return document.querySelector('#identity-modal-list .identity-pick[data-identity="' + id + '"]');
+}
+
+function groups() {
+    return [...document.querySelectorAll('#identity-modal-list .identity-group')];
+}
+
+function headOf(kind) {
+    return document.querySelector('#identity-modal-list .identity-group-head[data-kind="' + kind + '"]');
+}
+
+/** 当前展开的大类（按 aria-expanded 判定，与用户看到的一致） */
+function expandedIds() {
+    return groups()
+        .filter((g) => g.querySelector('.identity-group-head').getAttribute('aria-expanded') === 'true')
+        .map((g) => g.getAttribute('data-kind'));
 }
 
 beforeEach(() => {
@@ -103,15 +123,49 @@ describe('两处入口的绑定（不能依赖脚本与 DOM 的先后）', () =>
 });
 
 describe('弹窗内容', () => {
-    test('6 张身份卡全渲染，且每张都带一句话说明（不写说明就选不动）', () => {
+    test('分两大类折叠：默认展开「我自己」4 张，每张都带一句话说明（不写说明就选不动）', () => {
         window.EuriskoIdentityOnboarding.open();
-        expect(picks()).toHaveLength(6);
+
+        expect(groups()).toHaveLength(2);
+        expect(expandedIds()).toEqual(['self']);        // 一次只展开一组
+
+        // ⚠️ 卡片顺序按「同类内数组顺序」，不等于 SCENARIOS 的下标 —— 断言要按组过滤后再对位
+        const selfCards = SCENARIOS.filter((s) => s.kind === 'self');
+        expect(picks()).toHaveLength(selfCards.length);
         picks().forEach((btn, i) => {
-            const s = SCENARIOS[i];
+            const s = selfCards[i];
             expect(btn.getAttribute('data-identity')).toBe(s.id);
             expect(btn.textContent).toContain(s.name);
             expect(btn.textContent).toContain(s.desc);
         });
+    });
+
+    test('点大类标题切换展开，卡片随之更换 —— 切换本身不落盘', () => {
+        window.EuriskoIdentityOnboarding.open();
+
+        expect(headOf('enterprise').getAttribute('aria-expanded')).toBe('false');
+        headOf('enterprise').click();
+
+        expect(expandedIds()).toEqual(['enterprise']);
+        expect(picks().map((b) => b.getAttribute('data-identity'))).toEqual(['finance', 'hr']);
+        expect(window.EuriskoIdentityPref.get()).toBe('');
+        expect(window.EuriskoIdentityPref.onboarded()).toBe(false);
+    });
+
+    test('已有身份 → 打开就展开它那一组并预选（改身份的人少点一下）', () => {
+        window.EuriskoIdentityPref.set('finance');
+        window.EuriskoIdentityOnboarding.open();
+
+        expect(expandedIds()).toEqual(['enterprise']);
+        expect(pickById('finance').classList.contains('is-on')).toBe(true);
+    });
+
+    test('注册表里没有大类信息 → 退回平铺 6 张（老页面 / 桩缺字段不该白屏）', () => {
+        window.EuriskoToolRegistry = { scenarios: () => SCENARIOS };   // 故意不给 identityKinds
+        window.EuriskoIdentityOnboarding.open();
+
+        expect(groups()).toHaveLength(0);
+        expect(picks()).toHaveLength(6);
     });
 
     test('选中态是 is-on + aria-pressed（勾换到这张卡上，不关弹窗还能接着填）', () => {
@@ -170,6 +224,7 @@ describe('只有「下一步」落盘', () => {
     test('「下一步」是唯一落盘口：身份 + 职务 + 公司一次写完，然后关窗', () => {
         document.body.insertAdjacentHTML('beforeend', '<div id="identity-settings-summary"></div>');
         window.EuriskoIdentityOnboarding.open();
+        headOf('enterprise').click();      // finance 在企业组，先展开那一组
         pickById('finance').click();
         document.getElementById('identity-modal-job').value = '财务经理';
         document.getElementById('identity-modal-company').value = '某某科技';

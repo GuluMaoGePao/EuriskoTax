@@ -515,7 +515,12 @@
         chip.classList.remove('hidden');
         // 措辞是「推荐」不是「筛选」：身份决定谁排在前面，不决定谁能出现 —— 名字说错了，
         // 后面的人就会照着名字继续把它做成筛选。
-        chip.innerHTML = '<span class="tool-chip-label">按身份推荐：' + esc(scen.name) + '</span>' +
+        // v2.0.0：文案改走 identityLabel 的两级标签（「我自己 · 上班族」），
+        // 取不到就退回卡名 —— 分类条结构本身不动（5 组 + 推荐 / 最近 / 全部）。
+        var label = (typeof R().identityLabel === 'function'
+            ? (R().identityLabel(scen.id) || scen.name)
+            : scen.name);
+        chip.innerHTML = '<span class="tool-chip-label">按身份推荐：' + esc(label) + '</span>' +
             '<button type="button" id="toolbox-scenario-clear" class="tool-chip-clear">清除 ›</button>';
         var clear = document.getElementById('toolbox-scenario-clear');
         if (clear) {

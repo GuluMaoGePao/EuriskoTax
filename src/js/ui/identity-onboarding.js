@@ -16,6 +16,11 @@
  *   3. **职务 / 公司只是显示用的备注**，不参与任何计算。留空完全合法 ——
  *      这也是两个输入框都**不校验**、没有"必填"标记的原因：它们不是登录资料。
  *
+ * v2.0.0（阶段21）：6 张卡按**立场轴**折成两大类（我自己 / 企业），一次展开一组。
+ * 大类只是分组标题，落盘与推荐排序一律以**场景 id** 为准（employee…hr），
+ * 所以存量身份零迁移、工具页分类条零改动。设计依据见
+ * docs/development/阶段21-身份两级收敛-未开工.md §4–§5。
+ *
  * 游客可用：身份是本机偏好，不是登录特权（与 identity-pref / mode-pref 同一口径）。
  */
 (function () {
@@ -27,6 +32,11 @@
     // 弹窗内的**临时**选择：只有点「下一步」才落盘。
     // 点 × 或「暂时不填」都不算数 —— 否则"顺手点了一下"就被记成身份了。
     var picked = null;
+
+    // 当前展开的大类（v2.0.0）：两组只显示一组的卡片。
+    // 恒等于某一组、不允许全收起 —— 全收起时「下一步」没有可落盘的对象，
+    // 那个状态对用户是"页面坏了"，不是"什么都别选"（后者由「暂时不填」负责）。
+    var expandedKind = '';
 
     // 已挂上的 identity-pref 变更订阅的退订函数（init 重挂用）
     var unsubscribe = null;
@@ -53,6 +63,37 @@
         return hit ? hit.name : '';
     }
 
+    /**
+     * 两级标签的唯一真源：「我自己 · 上班族」（v2.0.0）。
+     * 取不到（老注册表 / 测试桩 / 未知 id）就退回卡名，绝不返回「 · 」这种半截串。
+     */
+    function labelOf(id) {
+        var R = reg();
+        if (!R || typeof R.identityLabel !== 'function') return nameOf(id);
+        try {
+            return R.identityLabel(id) || nameOf(id);
+        } catch (e) {
+            return nameOf(id);
+        }
+    }
+
+    /** 身份的两大类；注册表里没有就返回空数组（调用方走平铺兜底）。 */
+    function kinds() {
+        var R = reg();
+        if (!R || typeof R.identityKinds !== 'function') return [];
+        try { return R.identityKinds() || []; } catch (e) { return []; }
+    }
+
+    /** 场景属于哪个大类；注册表里没有 kindOf 就用场景自带的 kind 字段。 */
+    function kindOfId(scenarioId) {
+        var R = reg();
+        if (R && typeof R.kindOf === 'function') {
+            try { return R.kindOf(scenarioId) || ''; } catch (e) { /* 落到下面 */ }
+        }
+        var hit = scenarios().filter(function (s) { return s.id === scenarioId; })[0];
+        return hit ? (hit.kind || '') : '';
+    }
+
     function profile() {
         var L = lib();
         if (L && typeof L.profile === 'function') return L.profile();
@@ -66,28 +107,75 @@
     // 整卡形态（图标 + 名字 + 一句话说明）：这里是**让用户挑**的地方，
     // 说明必须出现 —— 首页那版 chip 不写说明是因为它只做"设为默认"这一个动作，
     // 而这里用户第一次见到这 6 个选项，看不出"个体户 / 小店"和自己有什么关系。
-    function drawList() {
-        var box = document.getElementById('identity-modal-list');
-        if (!box) return;
-        var current = picked != null ? picked : (profile().id || '');
+    //
+    // v2.0.0：6 张卡按大类分成两组（identityKinds），一次只展开一组。
+    // 为什么不做「先选大类 → 再选场景」两步：6 张卡本来一屏放得下，两步只多一次点击、
+    // 多一个返回态、多一个「第 1 步点了不算数」的歧义，换来的只是第一屏少 4 张卡。
+    function cardHtml(s, current) {
+        var on = s.id === current;
+        return '<button type="button" class="identity-pick' + (on ? ' is-on' : '') + '"' +
+            ' data-identity="' + esc(s.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+            '<i class="fa ' + esc(s.icon || 'fa-user') + '"></i>' +
+            '<span class="identity-pick-name">' + esc(s.name) + '</span>' +
+            '<span class="identity-pick-desc">' + esc(s.desc) + '</span>' +
+            '<i class="fa fa-check identity-pick-check"></i>' +
+            '</button>';
+    }
 
-        box.innerHTML = scenarios().map(function (s) {
-            var on = s.id === current;
-            return '<button type="button" class="identity-pick' + (on ? ' is-on' : '') + '"' +
-                ' data-identity="' + esc(s.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
-                '<i class="fa ' + esc(s.icon || 'fa-user') + '"></i>' +
-                '<span class="identity-pick-name">' + esc(s.name) + '</span>' +
-                '<span class="identity-pick-desc">' + esc(s.desc) + '</span>' +
-                '<i class="fa fa-check identity-pick-check"></i>' +
-                '</button>';
-        }).join('');
-
+    function bindCards(box) {
         box.querySelectorAll('.identity-pick').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 picked = btn.getAttribute('data-identity');
                 drawList();     // 就地重画：勾换到这张卡上（不关弹窗，还能接着填职务 / 公司）
             });
         });
+    }
+
+    function drawList() {
+        var box = document.getElementById('identity-modal-list');
+        if (!box) return;
+        var current = picked != null ? picked : (profile().id || '');
+        var ks = kinds();
+
+        // 兜底：注册表里没有大类信息（老页面 / 测试桩）→ 退回平铺，绝不白屏
+        if (!ks.length) {
+            box.className = 'identity-pick-grid';
+            box.innerHTML = scenarios().map(function (s) {
+                return cardHtml(s, current);
+            }).join('');
+            bindCards(box);
+            return;
+        }
+
+        box.className = 'identity-groups';
+        box.innerHTML = ks.map(function (k) {
+            var on = k.id === expandedKind;
+            var list = scenarios().filter(function (s) { return s.kind === k.id; });
+            return '<div class="identity-group" data-kind="' + esc(k.id) + '">' +
+                '<button type="button" class="identity-group-head" data-kind="' + esc(k.id) + '"' +
+                ' aria-expanded="' + (on ? 'true' : 'false') + '">' +
+                '<i class="fa ' + esc(k.icon || 'fa-user') + '"></i>' +
+                '<span class="identity-group-name">' + esc(k.name) + '</span>' +
+                '<span class="identity-group-desc">' + esc(k.desc) + '</span>' +
+                '<span class="identity-group-count">' + list.length + '</span>' +
+                '<i class="fa fa-chevron-down identity-group-arrow"></i>' +
+                '</button>' +
+                (on
+                    ? '<div class="identity-group-body"><div class="identity-pick-grid">'
+                        + list.map(function (s) { return cardHtml(s, current); }).join('')
+                        + '</div></div>'
+                    : '') +
+                '</div>';
+        }).join('');
+
+        box.querySelectorAll('.identity-group-head').forEach(function (head) {
+            head.addEventListener('click', function () {
+                expandedKind = head.getAttribute('data-kind') || '';
+                drawList();     // 只切换展开的组，不落盘（落盘口只有「下一步」）
+            });
+        });
+
+        bindCards(box);
     }
 
     function open(opts) {
@@ -97,7 +185,11 @@
         if (!m) return;
         var p = profile();
 
+        // 展开哪一组：已有身份 → 它那一组（改身份的人少一步）；无身份 → 第一组
+        var ks = kinds();
+        expandedKind = kindOfId(p.id || '') || (ks[0] ? ks[0].id : '');
         picked = p.id || '';
+
         var job = document.getElementById('identity-modal-job');
         var comp = document.getElementById('identity-modal-company');
         if (job) job.value = p.title || '';
@@ -122,6 +214,7 @@
         if (typeof window.closeModal === 'function') window.closeModal(m);
         else m.classList.add('hidden');
         picked = null;
+        expandedKind = '';
     }
 
     function commit() {
@@ -161,7 +254,7 @@
         var card = document.getElementById(CARD_ID);
         if (!card) return;
         var p = profile();
-        var name = nameOf(p.id);
+        var name = labelOf(p.id);      // 两级标签：「我自己 · 上班族」
         var titleEl = document.getElementById('profile-identity-title');
         var subEl = document.getElementById('profile-identity-sub');
         if (titleEl) titleEl.textContent = name ? '我是' + name : '我是谁';
@@ -180,7 +273,7 @@
         if (!box) return;
         var p = profile();
         var rows = [
-            ['身份', nameOf(p.id) || '未选择'],
+            ['身份', labelOf(p.id) || '未选择'],
             ['职务名称', p.title || '未填写'],
             ['公司名称', p.company || '未填写']
         ];
