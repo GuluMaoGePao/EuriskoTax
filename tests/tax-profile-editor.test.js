@@ -103,6 +103,25 @@ describe('我的情况（档案查看 / 修改）', () => {
         expect(window.EuriskoTaxProfile.get().city).toBe('南京');
     });
 
+    // v2.0.0：身份下拉按「我自己 / 企业」分段 —— 只加标题，值一个不许改
+    test('身份下拉分两段（我自己 / 企业），值仍是四个老值（不改存储就不要改 value）', () => {
+        window.EuriskoTaxProfileEditor.render();
+        const sel = card().querySelector('select[data-key="identity"]');
+        expect(sel).not.toBeNull();
+
+        const groups = Array.from(sel.querySelectorAll('optgroup')).map((g) => g.getAttribute('label'));
+        expect(groups).toEqual(['我自己', '企业']);
+
+        const values = Array.from(sel.querySelectorAll('option')).map((o) => o.value);
+        expect(values).toEqual(['', 'employee', 'freelance', 'owner', 'finance']);
+
+        // 「未填」不带组（它不属于任何一类），其余四个按段归位
+        const firstOpt = sel.querySelector('option');
+        expect(firstOpt.parentElement.tagName.toLowerCase()).toBe('select');
+        const selfOpts = Array.from(sel.querySelectorAll('optgroup')[0].querySelectorAll('option')).map((o) => o.value);
+        expect(selfOpts).toEqual(['employee', 'freelance', 'owner']);
+    });
+
     test('容器不存在时不抛错（我的页之外的场景不会被拖垮）', () => {
         document.body.innerHTML = '';
         expect(() => window.EuriskoTaxProfileEditor.render()).not.toThrow();

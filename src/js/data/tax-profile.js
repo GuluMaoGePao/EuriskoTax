@@ -29,11 +29,13 @@
             label: '身份',
             ask: '你算的是自己的工资，还是店里的账？',
             kind: 'single',
+            // v2.0.0：group 只是**下拉里的分组标题**（「我自己 / 企业」两大类），
+            // value 一个都没改 —— 改值就要给存量档案写迁移，收益不抵风险。
             options: [
-                { value: 'employee', label: '上班族' },
-                { value: 'freelance', label: '自由职业 / 副业' },
-                { value: 'owner', label: '个体户 / 老板' },
-                { value: 'finance', label: '企业财务 / 代账' }
+                { value: 'employee', label: '上班族', group: 'self' },
+                { value: 'freelance', label: '自由职业 / 副业', group: 'self' },
+                { value: 'owner', label: '个体户 / 老板', group: 'self' },
+                { value: 'finance', label: '企业财务 / 代账', group: 'enterprise' }
             ]
         },
         {

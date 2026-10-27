@@ -26,6 +26,11 @@
 
     function boolText(v) { return v === 'yes' ? '有' : (v === 'no' ? '没有' : ''); }
 
+    // 身份选项的两大类标题（v2.0.0）：与 tool-registry 的 IDENTITY_KINDS 同名同义，
+    // 但这里只用来给 <optgroup> 起标签，不参与取值 —— 值仍是 employee / freelance /
+    // owner / finance 四个老值（改值要迁移存量档案，不做）。
+    var GROUP_LABEL = { self: '我自己', enterprise: '企业' };
+
     // 档案里某一项当前值的「人话」：卡片顶部那句"目前填了什么"要用
     function valueTextOf(item, profile) {
         var v = profile[item.key];
@@ -62,12 +67,30 @@
             return '<input type="text" class="whoami-input input-field" data-key="' + esc(item.key) +
                 '" value="' + esc(v || '') + '" placeholder="' + esc(item.ask) + '" />';
         }
-        return '<select class="whoami-select input-field" data-key="' + esc(item.key) + '">' +
-            '<option value="">未填</option>' +
-            item.options.map(function (o) {
+        // v2.0.0：option 带 group 就按**相邻同组**分段输出 optgroup（大类标题：我自己 / 企业）。
+        // 「未填」永远在最上面且不带组 —— 它是"还没选"，不属于任何一类。
+        // 只有值仍按 data-key + option.value 定位，与不分组时完全一致。
+        var segments = [];
+        item.options.forEach(function (o) {
+            var g = o.group || '';
+            var last = segments[segments.length - 1];
+            if (!last || last.group !== g) segments.push({ group: g, items: [o] });
+            else last.items.push(o);
+        });
+
+        var bodyHtml = segments.map(function (seg) {
+            var inner = seg.items.map(function (o) {
                 return '<option value="' + esc(o.value) + '"' + (o.value === v ? ' selected' : '') + '>' +
                     esc(o.label) + '</option>';
-            }).join('') +
+            }).join('');
+            return seg.group
+                ? '<optgroup label="' + esc(GROUP_LABEL[seg.group] || seg.group) + '">' + inner + '</optgroup>'
+                : inner;
+        }).join('');
+
+        return '<select class="whoami-select input-field" data-key="' + esc(item.key) + '">' +
+            '<option value="">未填</option>' +
+            bodyHtml +
             '</select>';
     }
 
