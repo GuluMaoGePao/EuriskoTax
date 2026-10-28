@@ -1,16 +1,19 @@
-// 阶段22 M4：A 侧问句引导（taxonomy-guide）的渲染与交互守卫
+// 阶段22 M4：双视角引导（taxonomy-guide）的渲染与交互守卫
 //
 // 为什么值得测：
-//   弹窗里出现的**每一句判定文案都必须来自 person-taxonomy.js 的 question 字段**
-//   （唯一文案来源）—— 在组件里抄一遍就是第二个真源，抄漏 / 抄旧就是引导错方向。
-//   交互侧守三件事：待补入口不做成死链接、点工具直达 openTool、跨格子事件全部可达。
+//   弹窗里出现的**每一句判定文案都必须来自字典**（person-taxonomy 的 question /
+//   tax-taxonomy 的 note，唯一文案来源）—— 在组件里抄一遍就是第二个真源。
+//   交互侧守四件事：待补入口不做成死链接、点工具直达 openTool、跨格子事件全部可达、
+//   企业侧 iit 不混入 A 侧 30 个个税工具（工具集按挂载点 at('B/C*') 取）。
 const { loadSource } = require('./helpers/load-source');
 
 beforeAll(() => {
     global.window = global;
     // 浏览器里由 index.html 顺序保证，测试里复现同一顺序
     loadSource('src/js/data/tool-registry.js');
+    loadSource('src/js/data/tax-taxonomy.js');
     loadSource('src/js/data/person-taxonomy.js');
+    loadSource('src/js/data/tool-taxonomy.js');
     loadSource('src/js/ui/taxonomy-guide-ui.js');
 });
 
@@ -125,5 +128,108 @@ describe('问句引导（阶段22 M4）', () => {
         G().open();
         G().open();
         expect(document.querySelectorAll('#taxonomy-guide-modal').length).toBe(1);
+    });
+});
+
+describe('企业视角（按税种，阶段22 M4 第二步）', () => {
+    const T = () => window.EuriskoTaxTaxonomy;
+    const M = () => window.EuriskoToolTaxonomy;
+
+    beforeEach(() => {
+        window.EuriskoToolbox = { openTool: jest.fn() };
+        // 视角是会话内状态：上个用例切到企业侧会残留，这里统一拨回个人侧
+        G().setMode('person');
+    });
+
+    test('open() 默认个人侧；切到企业侧出 5 税类卡，C4 特定目的降级但可点', () => {
+        G().open();
+        expect(G().mode()).toBe('person');
+        // 视角切换条在壳层（modal-body 之外），从 document 查
+        document.querySelector('#taxonomy-guide-mode-enterprise').click();
+        expect(G().mode()).toBe('enterprise');
+        // 弹窗标题随视角切换：两句话各自说清自己的分类依据
+        expect(document.getElementById('taxonomy-guide-head-title').textContent)
+            .toBe('替公司办税，从哪类入手？');
+        const cards = body().querySelectorAll('.guide-form-card[data-guide-taxcat]');
+        expect(cards.length).toBe(5);
+        expect(body().textContent).toContain('替公司或客户办税');
+        // 特定目的与资源环境税：defaultOpen=false → is-minor（降级不隐藏）
+        const purpose = body().querySelector('[data-guide-taxcat="purpose"]');
+        expect(purpose.classList.contains('is-minor')).toBe(true);
+        const turnover = body().querySelector('[data-guide-taxcat="turnover"]');
+        expect(turnover.classList.contains('is-minor')).toBe(false);
+    });
+
+    test('税类文案与计数来自字典 / 挂载点表（不抄第二份）', () => {
+        G().open('enterprise');
+        T().categories().forEach((c) => {
+            const card = body().querySelector(`[data-guide-taxcat="${c.id}"]`);
+            expect(card.querySelector('.guide-form-card__q').textContent).toBe(c.note);
+            const toolN = M().at('B/' + { turnover: 'C1', income: 'C2', property: 'C3', purpose: 'C4', levy: 'C5' }[c.id]).length;
+            expect(card.querySelector('.guide-form-card__meta').textContent).toContain(toolN + ' 个工具');
+        });
+    });
+
+    test('流转税详情：增值税两个档、城建税挂 surtax-stamp 两档、消费税关税标暂无', () => {
+        G().open('enterprise');
+        body().querySelector('[data-guide-taxcat="turnover"]').click();
+        const rows = [...body().querySelectorAll('.guide-event-row')];
+        expect(rows.length).toBe(4);   // 增值税 / 城建税 / 消费税 / 关税
+        // 按行名精确匹配（城建税 note 里也写着「消费税」，indexOf 会串行）
+        const chipsOf = (name) => {
+            const row = rows.find((r) => r.querySelector('.guide-event-row__name').textContent === name);
+            return row ? [...row.querySelectorAll('.guide-tool-chip')].map((c) => c.getAttribute('data-guide-tool')) : null;
+        };
+        expect(chipsOf('增值税')).toEqual(['vat', 'vat-deep']);
+        expect(chipsOf('城市维护建设税')).toEqual(['surtax-stamp', 'surtax-stamp-deep']);
+        expect(chipsOf('消费税')).toEqual([]);
+        expect(chipsOf('关税')).toEqual([]);
+        expect(body().querySelector('[data-guide-empty="tax-consumption"]')).toBeTruthy();
+        // 申报节奏白话来自 frequency
+        expect(body().textContent).toContain('随增值税附征');
+    });
+
+    test('所得税详情：个税只列 B 侧挂载（代扣 4 档 + 经营所得 2 档），不混入 A 侧 30 个', () => {
+        G().open('enterprise');
+        body().querySelector('[data-guide-taxcat="income"]').click();
+        const iitRow = [...body().querySelectorAll('.guide-event-row')]
+            .find((r) => r.querySelector('.guide-event-row__name').textContent === '个人所得税');
+        const chipIds = [...iitRow.querySelectorAll('.guide-tool-chip')]
+            .map((c) => c.getAttribute('data-guide-tool'));
+        expect(chipIds.sort()).toEqual(['bonus-tax', 'business', 'business-income',
+            'salary-tax', 'withholding', 'withholding-deep']);
+        expect(body().querySelector('[data-guide-empty="tax-iit"]')).toBeNull();
+        // 企业所得税是另一行，两档
+        const citRow = [...body().querySelectorAll('.guide-event-row')]
+            .find((r) => r.querySelector('.guide-event-row__name').textContent === '企业所得税');
+        expect([...citRow.querySelectorAll('.guide-tool-chip')].map((c) => c.getAttribute('data-guide-tool')))
+            .toEqual(['corporate-income-tax', 'corporate-income-tax-deep']);
+    });
+
+    test('费与用工：4 项费 + 「相关工具」兜底行收 employer-cost（not-a-tax）', () => {
+        G().open('enterprise');
+        body().querySelector('[data-guide-taxcat="levy"]').click();
+        const empties = [...body().querySelectorAll('[data-guide-empty]')].map((r) => r.getAttribute('data-guide-empty'));
+        expect(empties.sort()).toEqual(['tax-culture', 'tax-union']);   // 工会经费 / 文化事业建设费
+        const orphanRow = [...body().querySelectorAll('.guide-event-row')]
+            .find((r) => r.querySelector('.guide-event-row__name').textContent === '相关工具');
+        expect(orphanRow.querySelector('[data-guide-tool="employer-cost"]')).toBeTruthy();
+        // 点社保 chip 直达 openTool
+        body().querySelector('[data-guide-tool="social-base"]').click();
+        expect(window.EuriskoToolbox.openTool).toHaveBeenCalledWith('social-base');
+    });
+
+    test('企业侧点工具 chip 直达并关闭弹窗；返回按钮回税类首页；切回个人侧恢复 9 格', () => {
+        G().open('enterprise');
+        body().querySelector('[data-guide-taxcat="turnover"]').click();
+        body().querySelector('[data-guide-tool="vat"]').click();
+        expect(window.EuriskoToolbox.openTool).toHaveBeenCalledWith('vat');
+        expect(document.getElementById('taxonomy-guide-modal').classList.contains('hidden')).toBe(true);
+        G().open('enterprise');
+        body().querySelector('[data-guide-taxcat="turnover"]').click();
+        body().querySelector('#taxonomy-guide-back').click();
+        expect(body().querySelectorAll('[data-guide-taxcat]').length).toBe(5);
+        document.querySelector('#taxonomy-guide-mode-person').click();
+        expect(body().querySelectorAll('.guide-form-card[data-guide-form]').length).toBe(10);
     });
 });

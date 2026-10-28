@@ -1,21 +1,22 @@
-// === 阶段22 M4：A 侧问句引导（taxonomy-guide）===
+// === 阶段22 M4：双视角引导（taxonomy-guide）===
 //
 // 为什么需要这一步：
-//   事件轨道（home-mission.js 的 9 张卡）用的是**生活语言**，覆盖高发场景；但 9 格分类
-//   （《个人所得税法》第二条）此前只存在于数据层（person-taxonomy.js），页面上没有任何入口。
-//   本组件把「这笔钱在法律上属于哪一格」的判定问句变成可见的引导：
-//     ① 3 组 9 格，每格一张问句卡（question 是 person-taxonomy 的唯一文案来源，本文件不抄文案）
-//     ② 点格 → 该格的事件（生活语言）→ 点事件 / 工具直达 openTool
-//     ③ 跨格子事项（E13 E14 E16 E20 E24）单独一组，24 个事件全部可达
+//   事件轨道（home-mission.js 的 9 张卡）用的是**生活语言**，覆盖高发场景；但两套专业分类
+//   （阶段22 的核心交付）此前只存在于数据层，页面上没有任何入口。本组件一颗弹窗承载两个视角：
+//     A 我自己（person）：按「钱的性质」—— 3 组 9 格判定问句 → 格内事件 → 直达工具
+//     B 企业（enterprise）：按「征税对象」—— 5 税类 → 类内税种 / 费 → 直达工具
+//   两侧各自吃各自的真源，切换是会话内状态（不落存储，与工具页分类选择器同一条纪律）。
 //
 // 数据依赖（只读，不抄）：
 //   person-taxonomy：格（question / withheldBy / name）、事件（name / question / note / tools）
+//   tax-taxonomy：税类（CATEGORIES 的 name / note / defaultOpen）、条目（name / frequency / scope / note）
+//   tool-taxonomy：企业侧工具集（at('B/C*')，**不用 byTaxCode**——它会混入 A 侧 30 个个税工具）
 //   tool-registry：工具显示名（all + deep）
 //   Toolbox.openTool：打开工具的唯一入口（判空调用，测试里 mock）
 //
 // 边界纪律：
-//   - 本文件**不出现任何税率、公式、金额**；判定文案一律来自字典的 question
-//   - tools 为空的事件（E10 E16 E17 E22）显示「工具待补」与 note，不做成死链接
+//   - 本文件**不出现任何税率、公式、金额**；文案一律来自字典的 question / note
+//   - tools 为空的事件 / 税种显示「工具待补 / 暂无工具」，不做成死链接
 //   - 弹窗外壳沿用统一体系（内容型宽度档 / modal-mask / openModal / closeModal 兜底），
 //     与 entity-ui 同 family —— 见 tests/modal-shell.test.js 的登记
 (function () {
@@ -23,6 +24,9 @@
 
     var MODAL_ID = 'taxonomy-guide-modal';
     var BODY_ID = 'taxonomy-guide-body';
+
+    // 视角（阶段22「双视角导航」）：person = 我自己 · 按钱的性质；enterprise = 企业 · 按税种
+    var mode = 'person';
 
     // withheldBy 的白话提示（这是「谁来扣税」的产品形态差异，属于分类元数据不算口径）
     var WITHHELD_HINTS = {
@@ -67,20 +71,54 @@
             ' transition-transform duration-300">' +
             '<div class="modal-head bg-gradient-to-r from-primary to-blue-600 text-white p-5 rounded-t-xl">' +
             '<div class="flex justify-between items-center">' +
-            '<div><h3 class="text-lg font-bold">这笔钱属于哪一格？</h3>' +
-            '<p class="text-white/80 text-xs mt-0.5">按《个人所得税法》第二条的 9 格判定 · 不用先懂税</p></div>' +
+            '<div><h3 class="text-lg font-bold" id="taxonomy-guide-head-title">这笔钱属于哪一格？</h3>' +
+            '<p class="text-white/80 text-xs mt-0.5" id="taxonomy-guide-head-sub">按《个人所得税法》第二条的 9 格判定 · 不用先懂税</p></div>' +
             '<button type="button" id="taxonomy-guide-close"' +
             ' class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"' +
             ' aria-label="关闭">' +
             '<i class="fa fa-times"></i></button>' +
             '</div></div>' +
+            // 双视角切换：同一颗弹窗、两个真源 —— person 走 person-taxonomy（判定问句），
+            // enterprise 走 tax-taxonomy（专业税类）。切换是会话内状态，不落存储。
+            '<div class="guide-mode-tabs" role="tablist">' +
+            '<button type="button" id="taxonomy-guide-mode-person" class="guide-mode-tab is-on"' +
+            ' role="tab" aria-selected="true">我自己 · 按钱的性质</button>' +
+            '<button type="button" id="taxonomy-guide-mode-enterprise" class="guide-mode-tab"' +
+            ' role="tab" aria-selected="false">企业 · 按税种</button>' +
+            '</div>' +
             '<div class="modal-body p-5" id="' + BODY_ID + '"></div>' +
             '</div>';
         document.body.appendChild(div);
         document.getElementById('taxonomy-guide-close').addEventListener('click', function () {
             window.EuriskoTaxonomyGuide.close();
         });
+        document.getElementById('taxonomy-guide-mode-person').addEventListener('click', function () {
+            setMode('person');
+        });
+        document.getElementById('taxonomy-guide-mode-enterprise').addEventListener('click', function () {
+            setMode('enterprise');
+        });
         bindBody();
+    }
+
+    // 两个视角的标题各自说清自己的真源（文案里的分类依据不写死数字以外的东西）
+    var HEAD_TEXT = {
+        person: ['这笔钱属于哪一格？', '按《个人所得税法》第二条的 9 格判定 · 不用先懂税'],
+        enterprise: ['替公司办税，从哪类入手？', '按征税对象分五类 · 现行 18 个法定税种与 4 项费']
+    };
+
+    function setMode(m) {
+        if (m !== 'person' && m !== 'enterprise') return;
+        mode = m;
+        var mp = document.getElementById('taxonomy-guide-mode-person');
+        var me = document.getElementById('taxonomy-guide-mode-enterprise');
+        if (mp) { mp.classList.toggle('is-on', m === 'person'); mp.setAttribute('aria-selected', m === 'person' ? 'true' : 'false'); }
+        if (me) { me.classList.toggle('is-on', m === 'enterprise'); me.setAttribute('aria-selected', m === 'enterprise' ? 'true' : 'false'); }
+        var title = document.getElementById('taxonomy-guide-head-title');
+        var sub = document.getElementById('taxonomy-guide-head-sub');
+        if (title) title.textContent = HEAD_TEXT[m][0];
+        if (sub) sub.textContent = HEAD_TEXT[m][1];
+        render('home');
     }
 
     // ---------- 视图 ①：3 组 9 格 + 跨格子事项 ----------
@@ -171,11 +209,86 @@
             '<div class="guide-event-row__name">' + esc(e.name) + '</div>' +
             (sub ? '<div class="guide-event-row__sub">' + esc(sub) + '</div>' : '') +
             '<div class="guide-event-row__tools">' +
-            tools.map(function (tid) {
-                return '<button type="button" class="guide-tool-chip" data-guide-tool="' + esc(tid) + '"' +
-                    ' title="' + esc(tid) + '">' + esc(toolName(tid)) + '</button>';
-            }).join('') +
+            tools.map(function (tid) { return chipHtml(tid); }).join('') +
             '</div></div>';
+    }
+
+    function chipHtml(tid) {
+        return '<button type="button" class="guide-tool-chip" data-guide-tool="' + esc(tid) + '"' +
+            ' title="' + esc(tid) + '">' + esc(toolName(tid)) + '</button>';
+    }
+
+    // ---------- 企业视图 ①：5 税类（tax-taxonomy 的 CATEGORIES 是唯一真源） ----------
+    // 工具计数从挂载点表 at('B/C*') 取 —— 不用 byTaxCode：它会混入 A 侧 30 个个税工具。
+    var CAT_CODES = { turnover: 'C1', income: 'C2', property: 'C3', purpose: 'C4', levy: 'C5' };
+    var FREQ_TEXT = { month: '按月', quarter: '按季', year: '按年', onetime: '按次', withVat: '随增值税附征' };
+    var SCOPE_TEXT = { all: '普适', conditional: '有条件才涉及', industry: '特定行业' };
+
+    function taxHomeHtml() {
+        var T = window.EuriskoTaxTaxonomy;
+        var M = window.EuriskoToolTaxonomy;
+        if (!T) return '<p class="text-sm text-gray-500">税种字典未加载。</p>';
+        var html = '<p class="guide-step-title">替公司或客户办税？按征税对象选一类：</p>' +
+            '<div class="guide-group guide-forms">';
+        T.categories().forEach(function (c) {
+            var items = T.byCategory(c.id);
+            var toolN = M ? M.at('B/' + (CAT_CODES[c.id] || '')).length : 0;
+            // defaultOpen=false 的类（特定目的，95% 企业为零）样式降级但依然可点 ——
+            // 折叠是「不值得优先」，不是「不存在」
+            html += '<button type="button" class="guide-form-card' + (c.defaultOpen ? '' : ' is-minor') +
+                '" data-guide-taxcat="' + esc(c.id) + '">' +
+                '<span class="guide-form-card__name">' + esc(c.name) + '</span>' +
+                '<span class="guide-form-card__q">' + esc(c.note || '') + '</span>' +
+                '<span class="guide-form-card__meta">' + items.length + ' 项 · ' + toolN + ' 个工具 ›</span>' +
+                '</button>';
+        });
+        return html + '</div>';
+    }
+
+    // ---------- 企业视图 ②：税类详情（条目 + 工具直达） ----------
+    function taxCatHtml(catId) {
+        var T = window.EuriskoTaxTaxonomy;
+        var M = window.EuriskoToolTaxonomy;
+        var c = T && T.categories().filter(function (x) { return x.id === catId; })[0];
+        if (!c) return taxHomeHtml();
+        var mounts = M ? M.at('B/' + (CAT_CODES[catId] || '')) : [];
+        var html = '<button type="button" id="taxonomy-guide-back" class="guide-back">‹ 换一类</button>' +
+            '<div class="guide-form-head">' +
+            '<div class="guide-form-head__group">企业侧 · 按税种</div>' +
+            '<h4 class="guide-form-head__name">' + esc(c.name) + '</h4>' +
+            '<p class="guide-form-head__q">' + esc(c.note || '') + '</p>' +
+            '</div><div class="guide-events">';
+        T.byCategory(catId).forEach(function (item) {
+            var sub = ((FREQ_TEXT[item.frequency] || '') +
+                ((FREQ_TEXT[item.frequency] && SCOPE_TEXT[item.scope]) ? ' · ' : '') +
+                (SCOPE_TEXT[item.scope] || '')) || '口径见工具页';
+            var tools = mounts.filter(function (m) { return m.taxCode === item.id; });
+            var name = esc(item.name) + (item.kind !== 'tax' ? '（费）' : '');
+            if (!tools.length) {
+                html += '<div class="guide-event-row is-empty" data-guide-empty="tax-' + esc(item.id) + '">' +
+                    '<div class="guide-event-row__name">' + name + '</div>' +
+                    '<div class="guide-event-row__sub">' + esc(sub) + ' · 暂无工具</div></div>';
+            } else {
+                html += '<div class="guide-event-row">' +
+                    '<div class="guide-event-row__name">' + name + '</div>' +
+                    (item.note ? '<div class="guide-event-row__sub">' + esc(item.note) + '</div>'
+                        : '<div class="guide-event-row__sub">' + esc(sub) + '</div>') +
+                    '<div class="guide-event-row__tools">' +
+                    tools.map(function (m) { return chipHtml(m.id); }).join('') +
+                    '</div></div>';
+            }
+        });
+        // 挂在这一类下、但不对应任何税种的工具（如 employer-cost 是成本测算 not-a-tax）
+        var orphans = mounts.filter(function (m) { return m.taxCode == null; });
+        if (orphans.length) {
+            html += '<div class="guide-event-row">' +
+                '<div class="guide-event-row__name">相关工具</div>' +
+                '<div class="guide-event-row__sub">挂在「' + esc(c.name) + '」下，但不是税种（成本测算等）</div>' +
+                '<div class="guide-event-row__tools">' +
+                orphans.map(function (m) { return chipHtml(m.id); }).join('') +
+                '</div></div>';
+        }
+        return html + '</div>';
     }
 
     // ---------- 交互 ----------
@@ -193,6 +306,8 @@
                 render(fid === 'cross' ? 'cross' : fid);
                 return;
             }
+            var taxcard = t.closest ? t.closest('[data-guide-taxcat]') : null;
+            if (taxcard) { render('tax:' + taxcard.getAttribute('data-guide-taxcat')); return; }
             var row = t.closest ? t.closest('[data-guide-event]') : null;
             if (row) { openTool(row.getAttribute('data-guide-first')); }
         });
@@ -201,13 +316,19 @@
     function render(view) {
         var body = document.getElementById(BODY_ID);
         if (!body) return;
-        body.innerHTML = view === 'home' || !view ? homeHtml()
-            : (view === 'cross' ? crossHtml() : formHtml(view));
+        if (!view || view === 'home') {
+            body.innerHTML = (mode === 'enterprise') ? taxHomeHtml() : homeHtml();
+            return;
+        }
+        if (view.indexOf('tax:') === 0) { body.innerHTML = taxCatHtml(view.slice(4)); return; }
+        body.innerHTML = (view === 'cross') ? crossHtml() : formHtml(view);
     }
 
-    function open() {
+    // open(mode)：默认 person；身份卡等入口可传 'enterprise' 直接落到企业侧
+    function open(m) {
         ensureModal();
-        render('home');
+        if (m === 'enterprise' || m === 'person') setMode(m);
+        else render('home');
         var modal = document.getElementById(MODAL_ID);
         if (typeof window.openModal === 'function') window.openModal(modal);
         else { modal.classList.remove('hidden'); modal.classList.remove('opacity-0'); }
@@ -233,10 +354,12 @@
         }
     }
 
-    // 首页入口按钮（#home-guide-entry，由 index.html 提供；缺省时静默，测试直接调 open()）
+    // 首页入口按钮（#home-guide-entry，由 index.html 提供；缺省时静默，测试直接调 open()）。
+    // 入口长在 A 侧语境（事件轨道卡头），所以显式传 'person' ——
+    // open() 不带参数会沿用上次视角（企业用户切回来不该被弹回个人侧）。
     function init() {
         var entry = document.getElementById('home-guide-entry');
-        if (entry) entry.addEventListener('click', function () { open(); });
+        if (entry) entry.addEventListener('click', function () { open('person'); });
     }
 
     if (document.readyState === 'loading') {
@@ -250,6 +373,8 @@
         close: close,
         isOpen: isOpen,
         render: render,
+        setMode: setMode,
+        mode: function () { return mode; },
         toolName: toolName
     };
 })();

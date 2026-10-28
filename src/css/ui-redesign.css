@@ -2163,8 +2163,32 @@
 }
 
 /* ===== 阶段22 M4：问句引导（taxonomy-guide）=====
-   数据与文案全部来自 person-taxonomy.js（question 是唯一文案来源，这里只有版式）。
-   类名与 event-card 同 family：令牌（--sp / --c / --r / --fs / --sh）复用既有体系。 */
+   数据与文案全部来自 person-taxonomy.js / tax-taxonomy.js（question / note 是唯一文案来源，
+   这里只有版式）。类名与 event-card 同 family：令牌（--sp / --c / --r / --fs / --sh）复用既有体系。 */
+.guide-mode-tabs {
+    display: flex;
+    gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-5);
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-surface-1, var(--c-surface-0));
+}
+.guide-mode-tab {
+    padding: 4px var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: none;
+    cursor: pointer;
+    transition: color var(--dur-micro) var(--ease),
+                background-color var(--dur-micro) var(--ease);
+}
+.guide-mode-tab.is-on {
+    color: var(--c-brand);
+    background: var(--c-surface-0);
+    border-color: var(--c-border);
+    font-weight: 600;
+}
 .guide-step-title {
     font-size: var(--fs-base);
     font-weight: 600;
@@ -2316,5 +2340,9 @@
 .guide-tool-chip:focus-visible {
     box-shadow: var(--sh-focus);
     outline: none;
+}
+/* 特定目的等低频税类：降级但可点（折叠是「不值得优先」，不是「不存在」） */
+.guide-form-card.is-minor {
+    opacity: .65;
 }
 
