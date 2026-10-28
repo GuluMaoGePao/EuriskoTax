@@ -148,9 +148,9 @@ describe('个人字典（阶段22 M2）', () => {
         expect(P.getEvent('E16').taxCode).toBe('deed');
     });
 
-    test('tools 全部存在于现有 41 个入口（tool-registry all + deep）', () => {
+    test('tools 全部存在于现有 42 个入口（tool-registry all + deep）', () => {
         const ids = new Set(R.all().concat(R.deep()).map((t) => t.id));
-        expect(ids.size).toBe(41);
+        expect(ids.size).toBe(42);
         P.events().forEach((e) => {
             (e.tools || []).forEach((tid) => expect(ids.has(tid)).toBe(true));
         });
@@ -158,9 +158,10 @@ describe('个人字典（阶段22 M2）', () => {
 
     test('查询接口可用：eventsByForm / forAlias / getEvent', () => {
         expect(P.getEvent('E2').tools).toEqual(['bonus-tax', 'bonus-tax-deep']);
-        // F7 财产租赁目前只有 E17 一个事件、0 个工具 —— 全表唯一空格子（P0 依据）
+        // F7 财产租赁只有 E17 一个事件 —— 阶段22 M5 之前它是全表唯一空格子（P0 依据），
+        // 现在挂上了 property-rental（个人出租组合），这条从「空格子」改成「有且只有它」
         expect(P.eventsByForm('F7').map((e) => e.id)).toEqual(['E17']);
-        expect(P.eventsByForm('F7')[0].tools).toEqual([]);
+        expect(P.eventsByForm('F7')[0].tools).toEqual(['property-rental']);
         expect(P.forAlias('lawyer').length).toBe(4);
         // E3 是多格事件：数组里的每一项都必须是真实存在的格
         expect(P.getEvent('E3').form).toContain('F1');
@@ -173,9 +174,9 @@ describe('挂载点表（阶段22 M3）', () => {
     const MIXED_IDS = ['surtax-stamp', 'surtax-stamp-deep', 'disability-fund', 'disability-fund-deep',
         'classification', 'property-transfer', 'employer-cost'];
 
-    test('模块已挂载：恰好 41 条挂载点', () => {
+    test('模块已挂载：恰好 42 条挂载点', () => {
         expect(M).toBeTruthy();
-        expect(M.all().length).toBe(41);
+        expect(M.all().length).toBe(42);
     });
 
     test('口径守护：validate() 无问题（含对三个字典的存在性校验）', () => {
@@ -185,14 +186,14 @@ describe('挂载点表（阶段22 M3）', () => {
     test('与注册表双向一致：无孤儿、无幽灵', () => {
         const regIds = new Set(R.all().concat(R.deep()).map((t) => t.id));
         const mountIds = new Set(M.all().map((m) => m.id));
-        expect(regIds.size).toBe(41);
-        expect(mountIds.size).toBe(41);
+        expect(regIds.size).toBe(42);
+        expect(mountIds.size).toBe(42);
         regIds.forEach((id) => expect(mountIds.has(id)).toBe(true));
         mountIds.forEach((id) => expect(regIds.has(id)).toBe(true));
     });
 
-    test('A 30 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
-        expect(M.countByBranch('A')).toBe(30);
+    test('A 31 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
+        expect(M.countByBranch('A')).toBe(31);
         expect(M.countByBranch('B')).toBe(11);
     });
 
@@ -201,8 +202,8 @@ describe('挂载点表（阶段22 M3）', () => {
         expect(ids).toEqual(['net-salary', 'reverse', 'salary-tax']);
     });
 
-    test('A 侧 30 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
-        expect(M.byTaxCode('iit').length).toBe(30);
+    test('A 侧 31 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
+        expect(M.byTaxCode('iit').length).toBe(31);
         expect(M.byTaxCode('vat').length).toBe(2);
         expect(M.byTaxCode('city-tax').length).toBe(2);
         const ec = M.get('employer-cost');

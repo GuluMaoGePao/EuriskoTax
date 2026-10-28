@@ -31,7 +31,7 @@ beforeAll(() => {
         'equity-incentive', 'severance', 'early-retirement', 'expat-allowance', 'private-pension',
         'health-insurance', 'annuity', 'social-insurance', 'employer-cost', 'disability-fund',
         'vat', 'surtax-stamp', 'business-income', 'corporate-income-tax', 'donation',
-        'property-transfer', 'non-resident'].forEach(function (m) {
+        'property-transfer', 'property-rental', 'non-resident'].forEach(function (m) {
         loadSource('src/js/calculation/' + m + '-quick.js');
     });
     loadSource('src/js/calculation/utils.js');
@@ -212,6 +212,71 @@ describe('卖房：转让所得 20%（国税发〔2006〕108 号）、满五唯�
         const v = Object.assign({}, base, { isOnlyHome: true });
         expect(rowOf('property-transfer', v, '应纳税额')).toBe(400000);
         expect(primaryOf('property-transfer', v)).toBe(0);
+    });
+});
+
+// 阶段22 M5（v2.1.0）：个人出租 —— 五个税种一屏，政策手算对拍。
+// 这是全表最后一格 0 工具的所得形态（F7 财产租赁）补上的那一个，也是**第一个跨税种组合器**：
+// 一笔房租同时过增值税、城建税与两项附加、房产税、印花税、个人所得税五个税种，
+// 而且它们互相咬合（增值税是价外税 → 房租先按 5% 分离；增值税免了附加跟着免；
+// 房租里缴的这些税又能在个税前扣掉）。下列数字全部手算，改断言前先改政策依据。
+describe('个人出租（deep）：价外税、分摊免征、修缮费逐月结转', () => {
+    // 月租 12 万（含税），市区，六税两费减半，无修缮
+    //   增值税：120000 ÷ 1.05 = 114285.71（超过 10 万免征线 → 全额计税）× 1.5% = 1714.29
+    //   附加税：1714.29 ×（7%+3%+2%）× 50% = 102.85
+    //   房产税：114285.71 × 4% × 50% = 2285.71
+    //   印花税：个人出租住房的租赁合同免征 → 0（财税〔2008〕24 号二）
+    //   个税：(114285.71 − 1714.29 − 102.85 − 2285.71) = 110182.86 > 4000 → 定率减 20%
+    //         → 88146.29 × 10% = 8814.63
+    //   合计：1714.29 + 102.85 + 2285.71 + 8814.63 = 12917.48
+    test('月租 12 万：增值税 1714.29、附加 102.85、房产税 2285.71、印花税 0、个税 8814.63', () => {
+        const v = { usage: 'housing', monthlyRent: 120000, payMode: 'month', months: 1,
+            location: 'urban', halve: true, repair: 0 };
+        expect(rowOf('property-rental', v, '增值税')).toBeCloseTo(1714.29, 2);
+        expect(rowOf('property-rental', v, '城市维护建设税')).toBeCloseTo(60.0, 2);
+        expect(rowOf('property-rental', v, '教育费附加')).toBeCloseTo(25.71, 2);
+        expect(rowOf('property-rental', v, '地方教育附加')).toBeCloseTo(17.14, 2);
+        expect(rowOf('property-rental', v, '房产税')).toBeCloseTo(2285.71, 2);
+        expect(rowOf('property-rental', v, '印花税')).toBe(0);
+        expect(rowOf('property-rental', v, '个人所得税')).toBeCloseTo(8814.63, 2);
+        expect(primaryOf('property-rental', v)).toBeCloseTo(12917.48, 2);
+    });
+
+    // 同一笔 12 万，改成按月收 1 万收 12 个月：分摊后月租金未超过 10 万 → 免征增值税
+    //   增值税 0 → 附加 0；房产税 9523.81 × 4% × 50% = 190.48/月 × 12 = 2285.76
+    //   个税：(9523.81 − 190.48) × 80% = 7466.67 × 10% = 746.67/月 × 12 = 8960.04
+    //   合计 11245.80 —— 与「一次性收 12 万不分摊」的 12917.48 差 1671.68
+    test('月租 1 万收 12 个月：分摊后免征 → 房产税 2285.76、个税 8960.04、合计 11245.80', () => {
+        const v = { usage: 'housing', monthlyRent: 10000, payMode: 'once', months: 12,
+            location: 'urban', halve: true, repair: 0 };
+        expect(rowOf('property-rental', v, '增值税')).toBe(0);
+        expect(rowOf('property-rental', v, '房产税')).toBeCloseTo(2285.76, 2);
+        expect(rowOf('property-rental', v, '个人所得税')).toBeCloseTo(8960.04, 2);
+        expect(primaryOf('property-rental', v)).toBeCloseTo(11245.80, 2);
+    });
+
+    // 修缮费 5000：每月最多扣 800 → 800×6 + 200 逐月扣完
+    //   少算的应纳税所得额 = 5000 × 80% = 4000 → 少缴个税 4000 × 10% = 400
+    //   合计由 11245.80 降到 10845.80（不是一次性少 500）
+    test('修缮 5000 元：逐月扣 800，个税少 400（不是当月扣 800 剩下作废、也不是一次性全扣）', () => {
+        const v = { usage: 'housing', monthlyRent: 10000, payMode: 'once', months: 12,
+            location: 'urban', halve: true, repair: 5000 };
+        expect(rowOf('property-rental', v, '个人所得税')).toBeCloseTo(8560.04, 2);
+        expect(primaryOf('property-rental', v)).toBeCloseTo(10845.80, 2);
+    });
+
+    // 商铺不是住房：财税〔2008〕24 号二那一整包优惠一条都享受不到
+    //   增值税 0（分摊后 9523.81 ≤ 10 万照样免征）；房产税 9523.81 × 12% × 50% = 571.43/月
+    //   印花税 120000 × 1‰ × 50% = 60；个税 (9523.81 − 571.43 − 5) × 80% = 7157.90 × 20% = 1431.58/月
+    //   合计 = 6857.16 + 60 + 17178.96 = 24096.12
+    test('商铺（非住房）月租 1 万收 12 个月：房产税 12%、个税 20%、贴花 60 → 合计 24096.12', () => {
+        const v = { usage: 'nonHousing', monthlyRent: 10000, payMode: 'once', months: 12,
+            location: 'urban', halve: true, repair: 0 };
+        expect(rowOf('property-rental', v, '增值税')).toBe(0);
+        expect(rowOf('property-rental', v, '房产税')).toBeCloseTo(6857.16, 2);
+        expect(rowOf('property-rental', v, '印花税')).toBeCloseTo(60, 2);
+        expect(rowOf('property-rental', v, '个人所得税')).toBeCloseTo(17178.96, 2);
+        expect(primaryOf('property-rental', v)).toBeCloseTo(24096.12, 2);
     });
 });
 

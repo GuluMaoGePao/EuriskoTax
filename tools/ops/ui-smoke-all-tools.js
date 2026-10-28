@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 /**
- * 真机冒烟：41 个工具逐个走一遍（阶段19 收官）
+ * 真机冒烟：42 个工具逐个走一遍（阶段19 收官）
  *
  * 为什么要有这个脚本：
  *   阶段19 一路踩的都是同一类坑 —— 「jsdom 全绿 → 真机点开一看不对」（18-6a 行名带括号后缀、
  *   19-12 政策徽标把标题压成一字一行、18-2 点老记录看到最近一次算的东西）。单测钉的是
- *   「函数在给定输入下返回什么」，钉不住「41 个入口在真机上是不是都出得来数」：
+ *   「函数在给定输入下返回什么」，钉不住「42 个入口在真机上是不是都出得来数」：
  *   deep 侧尤其如此 —— 21 个完整测算的结果卡由渲染器按 spec **现拼**，任何一处 spec 缺字段、
  *   compute 抛错、渲染器少判空，在单测里都是绿的那一格（测试只挑两三个代表跑）。
  *
- * 所以这里把**全部 41 个工具**在真机上各算一次，只问三件事：
+ * 所以这里把**全部 42 个工具**在真机上各算一次，只问三件事：
  *   ① 出不出得来结果（结果区在不在、主结果有没有数）；
  *   ② 有没有抛异常（页面级 error 一并收，不只看 try/catch）；
  *   ③ deep 侧那枚政策时效徽标在不在（19-12 刚铺到 21 个 spec，逐个人肉看不完）。
  *
  * 三条边界（改这个文件前先读）：
- *   - **不写留痕**：跑之前拍 localStorage 快照、跑之后**整份还原** —— 41 次测算如果灌进历史，
+ *   - **不写留痕**：跑之前拍 localStorage 快照、跑之后**整份还原** —— 42 次测算如果灌进历史，
  *     这个会话的历史就不再是「我算过什么」，后面拍基线也会被污染（历史卡、最近测算都在首页）。
  *   - **只报不修**：它不做任何修正动作，失败就退出码 1 交给人判断。自动化改代码 = 埋雷。
  *   - **复用基线底座**（ui-lib/screenshot-kit 的服务器与浏览器调用），不另起一套。
@@ -44,7 +44,7 @@ const INJECT_JS = `(() => {
 })()`;
 
 const SMOKE_JS = `(() => {
-    // 快照：跑完原样还原，41 次测算不留痕
+    // 快照：跑完原样还原，42 次测算不留痕
     var snap = {};
     try {
         for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); snap[k] = localStorage.getItem(k); }
@@ -55,6 +55,21 @@ const SMOKE_JS = `(() => {
 
     function hasNum(s) { return /[0-9]/.test(String(s || '')); }
     function txt(el) { return el ? String(el.textContent || '').replace(/\\s+/g, ' ').trim() : ''; }
+
+    // v1.138.0 把 money 的示例预填**全部归零**之后，空表单不出数是**设计**（产品不替用户先填一个数），
+    // 于是照 default 打开的工具算出来的是「还没填」的引导语 —— 里面一个数字都没有。
+    // 那不是工具的缺陷，是这份脚本自己停在 v1.104.0 的取数方式上：它问的应该是
+    // 「填好了能不能算出数」，而不是「空着能不能算出数」。所以这里按 spec 的 sample 走一遍：
+    // sample 正是仓库约定的「测试与演示读它、产品渲染读 default」的那一份值，
+    // 走 openTool / W.open 的 values 入参，也就顺带验了「历史查看 / 带参链接」那条真实路径。
+    function sampleValues(t) {
+        var v = {};
+        (t.fields || []).forEach(function (f) {
+            if (f.default !== undefined) v[f.key] = f.default;
+            if (f.sample !== undefined) v[f.key] = f.sample;
+        });
+        return v;
+    }
 
     var rows = [];
     var reg = window.EuriskoToolRegistry;
@@ -67,7 +82,7 @@ const SMOKE_JS = `(() => {
         var r = { id: t.id, name: t.name, kind: 'quick' };
         try {
             if (!TB || typeof TB.openTool !== 'function') { r.ok = false; r.why = 'no-toolbox'; rows.push(r); return; }
-            TB.openTool(t.id);
+            TB.openTool(t.id, { values: sampleValues(t) });
             var box = document.getElementById('quick-result');
             r.box = !!box;
             r.value = txt(box ? box.querySelector('.tool-result-primary-value') : null);
@@ -82,7 +97,7 @@ const SMOKE_JS = `(() => {
         var r = { id: t.id, name: t.name, kind: 'deep' };
         try {
             if (!W || typeof W.open !== 'function') { r.ok = false; r.why = 'no-wizard'; rows.push(r); return; }
-            W.open(t.id, { values: {} });
+            W.open(t.id, { values: sampleValues(t) });
             var card = document.getElementById('dw-result-card');
             var stamp = document.getElementById('dw-policy-stamp');
             r.card = !!card;
@@ -144,7 +159,7 @@ function parseJson(s) {
     await browser.ab(['eval', INJECT_JS]);
     await browser.ab(['reload']);
     await browser.waitForReady();
-    step('遍历 41 个工具（真机计算）');
+    step('遍历 42 个工具（真机计算）');
     const raw = await browser.ab(['eval', SMOKE_JS], 180000);
     step('取回结果');
     const data = parseJson(raw);

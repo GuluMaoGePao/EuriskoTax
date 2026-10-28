@@ -26,6 +26,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
+    loadSource('src/js/calculation/property-rental-quick.js');   // 阶段22 M5：出租组合器
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/data/tax-profile.js');
     loadSource('src/js/ui/param-memory.js');

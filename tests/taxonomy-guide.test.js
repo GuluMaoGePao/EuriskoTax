@@ -93,15 +93,18 @@ describe('问句引导（阶段22 M4）', () => {
         expect(G().toolName('不存在的工具')).toBe('不存在的工具');
     });
 
-    test('待补入口不做成死链接：F7 只有一行、标 is-empty、点击不触发 openTool', () => {
+    // 阶段22 M5（v2.1.0）：F7 财产租赁曾是全表唯一一格 0 工具的地方（当时的取舍是宁可标
+    // 「工具待补」也不做死链接）。property-rental 落地后，这一行从待补变成真入口 ——
+    // 钉住的是它现在真的能点进去，而不是还挂着 is-empty 的旧状态。
+    test('M5 后 F7 不再是待补：E17 那一行可直接点进 property-rental', () => {
         G().open();
         body().querySelector('[data-guide-form="F7"]').click();
         const rows = body().querySelectorAll('.guide-event-row');
         expect(rows.length).toBe(1);
-        expect(rows[0].classList.contains('is-empty')).toBe(true);
-        expect(body().textContent).toContain('工具待补');
+        expect(rows[0].classList.contains('is-empty')).toBe(false);
+        expect(body().textContent).not.toContain('工具待补');
         rows[0].click();
-        expect(window.EuriskoToolbox.openTool).not.toHaveBeenCalled();
+        expect(window.EuriskoToolbox.openTool).toHaveBeenCalledWith('property-rental');
     });
 
     test('跨格子组：5 个事件全部可达，E13 有两个工具档', () => {

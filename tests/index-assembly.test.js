@@ -172,7 +172,7 @@ describe('按 index.html 的真实顺序装配一遍', () => {
         const registry = window.EuriskoToolRegistry;
         expect(typeof registry).toBe('object');
         expect(registry.all().length).toBe(20);
-        expect(registry.deep().length).toBe(21);
+        expect(registry.deep().length).toBe(22);
     });
 
     // 这条才是整套守护的牙齿所在。spec 的 compute 是**运行时**才去取 quick 模块的全局对象的：

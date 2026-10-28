@@ -91,7 +91,7 @@ describe('工具注册表：数量与分组', () => {
             'annual-settlement-deep',
             'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep',
             'donation', 'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'non-resident',
-            'private-pension-deep', 'property-transfer', 'reverse', 'severance-deep',
+            'private-pension-deep', 'property-rental', 'property-transfer', 'reverse', 'severance-deep',
             'social-base-deep', 'special-deduction-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
         ]);   // 17D-9（v1.65.0）：private-pension-deep 个人养老金与税优三件套 —— 第九个；
         // 17D-10（v1.66.0）：donation 公益慈善捐赠扣除 —— 第十个（13/16 → 14/16），且是
@@ -231,8 +231,11 @@ describe('工具注册表：数量与分组', () => {
         // 它是《个人所得税法》第二条里单独一档的**财产转让所得**（20% 比例税率），个税场景 14/16 → 15/16。
         // 17D-13（v1.69.0）：non-resident 是第 7 个 —— 即便同属个税，那五个框默认这位是**中国税收
         // 居民**，而无住所个人进门要先答「这笔钱要不要在中国缴」，个税场景 15/16 → **16/16**。
+        // 阶段22 M5（v2.1.0）：property-rental 是第 8 个 —— 它不是任何速算器的口径，而是
+        // **第一个真正的跨税种组合器**：一笔房租要同时过增值税、城建税与两项附加、房产税、
+        // 印花税、个人所得税。与 property-transfer 同款，它没有同名速算器可复用。
         expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'donation', 'forward',
-            'non-resident', 'property-transfer', 'reverse']);
+            'non-resident', 'property-rental', 'property-transfer', 'reverse']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);

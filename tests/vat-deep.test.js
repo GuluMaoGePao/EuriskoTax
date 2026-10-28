@@ -26,6 +26,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-registry.js');   // vat-quick 在加载那一刻就抓 registry
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
+    loadSource('src/js/calculation/property-rental-quick.js');   // 阶段22 M5：出租组合器
     loadSource('src/js/calculation/utils.js');
     loadSource('src/js/data/tool-registry.js');
     loadSource('src/js/ui/toolbox-ui.js');

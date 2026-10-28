@@ -122,9 +122,9 @@ describe('工具页', () => {
     const catChips = () => Array.from(document.querySelectorAll('#toolbox-categories .tool-cat-chip'));
     const clickCat = (id) => document.querySelector(`#toolbox-categories .tool-cat-chip[data-cat="${id}"]`).click();
 
-    // 默认（无身份、无历史）落在「全部」：五个场景段依次排开，41 个入口一次看全 ——
+    // 默认（无身份、无历史）落在「全部」：五个场景段依次排开，42 个入口一次看全 ——
     // 新人要能一眼看全，入口总数也必须在这一屏上数得出来。
-    test('默认渲染 41 个入口，分 5 个场景段', () => {
+    test('默认渲染 42 个入口，分 5 个场景段', () => {
         expect(entries()).toHaveLength(REG().all().length + REG().deep().length);
         const groups = Array.from(document.querySelectorAll('#toolbox-groups .tool-group'));
         expect(groups).toHaveLength(5);
@@ -172,7 +172,7 @@ describe('工具页', () => {
     });
 
     // 可达性铁律：切换分类是视图，不是删入口 —— 回到「全部」时 41 个一个不少。
-    test('切回「全部」：41 个入口仍然都在（分类是视图，不是删入口）', () => {
+    test('切回「全部」：42 个入口仍然都在（分类是视图，不是删入口）', () => {
         clickCat('corp');
         expect(entries().length).toBeLessThan(REG().all().length + REG().deep().length);
         clickCat('all');
@@ -272,11 +272,20 @@ describe('工具页', () => {
         expect(ids).toContain('net-salary');
     });
 
-    // 注意关键词：17C-5 之后「残保金」已有自己的完整测算，会命中两版，不能再用它测「无命中」。
-    test('搜索无命中时给出空态，而不是把无关的 41 个留在下面', () => {
-        window.EuriskoToolbox.renderToolbox('房产税');
+    // 注意关键词：17C-5 之后「残保金」已有自己的完整测算，会命中两版，不能再用它测「无命中」；
+    // 阶段22 M5 之后「房产税」也不能再用了 —— 它现在能命中 property-rental（见下一条）。
+    test('搜索无命中时给出空态，而不是把无关的 42 个留在下面', () => {
+        window.EuriskoToolbox.renderToolbox('zzz这个税种不存在');
         expect(document.querySelector('#toolbox-groups .tool-empty')).not.toBeNull();
         expect(entries()).toHaveLength(0);
+    });
+
+    // 阶段22 M5（v2.1.0）之前，搜「房产税」是**零命中**：房产税在个人出租里天天要交，
+    // 但 41 个入口里没有一个名字带它（总表 §4：C3 财产与行为税里它是空的）。
+    test('搜「房产税」现在能命中出租工具（此前是零命中）', () => {
+        window.EuriskoToolbox.renderToolbox('房产税');
+        const ids = entries().map((el) => el.getAttribute('data-tool-id'));
+        expect(ids).toContain('property-rental');
     });
 
     // 21 个完整测算不是写在 HTML 里的静态卡，而是由注册表渲染出来的 ——
@@ -710,15 +719,15 @@ describe('最近使用', () => {
 });
 
 // ====== 阶段19-3：工具页降载 ======
-// 41 个入口一次全铺开等于没有目录：场景组默认折叠、记忆展开、卡片带状态微标签、
+// 42 个入口一次全铺开等于没有目录：场景组默认折叠、记忆展开、卡片带状态微标签、
 // 进页面就聚焦搜索。三条验收都钉在这儿：**入口可达性不能因为降载而变差**。
-describe('阶段19-3：41 个入口全部可达', () => {
-    test('20 个速算器 + 21 个完整测算，每个都有落点', () => {
+describe('阶段19-3：42 个入口全部可达', () => {
+    test('20 个速算器 + 22 个完整测算，每个都有落点', () => {
         const R = window.EuriskoToolRegistry;
         const quick = R.all().map((t) => t.id);
         const deep = R.deep().map((t) => t.id);
         expect(quick).toHaveLength(20);
-        expect(deep).toHaveLength(21);
+        expect(deep).toHaveLength(22);
 
         const inGroups = new Set(Array.from(document.querySelectorAll('#toolbox-groups [data-tool-id]'))
             .map((el) => el.getAttribute('data-tool-id')));
@@ -736,7 +745,7 @@ describe('阶段19-3：41 个入口全部可达', () => {
     // 「折叠不删 DOM」那条随折叠机制一起删了 —— 它钉的是"降载不能把入口变成不可达"，
     // 而现在**没有任何东西把入口收起来**：每一类躺在哪条 chip 后面都是静态可查的，
     // 可达性改由「切回全部 41 个都在」那条守住（在同一个 describe 里）。
-    test('41 个入口一次渲染在同一块内容区里（不再分散在两块容器）', () => {
+    test('42 个入口一次渲染在同一块内容区里（不再分散在两块容器）', () => {
         const R = window.EuriskoToolRegistry;
         expect(document.querySelectorAll('#toolbox-groups .tool-entry'))
             .toHaveLength(R.all().length + R.deep().length);
@@ -748,7 +757,7 @@ describe('阶段19-3：41 个入口全部可达', () => {
 
 describe('分类状态（v1.143.0，取代「场景组折叠与记忆」）', () => {
     // 这一段原先钉的是折叠与它的 localStorage 记忆 —— 那套机制随 v1.143.0 删除，
-    // 一并替换的是它当初要解决的问题：41 个入口一次铺开太长。现在由分类承担，
+    // 一并替换的是它当初要解决的问题：42 个入口一次铺开太长。现在由分类承担，
     // 于是这里改钉「分类的尾巴有多短」：**状态全是会话级的，一个键都不往 localStorage 里写**。
     beforeEach(() => {
         window.EuriskoToolbox.renderToolbox('', null);
@@ -826,7 +835,7 @@ describe('阶段19-3：进入工具页自动聚焦搜索框', () => {
         document.getElementById(pageId).classList.add('active');
     };
 
-    test('桌面（≥768px）：切进工具页就聚焦，41 个入口靠搜比靠翻快', () => {
+    test('桌面（≥768px）：切进工具页就聚焦，42 个入口靠搜比靠翻快', () => {
         window.innerWidth = 1024;
         goto('mode-selection-page');
         window.EuriskoToolbox.syncNav();

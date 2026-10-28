@@ -25,6 +25,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/tax-registry.js');
     loadSource('src/js/calculation/vat-quick.js');
     loadSource('src/js/calculation/surtax-stamp-quick.js');
+    loadSource('src/js/calculation/property-rental-quick.js');   // 阶段22 M5：出租组合器
     loadSource('src/js/calculation/corporate-income-tax-quick.js');
     loadSource('src/js/calculation/social-insurance-quick.js');
     loadSource('src/js/calculation/disability-fund-quick.js');
@@ -497,8 +498,8 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
         });
 
         expect(problems).toEqual([]);
-        expect(tools.length).toBe(21);
-        expect(covered).toBe(21 - NEEDS_INPUT.length);   // 能默认算的都过了一遍
+        expect(tools.length).toBe(22);
+        expect(covered).toBe(22 - NEEDS_INPUT.length);   // 能默认算的都过了一遍
         expect(stillNeeds.sort()).toEqual(NEEDS_INPUT.slice().sort());
         expect(withChart).toBeGreaterThan(0);            // 覆盖面里至少有一部分画得出图
         delete window.EuriskoReport;
