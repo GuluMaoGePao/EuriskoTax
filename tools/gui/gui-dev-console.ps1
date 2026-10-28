@@ -3,7 +3,7 @@
 # 双击 EuriskoTax-Console.bat 即可运行，无需消耗 AI 积分
 #
 # v3.5 更新内容:
-#   1. 补齐「文档里有、控制台里没有」的按钮：预发（beta）整条链路、41 个工具真机、
+#   1. 补齐「文档里有、控制台里没有」的按钮：预发（beta）整条链路、42 个工具真机、
 #      视觉基线对比、对比度审计、线上指纹核对、发布台账、发布自检 verify:release
 #   2. 新增「CI 门禁预演」：干净克隆一份仓库跑 CI 的同款三步，push 之前就知道会不会红
 #   3. 部署页按动线重排：预发 → 正式 → 发完核对与台账，改完该点哪个一眼能看到
@@ -3051,7 +3051,7 @@ Add-SectionCard -TabCtx $tab2Ctx `
 # ==============================================================================
 # ============ 标签页 3: 测试中心 ============
 # ==============================================================================
-$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准 · 发布门禁 · UI 与视觉验证 · CI 预演" -HeaderDesc "本页包含 5 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）  ③ 发布门禁（一键全套 + verify:local 本地链路 + verify:pg 生产等价演练 + verify:release 发布自检）  ④ UI 与视觉验证（41 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫）  ⑤ CI 门禁预演（干净克隆跑 CI 同款三步）"
+$tab3Ctx = New-TabPanel -HeaderText "🧪  测试中心" -HeaderTagline "Jest 单元测试 · 覆盖率报告 · 性能基准 · 发布门禁 · UI 与视觉验证 · CI 预演" -HeaderDesc "本页包含 5 个功能区：① 单元测试（全部测试/监视模式/覆盖率/打开报告/tests目录/测试报告）  ② 性能 & 代码质量（基准测试/优化报告/性能单测）  ③ 发布门禁（一键全套 + verify:local 本地链路 + verify:pg 生产等价演练 + verify:release 发布自检）  ④ UI 与视觉验证（42 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫）  ⑤ CI 门禁预演（干净克隆跑 CI 同款三步）"
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "1. 单元测试" `
@@ -3117,10 +3117,10 @@ Add-SectionCard -TabCtx $tab3Ctx `
 
 Add-SectionCard -TabCtx $tab3Ctx `
     -Title "4. UI 与视觉验证（改了界面必跑）" `
-    -Subtitle "41 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫" `
+    -Subtitle "42 个工具真机 · 视觉基线 · 对比度审计 · 级联守卫" `
     -Description "详细说明：这一区守的是「页面上照样有数字、但其实已经坏了」。工具算错了没人会报（页面照样显示结果），颜色在深色模式下看不清（浅色看着对证明不了深色没问题），样式改一处串到别处（级联）—— 这些都不会让单测变红，只能真机点一遍。改了工具或界面之后，按 逐个算 → 视觉 → 对比度 → 级联 的顺序点一遍。" `
     -AccentColor $C_CYAN -ButtonsPerRow 2 -Buttons @(
-    @{ Text = "🔧 41 个工具逐个算`nsmoke:ui · 真机"; Desc = "在真浏览器里把 41 个工具各算一遍：出不出数、抛不抛错、深侧徽标在不在。关键：它不写留痕 —— 跑前快照 localStorage、跑后整份还原。否则 41 次测算会灌进历史，「我算过什么」就被污染了，后面的截图基线也会跟着脏。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
+    @{ Text = "🔧 42 个工具逐个算`nsmoke:ui · 真机"; Desc = "在真浏览器里把 42 个工具各算一遍：出不出数、抛不抛错、深侧徽标在不在。关键：它不写留痕 —— 跑前快照 localStorage、跑后整份还原。否则 42 次测算会灌进历史，「我算过什么」就被污染了，后面的截图基线也会跟着脏。"; Color = "80, 195, 210"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "smoke-ui" -Command "npm run smoke:ui" -WorkingDir $ProjectRoot } },
     @{ Text = "📸 视觉基线对比`n7 页 × 2 断点 × 2 主题 = 28 张"; Desc = "把页面按 7 页 × 桌面/手机 × 浅色/深色 拍 28 张与基线比对，专抓排版被改坏。注意：生成与比对必须用同一个浏览器引擎（两套引擎有像素微差，混用会假报警）；网络差时可能拍出没加载完的图，那种状态别固化成基线。"; Color = "75, 140, 230"; Width = $BTN_WIDE_W;
        OnClick = { Invoke-AsyncCommand -Name "shot" -Command "node tools\ops\ui-screenshot-baseline.js" -WorkingDir $ProjectRoot } },
