@@ -21,12 +21,13 @@ const CSS = read('src/css/ui-redesign.css');
 // 所以查控件字号必须读这一份 —— 只读 ui-redesign.css 会查到空串。
 const APP_CSS = read('src/css/tailwind.src.css');
 const TOKENS = read('src/css/tokens.css');
-// 4 处 JS 动态生成的弹窗模板
+// 5 处 JS 动态生成的弹窗模板
 const JS_TPL = [
     'src/js/ui/tax-assistant-ui.js', // 税率表速查
     'src/js/ui/scenario-ui.js',      // 我的方案
     'src/js/ui/entity-ui.js',        // 主体 / 模板 / 台账 三个管理器
-    'src/js/export/final-report.js'  // 导出版本选择
+    'src/js/export/final-report.js', // 导出版本选择
+    'src/js/ui/taxonomy-guide-ui.js' // 阶段22 M4：问句引导（9 格 → 事件 → 工具）
 ];
 
 describe('弹窗统一外壳：基类与尺寸档', () => {
@@ -114,7 +115,7 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         expect(sized).toBe(shells);
     });
 
-    test('4 处 JS 生成的弹窗模板也用上基类', () => {
+    test('5 处 JS 生成的弹窗模板也用上基类', () => {
         JS_TPL.forEach((p) => {
             const src = read(p);
             expect(src).toContain('modal-shell');
@@ -128,11 +129,12 @@ describe('弹窗统一外壳：所有弹窗都接入', () => {
         const all = [HTML, ...JS_TPL.map(read)].join('\n');
         const lg = (all.match(/modal-shell--lg/g) || []).length;
         const sm = (all.match(/modal-shell--sm/g) || []).length;
-        // 12 = 反馈 / 升级码 / 公告 / 关于 / 留资 / 协议×2 / 帮助 / **身份（v1.139.0）**
+        // 13 = 反馈 / 升级码 / 公告 / 关于 / 留资 / 协议×2 / 帮助 / **身份（v1.139.0）**
         //       + 三处 JS 模板（三个管理器共用一处 / 税率表 / 我的方案）
-        expect(lg).toBe(12);
+        //       + **问句引导（阶段22 M4）**
+        expect(lg).toBe(13);
         expect(sm).toBe(3);                   // alert / confirm / 导出版本：一句话决策
-        expect(lg + sm).toBe(15);             // 与「所有外壳都挑了档」那条的总数对齐
+        expect(lg + sm).toBe(16);             // 与「所有外壳都挑了档」那条的总数对齐
     });
 
     // 限高只走 --h-modal 一处：再有手写的 max-h-[85vh] / [88vh] / [90vh]，
@@ -179,15 +181,15 @@ describe('遮罩层：底色与层级走令牌', () => {
         expect(all).not.toContain('bg-slate-900/60 flex items-center justify-center z-50');
     });
 
-    // 15 = 此前 14 处 + v1.139.0「我是谁」身份弹窗
-    test('15 处背景层都换成 modal-mask', () => {
+    // 16 = 此前 14 处 + v1.139.0「我是谁」身份弹窗 + 阶段22 M4 问句引导
+    test('16 处背景层都换成 modal-mask', () => {
         // v1.141.0：只数**真正挂在元素上**的那一次（HTML 的 class 属性 / JS 的 className
         // 赋值）。注释里提一句、或选择器里用到（closePolicyModal 的「还有别的弹窗开着吗」
         // 就是这么查的）都不算 —— 否则每解释一遍这个类名，数字就得跟着改一次，
         // 而它能守的东西（有没有漏改的遮罩层）一点没变。
         const inHtml = (HTML.match(/class="[^"]*modal-mask/g) || []).length;
         const inJs = (JS_TPL.map(read).join('\n').match(/className\s*=\s*'modal-mask/g) || []).length;
-        expect(inHtml + inJs).toBe(15);
+        expect(inHtml + inJs).toBe(16);
     });
 });
 

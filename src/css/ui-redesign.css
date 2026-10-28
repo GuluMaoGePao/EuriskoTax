@@ -2162,3 +2162,159 @@
     }
 }
 
+/* ===== 阶段22 M4：问句引导（taxonomy-guide）=====
+   数据与文案全部来自 person-taxonomy.js（question 是唯一文案来源，这里只有版式）。
+   类名与 event-card 同 family：令牌（--sp / --c / --r / --fs / --sh）复用既有体系。 */
+.guide-step-title {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+    margin-bottom: var(--sp-4);
+}
+.guide-group {
+    margin-bottom: var(--sp-5);
+}
+.guide-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+    margin-bottom: var(--sp-2);
+}
+.guide-group-title span {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--c-text-2);
+    opacity: .7;
+}
+.guide-forms {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--sp-2);
+}
+.guide-form-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+    text-align: left;
+    transition: box-shadow var(--dur-micro) var(--ease),
+                transform var(--dur-micro) var(--ease);
+}
+.guide-form-card:hover,
+.guide-form-card:focus-visible {
+    box-shadow: var(--sh-2);
+    transform: translateY(-1px);
+    outline: none;
+}
+.guide-form-card:focus-visible {
+    box-shadow: var(--sh-focus);
+}
+.guide-form-card__name {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.guide-form-card__q {
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    opacity: .85;
+}
+.guide-form-card__meta {
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+}
+.guide-back {
+    margin-bottom: var(--sp-3);
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+.guide-form-head {
+    padding-bottom: var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--c-border);
+}
+.guide-form-head__group {
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    opacity: .7;
+}
+.guide-form-head__name {
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    color: var(--c-text);
+    margin: var(--sp-1) 0;
+}
+.guide-form-head__q {
+    font-size: var(--fs-base);
+    color: var(--c-text);
+}
+.guide-form-head__hint {
+    margin-top: var(--sp-1);
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    opacity: .75;
+}
+.guide-events {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+.guide-event-row {
+    padding: var(--sp-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-card);
+    background: var(--c-surface-0);
+}
+.guide-event-row:not(.is-empty) {
+    cursor: pointer;
+    transition: box-shadow var(--dur-micro) var(--ease);
+}
+.guide-event-row:not(.is-empty):hover {
+    box-shadow: var(--sh-2);
+}
+.guide-event-row.is-empty {
+    opacity: .6;
+}
+.guide-event-row__name {
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--c-text);
+}
+.guide-event-row__sub {
+    font-size: var(--fs-xs);
+    color: var(--c-text-2);
+    opacity: .8;
+    margin-top: 2px;
+}
+.guide-event-row__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+}
+.guide-tool-chip {
+    padding: 4px var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--c-brand);
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface-0);
+    cursor: pointer;
+    transition: box-shadow var(--dur-micro) var(--ease);
+}
+.guide-tool-chip:hover,
+.guide-tool-chip:focus-visible {
+    box-shadow: var(--sh-focus);
+    outline: none;
+}
+

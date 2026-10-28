@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '2.0.0';
+        window.__APP_VERSION__ = '2.0.1';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -589,6 +589,11 @@
                             <span>我遇到了什么事</span>
                         </div>
                         <span class="text-xs text-gray-500">不用先懂税，认得自己的事就行</span>
+                        <!-- 阶段22 M4：问句引导入口 —— 事件轨道按「事」找，这里按「钱的性质」找
+                             （9 格判定问句 → 该格的事件 → 直达工具）。文案全部来自
+                             person-taxonomy.js 的 question 字段，弹窗由 taxonomy-guide-ui.js 动态创建。 -->
+                        <button type="button" id="home-guide-entry" class="text-xs text-primary hover:underline">
+                            按钱的性质找 ›</button>
                     </div>
                     <div id="home-event-rail" class="event-rail is-collapsed">
                         <!-- 由 home-ui.js 按 home-mission.js 的 eventCards 渲染 -->
@@ -1746,7 +1751,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 2.0.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 2.0.1</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2157,6 +2162,9 @@
          必须排在 home-ui.js **之前** —— home-ui 的节点表以这里为真源（缺了就用它自己那份兜底）。 -->
     <script src="src/js/ui/home-mission.js"></script>
     <script src="src/js/ui/home-ui.js"></script>
+    <!-- 阶段22 M4：A 侧问句引导（弹窗动态创建，入口按钮 #home-guide-entry 在首页事件轨道卡头）。
+         只读依赖 person-taxonomy / tool-registry（已在前），打开工具走 EuriskoToolbox.openTool。 -->
+    <script src="src/js/ui/taxonomy-guide-ui.js"></script>
     <script src="src/js/export/export-utils.js"></script>
     <script src="src/js/calculation/utils.js"></script>
     <!-- 阶段15D / 16：App 内多税种入口。
@@ -2193,6 +2201,17 @@
     <script src="src/js/calculation/vat-quick.js"></script>
     <script src="src/js/calculation/corporate-income-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>
+    <!-- 阶段22 M1：税种字典（B 企业侧分类的唯一真源）。纯数据 + 查询接口，不依赖任何模块，
+         故排在这里即可；后续 person-taxonomy / tool-taxonomy 会引用它的 id 做外键。 -->
+    <script src="src/js/data/tax-taxonomy.js"></script>
+    <!-- 阶段22 M2：个人字典（A「我自己」侧分类的唯一真源）。9 格所得形态 + 职业别名 + 24 事件；
+         question 是将来引导 UI 的唯一文案来源。validate() 会反查 tax-taxonomy（已在前）与
+         tool-registry（在前）做存在性校验，故必须排在两者之后。 -->
+    <script src="src/js/data/person-taxonomy.js"></script>
+    <!-- 阶段22 M3：挂载点表。41 个入口 → 挂在分类树哪里（主挂 + 次挂），A 30 / B 11；
+         是唯一同时引用 tax-taxonomy / person-taxonomy / tool-registry 三个真源的文件，
+         注册表一行不改。validate() 做双向一致性校验（无孤儿、无幽灵）。 -->
+    <script src="src/js/data/tool-taxonomy.js"></script>
     <!-- v1.142.0：原先排在这里的 mode-pref.js（简明 / 完整视图密度）已随那个概念一并删除。
          进阶参数折叠与「主动翻过参数」的行为计数落在 toolbox-ui.js —— 谁画折叠块谁记。 -->
     <!-- 身份视角偏好（「我是谁」那 6 张卡选的是推荐排序，不是筛选）——
