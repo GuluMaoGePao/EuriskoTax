@@ -37,10 +37,12 @@
         C5: 'levy'
     };
 
-    // ---- 41 条挂载点（A 30 / B 11，与总表 §3 映射总表逐行核对）----
+    // ---- 42 条挂载点（A 31 / B 11，与总表 §3 映射总表逐行核对）----
     // branch：主挂载点所在分支，决定 A/B 计数归属；secondary 不重复计数。
+    // 阶段22 M5：F7 财产租赁补上 property-rental 后，A 由 30 → 31、总数 41 → 42 ——
+    // 「41 个入口」本就是由分类体系统计得出的数字，不是硬约束（总表 §5 维护约定 3）。
     var MOUNTS = [
-        // ===== A 我自己（30 个工具）=====
+        // ===== A 我自己（31 个工具）=====
 
         // F1 工资薪金（14 个工具）
         { id: 'salary-tax',            branch: 'A', primary: 'F1/E1',  secondary: ['B/C2'], taxCode: 'iit' },
@@ -75,6 +77,10 @@
         // F5 经营所得（2 个工具）
         { id: 'business-income', branch: 'A', primary: 'F5/E19', secondary: ['B/C2'], taxCode: 'iit' },
         { id: 'business',        branch: 'A', primary: 'F5/E19', secondary: ['B/C2'], taxCode: 'iit' },
+
+        // F7 财产租赁（1 个工具 —— 阶段22 M5：全表最后一块 0 工具的格子补上了）
+        { id: 'property-rental', branch: 'A', primary: 'F7/E17', secondary: ['B/C3'], taxCode: 'iit',
+          note: '真正的跨税种组合器：个税 + 房产税 + 增值税 + 附加 + 印花税一屏出总额，各税种仍调自己的内核' },
 
         // F8 财产转让（1 个工具）
         { id: 'property-transfer', branch: 'A', primary: 'F8/E15', taxCode: 'iit',
@@ -158,7 +164,7 @@
         var person = window.EuriskoPersonTaxonomy;
 
         // 1. 数量与双向一致（无孤儿、无幽灵）
-        if (MOUNTS.length !== 41) issues.push('挂载点必须恰好 41 条，实际 ' + MOUNTS.length);
+        if (MOUNTS.length !== 42) issues.push('挂载点必须恰好 42 条，实际 ' + MOUNTS.length);
         if (reg) {
             var regIds = reg.all().concat(reg.deep()).map(function (t) { return t.id; });
             var mountIds = MOUNTS.map(function (m) { return m.id; });
@@ -255,8 +261,8 @@
             });
         });
 
-        // 7. 计数口径：A 30 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
-        if (byBranch('A').length !== 30) issues.push('A 分支必须恰好 30 个工具，实际 ' + byBranch('A').length);
+        // 7. 计数口径：A 31 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
+        if (byBranch('A').length !== 31) issues.push('A 分支必须恰好 31 个工具，实际 ' + byBranch('A').length);
         if (byBranch('B').length !== 11) issues.push('B 分支必须恰好 11 个工具，实际 ' + byBranch('B').length);
 
         // 8. 已知混装 / 待处理工具必须带 mixed（总表 §3 的 9 个 ⚠️ 里与本表相关的 7 个工具）

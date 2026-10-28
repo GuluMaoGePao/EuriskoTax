@@ -841,6 +841,69 @@ var propertyTransferRules = {
     basis: '《个人所得税法》第三条（财产转让所得 20%）、国税发〔2006〕108 号、国税发〔2007〕33 号、财税字〔1999〕278 号、财税〔2009〕78 号'
 };
 
+// 阶段22 M5（v2.1.0）：个人出租不动产 —— 财产租赁所得 + 房产税 + 增值税及附加 + 印花税。
+//
+// 与 property-transfer 同一类处境：它不是工资、不是劳务、不是经营所得，20 个速算器里
+// **一个都收不下它**（阶段22 分类总表 §1.2.4：F7 财产租赁是全表唯一一格 0 工具的所得形态）。
+//
+// 这个文件只声明**法定参数**，且凡是别处已经有的数字一律**引用**而不是抄：
+//   · 增值税 5%（出租不动产的征收率）→ 引 vatRules.smallScale.levyRates 的 realestate 档；
+//   · 免征线 10 万 / 月 → 引 vatRules.smallScale.monthlyThreshold；
+//   · 财产租赁所得 20% → 引 classificationTaxRates.rent.rate；
+//   · 租赁合同印花税税率 → 在 stampDutyRules.items，本文件只记税目 key 与「住房免征」；
+//   · 房产税、个税的减征比例 → 引 surtaxRules.halve.ratio（六税两费减半）。
+// 真正独属于这一档的只有四个数：住房减按 **1.5%** 的增值税、房产税 **4%**、个税 **10%**、
+// 修缮费 **800 元/月**。公式不在这里，在 property-rental-quick.js。
+var rentalRules = {
+    vat: {
+        // 出租不动产的征收率 5%，且按财政部 税务总局公告 2026 年第 10 号**不享受** 3% 减按 1%
+        levyRate: vatRules.smallScale.levyRates[1].rate,
+        // 个人出租**住房**：按 5% 征收率减按 1.5% 计算应纳税额
+        //   （财税〔2016〕36 号附件 2 第一条（九）、国家税务总局公告 2016 年第 14 号第四条）
+        housingReducedRate: 0.015,
+        // 一次性收取租金的可在租赁期内平均分摊，分摊后月租金未超过 10 万元的免征增值税
+        //   （财税〔2016〕36 号附件 2 第一条（九）、财政部 税务总局公告 2023 年第 1 号）
+        monthlyThreshold: vatRules.smallScale.monthlyThreshold,
+        thresholdInclusive: vatRules.smallScale.thresholdInclusive,
+        formula: '含税销售额 ÷ (1 + 5%) × 减按后的征收率',
+        spreadNote: '一次性收取租金的，可在对应的租赁期内平均分摊，分摊后的月租金收入未超过 10 万元的免征增值税',
+        basis: '财税〔2016〕36 号附件 2 第一条（九）、国家税务总局公告 2016 年第 14 号第四条、财政部 税务总局公告 2023 年第 1 号、财政部 税务总局公告 2026 年第 10 号'
+    },
+    propertyTax: {
+        housingRate: 0.04,           // 个人出租住房：按租金收入 4%（财税〔2008〕24 号二）
+        nonHousingRate: 0.12,        // 其他房产从租计征：租金收入 12%（《房产税暂行条例》第四条）
+        halveApplicable: true,       // 六税两费减半范围含房产税
+        basis: '《中华人民共和国房产税暂行条例》第四条、财税〔2008〕24 号二'
+    },
+    stamp: {
+        leaseKey: 'lease',           // 税率（1‰）与减半规则在 stampDutyRules.items，这里只记税目
+        housingExempt: true,         // 对**个人出租、承租住房**签订的租赁合同免征印花税
+        basis: '财税〔2008〕24 号二'
+    },
+    landUseTax: {
+        housingExempt: true,         // 对个人出租住房免征城镇土地使用税（财税〔2008〕24 号二）
+        // 非住房按实际占用土地面积 × 所在地定额（大城市 1.5~30 元/㎡·年 等），由省、自治区、直辖市
+        // 人民政府在区间内确定 —— 各地不同，本工具**不估**，只提示去当地口径核对。
+        nonHousingNote: '出租非住房涉及的城镇土地使用税按实际占用土地面积与当地定额税额计算，定额由省级政府在法定幅度内确定，本工具不估',
+        basis: '《中华人民共和国城镇土地使用税暂行条例》第四条、财税〔2008〕24 号二'
+    },
+    iit: {
+        rate: classificationTaxRates.rent.rate,   // 财产租赁所得：比例税率 20%（《个人所得税法》第三条）
+        housingReducedRate: 0.10,    // 个人出租住房取得的所得减按 10%（财税〔2008〕24 号二）
+        expenseThreshold: 4000,      // 每次（月）收入 4000 元的分界
+        expenseFlat: 800,            // ≤ 4000：定额减除费用 800 元
+        expenseRatio: 0.20,          // > 4000：定率减除 20%
+        repairMonthlyCap: 800,       // 修缮费用每月最多扣 800 元，扣不完的**结转以后月份**继续扣
+        repairCarryForward: true,
+        deductibleNote: '出租过程中缴纳的税费（增值税及附加、房产税等）与修缮费用可持凭证扣除',
+        basis: '《中华人民共和国个人所得税法》第三条、第六条，国税发〔1994〕89 号第六条，财税〔2008〕24 号二'
+    },
+    // 住房 vs 非住房是**两套完全不同的税**，一字之差差几万：
+    //   住房 → 增值税减按 1.5%、房产税 4%、个税 10%、免征印花税与城镇土地使用税；
+    //   非住房 → 增值税 5%、房产税 12%、个税 20%、租赁合同按 1‰ 贴花、城镇土地使用税按当地定额。
+    usageNote: '财税〔2008〕24 号二对个人出租住房给的优惠是一整包（4% 房产税 + 10% 个税 + 免征印花税与城镇土地使用税），出租商铺、写字楼等非住房一律不适用'
+};
+
 // 17D-13（v1.69.0）：非居民个人 / 无住所个人 —— 这一类人进门要解决的不是「扣多少」，
 // 而是「**这笔钱要不要在中国缴**」：90 天 / 183 天 / 满六年三道门槛决定哪些钱压根不用缴。
 // 月度税率表不在这里复制 —— 与年终奖单独计税共用 `bonusMonthlyTaxRates`。
@@ -1034,6 +1097,8 @@ window.EuriskoTaxConstants = {
     socialInsuranceRules: socialInsuranceRules,
     businessIncomeRules: businessIncomeRules,
     donationRules: donationRules,
+    propertyTransferRules: propertyTransferRules,
+    rentalRules: rentalRules,
     disabilityFundRules: disabilityFundRules,
     unionFeeRules: unionFeeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,

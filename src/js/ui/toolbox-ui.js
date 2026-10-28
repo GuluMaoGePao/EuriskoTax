@@ -287,7 +287,7 @@
     }
 
     // 场景段：一个场景 = 一个标题 + 两档工具。取代原先「可折叠的组」——
-    // 折叠把 41 个入口藏在一摞标题后面（没展开的组对浏览者等于不存在），而它当初要解决的
+    // 折叠把 42 个入口藏在一摞标题后面（没展开的组对浏览者等于不存在），而它当初要解决的
     // 「一屏太长」问题，现在由分类选择器承担：不选「全部」就不会一次看到 41 个。
     // 组头不再是 <button>：没有折叠可点了，做成按钮等于给屏幕阅读器一个假的可操作承诺。
     function groupBlockHtml(g, quickList, deepList, actionHtml) {
@@ -615,7 +615,7 @@
     }
 
     // 「全部」= 五个场景段依次排开，每段内先「估个数」后「要明细」。
-    // 这是唯一会一次给出 41 个入口的视图，也是 chip 上永远留着的那一项 ——
+    // 这是唯一会一次给出 42 个入口的视图，也是 chip 上永远留着的那一项 ——
     // 新人要能一眼看全，入口总数必须在页面上数得出来（改了注册表这里自动跟上）。
     function allSectionsHtml() {
         return (R().groups() || []).map(function (g) {
@@ -1991,7 +1991,7 @@
         var loginPageEl = document.getElementById('login-page');
         if (loginPageEl && !loginPageEl.classList.contains('hidden')) visible = false;
 
-        // 阶段19-3：进工具页就聚焦搜索框 —— 41 个入口靠翻不如靠搜。
+        // 阶段19-3：进工具页就聚焦搜索框 —— 42 个入口靠翻不如靠搜。
         // 只在「刚切进来」的那一次聚焦：页面内反复同步时不抢用户的焦点。
         // 手机不聚焦：键盘一上来顶掉半屏，而用户还没决定搜什么。
         if (activeId === TOOLS_PAGE && lastNavPage !== TOOLS_PAGE) focusSearchIfDesktop();
@@ -2113,7 +2113,7 @@
             });
         }
 
-        // 首页搜索入口：进入工具页并聚焦搜索框（41 个工具时，搜索比浏览快）
+        // 首页搜索入口：进入工具页并聚焦搜索框（42 个工具时，搜索比浏览快）
         var entry = document.getElementById('toolbox-search-entry');
         if (entry) {
             entry.addEventListener('click', function () {

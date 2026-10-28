@@ -83,7 +83,7 @@
         { id: 'property', name: '房产税', kind: 'tax', category: 'property',
             frequency: 'year', scope: 'conditional', entities: ['company', 'person'],
             law: '《中华人民共和国房产税暂行条例》', effectiveFrom: '1986-10-01',
-            note: '从价与从租两套算法；个人出租住房有专门优惠口径，见 property（待建）' },
+            note: '从价与从租两套算法；个人出租住房的从租口径已在 property-rental 落地（税率见 rentalRules），从价仍缺工具' },
 
         { id: 'land-use', name: '城镇土地使用税', kind: 'tax', category: 'property',
             frequency: 'year', scope: 'conditional', entities: ['company'],

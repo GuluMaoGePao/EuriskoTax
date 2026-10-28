@@ -6404,6 +6404,213 @@
                     rows: rows, note: note, extras: extras, steps: steps
                 };
             }
+        },
+        {
+            // 阶段22 M5（v2.1.0）：**个人出租不动产** —— 分类总表 §1.2.4 点名的那一格：F7 财产租赁
+            // 是全表**唯一一个 0 工具**的所得形态，而它对应的恰恰是「买房出租」这个最普遍的个人
+            // 投资行为。之所以现在才做，是因为它既不是工资也不是劳务：一笔房租要同时过
+            // **五个税种**（增值税 + 城建税 + 两项附加 + 房产税 + 印花税 + 个人所得税），而且互相咬合：
+            //   ① **住房与非住房是两套税**：财税〔2008〕24 号二给住房的优惠是**一整包** ——
+            //      增值税减按 1.5%、房产税 4%、个税 10%、免征印花税与城镇土地使用税；
+            //      商铺、写字楼一律不适用。月租 1 万收 1 年：住房 1.12 万、非住房 2.41 万，**差 1.29 万**；
+            //   ② **增值税是价外税**：住房的法定表述是「按 5% 征收率**减按 1.5%**」，
+            //      公式 = 含税租金 ÷ (1 + 5%) × 1.5% —— 拿含税租金直接乘 1.5% 会少算，
+            //      按 1.5% 去分离又会多算，两步必须用不同的率（vatOf 里刻意分开写）；
+            //   ③ **一次性收租可以分摊**：分摊后的月租金未超过 10 万元的免征增值税（36 号附件 2）。
+            //      一次性收 1 年 12 万：分摊 → 0，不分摊 → 1714 元 —— 同一笔房租，收法不同差 1714 元；
+            //   ④ **修缮费每月最多扣 800 元、且扣不完的结转以后月份**（国税发〔1994〕89 号六）：
+            //      一次性花 5000 元修房子，不是当月作废，是 800×6 + 200 逐月扣完；
+            //   ⑤ 这五个税种的税率先在个税前扣掉，剩下的才是个税的应纳税所得额 ——
+            //      「房租收入 × 税率」这种算法会把房租当成所得，多算一大截。
+            // 仓库硬约束：**每个税种仍调用它自己的内核**（vat-quick / surtax-stamp-quick），
+            // 本条目只做组合与呈现，不复制任何一条公式（口径在 property-rental-quick.js）。
+            id: 'property-rental', name: '出租房子要交多少税',
+            subtitle: '财产租赁个税 + 房产税 + 增值税及附加，一屏出总额',
+            icon: 'fa-home', status: 'deep', comparable: true, group: 'special',
+            nextTools: ['property-transfer', 'vat', 'surtax-stamp', 'business-income'],
+            policyKey: 'property-rental',
+            fields: [
+                { key: 'usage', step: 'property', label: '出租的是', type: 'select', default: 'housing',
+                    options: [{ value: 'housing', label: '住房（住宅）' }, { value: 'nonHousing', label: '非住房（商铺 / 写字楼等）' }],
+                    hint: '财税〔2008〕24 号二：只有对个人出租住房才给 4% 房产税 + 10% 个税 + 免征印花税与城镇土地使用税这一整包优惠' },
+                { key: 'monthlyRent', step: 'property', label: '月租金（合同金额，元）', type: 'money', default: 0, sample: 5000,
+                    hint: '合同里写的通常是含税价：先按 5% 征收率分离，再乘减按后的征收率' },
+                { key: 'payMode', step: 'property', label: '租金怎么收', type: 'select', default: 'month',
+                    options: [{ value: 'month', label: '按月收取' }, { value: 'once', label: '一次性收取几个月 / 一年' }],
+                    hint: '一次性收取租金的，可在租赁期内平均分摊，分摊后的月租金未超过 10 万元的免征增值税（财税〔2016〕36 号附件 2）' },
+                { key: 'months', step: 'property', label: '一次性收取几个月', type: 'select', default: 12,
+                    when: { key: 'payMode', in: ['once'] },
+                    options: [3, 6, 12, 24].map(function (m) { return { value: m, label: m + ' 个月' }; }),
+                    hint: '分摊后仍然按月租金判断免征线 —— 分摊的是「月租金收入」，不是把总额往外摊' },
+                { key: 'location', step: 'tax', label: '房产所在地', type: 'select', default: 'urban',
+                    options: [
+                        { value: 'urban', label: '市区（城建税 7%）' },
+                        { value: 'county', label: '县城、镇（城建税 5%）' },
+                        { value: 'other', label: '不在市区、县城或镇（城建税 1%）' }
+                    ],
+                    hint: '城建税三档按房产所在地划分，不是按纳税人身份；与教育费附加 3%、地方教育附加 2% 一并随增值税附征' },
+                { key: 'halve', step: 'tax', label: '享受“六税两费”减半征收', type: 'switch', default: false,
+                    hint: '城建税、两项附加、房产税、印花税（不含证券交易印花税）减半，执行至 2027-12-31（财税〔2023〕12 号）' },
+                { key: 'repair', step: 'cost', label: '租赁期内发生的修缮费用（元）', type: 'money', default: 0, sample: 5000,
+                    hint: '由纳税人负担的修缮费，凭合法凭证扣除：每月最多扣 800 元，当月扣不完的结转以后月份继续扣，不是作废（国税发〔1994〕89 号六）' }
+            ],
+            steps: [
+                { key: 'property', title: '房子与租金', why: '先定住房还是非住房、租金多少、怎么收 —— 这三项直接决定后面四个税种用哪一套税率' },
+                { key: 'tax', title: '增值税与附加、房产税', why: '增值税先做价税分离，附加随实缴增值税走，房产税按不含税租金收入计征' },
+                { key: 'cost', title: '修缮与扣除', why: '前面缴的税与修缮费都能在个税前扣掉，扣完剩下的才是个税的应纳税所得额' }
+            ],
+            pitfalls: [
+                '增值税是价外税，房租要先按 5% 分离：个人出租住房的法定表述是「按 5% 的征收率减按 1.5% 计算应纳税额」，公式 = 含税租金 ÷ (1 + 5%) × 1.5%。拿含税租金直接乘 1.5% 会少算，按 1.5% 去分离又会多算 —— 这两步必须用不同的率',
+                '一次性收租可以在租赁期内平均分摊（财税〔2016〕36 号附件 2 第一条（九）、财政部 税务总局公告 2023 年第 1 号）：分摊后按月看租金收入，未超过 10 万元的免征增值税。一次性收 1 年 12 万：分摊 → 免征，不分摊 → 实缴 1714 元，同一笔房租收法不同差 1714 元',
+                '修缮费不是当月扣完就作废：每月最多扣 800 元，扣不完的结转以后月份继续扣（国税发〔1994〕89 号六）。一次性花 5000 元修房子，是 800×6 + 200 逐月扣完 —— 一次性扣掉会把税额算小',
+                '住房的优惠是一整包，别把商铺也算进去：财税〔2008〕24 号二给个人出租住房的 4% 房产税、10% 个税、免征印花税与城镇土地使用税，出租非住房一律不适用。月租 1 万收 1 年：住房 1.12 万、非住房 2.41 万，差 1.29 万',
+                '个税的应纳税所得额不是「房租 × 税率」：要先扣掉出租过程中缴纳的税费（增值税及附加、房产税、印花税）与修缮费，再扣法定费用扣除标准（月收入 ≤ 4000 减 800、> 4000 减 20%）。直接拿房租乘税率会把税算大一截',
+                '增值税免了，三项附加跟着免 —— 附加税的计税依据是「依法实际缴纳」的增值税、消费税（城建税法第二条），不是租金收入。但房产税不跟着免：它按租金收入计征，与增值税缴不缴无关',
+                '个人出租住房免征城镇土地使用税，但那是住房；出租非住房涉及的土地使用税按实际占用面积 × 当地定额，定额由省级政府在法定幅度内确定，各地不同 —— 本工具不估这一项'
+            ],
+            compare: [
+                '住房 vs 非住房：4% 房产税 + 10% 个税 + 免征印花税与城镇土地使用税，是一整包给的，不是逐项可选的',
+                '一次性收租：分摊后月租金 ≤ 10 万元 → 免征增值税；不分摊则按全额计税',
+                '修缮费：每月最多扣 800 元，扣不完结转以后月份 —— 与「当月全额扣除」的差额就是多缴的税'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoPropertyRentalQuick;
+                if (!Q) return null;
+
+                var input = {
+                    usage: v.usage || 'housing',
+                    monthlyRent: Number(v.monthlyRent) || 0,
+                    payMode: v.payMode || 'month',
+                    months: Number(v.months) || 1,
+                    location: v.location || 'urban',
+                    halve: v.halve !== false,
+                    repair: Number(v.repair) || 0
+                };
+                var s = Q.stackOf(input);
+                var spread = Q.spreadCompareOf(input);
+                var usage = Q.usageCompareOf(input);
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+
+                var rows = [{
+                    label: '租金收入（合同金额，含税）', value: s.grossIncome, kind: 'money',
+                    hint: '共 ' + s.months + ' 个月；不含增值税的租金收入 ' + Math.round(s.exclusiveIncome) + ' 元'
+                }];
+                s.rows.forEach(function (r0) {
+                    if (r0.tax <= 0 && r0.key === 'stamp' && s.housing) {
+                        rows.push({ label: r0.label, value: 0, kind: 'money', hint: r0.note });
+                        return;
+                    }
+                    rows.push({ label: r0.label, value: r0.tax, kind: 'money', hint: r0.note });
+                });
+                if (!s.housing) {
+                    rows.push({
+                        label: '城镇土地使用税', value: 0, kind: 'money',
+                        hint: s.landUseTax.note + '（未计入合计）'
+                    });
+                }
+                rows.push({ label: '本期合计税额', value: s.total, kind: 'money' });
+                rows.push({ label: '实际到手（租金 − 各项税）', value: s.netIncome, kind: 'money' });
+
+                var note = '月租金 ' + Math.round(input.monthlyRent) + ' 元'
+                    + (s.months > 1 ? '，一次性收取 ' + s.months + ' 个月' : '')
+                    + '：不含税租金收入 ' + Math.round(s.vat.exclusive) + ' 元/月';
+                note += s.vat.exempt
+                    ? '，分摊后未超过 10 万元 → 免征增值税（三项附加的计税依据同时为 0）'
+                    : '，增值税 ' + Math.round(s.vat.monthlyTax) + ' 元/月（' + s.vat.rateText + '）';
+                note += '，房产税 ' + Math.round(s.propertyTax.monthlyTax) + ' 元/月'
+                    + '，个人所得税 ' + Math.round(s.iit.monthlyTax) + ' 元/月'
+                    + '，合计 ' + Math.round(s.monthlyTotal) + ' 元/月。';
+                if (s.iit.repairDeducted > 0) {
+                    note += '修缮费本期扣除 ' + Math.round(s.iit.repairDeducted) + ' 元'
+                        + (s.iit.repairCarried > 0 ? '，还剩 ' + Math.round(s.iit.repairCarried) + ' 元结转以后月份' : '（已扣完）');
+                }
+
+                var extras = [{
+                    title: '住房 vs 非住房：同一笔房租的两套税',
+                    note: usage.note,
+                    table: {
+                        head: ['口径', '增值税', '附加税费', '房产税', '印花税', '个人所得税', '合计'],
+                        rows: [[
+                            '出租住房', money(usage.housing.vat.tax), money(usage.housing.surtax.total),
+                            money(usage.housing.propertyTax.tax), money(usage.housing.stamp.tax),
+                            money(usage.housing.iit.tax), money(usage.housing.total)
+                        ], [
+                            '出租非住房', money(usage.nonHousing.vat.tax), money(usage.nonHousing.surtax.total),
+                            money(usage.nonHousing.propertyTax.tax), money(usage.nonHousing.stamp.tax),
+                            money(usage.nonHousing.iit.tax), money(usage.nonHousing.total)
+                        ]]
+                    }
+                }, {
+                    title: '一次性收租：分摊与不分摊的增值税对照',
+                    note: spread.note,
+                    table: {
+                        head: ['口径', '每期租金', '分摊后月租金', '增值税'],
+                        rows: [[
+                            '分摊（可享受免征）',
+                            money(spread.spread.totalIncome), money(spread.spread.exclusive), money(spread.spread.tax)
+                        ], [
+                            '不分摊（一次性全额计税）',
+                            money(spread.unspread.totalIncome), money(spread.unspread.exclusive), money(spread.unspread.tax)
+                        ]]
+                    }
+                }];
+
+                // 修缮费跨月结转，各月可扣金额不同 —— 推导链取**首月**（修缮费扣得最多的那个月）
+                var first = s.iit.rows[0] || { income: 0, fees: 0, repair: 0, expense: 0, taxable: 0, tax: 0 };
+                var steps = [{
+                    title: '① 增值税（价外税：先分离，再减按）',
+                    rows: [
+                        { label: '月租金（含税）', value: s.vat.monthlyRent, format: 'money' },
+                        { label: '不含税租金收入（含税 ÷ (1 + 5%)）', value: s.vat.exclusive, format: 'money',
+                            note: '价税分离一律用 5% 征收率，与增值税口径同源' },
+                        { label: '免征线（分摊后月租金）', value: s.vat.threshold, format: 'money',
+                            note: s.vat.exempt ? '未超过 → 免征' : '已超过 → 全额计税' },
+                        { label: '适用征收率', value: s.vat.rateText, format: 'text', note: s.vat.note },
+                        { label: '应缴增值税', value: s.vat.tax, format: 'money' }
+                    ],
+                    footnote: s.vat.basis
+                }, {
+                    title: '② 附加税费与房产税（都跟着上面的结果走）',
+                    rows: [
+                        { label: '城建税计税依据（实缴增值税）', value: s.surtax.base, format: 'money' },
+                        { label: '税率（城建 + 教育费附加 + 地方教育附加）', value: s.surtax.effectiveRate, format: 'percent',
+                            note: input.halve ? '已按“六税两费”减半' : '未享受减半' },
+                        { label: '附加税费合计', value: s.surtax.total, format: 'money' },
+                        { label: '房产税计税依据（不含税租金收入）', value: s.propertyTax.base, format: 'money' },
+                        { label: '房产税税率', value: s.propertyTax.rate, format: 'percent', note: s.propertyTax.note },
+                        { label: '应缴房产税', value: s.propertyTax.tax, format: 'money' }
+                    ],
+                    footnote: '附加税的计税依据是依法实际缴纳的增值税（城建税法第二条）—— 增值税免了附加跟着免；房产税按租金收入计征，不受增值税免征影响'
+                }, {
+                    title: '③ 个人所得税（财产租赁所得）',
+                    rows: [{
+                        label: '每月租金收入（不含税）', value: first.income, format: 'money'
+                    }, {
+                        label: '减：出租过程中缴纳的税费', value: first.fees, format: 'money',
+                        note: '增值税及附加、房产税、印花税，凭完税凭证扣除'
+                    }, {
+                        label: '减：修缮费用', value: first.repair, format: 'money',
+                        note: '每月最多扣 ' + s.iit.repairCap + ' 元，扣不完的结转以后月份'
+                    }, {
+                        label: '减：法定费用扣除标准', value: first.expense, format: 'money',
+                        note: s.iit.expenseMode === 'ratio' ? '收入 > 4000 元：定率减除 20%' : '收入 ≤ 4000 元：定额减除 800 元'
+                    }, {
+                        label: '应纳税所得额（首月）', value: first.taxable, format: 'money'
+                    }, {
+                        label: '适用税率', value: s.iit.rate, format: 'percent',
+                        note: s.housing ? '个人出租住房取得的所得减按 10%（财税〔2008〕24 号二）' : '财产租赁所得 20%（《个人所得税法》第三条）'
+                    }, {
+                        label: '应缴个人所得税', value: s.iit.tax, format: 'money'
+                    }],
+                    footnote: s.iit.basis
+                }];
+
+                return {
+                    primary: { label: '本期要交的税（五个税种合计）', value: s.total, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
         }
     ];
 
@@ -7989,6 +8196,9 @@
         ],
         // 核定征收率（只在原值凭证不全时才用）、转让过程的税金、装修费 / 贷款利息 / 其他合理费用
         'property-transfer': ['assessRate', 'vatAndSurcharge', 'decoration', 'loanInterest', 'otherFees'],
+        // 阶段22 M5：出租的三个主判定是「住房 / 非住房 + 月租金 + 怎么收」，
+        // 房产所在地（城建税三档）、六税两费减半与修缮费是进阶项 —— 都有默认，改了才影响税额。
+        'property-rental': ['location', 'halve', 'repair'],
         // 六年规则的两项细节（此前住满年度数 / 单次最长离境）与月份折算：都有默认，主判定是居住天数
         'non-resident': ['fullYearsBefore', 'maxSingleAbsence', 'calendarDays', 'months']
     };
