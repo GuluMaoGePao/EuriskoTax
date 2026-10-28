@@ -354,12 +354,20 @@
         }
     }
 
-    // 首页入口按钮（#home-guide-entry，由 index.html 提供；缺省时静默，测试直接调 open()）。
-    // 入口长在 A 侧语境（事件轨道卡头），所以显式传 'person' ——
-    // open() 不带参数会沿用上次视角（企业用户切回来不该被弹回个人侧）。
+    // 首页入口按钮（index.html 提供；缺省时静默，测试直接调 open()）。
+    // 两颗入口各自显式指定视角 —— open() 不带参数会沿用上次视角：
+    // 企业用户上次用企业侧，从个人语境的入口点进来不该被弹回个人侧（反之亦然）。
+    // 幂等（data-guide-bound）：模块求值时绑一次，将来动态注入入口或测试补绑不重复挂监听。
+    function bindEntry(btnId, m) {
+        var btn = document.getElementById(btnId);
+        if (!btn || btn.getAttribute('data-guide-bound') === '1') return;
+        btn.setAttribute('data-guide-bound', '1');
+        btn.addEventListener('click', function () { open(m); });
+    }
+
     function init() {
-        var entry = document.getElementById('home-guide-entry');
-        if (entry) entry.addEventListener('click', function () { open('person'); });
+        bindEntry('home-guide-entry', 'person');
+        bindEntry('home-guide-entry-tax', 'enterprise');
     }
 
     if (document.readyState === 'loading') {
@@ -375,6 +383,7 @@
         render: render,
         setMode: setMode,
         mode: function () { return mode; },
+        init: init,
         toolName: toolName
     };
 })();

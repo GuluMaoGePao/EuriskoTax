@@ -588,12 +588,19 @@
                             <i class="fa fa-compass text-primary mr-2"></i>
                             <span>我遇到了什么事</span>
                         </div>
-                        <span class="text-xs text-gray-500">不用先懂税，认得自己的事就行</span>
-                        <!-- 阶段22 M4：问句引导入口 —— 事件轨道按「事」找，这里按「钱的性质」找
-                             （9 格判定问句 → 该格的事件 → 直达工具）。文案全部来自
-                             person-taxonomy.js 的 question 字段，弹窗由 taxonomy-guide-ui.js 动态创建。 -->
-                        <button type="button" id="home-guide-entry" class="text-xs text-primary hover:underline">
-                            按钱的性质找 ›</button>
+                        <span class="text-xs text-gray-500 hidden sm:inline">不用先懂税，认得自己的事就行</span>
+                        <!-- 阶段22 M4：双视角引导入口 —— 事件轨道按「事」找；这两颗按分类找：
+                             「按钱的性质」→ 9 格判定问句（person-taxonomy 唯一文案来源）；
+                             「按税种」→ 企业侧 5 税类目录（tax-taxonomy / tool-taxonomy）。
+                             弹窗由 taxonomy-guide-ui.js 动态创建，内部可来回切换视角。
+                             说明 span 在手机上隐藏（hidden sm:inline）：375 宽下标题 +
+                             两颗按钮已占满一行，说明文字让位。 -->
+                        <div class="flex gap-3">
+                            <button type="button" id="home-guide-entry" class="text-xs text-primary hover:underline">
+                                按钱的性质找 ›</button>
+                            <button type="button" id="home-guide-entry-tax" class="text-xs text-primary hover:underline">
+                                按税种找 ›</button>
+                        </div>
                     </div>
                     <div id="home-event-rail" class="event-rail is-collapsed">
                         <!-- 由 home-ui.js 按 home-mission.js 的 eventCards 渲染 -->

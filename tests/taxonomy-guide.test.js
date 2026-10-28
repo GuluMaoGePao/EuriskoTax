@@ -129,6 +129,21 @@ describe('问句引导（阶段22 M4）', () => {
         G().open();
         expect(document.querySelectorAll('#taxonomy-guide-modal').length).toBe(1);
     });
+
+    test('首页两颗入口各自直达对应视角（上次视角不串台）', () => {
+        // 先把会话状态切到企业侧：个人入口再点开时仍应是个人侧（入口显式指定，不沿用残留）
+        G().setMode('enterprise');
+        document.body.insertAdjacentHTML('beforeend',
+            '<button type="button" id="home-guide-entry"></button>' +
+            '<button type="button" id="home-guide-entry-tax"></button>');
+        // init 在模块求值时跑过一次（那时按钮还不存在），组件暴露了 init 供补绑（也供将来动态注入入口）
+        G().init();
+        document.getElementById('home-guide-entry').click();
+        expect(G().mode()).toBe('person');
+        document.getElementById('home-guide-entry-tax').click();
+        expect(G().mode()).toBe('enterprise');
+        expect(G().isOpen()).toBe(true);
+    });
 });
 
 describe('企业视角（按税种，阶段22 M4 第二步）', () => {
