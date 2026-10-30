@@ -6611,6 +6611,236 @@
                     rows: rows, note: note, extras: extras, steps: steps
                 };
             }
+        },
+        {
+            // 阶段22 M5 续（v2.2.0）：契税 —— 买房这一笔最大的税。
+            // 挂点是 A 分支的 E16「买房了」（跨格子事项：契税不是所得，9 格收不下它），
+            // 次挂 B / C3 契税。与出租组合同一个写法：价税分离和印花税都调现有内核，
+            // 本 spec 只负责把字段与结果排出来，税率在 deed-tax-quick.js 与 deedTaxRules。
+            id: 'deed-tax', name: '买房要交多少契税',
+            subtitle: '契税 + 印花税，先定计税依据再定税率',
+            icon: 'fa-key', status: 'deep', comparable: true, group: 'special',
+            nextTools: ['property-transfer', 'property-rental', 'surtax-stamp', 'vat'],
+            policyKey: 'deed-tax',
+            fields: [
+                { key: 'scene', step: 'deal', label: '房子是怎么来的', type: 'select', default: 'sale',
+                    options: [
+                        { value: 'sale', label: '买来的（新房 / 二手房）' },
+                        { value: 'swap', label: '房屋互换（按差额计税）' },
+                        { value: 'assess', label: '受赠或其他没有价格的转移（按核定价）' },
+                        { value: 'inherit', label: '法定继承 / 夫妻之间变更权属' }
+                    ],
+                    hint: '契税法第四条：买卖按成交价格、互换按价格差额、没有价格的由税务机关参照市场价格核定；第六条：法定继承人继承承受、婚姻关系存续期间夫妻之间变更权属的免征' },
+                { key: 'usage', step: 'deal', label: '房屋用途', type: 'select', default: 'housing',
+                    options: [{ value: 'housing', label: '住房（住宅）' }, { value: 'nonHousing', label: '非住房（商铺 / 写字楼 / 车位等）' }],
+                    hint: '只有个人购买住房才有 1% / 1.5% / 2% 这几档优惠；非住房一律按当地法定税率，另要按产权转移书据贴花' },
+                { key: 'price', step: 'deal', label: '成交价格（合同金额，元）', type: 'money', default: 0, sample: 5000000,
+                    hint: '合同里写的通常是含税价；契税的计税依据不含增值税，下面选对增值税口径后会自动分离' },
+                { key: 'swapPrice', step: 'deal', label: '对方那套房的价格（元）', type: 'money', default: 0, sample: 3500000,
+                    when: { key: 'scene', in: ['swap'] },
+                    hint: '互换按两套房价格的差额计税，由支付差价的一方缴纳；两套房价格相等时差额为 0' },
+                { key: 'buyer', step: 'house', label: '买房的是', type: 'select', default: 'individual',
+                    options: [{ value: 'individual', label: '个人（自然人）' }, { value: 'company', label: '企业 / 单位' }],
+                    hint: '财税〔2016〕23 号一的优惠只给个人购买家庭唯一或第二套改善性住房，企业购房按当地法定税率' },
+                { key: 'area', step: 'house', label: '建筑面积（平方米）', type: 'number', default: 0, sample: 89,
+                    when: { key: 'usage', in: ['housing'] },
+                    hint: '90 平方米那条线含本数：90 平方米及以下按小面积档，超过一平方米就跳一档' },
+                { key: 'housingSet', step: 'house', label: '这是家庭第几套住房', type: 'select', default: 'first',
+                    when: { key: 'usage', in: ['housing'] },
+                    options: [
+                        { value: 'first', label: '家庭唯一住房' },
+                        { value: 'second', label: '第二套改善性住房' },
+                        { value: 'third', label: '第三套及以上' }
+                    ],
+                    hint: '家庭成员范围包括购房人、配偶以及未成年子女（财税〔2016〕23 号一）；第三套及以上不享受优惠' },
+                { key: 'city', step: 'house', label: '房子在哪个城市', type: 'select', default: 'other',
+                    when: { key: 'housingSet', in: ['second'] },
+                    options: [
+                        { value: 'other', label: '北上广深以外' },
+                        { value: 'big4', label: '北京 / 上海 / 广州 / 深圳' }
+                    ],
+                    hint: '财税〔2016〕23 号一（二）：北上广深暂不实施第二套改善性住房的契税优惠，按当地法定税率' },
+                { key: 'vatMode', step: 'tax', label: '这笔交易的增值税口径', type: 'select', default: 'exempt',
+                    options: [
+                        { value: 'exempt', label: '免征增值税（二手房满两年等）' },
+                        { value: 'general', label: '一般计税 9%（开发商销售商品房）' },
+                        { value: 'simple', label: '简易计税 5%（老项目等）' }
+                    ],
+                    hint: '财税〔2021〕23 号一：契税的计税依据不含增值税；免征增值税的，成交价格不扣减增值税税额' },
+                { key: 'statutoryRate', step: 'tax', label: '当地法定契税税率', type: 'select', default: 0.03,
+                    options: [
+                        { value: 0.03, label: '3%（绝大多数省份）' },
+                        { value: 0.04, label: '4%' },
+                        { value: 0.05, label: '5%' }
+                    ],
+                    hint: '契税法第三条：税率是 3%~5% 的幅度，具体由省级人民政府提出、报同级人大常委会决定，不是全国统一的 3%' },
+                { key: 'halve', step: 'tax', label: '印花税按小规模纳税人减半征收', type: 'switch', default: false,
+                    when: { key: 'usage', in: ['nonHousing'] },
+                    hint: '印花税（不含证券交易印花税）减半，执行至 2027-12-31（财税〔2023〕12 号）；对个人购买住房本身免征印花税，这一项只对非住房有效' }
+            ],
+            steps: [
+                { key: 'deal', title: '房子与交易', why: '先定怎么来的、什么用途、多少钱 —— 这三件事决定计税依据是全额还是差额' },
+                { key: 'house', title: '买房的人与这套房', why: '优惠按「套数 × 面积」四格给，而且只给个人购买住房，先问清再选税率' },
+                { key: 'tax', title: '计税口径', why: '成交价是否含增值税决定计税依据，当地法定税率决定优惠不适用时按多少算' }
+            ],
+            pitfalls: [
+                '计税依据不含增值税（契税法第四条、财税〔2021〕23 号一）：向开发商买新房时 500 万的合同价要先按 9% 分离，计税依据是 458.72 万而不是 500 万，契税 1.5% 差 6193 元。反过来，二手房满两年免征增值税的，成交价格不扣减，直接就是计税依据',
+                '法定税率是 3%~5% 的幅度，不是固定的 3%（契税法第三条）：具体适用税率由省级人民政府提出、报同级人大常委会决定。第三套及以上住房与北上广深的第二套都要回到这一档',
+                '个人购买住房的优惠按套数与面积四格给（财税〔2016〕23 号一）：唯一住房 90 平方米及以下 1%、以上 1.5%；第二套改善性住房 1% / 2%。90 平方米这条线含本数，差一平方米就跳档',
+                '北上广深暂不实施第二套改善性住房的优惠：同样买 110 平方米的第二套房，500 万在长沙按 2% 是 10 万、在深圳按 3% 是 15 万。首套优惠北上广深仍然适用',
+                '优惠只给个人：企业买房不适用 1% / 1.5% / 2% 这几档，按当地法定税率全额计征',
+                '房屋互换按差额计税（契税法第四条（二））：是两套房价格的差额，不是各自全额相加；价格相等时差额为 0，契税也就为 0',
+                '法定继承人继承承受房屋权属免征契税（契税法第六条（五）），婚姻关系存续期间夫妻之间变更权属也免征（第六条（四））。但遗嘱把房子留给非法定继承人属于赠与，不在免征范围，要按核定价计征',
+                '买房还要缴印花税，但只对非住房：对个人购买住房免征（财税〔2008〕137 号二），买商铺、写字楼要按产权转移书据 0.5‰ 贴花'
+            ],
+            compare: [
+                '首套 / 二套 / 三套：唯一住房 1% / 1.5%，第二套改善性住房 1% / 2%（北上广深不实施），第三套及以上回到法定税率',
+                '90 平方米那条线：上下差一平方米，税率跳一档（含本数：90 平方米及以下按小面积档）',
+                '含税与不含税：合同价里是否含着增值税，直接改掉计税依据'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoDeedTaxQuick;
+                if (!Q) return null;
+
+                var input = {
+                    scene: v.scene || 'sale',
+                    usage: v.usage || 'housing',
+                    buyer: v.buyer || 'individual',
+                    price: Number(v.price) || 0,
+                    swapPrice: Number(v.swapPrice) || 0,
+                    area: Number(v.area) || 0,
+                    housingSet: v.housingSet || 'first',
+                    city: v.city || 'other',
+                    vatMode: v.vatMode || 'exempt',
+                    statutoryRate: Number(v.statutoryRate) || 0.03,
+                    halve: v.halve !== false
+                };
+                var s = Q.stackOf(input);
+                var setCmp = Q.setCompareOf(input);
+                var areaCmp = Q.areaCompareOf(input);
+                var vatCmp = Q.vatCompareOf(input);
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+
+                var rows = s.rows.map(function (r0) {
+                    return { label: r0.label, value: r0.value, kind: r0.kind, hint: r0.hint };
+                });
+
+                var note = (input.scene === 'swap' ? '两套房差价 ' : '成交价格 ')
+                    + Math.round(s.basis.gross) + ' 元';
+                if (input.scene === 'inherit') {
+                    note += '：法定继承（或夫妻之间变更权属）免征契税，合计 ' + Math.round(s.total) + ' 元只剩印花税那一笔。';
+                } else {
+                    note += '：计税依据 ' + Math.round(s.deedTax.base) + ' 元'
+                        + '，契税按 ' + Math.round(s.deedTax.rate * 1000) / 100 + '% 计征 '
+                        + Math.round(s.deedTax.tax) + ' 元'
+                        + '，印花税 ' + Math.round(s.stamp.tax) + ' 元'
+                        + '，合计 ' + Math.round(s.total) + ' 元。';
+                }
+                if (s.deedTax.preferential) {
+                    note += '已享受优惠税率，按法定税率 ' + Math.round(s.deedTax.statutoryRate * 100)
+                        + '% 则要多缴 ' + Math.round(s.deedTax.saving) + ' 元。';
+                }
+
+                var extras = [{
+                    title: '同一套房：家庭第几套决定税率',
+                    note: setCmp.note,
+                    table: {
+                        head: ['口径', '契税税率', '契税', '印花税', '合计'],
+                        rows: [
+                            ['家庭唯一住房', pct(setCmp.first.deedTax.rate), money(setCmp.first.deedTax.tax),
+                                money(setCmp.first.stamp.tax), money(setCmp.first.total)],
+                            ['第二套改善性住房', pct(setCmp.second.deedTax.rate), money(setCmp.second.deedTax.tax),
+                                money(setCmp.second.stamp.tax), money(setCmp.second.total)],
+                            ['第三套及以上', pct(setCmp.third.deedTax.rate), money(setCmp.third.deedTax.tax),
+                                money(setCmp.third.stamp.tax), money(setCmp.third.total)]
+                        ]
+                    }
+                }, {
+                    title: '90 平方米那条线：差一平方米差多少',
+                    note: areaCmp.note,
+                    table: {
+                        head: ['口径', '契税税率', '契税', '合计'],
+                        rows: [
+                            [areaCmp.limit + ' 平方米及以下', pct(areaCmp.small.deedTax.rate),
+                                money(areaCmp.small.deedTax.tax), money(areaCmp.small.total)],
+                            [areaCmp.limit + ' 平方米以上', pct(areaCmp.large.deedTax.rate),
+                                money(areaCmp.large.deedTax.tax), money(areaCmp.large.total)]
+                        ]
+                    }
+                }, {
+                    title: '计税依据含不含增值税的差额',
+                    note: vatCmp.note,
+                    table: {
+                        head: ['口径', '计税依据', '契税', '合计'],
+                        rows: [
+                            ['免征增值税（不扣减）', money(vatCmp.exempt.deedTax.base),
+                                money(vatCmp.exempt.deedTax.tax), money(vatCmp.exempt.total)],
+                            ['按 9% 分离（一般计税）', money(vatCmp.general.deedTax.base),
+                                money(vatCmp.general.deedTax.tax), money(vatCmp.general.total)]
+                        ]
+                    }
+                }];
+
+                var steps = [{
+                    title: '① 计税依据（不含增值税）',
+                    rows: [{
+                        label: input.scene === 'swap' ? '两套房的价格差额' : '成交价格（合同金额）',
+                        value: s.basis.gross, format: 'money',
+                        note: input.scene === 'swap'
+                            ? '房屋互换按所互换房屋价格的差额计税（契税法第四条（二））'
+                            : '合同里写的数，通常是含税价'
+                    }, {
+                        label: '增值税处理方式', value: s.basis.modeText, format: 'text',
+                        note: s.basis.vatRate > 0 ? '价税分离调 vat-quick 的 priceSplitOf' : '免征增值税的成交价格不扣减'
+                    }, {
+                        label: '分离出的增值税', value: s.basis.vat, format: 'money'
+                    }, {
+                        label: '契税计税依据', value: s.basis.base, format: 'money',
+                        note: '应纳税额 = 计税依据 × 适用税率（契税法第五条）'
+                    }],
+                    footnote: s.basis.basis
+                }, {
+                    title: '② 适用税率怎么定',
+                    rows: [{
+                        label: '房屋用途与购房人',
+                        value: (s.housing ? '住房' : '非住房') + ' · ' + (s.individual ? '个人' : '企业'),
+                        format: 'text'
+                    }, {
+                        label: '判定结果', value: s.deedTax.areaText || '按法定税率', format: 'text',
+                        note: s.deedTax.reason
+                    }, {
+                        label: '适用税率', value: s.deedTax.rate, format: 'percent',
+                        note: s.deedTax.preferential ? '优惠税率' : '法定税率'
+                    }, {
+                        label: '当地法定税率（不适用优惠时）', value: s.deedTax.statutoryRate, format: 'percent',
+                        note: '契税法第三条：3%~5% 的幅度，由省级人大常委会决定'
+                    }, {
+                        label: '应缴契税', value: s.deedTax.tax, format: 'money'
+                    }],
+                    footnote: s.deedTax.basis
+                }, {
+                    title: '③ 印花税与合计',
+                    rows: [{
+                        label: '产权转移书据计税金额', value: s.stamp.amount, format: 'money'
+                    }, {
+                        label: '印花税税率', value: s.stamp.rate || 0, format: 'percent',
+                        note: s.stamp.exempt ? '对个人购买住房免征印花税（财税〔2008〕137 号二）' : '非住房按产权转移书据贴花'
+                    }, {
+                        label: '应缴印花税', value: s.stamp.tax, format: 'money'
+                    }, {
+                        label: '合计要交的税', value: s.total, format: 'money'
+                    }, {
+                        label: '房款 + 税（总支出）', value: s.outlay, format: 'money'
+                    }],
+                    footnote: s.stamp.basis
+                }];
+
+                return {
+                    primary: { label: '买房要交的税（契税 + 印花税）', value: s.total, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
         }
     ];
 

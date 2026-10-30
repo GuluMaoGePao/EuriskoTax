@@ -93,7 +93,9 @@
         { id: 'deed', name: '契税', kind: 'tax', category: 'property',
             frequency: 'onetime', scope: 'conditional', entities: ['company', 'person'],
             law: '《中华人民共和国契税法》', effectiveFrom: '2021-09-01',
-            note: '个人购买住房有优惠口径，具体由地方确定；本税种是买房场景的主税种' },
+            note: '个人购买住房有优惠口径，具体由地方确定；本税种是买房场景的主税种。'
+                + 'v2.2.0 起已有工具 deed-tax（主挂 A / E16 买房，次挂本格）：'
+                + '计税依据不含增值税、个人购买住房按「套数 × 面积」四格给优惠、北上广深暂不实施第二套那一条' },
 
         { id: 'vehicle', name: '车船税', kind: 'tax', category: 'property',
             frequency: 'year', scope: 'conditional', entities: ['company', 'person'],

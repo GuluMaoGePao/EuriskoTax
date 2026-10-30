@@ -19,7 +19,7 @@
 //
 // 口径说明（与规格 §4.2 的修正一致）：
 //   - **同一路径可以挂多个工具**：速算与完整测算算**同一入口**（`salary-tax` / `net-salary` /
-//     `reverse` 都在 F1/E1）；「A 30 / B 11」按**工具数**计，不是按路径去重计。
+//     `reverse` 都在 F1/E1）；「A 32 / B 11」按**工具数**计，不是按路径去重计。
 //   - `taxCode` 为 null 只允许 `employer-cost`（成本测算，`mixed` 标注 not-a-tax）。
 //   - 混装工具的次税种 / 拆分建议写在 `mixed`，不另立字段。
 //
@@ -37,12 +37,13 @@
         C5: 'levy'
     };
 
-    // ---- 42 条挂载点（A 31 / B 11，与总表 §3 映射总表逐行核对）----
+    // ---- 43 条挂载点（A 32 / B 11，与总表 §3 映射总表逐行核对）----
     // branch：主挂载点所在分支，决定 A/B 计数归属；secondary 不重复计数。
-    // 阶段22 M5：F7 财产租赁补上 property-rental 后，A 由 30 → 31、总数 41 → 42 ——
+    // 阶段22 M5：F7 财产租赁补上 property-rental 后，A 由 30 → 31、总数 41 → 42；
+    // 同轮 M5 续补上契税（cross/E16）后，A 由 31 → 32、总数 42 → 43 ——
     // 「41 个入口」本就是由分类体系统计得出的数字，不是硬约束（总表 §5 维护约定 3）。
     var MOUNTS = [
-        // ===== A 我自己（31 个工具）=====
+        // ===== A 我自己（32 个工具）=====
 
         // F1 工资薪金（14 个工具）
         { id: 'salary-tax',            branch: 'A', primary: 'F1/E1',  secondary: ['B/C2'], taxCode: 'iit' },
@@ -93,11 +94,15 @@
         { id: 'non-resident', branch: 'A', primary: 'L1/non-resident', secondary: ['F1'], taxCode: 'iit',
           note: '非居民按月分项计税（F1 的算法变体，挂在身份层）' },
 
-        // 跨格子事项（4 个工具）
+        // 跨格子事项（5 个工具）
         { id: 'private-pension',      branch: 'A', primary: 'cross/E13', secondary: ['F5'], taxCode: 'iit' },
         { id: 'private-pension-deep', branch: 'A', primary: 'cross/E13', taxCode: 'iit' },
         { id: 'health-insurance',     branch: 'A', primary: 'cross/E14', taxCode: 'iit' },
         { id: 'donation',             branch: 'A', primary: 'cross/E24', taxCode: 'iit' },
+        // 阶段22 M5 续（v2.2.0）：买房不是一笔所得（所以 9 格收不下它），按跨格子事项挂在 E16，
+        // 次挂 B/C3 契税 —— B 分支那一格此前也是空的，企业买房同样要缴这一笔。
+        { id: 'deed-tax', branch: 'A', primary: 'cross/E16', secondary: ['B/C3'], taxCode: 'deed',
+          note: '契税 + 印花税：计税依据不含增值税，个人购买住房按「套数 × 面积」四格给优惠' },
 
         // ===== B 企业（11 个工具）=====
 
@@ -164,7 +169,7 @@
         var person = window.EuriskoPersonTaxonomy;
 
         // 1. 数量与双向一致（无孤儿、无幽灵）
-        if (MOUNTS.length !== 42) issues.push('挂载点必须恰好 42 条，实际 ' + MOUNTS.length);
+        if (MOUNTS.length !== 43) issues.push('挂载点必须恰好 43 条，实际 ' + MOUNTS.length);
         if (reg) {
             var regIds = reg.all().concat(reg.deep()).map(function (t) { return t.id; });
             var mountIds = MOUNTS.map(function (m) { return m.id; });
@@ -261,8 +266,9 @@
             });
         });
 
-        // 7. 计数口径：A 31 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
-        if (byBranch('A').length !== 31) issues.push('A 分支必须恰好 31 个工具，实际 ' + byBranch('A').length);
+        // 7. 计数口径：A 32 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
+        //    阶段22 M5 续：补上 deed-tax（A / cross/E16）后 A 由 31 → 32。
+        if (byBranch('A').length !== 32) issues.push('A 分支必须恰好 32 个工具，实际 ' + byBranch('A').length);
         if (byBranch('B').length !== 11) issues.push('B 分支必须恰好 11 个工具，实际 ' + byBranch('B').length);
 
         // 8. 已知混装 / 待处理工具必须带 mixed（总表 §3 的 9 个 ⚠️ 里与本表相关的 7 个工具）

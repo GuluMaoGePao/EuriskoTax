@@ -904,6 +904,57 @@ var rentalRules = {
     usageNote: '财税〔2008〕24 号二对个人出租住房给的优惠是一整包（4% 房产税 + 10% 个税 + 免征印花税与城镇土地使用税），出租商铺、写字楼等非住房一律不适用'
 };
 
+// 阶段22 M5 续（v2.2.0）：契税 —— 买房这一笔最大的税，此前全站没有任何一个入口能算它
+// （分类总表 §1.2：E16 买房了是「跨格子事项」，B 分支 C3 里契税那一格也是空的）。
+//
+// 同一个「不复制口径」的写法：凡别处已经有的数字一律**引用**而不是抄 ——
+//   · 增值税税率 9% / 5%（销售不动产）→ 引 vatRules.smallScale / 一般计税档；
+//   · 价税分离的公式 → 调 EuriskoVatQuick.priceSplitOf，本文件不自己除；
+//   · 产权转移书据印花税的税率与减半 → 在 stampDutyRules.items，这里只记税目 key。
+// 真正独属于契税的只有三样：**法定税率幅度 3%~5%**（具体由省级人大常委会定）、
+// **个人购买住房的两档优惠（1% / 1.5% / 2%）**、以及**90 平方米那条面积线**。
+// 公式不在这里，在 deed-tax-quick.js。
+var deedTaxRules = {
+    effectiveFrom: '2021-09-01',      // 《契税法》施行日
+    statutory: {
+        min: 0.03,                    // 契税税率为 3%~5%（第三条）
+        max: 0.05,
+        default: 0.03,                // 具体适用税率由省级人民政府提出、同级人大常委会决定
+        basis: '《中华人民共和国契税法》第三条'
+    },
+    // 计税依据：成交价格**不含增值税**（第四条 + 财税〔2021〕23 号一）
+    basisRules: {
+        excludeVat: true,
+        exemptNoDeduction: true,      // 免征增值税的，成交价格不扣减增值税税额
+        swapByDiff: true,             // 房屋互换：按所互换房屋价格的**差额**（第四条（二））
+        assessWhenNoPrice: true,      // 赠与等无价格的：由税务机关参照市场价格核定（第四条（三））
+        basis: '《中华人民共和国契税法》第四条、《关于契税法实施有关事项执行口径的公告》第一条（财税〔2021〕23 号）'
+    },
+    housing: {
+        buyerIndividual: true,        // 优惠只给**个人**购买家庭唯一 / 第二套改善性住房（企业购房不适用）
+        areaLimit: 90,                // 90 平方米那条线（含本数：≤90 为 small）
+        first: { small: 0.01, large: 0.015 },
+        second: { small: 0.01, large: 0.02 },
+        // 北上广深**暂不实施**第二套改善性住房的优惠（财税〔2016〕23 号一（二）末句）
+        bigFourSecondExcluded: true,
+        bigFourCities: '北京市、上海市、广州市、深圳市',
+        setLimit: 2,                  // 第三套及以上：不享受优惠，按法定税率
+        basis: '《关于调整房地产交易环节契税 营业税优惠政策的通知》第一条（财税〔2016〕23 号）'
+    },
+    stamp: {
+        itemKey: 'propertyTransfer',  // 税率（0.5‰）与减半规则在 stampDutyRules.items，这里只记税目
+        housingExempt: true,          // 对个人**购买住房**免征印花税
+        basis: '《中华人民共和国印花税法》税目税率表、《关于调整房地产交易环节税收政策的通知》第二条（财税〔2008〕137 号）'
+    },
+    exempt: {
+        scenes: ['inherit'],          // 法定继承人继承承受、婚姻关系存续期间夫妻之间变更权属
+        basis: '《中华人民共和国契税法》第六条（四）（五）',
+        note: '法定继承人通过继承承受土地、房屋权属，以及婚姻关系存续期间夫妻之间变更土地、房屋权属的，免征契税'
+    },
+    deadline: '在依法办理土地、房屋权属登记手续前申报缴纳（纳税义务发生时间为签订权属转移合同的当天）',
+    basis: '《中华人民共和国契税法》第三条、第四条、第五条、第六条、第九条、第十条，财税〔2016〕23 号，财税〔2021〕23 号，财税〔2008〕137 号'
+};
+
 // 17D-13（v1.69.0）：非居民个人 / 无住所个人 —— 这一类人进门要解决的不是「扣多少」，
 // 而是「**这笔钱要不要在中国缴**」：90 天 / 183 天 / 满六年三道门槛决定哪些钱压根不用缴。
 // 月度税率表不在这里复制 —— 与年终奖单独计税共用 `bonusMonthlyTaxRates`。
@@ -1099,6 +1150,7 @@ window.EuriskoTaxConstants = {
     donationRules: donationRules,
     propertyTransferRules: propertyTransferRules,
     rentalRules: rentalRules,
+    deedTaxRules: deedTaxRules,
     disabilityFundRules: disabilityFundRules,
     unionFeeRules: unionFeeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
