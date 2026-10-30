@@ -19,7 +19,7 @@
 //
 // 口径说明（与规格 §4.2 的修正一致）：
 //   - **同一路径可以挂多个工具**：速算与完整测算算**同一入口**（`salary-tax` / `net-salary` /
-//     `reverse` 都在 F1/E1）；「A 32 / B 11」按**工具数**计，不是按路径去重计。
+//     `reverse` 都在 F1/E1）；「A 33 / B 11」按**工具数**计，不是按路径去重计。
 //   - `taxCode` 为 null 只允许 `employer-cost`（成本测算，`mixed` 标注 not-a-tax）。
 //   - 混装工具的次税种 / 拆分建议写在 `mixed`，不另立字段。
 //
@@ -37,13 +37,14 @@
         C5: 'levy'
     };
 
-    // ---- 43 条挂载点（A 32 / B 11，与总表 §3 映射总表逐行核对）----
+    // ---- 44 条挂载点（A 33 / B 11，与总表 §3 映射总表逐行核对）----
     // branch：主挂载点所在分支，决定 A/B 计数归属；secondary 不重复计数。
     // 阶段22 M5：F7 财产租赁补上 property-rental 后，A 由 30 → 31、总数 41 → 42；
-    // 同轮 M5 续补上契税（cross/E16）后，A 由 31 → 32、总数 42 → 43 ——
+    // M5 续补上契税（cross/E16）后，A 由 31 → 32、总数 42 → 43；
+    // 再补上车辆购置税（cross/E25）后，A 由 32 → 33、总数 43 → 44 ——
     // 「41 个入口」本就是由分类体系统计得出的数字，不是硬约束（总表 §5 维护约定 3）。
     var MOUNTS = [
-        // ===== A 我自己（32 个工具）=====
+        // ===== A 我自己（33 个工具）=====
 
         // F1 工资薪金（14 个工具）
         { id: 'salary-tax',            branch: 'A', primary: 'F1/E1',  secondary: ['B/C2'], taxCode: 'iit' },
@@ -103,6 +104,11 @@
         // 次挂 B/C3 契税 —— B 分支那一格此前也是空的，企业买房同样要缴这一笔。
         { id: 'deed-tax', branch: 'A', primary: 'cross/E16', secondary: ['B/C3'], taxCode: 'deed',
           note: '契税 + 印花税：计税依据不含增值税，个人购买住房按「套数 × 面积」四格给优惠' },
+        // 阶段22 M5 续（v2.3.0）：买车与买房同类（不是所得，是购置环节一次性征收的税），按跨格子
+        // 事项挂在 E25，次挂 B/C3 —— 企业买车同样缴这一笔，且除新能源减免外没有别的优惠档。
+        { id: 'vehicle-purchase-tax', branch: 'A', primary: 'cross/E25', secondary: ['B/C3'],
+          taxCode: 'vehicle-purchase',
+          note: '计税价格不含增值税（发票价按 13% 分离）；新能源 2026 年起减半且每辆封顶 7500 元' },
 
         // ===== B 企业（11 个工具）=====
 
@@ -169,7 +175,7 @@
         var person = window.EuriskoPersonTaxonomy;
 
         // 1. 数量与双向一致（无孤儿、无幽灵）
-        if (MOUNTS.length !== 43) issues.push('挂载点必须恰好 43 条，实际 ' + MOUNTS.length);
+        if (MOUNTS.length !== 44) issues.push('挂载点必须恰好 44 条，实际 ' + MOUNTS.length);
         if (reg) {
             var regIds = reg.all().concat(reg.deep()).map(function (t) { return t.id; });
             var mountIds = MOUNTS.map(function (m) { return m.id; });
@@ -266,9 +272,10 @@
             });
         });
 
-        // 7. 计数口径：A 32 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
-        //    阶段22 M5 续：补上 deed-tax（A / cross/E16）后 A 由 31 → 32。
-        if (byBranch('A').length !== 32) issues.push('A 分支必须恰好 32 个工具，实际 ' + byBranch('A').length);
+        // 7. 计数口径：A 33 / B 11（按工具数，速算 + 完整测算算同一入口但各占一条）
+        //    阶段22 M5 续：补上 deed-tax（A / cross/E16）后 A 由 31 → 32；
+        //    再补上 vehicle-purchase-tax（A / cross/E25）后 A 由 32 → 33。
+        if (byBranch('A').length !== 33) issues.push('A 分支必须恰好 33 个工具，实际 ' + byBranch('A').length);
         if (byBranch('B').length !== 11) issues.push('B 分支必须恰好 11 个工具，实际 ' + byBranch('B').length);
 
         // 8. 已知混装 / 待处理工具必须带 mixed（总表 §3 的 9 个 ⚠️ 里与本表相关的 7 个工具）

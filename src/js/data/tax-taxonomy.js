@@ -105,7 +105,10 @@
         { id: 'vehicle-purchase', name: '车辆购置税', kind: 'tax', category: 'property',
             frequency: 'onetime', scope: 'conditional', entities: ['company', 'person'],
             law: '《中华人民共和国车辆购置税法》', effectiveFrom: '2019-07-01',
-            note: '计税价格是主要判断点（不含增值税的购车价）' },
+            note: '计税价格是主要判断点（不含增值税的购车价，进口自用另加关税与消费税）。'
+                // ⚠️ 字典里不许存税率与金额（口径一律见 vehiclePurchaseTaxRules），所以这里只说口径不说数
+                + 'v2.3.0 起已有工具 vehicle-purchase-tax（主挂 A / E25 买车，次挂本格）：'
+                + '购买自用按含税发票价分离、进口自用按组成计税价格、新能源汽车另有减免档期与封顶额' },
 
         // ---- 特定目的与资源环境税（6 个法定税种）----
         { id: 'lvat', name: '土地增值税', kind: 'tax', category: 'purpose',

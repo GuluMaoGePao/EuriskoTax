@@ -25,7 +25,7 @@
          这类问题从用户反馈里几乎定位不到，所以 tests/version-sync.test.js 已把这份纪律固化成断言：
          漏改在本地 npm test 当场变红，不必等 push 之后的线上指纹拦。 -->
     <script>
-        window.__APP_VERSION__ = '2.2.0';
+        window.__APP_VERSION__ = '2.3.0';
         (function () {
             // 仅线上 http(s) 环境启用；本地开发不参与，避免打断热更新
             if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
@@ -520,7 +520,7 @@
                 <!-- 阶段11：首页公告条（由 content-center-ui.js 按 home_banner 展示位填充，可关闭） -->
                 <div id="content-home-banner" class="hidden"></div>
 
-                <!-- ① 搜索条（阶段20 P1）：43 个入口早已越过「搜索优先于浏览」的 25 阈值，
+                <!-- ① 搜索条（阶段20 P1）：44 个入口早已越过「搜索优先于浏览」的 25 阈值，
                      搜索因此从**一张卡**升级为**常驻条**，并上移到首屏最上（动线第一步）。
                      不是卡片：卡片形态会把它和下面的内容卡排成同一层，视觉上仍是「又一个入口」。
                      点击 = 进工具页并聚焦搜索框（app.js 绑定），不另起一套搜索实现 ——
@@ -674,7 +674,7 @@
                      ① 首次登录后的弹窗（#identity-modal，选完点「下一步」即关，手机全屏）；
                      ② 个人中心（常驻显示 + 随时修改），「我的」页顶部另给一张身份卡（#profile-identity-card）
                         做一眼可见的入口。
-                     撤的理由：身份改的是**谁排在前面**，不改任何入口的可达性（43 个入口照旧全开）。
+                     撤的理由：身份改的是**谁排在前面**，不改任何入口的可达性（44 个入口照旧全开）。
                      把它摆在首页第 5 张卡上，用户一打开先被问"你是谁"，而答案对他接下来要做的事
                      没有影响 —— 首页是动作页，不是问卷。
                      ⚠️ #home-scenarios / #home-identity-note 两个 id 随卡一起删：
@@ -739,7 +739,7 @@
             </div>
         </div>
 
-        <!-- 工具页：43 个入口只按「人/场景」分一套类。
+        <!-- 工具页：44 个入口只按「人/场景」分一套类。
              早期把「深度测算」与「工具箱」并列，那是实现形态的分界（向导 vs 一屏算完），
              不是用户心智的分界 —— 现在形态差异降为最后一组的一行说明。 -->
         <div id="tools-page" class="page hidden">
@@ -1687,7 +1687,7 @@
                     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
                         <p class="text-sm text-gray-700 leading-relaxed">
                             <!-- 场景数由 auth-ui.js 的 fillAboutBlurb() 在打开弹窗时从 tool-registry 现数
-                                 （原先手写「20 个速算器与 23 个完整测算」，三个数分布在 hero、这里、测试里，
+                                 （原先手写「20 个速算器与 24 个完整测算」，三个数分布在 hero、这里、测试里，
                                  加一个测算就得改三处；漏改的结果是页面自己跟自己打架）。
                                  取不到数就保留下面这版**不带数字**的兜底 —— 不编数字比缺数字糟。 -->
                             <span id="about-scenario-blurb">EuriskoTax 税费计算器覆盖个税、企业税、社保等税费场景，按 2026 年现行政策口径测算。</span>
@@ -1758,7 +1758,7 @@
                             <span class="text-gray-300">|</span>
                             <a href="#" onclick="openPolicyModal(event, 'privacy-policy-modal')" class="text-primary hover:underline">《隐私政策》</a>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">版本 2.2.0</p>
+                        <p class="text-xs text-gray-500 mt-2">版本 2.3.0</p>
                         <p class="text-xs text-gray-500 mt-1">© 2026 EuriskoTax 税费计算器</p>
                         <!-- 备案位（ICP / 公安）：主应用页尾删掉之后，**App 内这一处**就是备案号的
                              落点（「我的 → 关于我们」两跳可达）。内容与登录页页尾、21 个落地页
@@ -2215,6 +2215,8 @@
          与出租组合同一个写法：计税依据的价税分离调 EuriskoVatQuick.priceSplitOf，
          产权转移书据印花税调 EuriskoSurtaxQuick.stampDutyOf，本文件不复制任何一条公式。 -->
     <script src="src/js/calculation/deed-tax-quick.js"></script>
+    <!-- 阶段22 M5 续（v2.3.0）：车辆购置税内核。13% 引 vatRules、价税分离调 vat-quick，不抄公式。 -->
+    <script src="src/js/calculation/vehicle-purchase-tax-quick.js"></script>
     <script src="src/js/data/tool-registry.js"></script>
     <!-- 阶段22 M1：税种字典（B 企业侧分类的唯一真源）。纯数据 + 查询接口，不依赖任何模块，
          故排在这里即可；后续 person-taxonomy / tool-taxonomy 会引用它的 id 做外键。 -->
@@ -2223,7 +2225,7 @@
          question 是将来引导 UI 的唯一文案来源。validate() 会反查 tax-taxonomy（已在前）与
          tool-registry（在前）做存在性校验，故必须排在两者之后。 -->
     <script src="src/js/data/person-taxonomy.js"></script>
-    <!-- 阶段22 M3：挂载点表。43 个入口 → 挂在分类树哪里（主挂 + 次挂），A 32 / B 11
+    <!-- 阶段22 M3：挂载点表。44 个入口 → 挂在分类树哪里（主挂 + 次挂），A 33 / B 11
          （M5 补上 F7 财产租赁后 41 → 42，入口数由分类体系统计得出，不是硬约束）；
          是唯一同时引用 tax-taxonomy / person-taxonomy / tool-registry 三个真源的文件，
          注册表一行不改。validate() 做双向一致性校验（无孤儿、无幽灵）。 -->
@@ -2246,7 +2248,7 @@
     <!-- 阶段17 通用多步测算向导：复用 toolbox-ui 暴露的 fieldHtml / readValues / visibleFields / fmtValue，
          必须排在 toolbox-ui.js 之后 -->
     <script src="src/js/ui/deep-wizard-ui.js"></script>
-    <!-- 阶段19-4 顺延（v1.99.0）：结果页「各项数额」条 —— 速算器结果页与 23 个完整测算的
+    <!-- 阶段19-4 顺延（v1.99.0）：结果页「各项数额」条 —— 速算器结果页与 24 个完整测算的
          结果步共用这一份。排在 toolbox-ui.js / deep-wizard-ui.js 之后（两个渲染器在结果里调它），
          缺了它两边都只是少一张图（并各打一条 warn），绝不影响测算本身。 -->
     <script src="src/js/ui/result-bars.js"></script>

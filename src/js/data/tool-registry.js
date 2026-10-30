@@ -6841,6 +6841,230 @@
                     rows: rows, note: note, extras: extras, steps: steps
                 };
             }
+        },
+        {
+            // 阶段22 M5 续（v2.3.0）：车辆购置税 —— 买车这一笔。
+            // 与契税同类（不是所得，是购置环节的一次性税），主挂 A 分支新加的 E25「买车了」，
+            // 次挂 B / C3 财产与行为税。同样只排字段与结果：13% 引 vatRules、价税分离调 vat-quick，
+            // 税率与新能源减免的封顶额在 vehicle-purchase-tax-quick.js 与 vehiclePurchaseTaxRules。
+            id: 'vehicle-purchase-tax', name: '买车要交多少购置税',
+            subtitle: '计税价格按 10% 计征，新能源有减免且有封顶',
+            icon: 'fa-car', status: 'deep', comparable: true, group: 'special',
+            nextTools: ['deed-tax', 'surtax-stamp', 'vat'],
+            policyKey: 'vehicle-purchase',
+            fields: [
+                { key: 'source', step: 'car', label: '车是怎么来的', type: 'select', default: 'buy',
+                    options: [
+                        { value: 'buy', label: '买来的（新车）' },
+                        { value: 'used', label: '买来的（二手车）' },
+                        { value: 'import', label: '进口自用（含关税与消费税）' },
+                        { value: 'selfMade', label: '自产自用（按同类车辆销售价格）' },
+                        { value: 'gift', label: '受赠 / 获奖等其他方式（按凭证载明价格）' }
+                    ],
+                    hint: '车辆购置税法第六条：计税价格按取得方式分四种定法；第三条：一次性征收，购置已征车辆不再征收' },
+                { key: 'energy', step: 'car', label: '车辆类型', type: 'select', default: 'ne',
+                    options: [
+                        { value: 'ne', label: '新能源汽车（纯电 / 插混 / 燃料电池）' },
+                        { value: 'fuel', label: '燃油车（或其他不享受减免的车辆）' }
+                    ],
+                    hint: '财政部 税务总局公告 2023 年第 10 号：新能源乘用车 2026 至 2027 年减半征收，每辆减税额不超过 7500 元' },
+                { key: 'price', step: 'price', label: '机动车销售统一发票上的价税合计（元）', type: 'money',
+                    default: 0, sample: 300000,
+                    when: { key: 'source', in: ['buy', 'used'] },
+                    hint: '发票上写的是含税价；车辆购置税的计税价格不包括增值税税款（《车辆购置税法》第六条（一）），下面会自动按 13% 分离' },
+                { key: 'exclusivePrice', step: 'price', label: '凭证载明的价格（不含增值税，元）', type: 'money',
+                    default: 0, sample: 200000,
+                    when: { key: 'source', in: ['selfMade', 'gift'] },
+                    hint: '自产自用按同类应税车辆的销售价格、受赠或获奖按购置时相关凭证载明的价格确定，这两个价格本身不含增值税（《车辆购置税法》第六条（三）（四））' },
+                { key: 'customsPrice', step: 'price', label: '关税完税价格（元）', type: 'money',
+                    default: 0, sample: 400000,
+                    when: { key: 'source', in: ['import'] },
+                    hint: '进口自用的计税价格 = 关税完税价格 + 关税 + 消费税（《车辆购置税法》第六条（二）），不是按落地售价' },
+                { key: 'tariffRate', step: 'price', label: '进口关税税率', type: 'select', default: 0.15,
+                    when: { key: 'source', in: ['import'] },
+                    options: [
+                        { value: 0.15, label: '15%（乘用车整车最惠国税率）' },
+                        { value: 0.20, label: '20%' },
+                        { value: 0.25, label: '25%' }
+                    ],
+                    hint: '按报关时适用的关税税率填；最惠国税率之下乘用车整车通常为 15%' },
+                { key: 'consumptionRate', step: 'price', label: '进口环节消费税税率（乘用车按气缸容量分档）',
+                    type: 'select', default: 0.05,
+                    when: { key: 'source', in: ['import'] },
+                    options: [
+                        { value: 0.01, label: '1%（1.0 升及以下）' },
+                        { value: 0.03, label: '3%（1.0 至 1.5 升）' },
+                        { value: 0.05, label: '5%（1.5 至 2.0 升）' },
+                        { value: 0.09, label: '9%（2.0 至 2.5 升）' },
+                        { value: 0.12, label: '12%（2.5 至 3.0 升）' },
+                        { value: 0.25, label: '25%（3.0 至 4.0 升）' },
+                        { value: 0.40, label: '40%（4.0 升以上）' }
+                    ],
+                    hint: '消费税是价内税：组成计税价格 =（关税完税价格 + 关税）÷（1 − 消费税税率），税率见《消费税税目税率表》乘用车档' },
+                { key: 'period', step: 'tax', label: '新能源汽车减免档期', type: 'select', default: 'half2026',
+                    when: { key: 'energy', in: ['ne'] },
+                    options: [
+                        { value: 'half2026', label: '2026-01-01 至 2027-12-31（减半，每辆封顶 7500 元）' },
+                        { value: 'exempt2024', label: '2024-01-01 至 2025-12-31（免征，每辆封顶 15000 元）' },
+                        { value: 'none', label: '2028 年起或不在减免车型目录内（全额）' }
+                    ],
+                    hint: '财政部 税务总局公告 2023 年第 10 号：2024 至 2025 年免征、2026 至 2027 年减半，两档都有封顶额' }
+            ],
+            steps: [
+                { key: 'car', title: '车是怎么来的', why: '计税价格按取得方式分四种定法，二手车根本不征 —— 先问清这一件事' },
+                { key: 'price', title: '价格与计税价格', why: '发票价是含税的，进口车还要先算关税与消费税，这一步定计税价格' },
+                { key: 'tax', title: '减免与实缴', why: '新能源减免分档期且有封顶：减半算出来的数常常超过封顶额' }
+            ],
+            pitfalls: [
+                '计税价格不含增值税（车辆购置税法第六条（一））：发票上的 30 万是含税价，计税价格是 265486.73，购置税 26548.67 —— 直接拿发票价乘 10% 得到 3 万，多算 3451.33',
+                '新能源汽车 2026 年起不是全免了：2024 至 2025 年免征（每辆封顶 15000 元），2026 至 2027 年改为减半征收（每辆封顶 7500 元），2028 年起按现行政策不再有这一条',
+                '减免额有封顶：一辆 30 万的新能源车应纳税额 26548.67，减半是 13274.34 但封顶 7500，实缴 19048.67 —— 既不是 0，也不是应纳税额的一半',
+                '二手车不再征收（第三条：一次性征收）：购置已征车辆购置税的车辆不缴这一笔，与过户费、车船税不是一回事',
+                '进口自用按组成计税价格（第六条（二））：关税完税价格加关税再加消费税，不是按落地售价；消费税本身还要再按组成计税价格算一遍',
+                '自产自用与受赠、获奖按凭证载明的价格确定，且这两个价格本身不含增值税（第六条（三）（四））—— 与购买自用时从含税发票价里分离是两件事',
+                '申报期限是购置当日起 60 日内（第十三条），逾期有滞纳金；购置税缴清后才能上牌',
+                '法定免税是特定车辆（警车、消防车、救护车、工程救险车、城市公交企业的公共汽电车辆、外国驻华使领馆及有关人员自用车辆等，第九条）；私家车不在其中。留学回国人员购买国产小汽车、长期来华定居专家进口自用车另有免税规定（第十条）',
+                '车船税是保有环节每年缴的税（通常由保险机构代收），与购置税不是一回事 —— 买车当年两笔都要缴'
+            ],
+            compare: [
+                '新能源与燃油：同一辆车、同一计税价格，减免后差多少（减免有封顶）',
+                '含税与不含税：发票价直接乘 10% 会多缴多少',
+                '新能源减免档期：免征 / 减半封顶 / 全额三个档期的实缴对照'
+            ],
+            compute: function (v) {
+                var Q = window.EuriskoVehiclePurchaseTaxQuick;
+                if (!Q) return null;
+
+                var input = {
+                    source: v.source || 'buy',
+                    energy: v.energy || 'fuel',
+                    price: Number(v.price) || 0,
+                    exclusivePrice: Number(v.exclusivePrice) || 0,
+                    customsPrice: Number(v.customsPrice) || 0,
+                    tariffRate: Number(v.tariffRate) || 0.15,
+                    consumptionRate: Number(v.consumptionRate) || 0.05,
+                    period: v.period || 'half2026'
+                };
+                var s = Q.stackOf(input);
+                var energyCmp = Q.energyCompareOf(input);
+                var vatCmp = Q.vatCompareOf(input);
+                var periodCmp = Q.periodCompareOf(input);
+                var money = function (x) { return { value: x, kind: 'money' }; };
+                var pct = function (x) { return { value: x, kind: 'percent' }; };
+
+                var rows = s.rows.map(function (r0) {
+                    return { label: r0.label, value: r0.value, kind: r0.kind, hint: r0.hint };
+                });
+
+                var note = '计税价格 ' + Math.round(s.basis.base) + ' 元'
+                    + '，按 ' + Math.round(s.tax.rate * 100) + '% 计征 ' + Math.round(s.tax.tax) + ' 元';
+                if (input.source === 'used') {
+                    note = '二手车：车辆购置税一次性征收，购置已征车辆不再征收（第三条），这一笔是 0 元。';
+                } else if (s.tax.relief.applied) {
+                    note += '，新能源减免 ' + Math.round(s.tax.relief.relief) + ' 元'
+                        + (s.tax.relief.capped ? '（已封顶 ' + Math.round(s.tax.relief.cap) + ' 元）' : '')
+                        + '，实缴 ' + Math.round(s.total) + ' 元。';
+                } else {
+                    note += '，实缴 ' + Math.round(s.total) + ' 元。';
+                }
+
+                var extras = [{
+                    title: '新能源与燃油：同一辆车的差额',
+                    note: energyCmp.note,
+                    table: {
+                        head: ['车辆类型', '计税价格', '减免', '实缴购置税'],
+                        rows: [
+                            ['新能源汽车', money(energyCmp.ne.basis.base), money(energyCmp.ne.tax.relief.relief),
+                                money(energyCmp.ne.total)],
+                            ['燃油车', money(energyCmp.fuel.basis.base), money(energyCmp.fuel.tax.relief.relief),
+                                money(energyCmp.fuel.total)]
+                        ]
+                    }
+                }, {
+                    title: '计税依据含不含增值税的差额',
+                    note: vatCmp.note,
+                    table: {
+                        head: ['口径', '计税价格', '购置税'],
+                        rows: [
+                            ['不含增值税（法定口径）', money(vatCmp.right.basis.base), money(vatCmp.right.tax.tax)],
+                            ['直接按发票价乘税率（错）', money(vatCmp.right.basis.gross), money(vatCmp.wrong)]
+                        ]
+                    }
+                }, {
+                    title: '新能源减免档期对照',
+                    note: periodCmp.note,
+                    table: {
+                        head: ['档期', '减免规则', '减免额', '实缴购置税'],
+                        rows: periodCmp.periods.map(function (p) {
+                            return [p.period.label, p.period.note, money(p.stack.tax.relief.relief),
+                                money(p.stack.total)];
+                        })
+                    }
+                }];
+
+                var steps = [{
+                    title: '① 计税价格怎么定',
+                    rows: [{
+                        label: '取得方式',
+                        value: { buy: '购买自用', used: '购置二手车', import: '进口自用',
+                            selfMade: '自产自用', gift: '受赠 / 获奖' }[s.source] || s.source,
+                        format: 'text',
+                        note: s.basis.basis
+                    }, {
+                        label: s.source === 'import' ? '关税完税价格' : '发票 / 凭证价格',
+                        value: s.basis.gross, format: 'money',
+                        note: s.basis.note
+                    }, {
+                        label: '增值税处理方式',
+                        value: s.source === 'buy'
+                            ? '按 ' + Math.round(s.basis.vatRate * 100) + '% 分离（计税价格不含增值税）'
+                            : '不涉及（凭证价格不含增值税 / 进口环节不计）',
+                        format: 'text',
+                        note: s.source === 'buy' ? '价税分离调 vat-quick 的 priceSplitOf' : ''
+                    }, {
+                        label: '分离出的增值税', value: s.basis.vat, format: 'money'
+                    }, {
+                        label: '车辆购置税计税价格', value: s.basis.base, format: 'money',
+                        note: '车辆购置税法第六条'
+                    }],
+                    footnote: s.basis.basis
+                }, {
+                    title: '② 应纳税额 = 计税价格 × 10%',
+                    rows: [{
+                        label: '计税价格', value: s.basis.base, format: 'money'
+                    }, {
+                        label: '税率', value: s.tax.rate, format: 'percent',
+                        note: '车辆购置税法第四条：税率为百分之十，全国统一'
+                    }, {
+                        label: '应纳税额', value: s.tax.tax, format: 'money'
+                    }],
+                    footnote: s.tax.note
+                }, {
+                    title: '③ 减免与实缴',
+                    rows: [{
+                        label: '是否享受新能源减免',
+                        value: s.newEnergy ? '新能源汽车' : '不享受', format: 'text',
+                        note: Q.rules().ne ? Q.rules().ne.kinds : ''
+                    }, {
+                        label: '减免档期', value: s.tax.relief.period ? s.tax.relief.period.label : '—', format: 'text'
+                    }, {
+                        label: '封顶额', value: s.tax.relief.cap, format: 'money',
+                        note: s.tax.relief.capped ? '减半算出的减免额已超过封顶，按封顶额减' : ''
+                    }, {
+                        label: '减免额', value: s.tax.relief.relief, format: 'money'
+                    }, {
+                        label: '实缴车辆购置税', value: s.total, format: 'money'
+                    }, {
+                        label: '车款 + 购置税（总支出）', value: s.outlay, format: 'money'
+                    }],
+                    footnote: s.deadline
+                }];
+
+                return {
+                    primary: { label: '买车要交的车辆购置税', value: s.total, kind: 'money' },
+                    rows: rows, note: note, extras: extras, steps: steps
+                };
+            }
         }
     ];
 

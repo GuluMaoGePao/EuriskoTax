@@ -106,7 +106,7 @@
           note: '佣金=F2（展业成本可扣）/ 注册了个体户=F5' }
     ];
 
-    // ---- 24 个事件：用户语言的真正入口 ----
+    // ---- 25 个事件：用户语言的真正入口 ----
     // form：指向 F1–F9；跨多格的记数组；'cross' = 跨格子事项（必须写 crossReason）。
     // tools：只登记「已存在」的入口（速算 + 完整测算算一个）；待做项留空数组。
     var EVENTS = [
@@ -176,7 +176,13 @@
             note: '无专器，暂用通用格' },
         { id: 'E24', name: '捐款了', form: 'cross', taxCode: 'iit',
             crossReason: '捐赠扣除跨综合 / 经营 / 分类三组，不属于单一形态',
-            tools: ['donation'] }
+            tools: ['donation'] },
+        // 阶段22 M5 续（v2.3.0）：与 E16 买房同类 —— 车辆购置税不是所得，是购置车辆时的一次性税。
+        { id: 'E25', name: '买车了', form: 'cross', taxCode: 'vehicle-purchase',
+            crossReason: '车辆购置税不是所得，是购置车辆时一次性征收的税',
+            tools: ['vehicle-purchase-tax'],
+            question: '新车还是二手车？新能源还是燃油？',
+            pitfall: '计税价格不含增值税（发票上的价税合计要先分离出增值税再计税）；购置已征车辆购置税的二手车不再征收，车船税是另一笔' }
     ];
 
     var FORM_IDS = INCOME_FORMS.map(function (f) { return f.id; });
@@ -269,7 +275,8 @@
             if (!a.forms || !a.forms.length) issues.push(a.id + '：forms 为空');
         });
 
-        if (EVENTS.length !== 24) issues.push('事件必须恰好 24 个，实际 ' + EVENTS.length);
+        // 阶段22 M5 续（v2.3.0）：E25「买车了」入表后事件由 24 → 25
+        if (EVENTS.length !== 25) issues.push('事件必须恰好 25 个，实际 ' + EVENTS.length);
         EVENTS.forEach(function (e) {
             if (seenEvent[e.id]) issues.push('事件 id 重复：' + e.id);
             seenEvent[e.id] = true;
