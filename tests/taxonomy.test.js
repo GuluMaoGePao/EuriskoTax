@@ -148,9 +148,9 @@ describe('个人字典（阶段22 M2）', () => {
         expect(P.getEvent('E16').taxCode).toBe('deed');
     });
 
-    test('tools 全部存在于现有 42 个入口（tool-registry all + deep）', () => {
+    test('tools 全部存在于现有 43 个入口（tool-registry all + deep）', () => {
         const ids = new Set(R.all().concat(R.deep()).map((t) => t.id));
-        expect(ids.size).toBe(42);
+        expect(ids.size).toBe(43);
         P.events().forEach((e) => {
             (e.tools || []).forEach((tid) => expect(ids.has(tid)).toBe(true));
         });
@@ -174,9 +174,9 @@ describe('挂载点表（阶段22 M3）', () => {
     const MIXED_IDS = ['surtax-stamp', 'surtax-stamp-deep', 'disability-fund', 'disability-fund-deep',
         'classification', 'property-transfer', 'employer-cost'];
 
-    test('模块已挂载：恰好 42 条挂载点', () => {
+    test('模块已挂载：恰好 43 条挂载点', () => {
         expect(M).toBeTruthy();
-        expect(M.all().length).toBe(42);
+        expect(M.all().length).toBe(43);
     });
 
     test('口径守护：validate() 无问题（含对三个字典的存在性校验）', () => {
@@ -186,14 +186,15 @@ describe('挂载点表（阶段22 M3）', () => {
     test('与注册表双向一致：无孤儿、无幽灵', () => {
         const regIds = new Set(R.all().concat(R.deep()).map((t) => t.id));
         const mountIds = new Set(M.all().map((m) => m.id));
-        expect(regIds.size).toBe(42);
-        expect(mountIds.size).toBe(42);
+        expect(regIds.size).toBe(43);
+        expect(mountIds.size).toBe(43);
         regIds.forEach((id) => expect(mountIds.has(id)).toBe(true));
         mountIds.forEach((id) => expect(regIds.has(id)).toBe(true));
     });
 
-    test('A 31 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
-        expect(M.countByBranch('A')).toBe(31);
+    // 阶段22 M5 续：契税（cross/E16）入表后 A 由 31 → 32
+    test('A 32 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
+        expect(M.countByBranch('A')).toBe(32);
         expect(M.countByBranch('B')).toBe(11);
     });
 
@@ -202,7 +203,7 @@ describe('挂载点表（阶段22 M3）', () => {
         expect(ids).toEqual(['net-salary', 'reverse', 'salary-tax']);
     });
 
-    test('A 侧 31 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
+    test('A 侧 32 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
         expect(M.byTaxCode('iit').length).toBe(31);
         expect(M.byTaxCode('vat').length).toBe(2);
         expect(M.byTaxCode('city-tax').length).toBe(2);

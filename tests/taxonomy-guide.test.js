@@ -112,13 +112,14 @@ describe('问句引导（阶段22 M4）', () => {
         body().querySelector('[data-guide-form="cross"]').click();
         const rows = body().querySelectorAll('.guide-event-row');
         expect(rows.length).toBe(5);
-        // 可点的 3 个（有工具）：E13 / E14 / E24；待补的 2 个：E16 / E20
+        // 阶段22 M5 续（v2.2.0）：E16 买房有了 deed-tax，可点的变成 4 个（E13 / E14 / E16 / E24），
+        // 待补的只剩 E20（跨格子里唯一还空着的一格）。
         const clickable = [...rows].filter((r) => r.hasAttribute('data-guide-event'))
             .map((r) => r.getAttribute('data-guide-event')).sort();
-        expect(clickable).toEqual(['E13', 'E14', 'E24']);
+        expect(clickable).toEqual(['E13', 'E14', 'E16', 'E24']);
         const empty = [...rows].filter((r) => r.hasAttribute('data-guide-empty'))
             .map((r) => r.getAttribute('data-guide-empty')).sort();
-        expect(empty).toEqual(['E16', 'E20']);
+        expect(empty).toEqual(['E20']);
         const chips = body().querySelector('[data-guide-event="E13"]').querySelectorAll('.guide-tool-chip');
         expect(chips.length).toBe(2); // private-pension / private-pension-deep
         expect(body().textContent).toContain('买房了');

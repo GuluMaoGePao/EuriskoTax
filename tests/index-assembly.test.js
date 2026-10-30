@@ -167,12 +167,12 @@ describe('按 index.html 的真实顺序装配一遍', () => {
         expect(loaded).toBe(CLASSIC.length);
     });
 
-    test('装配完成后注册表可用：20 个速算器 + 21 个 spec 驱动完整测算', () => {
+    test('装配完成后注册表可用：20 个速算器 + 23 个 spec 驱动完整测算', () => {
         // 与 tests/tool-registry.test.js 同一口径（改数量时两处一起改）
         const registry = window.EuriskoToolRegistry;
         expect(typeof registry).toBe('object');
         expect(registry.all().length).toBe(20);
-        expect(registry.deep().length).toBe(22);
+        expect(registry.deep().length).toBe(23);
     });
 
     // 这条才是整套守护的牙齿所在。spec 的 compute 是**运行时**才去取 quick 模块的全局对象的：
@@ -274,7 +274,7 @@ describe('按 index.html 的真实顺序装配一遍', () => {
             expect(aboutStart).toBeGreaterThan(-1);
             const aboutBlock = stripComments(HTML.slice(aboutStart, aboutStart + 6000));
             expect(aboutBlock).toContain('不上传任何数据');
-            // v1.125.0：关于弹窗不再手写「20 个速算器与 21 个完整测算」—— 那是**开发口径**
+            // v1.125.0：关于弹窗不再手写「20 个速算器与 23 个完整测算」—— 那是**开发口径**
             // （login-identifier.test.js 判过一次，登录页不许出现），用户看得见的地方只说
             // 场景总数，而且那份数由 fillAboutBlurb() 从 registry 现数。
             expect(aboutBlock).not.toContain('20 个速算器');

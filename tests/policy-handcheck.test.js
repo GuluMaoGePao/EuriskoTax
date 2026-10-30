@@ -31,7 +31,7 @@ beforeAll(() => {
         'equity-incentive', 'severance', 'early-retirement', 'expat-allowance', 'private-pension',
         'health-insurance', 'annuity', 'social-insurance', 'employer-cost', 'disability-fund',
         'vat', 'surtax-stamp', 'business-income', 'corporate-income-tax', 'donation',
-        'property-transfer', 'property-rental', 'non-resident'].forEach(function (m) {
+        'property-transfer', 'property-rental', 'deed-tax', 'non-resident'].forEach(function (m) {
         loadSource('src/js/calculation/' + m + '-quick.js');
     });
     loadSource('src/js/calculation/utils.js');
@@ -277,6 +277,73 @@ describe('个人出租（deep）：价外税、分摊免征、修缮费逐月结
         expect(rowOf('property-rental', v, '印花税')).toBeCloseTo(60, 2);
         expect(rowOf('property-rental', v, '个人所得税')).toBeCloseTo(17178.96, 2);
         expect(primaryOf('property-rental', v)).toBeCloseTo(24096.12, 2);
+    });
+});
+
+// 阶段22 M5 续（v2.2.0）：契税 —— 买房这一笔最大的税。
+// 三处最容易算错的地方逐个对拍：① 计税依据不含增值税（免征的又不扣减）；
+// ② 个人购买住房的优惠按「套数 × 面积」四格给，北上广深暂不实施第二套那一条；
+// ③ 房屋互换按差额、法定继承免征。数字全部手算，改断言前先改政策依据。
+describe('契税（deep）：不含税计税依据、套数乘面积四格、互换与继承', () => {
+    // 首套 89㎡（≤90）、成交价 500 万、满两年免征增值税 → 计税依据就是 500 万（不扣减）
+    //   契税 = 5000000 × 1% = 50000；住房免征印花税 → 合计 50000
+    test('首套 89㎡ 500 万：契税 5 万、印花税 0（住房免征）', () => {
+        const v = { scene: 'sale', usage: 'housing', buyer: 'individual', price: 5000000,
+            area: 89, housingSet: 'first', city: 'other', vatMode: 'exempt', statutoryRate: 0.03 };
+        expect(rowOf('deed-tax', v, '契税计税依据（不含增值税）')).toBe(5000000);
+        expect(rowOf('deed-tax', v, '契税')).toBeCloseTo(50000, 2);
+        expect(rowOf('deed-tax', v, '印花税（产权转移书据）')).toBe(0);
+        expect(primaryOf('deed-tax', v)).toBeCloseTo(50000, 2);
+    });
+
+    // 同一套房改成 120㎡：首套 >90 → 1.5%
+    //   800 万是新房（一般计税 9%）：8000000 ÷ 1.09 = 7339449.54
+    //   契税 = 7339449.54 × 1.5% = 110091.74（直接拿 800 万乘 1.5% 是 120000，多算 9908.26）
+    test('首套 120㎡ 800 万新房：先按 9% 分离 → 契税 110091.74（不是 120000）', () => {
+        const v = { scene: 'sale', usage: 'housing', buyer: 'individual', price: 8000000,
+            area: 120, housingSet: 'first', city: 'other', vatMode: 'general', statutoryRate: 0.03 };
+        expect(rowOf('deed-tax', v, '契税计税依据（不含增值税）')).toBeCloseTo(7339449.54, 2);
+        expect(rowOf('deed-tax', v, '契税')).toBeCloseTo(110091.74, 2);
+        expect(primaryOf('deed-tax', v)).toBeCloseTo(110091.74, 2);
+    });
+
+    // 第二套改善性住房 110㎡、500 万、免征增值税：
+    //   其他城市 → 2% = 100000；北上广深暂不实施这一条 → 法定 3% = 150000，差 5 万
+    test('二套 110㎡ 500 万：其他城市 2% 缴 10 万，北上广深按法定 3% 缴 15 万', () => {
+        const base = { scene: 'sale', usage: 'housing', buyer: 'individual', price: 5000000,
+            area: 110, housingSet: 'second', vatMode: 'exempt', statutoryRate: 0.03 };
+        expect(rowOf('deed-tax', Object.assign({}, base, { city: 'other' }), '契税')).toBeCloseTo(100000, 2);
+        expect(rowOf('deed-tax', Object.assign({}, base, { city: 'big4' }), '契税')).toBeCloseTo(150000, 2);
+    });
+
+    // 商铺 300 万、一般计税 9%：
+    //   计税依据 2752293.58 → 契税 3% = 82568.81
+    //   印花税：扣掉增值税后 2752293.58 × 0.5‰ = 1376.15（住房这一笔是免征的）
+    test('商铺 300 万：契税 82568.81 + 印花税 1376.15 = 83944.96', () => {
+        const v = { scene: 'sale', usage: 'nonHousing', buyer: 'individual', price: 3000000,
+            area: 0, housingSet: 'first', city: 'other', vatMode: 'general', statutoryRate: 0.03,
+            halve: false };
+        expect(rowOf('deed-tax', v, '契税')).toBeCloseTo(82568.81, 2);
+        expect(rowOf('deed-tax', v, '印花税（产权转移书据）')).toBeCloseTo(1376.15, 2);
+        expect(primaryOf('deed-tax', v)).toBeCloseTo(83944.96, 2);
+    });
+
+    // 房屋互换：500 万换 350 万 → 按差额 150 万计税（不是各算一遍）
+    //   互换不适用「购买住房」的优惠档 → 法定 3% = 45000
+    test('互换 500 万换 350 万：按差额 150 万计征 → 45000', () => {
+        const v = { scene: 'swap', usage: 'housing', buyer: 'individual', price: 5000000,
+            swapPrice: 3500000, area: 89, housingSet: 'first', city: 'other',
+            vatMode: 'exempt', statutoryRate: 0.03 };
+        expect(rowOf('deed-tax', v, '两套房的差价（互换）')).toBe(1500000);
+        expect(rowOf('deed-tax', v, '契税')).toBeCloseTo(45000, 2);
+    });
+
+    // 法定继承人继承承受房屋权属：免征（契税法第六条（五））—— 中介常说的「继承要交 3%」是错的
+    test('法定继承：契税为 0（不是 3% 的 15 万）', () => {
+        const v = { scene: 'inherit', usage: 'housing', buyer: 'individual', price: 5000000,
+            area: 110, housingSet: 'first', city: 'other', vatMode: 'exempt', statutoryRate: 0.03 };
+        expect(rowOf('deed-tax', v, '契税')).toBe(0);
+        expect(primaryOf('deed-tax', v)).toBe(0);
     });
 });
 

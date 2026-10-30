@@ -87,9 +87,11 @@ describe('工具注册表：数量与分组', () => {
         // 17D-8（v1.64.0）：special-deduction-deep 专项附加扣除（12/16）—— 第八个。速算器收的是
         //   **一个**「扣除前全年应纳税所得额」，于是「夫妻之间怎么分摊最省」「按实际符合条件的月份
         //   累计」「逐项边际节税」这三层它一个都答不了（实测分摊差 4656 元）。
+        // 阶段22 M5 续（v2.2.0）：deed-tax 契税 —— 第 23 个 spec 驱动的完整测算
         expect(specDriven).toEqual([
             'annual-settlement-deep',
-            'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'disability-fund-deep',
+            'bonus-tax-deep', 'business', 'classification', 'corporate-income-tax-deep', 'deed-tax',
+            'disability-fund-deep',
             'donation', 'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'non-resident',
             'private-pension-deep', 'property-rental', 'property-transfer', 'reverse', 'severance-deep',
             'social-base-deep', 'special-deduction-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
@@ -234,8 +236,10 @@ describe('工具注册表：数量与分组', () => {
         // 阶段22 M5（v2.1.0）：property-rental 是第 8 个 —— 它不是任何速算器的口径，而是
         // **第一个真正的跨税种组合器**：一笔房租要同时过增值税、城建税与两项附加、房产税、
         // 印花税、个人所得税。与 property-transfer 同款，它没有同名速算器可复用。
-        expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'donation', 'forward',
-            'non-resident', 'property-rental', 'property-transfer', 'reverse']);
+        // 阶段22 M5 续（v2.2.0）：deed-tax 是第 9 个 —— 契税不是所得（买房是跨格子事项，
+        // 9 格收不下它），也没有同名速算器可复用。
+        expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'deed-tax',
+            'donation', 'forward', 'non-resident', 'property-rental', 'property-transfer', 'reverse']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);

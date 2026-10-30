@@ -55,7 +55,8 @@ describe('分级清单可审计', () => {
                 if (s.level) expect(s.level).toBe('advanced');
             });
         });
-        expect(ids.length).toBe(22);
+        // 阶段22 M5 续（v2.2.0）：契税 deed-tax 是第 23 个
+        expect(ids.length).toBe(23);
     });
 
     // v1.142.0 第三轮：步级 advanced 整档取消 —— 原先它会把整步收起并挪到最后，
