@@ -23,8 +23,10 @@
 const { loadSource } = require('./helpers/load-source');
 
 beforeAll(() => {
-    loadSource('src/js/calculation/tax-constants.js');          // propertyTransferRules
+    loadSource('src/js/calculation/tax-constants.js');          // propertyTransferRules + propertySaleRules
     loadSource('src/js/calculation/tax-registry.js');
+    loadSource('src/js/calculation/vat-quick.js');              // 阶段22 M5 续：价税分离
+    loadSource('src/js/calculation/surtax-stamp-quick.js');     // 附加与印花税
     loadSource('src/js/calculation/property-transfer-quick.js');
     loadSource('src/js/calculation/utils.js');
     loadSource('src/js/data/tool-registry.js');
@@ -64,11 +66,15 @@ function tableOf(out, keyword) {
 }
 
 describe('应纳税所得额：不是「售价 − 买价」的俗称', () => {
+    // 阶段22 M5 续（v2.4.0）：主结果从「应缴个人所得税」改成「卖房这一笔要缴的税合计」。
+    // 本例住房满 2 年 → 增值税与附加、印花税都是 0，所以合计仍等于个税（换购退税后 67200）。
     test('默认形态：500 − 300 − 30 − 2 = 168 万，20% → 33.6 万', () => {
         const s = Q().stackOf(values());
         expect(s.taxable).toBeCloseTo(1680000, 6);
         expect(s.taxBeforeExempt).toBeCloseTo(336000, 6);
-        expect(compute().primary.value).toBeCloseTo(336000, 6);
+        expect(s.netTax).toBeCloseTo(67200, 6);            // 换购 400 ÷ 500 → 退 80%
+        expect(s.total).toBeCloseTo(67200, 6);
+        expect(compute().primary.value).toBeCloseTo(67200, 6);
     });
 
     test('装修费有原值比例上限：商品房 10%（原值 200 万、发票 30 万 → 只能扣 20 万，多缴 2 万）', () => {
@@ -112,7 +118,8 @@ describe('核定征收不是可选项', () => {
         const s = Q().stackOf(values({ hasValueProof: false, decoration: 300000 }));
         expect(s.method).toBe('assess');
         expect(s.tax).toBeCloseTo(50000, 6);
-        expect(compute({ hasValueProof: false }).primary.value).toBeCloseTo(50000, 6);
+        // 主结果是合计：本例增值税与附加、印花税均为 0，合计 = 个税换购退税后 5 万 × 20% = 1 万
+        expect(compute({ hasValueProof: false }).primary.value).toBeCloseTo(10000, 6);
     });
 
     test('核定征收率按省局口径可改（2% → 10 万）', () => {
@@ -161,12 +168,20 @@ describe('满五唯一：免在哪、唯一看多大范围', () => {
         expect(s.refund.reasons.join('')).toContain('已缴个税为 0');
     });
 
+    // 阶段22 M5 续（v2.4.0）：非住房要缴增值税（按差额）与印花税，且这两笔**同时是个税的扣除项**
+    // —— 所以个税不再是 33.6 万：未填购置原价时按全额差额计征，增值税 238095.24 + 附加 14285.71
+    // + 印花税 1190.48 = 253571.43 进扣除后，应纳税所得额 1426428.57 → 个税 285285.71。
     test('非住房既不免征、也不能换购退税（国税发〔2007〕33 号二）', () => {
         const s = Q().stackOf(values({ usage: 'nonresidence' }));
         expect(s.exemptEligible).toBe(false);
         expect(s.refund.applied).toBe(false);
         expect(s.refund.reasons.join('')).toContain('非住房');
-        expect(s.tax).toBeCloseTo(336000, 6);
+        // 非住房按差额：原值样本 300 万 → 差额 200 万，不含税 1904761.90 → 增值税 95238.10；
+        // 附加 5714.28（减半后）、印花税 1226.19（非住房照征，住房免的那一条不适用）
+        expect(s.vat.mode).toBe('diff');
+        expect(s.stamp.tax).toBeCloseTo(1226.19, 2);
+        expect(s.transferTax).toBeCloseTo(102178.57, 2);
+        expect(s.tax).toBeCloseTo(315564.29, 2);
     });
 
     test('三档边界表：满五唯一 0、满五非唯一与不足五年都照缴', () => {
@@ -236,15 +251,120 @@ describe('换购退税：退的是已缴个税，不是补贴', () => {
     });
 });
 
+// 阶段22 M5 续（v2.4.0）：卖房这一笔**不止个税** —— 增值税及附加、印花税此前要用户自己填
+// （quick 文件里那句「增值税及附加由调用方传入」），而它同时**是**个税的扣除项，填错一点个税
+// 跟着一起错。现在这一层自己算：住房满 2 年免征（北上广深的非普通住房按差额）、非住房按差额，
+// 附加随实缴增值税（免了就免、小规模减半），印花税住房免征、非住房 0.5‰ 且减半。
+describe('卖房组合：增值税与附加、印花税，以及它们怎么反过来影响个税', () => {
+    const noRepurchase = { repurchase: false };
+
+    test('住房满 2 年：增值税免征 → 附加跟着免、印花税住房也免，合计就是个税', () => {
+        const s = Q().stackOf(values(noRepurchase));
+        expect(s.vat.mode).toBe('exempt');
+        expect(s.vat.tax).toBe(0);
+        expect(s.surtax.total).toBe(0);       // 计税依据是**实缴**增值税，不是转让收入
+        expect(s.stamp.tax).toBe(0);          // 个人销售住房暂免印花税（财税〔2008〕137 号二）
+        expect(s.transferTax).toBe(0);
+        expect(s.total).toBeCloseTo(336000, 6);
+    });
+
+    // 500 万不满 2 年卖出：500 万 ÷ 1.05 × 5% = 238095.24
+    //   附加 = 238095.24 × (7% + 3% + 2%) × 50% = 14285.71（六税两费减半）
+    //   个税：500 − 300 − 25.238095 − 32 = 1427619.05 → × 20% = 285523.81
+    //   合计 537904.76
+    test('住房不满 2 年：全额 5% 计征，增值税 238095.24 + 附加 14285.71', () => {
+        const s = Q().stackOf(values(Object.assign({ holdYears: 1 }, noRepurchase)));
+        expect(s.vat.mode).toBe('full');
+        expect(s.vat.exclusive).toBeCloseTo(4761904.76, 2);
+        expect(s.vat.tax).toBeCloseTo(238095.24, 2);
+        expect(s.surtax.cityTax).toBeCloseTo(8333.33, 2);
+        expect(s.surtax.educationTax).toBeCloseTo(3571.43, 2);
+        expect(s.surtax.localEducationTax).toBeCloseTo(2380.95, 2);
+        expect(s.surtax.total).toBeCloseTo(14285.71, 2);
+        expect(s.taxable).toBeCloseTo(1427619.05, 2);
+        expect(s.tax).toBeCloseTo(285523.81, 2);
+        expect(s.total).toBeCloseTo(537904.76, 2);
+    });
+
+    // 免掉的增值税**进了个税扣除项** → 个税反而少缴：336000 − 285523.81 = 50476.19
+    // 但加上增值税及附加后，早卖一年**总共**多缴 201904.76
+    test('早卖一年：个税少缴 50476.19，但合计多缴 201904.76', () => {
+        const full = Q().stackOf(values(noRepurchase));
+        const early = Q().stackOf(values(Object.assign({ holdYears: 1 }, noRepurchase)));
+        expect(full.tax - early.tax).toBeCloseTo(50476.19, 2);
+        expect(early.total - full.total).toBeCloseTo(201904.76, 2);
+    });
+
+    // 北上广深：满 2 年的**普通**住房免征，非普通住房按差额（500 − 300 = 200 万）
+    //   200 万 ÷ 1.05 × 5% = 95238.10，附加 5714.28
+    test('北上广深满 2 年：普通住房免征，非普通住房按差额 95238.10', () => {
+        const ordinary = Q().stackOf(values(Object.assign({ cityGroup: 'four' }, noRepurchase)));
+        expect(ordinary.vat.mode).toBe('exempt');
+
+        const non = Q().stackOf(values(Object.assign(
+            { cityGroup: 'four', isOrdinary: 'nonordinary', vatBasisPrice: 3000000 }, noRepurchase)));
+        expect(non.vat.mode).toBe('diff');
+        expect(non.vat.base).toBeCloseTo(2000000, 6);
+        expect(non.vat.tax).toBeCloseTo(95238.10, 2);
+        expect(non.surtax.total).toBeCloseTo(5714.28, 2);
+        expect(non.total).toBeCloseTo(416761.90, 2);
+    });
+
+    // 非住房：按差额（500 − 200 = 300 万）→ 142857.14；附加 8571.43；
+    //   印花税按产权转移书据 0.5‰、计税依据不含增值税：(500 − 14.285714) 万 × 0.5‰ = 2428.57 → 减半 1214.29
+    test('非住房（商铺）：增值税按差额 142857.14、印花税减半后 1214.29', () => {
+        const s = Q().stackOf(values(Object.assign(
+            { usage: 'nonresidence', vatBasisPrice: 2000000 }, noRepurchase)));
+        expect(s.vat.mode).toBe('diff');
+        expect(s.vat.tax).toBeCloseTo(142857.14, 2);
+        expect(s.surtax.total).toBeCloseTo(8571.43, 2);
+        expect(s.stamp.housing).toBe(false);
+        expect(s.stamp.statutoryTax).toBeCloseTo(2428.57, 2);
+        expect(s.stamp.tax).toBeCloseTo(1214.29, 2);
+        expect(s.transferTax).toBeCloseTo(152642.86, 2);
+        expect(s.total).toBeCloseTo(458114.29, 2);
+        expect(s.notes.join('')).toContain('土地增值税');
+    });
+
+    test('转让环节税金自动计入个税扣除：不用手填，填了也不重复', () => {
+        const s = Q().stackOf(values(Object.assign({ holdYears: 1 }, noRepurchase)));
+        expect(s.taxPaidInTransfer).toBeCloseTo(s.transferTax, 6);
+        // 手填那栏现在是「除上述之外另缴的税金」：填 5 万就在自动算出的基础上再加
+        const withOther = Q().stackOf(values(Object.assign({ holdYears: 1, vatAndSurcharge: 50000 }, noRepurchase)));
+        expect(withOther.taxPaidInTransfer).toBeCloseTo(s.transferTax + 50000, 6);
+        expect(withOther.otherTaxPaid).toBeCloseTo(50000, 6);
+    });
+
+    // 同源：5% 引 vatRules 的不动产档、减半与三档附加在 surtaxRules、2 年那条线在 propertySaleRules
+    test('口径同源：5% 引 vatRules、减半引 surtaxRules、2 年线在 propertySaleRules', () => {
+        const rules = Q().saleRules();
+        const C = window.EuriskoTaxConstants;
+        expect(rules.vat.levyRate).toBe(C.vatRules.smallScale.levyRates[1].rate);
+        expect(rules.vat.levyRate).toBeCloseTo(0.05, 6);
+        expect(rules.vat.housingExemptYears).toBe(2);
+        expect(rules.vat.bigFour.nonOrdinaryByDiff).toBe(true);
+        expect(rules.vat.nonHousingByDiff).toBe(true);
+        expect(rules.surtax.followVat).toBe(true);
+        expect(rules.stamp.itemKey).toBe('propertyTransfer');
+        expect(rules.stamp.housingExempt).toBe(true);
+        expect(rules.landVat.housingExempt).toBe(true);   // 个人销售住房暂免土地增值税
+        // 附加与印花税确实调的是 surtax-stamp-quick（改上游而这里不跟着变就会红）
+        expect(rules.surtax.halve).toBe(true);
+        expect(C.surtaxRules.halve.ratio).toBeCloseTo(0.5, 6);
+    });
+});
+
 describe('spec 接线：结果区、对照表与推导链', () => {
     test('primary / rows / note / extras / steps 五件套齐全', () => {
+        // 阶段22 M5 续（v2.4.0）：主结果改成「卖房这一笔要缴的税合计」，对照表从 3 张变 4 张
+        // （多了「满 2 年那条线」），推导链从 3 段变 4 段（多了增值税与附加）。
         const out = compute();
-        expect(out.primary.label).toContain('应缴个人所得税');
-        expect(out.primary.value).toBeCloseTo(336000, 6);
+        expect(out.primary.label).toContain('卖房这一笔要缴的税合计');
+        expect(out.primary.value).toBeCloseTo(67200, 6);
         expect(out.rows.length).toBeGreaterThan(4);
         expect(out.note).toContain('应纳税所得额');
-        expect(out.extras).toHaveLength(3);
-        expect(out.steps).toHaveLength(3);
+        expect(out.extras).toHaveLength(4);
+        expect(out.steps).toHaveLength(4);
     });
 
     test('三张对照表：核定能不能选 / 满五唯一 / 换购买多少退多少', () => {
@@ -257,20 +377,22 @@ describe('spec 接线：结果区、对照表与推导链', () => {
         expect(rp[3][3].value).toBeCloseTo(336000, 6);   // 买 600 万 → 全退
     });
 
-    test('推导链三段：108 号一 → 278 号四 → 2026 年第 3 号', () => {
+    test('推导链四段：增值税与附加 → 108 号一 → 278 号四 → 2026 年第 3 号', () => {
         const out = compute();
         expect(out.steps.map((s) => s.title)).toEqual([
-            '① 应纳税所得额（国税发〔2006〕108 号一）',
-            '② 满五唯一免征（财税字〔1999〕278 号四）',
-            '③ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）'
+            '① 增值税与附加（卖房这一笔不止个税）',
+            '② 应纳税所得额（国税发〔2006〕108 号一）',
+            '③ 满五唯一免征（财税字〔1999〕278 号四）',
+            '④ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）'
         ]);
-        expect(JSON.stringify(out.steps[0].rows)).toContain('装修费');
-        expect(out.steps[2].footnote).toContain('2027-12-31');
+        expect(JSON.stringify(out.steps[1].rows)).toContain('装修费');
+        expect(JSON.stringify(out.steps[0].rows)).toContain('增值税');
+        expect(out.steps[3].footnote).toContain('2027-12-31');
     });
 
     test('核定形态下推导链换成「转让收入 × 征收率」，不再展示原值与装修费', () => {
         const out = compute({ hasValueProof: false });
-        expect(out.steps[0].rows.map((r) => r.label)).toEqual(['转让收入', '核定征收率', '核定应纳税额']);
+        expect(out.steps[1].rows.map((r) => r.label)).toEqual(['转让收入', '核定征收率', '核定应纳税额']);
         expect(JSON.stringify(out.rows)).not.toContain('房屋原值');
     });
 });
@@ -282,11 +404,11 @@ describe('走向导：由 spec 驱动', () => {
         document.body.innerHTML = '<div id="deep-wizard-page" class="page hidden"></div>';
     });
 
-    test('被通用向导接管：房子与产权 → 能扣什么 → 卖后换购 → 结果', () => {
+    test('被通用向导接管：房子与产权 → 增值税与附加 → 能扣什么 → 卖后换购 → 结果', () => {
         const tool = R().get('property-transfer');
         expect(W().has(tool)).toBe(true);
         expect(W().stepsOf(tool).map((s) => s.title)).toEqual([
-            '房子与产权', '能扣什么', '卖后换购', '计算结果'
+            '房子与产权', '增值税与附加', '能扣什么', '卖后换购', '计算结果'
         ]);
     });
 

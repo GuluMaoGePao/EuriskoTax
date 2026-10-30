@@ -216,6 +216,52 @@ describe('卖房：转让所得 20%（国税发〔2006〕108 号）、满五唯�
     });
 });
 
+// 阶段22 M5 续（v2.4.0）：卖房这一笔不止个税 —— 增值税及附加、印花税此前要用户手填，
+// 而它同时是**个税的扣除项**，填错一点个税跟着一起错。下面四例全部手算：
+// 主结果也从「应缴个人所得税」改成「卖房这一笔要缴的税合计」。
+describe('卖房组合：增值税 5%、附加随实缴增值税减半、印花税住房免征', () => {
+    const base = { usage: 'residence', acquireType: 'purchase', salePrice: 5000000, originalValue: 3000000,
+        hasValueProof: true, holdYears: 6, repurchase: false, isOnlyHome: false,
+        cityGroup: 'other', isOrdinary: 'ordinary', location: 'urban', halve: true };
+
+    // 500 万 ÷ 1.05 × 5% = 238095.24；附加 = 238095.24 × 12% × 50% = 14285.71
+    //   个税：500 − 300 − 25.238095 = 1747619.05 → ×20% = 349523.81
+    //   合计 601904.76
+    test('住房不满 2 年：增值税 238095.24 + 附加 14285.71，合计 601904.76', () => {
+        const v = Object.assign({}, base, { holdYears: 1 });
+        expect(rowOf('property-transfer', v, '增值税')).toBeCloseTo(238095.24, 2);
+        expect(rowOf('property-transfer', v, '城建税及两项附加')).toBeCloseTo(14285.71, 2);
+        expect(rowOf('property-transfer', v, '印花税（产权转移书据）')).toBe(0);   // 住房免征
+        expect(primaryOf('property-transfer', v)).toBeCloseTo(601904.76, 2);
+    });
+
+    // 满 2 年免征：附加跟着免（计税依据是实缴增值税，不是转让收入）
+    test('住房满 2 年：增值税与附加都是 0，合计就是个税 400000', () => {
+        const v = Object.assign({}, base, { holdYears: 6 });
+        expect(rowOf('property-transfer', v, '增值税')).toBe(0);
+        expect(rowOf('property-transfer', v, '城建税及两项附加')).toBe(0);
+        expect(primaryOf('property-transfer', v)).toBe(400000);
+    });
+
+    // 北上广深满 2 年的**非普通**住房：按差额（500 − 300 = 200 万）
+    //   200 万 ÷ 1.05 × 5% = 95238.10，附加 5714.28；个税 (500−300−10.095238) × 20% = 379809.52
+    test('北上广深满 2 年非普通住房：按差额 95238.10，合计 480761.90', () => {
+        const v = Object.assign({}, base, { cityGroup: 'four', isOrdinary: 'nonordinary',
+            vatBasisPrice: 3000000 });
+        expect(rowOf('property-transfer', v, '增值税')).toBeCloseTo(95238.10, 2);
+        expect(primaryOf('property-transfer', v)).toBeCloseTo(480761.90, 2);
+    });
+
+    // 非住房：差额（500 − 200 = 300 万）→ 142857.14；附加 8571.43；
+    //   印花税 = (500 万 − 142857.14) × 0.5‰ = 2428.57，减半后 1214.29 —— 住房免的那一条不适用
+    test('非住房（商铺）：增值税 142857.14、印花税减半后 1214.29，合计 522114.29', () => {
+        const v = Object.assign({}, base, { usage: 'nonresidence', vatBasisPrice: 2000000 });
+        expect(rowOf('property-transfer', v, '增值税')).toBeCloseTo(142857.14, 2);
+        expect(rowOf('property-transfer', v, '印花税（产权转移书据）')).toBeCloseTo(1214.29, 2);
+        expect(primaryOf('property-transfer', v)).toBeCloseTo(522114.29, 2);
+    });
+});
+
 // 阶段22 M5（v2.1.0）：个人出租 —— 五个税种一屏，政策手算对拍。
 // 这是全表最后一格 0 工具的所得形态（F7 财产租赁）补上的那一个，也是**第一个跨税种组合器**：
 // 一笔房租同时过增值税、城建税与两项附加、房产税、印花税、个人所得税五个税种，
