@@ -27,6 +27,7 @@ beforeAll(() => {
     loadSource('src/js/calculation/surtax-stamp-quick.js');
     loadSource('src/js/calculation/property-rental-quick.js');   // 阶段22 M5：出租组合器
     loadSource('src/js/calculation/deed-tax-quick.js');          // 阶段22 M5 续：契税
+    loadSource('src/js/calculation/vehicle-purchase-tax-quick.js'); // 阶段22 M5 续：车辆购置税
     loadSource('src/js/calculation/corporate-income-tax-quick.js');
     loadSource('src/js/calculation/social-insurance-quick.js');
     loadSource('src/js/calculation/disability-fund-quick.js');
@@ -225,7 +226,7 @@ describe('多步向导：第三个税种（企业所得税）', () => {
         expect(document.getElementById('qf-donation')).toBeTruthy();
     });
 
-    // 阶段19-4 顺延（v1.99.0）：结果可视化。23 个完整测算的结果步与速算器共用
+    // 阶段19-4 顺延（v1.99.0）：结果可视化。24 个完整测算的结果步与速算器共用
     // result-bars.js 那一份 —— 这里钉的是它挂对了地方、且取的是同一份 view。
     test('结果步画「各项数额」条：主结果排第一，且排在逐行明细之前', () => {
         W().open('corporate-income-tax-deep', { fresh: true });
@@ -410,7 +411,7 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
     // 这里补齐覆盖面。**取数不走 UI 导航**：21 个 spec 里只有一部分能靠默认值点到底，
     // 其余有必填项（阶段19 真机冒烟 41/41 出数，缺的是默认值不是能力）—— 靠点 next 去凑
     // 覆盖面，量到的只是「哪些 spec 给了全默认值」，不是「报告在 21 个税种上取数对不对」。
-    test('23 个完整测算逐一取数：交付版报告在每一个税种上都拼得出来', () => {
+    test('24 个完整测算逐一取数：交付版报告在每一个税种上都拼得出来', () => {
         loadSource('src/js/export/final-report.js');
         const tools = R().deep();
         const problems = [];
@@ -499,9 +500,9 @@ describe('多步向导：结果区与存量页面对等（17A-2）', () => {
         });
 
         expect(problems).toEqual([]);
-        // 阶段22 M5 续（v2.2.0）：契税 deed-tax 进来后 deep 由 22 → 23
-        expect(tools.length).toBe(23);
-        expect(covered).toBe(23 - NEEDS_INPUT.length);   // 能默认算的都过了一遍
+        // 阶段22 M5 续（v2.3.0）：车辆购置税 vehicle-purchase-tax 进来后 deep 由 23 → 24
+        expect(tools.length).toBe(24);
+        expect(covered).toBe(24 - NEEDS_INPUT.length);   // 能默认算的都过了一遍
         expect(stillNeeds.sort()).toEqual(NEEDS_INPUT.slice().sort());
         expect(withChart).toBeGreaterThan(0);            // 覆盖面里至少有一部分画得出图
         delete window.EuriskoReport;
@@ -956,7 +957,7 @@ describe('完整测算内部结构：字段并排（1.17 那页的 grid 读法�
 
 // 任务①：勾选框统一成「方框在前 + 名字在后」，专项扣除默认勾上（1.17 那四个页面的样子）。
 // 三条各钉一半：**形态**（不许再出现替用户陈述结论的「否」）、**默认**、
-// **覆盖面**（20 个速算器与 23 个完整测算共用同一份 fieldHtml，不许有一处漏改）。
+// **覆盖面**（20 个速算器与 24 个完整测算共用同一份 fieldHtml，不许有一处漏改）。
 describe('勾选框：方框在前 + 名字在后，专项扣除默认勾上', () => {
     function atDeduction(toolId) {
         W().open(toolId, { fresh: true });
@@ -1178,7 +1179,7 @@ describe('完整测算 ↔ 速算版：双向可达', () => {
         expect(window.showPage).toHaveBeenCalledWith('quick-calculator-page');
     });
 
-    // 23 个完整测算的 nextTools 写了却从没渲染过 —— 填得最全的那批反而是唯一没有
+    // 24 个完整测算的 nextTools 写了却从没渲染过 —— 填得最全的那批反而是唯一没有
     // 「算完还能干什么」的入口。
     test('结果页渲染「算完还能干什么」（nextTools 不再是死数据）', () => {
         W().open('vat-deep', { fresh: true });

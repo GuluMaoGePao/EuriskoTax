@@ -52,9 +52,9 @@ describe('问句引导（阶段22 M4）', () => {
         const meta = (id) => body().querySelector(`[data-guide-form="${id}"] .guide-form-card__meta`).textContent;
         expect(meta('F1')).toContain('9 个事项');
         expect(meta('F7')).toContain('1 个事项');
-        // 跨格组 5 个
+        // 跨格组 6 个（阶段22 M5 续 v2.3.0：E25 买车入表后由 5 → 6）
         expect(body().querySelector('[data-guide-form="cross"] .guide-form-card__meta').textContent)
-            .toContain('5 个事项');
+            .toContain('6 个事项');
     });
 
     test('点 F1 → 事件 9 行、withheldBy 白话提示、返回可用', () => {
@@ -107,16 +107,16 @@ describe('问句引导（阶段22 M4）', () => {
         expect(window.EuriskoToolbox.openTool).toHaveBeenCalledWith('property-rental');
     });
 
-    test('跨格子组：5 个事件全部可达，E13 有两个工具档', () => {
+    test('跨格子组：6 个事件全部可达，E13 有两个工具档', () => {
         G().open();
         body().querySelector('[data-guide-form="cross"]').click();
         const rows = body().querySelectorAll('.guide-event-row');
-        expect(rows.length).toBe(5);
-        // 阶段22 M5 续（v2.2.0）：E16 买房有了 deed-tax，可点的变成 4 个（E13 / E14 / E16 / E24），
-        // 待补的只剩 E20（跨格子里唯一还空着的一格）。
+        expect(rows.length).toBe(6);
+        // 阶段22 M5 续（v2.3.0）：E25 买车有了 vehicle-purchase-tax，可点的变成 5 个
+        //（E13 / E14 / E16 / E24 / E25），待补的只剩 E20（跨格子里唯一还空着的一格）。
         const clickable = [...rows].filter((r) => r.hasAttribute('data-guide-event'))
             .map((r) => r.getAttribute('data-guide-event')).sort();
-        expect(clickable).toEqual(['E13', 'E14', 'E16', 'E24']);
+        expect(clickable).toEqual(['E13', 'E14', 'E16', 'E24', 'E25']);
         const empty = [...rows].filter((r) => r.hasAttribute('data-guide-empty'))
             .map((r) => r.getAttribute('data-guide-empty')).sort();
         expect(empty).toEqual(['E20']);

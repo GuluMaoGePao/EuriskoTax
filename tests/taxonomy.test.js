@@ -81,12 +81,13 @@ describe('个人字典（阶段22 M2）', () => {
     const R = global.window.EuriskoToolRegistry;
     const FORM_IDS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 
-    test('模块已挂载：3 组 / 9 格 / 10 别名 / 24 事件', () => {
+    test('模块已挂载：3 组 / 9 格 / 10 别名 / 25 事件', () => {
         expect(P).toBeTruthy();
         expect(P.groups().length).toBe(3);
         expect(P.forms().length).toBe(9);
         expect(P.aliases().length).toBe(10);
-        expect(P.events().length).toBe(24);
+        // 阶段22 M5 续（v2.3.0）：E25「买车了」—— 与 E16 买房同类的跨格子事项
+        expect(P.events().length).toBe(25);
     });
 
     test('口径守护：validate() 无问题（含对税种字典与注册表的存在性校验）', () => {
@@ -128,15 +129,15 @@ describe('个人字典（阶段22 M2）', () => {
         expect(P.getAlias('employee').identity).toBeUndefined();
     });
 
-    test('事件 id 恰为 E1–E24，无重复无跳号', () => {
+    test('事件 id 恰为 E1–E25，无重复无跳号', () => {
         const ids = P.events().map((e) => e.id);
-        expect(new Set(ids).size).toBe(24);
+        expect(new Set(ids).size).toBe(25);
         ids.forEach((id, i) => expect(id).toBe('E' + (i + 1)));
     });
 
-    test('cross 事件恰好 5 个（E13 E14 E16 E20 E24），且都写明原因', () => {
+    test('cross 事件恰好 6 个（E13 E14 E16 E20 E24 E25），且都写明原因', () => {
         const crosses = P.events().filter((e) => e.form === 'cross');
-        expect(crosses.map((e) => e.id)).toEqual(['E13', 'E14', 'E16', 'E20', 'E24']);
+        expect(crosses.map((e) => e.id)).toEqual(['E13', 'E14', 'E16', 'E20', 'E24', 'E25']);
         crosses.forEach((e) => expect(e.crossReason.length).toBeGreaterThan(4));
     });
 
@@ -148,9 +149,9 @@ describe('个人字典（阶段22 M2）', () => {
         expect(P.getEvent('E16').taxCode).toBe('deed');
     });
 
-    test('tools 全部存在于现有 43 个入口（tool-registry all + deep）', () => {
+    test('tools 全部存在于现有 44 个入口（tool-registry all + deep）', () => {
         const ids = new Set(R.all().concat(R.deep()).map((t) => t.id));
-        expect(ids.size).toBe(43);
+        expect(ids.size).toBe(44);
         P.events().forEach((e) => {
             (e.tools || []).forEach((tid) => expect(ids.has(tid)).toBe(true));
         });
@@ -174,9 +175,9 @@ describe('挂载点表（阶段22 M3）', () => {
     const MIXED_IDS = ['surtax-stamp', 'surtax-stamp-deep', 'disability-fund', 'disability-fund-deep',
         'classification', 'property-transfer', 'employer-cost'];
 
-    test('模块已挂载：恰好 43 条挂载点', () => {
+    test('模块已挂载：恰好 44 条挂载点', () => {
         expect(M).toBeTruthy();
-        expect(M.all().length).toBe(43);
+        expect(M.all().length).toBe(44);
     });
 
     test('口径守护：validate() 无问题（含对三个字典的存在性校验）', () => {
@@ -186,15 +187,15 @@ describe('挂载点表（阶段22 M3）', () => {
     test('与注册表双向一致：无孤儿、无幽灵', () => {
         const regIds = new Set(R.all().concat(R.deep()).map((t) => t.id));
         const mountIds = new Set(M.all().map((m) => m.id));
-        expect(regIds.size).toBe(43);
-        expect(mountIds.size).toBe(43);
+        expect(regIds.size).toBe(44);
+        expect(mountIds.size).toBe(44);
         regIds.forEach((id) => expect(mountIds.has(id)).toBe(true));
         mountIds.forEach((id) => expect(regIds.has(id)).toBe(true));
     });
 
-    // 阶段22 M5 续：契税（cross/E16）入表后 A 由 31 → 32
-    test('A 32 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
-        expect(M.countByBranch('A')).toBe(32);
+    // 阶段22 M5 续：契税（cross/E16）入表后 A 由 31 → 32；车辆购置税（cross/E25）入表后 32 → 33
+    test('A 33 / B 11（按工具数：速算 + 完整测算算同一入口但各占一条）', () => {
+        expect(M.countByBranch('A')).toBe(33);
         expect(M.countByBranch('B')).toBe(11);
     });
 
@@ -203,7 +204,7 @@ describe('挂载点表（阶段22 M3）', () => {
         expect(ids).toEqual(['net-salary', 'reverse', 'salary-tax']);
     });
 
-    test('A 侧 32 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
+    test('A 侧 33 个工具全部挂个税（iit），B 侧税码各异且 employer-cost 为空', () => {
         expect(M.byTaxCode('iit').length).toBe(31);
         expect(M.byTaxCode('vat').length).toBe(2);
         expect(M.byTaxCode('city-tax').length).toBe(2);

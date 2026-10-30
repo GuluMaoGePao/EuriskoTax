@@ -330,9 +330,10 @@ describe('挂载：买房是跨格子事项，契税那一格在 B 分支', () =
         expect(e.tools).toContain('deed-tax');
     });
 
-    test('入口数由分类统计得出：43 个入口、A 32 / B 11', () => {
-        expect(T().all().length).toBe(43);
-        expect(T().countByBranch('A')).toBe(32);
+    // 阶段22 M5 续（v2.3.0）：车辆购置税入表后 43 → 44、A 32 → 33
+    test('入口数由分类统计得出：44 个入口、A 33 / B 11', () => {
+        expect(T().all().length).toBe(44);
+        expect(T().countByBranch('A')).toBe(33);
         expect(T().countByBranch('B')).toBe(11);
         expect(T().validate().length).toBe(0);
     });

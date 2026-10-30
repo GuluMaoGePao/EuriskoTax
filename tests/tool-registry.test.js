@@ -94,7 +94,9 @@ describe('工具注册表：数量与分组', () => {
             'disability-fund-deep',
             'donation', 'early-retirement-deep', 'equity-deep', 'expat-deep', 'forward', 'non-resident',
             'private-pension-deep', 'property-rental', 'property-transfer', 'reverse', 'severance-deep',
-            'social-base-deep', 'special-deduction-deep', 'surtax-stamp-deep', 'vat-deep', 'withholding-deep'
+            'social-base-deep', 'special-deduction-deep', 'surtax-stamp-deep', 'vat-deep',
+            // 阶段22 M5 续（v2.3.0）：车辆购置税 —— 第 24 个 spec 驱动的完整测算
+            'vehicle-purchase-tax', 'withholding-deep'
         ]);   // 17D-9（v1.65.0）：private-pension-deep 个人养老金与税优三件套 —— 第九个；
         // 17D-10（v1.66.0）：donation 公益慈善捐赠扣除 —— 第十个（13/16 → 14/16），且是
         // **第一个没有同名速算器的完整测算**：捐赠横跨综合 / 经营 / 分类三个所得项目，
@@ -238,8 +240,11 @@ describe('工具注册表：数量与分组', () => {
         // 印花税、个人所得税。与 property-transfer 同款，它没有同名速算器可复用。
         // 阶段22 M5 续（v2.2.0）：deed-tax 是第 9 个 —— 契税不是所得（买房是跨格子事项，
         // 9 格收不下它），也没有同名速算器可复用。
+        // 阶段22 M5 续（v2.3.0）：vehicle-purchase-tax 是第 10 个 —— 车辆购置税同样不是所得
+        // （买车是跨格子事项），也没有同名速算器可复用。
         expect(migrated.map((t) => t.id).sort()).toEqual(['business', 'classification', 'deed-tax',
-            'donation', 'forward', 'non-resident', 'property-rental', 'property-transfer', 'reverse']);
+            'donation', 'forward', 'non-resident', 'property-rental', 'property-transfer', 'reverse',
+            'vehicle-purchase-tax']);
         migrated.forEach((t) => {
             expect(Array.isArray(t.fields) && t.fields.length > 0).toBe(true);
             expect(Array.isArray(t.steps) && t.steps.length > 0).toBe(true);

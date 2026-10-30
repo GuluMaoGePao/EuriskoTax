@@ -222,7 +222,7 @@ describe('身份卡 · 设为默认视角', () => {
         expect(note().textContent).toContain('个体户 / 小店');
         expect(note().textContent).toContain('默认视角');
         // 入口总数从注册表算（20 速算 + 23 deep），不写死 43
-        expect(note().textContent).toContain('共 43 个入口仍然都能用');
+        expect(note().textContent).toContain('共 44 个入口仍然都能用');
         note().querySelector('.identity-note-clear').click();
         expect(P().get()).toBe('');
         expect(note().classList.contains('hidden')).toBe(true);

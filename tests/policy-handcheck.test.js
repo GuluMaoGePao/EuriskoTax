@@ -31,7 +31,8 @@ beforeAll(() => {
         'equity-incentive', 'severance', 'early-retirement', 'expat-allowance', 'private-pension',
         'health-insurance', 'annuity', 'social-insurance', 'employer-cost', 'disability-fund',
         'vat', 'surtax-stamp', 'business-income', 'corporate-income-tax', 'donation',
-        'property-transfer', 'property-rental', 'deed-tax', 'non-resident'].forEach(function (m) {
+        'property-transfer', 'property-rental', 'deed-tax', 'vehicle-purchase-tax',
+        'non-resident'].forEach(function (m) {
         loadSource('src/js/calculation/' + m + '-quick.js');
     });
     loadSource('src/js/calculation/utils.js');
@@ -344,6 +345,61 @@ describe('契税（deep）：不含税计税依据、套数乘面积四格、互
             area: 110, housingSet: 'first', city: 'other', vatMode: 'exempt', statutoryRate: 0.03 };
         expect(rowOf('deed-tax', v, '契税')).toBe(0);
         expect(primaryOf('deed-tax', v)).toBe(0);
+    });
+});
+
+// 阶段22 M5 续（v2.3.0）：车辆购置税 —— 买车这一笔。
+// 三处最容易算错的地方逐个对拍：① 计税价格不含增值税（发票价要先分离出 13%）；
+// ② 新能源 2026 年起是**减半且封顶**，不是全免；③ 二手车不再征收、进口按组成计税价格。
+// 数字全部手算，改断言前先改政策依据。
+describe('车辆购置税（deep）：不含增值税的计税价格、新能源封顶减免、二手车与进口', () => {
+    // 发票价 30 万（价税合计）：300000 ÷ 1.13 = 265486.73 → 购置税 26548.67
+    //   直接拿发票价乘 10% 是 30000 —— 多算 3451.33
+    test('新车 30 万（燃油）：计税价格 265486.73、购置税 26548.67（不是 30000）', () => {
+        const v = { source: 'buy', energy: 'fuel', price: 300000 };
+        expect(rowOf('vehicle-purchase-tax', v, '车辆购置税计税价格（不含增值税）'))
+            .toBeCloseTo(265486.73, 2);
+        expect(rowOf('vehicle-purchase-tax', v, '车辆购置税（按 10% 计征）')).toBeCloseTo(26548.67, 2);
+        expect(primaryOf('vehicle-purchase-tax', v)).toBeCloseTo(26548.67, 2);
+    });
+
+    // 新能源 30 万、2026 档：应纳税额 26548.67，减半是 13274.34 但**封顶 7500**
+    //   → 实缴 19048.67（不是 0，也不是 13274.34）
+    test('新能源 30 万（2026 档）：减半封顶 7500 → 实缴 19048.67', () => {
+        const v = { source: 'buy', energy: 'ne', price: 300000, period: 'half2026' };
+        expect(rowOf('vehicle-purchase-tax', v, '新能源汽车减免')).toBeCloseTo(7500, 2);
+        expect(primaryOf('vehicle-purchase-tax', v)).toBeCloseTo(19048.67, 2);
+    });
+
+    // 车价降到 10 万：应纳税额 8849.56，减半 4424.78 < 封顶 → 按一半减，实缴 4424.78
+    test('新能源 10 万（2026 档）：减半 4424.78 未触封顶 → 实缴 4424.78', () => {
+        const v = { source: 'buy', energy: 'ne', price: 100000, period: 'half2026' };
+        expect(rowOf('vehicle-purchase-tax', v, '车辆购置税（按 10% 计征）')).toBeCloseTo(8849.56, 2);
+        expect(rowOf('vehicle-purchase-tax', v, '新能源汽车减免')).toBeCloseTo(4424.78, 2);
+        expect(primaryOf('vehicle-purchase-tax', v)).toBeCloseTo(4424.78, 2);
+    });
+
+    // 进口自用：完税价 40 万、关税 15% = 60000、消费税 5%
+    //   组成计税价格 = 460000 ÷ 0.95 = 484210.53（消费税 24210.53）→ 购置税 48421.05
+    test('进口自用 40 万：关税 6 万 + 消费税 24210.53 → 购置税 48421.05（不是 40000）', () => {
+        const v = { source: 'import', energy: 'fuel', customsPrice: 400000,
+            tariffRate: 0.15, consumptionRate: 0.05 };
+        expect(rowOf('vehicle-purchase-tax', v, '进口关税')).toBeCloseTo(60000, 2);
+        expect(rowOf('vehicle-purchase-tax', v, '进口环节消费税')).toBeCloseTo(24210.53, 2);
+        expect(primaryOf('vehicle-purchase-tax', v)).toBeCloseTo(48421.05, 2);
+    });
+
+    // 二手车：一次性征收（第三条），购置已征车辆不再征收
+    test('二手车：不再征收，实缴为 0', () => {
+        const v = { source: 'used', energy: 'fuel', price: 150000 };
+        expect(primaryOf('vehicle-purchase-tax', v)).toBe(0);
+    });
+
+    // 受赠：按凭证载明的价格（本身不含增值税）20 万 → 购置税 20000
+    test('受赠自用：凭证载明价格 20 万（不含增值税）→ 购置税 20000', () => {
+        const v = { source: 'gift', energy: 'fuel', exclusivePrice: 200000 };
+        expect(rowOf('vehicle-purchase-tax', v, '车辆购置税计税价格')).toBe(200000);
+        expect(primaryOf('vehicle-purchase-tax', v)).toBeCloseTo(20000, 2);
     });
 });
 
