@@ -160,7 +160,7 @@ powershell -ExecutionPolicy Bypass -STA -File .\tools\gui\gui-dev-console.ps1
 >
 > | 按钮 | 执行命令 | 适用场景 |
 > |------|---------|---------|
-> | **🔧 42 个工具逐个算** | `npm run smoke:ui` | 真机把 42 个工具各算一遍（出不出数 / 抛不抛错 / deep 侧政策徽标在不在）。**不写留痕**：跑前快照 localStorage、跑后整份还原 —— 否则 41 次测算会污染历史与截图基线 |
+> | **🔧 43 个工具逐个算** | `npm run smoke:ui` | 真机把 43 个工具各算一遍（出不出数 / 抛不抛错 / deep 侧政策徽标在不在）。**不写留痕**：跑前快照 localStorage、跑后整份还原 —— 否则 43 次测算会污染历史与截图基线 |
 > | **📸 视觉基线对比** | `node tools\ops\ui-screenshot-baseline.js` | 7 页 × 桌面/手机 × 浅色/深色 = 28 张与基线比对。生成与比对必须用**同一个引擎**（两套引擎有像素微差，混用会假报警） |
 > | **🎨 对比度审计** | `node tools\ops\ui-contrast-audit.js` | 改了配色必跑。深色是另一套值（阴影靠更黑不靠更灰、透明度 .30/.40/.50）—— 浅色看着对证明不了深色没问题 |
 > | **🧩 级联守卫** | `npm run check:cascade` | 改了 `tokens.css` / `ui-redesign.css` 之后跑，抓「改一处串到别处」 |
