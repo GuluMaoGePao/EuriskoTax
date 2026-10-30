@@ -5922,8 +5922,10 @@
                 { key: 'isOnlyHome', step: 'property', label: '本次出售的住房是家庭唯一生活用房', type: 'switch', default: false,
                     when: { key: 'usage', in: ['residence'] },
                     hint: '「唯一」是同一省 / 自治区 / 直辖市范围内（有配偶的为夫妻双方）只有这一套住房 —— 不是全国唯一、也不是同城唯一' },
-                { key: 'vatAndSurcharge', step: 'cost', label: '转让过程中缴纳的税金（元）', type: 'money', default: 0,
-                    hint: '增值税及附加、土地增值税等；住房满 2 年免征增值税时填 0（108 号一（三））' },
+                // 阶段22 M5 续（v2.4.0）：增值税及附加、印花税现在由本工具自己算（见「增值税与附加」那一步），
+                // 这一栏只留「除了上面几笔之外、转让过程中另缴的税金」（非住房的土地增值税等）。
+                { key: 'vatAndSurcharge', step: 'cost', label: '除上述之外另缴的税金（元）', type: 'money', default: 0,
+                    hint: '非住房的土地增值税等；增值税及附加、印花税已单独算出并自动计入扣除，别在这里重复填（108 号一（三））' },
                 { key: 'houseType', step: 'cost', label: '房屋性质', type: 'select', default: 'commercial',
                     when: { key: 'usage', in: ['residence'] },
                     options: [{ value: 'commercial', label: '商品房及其他住房' },
@@ -5944,10 +5946,28 @@
                     when: { key: 'repurchase', in: [true] } },
                 { key: 'repurchasePrice', step: 'repurchase', label: '新购住房金额（元）', type: 'money', default: 0, sample: 4000000,
                     when: { key: 'repurchase', in: [true] },
-                    hint: '换购退税：新购金额不低于现住房转让金额的，全额退还已缴个税；低于的，按「新购 ÷ 转让金额」的比例退' }
+                    hint: '换购退税：新购金额不低于现住房转让金额的，全额退还已缴个税；低于的，按「新购 ÷ 转让金额」的比例退' },
+                // ---- 阶段22 M5 续（v2.4.0）：卖房这一笔不止个税 ----
+                { key: 'cityGroup', step: 'vat', label: '房子在不在北上广深', type: 'select', default: 'other',
+                    options: [{ value: 'other', label: '北上广深之外' }, { value: 'four', label: '北京 / 上海 / 广州 / 深圳' }],
+                    when: { key: 'usage', in: ['residence'] },
+                    hint: '只有北上广深对满 2 年的非普通住房按差额征增值税，其余地区满 2 年一律免征（财税〔2016〕36 号附件 3 第五条）' },
+                { key: 'isOrdinary', step: 'vat', label: '是不是普通住房', type: 'select', default: 'ordinary',
+                    options: [{ value: 'ordinary', label: '普通住房' }, { value: 'nonordinary', label: '非普通住房（别墅 / 高档公寓等）' }],
+                    when: { key: 'cityGroup', in: ['four'] },
+                    hint: '普通住房的标准由各省、自治区、直辖市划定（容积率、面积、成交价三条线）；北上广深满 2 年的非普通住房按差额征 5%' },
+                { key: 'vatBasisPrice', step: 'vat', label: '购入时的原价（元，差额计税用）', type: 'money', default: 0, sample: 3000000,
+                    hint: '只有按差额计税时才用到（满 2 年的非普通住房、非住房）；全额计税或免征时不看这一项' },
+                { key: 'location', step: 'vat', label: '城建税所在地', type: 'select', default: 'urban',
+                    options: [{ value: 'urban', label: '市区（7%）' }, { value: 'county', label: '县城、镇（5%）' }, { value: 'other', label: '其他（1%）' }],
+                    hint: '附加的计税依据是实缴增值税：增值税免了附加跟着免；三档城建税率是市区 7%、县城和镇 5%、其他 1%' },
+                { key: 'halve', step: 'vat', label: '适用「六税两费」减半', type: 'select', default: 'yes',
+                    options: [{ value: 'yes', label: '适用（减半征收）' }, { value: 'no', label: '不适用（按全额）' }],
+                    hint: '2023-01-01 至 2027-12-31，增值税小规模纳税人（含其他个人）减半征收城建税与两项附加、印花税（财政部 税务总局公告 2023 年第 12 号）' }
             ],
             steps: [
                 { key: 'property', title: '房子与产权', why: '先定三件事：住房还是非住房、怎么取得的（受赠 / 继承的原值另有规定）、满五年是不是家庭唯一' },
+                { key: 'vat', title: '增值税与附加', why: '卖房这一笔不止个税：住房满 2 年免征增值税（北上广深的非普通住房按差额），非住房按差额；附加随增值税、免了就免 —— 这些同时还是个税的扣除项' },
                 { key: 'cost', title: '能扣什么', why: '原值、转让环节税金、装修费（有原值比例上限）、贷款利息与手续费公证费 —— 扣完才是应纳税所得额' },
                 { key: 'repurchase', title: '卖后换购', why: '出售住房后 1 年内在同城重新购房的，按新购金额占转让金额的比例退还已缴个税' }
             ],
@@ -5959,9 +5979,16 @@
                 '换购退税退的是已缴个税，不是补贴（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号，执行至 2027-12-31）：出售住房后 1 年内在同城重新购房、且售房人为新购住房产权人或之一，新购金额 ≥ 转让金额全额退，< 则按新购 ÷ 转让金额的比例退。卖 500 万缴 33.6 万：买 400 万退 26.88 万、买 600 万全退 33.6 万',
                 '已经满五唯一的人换购退不到钱：已缴个税本来就是 0，退税额 = 0 × 比例 = 0。别把「卖了再买能退税」当成年年可吃的红利 —— 它只在你真的缴了税时才有意义',
                 '非住房（商铺、写字楼）不适用满五唯一免征，也不适用换购住房退税（国税发〔2007〕33 号二），装修费也不受住房那档比例上限约束',
-                '装修费须凭税务统一发票、且发票付款人与产权人一致；住房贷款利息凭贷款利息支出凭证按实际发生额扣除；转让收入按实际成交价，网签价明显偏低又无正当理由的，税务机关有权核定'
+                '装修费须凭税务统一发票、且发票付款人与产权人一致；住房贷款利息凭贷款利息支出凭证按实际发生额扣除；转让收入按实际成交价，网签价明显偏低又无正当理由的，税务机关有权核定',
+                // 阶段22 M5 续（v2.4.0）：卖房这一笔不止个税
+                '卖房不止缴个税：住房不满 2 年就卖，按 5% 征收率全额缴增值税（含税价先分离出税额），满 2 年（含）才免征 —— 北上广深的非普通住房满 2 年仍按差额缴，其余地区一律免。它同时是个税的扣除项：500 万的房子不满 2 年卖出，增值税 238095.24 + 附加 14285.71，这两笔进扣除后个税反而少缴约 5 万',
+                '附加的计税依据是实缴的增值税，不是转让收入：增值税免征时附加为 0，别拿收入直接乘 12%；且小规模纳税人（含其他个人）2023-01-01 至 2027-12-31 减半征收城建税与两项附加（财政部 税务总局公告 2023 年第 12 号）',
+                '个人销售住房暂免印花税与土地增值税（财税〔2008〕137 号），但非住房（商铺、写字楼）两项都不免：印花税按产权转移书据 0.5‰、土地增值税按 30%~60% 四级超率累进（这一笔本工具只提示、不代算，可填进「另缴的税金」里计入个税扣除）'
             ],
             compare: [
+                '满 2 年那条线：不满 2 年全额缴增值税，满 2 年免征（北上广深的非普通住房按差额缴）',
+                '附加随增值税：计税依据是实缴增值税，免征时附加一并免；不是按转让收入乘一个率',
+                '住房与非住房：住房免印花税与土地增值税，非住房照征且增值税一律按差额',
                 '查账 vs 核定：有原值凭证必须查账，核定 1%~3% 只是凭证不全时的替代 —— 「哪个省选哪个」不成立',
                 '满五唯一：免的是全部个税，但「唯一」看同一省 / 自治区 / 直辖市范围内，不是全国唯一',
                 '换购退税：已缴个税 × 新购 ÷ 转让金额，与满五唯一免征不叠加（免征时已缴为 0）'
@@ -5985,7 +6012,11 @@
                     otherFees: Number(v.otherFees) || 0,
                     assessRate: Number(v.assessRate) || 0,
                     repurchase: !!v.repurchase, sameCity: !!v.sameCity, isNewOwner: !!v.isNewOwner,
-                    repurchasePrice: Number(v.repurchasePrice) || 0
+                    repurchasePrice: Number(v.repurchasePrice) || 0,
+                    // 阶段22 M5 续（v2.4.0）：增值税与附加、印花税改为本工具自己算
+                    cityGroup: v.cityGroup || 'other', isOrdinary: v.isOrdinary || 'ordinary',
+                    vatBasisPrice: Number(v.vatBasisPrice) || 0,
+                    location: v.location || 'urban', halve: v.halve !== 'no'
                 };
                 var s = Q.stackOf(input);
                 var cmp = Q.assessCompareOf(input);
@@ -5994,7 +6025,22 @@
                 var pct = function (x) { return { value: x, kind: 'percent' }; };
                 var isAssess = s.method === 'assess';
 
+                // 「满 2 年」这条线的对照：同一套房，早卖一年多缴多少
+                var vatCmp = Q.vatOf(Object.assign({}, input, {
+                    holdYears: s.vat.years >= 2 ? 1 : 2
+                }));
+
                 var rows = [{ label: '转让收入（实际成交价）', value: s.price, kind: 'money' }];
+                rows.push({ label: '增值税', value: s.vat.tax, kind: 'money', hint: s.vat.note });
+                rows.push({ label: '城建税及两项附加', value: s.surtax.total, kind: 'money',
+                    hint: s.vat.tax > 0
+                        ? '以实缴增值税 ' + Math.round(s.vat.tax) + ' 元为计税依据；'
+                            + (s.surtax.saved > 0 ? '六税两费减半省了 ' + Math.round(s.surtax.saved) + ' 元' : '按全额附征')
+                        : '增值税免征 → 附加跟着免（计税依据是实缴增值税，不是收入）' });
+                rows.push({ label: '印花税（产权转移书据）', value: s.stamp.tax, kind: 'money',
+                    hint: s.stamp.note });
+                rows.push({ label: '转让环节税金小计', value: s.transferTax, kind: 'money',
+                    hint: '这一笔同时计入个税的扣除项（国税发〔2006〕108 号一（三））' });
                 if (isAssess) {
                     rows.push({ label: '核定征收率', value: s.assessRate, kind: 'percent',
                         hint: '原值凭证不全：按转让收入 1%~3% 核定（省局 / 市局确定）' });
@@ -6002,7 +6048,10 @@
                 } else {
                     rows.push({ label: '减：房屋原值', value: s.basis.value, kind: 'money', hint: s.basis.label });
                     rows.push({ label: '减：转让过程中缴纳的税金', value: s.taxPaidInTransfer, kind: 'money',
-                        hint: '增值税及附加等；住房满 2 年免征增值税时填 0' });
+                        hint: '增值税 ' + Math.round(s.vat.tax) + ' + 附加 ' + Math.round(s.surtax.total)
+                            + ' + 印花税 ' + Math.round(s.stamp.tax)
+                            + (s.otherTaxPaid > 0 ? ' + 另缴 ' + Math.round(s.otherTaxPaid) : '')
+                            + '（自动计入，不用手填）' });
                     rows.push({ label: '减：合理费用', value: s.decoration.allowed + s.loanInterest + s.otherFees,
                         kind: 'money', hint: s.decoration.note });
                     rows.push({ label: '应纳税所得额', value: s.taxable, kind: 'money' });
@@ -6018,8 +6067,23 @@
                         hint: '退还比例 ' + Math.round(s.refund.ratio * 100) + '%（新购 ÷ 转让金额）' });
                 }
                 rows.push({ label: '实际净缴个税', value: s.netTax, kind: 'money' });
+                rows.push({ label: '卖房这一笔要缴的税合计', value: s.total, kind: 'money',
+                    hint: '增值税 + 附加 + 印花税 + 个税（换购退税后）' });
 
                 var extras = [{
+                    title: '早卖一年差多少：住房「满 2 年」那条线',
+                    note: '购买不足 2 年的住房对外销售按 5% 征收率全额缴纳增值税，满 2 年（含）免征；'
+                        + '北上广深的非普通住房满 2 年仍按差额缴 —— 下面两行只换持有年限，其余不变。'
+                        + '增值税免了附加跟着免，但它还是个税的扣除项：免掉的这一笔会让个税反过来多缴一点。',
+                    table: {
+                        head: ['情形', '增值税', '附加', '说明'],
+                        rows: [
+                            ['持有 ' + s.vat.years + ' 年（本例）', money(s.vat.tax), money(s.surtax.total), s.vat.note],
+                            ['持有 ' + vatCmp.years + ' 年', money(vatCmp.tax),
+                                money(Q.surtaxOf(vatCmp.tax, input).total), vatCmp.note]
+                        ]
+                    }
+                }, {
                     title: '核定 1% 能不能选：查账与核定对照',
                     note: cmp.note,
                     table: {
@@ -6080,7 +6144,24 @@
                 }
 
                 var steps = [{
-                    title: '① 应纳税所得额（国税发〔2006〕108 号一）',
+                    title: '① 增值税与附加（卖房这一笔不止个税）',
+                    rows: [
+                        { label: '转让收入（含税）', value: s.price, format: 'money' },
+                        { label: s.vat.mode === 'diff' ? '减：购置原价' : '计税依据',
+                            value: s.vat.base, format: 'money',
+                            note: s.vat.mode === 'diff' ? '按差额计税（财税〔2016〕36 号附件 2 第一条（八））'
+                                : (s.vat.mode === 'full' ? '不足 2 年：按全额计税' : '满 2 年：免征') },
+                        { label: '不含税销售额', value: s.vat.exclusive, format: 'money' },
+                        { label: '× 征收率', value: s.vat.rate, format: 'percent' },
+                        { label: '增值税', value: s.vat.tax, format: 'money' },
+                        { label: '城建税及两项附加', value: s.surtax.total, format: 'money',
+                            note: '以实缴增值税为计税依据；六税两费减半' },
+                        { label: '印花税（产权转移书据）', value: s.stamp.tax, format: 'money' },
+                        { label: '转让环节税金小计', value: s.transferTax, format: 'money' }
+                    ],
+                    footnote: '增值税免了附加跟着免（计税依据是实缴增值税）；这一笔小计同时是第 ② 步里个税的扣除项'
+                }, {
+                    title: '② 应纳税所得额（国税发〔2006〕108 号一）',
                     rows: isAssess ? [
                         { label: '转让收入', value: s.price, format: 'money' },
                         { label: '核定征收率', value: s.assessRate, format: 'percent' },
@@ -6100,7 +6181,7 @@
                     footnote: isAssess ? '原值凭证不全 → 由税务机关按转让收入 1%~3% 核定（108 号三）'
                         : '转让收入按实际成交价；房屋原值含购置价款与缴纳的契税、土地出让金等（108 号二）'
                 }, {
-                    title: '② 满五唯一免征（财税字〔1999〕278 号四）',
+                    title: '③ 满五唯一免征（财税字〔1999〕278 号四）',
                     rows: [
                         { label: '自用年限', value: s.rules.exemption.years, format: 'text',
                             note: '本例 ' + Math.round(input.holdYears) + ' 年' },
@@ -6110,7 +6191,7 @@
                     ],
                     footnote: '自用 5 年以上 且 是家庭唯一生活用房才免征；自用年限从房屋产权证与契税完税凭证里注明时间更早的那个起算'
                 }, {
-                    title: '③ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）',
+                    title: '④ 换购住房退税（财政部 税务总局 住房城乡建设部公告 2026 年第 3 号）',
                     rows: [
                         { label: '已缴个人所得税', value: s.tax, format: 'money' },
                         { label: '新购住房金额', value: s.refund.repurchasePrice, format: 'money' },
@@ -6121,9 +6202,14 @@
                     footnote: '出售住房后 1 年内在同城重新购房、售房人为新购住房产权人或之一；执行至 2027-12-31'
                 }];
 
+                note += '；加上增值税 ' + Math.round(s.vat.tax) + ' 元、附加 ' + Math.round(s.surtax.total)
+                    + ' 元、印花税 ' + Math.round(s.stamp.tax) + ' 元，卖房这一笔合计 '
+                    + Math.round(s.total) + ' 元';
+
                 return {
-                    primary: { label: s.exemptEligible ? '应缴个人所得税（免征）' : '应缴个人所得税',
-                        value: s.tax, kind: 'money' },
+                    // 阶段22 M5 续（v2.4.0）：主结果从「应缴个人所得税」改成**卖房这一笔的全部税** ——
+                    // 用户问的是「卖房要交多少税」，只给个税会漏掉几十万的增值税及附加。
+                    primary: { label: '卖房这一笔要缴的税合计', value: s.total, kind: 'money' },
                     rows: rows, note: note, extras: extras, steps: steps
                 };
             }

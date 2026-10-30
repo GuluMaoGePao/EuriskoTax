@@ -27,8 +27,15 @@
  *      新购金额 ≥ 转让金额**全额退还**已缴个税，< 则按 **新购 ÷ 转让** 的比例退还；
  *   7. **非住房（商铺、写字楼）不适用**满五唯一免征，也**不适用**换购退税（国税发〔2007〕33 号二）。
  *
+ * 阶段22 M5 续（v2.4.0）：卖房这一笔**不止个税**。以前增值税及附加是「调用方传入」的一个数，
+ *   而它同时**是**个税的扣除项 —— 填错一点，个税跟着一起错。现在这一层自己算：
+ *   增值税（住房满 2 年免征、北上广深非普通住房按差额、非住房按差额，5% 征收率）、
+ *   城建税及两项附加（随实缴增值税，免了就免，小规模减半）、印花税（住房免征、非住房 0.5‰），
+ *   再加个税，一屏给出「卖房这一笔要缴多少税」。
+ *
  * 同源：税率、装修费比例上限、免征年限、退税口径全部取注册表声明的 propertyTransferRules；
- *   增值税及附加由调用方传入（口径在 surtax-stamp-quick / vat-quick，不在这里复制一遍）。
+ *   卖房这一层的口径取 propertySaleRules（5% 引 vatRules 的 realestate 档），
+ *   价税分离调 EuriskoVatQuick.priceSplitOf、附加与印花税调 EuriskoSurtaxQuick —— 一条公式都不复制。
  */
 (function (global) {
     'use strict';
@@ -210,6 +217,123 @@
         };
     }
 
+    function round2(x) {
+        return Math.round((Number(x) || 0) * 100) / 100;
+    }
+
+    /** 卖房这一笔的口径（增值税 / 附加 / 印花税 / 土地增值税提示）在 propertySaleRules */
+    function saleRules() {
+        return (global.EuriskoTaxConstants && global.EuriskoTaxConstants.propertySaleRules) || {};
+    }
+
+    /**
+     * 增值税（阶段22 M5 续，v2.4.0）：卖房这一笔**不止个税**，光增值税及附加就能到几十万，
+     * 而它同时还是个税的扣除项 —— 以前让用户自己填，填错一点个税跟着一起错。
+     *
+     * 三种算法（财税〔2016〕36 号附件 3 第五条、附件 2 第一条（八））：
+     *   住房不满 2 年 → 全额 5%；住房满 2 年 → 免征（**北上广深的非普通住房按差额**）；
+     *   非住房 → 按「全部价款 − 购置原价」的差额 5%。
+     * 5% 引 vatRules 的 realestate 档、价税分离调 EuriskoVatQuick.priceSplitOf，这里一条公式都不复制。
+     */
+    function vatOf(input) {
+        input = input || {};
+        var r = saleRules().vat || {};
+        var rate = r.levyRate || 0.05;
+        var residence = isResidence(input);
+        var price = toNumber(input.salePrice);
+        var years = toNumber(input.holdYears);
+        var buyPrice = toNumber(input.vatBasisPrice);
+        var bigFour = input.cityGroup === 'four';
+        var ordinary = input.isOrdinary !== 'nonordinary';
+
+        var mode, base;
+        if (!residence) {
+            mode = 'diff';
+            base = Math.max(0, price - buyPrice);
+        } else if (years < (r.housingExemptYears || 2)) {
+            mode = 'full';
+            base = price;
+        } else if (bigFour && !ordinary) {
+            mode = 'diff';
+            base = Math.max(0, price - buyPrice);
+        } else {
+            mode = 'exempt';
+            base = 0;
+        }
+
+        var split = (base > 0 && global.EuriskoVatQuick)
+            ? global.EuriskoVatQuick.priceSplitOf({ amount: base, rate: rate, taxIncluded: true })
+            : null;
+        var exclusive = split ? split.exclusive : (rate > 0 ? base / (1 + rate) : base);
+        var tax = mode === 'exempt' ? 0 : round2(exclusive * rate);
+
+        var note;
+        if (mode === 'exempt') {
+            note = '购买 2 年以上的住房对外销售免征增值税（财税〔2016〕36 号附件 3 第五条）';
+        } else if (mode === 'full') {
+            note = '购买不足 2 年的住房对外销售：按 5% 征收率全额缴纳增值税，'
+                + '含税 ' + Math.round(price) + ' 元先分离出税额再乘 5%';
+        } else if (!residence) {
+            note = '转让非住房：按全部价款减去购置原价后的差额、5% 征收率计算'
+                + '（财税〔2016〕36 号附件 2 第一条（八））';
+        } else {
+            note = '北上广深满 2 年的非普通住房：按销售收入减去购买住房价款后的差额、5% 征收率计算';
+        }
+
+        return {
+            mode: mode, rate: rate, price: price, buyPrice: buyPrice,
+            base: base, exclusive: round2(exclusive), tax: tax,
+            residence: residence, years: years, bigFour: bigFour, note: note,
+            basis: r.basis
+        };
+    }
+
+    /**
+     * 附加（城建税 + 教育费附加 + 地方教育附加）：计税依据是**实缴增值税** ——
+     * 增值税免了附加跟着免。三档税率与六税两费减半由 surtax-stamp-quick 的 surtaxOf 作答，本文件不重算。
+     */
+    function surtaxOf(vatTax, input) {
+        input = input || {};
+        if (!global.EuriskoSurtaxQuick) {
+            return { total: 0, cityTax: 0, educationTax: 0, localEducationTax: 0, base: 0 };
+        }
+        return global.EuriskoSurtaxQuick.surtaxOf({
+            vat: vatTax,
+            consumption: 0,
+            location: input.location,
+            halve: input.halve
+        });
+    }
+
+    /** 印花税：产权转移书据 0.5‰，**个人销售住房暂免**（财税〔2008〕137 号二）；非住房照征且可减半 */
+    function stampOf(input) {
+        input = input || {};
+        var r = saleRules().stamp || {};
+        var v = vatOf(input);
+        if (isResidence(input)) {
+            return {
+                housing: true, tax: 0, statutoryTax: 0, saving: 0, amount: v.price,
+                note: '对个人销售住房暂免征收印花税（财税〔2008〕137 号二）', basis: r.basis
+            };
+        }
+        var stamp = global.EuriskoSurtaxQuick
+            ? global.EuriskoSurtaxQuick.stampDutyOf({
+                item: r.itemKey, amount: v.price, vat: v.tax, halve: input.halve
+            })
+            : null;
+        return {
+            housing: false,
+            tax: stamp ? stamp.tax : 0,
+            statutoryTax: stamp ? stamp.statutoryTax : 0,
+            saving: stamp ? stamp.saved : 0,
+            amount: v.price,
+            rate: stamp ? stamp.rate : 0.0005,
+            rateText: stamp ? stamp.rateText : '万分之五',
+            note: '产权转移书据按 ' + (stamp ? stamp.rateText : '万分之五') + ' 贴花，计税依据不含单独列明的增值税税款',
+            basis: r.basis
+        };
+    }
+
     /**
      * 完整测算：房屋原值 → 各项扣除 → 应纳税所得额 → 20% 税额 → 免征 → 核定 / 查账 → 换购退税。
      *
@@ -225,7 +349,16 @@
         var residence = isResidence(input);
         var price = toNumber(input.salePrice);
         var basis = basisOf(input);
-        var taxPaid = toNumber(input.vatAndSurcharge);
+        // 阶段22 M5 续（v2.4.0）：增值税及附加、印花税不再是用户手填的一个数，
+        // 而是本文件自己算出来 —— 它们同时是**个税的扣除项**，算错一点个税跟着一起错。
+        var vat = vatOf(input);
+        var surtax = surtaxOf(vat.tax, input);
+        var stamp = stampOf(input);
+        var transferTax = round2(vat.tax + surtax.total + stamp.tax);
+        // 手填的那一栏改成「除了上面这几笔之外、转让过程中另缴的税金」（如土地增值税）
+        var otherTaxPaid = toNumber(input.otherTaxPaid !== undefined
+            ? input.otherTaxPaid : input.vatAndSurcharge);
+        var taxPaid = round2(transferTax + otherTaxPaid);
         var deco = decorationCapOf(input);
         var loanInterest = toNumber(input.loanInterest);
         var otherFees = toNumber(input.otherFees);
@@ -262,6 +395,13 @@
         }
         if (!residence) {
             notes.push('转让非住房：不适用满五唯一免征，也不适用换购住房退税（国税发〔2007〕33 号二）');
+            // 个人销售**住房**暂免土地增值税，非住房不免 —— 这一笔本工具只提示、不计算
+            notes.push('转让非住房还要缴土地增值税（30%~60% 四级超率累进，个人销售住房暂免，'
+                + '财税〔2008〕137 号三）：本工具按你填的「其他已缴税金」计入个税扣除，不代算这一笔');
+        }
+        if (vat.mode !== 'exempt') {
+            notes.push('增值税 ' + Math.round(vat.tax) + ' 元 + 附加 ' + Math.round(surtax.total)
+                + ' 元已经计进个税的「转让过程中缴纳的税金」扣除项 —— 手动估算时最容易漏的正是这一层');
         }
         if (exemptEligible) {
             notes.push('自用 ' + years + ' 年且为家庭唯一生活用房 → 免征个人所得税（财税字〔1999〕278 号四）');
@@ -276,6 +416,11 @@
             isResidence: residence,
             price: price,
             basis: basis,
+            vat: vat,
+            surtax: surtax,
+            stamp: stamp,
+            transferTax: transferTax,
+            otherTaxPaid: otherTaxPaid,
             taxPaidInTransfer: taxPaid,
             decoration: deco,
             loanInterest: loanInterest,
@@ -294,6 +439,8 @@
             tax: finalTax,
             refund: refund,
             netTax: refund.netTax,
+            // 卖房这一笔的**全部**税：增值税 + 附加 + 印花税 + 个税（换购退税后）
+            total: round2(transferTax + refund.netTax),
             notes: notes
         };
     }
@@ -307,6 +454,10 @@
         assessCompareOf: assessCompareOf,
         repurchaseRefundOf: repurchaseRefundOf,
         exemptCompareOf: exemptCompareOf,
+        saleRules: saleRules,
+        vatOf: vatOf,
+        surtaxOf: surtaxOf,
+        stampOf: stampOf,
         stackOf: stackOf
     };
 })(typeof window !== 'undefined' ? window : this);

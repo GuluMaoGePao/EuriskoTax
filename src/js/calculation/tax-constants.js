@@ -1011,6 +1011,52 @@ var vehiclePurchaseTaxRules = {
     basis: '《中华人民共和国车辆购置税法》第三条、第四条、第六条、第七条、第九条、第十条、第十三条，财政部 税务总局公告 2023 年第 10 号'
 };
 
+// 卖房这一笔的全部税（增值税及附加 + 印花税 + 个税）—— 阶段22 M5 续（v2.4.0）
+//
+// property-transfer 此前只算**个税**：增值税及附加以「转让过程中缴纳的税金」的形式让用户自己填
+// （quick 文件注释里那句「增值税及附加由调用方传入」）。可卖房真正要缴的税不止个税 ——
+// 一套不满 2 年就卖掉的房子，光增值税及附加就能到 25 万，而它同时还**是**个税的扣除项：
+// 填错一点，个税跟着一起错。所以这里把这一层补成组合器（照 property-rental 的写法）。
+//
+// 同一个「能引的就引」的原则：
+//   · 5% 的征收率 → 引 vatRules.smallScale.levyRates 的 realestate 档，不抄一个 0.05；
+//   · 价税分离 → 调 EuriskoVatQuick.priceSplitOf，本文件不自己除；
+//   · 附加的三档税率与减半 → 调 EuriskoSurtaxQuick.surtaxOf，这里只记「附加随增值税、免了就免」；
+//   · 产权转移书据印花税的税率与减半 → 在 stampDutyRules.items，这里只记税目 key 与「住房免征」。
+// 真正独属于卖房的只有四样：2 年那条线、北上广深非普通住房按差额、非住房按差额、
+// 以及个人销售住房暂免土地增值税（非住房不免，本工具只提示不计算）。
+var propertySaleRules = {
+    vat: {
+        levyRate: vatRules.smallScale.levyRates[1].rate,   // 销售不动产的征收率 5%
+        housingExemptYears: 2,        // 购买 **2 年以上（含 2 年）** 的住房对外销售免征增值税
+        // 北上广深**满 2 年的非普通住房**按差额，普通住房才免（其余地区满 2 年一律免）
+        bigFour: {
+            cities: '北京市、上海市、广州市、深圳市',
+            nonOrdinaryByDiff: true
+        },
+        nonHousingByDiff: true,       // 非住房（商铺 / 写字楼）：按「全部价款 − 购置原价」的差额
+        formula: '含税销售额 ÷ (1 + 5%) × 5%；差额计税的先减购置原价再分离',
+        basis: '《营业税改征增值税试点过渡政策的规定》第五条（财税〔2016〕36 号附件 3）、'
+            + '《营业税改征增值税试点有关事项的规定》第一条（八）（财税〔2016〕36 号附件 2）'
+    },
+    surtax: {
+        followVat: true,              // 计税依据是**实缴增值税**：增值税免了，附加跟着免
+        halve: true,                  // 小规模纳税人（含其他个人）六税两费减半
+        basis: '《中华人民共和国城市维护建设税法》第二条、财政部 税务总局公告 2023 年第 12 号第一条'
+    },
+    stamp: {
+        itemKey: 'propertyTransfer',  // 税率（0.5‰）与减半规则在 stampDutyRules.items，这里只记税目
+        housingExempt: true,          // 对个人**销售住房**暂免征收印花税
+        basis: '《中华人民共和国印花税法》税目税率表、《关于调整房地产交易环节税收政策的通知》第二条（财税〔2008〕137 号）'
+    },
+    landVat: {
+        housingExempt: true,          // 对个人销售住房暂免征收土地增值税
+        note: '非住房（商铺 / 写字楼）不免税，按 30%~60% 四级超率累进，'
+            + '扣除项还要区分「取得成本 + 开发费用 + 加计 20%」，本工具只提示、不计算',
+        basis: '《关于调整房地产交易环节税收政策的通知》第三条（财税〔2008〕137 号）、《中华人民共和国土地增值税暂行条例》'
+    }
+};
+
 // 17D-13（v1.69.0）：非居民个人 / 无住所个人 —— 这一类人进门要解决的不是「扣多少」，
 // 而是「**这笔钱要不要在中国缴**」：90 天 / 183 天 / 满六年三道门槛决定哪些钱压根不用缴。
 // 月度税率表不在这里复制 —— 与年终奖单独计税共用 `bonusMonthlyTaxRates`。
@@ -1208,6 +1254,7 @@ window.EuriskoTaxConstants = {
     rentalRules: rentalRules,
     deedTaxRules: deedTaxRules,
     vehiclePurchaseTaxRules: vehiclePurchaseTaxRules,
+    propertySaleRules: propertySaleRules,
     disabilityFundRules: disabilityFundRules,
     unionFeeRules: unionFeeRules,
     MIN_SOCIAL_SECURITY_BASE: MIN_SOCIAL_SECURITY_BASE,
